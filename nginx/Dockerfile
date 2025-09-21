@@ -9,7 +9,7 @@ COPY ./nginx/nginx.conf /etc/nginx/conf.d/default.conf
 RUN rm -rf /etc/nginx/sites-enabled/website
 RUN rm -rf /etc/nginx/sites-available/website
 
-RUN mkdir -p /etc/nginx/sites-enabled/
+RUN mkdir -p /etc/nginx/sites-enabled
 RUN mkdir -p /etc/nginx/sites-available
 
 COPY ./nginx/nginx.conf /etc/nginx/sites-available/website
