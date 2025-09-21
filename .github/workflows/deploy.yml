@@ -61,7 +61,7 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          echo '${{secrets.PRIVATE_KEY}}' > /tmp/temp_key
+          echo '${{secrets.AWS_PRIVATE_KEY}}' > /tmp/temp_key
           chmod 600 /tmp/temp_key
 
           # Delete files on remote server
