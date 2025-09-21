@@ -1,6 +1,6 @@
 {
-  "name": "aws-nextjs-app",
-  "version": "0.1.0",
+  "name": "boudreaux",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -10,10 +10,10 @@
     "lint": "eslint",
     "sync:cdn": "npx tsx scripts/sync-cdn.ts",
     "sync:cdn:no-build": "SKIP_BUILD=true npx tsx scripts/sync-cdn.ts",
-    "docker:build:website": "docker build -t ghcr.io/mkelley33/aws-nextjs-app/website:latest .",
-    "docker:push:website": "docker push ghcr.io/mkelley33/aws-nextjs-app/website:latest",
-    "docker:build:nginx": "docker build -t ghcr.io/mkelley33/aws-nextjs-app/nginx:latest .",
-    "docker:push:nginx": "docker push ghcr.io/mkelley33/aws-nextjs-app/nginx:latest",
+    "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website:latest .",
+    "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website:latest",
+    "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx:latest .",
+    "docker:push:nginx": "docker push ghcr.io/braveneworg/boudreaux/nginx:latest",
     "docker:publish:website": "npm run docker:build:website && npm run docker:push:website",
     "docker:publish:nginx": "npm run docker:build:nginx && npm run docker:push:nginx"
   },

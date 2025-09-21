@@ -1,5 +1,10 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Publish to ghcr.io
+
+```bash
+docker build -t ghcr.io/braveneworg/boudreaux:latest
+
 ## Getting Started
 
 First, run the development server:
