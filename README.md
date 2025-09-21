@@ -25,6 +25,11 @@ docker build -t ghcr.io/braveneworg/boudreaux/nginx:latest .
 docker push ghcr.io/braveneworg/boudreaux/nginx:latest
 ```
 
+**Make sure the following .env variables are set:
+
+- NEXT_APP_WEBSITE_IMAGE=ghcr.io/org-or-user/repo-name/website:latest
+- NEXT_APP_NGINX_IMAGE=ghcr.io/org-or-user/repo-name/nginx:latest
+
 ## Getting Started
 
 First, run the development server:
