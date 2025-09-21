@@ -1,10 +1,233 @@
 <!DOCTYPE html>
-<html>
-<head>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>CDN - Static Assets Only</title>
-</head>
-<body>
-    <h1>This is a CDN for static assets only</h1>
-    <p>Please access specific files, not the root.</p>
-</body>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .notice {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .notice h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #ff6b6b;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .notice p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            transform: perspective(1000px) rotateX(5deg);
+            transition: transform 0.3s ease;
+        }
+
+        .video-container:hover {
+            transform: perspective(1000px) rotateX(0deg) scale(1.02);
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        }
+
+        iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .message {
+            margin-top: 30px;
+            font-size: 1.2rem;
+            color: #ffd700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        .sparkles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .sparkle {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0;
+            animation: sparkle 3s linear infinite;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.3);
+            }
+            to {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.6);
+            }
+        }
+
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0) rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .notice h1 {
+                font-size: 1.2rem;
+            }
+
+            .notice p {
+                font-size: 1rem;
+            }
+
+            .message {
+                font-size: 1rem;
+            }
+
+            .video-container {
+                transform: none;
+            }
+
+            .video-container:hover {
+                transform: scale(1.02);
+            }
+        }
+    </style>
+  </head>
+  <body>
+    <div class="sparkles" id="sparkles"></div>
+
+    <div class="container">
+        <div class="notice">
+            <h1>⚠️ CDN Notice</h1>
+            <p>This is a CDN for static assets only. Please access specific files, not the root.</p>
+        </div>
+
+        <div class="video-container">
+            <div class="video-wrapper">
+                <iframe
+                    src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&loop=1&playlist=dQw4w9WgXcQ&controls=1&showinfo=0&rel=0&modestbranding=1"
+                    title="Never Gonna Give You Up - Rick Astley"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+
+        <div class="message">
+            🎵 Never gonna give you up, never gonna let you down! 🎵
+        </div>
+    </div>
+
+    <script>
+        // Create floating sparkles
+        function createSparkle() {
+            const sparkle = document.createElement('div');
+            sparkle.className = 'sparkle';
+
+            const size = Math.random() * 4 + 2;
+            sparkle.style.width = size + 'px';
+            sparkle.style.height = size + 'px';
+            sparkle.style.left = Math.random() * window.innerWidth + 'px';
+            sparkle.style.top = Math.random() * window.innerHeight + 'px';
+            sparkle.style.animationDelay = Math.random() * 3 + 's';
+
+            document.getElementById('sparkles').appendChild(sparkle);
+
+            setTimeout(() => {
+                sparkle.remove();
+            }, 3000);
+        }
+
+        // Create sparkles periodically
+        setInterval(createSparkle, 500);
+
+        // Initial sparkles
+        for (let i = 0; i < 10; i++) {
+            setTimeout(createSparkle, i * 200);
+        }
+
+        // Add some fun console messages
+        console.log("🎵 Never gonna give you up! 🎵");
+        console.log("You've been Rick Rolled! 😄");
+        console.log("This CDN is for static assets only.");
+    </script>
+  </body>
 </html>
