@@ -34,7 +34,7 @@ export default async function Home() {
           >
             <Image
               className="dark:invert"
-              src="/vercel.svg"
+              src="/media/vercel.svg"
               alt="Vercel logomark"
               width={20}
               height={20}
