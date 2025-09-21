@@ -19,16 +19,16 @@ runner.
 ## Publish to ghcr.io
 
 ```bash
-docker build -t ghcr.io/org-or-user/repo-name/website:latest .
-docker push ghcr.io/org-or-user/repo-name/website:latest
-docker build -t ghcr.io/org-or-user/repo-name/nginx:latest .
-docker push ghcr.io/org-or-user/repo-name/nginx:latest
+docker build -t ghcr.io/org-or-user/repo-name/website .
+docker push ghcr.io/org-or-user/repo-name/website
+docker build -t ghcr.io/org-or-user/repo-name/nginx .
+docker push ghcr.io/org-or-user/repo-name/nginx
 ```
 
 **Make sure the following .env variables are set:
 
-- NEXT_APP_WEBSITE_IMAGE=ghcr.io/org-or-user/repo-name/website:latest
-- NEXT_APP_NGINX_IMAGE=ghcr.io/org-or-user/repo-name/nginx:latest
+- NEXT_APP_WEBSITE_IMAGE=ghcr.io/org-or-user/repo-name/website
+- NEXT_APP_NGINX_IMAGE=ghcr.io/org-or-user/repo-name/nginx
 
 ## Getting Started
 
