@@ -1,0 +1,145 @@
+name: Continuous Integration and Delivery
+
+on:
+  push:
+    branches: [main]
+env:
+  NEXT_APP_WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/website
+  NEXT_APP_NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/nginx
+  NEXT_APP_CDN_DOMAIN: cdn.fakefourrecords.com
+  REGISTRY: ghcr.io
+jobs:
+  build:
+    name: Build All Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v3
+
+      - name: Set environment variables
+        run: |
+          echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/website" >> $GITHUB_ENV
+          echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/nginx" >> $GITHUB_ENV
+          echo "NEXT_APP_CDN_DOMAIN=${{ env.NEXT_APP_CDN_DOMAIN }}" >> $GITHUB_ENV
+      - name: Log in to GitHub Packages
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          NGINX_SERVER_NAME: ${{ secrets.NGINX_SERVER_NAME }}
+        run: echo "$PERSONAL_ACCESS_TOKEN" | docker login ghcr.io -u ${{ secrets.NAMESPACE }} --password-stdin
+
+      - name: Build images
+        run: |
+          docker compose -f docker-compose.ci.yml build
+      - name: Push images
+        run: |
+          docker push ${{ env.NEXT_APP_WEBSITE_IMAGE }}
+          docker push ${{ env.NEXT_APP_NGINX_IMAGE }}
+  deploy:
+    name: Deploy to AWS EC2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v3
+      - name: Add environment variables to .env
+        run: |
+          echo 'NEXT_APP_WEBSITE_IMAGE="${{ env.NEXT_APP_WEBSITE_IMAGE }}"' >> .env
+          echo 'NEXT_APP_NGINX_IMAGE="${{ env.NEXT_APP_NGINX_IMAGE }}"' >> .env
+          echo 'NAMESPACE="${{ secrets.NAMESPACE }}"' >> .env
+          echo 'PERSONAL_ACCESS_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"' >> .env
+          echo 'NEXT_APP_CDN_DOMAIN="${{ env.NEXT_APP_CDN_DOMAIN }}"' >> .env
+      - name: Add the private SSH key to the ssh-agent
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          mkdir -p ~/.ssh
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh-add - <<< "${{ secrets.PRIVATE_KEY }}"
+      - name: Deploy images on AWS EC2
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          echo '${{secrets.PRIVATE_KEY}}' > /tmp/temp_key
+          chmod 600 /tmp/temp_key
+
+          # Delete files on remote server
+          ssh -i /tmp/temp_key -o StrictHostKeyChecking=no ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }} "rm -f .env docker-compose.prod.yml"
+          # Copy files to remote server
+
+          echo '${{secrets.AWS_PRIVATE_KEY}}' > ./private_key.pem
+          echo '${{secrets.AWS_CERTIFICATE}}' > ./certificate.pem
+          chmod 644 ./certificate.pem
+          chmod 600 ./private_key.pem
+          scp -i /tmp/temp_key -o StrictHostKeyChecking=no -r ./.env ./docker-compose.prod.yml ./private_key.pem ./certificate.pem ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }}:
+
+          # SSH and execute deployment commands
+          ssh -i /tmp/temp_key -o StrictHostKeyChecking=no ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }} \
+            NEXT_APP_WEBSITE_IMAGE='${{env.NEXT_APP_WEBSITE_IMAGE}}' NEXT_APP_NGINX_IMAGE='${{env.NEXT_APP_NGINX_IMAGE}}' PERSONAL_ACCESS_TOKEN='${{secrets.PERSONAL_ACCESS_TOKEN}}' NAMESPACE='${{secrets.NAMESPACE}}' \
+            bash << 'EOF'
+            set -e  # Exit on any error
+
+            # Validate required variables
+            if [ -z "${NEXT_APP_WEBSITE_IMAGE}" ] || [ -z "${NEXT_APP_NGINX_IMAGE}" ]; then
+              echo "Error: Required environment variables are missing"
+              exit 1
+            fi
+
+            # Update package lists
+            sudo apt-get update
+
+            # Remove conflicting packages
+            sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
+
+            # Install prerequisites
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+            # Set up Docker repository (only if not already done)
+            if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
+              sudo install -m 0755 -d /etc/apt/keyrings
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+              sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+              # Add Docker repository
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+              sudo apt-get update
+            fi
+
+            # Install Docker from official repository (remove docker.io conflict)
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+            # Start Docker service
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            # Add user to docker group
+            sudo usermod -aG docker $USER
+
+            # Stop existing containers and clean up
+            sudo docker compose -f docker-compose.prod.yml down --rmi all -v 2>/dev/null || true
+
+            # Login to container registry
+            echo "${PERSONAL_ACCESS_TOKEN}" | sudo docker login ghcr.io -u "${NAMESPACE}" --password-stdin
+
+            # Pull latest images with proper quoting
+            sudo docker pull "${NEXT_APP_WEBSITE_IMAGE}"
+            sudo docker pull "${NEXT_APP_NGINX_IMAGE}"
+
+            # Deploy with docker compose using .env file
+
+            sudo docker compose -f docker-compose.prod.yml up -d
+
+            # Logout and cleanup
+            sudo docker logout
+
+            # Clean up unused images and containers
+            sudo docker system prune -f
+
+            echo $WORKDIR
+
+            echo "Deployment completed successfully"
+          EOF
+
+          # Clean up temporary SSH key
+          rm /tmp/temp_key

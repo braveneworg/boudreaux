@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  website:
+    image: '${NEXT_APP_WEBSITE_IMAGE}'
+    container_name: website
+    restart: unless-stopped
+    expose:
+      - '3000'
+    networks:
+      - app-network
+
+  nginx:
+    secrets:
+      - ssl_cert
+      - ssl_key
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+      cache_from:
+        - '${NEXT_APP_NGINX_IMAGE}'
+    container_name: nginx
+    image: '${NEXT_APP_NGINX_IMAGE}'
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - website
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+secrets:
+  ssl_cert:
+    file: ./certificate.pem
+  ssl_key:
+    file: ./private_key.pem
