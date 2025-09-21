@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Purpose
+
+To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub Actions, and AWS EC2.
+
 ## Set github secrets
 - AWS_CERTIFICATE - the certificate exported ACM certificate in PEM format
 - AWS_EC2_IP_ADDRESS - the public IP address of the EC2 instance (elastic IP recommended)
