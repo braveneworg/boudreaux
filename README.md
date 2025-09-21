@@ -3,7 +3,11 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Publish to ghcr.io
 
 ```bash
-docker build -t ghcr.io/braveneworg/boudreaux:latest
+docker build -t ghcr.io/braveneworg/boudreaux/website:latest .
+docker push ghcr.io/braveneworg/boudreaux/website:latest
+docker build -t ghcr.io/braveneworg/boudreaux/nginx:latest .
+docker push ghcr.io/braveneworg/boudreaux/nginx:latest
+```
 
 ## Getting Started
 
