@@ -15,7 +15,7 @@ runner.
 - Assign an elastic IP address to the instance
 - Open port 22 (SSH), 80 (HTTP), and 443 (HTTPS)
 - Be sure to add ssh user to sudoers file
-
+- Also remove any password requirement for sudo
 ## Publish to ghcr.io
 
 ```bash
