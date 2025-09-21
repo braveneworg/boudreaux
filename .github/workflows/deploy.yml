@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
 env:
-  NEXT_APP_WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website:latest
-  NEXT_APP_NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx:latest
+  NEXT_APP_WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
+  NEXT_APP_NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
   NEXT_APP_CDN_DOMAIN: cdn.fakefourrecords.com
   REGISTRY: ghcr.io
 jobs:
