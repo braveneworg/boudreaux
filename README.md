@@ -19,10 +19,10 @@ runner.
 ## Publish to ghcr.io
 
 ```bash
-docker build -t ghcr.io/braveneworg/boudreaux/website:latest .
-docker push ghcr.io/braveneworg/boudreaux/website:latest
-docker build -t ghcr.io/braveneworg/boudreaux/nginx:latest .
-docker push ghcr.io/braveneworg/boudreaux/nginx:latest
+docker build -t ghcr.io/org-or-user/repo-name/website:latest .
+docker push ghcr.io/org-or-user/repo-name/website:latest
+docker build -t ghcr.io/org-or-user/repo-name/nginx:latest .
+docker push ghcr.io/org-or-user/repo-name/nginx:latest
 ```
 
 **Make sure the following .env variables are set:
