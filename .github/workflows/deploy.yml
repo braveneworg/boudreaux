@@ -18,8 +18,8 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/website" >> $GITHUB_ENV
-          echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/nginx" >> $GITHUB_ENV
+          echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/website" >> $GITHUB_ENV
+          echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/nginx" >> $GITHUB_ENV
           echo "NEXT_APP_CDN_DOMAIN=${{ env.NEXT_APP_CDN_DOMAIN }}" >> $GITHUB_ENV
       - name: Log in to GitHub Packages
         env:
