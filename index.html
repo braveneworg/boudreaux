@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex, nofollow">
     <title>CDN - Static Assets Only</title>
     <style>
         * {
@@ -33,20 +32,8 @@
         }
 
         .notice {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
             padding: 20px;
             margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .notice h1 {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-            color: #ff6b6b;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .notice p {
@@ -170,20 +157,19 @@
             }
         }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="sparkles" id="sparkles"></div>
 
     <div class="container">
         <div class="notice">
-            <h1>⚠️ CDN Notice</h1>
-            <p>This is a CDN for static assets only. Please access specific files, not the root.</p>
+            <p>⚠️ This is a CDN for static assets only. Please access specific files, not the root.</p>
         </div>
 
         <div class="video-container">
             <div class="video-wrapper">
                 <iframe
-                    src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ&controls=1&showinfo=0&rel=0&modestbranding=1"
+                    src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&loop=1&playlist=dQw4w9WgXcQ&controls=1&showinfo=0&rel=0&modestbranding=1"
                     title="Never Gonna Give You Up - Rick Astley"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen>
@@ -229,5 +215,5 @@
         console.log("You've been Rick Rolled! 😄");
         console.log("This CDN is for static assets only.");
     </script>
-  </body>
+</body>
 </html>
