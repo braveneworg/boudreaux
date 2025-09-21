@@ -223,7 +223,7 @@ class CDNSync {
   private async syncStaticFiles(): Promise<void> {
     this.log('Syncing Next.js static files...');
 
-    const staticDir = join(this.config.buildDir, 'static');
+    const staticDir = join(this.config.buildDir, 'media');
     if (!existsSync(staticDir)) {
       this.log('No static files found to sync', 'warning');
       return;
