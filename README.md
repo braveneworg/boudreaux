@@ -10,6 +10,12 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - PERSONAL_ACCESS_TOKEN - a GitHub personal access token with `read:packages` and `write:packages` permissions
 runner.
 
+# EC 2 instance setup
+- Launch an EC2 instance (Amazon Linux 2 or Ubuntu)
+- Assign an elastic IP address to the instance
+- Open port 22 (SSH), 80 (HTTP), and 443 (HTTPS)
+- Be sure to add ssh user to sudoers file
+
 ## Publish to ghcr.io
 
 ```bash
