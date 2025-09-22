@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production'
-    ? process.env.NEXT_APP_CDN_DOMAIN
-    : process.env.NEXT_APP_CDN_DOMAIN || 'boogers',
+    ? 'media'
+    : '',
 
   // Configure images for CDN
   images: {
