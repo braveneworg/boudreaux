@@ -6,7 +6,6 @@ on:
 env:
   NEXT_APP_WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
   NEXT_APP_NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
-  NEXT_APP_CDN_DOMAIN: cdn.fakefourrecords.com
   REGISTRY: ghcr.io
 jobs:
   build:
@@ -20,7 +19,6 @@ jobs:
         run: |
           echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/website" >> $GITHUB_ENV
           echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/nginx" >> $GITHUB_ENV
-          echo "NEXT_APP_CDN_DOMAIN=${{ env.NEXT_APP_CDN_DOMAIN }}" >> $GITHUB_ENV
       - name: Log in to GitHub Packages
         env:
           PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -48,7 +46,6 @@ jobs:
           echo 'NEXT_APP_NGINX_IMAGE="${{ env.NEXT_APP_NGINX_IMAGE }}"' >> .env
           echo 'NAMESPACE="${{ secrets.NAMESPACE }}"' >> .env
           echo 'PERSONAL_ACCESS_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"' >> .env
-          echo 'NEXT_APP_CDN_DOMAIN="${{ env.NEXT_APP_CDN_DOMAIN }}"' >> .env
       - name: Add the private SSH key to the ssh-agent
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
