@@ -6,7 +6,7 @@
  */
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
-import { S3Client, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, HeadObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { execSync, spawn } from 'child_process';
 import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
@@ -46,9 +46,10 @@ interface SyncConfig {
   cloudFrontDistributionId?: string;
   cdnDomain: string;
   buildDir: string;
-  publicDir: string;
+  mediaDir: string;
   skipBuild: boolean;
   skipInvalidation: boolean;
+  skipCleanup: boolean;
   awsRegion: string;
 }
 
@@ -79,9 +80,10 @@ class CDNSync {
       cloudFrontDistributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID,
       cdnDomain: process.env.CDN_DOMAIN || 'not found', // CloudFront domain, not S3
       buildDir: '.next',
-      publicDir: 'public/.',
+      mediaDir: join('public', 'media'),
       skipBuild: process.env.SKIP_BUILD === 'true',
       skipInvalidation: process.env.SKIP_INVALIDATION === 'true',
+      skipCleanup: process.env.SKIP_CLEANUP === 'true',
       awsRegion: process.env.AWS_REGION || 'us-east-1'
     };
   }
@@ -236,22 +238,24 @@ class CDNSync {
 
     await this.uploadFiles(filesToUpload);
     this.log(`Uploaded ${filesToUpload.length} static files`, 'success');
-  }  private async syncPublicFiles(): Promise<void> {
-    this.log('Syncing public directory files...');
+  }
 
-    if (!existsSync(this.config.publicDir)) {
-      this.log('Public directory not found, skipping', 'warning');
+  private async syncMediaFiles(): Promise<void> {
+    this.log('Syncing media directory files...');
+
+    if (!existsSync(this.config.mediaDir)) {
+      this.log('Media directory not found, skipping', 'warning');
       return;
     }
 
     // Sync non-HTML files with longer cache
-    const regularFiles = this.getFilesToUpload(this.config.publicDir, 'media', {
+    const regularFiles = this.getFilesToUpload(this.config.mediaDir, 'media', {
       cacheControl: 'public, max-age=86400',
       excludePatterns: ['*.html', '*.DS_Store']
     });
 
     // Sync HTML files with shorter cache
-    const htmlFiles = this.getFilesToUpload(this.config.publicDir, 'media', {
+    const htmlFiles = this.getFilesToUpload(this.config.mediaDir, 'media', {
       cacheControl: 'public, max-age=300',
       excludePatterns: ['*.DS_Store']
     }).filter(file => file.localPath.endsWith('.html'));
@@ -260,9 +264,9 @@ class CDNSync {
 
     if (allFiles.length > 0) {
       await this.uploadFiles(allFiles);
-      this.log(`Uploaded ${allFiles.length} public files`, 'success');
+      this.log(`Uploaded ${allFiles.length} media files`, 'success');
     } else {
-      this.log('No public files to sync', 'warning');
+      this.log('No media files to sync', 'warning');
     }
   }
 
@@ -368,6 +372,60 @@ class CDNSync {
     await Promise.all(uploadPromises);
   }
 
+  private async clearS3MediaDirectory(): Promise<void> {
+    this.log('Clearing existing media files from S3...');
+
+    try {
+      // List all objects with the 'media/' prefix
+      const listCommand = new ListObjectsV2Command({
+        Bucket: this.config.s3Bucket,
+        Prefix: 'media/'
+      });
+
+      const response = await this.s3Client.send(listCommand);
+
+      if (!response.Contents || response.Contents.length === 0) {
+        this.log('No existing media files found in S3', 'info');
+        return;
+      }
+
+      // Delete objects in batches (S3 allows max 1000 objects per delete request)
+      const objectsToDelete = response.Contents.map(obj => ({ Key: obj.Key! }));
+
+      const deleteCommand = new DeleteObjectsCommand({
+        Bucket: this.config.s3Bucket,
+        Delete: {
+          Objects: objectsToDelete,
+          Quiet: false
+        }
+      });
+
+      const deleteResponse = await this.s3Client.send(deleteCommand);
+
+      const deletedCount = deleteResponse.Deleted?.length || 0;
+      const errorCount = deleteResponse.Errors?.length || 0;
+
+      this.log(`Successfully deleted ${deletedCount} files from S3`, 'success');
+
+      if (errorCount > 0) {
+        this.log(`Failed to delete ${errorCount} files`, 'warning');
+        deleteResponse.Errors?.forEach(error => {
+          this.log(`Error deleting ${error.Key}: ${error.Message}`, 'error');
+        });
+      }
+
+      // Handle pagination if there are more than 1000 objects
+      if (response.IsTruncated) {
+        this.log('More files to delete, continuing...', 'info');
+        await this.clearS3MediaDirectory(); // Recursive call for remaining files
+      }
+
+    } catch (error: unknown) {
+      this.log(`Failed to clear S3 media directory: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      throw error;
+    }
+  }
+
   private async setContentTypes(): Promise<void> {
     this.log('Content types are set during upload - skipping post-processing', 'info');
     // Content types are now set automatically during upload via mime.getType()
@@ -414,7 +472,7 @@ class CDNSync {
     // Test files in media directory
     const testFiles = [
       'media/_next/static/chunks/webpack.js',
-      'media/next.svg', // from public directory
+      'media/next.svg', // from public/media directory
       'media/index.html' // if you have HTML files
     ];
 
@@ -450,10 +508,17 @@ class CDNSync {
       await this.buildApplication();
       this.validateBuildDirectory();
 
+      // Clear existing media files first (unless skipped)
+      if (!this.config.skipCleanup) {
+        await this.clearS3MediaDirectory();
+      } else {
+        this.log('Skipping S3 cleanup (SKIP_CLEANUP=true)', 'warning');
+      }
+
       // Sync files
+      await this.syncMediaFiles();
       await this.syncStaticFiles();
-      await this.syncPublicFiles();
-      await this.syncMediaAssets();
+      await this.syncMediaAssets()  ;
 
       // Optimize
       await this.setContentTypes();
@@ -480,6 +545,24 @@ class CDNSync {
 if (require.main === module) {
   const cdnSync = new CDNSync();
   cdnSync.run();
+}
+
+// Copy files down from cdn.fakefourrecords.com/media directory to public/media
+// This makes sure we always have the latest media files locally for development
+const cdnMediaDir = 'cdn.fakefourrecords.com/media';
+// Create the publicMediaDir if it doesn't exist
+const publicMediaDir = join(process.cwd(), 'public', 'media');
+
+if (!existsSync(publicMediaDir)) {
+  execSync(`mkdir -p ${publicMediaDir}`);
+  console.log(`${colors.green}[CDN-SYNC]${colors.reset} Created directory: ${publicMediaDir}`);
+}
+
+if (existsSync(cdnMediaDir)) {
+  execSync(`cp -r ${cdnMediaDir}/* ${publicMediaDir}/`);
+  console.log(`${colors.green}[CDN-SYNC]${colors.reset} Copied media files from ${cdnMediaDir} to ${publicMediaDir}`);
+} else {
+  console.log(`${colors.yellow}[CDN-SYNC]${colors.reset} No media files found at ${cdnMediaDir}, skipping copy`);
 }
 
 export default CDNSync;
