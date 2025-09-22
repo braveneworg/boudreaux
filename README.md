@@ -29,7 +29,7 @@ runner.
 - Be sure to add ssh user to sudoers file
   `sudo usermod -aG sudo your-ssh-user`
 - Also remove any password requirement for sudo
-  `sudo passwd -d professorx`
+  `sudo passwd -d your-ssh-user`
 
 ## Publish to ghcr.io
 
