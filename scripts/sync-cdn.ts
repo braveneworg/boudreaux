@@ -223,13 +223,13 @@ class CDNSync {
   private async syncStaticFiles(): Promise<void> {
     this.log('Syncing Next.js static files...');
 
-    const staticDir = join(this.config.buildDir, 'media');
+    const staticDir = join(this.config.buildDir, 'static');
     if (!existsSync(staticDir)) {
       this.log('No static files found to sync', 'warning');
       return;
     }
 
-    const filesToUpload = this.getFilesToUpload(staticDir, '_next/static', {
+    const filesToUpload = this.getFilesToUpload(staticDir, 'media/_next/static', {
       cacheControl: 'public, max-age=31536000, immutable',
       excludePatterns: ['*.map', '*.DS_Store']
     });
@@ -245,13 +245,13 @@ class CDNSync {
     }
 
     // Sync non-HTML files with longer cache
-    const regularFiles = this.getFilesToUpload(this.config.publicDir, '/media/.', {
+    const regularFiles = this.getFilesToUpload(this.config.publicDir, 'media', {
       cacheControl: 'public, max-age=86400',
       excludePatterns: ['*.html', '*.DS_Store']
     });
 
     // Sync HTML files with shorter cache
-    const htmlFiles = this.getFilesToUpload(this.config.publicDir, '/media/.', {
+    const htmlFiles = this.getFilesToUpload(this.config.publicDir, 'media', {
       cacheControl: 'public, max-age=300',
       excludePatterns: ['*.DS_Store']
     }).filter(file => file.localPath.endsWith('.html'));
@@ -263,6 +263,37 @@ class CDNSync {
       this.log(`Uploaded ${allFiles.length} public files`, 'success');
     } else {
       this.log('No public files to sync', 'warning');
+    }
+  }
+
+  private async syncMediaAssets(): Promise<void> {
+    this.log('Syncing additional media assets...');
+
+    // Define directories that might contain media assets
+    const mediaDirs = ['music', 'images', 'videos'];
+    let totalFiles = 0;
+
+    for (const dir of mediaDirs) {
+      if (existsSync(dir)) {
+        this.log(`Found ${dir} directory, syncing...`);
+
+        const files = this.getFilesToUpload(dir, `media/${dir}`, {
+          cacheControl: 'public, max-age=86400',
+          excludePatterns: ['*.DS_Store', '*.tmp']
+        });
+
+        if (files.length > 0) {
+          await this.uploadFiles(files);
+          totalFiles += files.length;
+          this.log(`✓ Synced ${files.length} files from ${dir}/`, 'success');
+        }
+      }
+    }
+
+    if (totalFiles > 0) {
+      this.log(`Total media files synced: ${totalFiles}`, 'success');
+    } else {
+      this.log('No additional media assets found to sync', 'info');
     }
   }
 
@@ -380,19 +411,29 @@ class CDNSync {
   }
 
   private async testSampleFile(): Promise<void> {
-    const sampleFile = '_next/static/chunks/webpack.js';
+    // Test files in media directory
+    const testFiles = [
+      'media/_next/static/chunks/webpack.js',
+      'media/next.svg', // from public directory
+      'media/index.html' // if you have HTML files
+    ];
 
-    try {
-      const command = new HeadObjectCommand({
-        Bucket: this.config.s3Bucket,
-        Key: sampleFile
-      });
+    for (const sampleFile of testFiles) {
+      try {
+        const command = new HeadObjectCommand({
+          Bucket: this.config.s3Bucket,
+          Key: sampleFile
+        });
 
-      await this.s3Client.send(command);
-      this.log(`Sample file confirmed: ${this.config.cdnDomain}/${sampleFile}`, 'success');
-    } catch {
-      // Sample file might not exist, which is okay
+        await this.s3Client.send(command);
+        this.log(`✓ Sample file confirmed: ${this.config.cdnDomain}/${sampleFile}`, 'success');
+        return; // Exit after finding first successful file
+      } catch {
+        // Try next file
+      }
     }
+
+    this.log('Could not confirm any sample files (this might be normal)', 'warning');
   }
 
   public async run(): Promise<void> {
@@ -412,6 +453,7 @@ class CDNSync {
       // Sync files
       await this.syncStaticFiles();
       await this.syncPublicFiles();
+      await this.syncMediaAssets();
 
       // Optimize
       await this.setContentTypes();
