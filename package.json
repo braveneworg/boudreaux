@@ -18,7 +18,12 @@
     "docker:publish:nginx": "npm run docker:build:nginx && npm run docker:push:nginx"
   },
   "dependencies": {
+    "@auth/mongodb-adapter": "^3.10.0",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.18.2",
     "next": "15.5.0",
+    "next-auth": "^5.0.0-beta.29",
+    "nodemailer": "^6.10.1",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
