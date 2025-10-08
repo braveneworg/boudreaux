@@ -9,15 +9,9 @@ import { redirect } from 'next/navigation';
 import { generateUsername } from 'unique-username-generator';
 import { signIn } from '../../../../auth';
 import type { FormState } from '../types/form-state';
-import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
-
-interface UserData {
-  email: string;
-  termsAndConditions: boolean;
-}
 
 export const signupAction = async (_initialState: FormState, payload: FormData) => {
   const permittedFieldNames = [
@@ -46,21 +40,21 @@ export const signupAction = async (_initialState: FormState, payload: FormData) 
       console.log(`39: signup-action > error >>>`, error);
       formState.success = false;
 
-      if (error instanceof Error && error.name === 'PrismaServerError' && (error as PrismaServerError).code === 11000) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicateKeyError = error as Prisma.PrismaClientKnownRequestError;
-        if (duplicateKeyError?.message.includes('email_1')) {
-          if (!Array.isArray(formState.errors.email)) {
-            formState.errors.email = [];
+        console.log(`46: signup-action > duplicateKeyError >>>`, duplicateKeyError);
+        if (duplicateKeyError?.meta?.target === 'User_email_key') {
+          if (!formState.errors) {
+            formState.errors = {};
           }
-          setUnknownError(formState); // An account already exists with this email address, but don't tell user
+
+          console.log(`52: signup-action > label >>>`, 'its an email');
+
+          formState.errors.email = ['Account with this email already exists'];
         } else {
           setUnknownError(formState);
         }
       } else {
-        setUnknownError(formState);
-      }
-    } finally {
-      if (!formState.success && Object.keys(formState.errors).length > 0) {
         setUnknownError(formState);
       }
     }

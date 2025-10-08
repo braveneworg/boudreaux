@@ -31,7 +31,16 @@ const SignupPage = () => {
   const handleSubmit = async () => {
     if (isVerified) {
       const formData = new FormData(formReference.current!);
-      await signupAction(state, formData);
+      const result = await signupAction(state, formData);
+
+      if (!result.success) {
+        // Update the form state with the new state returned from the action
+        form.reset(undefined, { keepValues: true });
+
+        if (result.errors?.email) {
+          form.setError('email', { message: result.errors.email[0] });
+        }
+      }
     }
   };
 

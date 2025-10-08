@@ -29,9 +29,7 @@ const SignupSigninForm = ({
 
   return (
     <>
-    {console.log(`37: signup-signin-form > isSubmitted >>>`, isSubmitted)}
-    {JSON.stringify(state)}
-      <div className={cn('mt-8 max-w-96', { 'mb-8': !hasTermsAndConditions })}>
+      <div className={cn('mt-8 max-w-96')}>
         <FormField
           control={control}
           name="email"
@@ -79,6 +77,7 @@ const SignupSigninForm = ({
       <Button className="mt-4" disabled={isPending} size="lg">
         Submit
       </Button>
+      {/* TODO: Add Forgot Password link here */}
     </>
   );
 };

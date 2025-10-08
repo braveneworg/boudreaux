@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { FormState } from '../../types/form-state';
 
 interface ResponseError {
   errors: {
@@ -12,10 +13,15 @@ interface MongoServerError extends Error {
   keyPattern?: Record<string, number>;
 }
 
-const setUnknownError = (data: ResponseError, errorMessage = 'An unknown error occurred') => {
+const setUnknownError = (data: FormState, errorMessage = 'An unknown error occurred') => {
+  if (!data.errors) {
+    data.errors = {};
+  }
+
   if (!data.errors.general) {
     data.errors.general = [];
   }
+
   data.errors.general.push(errorMessage);
 }
 
