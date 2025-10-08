@@ -10,7 +10,7 @@ export default function Home() {
   const fetchHealthStatus = async () => {
     try {
       const response = await fetch('/api/health');
-      console.log(`12: page > label >>>`, response);
+
       if (response.ok) {
         const data = await response.json();
         setHealthStatus(data);
@@ -34,7 +34,8 @@ export default function Home() {
           <p className="border-b-2">{healthStatus?.message}</p>
         </div>
         <div>
-          <Link href="/signin">Sign In</Link>
+          <Link href="/signup">Sign Up</Link>
+          {/* TODO: or signin */}
         </div>
         <Image
           className="dark:invert"
