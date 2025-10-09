@@ -24,62 +24,58 @@ const SignupSigninForm = ({
   isPending,
   setIsVerified,
   state,
-}: SigninFormProperties) => {
-  const { isSubmitted } = state;
-
-  return (
-    <>
-      <div className={cn('mt-8 max-w-96')}>
+}: SigninFormProperties) => (
+  <>
+    <div className={cn('mt-8 max-w-96')}>
+      <FormField
+        control={control}
+        name="email"
+        render={({ field }) => (
+          <FormItem className="mt-4">
+            <FormLabel className="sr-only" htmlFor="email">
+              Email
+            </FormLabel>
+            <FormControl>
+              <FormInput id="email" placeholder="Email address" type="email" {...field} />
+            </FormControl>
+            <FormMessage>{state.errors?.email}</FormMessage>
+          </FormItem>
+        )}
+      />
+      {hasTermsAndConditions && (
         <FormField
           control={control}
-          name="email"
+          name="termsAndConditions"
           render={({ field }) => (
-            <FormItem className="mt-4">
-              <FormLabel className="sr-only" htmlFor="email">
-                Email
-              </FormLabel>
-              <FormControl>
-                <FormInput id="email" placeholder="Email address" type="email" {...field} />
-              </FormControl>
-              <FormMessage>{state.errors?.email}</FormMessage>
-            </FormItem>
+              <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
+                <FormControl>
+                  <Switch
+                  id="terms-and-conditions"
+                  name="termsAndConditions"
+                  checked={!!field.value || false}
+                  onCheckedChange={field.onChange}
+                  required
+                  />
+                </FormControl>
+                <FormLabel htmlFor="terms-and-conditions">
+                  <Link className=':hover:no-underline :visited:text-rebeccapurple underline text-blue-800' href="/terms-and-conditions">
+                    Accept terms and conditions?
+                  </Link>
+                </FormLabel>
+                <FormMessage className="relative -top-1.5">
+                  {(state.errors?.termsAndConditions && "You must accept the terms and conditions to continue")}
+                </FormMessage>
+              </FormItem>
           )}
         />
-        {hasTermsAndConditions && (
-          <FormField
-            control={control}
-            name="termsAndConditions"
-            render={({ field }) => (
-                <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
-                  <FormControl>
-                    <Switch
-                    id="terms-and-conditions"
-                    name="termsAndConditions"
-                    checked={!!field.value || false}
-                    onCheckedChange={field.onChange}
-                    required
-                    />
-                  </FormControl>
-                  <FormLabel htmlFor="terms-and-conditions">
-                    <Link className=':hover:no-underline :visited:text-rebeccapurple underline text-blue-800' href="/terms-and-conditions">
-                      Accept terms and conditions?
-                    </Link>
-                  </FormLabel>
-                  <FormMessage className="relative -top-1.5">
-                    {(state.errors?.termsAndConditions && "You must accept the terms and conditions to continue")}
-                  </FormMessage>
-                </FormItem>
-            )}
-          />
-        )}
-      </div>
-      <TurnstileWidget setIsVerified={setIsVerified} />
-      <Button className="mt-4" disabled={isPending} size="lg">
-        Submit
-      </Button>
-      {/* TODO: Add Forgot Password link here */}
-    </>
-  );
-};
+      )}
+    </div>
+    <TurnstileWidget setIsVerified={setIsVerified} />
+    <Button className="mt-4" disabled={isPending} size="lg">
+      Submit
+    </Button>
+    {/* TODO: Add Forgot Password link here */}
+  </>
+);
 
 export default SignupSigninForm;
