@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import signinSchema, { type FormSchemaType } from '../../app/lib/validation/signin-schema'
+import signinSchema, { type FormSchemaType } from './signin-schema'
 
 describe('signin-schema', () => {
   describe('email validation', () => {

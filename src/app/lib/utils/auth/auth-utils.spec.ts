@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from '../../app/lib/utils/auth/auth-utils'
-import type { FormState } from '../../app/lib/types/form-state'
+import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from './auth-utils'
+import type { FormState } from '../../types/form-state'
 
 describe('auth-utils', () => {
   describe('EMAIL_REGEX', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import getActionState from '../../app/lib/utils/auth/get-action-state'
+import getActionState from './get-action-state'
 import { z } from 'zod'
 
 describe('get-action-state', () => {

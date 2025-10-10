@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn } from '../../app/lib/utils/auth/tailwind-utils'
+import { cn } from './tailwind-utils'
 
 describe('tailwind-utils', () => {
   describe('cn (className utility)', () => {
