@@ -7,6 +7,7 @@ const formSchema = z
     termsAndConditions: z.boolean().refine((val) => val === true, {
       message: 'You must accept the terms and conditions',
     }),
+    general: z.string().optional(),
   });
 
 export type FormSchemaType = z.infer<typeof formSchema>;

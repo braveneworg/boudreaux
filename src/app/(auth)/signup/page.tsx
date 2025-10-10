@@ -14,6 +14,7 @@ const SignupPage = () => {
     errors: {},
     fields: {},
     success: false,
+    hasTimeout: false,
   });
 
   // Cloudflare Turnstile verification
@@ -41,6 +42,8 @@ const SignupPage = () => {
           form.setError('email', { message: result.errors.email[0] });
         }
       }
+    } else {
+      form.setError('general', { message: 'Please refresh the app and try again.' });
     }
   };
 

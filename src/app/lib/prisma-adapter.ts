@@ -1,11 +1,6 @@
-// lib/prisma-adapter.ts
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
 import type { Adapter } from "next-auth/adapters"
-
-interface ExtendedUserData {
-  termsAndConditions?: boolean
-}
 
 const prisma = new PrismaClient()
 
@@ -31,37 +26,67 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
 
     // Override getUser to return extra fields
     getUser: async (id) => {
-      const user = await prisma.user.findUnique({
+      const user = await p.user.findUnique({
         where: { id },
       })
-      return user
+      if (!user) return null
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email!,
+        emailVerified: user.emailVerified,
+        image: user.image,
+      }
     },
 
     // Override getUserByEmail to return extra fields
     getUserByEmail: async (email) => {
-      const user = await prisma.user.findUnique({
+      const user = await p.user.findUnique({
         where: { email },
       })
-      return user
+      if (!user) return null
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email!,
+        emailVerified: user.emailVerified,
+        image: user.image,
+      }
     },
 
     // Override getUserByAccount to return extra fields
     getUserByAccount: async (provider_providerAccountId) => {
-      const account = await prisma.account.findUnique({
+      const account = await p.account.findUnique({
         where: { provider_providerAccountId },
         select: { user: true },
       })
-      return account?.user ?? null
+      if (!account?.user) return null
+
+      return {
+        id: account.user.id,
+        name: account.user.name,
+        email: account.user.email!,
+        emailVerified: account.user.emailVerified,
+        image: account.user.image,
+      }
     },
 
     // Override updateUser to allow updating extra fields
     updateUser: async (data) => {
       const { id, ...updateData } = data
-      const user = await prisma.user.update({
+      const user = await p.user.update({
         where: { id },
         data: updateData,
       })
-      return user
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email!,
+        emailVerified: user.emailVerified,
+        image: user.image,
+      }
     },
   }
 }

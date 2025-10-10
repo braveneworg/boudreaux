@@ -1,8 +1,8 @@
 'use server';
 
-import getActionState from '@/lib/utils/auth/get-action-state';
-import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import signupSchema from '@/lib/validation/signup-schema';
+import getActionState from '@/app/lib/utils/auth/get-action-state';
+import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
+import signupSchema from '@/app/lib/validation/signup-schema';
 import { type AdapterUser } from "@auth/core/adapters"
 import { redirect } from 'next/navigation';
 import { generateUsername } from 'unique-username-generator';
@@ -10,9 +10,9 @@ import { signIn } from '../../../../auth';
 import type { FormState } from '../types/form-state';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 
-export const signupAction = async (_initialState: FormState, payload: FormData) => {
+export const signupAction = async (_initialState: FormState, payload: FormData): Promise<FormState> => {
   const permittedFieldNames = [
     'email',
     'termsAndConditions',
@@ -26,6 +26,8 @@ export const signupAction = async (_initialState: FormState, payload: FormData) 
     try {
       const { email } = formState.fields;
 
+      formState.hasTimeout = false;
+
       await adapter.createUser!({ ...parsed.data, username: generateUsername('', 4) } as unknown as AdapterUser);
 
       // Redirect happens way below because next throws an error if you redirect inside a try/catch
@@ -34,8 +36,19 @@ export const signupAction = async (_initialState: FormState, payload: FormData) 
       formState.success = true;
     } catch (error: unknown) {
       formState.success = false;
-
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      // Check for MongoDB timeout errors
+      if (error instanceof Error && (
+        error.message.includes('ETIMEOUT') ||
+        error.message.includes('timeout') ||
+        error.message.includes('timed out') ||
+        ('code' in error && error.code === 'ETIMEOUT')
+      )) {
+        formState.hasTimeout = true;
+        if (!formState.errors) {
+          formState.errors = {};
+        }
+        formState.errors.general = ['Connection timed out. Please try again.'];
+      } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicateKeyError = error as Prisma.PrismaClientKnownRequestError;
 
         if (duplicateKeyError?.meta?.target === 'User_email_key') {

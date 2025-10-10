@@ -5,13 +5,8 @@ import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import getActionState from '@/app/lib/utils/auth/get-action-state';
 import signinSchema from '@/app/lib/validation/signin-schema';
 import { redirect } from 'next/navigation';
-import { signIn } from 'next-auth/react';
-
-type FormState = {
-  errors?: Record<string, string[]>;
-  fields: Record<string, boolean | string>;
-  success: boolean;
-};
+import { signIn } from '../../../../auth';
+import type { FormState } from '../types/form-state';
 
 export const signinAction = async (_initialState: FormState, payload: FormData) => {
   const permittedFieldNames = [
@@ -32,12 +27,12 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     } catch {
       formState.success = false;
     } finally {
-      if (!formState.success && Object.keys(formState.errors).length > 0) {
+      if (!formState.success && formState.errors && Object.keys(formState.errors).length > 0) {
         setUnknownError(formState);
       }
     }
   }
-  1
+
   if (formState.success) {
     return redirect(encodeURI(`/success?email=${formState.fields.email}`));
   }

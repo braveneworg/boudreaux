@@ -3,4 +3,5 @@ export type FormState = {
   fields: Record<string, boolean | string>;
   success: boolean;
   isSubmitted?: boolean;
+  hasTimeout?: boolean;
 };
