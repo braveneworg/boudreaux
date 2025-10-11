@@ -38,7 +38,7 @@ interface FormControlProps {
 }
 
 interface FormFieldProps {
-  render: () => React.ReactNode;
+  render: (field: { field: { value: string; onChange: (value: string) => void } }) => React.ReactNode;
   control?: unknown;
   name?: string;
 }

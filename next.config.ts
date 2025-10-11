@@ -50,6 +50,10 @@ const nextConfig = {
   async rewrites() {
     return [
       // Add any custom rewrites here
+      {
+        source: '/signin',
+        destination: '/signup',
+      }
     ]
   },
 }

@@ -6,14 +6,18 @@ import type { FormState } from '@/app/lib/types/form-state';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 import Link from 'next/link';
 import type { Control} from 'react-hook-form';
-import type { FormSchemaType } from '@/app/lib/validation/signup-schema';
+import type { FormSchemaType as SignupSchema } from '@/app/lib/validation/signup-schema';
+import type { FormSchemaType as SigninSchema } from '@/app/lib/validation/signin-schema';
 
 import { Button } from '@/app/components/forms/ui/button';
 import { Switch } from '@/app/components/forms/ui/switch';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/forms/ui/form';
+import { usePathname } from 'next/navigation';
+
+type AuthSchema<T> = T extends { termsAndConditions: true } ? SignupSchema : SigninSchema;
 
 interface SigninFormProperties {
-  control: Control<FormSchemaType>;
+  control: Control<AuthSchema<{ termsAndConditions: true }>>;
   hasTermsAndConditions: boolean;
   isPending: boolean;
   setIsVerified: (isVerified: boolean) => void;
@@ -26,8 +30,11 @@ const SignupSigninForm = ({
   isPending,
   setIsVerified,
   state,
-}: SigninFormProperties) => (
-  <>
+}: SigninFormProperties) => {
+  const pathName = usePathname();
+  const isSigningIn = pathName === '/signin/';
+
+  return (<>
     <div className={cn('mt-8 max-w-96')}>
       <FormField
         control={control}
@@ -46,7 +53,7 @@ const SignupSigninForm = ({
           </FormItem>
         )}
       />
-      {hasTermsAndConditions && (
+      {hasTermsAndConditions && !isSigningIn && (
         <FormField
           control={control}
           name="termsAndConditions"
@@ -101,7 +108,7 @@ const SignupSigninForm = ({
       </div>
     )}
     {/* TODO: Add Forgot Password link here */}
-  </>
-);
+  </>)
+}
 
 export default SignupSigninForm;

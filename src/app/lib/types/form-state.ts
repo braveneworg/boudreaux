@@ -4,4 +4,5 @@ export type FormState = {
   success: boolean;
   isSubmitted?: boolean;
   hasTimeout?: boolean;
+  resolver?: 'zod' | 'yup' | 'custom';
 };
