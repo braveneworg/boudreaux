@@ -19,7 +19,7 @@ type BaseFormSchema = {
   termsAndConditions?: boolean;
 };
 
-interface SigninFormProperties {
+interface SignupSigninFormProps {
   control: Control<BaseFormSchema>;
   hasTermsAndConditions: boolean;
   isPending: boolean;
@@ -33,7 +33,7 @@ const SignupSigninForm = ({
   isPending,
   setIsVerified,
   state,
-}: SigninFormProperties) => {
+}: SignupSigninFormProps) => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin/';
 
@@ -110,7 +110,6 @@ const SignupSigninForm = ({
         </FormMessage>
       </div>
     )}
-    {/* TODO: Add Forgot Password link here */}
   </>)
 }
 
