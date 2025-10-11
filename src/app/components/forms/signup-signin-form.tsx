@@ -6,18 +6,21 @@ import type { FormState } from '@/app/lib/types/form-state';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 import Link from 'next/link';
 import type { Control} from 'react-hook-form';
-import type { FormSchemaType as SignupSchema } from '@/app/lib/validation/signup-schema';
-import type { FormSchemaType as SigninSchema } from '@/app/lib/validation/signin-schema';
 
 import { Button } from '@/app/components/forms/ui/button';
 import { Switch } from '@/app/components/forms/ui/switch';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/forms/ui/form';
 import { usePathname } from 'next/navigation';
 
-type AuthSchema<T> = T extends { termsAndConditions: true } ? SignupSchema : SigninSchema;
+// Common type for both signin and signup schemas
+type BaseFormSchema = {
+  email: string;
+  general?: string;
+  termsAndConditions?: boolean;
+};
 
 interface SigninFormProperties {
-  control: Control<AuthSchema<{ termsAndConditions: true }>>;
+  control: Control<BaseFormSchema>;
   hasTermsAndConditions: boolean;
   isPending: boolean;
   setIsVerified: (isVerified: boolean) => void;

@@ -7,7 +7,7 @@ import signupSchema, { type FormSchemaType as SignupSchemaType } from '@/lib/val
 import signinSchema, { type FormSchemaType as SigninSchemaType } from '@/lib/validation/signin-schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState, useRef, useState } from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, Control } from 'react-hook-form';
 import { signinAction } from '@/app/lib/actions/signin-action';
 
 const SignupPage = () => {
@@ -54,11 +54,11 @@ const SignupPage = () => {
     <FormProvider {...form}>
       <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)} ref={formReference}>
         <SignupSigninForm
-          control={form.control}
+          control={form.control as Control<{ email: string; general?: string; termsAndConditions?: boolean }>}
           isPending={isPending}
           setIsVerified={setIsVerified}
           state={state}
-          hasTermsAndConditions
+          hasTermsAndConditions={isSignupPath}
         />
       </form>
     </FormProvider>

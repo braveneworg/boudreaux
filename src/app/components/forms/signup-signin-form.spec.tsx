@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -124,7 +125,7 @@ vi.mock('next/link', () => ({
 const mockControl = {
   _formState: { errors: {} },
   register: vi.fn(),
-};
+} as any;
 
 describe('SignupSigninForm', () => {
   const defaultProps = {
