@@ -40,7 +40,7 @@ const SignupSigninForm = ({
         control={control}
         name="email"
         render={({ field }) => (
-          <FormItem className="mt-4">
+          <FormItem className={cn(isSigningIn ? 'mb-8' : 'mb-0', 'mt-4')}>
             <FormLabel className="sr-only" htmlFor="email">
               Email
             </FormLabel>
