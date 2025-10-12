@@ -8,11 +8,11 @@ import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 
 // Use in hamburger menu on mobile
-const SignedinToolbar = () => {
+const SignedinToolbar = ({ className }: { className?: string }) => {
   const isMobile = useIsMobile();
 
   return (
-    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, "flex items-center")}>
+    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, 'flex items-center', className)}>
       <SignedInAs />
       {!isMobile && <VerticalSeparator />}
       <Button variant="link:narrow" onClick={() => signOut()}>
