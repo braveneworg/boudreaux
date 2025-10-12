@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production'
-    ? 'media'
+    ? '/media'
     : '',
 
   // Configure images for CDN
@@ -50,6 +50,20 @@ const nextConfig = {
   async rewrites() {
     return [
       // Add any custom rewrites here
+      {
+        source: '/signin',
+        destination: '/signup',
+      },
+      {
+        source: '/success/signin',
+        has: [
+          {
+            type: 'query',
+            key: 'email',
+          },
+        ],
+        destination: '/success/signup?email=:email*',
+      }
     ]
   },
 }

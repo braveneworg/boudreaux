@@ -4,11 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV}
+      MONGODB_URI: ${MONGODB_URI}
     expose:
       - "3000"
     restart: unless-stopped
-
   nginx:
     build:
       context: ./nginx
