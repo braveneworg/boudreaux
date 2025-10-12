@@ -86,7 +86,7 @@ describe('signinAction', () => {
         redirectTo: '/',
       });
 
-      expect(mockRedirect).toHaveBeenCalledWith('/success?email=test@example.com');
+      expect(mockRedirect).toHaveBeenCalledWith('/success/signin?email=test%40example.com');
     });
 
     it('should use nodemailer provider for magic link', async () => {
@@ -394,7 +394,7 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockRedirect).toHaveBeenCalledWith(`/success?email=${emailWithSpecialChars}`);
+      expect(mockRedirect).toHaveBeenCalledWith(`/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`);
     });
   });
 });
