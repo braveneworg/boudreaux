@@ -34,7 +34,7 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   }
 
   if (formState.success) {
-    return redirect(encodeURI(`/success?email=${formState.fields.email}`));
+    return redirect(`/success/signin?email=${encodeURIComponent(formState.fields.email as string)}`);
   }
 
   return formState;

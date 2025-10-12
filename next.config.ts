@@ -53,6 +53,16 @@ const nextConfig = {
       {
         source: '/signin',
         destination: '/signup',
+      },
+      {
+        source: '/success/signin',
+        has: [
+          {
+            type: 'query',
+            key: 'email',
+          },
+        ],
+        destination: '/success/signup?email=:email*',
       }
     ]
   },

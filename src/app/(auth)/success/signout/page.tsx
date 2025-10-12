@@ -1,14 +1,8 @@
 import SuccessContainer from './container';
 
-const SuccessPage = async ({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) => {
-  const { email } = await searchParams;
-
+const SuccessPage = async () => {
   return (
-    <SuccessContainer email={(email as string).replace(' ', '+')} />
+    <SuccessContainer />
   );
 };
 

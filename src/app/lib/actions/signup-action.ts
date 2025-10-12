@@ -73,7 +73,7 @@ export const signupAction = async (_initialState: FormState, payload: FormData):
   }
 
   if (formState.success) {
-    return redirect(encodeURI(`/success?email=${formState.fields.email}`));
+    return redirect(encodeURI(`/success/signup?email=${formState.fields.email}`));
   }
 
   return formState;
