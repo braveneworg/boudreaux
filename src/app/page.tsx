@@ -1,9 +1,44 @@
-import Image from "next/image";
+'use client';
 
-export default async function Home() {
+import Image from "next/image";
+import { useEffect, useState } from 'react';
+import AuthToolbar from './components/auth/auth-toolbar';
+import { SessionProvider } from 'next-auth/react';
+
+export default function Home() {
+  const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(null);
+
+  const fetchHealthStatus = async () => {
+    try {
+      const response = await fetch('/api/health');
+
+      if (response.ok) {
+        const data = await response.json();
+        setHealthStatus(data);
+      } else {
+        setHealthStatus({ status: 'error', message: 'Failed to fetch health status' });
+      }
+    } catch (error) {
+      setHealthStatus({ status: 'error', message: (error as Error).message });
+    }
+  };
+
+  useEffect(() => {
+    (async () => { await fetchHealthStatus(); })();
+  }, []);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+    <div className="font-sans grid grid-rows-[20px_1fr_20px] justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
+      <main className="flex flex-col gap-[32px] row-start-2">
+        <div className="flex flex-col justify-center items-center sm:items-center">
+          <h1>DB health status:&nbsp; {healthStatus?.status === 'error' ? '❌' : '✅'}</h1>
+          <p className="border-b-2">{healthStatus?.message}</p>
+        </div>
+
+        <SessionProvider>
+          <AuthToolbar />
+        </SessionProvider>
+
         <Image
           className="dark:invert"
           src="/media/next.svg"
