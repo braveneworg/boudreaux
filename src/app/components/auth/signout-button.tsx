@@ -1,0 +1,28 @@
+import { Button } from '../forms/ui/button';
+import SignedInAs from './signed-in-as';
+import { signOut } from 'next-auth/react';
+import { LogOutIcon } from 'lucide-react';
+import VerticalSeparator from '../forms/ui/vertical-separator';
+import EditProfileButton from './edit-profile-button';
+import { useIsMobile } from '@/app/hooks/use-mobile';
+import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+
+// Use in hamburger menu on mobile
+const SignedinToolbar = () => {
+  const isMobile = useIsMobile();
+
+  return (
+    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, "flex items-center")}>
+      <SignedInAs />
+      {!isMobile && <VerticalSeparator />}
+      <Button variant="link:narrow" onClick={() => signOut()}>
+        <LogOutIcon />
+        Sign Out
+      </Button>
+      {!isMobile && <VerticalSeparator />}
+      <EditProfileButton />
+    </div>
+  );
+};
+
+export default SignedinToolbar;

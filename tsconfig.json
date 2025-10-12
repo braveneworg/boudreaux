@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -19,12 +20,12 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/app/components/*"],
-      "@/utils/*": ["./src/app/lib/utils/*"],
-      "@/ui/*": ["./src/app/components/forms/ui/*"],
-      "@/lib/*": ["./src/app/lib/*"],
-      "@/hooks/*": ["./src/app/hooks/*"]
+      "@/*": ["src/*"],
+      "@/components/*": ["src/app/components/*"],
+      "@/utils/*": ["src/app/lib/utils/*"],
+      "@/ui/*": ["src/app/components/ui/*"],
+      "@/lib/*": ["src/app/lib/*"],
+      "@/hooks/*": ["src/app/hooks/*"]
     }
   },
   "include": ["types/next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".github/workflows/auth.ts"],

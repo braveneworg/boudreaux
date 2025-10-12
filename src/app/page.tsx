@@ -1,8 +1,9 @@
 'use client';
 
 import Image from "next/image";
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import AuthToolbar from './components/auth/auth-toolbar';
+import { SessionProvider } from 'next-auth/react';
 
 export default function Home() {
   const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(null);
@@ -33,10 +34,11 @@ export default function Home() {
           <h1>DB health status:&nbsp; {healthStatus?.status === 'error' ? '❌' : '✅'}</h1>
           <p className="border-b-2">{healthStatus?.message}</p>
         </div>
-        <div>
-          <Link href="/signup">Sign Up</Link>
-          {/* TODO: or signin */}
-        </div>
+
+        <SessionProvider>
+          <AuthToolbar />
+        </SessionProvider>
+
         <Image
           className="dark:invert"
           src="/media/next.svg"

@@ -1,4 +1,4 @@
-import { Input } from "@/app/components/forms/ui/input";
+import { Input } from "./input";
 
 interface FormInputProperties {
   id: string;

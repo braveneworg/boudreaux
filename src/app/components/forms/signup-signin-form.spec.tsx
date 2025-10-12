@@ -55,7 +55,7 @@ interface FormLabelProps {
   className?: string;
 }
 
-vi.mock('@/app/components/forms/ui/form-input', () => ({
+vi.mock('@/app/components/ui/form-input', () => ({
   default: ({ id, placeholder, type, ...props }: FormInputProps) =>
     React.createElement('input', {
       'data-testid': `form-input-${id}`,
@@ -66,7 +66,7 @@ vi.mock('@/app/components/forms/ui/form-input', () => ({
     }),
 }));
 
-vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
+vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({ setIsVerified }: { setIsVerified: (verified: boolean) => void }) =>
     React.createElement('div', {
       'data-testid': 'turnstile-widget',
@@ -74,7 +74,7 @@ vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
     }),
 }));
 
-vi.mock('@/app/components/forms/ui/status-indicator', () => ({
+vi.mock('@/app/components/ui/status-indicator', () => ({
   default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) =>
     React.createElement('div', {
       'data-testid': 'status-indicator',
@@ -85,7 +85,7 @@ vi.mock('@/app/components/forms/ui/status-indicator', () => ({
     }),
 }));
 
-vi.mock('@/app/components/forms/ui/button', () => ({
+vi.mock('@/app/components/ui/button', () => ({
   Button: ({ children, disabled, size }: ButtonProps) =>
     React.createElement('button', {
       'data-testid': 'submit-button',
@@ -94,7 +94,7 @@ vi.mock('@/app/components/forms/ui/button', () => ({
     }, children),
 }));
 
-vi.mock('@/app/components/forms/ui/switch', () => ({
+vi.mock('@/app/components/ui/switch', () => ({
   Switch: ({ id, checked, onCheckedChange, required }: SwitchProps) =>
     React.createElement('input', {
       'data-testid': `switch-${id}`,
@@ -105,7 +105,7 @@ vi.mock('@/app/components/forms/ui/switch', () => ({
     }),
 }));
 
-vi.mock('@/app/components/forms/ui/form', () => ({
+vi.mock('@/app/components/ui/form', () => ({
   FormControl: ({ children }: FormControlProps) => React.createElement('div', { 'data-testid': 'form-control' }, children),
   FormField: ({ render }: FormFieldProps) => {
     const field = { value: '', onChange: vi.fn() };
