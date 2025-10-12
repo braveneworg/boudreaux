@@ -5,7 +5,7 @@ const EditProfileButton = () => {
   return (
     <Link className="flex items-center gap-2" href="/profile/edit">
       <UserIcon size={16} />
-      <span className="text-sm hover:underline">Edit Profile</span>
+      <span className="text-sm hover:underline underline-offset-4">Edit Profile</span>
     </Link>
   )
 };
