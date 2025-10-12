@@ -10,9 +10,6 @@ export default defineConfig({
       include: []
     }
   },
-  esbuild: {
-    target: 'node14'
-  },
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), './src'),

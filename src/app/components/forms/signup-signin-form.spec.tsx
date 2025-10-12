@@ -1,12 +1,100 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
 import type { FormState } from '@/app/lib/types/form-state';
 import React from 'react';
 
 // Mock all dependencies
+vi.mock('@/app/components/forms/ui/form-input', () => ({
+  default: ({ id, placeholder, type, ...props }: FormInputProps) => (
+    <input
+      data-testid={`form-input-${id}`}
+      id={id}
+      placeholder={placeholder}
+      type={type}
+      {...props}
+    />
+  ),
+}));
+
+vi.mock('@/app/components/forms/ui/form', () => ({
+  FormField: ({ name, render }: { name: string; render: (context: any) => React.ReactNode }) => {
+    const field = {
+      value: '',
+      onChange: vi.fn(),
+      onBlur: vi.fn(),
+      name,
+      ref: vi.fn()
+    };
+    return render({ field });
+  },
+  FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className} data-testid="form-item">{children}</div>
+  ),
+  FormLabel: ({ children, htmlFor, className }: { children: React.ReactNode; htmlFor?: string; className?: string }) => (
+    <label htmlFor={htmlFor} className={className} data-testid="form-label">{children}</label>
+  ),
+  FormControl: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  FormMessage: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className} data-testid="form-message">{children}</div>
+  ),
+}));
+
+vi.mock('@/app/components/forms/ui/switch', () => ({
+  Switch: ({ id, checked, onCheckedChange, required, ...props }: SwitchProps) => (
+    <input
+      type="checkbox"
+      id={id}
+      checked={checked}
+      onChange={(e) => onCheckedChange?.(e.target.checked)}
+      required={required}
+      data-testid={`switch-${id}`}
+      {...props}
+    />
+  ),
+}));
+
+vi.mock('@/app/components/forms/ui/button', () => ({
+  Button: ({ children, disabled, size, ...props }: ButtonProps) => (
+    <button
+      disabled={disabled}
+      data-testid="submit-button"
+      data-size={size}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+}));
+
+vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
+  default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
+    <div
+      data-testid="turnstile-widget"
+      onClick={() => setIsVerified?.(true)}
+      {...props}
+    >
+      Turnstile Widget
+    </div>
+  ),
+}));
+
+vi.mock('@/app/components/forms/ui/status-indicator', () => ({
+  default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) => (
+    <div
+      data-testid="status-indicator"
+      data-success={isSuccess?.toString() || 'false'}
+      data-error={hasError?.toString() || 'false'}
+      data-timeout={hasTimeout?.toString() || 'false'}
+      data-pending={isPending?.toString() || 'false'}
+    >
+      Status Indicator
+    </div>
+  ),
+}));
+
 interface FormInputProps {
   id: string;
   placeholder: string;
@@ -29,107 +117,29 @@ interface ButtonProps {
 
 interface SwitchProps {
   id: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
   required?: boolean;
+  [key: string]: unknown;
 }
 
-interface FormControlProps {
-  children: React.ReactNode;
+interface TurnstileWidgetProps {
+  setIsVerified?: (verified: boolean) => void;
+  [key: string]: unknown;
 }
 
-interface FormFieldProps {
-  render: (field: { field: { value: string; onChange: (value: string) => void } }) => React.ReactNode;
-  control?: unknown;
-  name?: string;
-}
-
-interface FormItemProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-interface FormLabelProps {
-  children: React.ReactNode;
-  htmlFor?: string;
-  className?: string;
-}
-
-vi.mock('@/app/components/ui/form-input', () => ({
-  default: ({ id, placeholder, type, ...props }: FormInputProps) =>
-    React.createElement('input', {
-      'data-testid': `form-input-${id}`,
-      id,
-      placeholder,
-      type,
-      ...props,
-    }),
-}));
-
-vi.mock('@/app/components/ui/turnstile-widget', () => ({
-  default: ({ setIsVerified }: { setIsVerified: (verified: boolean) => void }) =>
-    React.createElement('div', {
-      'data-testid': 'turnstile-widget',
-      onClick: () => setIsVerified(true),
-    }),
-}));
-
-vi.mock('@/app/components/ui/status-indicator', () => ({
-  default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) =>
-    React.createElement('div', {
-      'data-testid': 'status-indicator',
-      'data-success': isSuccess,
-      'data-error': hasError,
-      'data-timeout': hasTimeout,
-      'data-pending': isPending,
-    }),
-}));
-
-vi.mock('@/app/components/ui/button', () => ({
-  Button: ({ children, disabled, size }: ButtonProps) =>
-    React.createElement('button', {
-      'data-testid': 'submit-button',
-      disabled,
-      'data-size': size,
-    }, children),
-}));
-
-vi.mock('@/app/components/ui/switch', () => ({
-  Switch: ({ id, checked, onCheckedChange, required }: SwitchProps) =>
-    React.createElement('input', {
-      'data-testid': `switch-${id}`,
-      type: 'checkbox',
-      checked,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange(e.target.checked),
-      required,
-    }),
-}));
-
-vi.mock('@/app/components/ui/form', () => ({
-  FormControl: ({ children }: FormControlProps) => React.createElement('div', { 'data-testid': 'form-control' }, children),
-  FormField: ({ render }: FormFieldProps) => {
-    const field = { value: '', onChange: vi.fn() };
-    return render({ field });
-  },
-  FormItem: ({ children, className }: FormItemProps) => React.createElement('div', { className, 'data-testid': 'form-item' }, children),
-  FormLabel: ({ children, htmlFor, className }: FormLabelProps) => React.createElement('label', { htmlFor, className, 'data-testid': 'form-label' }, children),
-  FormMessage: ({ children, className }: FormItemProps) => React.createElement('div', { className, 'data-testid': 'form-message' }, children),
-}));
-
+// Mock next/link
 vi.mock('next/link', () => ({
-  default: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) =>
-    React.createElement('a', { href, className, 'data-testid': 'next-link' }, children),
+  default: ({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) => (
+    <a href={href} className={className} data-testid="next-link">
+      {children}
+    </a>
+  ),
 }));
-
-// Mock useForm hook
-const mockControl = {
-  _formState: { errors: {} },
-  register: vi.fn(),
-} as any;
 
 describe('SignupSigninForm', () => {
   const defaultProps = {
-    control: mockControl,
+    control: {} as any, // Simple mock since FormField component is mocked
     hasTermsAndConditions: true,
     isPending: false,
     setIsVerified: vi.fn(),
@@ -398,7 +408,7 @@ describe('SignupSigninForm', () => {
   describe('component integration', () => {
     it('should handle all props correctly', () => {
       const completeProps = {
-        control: mockControl,
+        control: {} as any,
         hasTermsAndConditions: true,
         isPending: true,
         setIsVerified: vi.fn(),

@@ -7,6 +7,9 @@ const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockGenerateUsername = vi.hoisted(() => vi.fn(() => 'test-user-1234'));
 
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
+
 // Mock dependencies
 vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({
   signIn: mockSignIn,

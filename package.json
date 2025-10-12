@@ -100,7 +100,7 @@
     "@types/nodemailer": "^6.4.20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^4.3.5",
+    "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^1.6.0",
     "@vitest/ui": "^1.6.0",
     "dotenv": "^17.2.2",

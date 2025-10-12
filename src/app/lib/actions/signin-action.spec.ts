@@ -6,6 +6,9 @@ const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
+
 // Mock dependencies
 vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({
   signIn: mockSignIn,
