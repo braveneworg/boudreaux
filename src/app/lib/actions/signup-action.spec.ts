@@ -101,8 +101,11 @@ describe('signupAction', () => {
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockAdapter.createUser).toHaveBeenCalledWith({
+        id: '',
         email: 'test@example.com',
-        termsAndConditions: true,
+        emailVerified: null,
+        name: null,
+        image: null,
         username: 'test-user-1234',
       });
 

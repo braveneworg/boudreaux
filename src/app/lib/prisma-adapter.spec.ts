@@ -60,6 +60,7 @@ describe('CustomPrismaAdapter', () => {
         id: '1',
         email: 'test@example.com',
         emailVerified: null,
+        username: 'testuser',
       };
 
       const createdUser = {
@@ -68,6 +69,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: null,
         image: null,
+        username: null,
       };
 
       ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
@@ -84,6 +86,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: null,
         image: null,
+        username: '',
       });
     });
 
@@ -120,6 +123,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: null,
         image: null,
+        username: 'testuser',
       });
     });
 
@@ -128,6 +132,7 @@ describe('CustomPrismaAdapter', () => {
         id: '1',
         email: 'test@example.com',
         emailVerified: null,
+        username: 'testuser',
       };
 
       const dbError = new Error('Database connection failed');
@@ -141,6 +146,7 @@ describe('CustomPrismaAdapter', () => {
         id: '1',
         email: 'test@example.com',
         emailVerified: null,
+        username: 'testuser',
       };
 
       const createdUser = {
@@ -149,6 +155,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: new Date(),
         image: 'avatar.jpg',
+        username: null,
         extraField: 'should not be included',
       };
 
@@ -162,6 +169,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: createdUser.emailVerified,
         image: 'avatar.jpg',
+        username: '',
       });
 
       expect(result).not.toHaveProperty('extraField');
@@ -176,6 +184,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
+        username: null,
       };
 
       ((mockPrisma as any)).user.findUnique.mockResolvedValue(user);
@@ -186,7 +195,14 @@ describe('CustomPrismaAdapter', () => {
         where: { id: '1' },
       });
 
-      expect(result).toEqual(user);
+      expect(result).toEqual({
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
     });
 
     it('should return null when user not found', async () => {
@@ -213,6 +229,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
+        username: null,
       };
 
       ((mockPrisma as any)).user.findUnique.mockResolvedValue(user);
@@ -223,7 +240,14 @@ describe('CustomPrismaAdapter', () => {
         where: { email: 'test@example.com' },
       });
 
-      expect(result).toEqual(user);
+      expect(result).toEqual({
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
     });
 
     it('should return null when user with email not found', async () => {
@@ -261,6 +285,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
+        username: null,
       };
 
       const account = { user };
@@ -279,7 +304,14 @@ describe('CustomPrismaAdapter', () => {
         select: { user: true },
       });
 
-      expect(result).toEqual(user);
+      expect(result).toEqual({
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
     });
 
     it('should return null when account not found', async () => {
@@ -342,6 +374,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'updated@example.com',
         emailVerified: null,
         image: null,
+        username: null,
       };
 
       ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
@@ -356,7 +389,14 @@ describe('CustomPrismaAdapter', () => {
         },
       });
 
-      expect(result).toEqual(updatedUser);
+      expect(result).toEqual({
+        id: '1',
+        name: 'Updated Name',
+        email: 'updated@example.com',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
     });
 
     it('should exclude id from update data', async () => {
@@ -399,13 +439,21 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: updateData.emailVerified,
         image: null,
+        username: null,
       };
 
       ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
 
       const result = await adapter!.updateUser(updateData);
 
-      expect(result).toEqual(updatedUser);
+      expect(result).toEqual({
+        id: '1',
+        name: 'Test User',
+        email: 'test@example.com',
+        emailVerified: updateData.emailVerified,
+        image: null,
+        username: '',
+      });
     });
 
     it('should handle update errors', async () => {
@@ -452,6 +500,7 @@ describe('CustomPrismaAdapter', () => {
         id: '1',
         email: 'test@example.com',
         emailVerified: null,
+        username: 'testuser',
       };
 
       const createdUser = {
@@ -478,6 +527,7 @@ describe('CustomPrismaAdapter', () => {
         id: '1',
         email: 'test@example.com',
         emailVerified: verifiedDate,
+        username: 'testuser',
       };
 
       const createdUser = {

@@ -9,6 +9,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
 
   return {
     ...baseAdapter,
+    ...baseAdapter,
     createUser: async (data) => {
       const user = await p.user.create({
         data: {
@@ -21,6 +22,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       email: user.email!,
       emailVerified: user.emailVerified,
       image: user.image,
+      username: user.username || '',
       }
     },
 
@@ -37,6 +39,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
+        username: user.username || '',
       }
     },
 
@@ -53,6 +56,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
+        username: user.username || '',
       }
     },
 
@@ -70,6 +74,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: account.user.email!,
         emailVerified: account.user.emailVerified,
         image: account.user.image,
+        username: account.user.username || '',
       }
     },
 
@@ -86,9 +91,10 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
+        username: user.username || '',
       }
     },
-  }
+  } as Adapter
 }
 
 // Export the prisma instance

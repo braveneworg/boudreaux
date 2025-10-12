@@ -19,6 +19,14 @@ declare module "next-auth" {
   }
 }
 
+declare module "next-auth/adapters" {
+  interface AdapterUser extends DefaultUser {
+    id: string;
+    username: string;
+    emailVerified?: Date | null;
+  }
+}
+
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     id: string;

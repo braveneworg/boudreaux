@@ -4,7 +4,7 @@ import type { AdapterUser } from "next-auth/adapters"
 import Nodemailer from 'next-auth/providers/nodemailer';
 import GoogleProvider from "next-auth/providers/google"
 import { prisma } from '@/app/lib/prisma';
-import { PrismaAdapter } from '@auth/prisma-adapter';
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 
 //keywords: auth, next-auth, mongodb, mongodb-adapter
 //docs: https://authjs.dev/reference/adapters/mongodb-adapter
@@ -46,7 +46,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 // - The `@@unique` attribute is used to create a unique index on a field or fields.
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: CustomPrismaAdapter(prisma),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
