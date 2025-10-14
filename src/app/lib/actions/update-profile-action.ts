@@ -20,6 +20,7 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
     'state',
     'zipCode',
     'country',
+    'allowSmsNotifications',
   ];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);

@@ -95,35 +95,46 @@ describe('profile-schema', () => {
       const result = profileSchema.safeParse(validData);
       expect(result.success).toBe(true);
     });
+
+    it('should validate data without firstName and lastName', () => {
+      const validData: ProfileFormData = {
+        phone: '555-123-4567',
+        city: 'New York'
+      };
+
+      const result = profileSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate completely empty data', () => {
+      const validData: ProfileFormData = {};
+
+      const result = profileSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+    });
   });
 
   describe('invalid data', () => {
-    it('should reject empty first name', () => {
-      const invalidData = {
+    it('should accept empty first name', () => {
+      const data = {
         firstName: '',
         lastName: 'Doe',
         phone: '555-123-4567'
       };
 
-      const result = profileSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('First name is required');
-      }
+      const result = profileSchema.safeParse(data);
+      expect(result.success).toBe(true);
     });
 
-    it('should reject empty last name', () => {
-      const invalidData = {
+    it('should accept empty last name', () => {
+      const data = {
         firstName: 'John',
         lastName: '',
         phone: '555-123-4567'
       };
 
-      const result = profileSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Last name is required');
-      }
+      const result = profileSchema.safeParse(data);
+      expect(result.success).toBe(true);
     });
 
     it('should reject first name that is too long', () => {
@@ -276,6 +287,40 @@ describe('profile-schema', () => {
       });
 
       it('should allow undefined country', () => {
+        const data: ProfileFormData = {
+          firstName: 'John',
+          lastName: 'Doe'
+        };
+
+        const result = profileSchema.safeParse(data);
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('allowSmsNotifications validation', () => {
+      it('should accept true value', () => {
+        const data: ProfileFormData = {
+          firstName: 'John',
+          lastName: 'Doe',
+          allowSmsNotifications: true
+        };
+
+        const result = profileSchema.safeParse(data);
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept false value', () => {
+        const data: ProfileFormData = {
+          firstName: 'John',
+          lastName: 'Doe',
+          allowSmsNotifications: false
+        };
+
+        const result = profileSchema.safeParse(data);
+        expect(result.success).toBe(true);
+      });
+
+      it('should allow undefined allowSmsNotifications', () => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe'

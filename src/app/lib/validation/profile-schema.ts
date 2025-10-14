@@ -3,11 +3,13 @@ import { COUNTRIES } from '../utils/countries';
 
 const profileSchema = z.object({
   firstName: z.string()
-    .min(1, { message: 'First name is required' })
-    .max(50, { message: 'First name must be less than 50 characters' }),
+    .max(50, { message: 'First name must be less than 50 characters' })
+    .optional()
+    .or(z.literal('')),
   lastName: z.string()
-    .min(1, { message: 'Last name is required' })
-    .max(50, { message: 'Last name must be less than 50 characters' }),
+    .max(50, { message: 'Last name must be less than 50 characters' })
+    .optional()
+    .or(z.literal('')),
   phone: z.string()
     .regex(/^(\+1|1)?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/, {
       message: 'Please enter a valid phone number'
@@ -43,6 +45,8 @@ const profileSchema = z.object({
     })
     .optional()
     .or(z.literal('')),
+  allowSmsNotifications: z.boolean()
+    .optional(),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;

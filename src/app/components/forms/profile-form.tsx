@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
@@ -19,16 +20,24 @@ import {
 } from '@/app/components/forms/ui/form';
 import { Input } from '@/app/components/forms/ui/input';
 import { Button } from '@/app/components/forms/ui/button';
+import { Checkbox } from '@/app/components/forms/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/forms/ui/card';
 import { Alert, AlertDescription } from '@/app/components/forms/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/forms/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/app/components/forms/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/app/components/forms/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
 
 interface ProfileFormProps {
   user: {
@@ -42,6 +51,7 @@ interface ProfileFormProps {
     state?: string | null;
     zipCode?: string | null;
     country?: string | null;
+    allowSmsNotifications?: boolean | null;
   };
 }
 
@@ -53,6 +63,7 @@ const initialFormState: FormState = {
 
 export default function ProfileForm({ user }: ProfileFormProps) {
   const [formState, action, isPending] = useActionState(updateProfileAction, initialFormState);
+  const [countryOpen, setCountryOpen] = useState(false);
 
   // Split the full name into first and last name for the form
   const { firstName, lastName } = splitFullName(user.name);
@@ -69,13 +80,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
       state: user.state || '',
       zipCode: user.zipCode || '',
       country: user.country || getDefaultCountry(),
+      allowSmsNotifications: user.allowSmsNotifications || false,
     },
   });
 
   const onSubmit = (data: ProfileFormData) => {
     const formData = new FormData();
-    formData.append('firstName', data.firstName);
-    formData.append('lastName', data.lastName);
+    formData.append('firstName', data.firstName || '');
+    formData.append('lastName', data.lastName || '');
     formData.append('phone', data.phone || '');
     formData.append('addressLine1', data.addressLine1 || '');
     formData.append('addressLine2', data.addressLine2 || '');
@@ -83,6 +95,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     formData.append('state', data.state || '');
     formData.append('zipCode', data.zipCode || '');
     formData.append('country', data.country || '');
+    formData.append('allowSmsNotifications', data.allowSmsNotifications ? 'true' : 'false');
 
     // TODO: Show some loading state while the action is pending
     action(formData);
@@ -92,7 +105,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
+          <CardTitle>Personal Information (Optional)</CardTitle>
           <CardDescription>
             Update your personal details and contact information.
           </CardDescription>
@@ -166,6 +179,27 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="allowSmsNotifications"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        id="allow-sms-notifications"
+                      />
+                    </FormControl>
+                    <FormLabel className="block text-sm font-normal" htmlFor="allow-sms-notifications">
+                      <strong>Allow us to send text messages to your mobile phone occasionally?</strong>
+                      <br />
+                      <em className='inline-block mt-3'>(Carrier charges may apply)</em>
+                    </FormLabel>
+                  </FormItem>
+                )}
+              />
+
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Address Information</h3>
 
@@ -191,7 +225,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                   name="addressLine2"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Address Line 2 (Optional)</FormLabel>
+                      <FormLabel>Address Line 2</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Apartment, suite, unit, etc."
@@ -262,23 +296,50 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Country</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || getDefaultCountry()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a country" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {COUNTRIES.map((country) => (
-                            <SelectItem key={country.code} value={country.code}>
-                              {country.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={countryOpen}
+                              className="w-full justify-between"
+                            >
+                              {field.value
+                                ? COUNTRIES.find((country) => country.code === field.value)?.name
+                                : "Select a country..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search countries..." />
+                            <CommandEmpty>No country found.</CommandEmpty>
+                            <CommandList>
+                              <CommandGroup>
+                                {COUNTRIES.map((country) => (
+                                  <CommandItem
+                                    key={country.code}
+                                    value={country.name}
+                                    onSelect={() => {
+                                      field.onChange(country.code);
+                                      setCountryOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        field.value === country.code ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {country.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -315,7 +376,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
             <div>
               <div className="font-medium">Username</div>
               <div className="text-sm text-muted-foreground">
-                {user.username || 'Not set'}
+                {`@${user.username}` || 'Not set'}
               </div>
             </div>
             <Button variant="outline" size="sm">

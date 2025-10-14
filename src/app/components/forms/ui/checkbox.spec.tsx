@@ -53,7 +53,7 @@ describe('Checkbox', () => {
       const checkbox = screen.getByTestId('checkbox')
       expect(checkbox).toHaveClass(
         'peer',
-        'size-4',
+        'size-7',
         'shrink-0',
         'rounded-[4px]',
         'border',
@@ -67,7 +67,7 @@ describe('Checkbox', () => {
 
       const checkbox = screen.getByTestId('checkbox')
       expect(checkbox).toHaveClass('custom-class')
-      expect(checkbox).toHaveClass('peer', 'size-4') // default classes should still be present
+      expect(checkbox).toHaveClass('peer', 'size-7') // default classes should still be present
     })
 
     it('should have checked state styles in classes', () => {
@@ -380,7 +380,7 @@ describe('Checkbox', () => {
       const checkIcon = checkbox.querySelector('svg')
 
       expect(checkIcon).toBeInTheDocument()
-      expect(checkIcon).toHaveClass('size-3.5')
+      expect(checkIcon).toHaveClass('size-5.5')
     })
   })
 
