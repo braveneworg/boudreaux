@@ -24,7 +24,7 @@ import { Button } from '@/app/components/forms/ui/button';
 import { Checkbox } from '@/app/components/forms/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/forms/ui/card';
 import { Alert, AlertDescription } from '@/app/components/forms/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CircleCheck } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -143,7 +143,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
         <CardContent>
           {formState.success && (
             <Alert className="mb-6">
-              <AlertCircle className="h-4 w-4" />
+              <CircleCheck />
               <AlertDescription>
                 Your profile has been updated successfully.
               </AlertDescription>
@@ -152,7 +152,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
 
           {formState.errors?.general && (
             <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle />
               <AlertDescription>
                 {formState.errors.general[0]}
               </AlertDescription>

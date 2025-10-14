@@ -25,6 +25,9 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);
 
+  console.log(`28: update-profile-action > formState >>>`, formState);
+  console.log(`29: update-profile-action > parsed >>>`, parsed);
+
   if (parsed.success) {
     try {
       // Get current user session
@@ -39,29 +42,30 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
         return formState;
       }
 
-      // Extract first and last name from the parsed data
-      const { firstName, lastName } = parsed.data;
-
+      const { firstName, lastName, phone, addressLine1, addressLine2, city, state, zipCode, country, allowSmsNotifications } = parsed.data;
       // Combine first and last name into the 'name' field for backward compatibility
       const fullName = `${firstName} ${lastName}`.trim();
+
 
       // Update user in database
       await prisma.user.update({
         where: { id: session.user.id },
         data: {
           name: fullName,
-          firstName: parsed.data.firstName,
-          lastName: parsed.data.lastName,
-          phone: parsed.data.phone,
-          addressLine1: parsed.data.addressLine1,
-          addressLine2: parsed.data.addressLine2,
-          city: parsed.data.city,
-          state: parsed.data.state,
-          zipCode: parsed.data.zipCode,
-          country: parsed.data.country,
-          allowSmsNotifications: parsed.data.allowSmsNotifications,
+          firstName,
+          lastName,
+          phone,
+          addressLine1,
+          addressLine2,
+          city,
+          state,
+          zipCode,
+          country,
+          allowSmsNotifications,
         },
       });
+
+      console.log('Profile updated successfully for user ID:', session.user.id);
 
       formState.success = true;
 
