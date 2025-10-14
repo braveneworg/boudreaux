@@ -17,6 +17,19 @@ model User {
   sessions      Session[]
   termsAndConditions Boolean   @default(false)
   username     String?         @unique
+
+  // Profile fields
+  firstName     String?
+  lastName      String?
+  phone         String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  zipCode       String?
+  country       String?
+  allowSmsNotifications Boolean? @default(false)
+
   // Optional for WebAuthn support
   Authenticator Authenticator[]
 

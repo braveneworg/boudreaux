@@ -45,6 +45,8 @@ interface ProfileFormProps {
     name?: string | null;
     email?: string | null;
     username?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
     phone?: string | null;
     addressLine1?: string | null;
     addressLine2?: string | null;
@@ -67,25 +69,48 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const [countryOpen, setCountryOpen] = useState(false);
   const [stateOpen, setStateOpen] = useState(false);
   const [isTransitionPending, startTransition] = useTransition();
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
-  // Split the full name into first and last name for the form
-  const { firstName, lastName } = splitFullName(user.name);
+  // Use direct firstName/lastName fields, with fallback to splitting the name
+  const fallbackNames = splitFullName(user.name);
+  const firstName = user.firstName || fallbackNames.firstName || '';
+  const lastName = user.lastName || fallbackNames.lastName || '';
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       firstName: firstName,
       lastName: lastName,
-      phone: user.phone || '',
-      addressLine1: user.addressLine1 || '',
-      addressLine2: user.addressLine2 || '',
-      city: user.city || '',
-      state: user.state || '',
-      zipCode: user.zipCode || '',
-      country: user.country || '',
-      allowSmsNotifications: user.allowSmsNotifications || false,
+      phone: user.phone ?? '',
+      addressLine1: user.addressLine1 ?? '',
+      addressLine2: user.addressLine2 ?? '',
+      city: user.city ?? '',
+      state: user.state ?? '',
+      zipCode: user.zipCode ?? '',
+      country: user.country ?? '',
+      allowSmsNotifications: user.allowSmsNotifications ?? false,
     },
   });
+
+  // Watch all form values to check if form has any content
+  const watchedValues = form.watch();
+
+  // Check if all personal profile fields are empty
+  const hasFormContent = () => {
+    const values = watchedValues;
+    return !!(
+      values.firstName?.trim() ||
+      values.lastName?.trim() ||
+      values.phone?.trim() ||
+      values.addressLine1?.trim() ||
+      values.addressLine2?.trim() ||
+      values.city?.trim() ||
+      values.state?.trim() ||
+      values.zipCode?.trim() ||
+      values.country?.trim() ||
+      values.allowSmsNotifications
+    );
+  };
 
   const onSubmit = (data: ProfileFormData) => {
     const formData = new FormData();
@@ -144,7 +169,18 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your first name" {...field} />
+                        <Input
+                          placeholder="Enter your first name"
+                          {...field}
+                          onChange={(e) => {
+                            setHasUserInteracted(true);
+                            form.setValue('firstName', e.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                            field.onChange(e);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -158,7 +194,18 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your last name" {...field} />
+                        <Input
+                          placeholder="Enter your last name"
+                          {...field}
+                          onChange={(e) => {
+                            setHasUserInteracted(true);
+                            form.setValue('lastName', e.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                            field.onChange(e);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -177,6 +224,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                         placeholder="(555) 123-4567"
                         type="tel"
                         {...field}
+                        onChange={(e) => {
+                          setHasUserInteracted(true);
+                          form.setValue('phone', e.target.value, {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          });
+                          field.onChange(e);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -192,7 +247,15 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                          setHasUserInteracted(true);
+                          const boolValue = checked === true;
+                          form.setValue('allowSmsNotifications', boolValue, {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          });
+                          field.onChange(boolValue);
+                        }}
                         id="allow-sms-notifications"
                       />
                     </FormControl>
@@ -218,6 +281,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                         <Input
                           placeholder="123 Main Street"
                           {...field}
+                          onChange={(e) => {
+                            setHasUserInteracted(true);
+                            form.setValue('addressLine1', e.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                            field.onChange(e);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -235,6 +306,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                         <Input
                           placeholder="Apartment, suite, unit, etc."
                           {...field}
+                          onChange={(e) => {
+                            setHasUserInteracted(true);
+                            form.setValue('addressLine2', e.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                            field.onChange(e);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -253,6 +332,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                           <Input
                             placeholder="New York"
                             {...field}
+                            onChange={(e) => {
+                              setHasUserInteracted(true);
+                              form.setValue('city', e.target.value, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              });
+                              field.onChange(e);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
@@ -276,7 +363,10 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                                 className="w-full justify-between"
                               >
                                 {field.value
-                                  ? US_STATES.find((state) => state.code === field.value)?.name
+                                  ? (() => {
+                                      const selectedState = US_STATES.find((state) => state.code === field.value);
+                                      return selectedState ? `${selectedState.name} - ${selectedState.code}` : "Select a state...";
+                                    })()
                                   : "Select a state..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -291,9 +381,19 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                                   {US_STATES.map((state) => (
                                     <CommandItem
                                       key={state.code}
-                                      value={state.name}
-                                      onSelect={() => {
-                                        field.onChange(state.code);
+                                      value={state.name.toLowerCase()}
+                                      onSelect={(currentValue) => {
+                                        setHasUserInteracted(true);
+                                        const selectedState = US_STATES.find(
+                                          (s) => s.name.toLowerCase() === currentValue
+                                        );
+                                        if (selectedState) {
+                                          form.setValue('state', selectedState.code, {
+                                            shouldDirty: true,
+                                            shouldValidate: true
+                                          });
+                                          field.onChange(selectedState.code);
+                                        }
                                         setStateOpen(false);
                                       }}
                                     >
@@ -302,7 +402,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                                           field.value === state.code ? "opacity-100" : "opacity-0"
                                         }`}
                                       />
-                                      {state.name}
+                                      {state.name} - {state.code}
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
@@ -325,6 +425,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                           <Input
                             placeholder="12345"
                             {...field}
+                            onChange={(e) => {
+                              setHasUserInteracted(true);
+                              form.setValue('zipCode', e.target.value, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              });
+                              field.onChange(e);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
@@ -364,9 +472,19 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                                 {COUNTRIES.map((country) => (
                                   <CommandItem
                                     key={country.code}
-                                    value={country.name}
-                                    onSelect={() => {
-                                      field.onChange(country.code);
+                                    value={country.name.toLowerCase()}
+                                      onSelect={(currentValue) => {
+                                      setHasUserInteracted(true);
+                                      const selectedCountry = COUNTRIES.find(
+                                        (c) => c.name.toLowerCase() === currentValue
+                                      );
+                                      if (selectedCountry) {
+                                        form.setValue('country', selectedCountry.code, {
+                                          shouldDirty: true,
+                                          shouldValidate: true
+                                        });
+                                        field.onChange(selectedCountry.code);
+                                      }
                                       setCountryOpen(false);
                                     }}
                                   >
@@ -391,7 +509,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
 
               <Button
                 type="submit"
-                disabled={isPending || isTransitionPending || !form.formState.isDirty}
+                disabled={isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
               >
                 {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
               </Button>

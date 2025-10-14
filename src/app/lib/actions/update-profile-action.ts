@@ -42,7 +42,7 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
       // Extract first and last name from the parsed data
       const { firstName, lastName } = parsed.data;
 
-      // Combine first and last name into the 'name' field for the User model
+      // Combine first and last name into the 'name' field for backward compatibility
       const fullName = `${firstName} ${lastName}`.trim();
 
       // Update user in database
@@ -50,8 +50,16 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
         where: { id: session.user.id },
         data: {
           name: fullName,
-          // Note: We'll store phone in a custom field when we extend the User model
-          // For now, we'll skip phone until the schema is updated
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          phone: parsed.data.phone,
+          addressLine1: parsed.data.addressLine1,
+          addressLine2: parsed.data.addressLine2,
+          city: parsed.data.city,
+          state: parsed.data.state,
+          zipCode: parsed.data.zipCode,
+          country: parsed.data.country,
+          allowSmsNotifications: parsed.data.allowSmsNotifications,
         },
       });
 

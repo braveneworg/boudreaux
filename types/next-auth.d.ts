@@ -7,7 +7,18 @@ declare module "next-auth" {
     user: {
       id: string; // Ensure id is defined
       username: string; // Add username if needed
-      // Add other custom properties if needed
+
+      // Profile fields
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string;
+      country?: string;
+      allowSmsNotifications?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -15,7 +26,18 @@ declare module "next-auth" {
     id: string; // Ensure id is defined
     username: string;
     emailVerified?: Date; // Ensure emailVerified is defined and optional
-    // Add other custom properties if needed
+
+    // Profile fields
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    allowSmsNotifications?: boolean;
   }
 }
 
@@ -24,6 +46,18 @@ declare module "next-auth/adapters" {
     id: string;
     username: string;
     emailVerified?: Date | null;
+
+    // Profile fields
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    allowSmsNotifications?: boolean;
   }
 }
 
