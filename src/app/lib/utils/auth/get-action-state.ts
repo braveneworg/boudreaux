@@ -20,9 +20,9 @@ const getActionState = <TForm>(data: FormData, permittedFieldNames: string[], fo
     let value: boolean | string = formData[key]!.toString();
 
     // Convert checkbox/switch "on" values to boolean
-    if (value === 'true') {
+    if (value === 'true' || value === 'on') {
       value = true;
-    } else if (value === 'on' || value === 'false') {
+    } else if (value === 'false' || value === 'off') {
       value = false;
     }
 
