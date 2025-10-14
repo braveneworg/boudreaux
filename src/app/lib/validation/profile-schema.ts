@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COUNTRIES } from '../utils/countries';
+import { US_STATES } from '../utils/states';
 
 const profileSchema = z.object({
   firstName: z.string()
@@ -29,7 +30,9 @@ const profileSchema = z.object({
     .optional()
     .or(z.literal('')),
   state: z.string()
-    .max(50, { message: 'State must be less than 50 characters' })
+    .refine((value) => value === '' || US_STATES.some(state => state.code === value), {
+      message: 'Please select a valid US state',
+    })
     .optional()
     .or(z.literal('')),
   zipCode: z.string()

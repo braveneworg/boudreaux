@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
@@ -8,7 +8,8 @@ import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profil
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type { FormState } from '@/app/lib/types/form-state';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
-import { COUNTRIES, getDefaultCountry } from '@/app/lib/utils/countries';
+import { COUNTRIES } from '@/app/lib/utils/countries';
+import { US_STATES } from '@/app/lib/utils/states';
 
 import {
   Form,
@@ -64,6 +65,8 @@ const initialFormState: FormState = {
 export default function ProfileForm({ user }: ProfileFormProps) {
   const [formState, action, isPending] = useActionState(updateProfileAction, initialFormState);
   const [countryOpen, setCountryOpen] = useState(false);
+  const [stateOpen, setStateOpen] = useState(false);
+  const [isTransitionPending, startTransition] = useTransition();
 
   // Split the full name into first and last name for the form
   const { firstName, lastName } = splitFullName(user.name);
@@ -79,7 +82,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
       city: user.city || '',
       state: user.state || '',
       zipCode: user.zipCode || '',
-      country: user.country || getDefaultCountry(),
+      country: user.country || '',
       allowSmsNotifications: user.allowSmsNotifications || false,
     },
   });
@@ -97,8 +100,10 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     formData.append('country', data.country || '');
     formData.append('allowSmsNotifications', data.allowSmsNotifications ? 'true' : 'false');
 
-    // TODO: Show some loading state while the action is pending
-    action(formData);
+    // Use startTransition to properly handle the async action
+    startTransition(() => {
+      action(formData);
+    });
   };
 
   return (
@@ -261,12 +266,50 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>State</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="NY"
-                            {...field}
-                          />
-                        </FormControl>
+                        <Popover open={stateOpen} onOpenChange={setStateOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={stateOpen}
+                                className="w-full justify-between"
+                              >
+                                {field.value
+                                  ? US_STATES.find((state) => state.code === field.value)?.name
+                                  : "Select a state..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search states..." />
+                              <CommandEmpty>No state found.</CommandEmpty>
+                              <CommandList>
+                                <CommandGroup>
+                                  {US_STATES.map((state) => (
+                                    <CommandItem
+                                      key={state.code}
+                                      value={state.name}
+                                      onSelect={() => {
+                                        field.onChange(state.code);
+                                        setStateOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          field.value === state.code ? "opacity-100" : "opacity-0"
+                                        }`}
+                                      />
+                                      {state.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -346,8 +389,11 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                 />
               </div>
 
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Updating...' : 'Update Profile'}
+              <Button
+                type="submit"
+                disabled={isPending || isTransitionPending || !form.formState.isDirty}
+              >
+                {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
               </Button>
             </form>
           </Form>
