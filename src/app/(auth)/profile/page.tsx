@@ -1,5 +1,3 @@
-import { auth } from '../../../../auth';
-import { redirect } from 'next/navigation';
 import ProfileForm from '@/app/components/forms/profile-form';
 
 export default async function ProfilePage() {

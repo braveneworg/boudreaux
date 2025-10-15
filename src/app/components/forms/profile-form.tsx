@@ -150,7 +150,7 @@ export default function ProfileForm() {
   }, [areFormValuesSet, form.formState.dirtyFields, setFormValues, user]);
 
 
-  if (status === 'loading') {
+  if (status === 'loading' || !user) {
     return (
       <div className='flex flex-col flex-wrap'>
         {Array.from({ length: 7 }).map((_, index) => (
