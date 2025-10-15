@@ -41,25 +41,6 @@ import {
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useSession } from 'next-auth/react';
-import { set } from 'mongoose';
-
-interface ProfileFormProps {
-  user: {
-    name?: string | null;
-    email?: string | null;
-    username?: string | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    phone?: string | null;
-    addressLine1?: string | null;
-    addressLine2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    zipCode?: string | null;
-    country?: string | null;
-    allowSmsNotifications?: boolean | null;
-  };
-}
 
 const initialFormState: FormState = {
   success: false,
@@ -73,8 +54,8 @@ export default function ProfileForm() {
   const [stateOpen, setStateOpen] = useState(false);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
-  const session = useSession();
-  const user = session?.data?.user;
+  const { data: session, status } = useSession();
+  const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
 
   // Use direct firstName/lastName fields, with fallback to splitting the name
@@ -139,7 +120,6 @@ export default function ProfileForm() {
 
   const setFormValues = useCallback((user: ProfileFormData) => {
     if (user && !areFormValuesSet) {
-      console.log(`143: profile-form > formState.fields >>>`, formState);
       Object.entries(user).forEach(([key, value]) => {
         // Only set the form value if the user has interacted with the form
         if (hasUserInteracted) return;
@@ -160,7 +140,7 @@ export default function ProfileForm() {
       });
       setAreFormValuesSet(true);
     }
-  }, [formState, hasUserInteracted, watchedValues, form]);
+  }, [areFormValuesSet, hasUserInteracted, watchedValues, form]);
 
   useEffect(() => {
     if (!areFormValuesSet) {
@@ -169,9 +149,15 @@ export default function ProfileForm() {
     }
   }, [areFormValuesSet, form.formState.dirtyFields, setFormValues, user]);
 
-  // If no user session, don't render the form
-  if (!user) {
-    return <Skeleton className="h-10 w-full" />;
+
+  if (status === 'loading') {
+    return (
+      <div className='flex flex-col flex-wrap'>
+        {Array.from({ length: 7 }).map((_, index) => (
+          <Skeleton key={index} className="h-8 w-full mb-4" />
+        ))}
+      </div>
+    );
   }
 
   return (

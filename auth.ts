@@ -78,10 +78,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Initial sign in - store user data in token
       if (user) {
-        // Don't return the email
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { email, ...newUser } = user as User;
-        token.user = newUser;
+        token.user = user as User;
       }
 
       // On subsequent requests, refresh user data from database
@@ -96,6 +93,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               name: true,
               username: true,
               image: true,
+              email: true,
               emailVerified: true,
               firstName: true,
               lastName: true,
@@ -128,7 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      session && (session.user = token.user as User & AdapterUser & { id: string; username: string; });
+      session && (session.user = token.user as User & AdapterUser & { id: string; username: string; email: string; });
 
       return session;
     },

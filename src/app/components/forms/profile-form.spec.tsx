@@ -97,6 +97,38 @@ vi.mock('lucide-react', () => ({
   AlertCircle: () => <span>⚠</span>,
 }));
 
+// Mock next-auth useSession
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: {
+      user: {
+        id: '1',
+        name: 'Test User',
+        email: 'test@example.com',
+        username: 'testuser',
+        firstName: 'Test',
+        lastName: 'User',
+      }
+    },
+    status: 'authenticated'
+  })
+}));
+
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    useActionState: () => [{}, vi.fn(), false],
+    useTransition: () => [false, vi.fn()],
+    useState: (initial: any) => {
+      // Handle specific state variables that affect loading
+      if (initial === true) return [false, vi.fn()]; // isLoading should be false
+      if (initial === false) return [true, vi.fn()]; // areFormValuesSet should be true
+      return [initial, vi.fn()];
+    },
+  };
+});
+
 vi.mock('@/app/lib/actions/update-profile-action', () => ({
   updateProfileAction: vi.fn(),
 }));
@@ -123,37 +155,21 @@ vi.mock('@/app/lib/utils/states', () => ({
 }));
 
 // Import the component after mocking
-import ProfileForm from '@/app/components/forms/profile-form';
-
-const mockUser = {
-  name: 'John Doe',
-  email: 'john@example.com',
-  username: 'johndoe',
-  firstName: '',
-  lastName: '',
-  phone: '',
-  addressLine1: '',
-  addressLine2: '',
-  city: '',
-  state: '',
-  zipCode: '',
-  country: '',
-  allowSmsNotifications: false,
-};
+import ProfileForm from './profile-form';
 
 describe('ProfileForm', () => {
   it('renders without crashing', () => {
-    render(<ProfileForm user={mockUser} />);
+    render(<ProfileForm />);
     expect(screen.getByTestId('form')).toBeInTheDocument();
   });
 
   it('renders submit button', () => {
-    render(<ProfileForm user={mockUser} />);
+    render(<ProfileForm />);
     expect(screen.getByRole('button', { name: /update profile/i })).toBeInTheDocument();
   });
 
   it('renders form fields', () => {
-    render(<ProfileForm user={mockUser} />);
+    render(<ProfileForm />);
 
     // Check for some form inputs
     const inputs = screen.getAllByRole('textbox');
