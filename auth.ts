@@ -65,13 +65,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Handle session updates (when user profile is updated)
+      if (trigger === "update" && session) {
+        // Merge the updated session data into the token
+        token.user = {
+          ...(token.user as object || {}),
+          ...(session as object || {})
+        };
+        return token;
+      }
+
+      // Initial sign in - store user data in token
       if (user) {
-        // Don't return the password or email
+        // Don't return the email
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { email, ...newUser } = user as User;
-
         token.user = newUser;
+      }
+
+      // On subsequent requests, refresh user data from database
+      // This ensures session stays in sync with latest user data
+      if (token.user && typeof token.user === 'object' && 'id' in token.user && !trigger) {
+        try {
+          const userId = (token.user as { id: string }).id;
+          const freshUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              image: true,
+              emailVerified: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              addressLine1: true,
+              addressLine2: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              country: true,
+              allowSmsNotifications: true,
+              // Add other fields you want in the session
+            }
+          });
+
+          if (freshUser) {
+            token.user = freshUser;
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          // Keep existing token data if database fetch fails
+        }
       }
 
       return token;
@@ -82,7 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      session && (session.user = token.user as User & AdapterUser & { id: string; username: string });
+      session && (session.user = token.user as User & AdapterUser & { id: string; username: string; });
 
       return session;
     },

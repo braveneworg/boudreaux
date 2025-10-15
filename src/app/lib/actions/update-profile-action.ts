@@ -25,9 +25,6 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);
 
-  console.log(`28: update-profile-action > formState >>>`, formState);
-  console.log(`29: update-profile-action > parsed >>>`, parsed);
-
   if (parsed.success) {
     try {
       // Get current user session
@@ -65,8 +62,6 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
         },
       });
 
-      console.log('Profile updated successfully for user ID:', session.user.id);
-
       formState.success = true;
 
       // Revalidate the profile page to show updated data
@@ -77,10 +72,8 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
 
       // Handle specific database errors
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        console.error('Database error:', error);
         setUnknownError(formState);
       } else {
-        console.error('Unknown error:', error);
         setUnknownError(formState);
       }
     }

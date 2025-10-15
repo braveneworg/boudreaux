@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
@@ -39,6 +39,7 @@ import {
   CommandList,
 } from '@/app/components/forms/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
 
 interface ProfileFormProps {
   user: {
@@ -130,6 +131,35 @@ export default function ProfileForm({ user }: ProfileFormProps) {
       action(formData);
     });
   };
+
+  useEffect(() => {
+    // Get the current user values to bind to the form
+    if (formState.fields) {
+      Object.entries(formState.fields).forEach(([key, value]) => {
+        // Only set the form value if the user has interacted with the form
+        if (hasUserInteracted) return;
+
+        // Ensure the key exists in the form schema
+        if (key in watchedValues) {
+          // For boolean fields, ensure proper boolean conversion
+          if (key === 'allowSmsNotifications') {
+            if (value === 'true' || value === true) {
+              form.setValue(key as keyof ProfileFormData, true);
+            } else {
+              form.setValue(key as keyof ProfileFormData, false);
+            }
+          } else {
+            form.setValue(key as keyof ProfileFormData, value as unknown as string);
+          }
+        }
+      });
+    }
+  }, [formState.fields, form, hasUserInteracted, watchedValues]);
+
+  // If no user session, don't render the form
+  if (!user) {
+    return <Skeleton className="h-10 w-full" />;
+  }
 
   return (
     <div className="space-y-6">
