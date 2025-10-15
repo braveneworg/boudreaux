@@ -15,9 +15,11 @@ interface TextFieldProps<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 > {
+  className?: string;
   control: Control<TFieldValues>;
   name: TName;
   label: string;
+  labelClassName?: string;
   placeholder: string;
   type?: 'text' | 'email' | 'tel';
   onUserInteraction?: () => void;
@@ -28,9 +30,11 @@ export default function TextField<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 >({
+  className,
   control,
   name,
   label,
+  labelClassName,
   placeholder,
   type = 'text',
   onUserInteraction,
@@ -41,8 +45,8 @@ export default function TextField<
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
+        <FormItem className={className}>
+          <FormLabel className={labelClassName}>{label}</FormLabel>
           <FormControl>
             <Input
               placeholder={placeholder}

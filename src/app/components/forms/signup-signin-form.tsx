@@ -64,11 +64,11 @@ const SignupSigninForm = ({
             <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
               <FormControl>
                 <Switch
-                name="termsAndConditions"
-                id="terms-and-conditions"
-                checked={!!field.value || false}
-                onCheckedChange={field.onChange}
-                required
+                  name="termsAndConditions"
+                  id="terms-and-conditions"
+                  checked={!!field.value || false}
+                  onCheckedChange={field.onChange}
+                  required
                 />
               </FormControl>
               <FormLabel htmlFor="terms-and-conditions">

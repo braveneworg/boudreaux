@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
 import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
+import changeEmailSchema, { type ChangeEmailFormData } from '@/app/lib/validation/change-email-schema';
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type { FormState } from '@/app/lib/types/form-state';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
@@ -25,19 +26,20 @@ const initialFormState: FormState = {
 };
 
 export default function ProfileForm() {
-  const [formState, action, isPending] = useActionState(updateProfileAction, initialFormState);
+  const [formState, profileFormAction, isPending] = useActionState(updateProfileAction, initialFormState);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
+  const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
 
   // Use direct firstName/lastName fields, with fallback to splitting the name
   const fallbackNames = splitFullName(user?.name);
   const firstName = user?.firstName || fallbackNames.firstName || '';
   const lastName = user?.lastName || fallbackNames.lastName || '';
 
-  const form = useForm<ProfileFormData>({
+  const personalProfileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       firstName: firstName,
@@ -53,8 +55,16 @@ export default function ProfileForm() {
     },
   });
 
+  const changeEmailForm = useForm<ChangeEmailFormData>({
+    resolver: zodResolver(changeEmailSchema),
+    defaultValues: {
+      email: user?.email ?? '',
+      confirmEmail: '',
+    },
+  });
+
   // Watch all form values to check if form has any content
-  const watchedValues = form.watch();
+  const watchedValues = personalProfileForm.watch();
 
   // Check if all personal profile fields are empty
   const hasFormContent = () => {
@@ -73,7 +83,7 @@ export default function ProfileForm() {
     );
   };
 
-  const onSubmit = (data: ProfileFormData) => {
+  const onSubmitPersonalProfileForm = (data: ProfileFormData) => {
     const formData = new FormData();
     formData.append('firstName', data.firstName || '');
     formData.append('lastName', data.lastName || '');
@@ -88,7 +98,24 @@ export default function ProfileForm() {
 
     // Use startTransition to properly handle the async action
     startTransition(() => {
-      action(formData);
+      profileFormAction(formData);
+    });
+  };
+
+  const handleEditEmailSubmit = (data: ChangeEmailFormData) => {
+    if (data.email === user?.email) {
+      // No change in email, do nothing
+      setIsEditingUserEmail(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('email', data.email || '');
+    formData.append('confirmEmail', data.confirmEmail || '');
+
+    // Use startTransition to properly handle the async action
+    startTransition(() => {
+      changeEmailAction(formData);
     });
   };
 
@@ -103,25 +130,25 @@ export default function ProfileForm() {
           // For boolean fields, ensure proper boolean conversion
           if (key === 'allowSmsNotifications') {
             if (value === 'true' || value === true) {
-              form.setValue(key as keyof ProfileFormData, true);
+              personalProfileForm.setValue(key as keyof ProfileFormData, true);
             } else {
-              form.setValue(key as keyof ProfileFormData, false);
+              personalProfileForm.setValue(key as keyof ProfileFormData, false);
             }
           } else {
-            form.setValue(key as keyof ProfileFormData, value as unknown as string);
+            personalProfileForm.setValue(key as keyof ProfileFormData, value as unknown as string);
           }
         }
       });
       setAreFormValuesSet(true);
     }
-  }, [areFormValuesSet, hasUserInteracted, watchedValues, form]);
+  }, [areFormValuesSet, hasUserInteracted, watchedValues, personalProfileForm]);
 
   useEffect(() => {
     if (!areFormValuesSet) {
       // Get the current user values to bind to the form
       setFormValues(user as ProfileFormData);
     }
-  }, [areFormValuesSet, form.formState.dirtyFields, setFormValues, user]);
+  }, [areFormValuesSet, personalProfileForm.formState.dirtyFields, setFormValues, user]);
 
 
   if (status === 'loading' || !user) {
@@ -132,6 +159,10 @@ export default function ProfileForm() {
         ))}
       </div>
     );
+  }
+
+  function handleEditEmailClick(): void {
+    setIsEditingUserEmail(!isEditingUserEmail);
   }
 
   return (
@@ -162,40 +193,40 @@ export default function ProfileForm() {
             </Alert>
           )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Form {...personalProfileForm}>
+            <form onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
-                  control={form.control}
+                  control={personalProfileForm.control}
                   name="firstName"
                   label="First Name"
                   placeholder="Enter your first name"
                   onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={form.setValue}
+                  setValue={personalProfileForm.setValue}
                 />
 
                 <TextField
-                  control={form.control}
+                  control={personalProfileForm.control}
                   name="lastName"
                   label="Last Name"
                   placeholder="Enter your last name"
                   onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={form.setValue}
+                  setValue={personalProfileForm.setValue}
                 />
               </div>
 
               <TextField
-                control={form.control}
+                control={personalProfileForm.control}
                 name="phone"
                 label="Phone Number"
                 placeholder="(555) 123-4567"
                 type="tel"
                 onUserInteraction={() => setHasUserInteracted(true)}
-                setValue={form.setValue}
+                setValue={personalProfileForm.setValue}
               />
 
               <CheckboxField
-                control={form.control}
+                control={personalProfileForm.control}
                 name="allowSmsNotifications"
                 id="allow-sms-notifications"
                 label={
@@ -206,66 +237,66 @@ export default function ProfileForm() {
                   </>
                 }
                 onUserInteraction={() => setHasUserInteracted(true)}
-                setValue={form.setValue}
+                setValue={personalProfileForm.setValue}
               />
 
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Address Information</h3>
 
                 <TextField
-                  control={form.control}
+                  control={personalProfileForm.control}
                   name="addressLine1"
                   label="Address"
                   placeholder="123 Main Street"
                   onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={form.setValue}
+                  setValue={personalProfileForm.setValue}
                 />
 
                 <TextField
-                  control={form.control}
+                  control={personalProfileForm.control}
                   name="addressLine2"
                   label="Address Line 2"
                   placeholder="Apartment, suite, unit, etc."
                   onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={form.setValue}
+                  setValue={personalProfileForm.setValue}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <TextField
-                    control={form.control}
+                    control={personalProfileForm.control}
                     name="city"
                     label="City"
                     placeholder="New York"
                     onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={form.setValue}
+                    setValue={personalProfileForm.setValue}
                   />
 
                   <StateField
-                    control={form.control}
+                    control={personalProfileForm.control}
                     onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={form.setValue}
+                    setValue={personalProfileForm.setValue}
                   />
 
                   <TextField
-                    control={form.control}
+                    control={personalProfileForm.control}
                     name="zipCode"
                     label="ZIP / Postal Code"
                     placeholder="12345"
                     onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={form.setValue}
+                    setValue={personalProfileForm.setValue}
                   />
                 </div>
 
                 <CountryField
-                  control={form.control}
+                  control={personalProfileForm.control}
                   onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={form.setValue}
+                  setValue={personalProfileForm.setValue}
                 />
               </div>
 
               <Button
                 type="submit"
-                disabled={isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
+                disabled={!personalProfileForm.isDirty ||isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
               >
                 {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
               </Button>
@@ -281,16 +312,50 @@ export default function ProfileForm() {
             Manage your account credentials and preferences.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <div className="font-medium">Email Address</div>
-              <div className="text-sm text-muted-foreground">{user.email}</div>
-            </div>
-            <Button variant="outline" size="sm">
-              Change
-            </Button>
-          </div>
+        <CardContent>
+          <Form {...changeEmailForm}>
+            <form className="flex flex-wrap items-center justify-between" onSubmit={changeEmailForm.handleSubmit(handleEditEmailSubmit)}>
+              <div className="flex font-medium">Email Address</div>
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={handleEditEmailClick}>
+                  { isEditingUserEmail ? 'Cancel' : 'Change' }
+                </Button>
+                <Button
+                  size="sm"
+                  type="submit"
+                  disabled={
+                    Object.keys(changeEmailForm.formState.errors).length > 0 ||
+                    isPending ||
+                    isTransitionPending ||
+                    !isEditingUserEmail ||
+                    !changeEmailForm.formState.isDirty
+                  }
+                  className="ml-2"
+                >
+                  {isPending || isTransitionPending ? 'Updating...' : 'Update Email'}
+                </Button>
+              </div>
+            {!isEditingUserEmail && <div className="text-sm text-muted-foreground w-full">{user.email}</div>}
+            {isEditingUserEmail && <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
+              <TextField
+                control={changeEmailForm.control}
+                name="email"
+                label="Email"
+                labelClassName="sr-only"
+                placeholder="Enter your email address"
+                setValue={changeEmailForm.setValue}
+              />
+              <TextField
+                control={changeEmailForm.control}
+                name="confirmEmail"
+                label="Confirm Email"
+                labelClassName="sr-only"
+                placeholder="Confirm your email address"
+                setValue={changeEmailForm.setValue}
+              />
+            </div>}
+            </form>
+          </Form>
 
           <div className="flex items-center justify-between py-2">
             <div>
@@ -299,7 +364,7 @@ export default function ProfileForm() {
                 {`@${user.username}` || 'Not set'}
               </div>
             </div>
-            <Button variant="outline" size="sm">
+            <Button type="button" variant="outline" size="sm">
               Change
             </Button>
           </div>
