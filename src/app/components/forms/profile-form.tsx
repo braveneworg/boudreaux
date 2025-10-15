@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
@@ -40,6 +40,8 @@ import {
 } from '@/app/components/forms/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
+import { useSession } from 'next-auth/react';
+import { set } from 'mongoose';
 
 interface ProfileFormProps {
   user: {
@@ -65,31 +67,34 @@ const initialFormState: FormState = {
   fields: {},
 };
 
-export default function ProfileForm({ user }: ProfileFormProps) {
+export default function ProfileForm() {
   const [formState, action, isPending] = useActionState(updateProfileAction, initialFormState);
   const [countryOpen, setCountryOpen] = useState(false);
   const [stateOpen, setStateOpen] = useState(false);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const session = useSession();
+  const user = session?.data?.user;
+  const [areFormValuesSet, setAreFormValuesSet] = useState(false);
 
   // Use direct firstName/lastName fields, with fallback to splitting the name
-  const fallbackNames = splitFullName(user.name);
-  const firstName = user.firstName || fallbackNames.firstName || '';
-  const lastName = user.lastName || fallbackNames.lastName || '';
+  const fallbackNames = splitFullName(user?.name);
+  const firstName = user?.firstName || fallbackNames.firstName || '';
+  const lastName = user?.lastName || fallbackNames.lastName || '';
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       firstName: firstName,
       lastName: lastName,
-      phone: user.phone ?? '',
-      addressLine1: user.addressLine1 ?? '',
-      addressLine2: user.addressLine2 ?? '',
-      city: user.city ?? '',
-      state: user.state ?? '',
-      zipCode: user.zipCode ?? '',
-      country: user.country ?? '',
-      allowSmsNotifications: user.allowSmsNotifications ?? false,
+      phone: user?.phone ?? '',
+      addressLine1: user?.addressLine1 ?? '',
+      addressLine2: user?.addressLine2 ?? '',
+      city: user?.city ?? '',
+      state: user?.state ?? '',
+      zipCode: user?.zipCode ?? '',
+      country: user?.country ?? '',
+      allowSmsNotifications: user?.allowSmsNotifications ?? false,
     },
   });
 
@@ -132,10 +137,10 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     });
   };
 
-  useEffect(() => {
-    // Get the current user values to bind to the form
-    if (formState.fields) {
-      Object.entries(formState.fields).forEach(([key, value]) => {
+  const setFormValues = useCallback((user: ProfileFormData) => {
+    if (user && !areFormValuesSet) {
+      console.log(`143: profile-form > formState.fields >>>`, formState);
+      Object.entries(user).forEach(([key, value]) => {
         // Only set the form value if the user has interacted with the form
         if (hasUserInteracted) return;
 
@@ -153,8 +158,16 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           }
         }
       });
+      setAreFormValuesSet(true);
     }
-  }, [formState.fields, form, hasUserInteracted, watchedValues]);
+  }, [formState, hasUserInteracted, watchedValues, form]);
+
+  useEffect(() => {
+    if (!areFormValuesSet) {
+      // Get the current user values to bind to the form
+      setFormValues(user as ProfileFormData);
+    }
+  }, [areFormValuesSet, form.formState.dirtyFields, setFormValues, user]);
 
   // If no user session, don't render the form
   if (!user) {

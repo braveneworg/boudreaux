@@ -3,12 +3,6 @@ import { redirect } from 'next/navigation';
 import ProfileForm from '@/app/components/forms/profile-form';
 
 export default async function ProfilePage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect('/signin');
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -18,7 +12,7 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      <ProfileForm user={session.user} />
+      <ProfileForm />
     </div>
   );
 }
