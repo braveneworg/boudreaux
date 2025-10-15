@@ -8,39 +8,15 @@ import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profil
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type { FormState } from '@/app/lib/types/form-state';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
-import { COUNTRIES } from '@/app/lib/utils/countries';
-import { US_STATES } from '@/app/lib/utils/states';
 
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/app/components/forms/ui/form';
-import { Input } from '@/app/components/forms/ui/input';
-import { Button } from '@/app/components/forms/ui/button';
-import { Checkbox } from '@/app/components/forms/ui/checkbox';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/forms/ui/card';
-import { Alert, AlertDescription } from '@/app/components/forms/ui/alert';
+import { Form } from '@/app/components/ui/form';
+import { Button } from '@/app/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { AlertCircle, CircleCheck } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/app/components/forms/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/app/components/forms/ui/command';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { Skeleton } from './ui/skeleton';
+import { Skeleton } from '../ui/skeleton';
 import { useSession } from 'next-auth/react';
+import { TextField, CheckboxField, StateField, CountryField } from './fields';
 
 const initialFormState: FormState = {
   success: false,
@@ -50,8 +26,6 @@ const initialFormState: FormState = {
 
 export default function ProfileForm() {
   const [formState, action, isPending] = useActionState(updateProfileAction, initialFormState);
-  const [countryOpen, setCountryOpen] = useState(false);
-  const [stateOpen, setStateOpen] = useState(false);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status } = useSession();
@@ -191,348 +165,101 @@ export default function ProfileForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
+                <TextField
                   control={form.control}
                   name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your first name"
-                          {...field}
-                          onChange={(e) => {
-                            setHasUserInteracted(true);
-                            form.setValue('firstName', e.target.value, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                            field.onChange(e);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  label="First Name"
+                  placeholder="Enter your first name"
+                  onUserInteraction={() => setHasUserInteracted(true)}
+                  setValue={form.setValue}
                 />
 
-                <FormField
+                <TextField
                   control={form.control}
                   name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter your last name"
-                          {...field}
-                          onChange={(e) => {
-                            setHasUserInteracted(true);
-                            form.setValue('lastName', e.target.value, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                            field.onChange(e);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  label="Last Name"
+                  placeholder="Enter your last name"
+                  onUserInteraction={() => setHasUserInteracted(true)}
+                  setValue={form.setValue}
                 />
               </div>
 
-              <FormField
+              <TextField
                 control={form.control}
                 name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="(555) 123-4567"
-                        type="tel"
-                        {...field}
-                        onChange={(e) => {
-                          setHasUserInteracted(true);
-                          form.setValue('phone', e.target.value, {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          });
-                          field.onChange(e);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                label="Phone Number"
+                placeholder="(555) 123-4567"
+                type="tel"
+                onUserInteraction={() => setHasUserInteracted(true)}
+                setValue={form.setValue}
               />
 
-              <FormField
+              <CheckboxField
                 control={form.control}
                 name="allowSmsNotifications"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          setHasUserInteracted(true);
-                          const boolValue = checked === true;
-                          form.setValue('allowSmsNotifications', boolValue, {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          });
-                          field.onChange(boolValue);
-                        }}
-                        id="allow-sms-notifications"
-                      />
-                    </FormControl>
-                    <FormLabel className="block text-sm font-normal" htmlFor="allow-sms-notifications">
-                      <strong>Allow us to send text messages to your mobile phone occasionally?</strong>
-                      <br />
-                      <em className='inline-block mt-3'>(Carrier charges may apply)</em>
-                    </FormLabel>
-                  </FormItem>
-                )}
+                id="allow-sms-notifications"
+                label={
+                  <>
+                    <strong>Allow us to send text messages to your mobile phone occasionally?</strong>
+                    <br />
+                    <em className='inline-block mt-3'>(Carrier charges may apply)</em>
+                  </>
+                }
+                onUserInteraction={() => setHasUserInteracted(true)}
+                setValue={form.setValue}
               />
 
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Address Information</h3>
 
-                <FormField
+                <TextField
                   control={form.control}
                   name="addressLine1"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="123 Main Street"
-                          {...field}
-                          onChange={(e) => {
-                            setHasUserInteracted(true);
-                            form.setValue('addressLine1', e.target.value, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                            field.onChange(e);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  label="Address"
+                  placeholder="123 Main Street"
+                  onUserInteraction={() => setHasUserInteracted(true)}
+                  setValue={form.setValue}
                 />
 
-                <FormField
+                <TextField
                   control={form.control}
                   name="addressLine2"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address Line 2</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Apartment, suite, unit, etc."
-                          {...field}
-                          onChange={(e) => {
-                            setHasUserInteracted(true);
-                            form.setValue('addressLine2', e.target.value, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                            field.onChange(e);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  label="Address Line 2"
+                  placeholder="Apartment, suite, unit, etc."
+                  onUserInteraction={() => setHasUserInteracted(true)}
+                  setValue={form.setValue}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
+                  <TextField
                     control={form.control}
                     name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="New York"
-                            {...field}
-                            onChange={(e) => {
-                              setHasUserInteracted(true);
-                              form.setValue('city', e.target.value, {
-                                shouldDirty: true,
-                                shouldValidate: true
-                              });
-                              field.onChange(e);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    label="City"
+                    placeholder="New York"
+                    onUserInteraction={() => setHasUserInteracted(true)}
+                    setValue={form.setValue}
                   />
 
-                  <FormField
+                  <StateField
                     control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <Popover open={stateOpen} onOpenChange={setStateOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={stateOpen}
-                                className="w-full justify-between"
-                              >
-                                {field.value
-                                  ? (() => {
-                                      const selectedState = US_STATES.find((state) => state.code === field.value);
-                                      return selectedState ? `${selectedState.name} - ${selectedState.code}` : "Select a state...";
-                                    })()
-                                  : "Select a state..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search states..." />
-                              <CommandEmpty>No state found.</CommandEmpty>
-                              <CommandList>
-                                <CommandGroup>
-                                  {US_STATES.map((state) => (
-                                    <CommandItem
-                                      key={state.code}
-                                      value={state.name.toLowerCase()}
-                                      onSelect={(currentValue) => {
-                                        setHasUserInteracted(true);
-                                        const selectedState = US_STATES.find(
-                                          (s) => s.name.toLowerCase() === currentValue
-                                        );
-                                        if (selectedState) {
-                                          form.setValue('state', selectedState.code, {
-                                            shouldDirty: true,
-                                            shouldValidate: true
-                                          });
-                                          field.onChange(selectedState.code);
-                                        }
-                                        setStateOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={`mr-2 h-4 w-4 ${
-                                          field.value === state.code ? "opacity-100" : "opacity-0"
-                                        }`}
-                                      />
-                                      {state.name} - {state.code}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    onUserInteraction={() => setHasUserInteracted(true)}
+                    setValue={form.setValue}
                   />
 
-                  <FormField
+                  <TextField
                     control={form.control}
                     name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ZIP / Postal Code</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="12345"
-                            {...field}
-                            onChange={(e) => {
-                              setHasUserInteracted(true);
-                              form.setValue('zipCode', e.target.value, {
-                                shouldDirty: true,
-                                shouldValidate: true
-                              });
-                              field.onChange(e);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    label="ZIP / Postal Code"
+                    placeholder="12345"
+                    onUserInteraction={() => setHasUserInteracted(true)}
+                    setValue={form.setValue}
                   />
                 </div>
 
-                <FormField
+                <CountryField
                   control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Country</FormLabel>
-                      <Popover open={countryOpen} onOpenChange={setCountryOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={countryOpen}
-                              className="w-full justify-between"
-                            >
-                              {field.value
-                                ? COUNTRIES.find((country) => country.code === field.value)?.name
-                                : "Select a country..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search countries..." />
-                            <CommandEmpty>No country found.</CommandEmpty>
-                            <CommandList>
-                              <CommandGroup>
-                                {COUNTRIES.map((country) => (
-                                  <CommandItem
-                                    key={country.code}
-                                    value={country.name.toLowerCase()}
-                                      onSelect={(currentValue) => {
-                                      setHasUserInteracted(true);
-                                      const selectedCountry = COUNTRIES.find(
-                                        (c) => c.name.toLowerCase() === currentValue
-                                      );
-                                      if (selectedCountry) {
-                                        form.setValue('country', selectedCountry.code, {
-                                          shouldDirty: true,
-                                          shouldValidate: true
-                                        });
-                                        field.onChange(selectedCountry.code);
-                                      }
-                                      setCountryOpen(false);
-                                    }}
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${
-                                        field.value === country.code ? "opacity-100" : "opacity-0"
-                                      }`}
-                                    />
-                                    {country.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  onUserInteraction={() => setHasUserInteracted(true)}
+                  setValue={form.setValue}
                 />
               </div>
 

@@ -3,6 +3,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 
+// Mock lucide-react icons
+vi.mock('lucide-react', () => ({
+  AlertCircle: (props: any) => <div data-testid="alert-circle-icon" {...props} />,
+  CircleCheck: (props: any) => <div data-testid="circle-check-icon" {...props} />,
+  Check: (props: any) => <div data-testid="check-icon" {...props} />,
+  ChevronsUpDown: (props: any) => <div data-testid="chevrons-up-down-icon" {...props} />,
+  CheckIcon: (props: any) => <div data-testid="check-icon" {...props} />,
+}));
+
 // Mock all external dependencies to avoid complex setup
 vi.mock('@/app/lib/utils', () => ({
   cn: (...args: any[]) => args.filter(Boolean).join(' '),
@@ -91,10 +100,36 @@ vi.mock('@/app/components/forms/ui/command', () => ({
   CommandList: ({ children }: any) => <div>{children}</div>,
 }));
 
-vi.mock('lucide-react', () => ({
-  Check: () => <span>✓</span>,
-  ChevronsUpDown: () => <span>↕</span>,
-  AlertCircle: () => <span>⚠</span>,
+// Mock the field components we created
+vi.mock('@/app/components/forms/fields', () => ({
+  TextField: ({ name, label, placeholder, ...props }: any) => (
+    <div data-testid={`text-field-${name}`}>
+      <label>{label}</label>
+      <input placeholder={placeholder} {...props} />
+    </div>
+  ),
+  CheckboxField: ({ name, label, ...props }: any) => (
+    <div data-testid={`checkbox-field-${name}`}>
+      <input type="checkbox" {...props} />
+      <label>{label}</label>
+    </div>
+  ),
+  StateField: ({ ...props }: any) => (
+    <div data-testid="state-field">
+      <label>State</label>
+      <select {...props}>
+        <option value="">Select a state...</option>
+      </select>
+    </div>
+  ),
+  CountryField: ({ ...props }: any) => (
+    <div data-testid="country-field">
+      <label>Country</label>
+      <select {...props}>
+        <option value="">Select a country...</option>
+      </select>
+    </div>
+  ),
 }));
 
 // Mock next-auth useSession

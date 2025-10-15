@@ -3,7 +3,7 @@ import { useSession } from 'next-auth/react';
 import SignInLink from './signin-link';
 import SignUpLink from './signup-link';
 import SignedinToolbar from './signout-button';
-import VerticalSeparator from '../forms/ui/vertical-separator';
+import VerticalSeparator from '../ui/vertical-separator';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 
 const AuthToolbar = ({ className }: { className?: string }) => {

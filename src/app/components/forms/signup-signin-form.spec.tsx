@@ -6,7 +6,7 @@ import type { FormState } from '@/app/lib/types/form-state';
 import React from 'react';
 
 // Mock all dependencies
-vi.mock('@/app/components/forms/ui/form-input', () => ({
+vi.mock('@/app/components/ui/form-input', () => ({
   default: ({ id, placeholder, type, ...props }: FormInputProps) => (
     <input
       data-testid={`form-input-${id}`}
@@ -18,7 +18,7 @@ vi.mock('@/app/components/forms/ui/form-input', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/form', () => ({
+vi.mock('@/app/components/ui/form', () => ({
   FormField: ({ name, render }: { name: string; render: (context: any) => React.ReactNode }) => {
     const field = {
       value: '',
@@ -41,7 +41,7 @@ vi.mock('@/app/components/forms/ui/form', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/switch', () => ({
+vi.mock('@/app/components/ui/switch', () => ({
   Switch: ({ id, checked, onCheckedChange, required, ...props }: SwitchProps) => (
     <input
       type="checkbox"
@@ -55,7 +55,7 @@ vi.mock('@/app/components/forms/ui/switch', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/button', () => ({
+vi.mock('@/app/components/ui/button', () => ({
   Button: ({ children, disabled, size, ...props }: ButtonProps) => (
     <button
       disabled={disabled}
@@ -68,7 +68,7 @@ vi.mock('@/app/components/forms/ui/button', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
+vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
     <div
       data-testid="turnstile-widget"
@@ -80,7 +80,7 @@ vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/status-indicator', () => ({
+vi.mock('@/app/components/ui/status-indicator', () => ({
   default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) => (
     <div
       data-testid="status-indicator"
@@ -134,6 +134,25 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
+}));
+
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/signup',
+}));
+
+// Mock react-hook-form
+vi.mock('react-hook-form', () => ({
+  Controller: ({ render }: { render: (context: any) => React.ReactNode }) => {
+    const field = {
+      value: '',
+      onChange: vi.fn(),
+      onBlur: vi.fn(),
+      name: 'test',
+      ref: vi.fn()
+    };
+    return render({ field });
+  },
 }));
 
 describe('SignupSigninForm', () => {

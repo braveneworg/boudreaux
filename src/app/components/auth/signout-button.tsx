@@ -1,8 +1,8 @@
-import { Button } from '../forms/ui/button';
+import { Button } from '../ui/button';
 import SignedInAs from './signed-in-as';
 import { signOut } from 'next-auth/react';
 import { LogOutIcon } from 'lucide-react';
-import VerticalSeparator from '../forms/ui/vertical-separator';
+import VerticalSeparator from '../ui/vertical-separator';
 import EditProfileButton from './edit-profile-button';
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
