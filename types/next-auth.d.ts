@@ -50,6 +50,7 @@ declare module "next-auth/adapters" {
     username: string;
     email: string;
     emailVerified?: Date | null;
+    previousEmail?: string; // For tracking previous email during changes
 
     // Profile fields
     firstName?: string;

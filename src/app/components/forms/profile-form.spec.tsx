@@ -168,6 +168,10 @@ vi.mock('@/app/lib/actions/update-profile-action', () => ({
   updateProfileAction: vi.fn(),
 }));
 
+vi.mock('@/app/lib/actions/change-email-action', () => ({
+  changeEmailAction: vi.fn(),
+}));
+
 vi.mock('@/app/lib/utils/profile-utils', () => ({
   splitFullName: (name: string) => ({
     firstName: name?.split(' ')[0] || '',
@@ -195,7 +199,8 @@ import ProfileForm from './profile-form';
 describe('ProfileForm', () => {
   it('renders without crashing', () => {
     render(<ProfileForm />);
-    expect(screen.getByTestId('form')).toBeInTheDocument();
+    // Check for the presence of both forms instead of using a generic selector
+    expect(screen.getAllByTestId('form')).toHaveLength(2);
   });
 
   it('renders submit button', () => {

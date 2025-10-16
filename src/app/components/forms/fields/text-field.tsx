@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 import {
   FormField,
@@ -23,6 +23,7 @@ interface TextFieldProps<
   placeholder: string;
   type?: 'text' | 'email' | 'tel';
   onUserInteraction?: () => void;
+  value?: string;
   setValue?: UseFormSetValue<TFieldValues>;
 }
 
@@ -39,7 +40,17 @@ export default function TextField<
   type = 'text',
   onUserInteraction,
   setValue,
+  value = '',
 }: TextFieldProps<TFieldValues, TName>) {
+  useEffect(() => {
+    if (setValue && value) {
+      setValue(name, value as TFieldValues[TName], {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+    }
+  }, [value, name, setValue]);
+
   return (
     <FormField
       control={control}
@@ -49,9 +60,9 @@ export default function TextField<
           <FormLabel className={labelClassName}>{label}</FormLabel>
           <FormControl>
             <Input
+              {...field}
               placeholder={placeholder}
               type={type}
-              {...field}
               onChange={(e) => {
                 onUserInteraction?.();
                 if (setValue) {

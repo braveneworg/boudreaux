@@ -80,10 +80,10 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
 
     // Override updateUser to allow updating extra fields
     updateUser: async (data) => {
-      const { id, ...updateData } = data
+      const { id, ...updateData } = data;
       const user = await p.user.update({
         where: { id },
-        data: updateData,
+        data: updateData
       })
       return {
         id: user.id,

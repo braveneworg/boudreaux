@@ -18,15 +18,17 @@ import { AlertCircle, CircleCheck } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { useSession } from 'next-auth/react';
 import { TextField, CheckboxField, StateField, CountryField } from './fields';
+import { changeEmailAction } from '@/app/lib/actions/change-email-action';
 
 const initialFormState: FormState = {
-  success: false,
-  hasTimeout: false,
+  errors: {},
   fields: {},
+  success: false,
 };
 
 export default function ProfileForm() {
   const [formState, profileFormAction, isPending] = useActionState(updateProfileAction, initialFormState);
+  const [, emailFormAction, isEmailPending] = useActionState(changeEmailAction, initialFormState);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status } = useSession();
@@ -60,6 +62,7 @@ export default function ProfileForm() {
     defaultValues: {
       email: user?.email ?? '',
       confirmEmail: '',
+      previousEmail: user?.email ?? '',
     },
   });
 
@@ -112,10 +115,10 @@ export default function ProfileForm() {
     const formData = new FormData();
     formData.append('email', data.email || '');
     formData.append('confirmEmail', data.confirmEmail || '');
-
+    formData.append('previousEmail', user?.email || '');
     // Use startTransition to properly handle the async action
-    startTransition(() => {
-      changeEmailAction(formData);
+    startTransition(async () => {
+      await emailFormAction(formData);
     });
   };
 
@@ -296,7 +299,7 @@ export default function ProfileForm() {
 
               <Button
                 type="submit"
-                disabled={!personalProfileForm.isDirty ||isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
+                disabled={!personalProfileForm.formState.isDirty || isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
               >
                 {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
               </Button>
@@ -309,7 +312,7 @@ export default function ProfileForm() {
         <CardHeader>
           <CardTitle>Account Settings</CardTitle>
           <CardDescription>
-            Manage your account credentials and preferences.
+            Manage your account credentials and preferences. <strong>Note:</strong> <em>Changing your email or username</em> will require you to sign in again.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -322,17 +325,16 @@ export default function ProfileForm() {
                 </Button>
                 <Button
                   size="sm"
-                  type="submit"
                   disabled={
                     Object.keys(changeEmailForm.formState.errors).length > 0 ||
                     isPending ||
+                    isEmailPending ||
                     isTransitionPending ||
                     !isEditingUserEmail ||
                     !changeEmailForm.formState.isDirty
                   }
-                  className="ml-2"
                 >
-                  {isPending || isTransitionPending ? 'Updating...' : 'Update Email'}
+                  {isPending || isEmailPending || isTransitionPending ? 'Updating...' : 'Update Email'}
                 </Button>
               </div>
             {!isEditingUserEmail && <div className="text-sm text-muted-foreground w-full">{user.email}</div>}

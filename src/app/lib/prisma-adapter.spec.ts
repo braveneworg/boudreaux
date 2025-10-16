@@ -361,7 +361,7 @@ describe('CustomPrismaAdapter', () => {
   });
 
   describe('updateUser', () => {
-    it('should update user data', async () => {
+    it('should update user data using id when no previousEmail provided', async () => {
       const updateData = {
         id: '1',
         name: 'Updated Name',
@@ -399,10 +399,51 @@ describe('CustomPrismaAdapter', () => {
       });
     });
 
-    it('should exclude id from update data', async () => {
+    it('should update user data using id and include previousEmail in data when provided', async () => {
       const updateData = {
         id: '1',
         name: 'Updated Name',
+        email: 'new@example.com',
+        previousEmail: 'old@example.com',
+      };
+
+      const updatedUser = {
+        id: '1',
+        name: 'Updated Name',
+        email: 'new@example.com',
+        emailVerified: null,
+        image: null,
+        username: null,
+      };
+
+      ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
+
+      const result = await adapter!.updateUser(updateData);
+
+      expect(((mockPrisma as any)).user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          name: 'Updated Name',
+          email: 'new@example.com',
+          previousEmail: 'old@example.com',
+        },
+      });
+
+      expect(result).toEqual({
+        id: '1',
+        name: 'Updated Name',
+        email: 'new@example.com',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
+    });
+
+    it('should exclude id but include previousEmail in update data', async () => {
+      const updateData = {
+        id: '1',
+        name: 'Updated Name',
+        previousEmail: 'old@example.com',
         someExtraField: 'value',
       };
 
@@ -422,6 +463,7 @@ describe('CustomPrismaAdapter', () => {
         where: { id: '1' },
         data: {
           name: 'Updated Name',
+          previousEmail: 'old@example.com',
           someExtraField: 'value',
         },
       });
@@ -430,6 +472,7 @@ describe('CustomPrismaAdapter', () => {
     it('should handle partial updates', async () => {
       const updateData = {
         id: '1',
+        email: 'test@example.com',
         emailVerified: new Date(),
       };
 
@@ -445,6 +488,14 @@ describe('CustomPrismaAdapter', () => {
       ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
 
       const result = await adapter!.updateUser(updateData);
+
+      expect(((mockPrisma as any)).user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          email: 'test@example.com',
+          emailVerified: updateData.emailVerified,
+        },
+      });
 
       expect(result).toEqual({
         id: '1',
