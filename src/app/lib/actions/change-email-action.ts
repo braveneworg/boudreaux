@@ -18,10 +18,7 @@ export const changeEmailAction = async (_initialState: FormState, payload: FormD
     'confirmEmail',
     'previousEmail',
   ];
-
   const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
-
-  console.log(`22: change-email-action > parsed >>>`, parsed);
 
   if (parsed.success) {
     try {
@@ -50,12 +47,9 @@ export const changeEmailAction = async (_initialState: FormState, payload: FormD
         previousEmail: previousEmail,
       } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
 
-      console.log(`34: change-email-action > formState >>>`, formState);
-
       formState.success = true;
 
     } catch (error: unknown) {
-      console.log(`39: change-email-action > error >>>`, error);
       formState.success = false;
       // Check for MongoDB timeout errors
       if (error instanceof Error && (

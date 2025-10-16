@@ -70,21 +70,6 @@ describe('changeEmailSchema', () => {
       }
     });
 
-    it('should reject invalid previousEmail format when provided', () => {
-      const invalidData = {
-        email: 'new@example.com',
-        confirmEmail: 'new@example.com',
-        previousEmail: 'invalid-email',
-      };
-
-      const result = changeEmailSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Invalid email address');
-        expect(result.error.issues[0].path).toEqual(['previousEmail']);
-      }
-    });
-
     it('should require email field', () => {
       const invalidData = {
         confirmEmail: 'test@example.com',
@@ -123,21 +108,6 @@ describe('changeEmailSchema', () => {
 
       const result = changeEmailSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-    });
-
-    it('should handle previousEmail as empty string', () => {
-      const invalidData = {
-        email: 'new@example.com',
-        confirmEmail: 'new@example.com',
-        previousEmail: '',
-      };
-
-      const result = changeEmailSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Invalid email address');
-        expect(result.error.issues[0].path).toEqual(['previousEmail']);
-      }
     });
   });
 });

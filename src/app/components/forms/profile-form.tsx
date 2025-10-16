@@ -106,7 +106,7 @@ export default function ProfileForm() {
     });
   };
 
-  const handleEditEmailSubmit = (data: ChangeEmailFormData) => {
+  const onEditEmailSubmit = (data: ChangeEmailFormData) => {
     if (data.email === user?.email) {
       // No change in email, do nothing
       setIsEditingUserEmail(false);
@@ -118,8 +118,8 @@ export default function ProfileForm() {
     formData.append('confirmEmail', data.confirmEmail || '');
     formData.append('previousEmail', user?.email || '');
     // Use startTransition to properly handle the async action
-    startTransition(async () => {
-      await emailFormAction(formData);
+    startTransition(() => {
+      emailFormAction(formData);
     });
   };
 
@@ -227,7 +227,7 @@ export default function ProfileForm() {
           )}
 
           <Form {...personalProfileForm}>
-            <form onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)} className="space-y-6">
+            <form onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)} noValidate className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
                   control={personalProfileForm.control}
@@ -350,16 +350,20 @@ export default function ProfileForm() {
         </CardHeader>
         <CardContent>
           <Form {...changeEmailForm}>
-            <form className="flex flex-wrap items-center justify-between" onSubmit={changeEmailForm.handleSubmit(handleEditEmailSubmit)}>
+            <form className="flex flex-wrap items-center justify-between" noValidate onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}>
               <div className="flex font-medium">Email Address</div>
               <div className="flex justify-end">
                 <Button className='mr-2' type="button" variant="outline" size="sm" onClick={handleEditEmailClick}>
                   { isEditingUserEmail ? 'Cancel' : 'Change' }
                 </Button>
+                <div className="text-sm text-red-500">
+                  {changeEmailForm.formState.errors.previousEmail?.message}
+                </div>
                 <Button
+                  type="submit"
                   size="sm"
                   disabled={
-                    Object.keys(changeEmailForm.formState.errors).length > 0 ||
+                    // Object.keys(changeEmailForm.formState.errors).length > 0 ||
                     isPending ||
                     isEmailPending ||
                     isTransitionPending ||
@@ -375,6 +379,7 @@ export default function ProfileForm() {
               <TextField
                 control={changeEmailForm.control}
                 name="email"
+                type="email"
                 label="Email"
                 labelClassName="sr-only"
                 placeholder="Enter your email address"
@@ -383,6 +388,7 @@ export default function ProfileForm() {
               <TextField
                 control={changeEmailForm.control}
                 name="confirmEmail"
+                type="email"
                 label="Confirm Email"
                 labelClassName="sr-only"
                 placeholder="Confirm your email address"

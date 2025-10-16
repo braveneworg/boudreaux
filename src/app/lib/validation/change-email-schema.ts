@@ -5,7 +5,7 @@ const emailRegex = z.string().regex(EMAIL_REGEX, { message: 'Invalid email addre
 const changeEmailSchema = z.object({
   email: emailRegex,
   confirmEmail: emailRegex,
-  previousEmail: emailRegex.optional(),
+  previousEmail: z.string().optional(),
 }).refine((data) => data.email === data.confirmEmail, {
   message: 'Email addresses do not match',
   path: ['confirmEmail'],
