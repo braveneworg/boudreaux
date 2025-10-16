@@ -19,6 +19,7 @@ import { Skeleton } from '../ui/skeleton';
 import { useSession } from 'next-auth/react';
 import { TextField, CheckboxField, StateField, CountryField } from './fields';
 import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import { Separator } from '@radix-ui/react-separator';
 
 const initialFormState: FormState = {
   errors: {},
@@ -153,6 +154,35 @@ export default function ProfileForm() {
     }
   }, [areFormValuesSet, personalProfileForm.formState.dirtyFields, setFormValues, user]);
 
+  // Update email form when user session changes
+  useEffect(() => {
+    if (user?.email && !isEditingUserEmail) {
+      // Only update if the current email value is different from the user's email
+      const currentEmail = changeEmailForm.getValues('email');
+      if (currentEmail !== user.email) {
+        changeEmailForm.setValue('email', user.email, { shouldValidate: false });
+      }
+      if (changeEmailForm.getValues('previousEmail') !== currentEmail) {
+        changeEmailForm.setValue('previousEmail', currentEmail, { shouldValidate: false });
+      }
+    }
+  }, [user?.email, changeEmailForm, isEditingUserEmail]);
+
+  // Watch email fields and clear errors when they match
+  const watchedEmail = changeEmailForm.watch('email');
+  const watchedConfirmEmail = changeEmailForm.watch('confirmEmail');
+  useEffect(() => {
+    // If both fields have values and they match, clear any existing errors
+    if (watchedEmail && watchedConfirmEmail && watchedEmail === watchedConfirmEmail) {
+      // Clear specific field errors for email and confirmEmail
+      const currentErrors = changeEmailForm.formState.errors;
+
+      if (currentErrors.email || currentErrors.confirmEmail) {
+        // Clear the errors by triggering validation
+        changeEmailForm.clearErrors(['email', 'confirmEmail']);
+      }
+    }
+  }, [watchedEmail, watchedConfirmEmail, changeEmailForm]);
 
   if (status === 'loading' || !user) {
     return (
@@ -298,6 +328,7 @@ export default function ProfileForm() {
               </div>
 
               <Button
+                size="sm"
                 type="submit"
                 disabled={!personalProfileForm.formState.isDirty || isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
               >
@@ -312,7 +343,9 @@ export default function ProfileForm() {
         <CardHeader>
           <CardTitle>Account Settings</CardTitle>
           <CardDescription>
-            Manage your account credentials and preferences. <strong>Note:</strong> <em>Changing your email or username</em> will require you to sign in again.
+            <p>Manage your account credentials and preferences.</p>
+            <p><strong>Note:</strong> <em>Changing your email or username</em> will require you to sign in again.</p>
+            <p>Make sure you have access to messages at the new email address.</p>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -320,7 +353,7 @@ export default function ProfileForm() {
             <form className="flex flex-wrap items-center justify-between" onSubmit={changeEmailForm.handleSubmit(handleEditEmailSubmit)}>
               <div className="flex font-medium">Email Address</div>
               <div className="flex justify-end">
-                <Button type="button" variant="outline" size="sm" onClick={handleEditEmailClick}>
+                <Button className='mr-2' type="button" variant="outline" size="sm" onClick={handleEditEmailClick}>
                   { isEditingUserEmail ? 'Cancel' : 'Change' }
                 </Button>
                 <Button
@@ -358,7 +391,7 @@ export default function ProfileForm() {
             </div>}
             </form>
           </Form>
-
+          <Separator orientation="horizontal" className="flex h-[1px] bg-gray-200 mt-6 mb-3" decorative />
           <div className="flex items-center justify-between py-2">
             <div>
               <div className="font-medium">Username</div>
