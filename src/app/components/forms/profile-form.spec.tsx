@@ -3,17 +3,22 @@ import React from 'react';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
-  AlertCircle: (props: Record<string, unknown>) => (
-    <div data-testid="alert-circle-icon" {...props} />
-  ),
-  CircleCheck: (props: Record<string, unknown>) => (
-    <div data-testid="circle-check-icon" {...props} />
-  ),
   Check: (props: Record<string, unknown>) => <div data-testid="check-icon" {...props} />,
   ChevronsUpDown: (props: Record<string, unknown>) => (
     <div data-testid="chevrons-up-down-icon" {...props} />
   ),
   CheckIcon: (props: Record<string, unknown>) => <div data-testid="check-icon" {...props} />,
+}));
+
+// Mock Sonner toast - using inline object creation to avoid hoisting issues
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+  Toaster: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 
 // Mock all external dependencies to avoid complex setup
@@ -95,9 +100,12 @@ vi.mock('@/app/components/forms/ui/card', () => ({
   CardTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
 }));
 
-vi.mock('@/app/components/forms/ui/alert', () => ({
-  Alert: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+vi.mock('@/app/components/ui/skeleton', () => ({
+  Skeleton: ({ className }: { className?: string }) => <div className={className}>Loading...</div>,
+}));
+
+vi.mock('@radix-ui/react-separator', () => ({
+  Separator: ({ className }: { className?: string }) => <hr className={className} />,
 }));
 
 vi.mock('@/app/components/forms/ui/popover', () => ({
@@ -181,11 +189,23 @@ vi.mock('next-auth/react', () => ({
 
 type UseStateReturn<T> = [T, React.Dispatch<React.SetStateAction<T>>];
 
+// Create a mutable formState for testing
+let mockFormState = {
+  errors: {},
+  fields: {},
+  success: false,
+};
+
+// Helper to update formState during tests
+export const setMockFormState = (state: typeof mockFormState) => {
+  mockFormState = state;
+};
+
 vi.mock('react', async (importOriginal) => {
   const actual = (await importOriginal()) as typeof React;
   return {
     ...actual,
-    useActionState: () => [{}, vi.fn(), false],
+    useActionState: () => [mockFormState, vi.fn(), false],
     useTransition: () => [false, vi.fn()],
     useState: (initial: unknown) => {
       // Handle specific state variables that affect loading
@@ -227,8 +247,20 @@ vi.mock('@/app/lib/utils/states', () => ({
 
 // Import the component after mocking
 import ProfileForm from './profile-form';
+import { toast } from 'sonner';
 
 describe('ProfileForm', () => {
+  beforeEach(() => {
+    // Reset mocks before each test
+    vi.clearAllMocks();
+    // Reset formState to initial state
+    mockFormState = {
+      errors: {},
+      fields: {},
+      success: false,
+    };
+  });
+
   it('renders without crashing', () => {
     render(<ProfileForm />);
     // Check for the presence of both forms instead of using a generic selector
@@ -246,5 +278,66 @@ describe('ProfileForm', () => {
     // Check for some form inputs
     const inputs = screen.getAllByRole('textbox');
     expect(inputs.length).toBeGreaterThan(0);
+  });
+
+  describe('Toast Notifications', () => {
+    it('displays success toast when profile is updated successfully', () => {
+      // Set success state
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify success toast was called
+      expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+    });
+
+    it('displays error toast when profile update fails', () => {
+      // Set error state
+      mockFormState = {
+        errors: {
+          general: ['An error occurred while updating your profile.'],
+        },
+        fields: {},
+        success: false,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify error toast was called
+      expect(toast.error).toHaveBeenCalledWith('An error occurred while updating your profile.');
+    });
+
+    it('does not display toast on initial render with no errors or success', () => {
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: false,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify no toasts were called
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('displays error toast with specific error message', () => {
+      const errorMessage = 'Database connection failed';
+      mockFormState = {
+        errors: {
+          general: [errorMessage],
+        },
+        fields: {},
+        success: false,
+      };
+
+      render(<ProfileForm />);
+
+      expect(toast.error).toHaveBeenCalledWith(errorMessage);
+    });
   });
 });

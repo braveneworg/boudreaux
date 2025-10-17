@@ -21,13 +21,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
-import { Alert, AlertDescription } from '@/app/components/ui/alert';
-import { AlertCircle, CircleCheck } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { useSession } from 'next-auth/react';
 import { TextField, CheckboxField, StateField, CountryField } from './fields';
 import { changeEmailAction } from '@/app/lib/actions/change-email-action';
 import { Separator } from '@radix-ui/react-separator';
+import { toast } from 'sonner';
 
 const initialFormState: FormState = {
   errors: {},
@@ -40,7 +39,10 @@ export default function ProfileForm() {
     updateProfileAction,
     initialFormState
   );
-  const [, emailFormAction, isEmailPending] = useActionState(changeEmailAction, initialFormState);
+  const [emailFormState, emailFormAction, isEmailPending] = useActionState(
+    changeEmailAction,
+    initialFormState
+  );
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status } = useSession();
@@ -201,6 +203,19 @@ export default function ProfileForm() {
     }
   }, [watchedEmail, watchedConfirmEmail, changeEmailForm]);
 
+  // Show toast notifications for form state changes
+  useEffect(() => {
+    if (formState.success) {
+      toast.success('Your profile has been updated successfully.');
+    }
+    if (formState.errors?.general) {
+      toast.error(formState.errors.general[0]);
+    }
+    if (emailFormState.success) {
+      toast.success('Your email has been updated successfully.');
+    }
+  }, [formState.success, formState.errors, emailFormState.success]);
+
   if (status === 'loading' || !user) {
     return (
       <div className="flex flex-col flex-wrap">
@@ -223,20 +238,6 @@ export default function ProfileForm() {
           <CardDescription>Update your personal details and contact information.</CardDescription>
         </CardHeader>
         <CardContent>
-          {formState.success && (
-            <Alert className="mb-6">
-              <CircleCheck />
-              <AlertDescription>Your profile has been updated successfully.</AlertDescription>
-            </Alert>
-          )}
-
-          {formState.errors?.general && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle />
-              <AlertDescription>{formState.errors.general[0]}</AlertDescription>
-            </Alert>
-          )}
-
           <Form {...personalProfileForm}>
             <form
               onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
