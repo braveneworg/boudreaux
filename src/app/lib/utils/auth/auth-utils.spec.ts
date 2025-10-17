@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from './auth-utils';
 import type { FormState } from '../../types/form-state';
 
