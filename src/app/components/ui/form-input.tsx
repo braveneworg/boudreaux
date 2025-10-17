@@ -1,4 +1,4 @@
-import { Input } from "./input";
+import { Input } from './input';
 
 interface FormInputProperties {
   id: string;
@@ -8,13 +8,7 @@ interface FormInputProperties {
 }
 
 const FormInput = ({ id, placeholder, type, ...properties }: FormInputProperties) => (
-    <Input
-      className="h-12 text-lg"
-      id={id}
-      placeholder={placeholder}
-      type={type}
-      {...properties}
-    />
-  );
+  <Input className="h-12 text-lg" id={id} placeholder={placeholder} type={type} {...properties} />
+);
 
 export default FormInput;

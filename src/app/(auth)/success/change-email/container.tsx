@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-const SuccessContainer = ({ email }: { email: string }) =>(
+const SuccessContainer = ({ email }: { email: string }) => (
   <>
     <h1>Success! 🎉</h1>
     <p>

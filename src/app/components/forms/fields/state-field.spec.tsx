@@ -1,13 +1,32 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, Control, FieldValues } from 'react-hook-form';
 import StateField from './state-field';
+
+interface ComboboxOption {
+  value: string;
+  label: string;
+}
 
 // Mock the ComboboxField component
 vi.mock('./combobox-field', () => ({
-  default: ({ label, placeholder, searchPlaceholder, emptyMessage, options, popoverWidth, onUserInteraction }: any) => (
+  default: ({
+    label,
+    placeholder,
+    searchPlaceholder,
+    emptyMessage,
+    options,
+    popoverWidth,
+    onUserInteraction,
+  }: {
+    label?: string;
+    placeholder?: string;
+    searchPlaceholder?: string;
+    emptyMessage?: string;
+    options: ComboboxOption[];
+    popoverWidth?: string;
+    onUserInteraction?: () => void;
+  }) => (
     <div data-testid="combobox-field">
       <label data-testid="combobox-label">{label}</label>
       <button data-testid="combobox-trigger">{placeholder}</button>
@@ -15,7 +34,7 @@ vi.mock('./combobox-field', () => ({
       <div data-testid="combobox-empty">{emptyMessage}</div>
       <div data-testid="combobox-width" className={popoverWidth} />
       <div data-testid="combobox-options">
-        {options.map((option: any) => (
+        {options.map((option) => (
           <button
             key={option.value}
             data-testid="state-option"
@@ -41,18 +60,20 @@ vi.mock('@/app/lib/utils/states', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({ children, defaultValues = {} }: { children: React.ReactNode; defaultValues?: any }) {
+function TestWrapper({
+  children,
+  defaultValues = {},
+}: {
+  children: React.ReactNode;
+  defaultValues?: Record<string, unknown>;
+}) {
   const methods = useForm({ defaultValues });
-  return (
-    <FormProvider {...methods}>
-      {children}
-    </FormProvider>
-  );
+  return <FormProvider {...methods}>{children}</FormProvider>;
 }
 
 describe('StateField', () => {
   const defaultProps = {
-    control: {} as any,
+    control: {} as Control<FieldValues>,
   };
 
   beforeEach(() => {

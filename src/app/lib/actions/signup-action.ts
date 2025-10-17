@@ -11,12 +11,11 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 
-export const signupAction = async (_initialState: FormState, payload: FormData): Promise<FormState> => {
-  const permittedFieldNames = [
-    'email',
-    'termsAndConditions',
-    'username',
-  ];
+export const signupAction = async (
+  _initialState: FormState,
+  payload: FormData
+): Promise<FormState> => {
+  const permittedFieldNames = ['email', 'termsAndConditions', 'username'];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signupSchema);
 
   if (parsed.success) {
@@ -33,7 +32,7 @@ export const signupAction = async (_initialState: FormState, payload: FormData):
         emailVerified: null,
         name: null,
         image: null,
-        username: generateUsername('', 4)
+        username: generateUsername('', 4),
       });
 
       // Redirect happens way below because next throws an error if you redirect inside a try/catch
@@ -43,12 +42,13 @@ export const signupAction = async (_initialState: FormState, payload: FormData):
     } catch (error: unknown) {
       formState.success = false;
       // Check for MongoDB timeout errors
-      if (error instanceof Error && (
-        error.message.includes('ETIMEOUT') ||
-        error.message.includes('timeout') ||
-        error.message.includes('timed out') ||
-        ('code' in error && error.code === 'ETIMEOUT')
-      )) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('ETIMEOUT') ||
+          error.message.includes('timeout') ||
+          error.message.includes('timed out') ||
+          ('code' in error && error.code === 'ETIMEOUT'))
+      ) {
         formState.hasTimeout = true;
         if (!formState.errors) {
           formState.errors = {};

@@ -9,9 +9,7 @@ import { signIn } from '../../../../auth';
 import type { FormState } from '../types/form-state';
 
 export const signinAction = async (_initialState: FormState, payload: FormData) => {
-  const permittedFieldNames = [
-    'email',
-  ];
+  const permittedFieldNames = ['email'];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signinSchema);
   if (parsed.success) {
@@ -23,7 +21,6 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
       await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
 
       formState.success = true;
-
     } catch {
       formState.success = false;
     } finally {
@@ -34,7 +31,9 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   }
 
   if (formState.success) {
-    return redirect(`/success/signin?email=${encodeURIComponent(formState.fields.email as string)}`);
+    return redirect(
+      `/success/signin?email=${encodeURIComponent(formState.fields.email as string)}`
+    );
   }
 
   return formState;

@@ -7,9 +7,7 @@ const SuccessPage = async ({
 }) => {
   const { email } = await searchParams;
 
-  return (
-    <SuccessContainer email={(email as string).replace(' ', '+')} />
-  );
+  return <SuccessContainer email={(email as string).replace(' ', '+')} />;
 };
 
 export default SuccessPage;

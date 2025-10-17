@@ -5,14 +5,22 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
 import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
-import changeEmailSchema, { type ChangeEmailFormData } from '@/app/lib/validation/change-email-schema';
+import changeEmailSchema, {
+  type ChangeEmailFormData,
+} from '@/app/lib/validation/change-email-schema';
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type { FormState } from '@/app/lib/types/form-state';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
 
 import { Form } from '@/app/components/ui/form';
 import { Button } from '@/app/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/app/components/ui/card';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { AlertCircle, CircleCheck } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
@@ -28,7 +36,10 @@ const initialFormState: FormState = {
 };
 
 export default function ProfileForm() {
-  const [formState, profileFormAction, isPending] = useActionState(updateProfileAction, initialFormState);
+  const [formState, profileFormAction, isPending] = useActionState(
+    updateProfileAction,
+    initialFormState
+  );
   const [, emailFormAction, isEmailPending] = useActionState(changeEmailAction, initialFormState);
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
@@ -123,29 +134,35 @@ export default function ProfileForm() {
     });
   };
 
-  const setFormValues = useCallback((user: ProfileFormData) => {
-    if (user && !areFormValuesSet) {
-      Object.entries(user).forEach(([key, value]) => {
-        // Only set the form value if the user has interacted with the form
-        if (hasUserInteracted) return;
+  const setFormValues = useCallback(
+    (user: ProfileFormData) => {
+      if (user && !areFormValuesSet) {
+        Object.entries(user).forEach(([key, value]) => {
+          // Only set the form value if the user has interacted with the form
+          if (hasUserInteracted) return;
 
-        // Ensure the key exists in the form schema
-        if (key in watchedValues) {
-          // For boolean fields, ensure proper boolean conversion
-          if (key === 'allowSmsNotifications') {
-            if (value === 'true' || value === true) {
-              personalProfileForm.setValue(key as keyof ProfileFormData, true);
+          // Ensure the key exists in the form schema
+          if (key in watchedValues) {
+            // For boolean fields, ensure proper boolean conversion
+            if (key === 'allowSmsNotifications') {
+              if (value === 'true' || value === true) {
+                personalProfileForm.setValue(key as keyof ProfileFormData, true);
+              } else {
+                personalProfileForm.setValue(key as keyof ProfileFormData, false);
+              }
             } else {
-              personalProfileForm.setValue(key as keyof ProfileFormData, false);
+              personalProfileForm.setValue(
+                key as keyof ProfileFormData,
+                value as unknown as string
+              );
             }
-          } else {
-            personalProfileForm.setValue(key as keyof ProfileFormData, value as unknown as string);
           }
-        }
-      });
-      setAreFormValuesSet(true);
-    }
-  }, [areFormValuesSet, hasUserInteracted, watchedValues, personalProfileForm]);
+        });
+        setAreFormValuesSet(true);
+      }
+    },
+    [areFormValuesSet, hasUserInteracted, watchedValues, personalProfileForm]
+  );
 
   useEffect(() => {
     if (!areFormValuesSet) {
@@ -186,7 +203,7 @@ export default function ProfileForm() {
 
   if (status === 'loading' || !user) {
     return (
-      <div className='flex flex-col flex-wrap'>
+      <div className="flex flex-col flex-wrap">
         {Array.from({ length: 7 }).map((_, index) => (
           <Skeleton key={index} className="h-8 w-full mb-4" />
         ))}
@@ -203,31 +220,29 @@ export default function ProfileForm() {
       <Card>
         <CardHeader>
           <CardTitle>Personal Information (Optional)</CardTitle>
-          <CardDescription>
-            Update your personal details and contact information.
-          </CardDescription>
+          <CardDescription>Update your personal details and contact information.</CardDescription>
         </CardHeader>
         <CardContent>
           {formState.success && (
             <Alert className="mb-6">
               <CircleCheck />
-              <AlertDescription>
-                Your profile has been updated successfully.
-              </AlertDescription>
+              <AlertDescription>Your profile has been updated successfully.</AlertDescription>
             </Alert>
           )}
 
           {formState.errors?.general && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle />
-              <AlertDescription>
-                {formState.errors.general[0]}
-              </AlertDescription>
+              <AlertDescription>{formState.errors.general[0]}</AlertDescription>
             </Alert>
           )}
 
           <Form {...personalProfileForm}>
-            <form onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)} noValidate className="space-y-6">
+            <form
+              onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
+              noValidate
+              className="space-y-6"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
                   control={personalProfileForm.control}
@@ -264,9 +279,11 @@ export default function ProfileForm() {
                 id="allow-sms-notifications"
                 label={
                   <>
-                    <strong>Allow us to send text messages to your mobile phone occasionally?</strong>
+                    <strong>
+                      Allow us to send text messages to your mobile phone occasionally?
+                    </strong>
                     <br />
-                    <em className='inline-block mt-3'>(Carrier charges may apply)</em>
+                    <em className="inline-block mt-3">(Carrier charges may apply)</em>
                   </>
                 }
                 onUserInteraction={() => setHasUserInteracted(true)}
@@ -330,7 +347,13 @@ export default function ProfileForm() {
               <Button
                 size="sm"
                 type="submit"
-                disabled={!personalProfileForm.formState.isDirty || isPending || isTransitionPending || !hasUserInteracted || !hasFormContent()}
+                disabled={
+                  !personalProfileForm.formState.isDirty ||
+                  isPending ||
+                  isTransitionPending ||
+                  !hasUserInteracted ||
+                  !hasFormContent()
+                }
               >
                 {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
               </Button>
@@ -344,17 +367,30 @@ export default function ProfileForm() {
           <CardTitle>Account Settings</CardTitle>
           <CardDescription>
             <p>Manage your account credentials and preferences.</p>
-            <p><strong>Note:</strong> <em>Changing your email or username</em> will require you to sign in again.</p>
+            <p>
+              <strong>Note:</strong> <em>Changing your email or username</em> will require you to
+              sign in again.
+            </p>
             <p>Make sure you have access to messages at the new email address.</p>
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...changeEmailForm}>
-            <form className="flex flex-wrap items-center justify-between" noValidate onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}>
+            <form
+              className="flex flex-wrap items-center justify-between"
+              noValidate
+              onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
+            >
               <div className="flex font-medium">Email Address</div>
               <div className="flex justify-end">
-                <Button className='mr-2' type="button" variant="outline" size="sm" onClick={handleEditEmailClick}>
-                  { isEditingUserEmail ? 'Cancel' : 'Change' }
+                <Button
+                  className="mr-2"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEditEmailClick}
+                >
+                  {isEditingUserEmail ? 'Cancel' : 'Change'}
                 </Button>
                 <div className="text-sm text-red-500">
                   {changeEmailForm.formState.errors.previousEmail?.message}
@@ -371,33 +407,43 @@ export default function ProfileForm() {
                     !changeEmailForm.formState.isDirty
                   }
                 >
-                  {isPending || isEmailPending || isTransitionPending ? 'Updating...' : 'Update Email'}
+                  {isPending || isEmailPending || isTransitionPending
+                    ? 'Updating...'
+                    : 'Update Email'}
                 </Button>
               </div>
-            {!isEditingUserEmail && <div className="text-sm text-muted-foreground w-full">{user.email}</div>}
-            {isEditingUserEmail && <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
-              <TextField
-                control={changeEmailForm.control}
-                name="email"
-                type="email"
-                label="Email"
-                labelClassName="sr-only"
-                placeholder="Enter your email address"
-                setValue={changeEmailForm.setValue}
-              />
-              <TextField
-                control={changeEmailForm.control}
-                name="confirmEmail"
-                type="email"
-                label="Confirm Email"
-                labelClassName="sr-only"
-                placeholder="Confirm your email address"
-                setValue={changeEmailForm.setValue}
-              />
-            </div>}
+              {!isEditingUserEmail && (
+                <div className="text-sm text-muted-foreground w-full">{user.email}</div>
+              )}
+              {isEditingUserEmail && (
+                <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
+                  <TextField
+                    control={changeEmailForm.control}
+                    name="email"
+                    type="email"
+                    label="Email"
+                    labelClassName="sr-only"
+                    placeholder="Enter your email address"
+                    setValue={changeEmailForm.setValue}
+                  />
+                  <TextField
+                    control={changeEmailForm.control}
+                    name="confirmEmail"
+                    type="email"
+                    label="Confirm Email"
+                    labelClassName="sr-only"
+                    placeholder="Confirm your email address"
+                    setValue={changeEmailForm.setValue}
+                  />
+                </div>
+              )}
             </form>
           </Form>
-          <Separator orientation="horizontal" className="flex h-[1px] bg-gray-200 mt-6 mb-3" decorative />
+          <Separator
+            orientation="horizontal"
+            className="flex h-[1px] bg-gray-200 mt-6 mb-3"
+            decorative
+          />
           <div className="flex items-center justify-between py-2">
             <div>
               <div className="font-medium">Username</div>

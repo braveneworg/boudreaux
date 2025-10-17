@@ -11,13 +11,13 @@ import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import type { FormState } from '../types/form-state';
 import { AdapterUser } from 'next-auth/adapters';
+import { signOut } from 'next-auth/react';
 
-export const changeEmailAction = async (_initialState: FormState, payload: FormData): Promise<FormState> => {
-  const permittedFieldNames = [
-    'email',
-    'confirmEmail',
-    'previousEmail',
-  ];
+export const changeEmailAction = async (
+  _initialState: FormState,
+  payload: FormData
+): Promise<FormState> => {
+  const permittedFieldNames = ['email', 'confirmEmail', 'previousEmail'];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
 
   if (parsed.success) {
@@ -48,16 +48,16 @@ export const changeEmailAction = async (_initialState: FormState, payload: FormD
       } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
 
       formState.success = true;
-
     } catch (error: unknown) {
       formState.success = false;
       // Check for MongoDB timeout errors
-      if (error instanceof Error && (
-        error.message.includes('ETIMEOUT') ||
-        error.message.includes('timeout') ||
-        error.message.includes('timed out') ||
-        ('code' in error && error.code === 'ETIMEOUT')
-      )) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('ETIMEOUT') ||
+          error.message.includes('timeout') ||
+          error.message.includes('timed out') ||
+          ('code' in error && error.code === 'ETIMEOUT'))
+      ) {
         formState.hasTimeout = true;
         if (!formState.errors) {
           formState.errors = {};
@@ -85,7 +85,12 @@ export const changeEmailAction = async (_initialState: FormState, payload: FormD
   }
 
   if (formState.success) {
-    return redirect(`/success/change-email?email=${encodeURIComponent(formState.fields!.email as string)}`);
+    // Sign the user out to force re-authentication with new email
+    await signOut({ redirect: false }); // User is redirected
+
+    return redirect(
+      `/success/change-email?email=${encodeURIComponent(formState.fields!.email as string)}`
+    );
   }
 
   return formState;

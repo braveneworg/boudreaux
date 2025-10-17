@@ -1,11 +1,13 @@
 'use client';
 
-import Image from "next/image";
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import AuthToolbar from './components/auth/auth-toolbar';
 
 export default function Home() {
-  const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(
+    null
+  );
 
   const fetchHealthStatus = async () => {
     try {
@@ -23,7 +25,9 @@ export default function Home() {
   };
 
   useEffect(() => {
-    (async () => { await fetchHealthStatus(); })();
+    (async () => {
+      await fetchHealthStatus();
+    })();
   }, []);
 
   return (
@@ -44,15 +48,13 @@ export default function Home() {
         />
         <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
           <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
+            Get started by editing{' '}
             <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
               src/app/page.tsx
             </code>
             .
           </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
+          <li className="tracking-[-.01em]">Save and see your changes instantly.</li>
         </ol>
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           <a
@@ -87,13 +89,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/file.svg" alt="File icon" width={16} height={16} />
           Learn
         </a>
         <a
@@ -102,13 +98,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/window.svg" alt="Window icon" width={16} height={16} />
           Examples
         </a>
         <a
@@ -117,13 +107,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/globe.svg" alt="Globe icon" width={16} height={16} />
           Go to nextjs.org →
         </a>
       </footer>

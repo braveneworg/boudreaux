@@ -1,47 +1,59 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, Control, FieldPath, FieldValues } from 'react-hook-form';
 import TextField from './text-field';
 
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({
-  FormField: ({ name, render }: any) => {
+  FormField: ({
+    name,
+    render,
+  }: {
+    name: string;
+    render: (context: { field: Record<string, unknown> }) => React.ReactNode;
+  }) => {
     // Simple mock that calls render with a basic field object
     const field = {
       value: '',
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
-      ref: vi.fn()
+      ref: vi.fn(),
     };
     return render({ field });
   },
-  FormItem: ({ children }: { children: React.ReactNode }) => <div data-testid="form-item">{children}</div>,
-  FormLabel: ({ children }: { children: React.ReactNode }) => <label data-testid="form-label">{children}</label>,
-  FormControl: ({ children }: { children: React.ReactNode }) => <div data-testid="form-control">{children}</div>,
+  FormItem: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form-item">{children}</div>
+  ),
+  FormLabel: ({ children }: { children: React.ReactNode }) => (
+    <label data-testid="form-label">{children}</label>
+  ),
+  FormControl: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form-control">{children}</div>
+  ),
   FormMessage: () => <div data-testid="form-message" />,
 }));
 
 vi.mock('@/app/components/ui/input', () => ({
-  Input: (props: any) => <input data-testid="text-input" {...props} />,
+  Input: (props: Record<string, unknown>) => <input data-testid="text-input" {...props} />,
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({ children, defaultValues = {} }: { children: React.ReactNode; defaultValues?: any }) {
+function TestWrapper({
+  children,
+  defaultValues = {},
+}: {
+  children: React.ReactNode;
+  defaultValues?: FieldValues;
+}) {
   const methods = useForm({ defaultValues });
-  return (
-    <FormProvider {...methods}>
-      {children}
-    </FormProvider>
-  );
+  return <FormProvider {...methods}>{children}</FormProvider>;
 }
 
 describe('TextField', () => {
   const defaultProps = {
-    control: {} as any, // Will be ignored due to mocking
-    name: 'testField' as any,
+    control: {} as Control<FieldValues>,
+    name: 'testField' as FieldPath<FieldValues>,
     label: 'Test Field',
     placeholder: 'Enter test value',
   };

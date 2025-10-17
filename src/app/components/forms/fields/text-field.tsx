@@ -2,18 +2,12 @@
 
 import React, { useEffect } from 'react';
 import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from '@/app/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 
 interface TextFieldProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > {
   className?: string;
   control: Control<TFieldValues>;
@@ -29,7 +23,7 @@ interface TextFieldProps<
 
 export default function TextField<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
   className,
   control,
@@ -68,7 +62,7 @@ export default function TextField<
                 if (setValue) {
                   setValue(name, e.target.value as TFieldValues[TName], {
                     shouldDirty: true,
-                    shouldValidate: true
+                    shouldValidate: true,
                   });
                 }
                 field.onChange(e);

@@ -1,8 +1,8 @@
 import NextAuth from 'next-auth';
-import type { User } from "next-auth"
-import type { AdapterUser } from "next-auth/adapters"
+import type { User } from 'next-auth';
+import type { AdapterUser } from 'next-auth/adapters';
 import Nodemailer from 'next-auth/providers/nodemailer';
-import GoogleProvider from "next-auth/providers/google"
+import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from '@/app/lib/prisma';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 
@@ -67,11 +67,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       // Handle session updates (when user profile is updated)
-      if (trigger === "update" && session) {
+      if (trigger === 'update' && session) {
         // Merge the updated session data into the token
         token.user = {
-          ...(token.user as object || {}),
-          ...(session as object || {})
+          ...((token.user as object) || {}),
+          ...((session as object) || {}),
         };
         return token;
       }
@@ -106,7 +106,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               country: true,
               allowSmsNotifications: true,
               // Add other fields you want in the session
-            }
+            },
           });
 
           if (freshUser) {
@@ -126,13 +126,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      session && (session.user = token.user as User & AdapterUser & { id: string; username: string; email: string; });
+      session &&
+        (session.user = token.user as User &
+          AdapterUser & { id: string; username: string; email: string; role: string });
 
       return session;
     },
   },
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
   },
   secret: process.env.AUTH_SECRET,
   pages: {

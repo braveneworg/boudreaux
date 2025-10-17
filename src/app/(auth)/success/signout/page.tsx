@@ -1,9 +1,7 @@
 import SuccessContainer from './container';
 
 const SuccessPage = async () => {
-  return (
-    <SuccessContainer />
-  );
+  return <SuccessContainer />;
 };
 
 export default SuccessPage;

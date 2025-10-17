@@ -2,17 +2,12 @@
 
 import React from 'react';
 import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-} from '@/app/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl } from '@/app/components/ui/form';
 import { Checkbox } from '@/app/components/ui/checkbox';
 
 interface CheckboxFieldProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > {
   control: Control<TFieldValues>;
   name: TName;
@@ -24,7 +19,7 @@ interface CheckboxFieldProps<
 
 export default function CheckboxField<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
   control,
   name,
@@ -48,7 +43,7 @@ export default function CheckboxField<
                 if (setValue) {
                   setValue(name, boolValue as TFieldValues[TName], {
                     shouldDirty: true,
-                    shouldValidate: true
+                    shouldValidate: true,
                   });
                 }
                 field.onChange(boolValue);

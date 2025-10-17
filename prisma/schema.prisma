@@ -12,12 +12,13 @@ model User {
   name          String?
   email         String?         @unique
   emailVerified DateTime?
-  previousEmail String?         @unique
+  previousEmail String?
   image         String?
   accounts      Account[]
   sessions      Session[]
   termsAndConditions Boolean   @default(false)
   username     String?         @unique
+  role         String?
 
   // Profile fields
   firstName     String?

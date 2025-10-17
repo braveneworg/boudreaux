@@ -1,13 +1,18 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import { useTurnstile } from 'react-turnstile';
 
 // Mock react-turnstile
 vi.mock('react-turnstile', () => ({
-  default: ({ onVerify, onError, onExpire, onTimeout, sitekey }: {
+  default: ({
+    onVerify,
+    onError,
+    onExpire,
+    onTimeout,
+    sitekey,
+  }: {
     onVerify?: (token: string) => void;
     onError?: () => void;
     onExpire?: () => void;

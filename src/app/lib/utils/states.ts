@@ -57,7 +57,7 @@ export const US_STATES: State[] = [
 ];
 
 export const getStateName = (code: string): string => {
-  const state = US_STATES.find(s => s.code === code);
+  const state = US_STATES.find((s) => s.code === code);
   return state ? state.name : code;
 };
 

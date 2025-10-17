@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { splitFullName, formatPhoneNumber } from './profile-utils';
 
 describe('profile-utils', () => {
@@ -6,45 +5,45 @@ describe('profile-utils', () => {
     it('should split a full name into first and last name', () => {
       expect(splitFullName('John Doe')).toEqual({
         firstName: 'John',
-        lastName: 'Doe'
+        lastName: 'Doe',
       });
     });
 
     it('should handle single names', () => {
       expect(splitFullName('John')).toEqual({
         firstName: 'John',
-        lastName: ''
+        lastName: '',
       });
     });
 
     it('should handle multiple middle names', () => {
       expect(splitFullName('John Michael Doe')).toEqual({
         firstName: 'John',
-        lastName: 'Michael Doe'
+        lastName: 'Michael Doe',
       });
     });
 
     it('should handle empty or null names', () => {
       expect(splitFullName('')).toEqual({
         firstName: '',
-        lastName: ''
+        lastName: '',
       });
 
       expect(splitFullName(null)).toEqual({
         firstName: '',
-        lastName: ''
+        lastName: '',
       });
 
       expect(splitFullName(undefined)).toEqual({
         firstName: '',
-        lastName: ''
+        lastName: '',
       });
     });
 
     it('should handle names with extra whitespace', () => {
       expect(splitFullName('  John   Doe  ')).toEqual({
         firstName: 'John',
-        lastName: 'Doe'
+        lastName: 'Doe',
       });
     });
   });

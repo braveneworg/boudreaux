@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import profileSchema, { type ProfileFormData } from './profile-schema';
 
 describe('profile-schema', () => {
@@ -7,7 +6,7 @@ describe('profile-schema', () => {
       const validData: ProfileFormData = {
         firstName: 'John',
         lastName: 'Doe',
-        phone: '(555) 123-4567'
+        phone: '(555) 123-4567',
       };
 
       const result = profileSchema.safeParse(validData);
@@ -18,7 +17,7 @@ describe('profile-schema', () => {
       const validData: ProfileFormData = {
         firstName: 'John',
         lastName: 'Doe',
-        phone: ''
+        phone: '',
       };
 
       const result = profileSchema.safeParse(validData);
@@ -32,14 +31,14 @@ describe('profile-schema', () => {
         '555.123.4567',
         '5551234567',
         '+1 555 123 4567',
-        '1-555-123-4567'
+        '1-555-123-4567',
       ];
 
-      phoneFormats.forEach(phone => {
+      phoneFormats.forEach((phone) => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe',
-          phone
+          phone,
         };
 
         const result = profileSchema.safeParse(data);
@@ -56,7 +55,7 @@ describe('profile-schema', () => {
         addressLine2: 'Apt 4B',
         city: 'New York',
         state: 'NY',
-        zipCode: '10001'
+        zipCode: '10001',
       };
 
       const result = profileSchema.safeParse(validData);
@@ -65,17 +64,17 @@ describe('profile-schema', () => {
 
     it('should validate various ZIP code formats', () => {
       const zipCodeFormats = [
-        '12345',           // US 5-digit
-        '12345-6789',      // US 9-digit
-        'A1A 1A1',         // Canadian with space
-        'A1A1A1',          // Canadian without space
+        '12345', // US 5-digit
+        '12345-6789', // US 9-digit
+        'A1A 1A1', // Canadian with space
+        'A1A1A1', // Canadian without space
       ];
 
-      zipCodeFormats.forEach(zipCode => {
+      zipCodeFormats.forEach((zipCode) => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe',
-          zipCode
+          zipCode,
         };
 
         const result = profileSchema.safeParse(data);
@@ -88,7 +87,7 @@ describe('profile-schema', () => {
         firstName: 'John',
         lastName: 'Doe',
         city: 'New York',
-        state: 'NY'
+        state: 'NY',
         // No address lines or zip code
       };
 
@@ -99,7 +98,7 @@ describe('profile-schema', () => {
     it('should validate data without firstName and lastName', () => {
       const validData: ProfileFormData = {
         phone: '555-123-4567',
-        city: 'New York'
+        city: 'New York',
       };
 
       const result = profileSchema.safeParse(validData);
@@ -119,7 +118,7 @@ describe('profile-schema', () => {
       const data = {
         firstName: '',
         lastName: 'Doe',
-        phone: '555-123-4567'
+        phone: '555-123-4567',
       };
 
       const result = profileSchema.safeParse(data);
@@ -130,7 +129,7 @@ describe('profile-schema', () => {
       const data = {
         firstName: 'John',
         lastName: '',
-        phone: '555-123-4567'
+        phone: '555-123-4567',
       };
 
       const result = profileSchema.safeParse(data);
@@ -141,7 +140,7 @@ describe('profile-schema', () => {
       const invalidData = {
         firstName: 'a'.repeat(51),
         lastName: 'Doe',
-        phone: '555-123-4567'
+        phone: '555-123-4567',
       };
 
       const result = profileSchema.safeParse(invalidData);
@@ -155,7 +154,7 @@ describe('profile-schema', () => {
       const invalidData = {
         firstName: 'John',
         lastName: 'a'.repeat(51),
-        phone: '555-123-4567'
+        phone: '555-123-4567',
       };
 
       const result = profileSchema.safeParse(invalidData);
@@ -171,14 +170,14 @@ describe('profile-schema', () => {
         'abc-def-ghij',
         '555-123',
         '555-123-456-789',
-        'not-a-phone-number'
+        'not-a-phone-number',
       ];
 
-      invalidPhoneFormats.forEach(phone => {
+      invalidPhoneFormats.forEach((phone) => {
         const data = {
           firstName: 'John',
           lastName: 'Doe',
-          phone
+          phone,
         };
 
         const result = profileSchema.safeParse(data);
@@ -219,24 +218,26 @@ describe('profile-schema', () => {
 
     it('should reject invalid ZIP code formats', () => {
       const invalidZipFormats = [
-        '1234',            // Too short
-        '123456',          // Too long for 5-digit
-        '12345-678',       // Invalid 9-digit format
-        'ABCDEF',          // Invalid letters only
-        '123AB',           // Mixed invalid format
+        '1234', // Too short
+        '123456', // Too long for 5-digit
+        '12345-678', // Invalid 9-digit format
+        'ABCDEF', // Invalid letters only
+        '123AB', // Mixed invalid format
       ];
 
-      invalidZipFormats.forEach(zipCode => {
+      invalidZipFormats.forEach((zipCode) => {
         const data = {
           firstName: 'John',
           lastName: 'Doe',
-          zipCode
+          zipCode,
         };
 
         const result = profileSchema.safeParse(data);
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].message).toBe('Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)');
+          expect(result.error.issues[0].message).toBe(
+            'Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)'
+          );
         }
       });
     });
@@ -245,11 +246,11 @@ describe('profile-schema', () => {
       it('should accept valid country codes', () => {
         const validCountries = ['US', 'CA', 'GB', 'FR', 'DE'];
 
-        validCountries.forEach(country => {
+        validCountries.forEach((country) => {
           const data: ProfileFormData = {
             firstName: 'John',
             lastName: 'Doe',
-            country
+            country,
           };
 
           const result = profileSchema.safeParse(data);
@@ -260,11 +261,11 @@ describe('profile-schema', () => {
       it('should reject invalid country codes', () => {
         const invalidCountries = ['XX', 'ZZ', 'INVALID', 'USA', '123'];
 
-        invalidCountries.forEach(country => {
+        invalidCountries.forEach((country) => {
           const data: ProfileFormData = {
             firstName: 'John',
             lastName: 'Doe',
-            country
+            country,
           };
 
           const result = profileSchema.safeParse(data);
@@ -279,7 +280,7 @@ describe('profile-schema', () => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe',
-          country: ''
+          country: '',
         };
 
         const result = profileSchema.safeParse(data);
@@ -289,7 +290,7 @@ describe('profile-schema', () => {
       it('should allow undefined country', () => {
         const data: ProfileFormData = {
           firstName: 'John',
-          lastName: 'Doe'
+          lastName: 'Doe',
         };
 
         const result = profileSchema.safeParse(data);
@@ -302,7 +303,7 @@ describe('profile-schema', () => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe',
-          allowSmsNotifications: true
+          allowSmsNotifications: true,
         };
 
         const result = profileSchema.safeParse(data);
@@ -313,7 +314,7 @@ describe('profile-schema', () => {
         const data: ProfileFormData = {
           firstName: 'John',
           lastName: 'Doe',
-          allowSmsNotifications: false
+          allowSmsNotifications: false,
         };
 
         const result = profileSchema.safeParse(data);
@@ -323,7 +324,7 @@ describe('profile-schema', () => {
       it('should allow undefined allowSmsNotifications', () => {
         const data: ProfileFormData = {
           firstName: 'John',
-          lastName: 'Doe'
+          lastName: 'Doe',
         };
 
         const result = profileSchema.safeParse(data);

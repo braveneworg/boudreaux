@@ -23,7 +23,7 @@ vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
 }));
 
 vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     setUnknownError: mockSetUnknownError,
@@ -58,7 +58,7 @@ describe('signinAction', () => {
       const mockFormState: FormState = {
         fields: { email: 'test@example.com' },
         success: false,
-        errors: {}
+        errors: {},
       };
 
       const mockParsed = {
@@ -156,7 +156,9 @@ describe('signinAction', () => {
 
       const mockParsed = {
         success: false,
-        error: { issues: [{ path: ['email'], message: 'Invalid email format' }] },
+        error: {
+          issues: [{ path: ['email'], message: 'Invalid email format' }],
+        },
       };
 
       vi.mocked(mockGetActionState).mockReturnValue({
@@ -359,7 +361,10 @@ describe('signinAction', () => {
 
       const result = await signinAction(mockInitialState, mockFormData);
 
-      expect(result.fields).toEqual({ email: 'test@example.com', rememberMe: 'true' });
+      expect(result.fields).toEqual({
+        email: 'test@example.com',
+        rememberMe: 'true',
+      });
       expect(result).toHaveProperty('success');
       expect(result).toHaveProperty('errors');
       expect(result).toHaveProperty('fields');
@@ -394,7 +399,9 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockRedirect).toHaveBeenCalledWith(`/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`);
+      expect(mockRedirect).toHaveBeenCalledWith(
+        `/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`
+      );
     });
   });
 });

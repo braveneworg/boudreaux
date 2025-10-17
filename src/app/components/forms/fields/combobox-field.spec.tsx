@@ -1,30 +1,44 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, Control, FieldValues } from 'react-hook-form';
 import ComboboxField from './combobox-field';
 
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({
-  FormField: ({ name, render }: any) => {
+  FormField: ({
+    name,
+    render,
+  }: {
+    name: string;
+    render: (context: Record<string, unknown>) => React.ReactNode;
+  }) => {
     const field = {
       value: '',
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
-      ref: vi.fn()
+      ref: vi.fn(),
     };
     return render({ field });
   },
-  FormItem: ({ children }: { children: React.ReactNode }) => <div data-testid="form-item">{children}</div>,
-  FormLabel: ({ children }: { children: React.ReactNode }) => <label data-testid="form-label">{children}</label>,
-  FormControl: ({ children }: { children: React.ReactNode }) => <div data-testid="form-control">{children}</div>,
+  FormItem: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form-item">{children}</div>
+  ),
+  FormLabel: ({ children }: { children: React.ReactNode }) => (
+    <label data-testid="form-label">{children}</label>
+  ),
+  FormControl: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form-control">{children}</div>
+  ),
   FormMessage: () => <div data-testid="form-message" />,
 }));
 
 vi.mock('@/app/components/ui/button', () => ({
-  Button: ({ children, role, ...props }: any) => (
+  Button: ({
+    children,
+    role,
+    ...props
+  }: { children?: React.ReactNode; role?: string } & Record<string, unknown>) => (
     <button data-testid="combobox-trigger" role={role} {...props}>
       {children}
     </button>
@@ -32,7 +46,7 @@ vi.mock('@/app/components/ui/button', () => ({
 }));
 
 vi.mock('@/app/components/ui/popover', () => ({
-  Popover: ({ children, open }: any) => (
+  Popover: ({ children, open }: { children?: React.ReactNode; open?: boolean }) => (
     <div data-testid="popover" data-open={open?.toString()}>
       {children}
     </div>
@@ -48,37 +62,59 @@ vi.mock('@/app/components/ui/popover', () => ({
 }));
 
 vi.mock('@/app/components/ui/command', () => ({
-  Command: ({ children }: { children: React.ReactNode }) => <div data-testid="command">{children}</div>,
-  CommandEmpty: ({ children }: { children: React.ReactNode }) => <div data-testid="command-empty">{children}</div>,
-  CommandGroup: ({ children }: { children: React.ReactNode }) => <div data-testid="command-group">{children}</div>,
-  CommandInput: ({ placeholder, ...props }: any) => (
+  Command: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="command">{children}</div>
+  ),
+  CommandEmpty: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="command-empty">{children}</div>
+  ),
+  CommandGroup: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="command-group">{children}</div>
+  ),
+  CommandInput: ({ placeholder, ...props }: { placeholder?: string } & Record<string, unknown>) => (
     <input data-testid="command-input" placeholder={placeholder} {...props} />
   ),
-  CommandItem: ({ children, onSelect, value }: any) => (
-    <button
-      data-testid="command-item"
-      data-value={value}
-      onClick={() => onSelect?.(value)}
-    >
+  CommandItem: ({
+    children,
+    onSelect,
+    value,
+  }: {
+    children?: React.ReactNode;
+    onSelect?: (value?: string) => void;
+    value?: string;
+  }) => (
+    <button data-testid="command-item" data-value={value} onClick={() => onSelect?.(value)}>
       {children}
     </button>
   ),
-  CommandList: ({ children }: { children: React.ReactNode }) => <div data-testid="command-list">{children}</div>,
+  CommandList: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="command-list">{children}</div>
+  ),
 }));
 
 vi.mock('lucide-react', () => ({
-  Check: (props: any) => <span data-testid="check-icon" {...props}>✓</span>,
-  ChevronsUpDown: (props: any) => <span data-testid="chevrons-icon" {...props}>↕</span>,
+  Check: (props: Record<string, unknown>) => (
+    <span data-testid="check-icon" {...props}>
+      ✓
+    </span>
+  ),
+  ChevronsUpDown: (props: Record<string, unknown>) => (
+    <span data-testid="chevrons-icon" {...props}>
+      ↕
+    </span>
+  ),
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({ children, defaultValues = {} }: { children: React.ReactNode; defaultValues?: any }) {
+function TestWrapper({
+  children,
+  defaultValues = {},
+}: {
+  children: React.ReactNode;
+  defaultValues?: Record<string, unknown>;
+}) {
   const methods = useForm({ defaultValues });
-  return (
-    <FormProvider {...methods}>
-      {children}
-    </FormProvider>
-  );
+  return <FormProvider {...methods}>{children}</FormProvider>;
 }
 
 describe('ComboboxField', () => {
@@ -89,8 +125,8 @@ describe('ComboboxField', () => {
   ];
 
   const defaultProps = {
-    control: {} as any,
-    name: 'testCombobox' as any,
+    control: {} as Control<FieldValues>,
+    name: 'testCombobox' as const,
     label: 'Test Combobox',
     placeholder: 'Select an option...',
     searchPlaceholder: 'Search options...',

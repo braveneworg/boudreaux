@@ -9,7 +9,10 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
-export const updateProfileAction = async (_initialState: FormState, payload: FormData): Promise<FormState> => {
+export const updateProfileAction = async (
+  _initialState: FormState,
+  payload: FormData
+): Promise<FormState> => {
   const permittedFieldNames = [
     'firstName',
     'lastName',
@@ -39,10 +42,20 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
         return formState;
       }
 
-      const { firstName, lastName, phone, addressLine1, addressLine2, city, state, zipCode, country, allowSmsNotifications } = parsed.data;
+      const {
+        firstName,
+        lastName,
+        phone,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        zipCode,
+        country,
+        allowSmsNotifications,
+      } = parsed.data;
       // Combine first and last name into the 'name' field for backward compatibility
       const fullName = `${firstName} ${lastName}`.trim();
-
 
       // Update user in database
       await prisma.user.update({
@@ -66,7 +79,6 @@ export const updateProfileAction = async (_initialState: FormState, payload: For
 
       // Revalidate the profile page to show updated data
       revalidatePath('/profile');
-
     } catch (error: unknown) {
       formState.success = false;
 

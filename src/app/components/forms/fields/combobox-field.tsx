@@ -2,19 +2,9 @@
 
 import React, { useState } from 'react';
 import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from '@/app/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Button } from '@/app/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/app/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -33,7 +23,7 @@ interface ComboboxOption {
 
 interface ComboboxFieldProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > {
   control: Control<TFieldValues>;
   name: TName;
@@ -49,7 +39,7 @@ interface ComboboxFieldProps<
 
 export default function ComboboxField<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
   control,
   name,
@@ -58,7 +48,7 @@ export default function ComboboxField<
   searchPlaceholder,
   emptyMessage,
   options,
-  popoverWidth = "w-[300px]",
+  popoverWidth = 'w-[300px]',
   onUserInteraction,
   setValue,
 }: ComboboxFieldProps<TFieldValues, TName>) {
@@ -106,7 +96,7 @@ export default function ComboboxField<
                             if (setValue) {
                               setValue(name, selectedOption.value as TFieldValues[TName], {
                                 shouldDirty: true,
-                                shouldValidate: true
+                                shouldValidate: true,
                               });
                             }
                             field.onChange(selectedOption.value);
@@ -116,7 +106,7 @@ export default function ComboboxField<
                       >
                         <Check
                           className={`mr-2 h-4 w-4 ${
-                            field.value === option.value ? "opacity-100" : "opacity-0"
+                            field.value === option.value ? 'opacity-100' : 'opacity-0'
                           }`}
                         />
                         {option.label}

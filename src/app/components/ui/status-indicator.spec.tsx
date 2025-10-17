@@ -1,21 +1,23 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
 import StatusIndicator from '@/app/components/ui/status-indicator';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
-  CheckIcon: ({ className }: { className?: string }) => React.createElement('div', {
-    'data-testid': 'check-icon',
-    className
-  }),
-  XIcon: ({ className }: { className?: string }) => React.createElement('div', {
-    'data-testid': 'x-icon',
-    className
-  }),
-  LoaderIcon: ({ className }: { className?: string }) => React.createElement('div', {
-    'data-testid': 'loader-icon',
-    className
-  }),
+  CheckIcon: ({ className }: { className?: string }) =>
+    React.createElement('div', {
+      'data-testid': 'check-icon',
+      className,
+    }),
+  XIcon: ({ className }: { className?: string }) =>
+    React.createElement('div', {
+      'data-testid': 'x-icon',
+      className,
+    }),
+  LoaderIcon: ({ className }: { className?: string }) =>
+    React.createElement('div', {
+      'data-testid': 'loader-icon',
+      className,
+    }),
 }));
 
 import React from 'react';
@@ -43,12 +45,7 @@ describe('StatusIndicator', () => {
 
     it('should prioritize pending state over other states', () => {
       render(
-        <StatusIndicator
-          isPending={true}
-          isSuccess={true}
-          hasError={true}
-          hasTimeout={true}
-        />
+        <StatusIndicator isPending={true} isSuccess={true} hasError={true} hasTimeout={true} />
       );
 
       expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
@@ -74,13 +71,7 @@ describe('StatusIndicator', () => {
     });
 
     it('should prioritize timeout over error and success states', () => {
-      render(
-        <StatusIndicator
-          hasTimeout={true}
-          hasError={true}
-          isSuccess={true}
-        />
-      );
+      render(<StatusIndicator hasTimeout={true} hasError={true} isSuccess={true} />);
 
       expect(screen.getByTestId('x-icon')).toBeInTheDocument();
       // Should only render one error icon, not multiple
@@ -148,12 +139,7 @@ describe('StatusIndicator', () => {
 
     it('should render nothing when all states are false', () => {
       const { container } = render(
-        <StatusIndicator
-          isSuccess={false}
-          hasError={false}
-          hasTimeout={false}
-          isPending={false}
-        />
+        <StatusIndicator isSuccess={false} hasError={false} hasTimeout={false} isPending={false} />
       );
 
       expect(container.firstChild).toBeNull();
@@ -187,8 +173,19 @@ describe('StatusIndicator', () => {
     it('should follow correct priority: pending > timeout > error > success', () => {
       // Test all combinations to ensure priority is respected
       const testCases = [
-        { props: { isPending: true, hasTimeout: true, hasError: true, isSuccess: true }, expected: 'loader-icon' },
-        { props: { hasTimeout: true, hasError: true, isSuccess: true }, expected: 'x-icon' },
+        {
+          props: {
+            isPending: true,
+            hasTimeout: true,
+            hasError: true,
+            isSuccess: true,
+          },
+          expected: 'loader-icon',
+        },
+        {
+          props: { hasTimeout: true, hasError: true, isSuccess: true },
+          expected: 'x-icon',
+        },
         { props: { hasError: true, isSuccess: true }, expected: 'x-icon' },
         { props: { isSuccess: true }, expected: 'check-icon' },
       ];

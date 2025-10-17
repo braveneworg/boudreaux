@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { COUNTRIES, getCountryName, getDefaultCountry } from './countries';
 
 describe('countries utility', () => {
@@ -9,7 +8,7 @@ describe('countries utility', () => {
     });
 
     it('should have valid country objects with code and name', () => {
-      COUNTRIES.forEach(country => {
+      COUNTRIES.forEach((country) => {
         expect(country).toHaveProperty('code');
         expect(country).toHaveProperty('name');
         expect(typeof country.code).toBe('string');
@@ -19,7 +18,7 @@ describe('countries utility', () => {
     });
 
     it('should include common countries', () => {
-      const countryCodes = COUNTRIES.map(c => c.code);
+      const countryCodes = COUNTRIES.map((c) => c.code);
       expect(countryCodes).toContain('US'); // United States
       expect(countryCodes).toContain('CA'); // Canada
       expect(countryCodes).toContain('GB'); // United Kingdom

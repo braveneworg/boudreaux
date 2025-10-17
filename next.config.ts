@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  assetPrefix: process.env.NODE_ENV === 'production'
-    ? '/media'
-    : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
 
   // Configure images for CDN
   images: {
@@ -43,7 +41,7 @@ const nextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
 
   // Configure rewrites if needed
@@ -63,9 +61,9 @@ const nextConfig = {
           },
         ],
         destination: '/success/signup?email=:email*',
-      }
-    ]
+      },
+    ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

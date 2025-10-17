@@ -14,13 +14,22 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, 'flex items-center', className)}>
+    <div
+      className={cn(
+        { 'flex-col': isMobile, 'flex-row': !isMobile },
+        'flex items-center',
+        className
+      )}
+    >
       <SignedInAs />
       {!isMobile && <VerticalSeparator />}
-      <Button variant="link:narrow" onClick={() => {
-        signOut({ redirect: false });
-        router.push('/success/signout');
-      }}>
+      <Button
+        variant="link:narrow"
+        onClick={() => {
+          signOut({ redirect: false });
+          router.push('/success/signout');
+        }}
+      >
         <LogOutIcon />
         Sign Out
       </Button>

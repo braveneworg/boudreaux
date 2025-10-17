@@ -1,31 +1,59 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, Control, FieldValues } from 'react-hook-form';
 import CheckboxField from './checkbox-field';
 
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({
-  FormField: ({ name, render }: any) => {
+  FormField: ({
+    name,
+    render,
+  }: {
+    name: string;
+    render: (context: Record<string, unknown>) => React.ReactNode;
+  }) => {
     const field = {
       value: false,
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
-      ref: vi.fn()
+      ref: vi.fn(),
     };
     return render({ field });
   },
-  FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) =>
-    <div data-testid="form-item" className={className}>{children}</div>,
-  FormLabel: ({ children, htmlFor, className }: { children: React.ReactNode; htmlFor?: string; className?: string }) =>
-    <label data-testid="form-label" htmlFor={htmlFor} className={className}>{children}</label>,
-  FormControl: ({ children }: { children: React.ReactNode }) => <div data-testid="form-control">{children}</div>,
+  FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="form-item" className={className}>
+      {children}
+    </div>
+  ),
+  FormLabel: ({
+    children,
+    htmlFor,
+    className,
+  }: {
+    children: React.ReactNode;
+    htmlFor?: string;
+    className?: string;
+  }) => (
+    <label data-testid="form-label" htmlFor={htmlFor} className={className}>
+      {children}
+    </label>
+  ),
+  FormControl: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form-control">{children}</div>
+  ),
 }));
 
 vi.mock('@/app/components/ui/checkbox', () => ({
-  Checkbox: ({ checked, onCheckedChange, id, ...props }: any) => (
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+    id,
+    ...props
+  }: { checked?: boolean; onCheckedChange?: (checked: boolean) => void; id?: string } & Record<
+    string,
+    unknown
+  >) => (
     <input
       data-testid="checkbox-input"
       type="checkbox"
@@ -38,19 +66,21 @@ vi.mock('@/app/components/ui/checkbox', () => ({
 }));
 
 // Test wrapper component that provides form context
-function TestWrapper({ children, defaultValues = {} }: { children: React.ReactNode; defaultValues?: any }) {
+function TestWrapper({
+  children,
+  defaultValues = {},
+}: {
+  children: React.ReactNode;
+  defaultValues?: Record<string, unknown>;
+}) {
   const methods = useForm({ defaultValues });
-  return (
-    <FormProvider {...methods}>
-      {children}
-    </FormProvider>
-  );
+  return <FormProvider {...methods}>{children}</FormProvider>;
 }
 
 describe('CheckboxField', () => {
   const defaultProps = {
-    control: {} as any,
-    name: 'testCheckbox' as any,
+    control: {} as Control<FieldValues>,
+    name: 'testCheckbox' as const,
     label: <span>Test Checkbox</span>,
     id: 'test-checkbox',
   };

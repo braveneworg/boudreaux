@@ -18,7 +18,9 @@ vi.mock('@/app/lib/utils', () => ({
 }));
 
 vi.mock('react-hook-form', () => ({
-  FormProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="form">{children}</div>,
+  FormProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="form">{children}</div>
+  ),
   useFormContext: () => ({
     register: () => ({}),
     control: {},
@@ -32,7 +34,10 @@ vi.mock('react-hook-form', () => ({
   },
   useForm: () => ({
     register: () => ({}),
-    handleSubmit: (fn: any) => (e: any) => { e?.preventDefault?.(); fn({}); },
+    handleSubmit: (fn: any) => (e: any) => {
+      e?.preventDefault?.();
+      fn({});
+    },
     watch: () => ({}),
     setValue: vi.fn(),
     control: {},
@@ -41,7 +46,7 @@ vi.mock('react-hook-form', () => ({
 }));
 
 vi.mock('react', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     useActionState: () => [{}, vi.fn(), false],
@@ -94,9 +99,7 @@ vi.mock('@/app/components/forms/ui/command', () => ({
   CommandEmpty: ({ children }: any) => <div>{children}</div>,
   CommandGroup: ({ children }: any) => <div>{children}</div>,
   CommandInput: (props: any) => <input {...props} />,
-  CommandItem: ({ children, onSelect }: any) => (
-    <button onClick={onSelect}>{children}</button>
-  ),
+  CommandItem: ({ children, onSelect }: any) => <button onClick={onSelect}>{children}</button>,
   CommandList: ({ children }: any) => <div>{children}</div>,
 }));
 
@@ -143,14 +146,14 @@ vi.mock('next-auth/react', () => ({
         username: 'testuser',
         firstName: 'Test',
         lastName: 'User',
-      }
+      },
     },
-    status: 'authenticated'
-  })
+    status: 'authenticated',
+  }),
 }));
 
 vi.mock('react', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     useActionState: () => [{}, vi.fn(), false],

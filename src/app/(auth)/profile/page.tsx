@@ -6,7 +6,8 @@ export default async function ProfilePage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">
-          Manage your account settings and personal information. We <strong>DO NOT sell</strong> your information.
+          Manage your account settings and personal information. We <strong>DO NOT sell</strong>{' '}
+          your information.
         </p>
       </div>
 

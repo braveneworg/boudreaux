@@ -3,7 +3,10 @@
  * @param fullName - The full name to split
  * @returns Object with firstName and lastName
  */
-export function splitFullName(fullName: string | null | undefined): { firstName: string; lastName: string } {
+export function splitFullName(fullName: string | null | undefined): {
+  firstName: string;
+  lastName: string;
+} {
   if (!fullName) {
     return { firstName: '', lastName: '' };
   }

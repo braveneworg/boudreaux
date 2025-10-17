@@ -1,5 +1,4 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 import CountryField from './country-field';
@@ -7,7 +6,15 @@ import { type ProfileFormData } from '@/app/lib/validation/profile-schema';
 
 // Mock the ComboboxField component
 vi.mock('./combobox-field', () => ({
-  default: ({ label, placeholder, searchPlaceholder, emptyMessage, options, popoverWidth, onUserInteraction }: {
+  default: ({
+    label,
+    placeholder,
+    searchPlaceholder,
+    emptyMessage,
+    options,
+    popoverWidth,
+    onUserInteraction,
+  }: {
     label?: string;
     placeholder?: string;
     searchPlaceholder?: string;
@@ -46,7 +53,7 @@ vi.mock('@/app/lib/utils/countries', () => ({
     { code: 'MX', name: 'Mexico' },
     { code: 'GB', name: 'United Kingdom' },
     { code: 'FR', name: 'France' },
-  ]
+  ],
 }));
 
 // Test wrapper component
@@ -77,27 +84,24 @@ describe('CountryField', () => {
   it('should render with default props', () => {
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={vi.fn()}
-        />
+        <CountryField control={{} as never} setValue={vi.fn()} />
       </TestWrapper>
     );
 
     expect(screen.getByTestId('combobox-field')).toBeInTheDocument();
     expect(screen.getByTestId('combobox-label')).toHaveTextContent('Country');
     expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Select a country...');
-    expect(screen.getByTestId('combobox-search')).toHaveAttribute('placeholder', 'Search countries...');
+    expect(screen.getByTestId('combobox-search')).toHaveAttribute(
+      'placeholder',
+      'Search countries...'
+    );
     expect(screen.getByTestId('combobox-empty')).toHaveTextContent('No country found.');
   });
 
   it('should render all country options', () => {
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={vi.fn()}
-        />
+        <CountryField control={{} as never} setValue={vi.fn()} />
       </TestWrapper>
     );
 
@@ -144,10 +148,7 @@ describe('CountryField', () => {
 
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={mockSetValue}
-        />
+        <CountryField control={{} as never} setValue={mockSetValue} />
       </TestWrapper>
     );
 
@@ -157,10 +158,7 @@ describe('CountryField', () => {
   it('should have correct option structure for countries', () => {
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={vi.fn()}
-        />
+        <CountryField control={{} as never} setValue={vi.fn()} />
       </TestWrapper>
     );
 
@@ -180,10 +178,7 @@ describe('CountryField', () => {
   it('should render without onUserInteraction prop', () => {
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={vi.fn()}
-        />
+        <CountryField control={{} as never} setValue={vi.fn()} />
       </TestWrapper>
     );
 
