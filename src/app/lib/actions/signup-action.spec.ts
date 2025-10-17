@@ -1,5 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 // Get the mocked functions using hoisted
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
