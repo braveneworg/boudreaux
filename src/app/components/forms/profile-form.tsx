@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useCallback, useEffect, useState, useTransition } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
 import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
 import changeEmailSchema, {
   type ChangeEmailFormData,
 } from '@/app/lib/validation/change-email-schema';
+import usernameSchema, {
+  type ChangeUsernameFormData,
+} from '@/app/lib/validation/change-username-schema';
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type { FormState } from '@/app/lib/types/form-state';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
@@ -25,8 +28,10 @@ import { Skeleton } from '../ui/skeleton';
 import { useSession } from 'next-auth/react';
 import { TextField, CheckboxField, StateField, CountryField } from './fields';
 import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
 import { Separator } from '@radix-ui/react-separator';
 import { toast } from 'sonner';
+import ChangeFieldButtons from './change-email-form';
 
 const initialFormState: FormState = {
   errors: {},
@@ -43,12 +48,17 @@ export default function ProfileForm() {
     changeEmailAction,
     initialFormState
   );
+  const [usernameFormState, usernameFormAction, isUsernamePending] = useActionState(
+    changeUsernameAction,
+    initialFormState
+  );
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
 
   // Use direct firstName/lastName fields, with fallback to splitting the name
   const fallbackNames = splitFullName(user?.name);
@@ -77,6 +87,14 @@ export default function ProfileForm() {
       email: user?.email ?? '',
       confirmEmail: '',
       previousEmail: user?.email ?? '',
+    },
+  });
+
+  const changeUsernameForm = useForm<ChangeUsernameFormData>({
+    resolver: zodResolver(usernameSchema),
+    defaultValues: {
+      username: user?.username ?? '',
+      confirmUsername: '',
     },
   });
 
@@ -136,6 +154,22 @@ export default function ProfileForm() {
     });
   };
 
+  const onEditUsernameSubmit = (data: ChangeUsernameFormData) => {
+    if (data.username === user?.username) {
+      // No change in username, do nothing
+      setIsEditingUsername(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('username', data.username || '');
+
+    // Use startTransition to properly handle the async action
+    startTransition(() => {
+      usernameFormAction(formData);
+    });
+  };
+
   const setFormValues = useCallback(
     (user: ProfileFormData) => {
       if (user && !areFormValuesSet) {
@@ -175,17 +209,25 @@ export default function ProfileForm() {
 
   // Update email form when user session changes
   useEffect(() => {
-    if (user?.email && !isEditingUserEmail) {
+    if (user?.username && user?.email && !isEditingUsername && !isEditingUserEmail) {
       // Only update if the current email value is different from the user's email
-      const currentEmail = changeEmailForm.getValues('email');
-      if (currentEmail !== user.email) {
+      const username = changeUsernameForm.getValues('username');
+      if (username !== user.username) {
+        changeUsernameForm.setValue('username', user.username, { shouldValidate: false });
+      }
+      const email = changeEmailForm.getValues('email');
+      if (email !== user.email) {
         changeEmailForm.setValue('email', user.email, { shouldValidate: false });
       }
-      if (changeEmailForm.getValues('previousEmail') !== currentEmail) {
-        changeEmailForm.setValue('previousEmail', currentEmail, { shouldValidate: false });
-      }
     }
-  }, [user?.email, changeEmailForm, isEditingUserEmail]);
+  }, [
+    user?.username,
+    changeUsernameForm,
+    isEditingUsername,
+    user?.email,
+    isEditingUserEmail,
+    changeEmailForm,
+  ]);
 
   // Watch email fields and clear errors when they match
   const watchedEmail = changeEmailForm.watch('email');
@@ -203,6 +245,22 @@ export default function ProfileForm() {
     }
   }, [watchedEmail, watchedConfirmEmail, changeEmailForm]);
 
+  // Watch username fields and clear errors when they match
+  const watchedUsername = changeUsernameForm.watch('username');
+  const watchedConfirmUsername = changeUsernameForm.watch('confirmUsername');
+  useEffect(() => {
+    // If both fields have values and they match, clear any existing errors
+    if (watchedUsername && watchedConfirmUsername && watchedUsername === watchedConfirmUsername) {
+      // Clear specific field errors for username and confirmUsername
+      const currentErrors = changeUsernameForm.formState.errors;
+
+      if (currentErrors.username || currentErrors.confirmUsername) {
+        // Clear the errors by triggering validation
+        changeUsernameForm.clearErrors(['username', 'confirmUsername']);
+      }
+    }
+  }, [watchedUsername, watchedConfirmUsername, changeUsernameForm]);
+
   // Show toast notifications for form state changes
   useEffect(() => {
     if (formState.success) {
@@ -214,7 +272,10 @@ export default function ProfileForm() {
     if (emailFormState.success) {
       toast.success('Your email has been updated successfully.');
     }
-  }, [formState.success, formState.errors, emailFormState.success]);
+    if (usernameFormState.success) {
+      toast.success('Your username has been updated successfully.');
+    }
+  }, [formState.success, formState.errors, emailFormState.success, usernameFormState.success]);
 
   if (status === 'loading' || !user) {
     return (
@@ -226,8 +287,17 @@ export default function ProfileForm() {
     );
   }
 
-  function handleEditEmailClick(): void {
-    setIsEditingUserEmail(!isEditingUserEmail);
+  function handleEditFieldButtonClick(event: React.MouseEvent<HTMLButtonElement>): void {
+    const id = event.currentTarget.id;
+    if (id === 'change-email-change-button') {
+      setIsEditingUserEmail(!isEditingUserEmail);
+    } else if (id === 'change-username-change-button') {
+      setIsEditingUsername(!isEditingUsername);
+    }
+  }
+
+  function handleEditUsernameClick(): void {
+    setIsEditingUsername(!isEditingUsername);
   }
 
   return (
@@ -383,36 +453,14 @@ export default function ProfileForm() {
               onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
             >
               <div className="flex font-medium">Email Address</div>
-              <div className="flex justify-end">
-                <Button
-                  className="mr-2"
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEditEmailClick}
-                >
-                  {isEditingUserEmail ? 'Cancel' : 'Change'}
-                </Button>
-                <div className="text-sm text-red-500">
-                  {changeEmailForm.formState.errors.previousEmail?.message}
-                </div>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={
-                    // Object.keys(changeEmailForm.formState.errors).length > 0 ||
-                    isPending ||
-                    isEmailPending ||
-                    isTransitionPending ||
-                    !isEditingUserEmail ||
-                    !changeEmailForm.formState.isDirty
-                  }
-                >
-                  {isPending || isEmailPending || isTransitionPending
-                    ? 'Updating...'
-                    : 'Update Email'}
-                </Button>
-              </div>
+              <ChangeFieldButtons<ChangeEmailFormData>
+                id="change-email"
+                isEditingField={isEditingUserEmail}
+                handleEditFieldButtonClick={handleEditFieldButtonClick}
+                changeFieldForm={changeEmailForm}
+                isPending={isEmailPending}
+                isTransitionPending={isTransitionPending}
+              />
               {!isEditingUserEmail && (
                 <div className="text-sm text-muted-foreground w-full">{user.email}</div>
               )}
@@ -446,15 +494,43 @@ export default function ProfileForm() {
             decorative
           />
           <div className="flex items-center justify-between py-2">
-            <div>
-              <div className="font-medium">Username</div>
+            <div className="flex font-medium">Username</div>
+            <ChangeFieldButtons<ChangeUsernameFormData>
+              isEditingField={isEditingUsername}
+              handleEditFieldClick={handleEditUsernameClick}
+              changeFieldForm={changeUsernameForm}
+              isPending={isUsernamePending}
+              isTransitionPending={isTransitionPending}
+            />
+            {!isEditingUsername && (
               <div className="text-sm text-muted-foreground">
                 {`@${user.username}` || 'Not set'}
               </div>
-            </div>
-            <Button type="button" variant="outline" size="sm">
-              Change
-            </Button>
+            )}
+            {isEditingUsername && (
+              <div>
+                <div className="text-sm w-full space-y-3 mt-2">
+                  <TextField
+                    control={changeUsernameForm.control}
+                    name="username"
+                    type="text"
+                    label="Email"
+                    labelClassName="sr-only"
+                    placeholder="Enter your username"
+                    setValue={changeUsernameForm.setValue}
+                  />
+                  <TextField
+                    control={changeUsernameForm.control}
+                    name="confirmUsername"
+                    type="text"
+                    label="Confirm username"
+                    labelClassName="sr-only"
+                    placeholder="Confirm your username"
+                    setValue={changeUsernameForm.setValue}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

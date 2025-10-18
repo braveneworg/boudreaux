@@ -1,10 +1,10 @@
 'use server';
 
 import 'server-only';
-import { auth, signOut } from '../../../../auth';
+import { auth } from '../../../../auth';
 import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import getActionState from '@/app/lib/utils/auth/get-action-state';
-import changeEmailSchema from '@/app/lib/validation/change-email-schema';
+import changeUsernameSchema from '@/app/lib/validation/change-username-schema';
 import { redirect } from 'next/navigation';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
@@ -12,12 +12,12 @@ import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import type { FormState } from '../types/form-state';
 import { AdapterUser } from 'next-auth/adapters';
 
-export const changeEmailAction = async (
+export const changeUsernameAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const permittedFieldNames = ['email', 'confirmEmail', 'previousEmail'];
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
+  const permittedFieldNames = ['username', 'confirmUsername'];
+  const { formState, parsed } = getActionState(payload, permittedFieldNames, changeUsernameSchema);
 
   if (parsed.success) {
     try {
@@ -25,26 +25,19 @@ export const changeEmailAction = async (
       const session = await auth();
 
       if (!session?.user?.id) {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be logged in to change your email'];
-        return formState;
+        throw Error('You must be logged in to change your username');
       }
-
-      // Use the current email from session as previousEmail if not provided
-      const previousEmail = parsed.data.previousEmail || session.user.email || '';
 
       const adapter = CustomPrismaAdapter(prisma);
 
       formState.hasTimeout = false;
 
+      const { id } = session.user;
+      const { username } = parsed.data;
       await adapter.updateUser!({
-        id: session.user.id,
-        email: parsed.data.email,
-        previousEmail: previousEmail,
-      } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
+        id,
+        username,
+      } as Pick<AdapterUser, 'username' | 'id'>);
 
       formState.success = true;
     } catch (error: unknown) {
@@ -65,11 +58,11 @@ export const changeEmailAction = async (
       } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicateKeyError = error as Prisma.PrismaClientKnownRequestError;
 
-        if (duplicateKeyError?.meta?.target === 'User_email_key') {
+        if (duplicateKeyError?.meta?.target === 'User_username_key') {
           if (!formState.errors) {
             formState.errors = {};
           }
-          formState.errors.email = ['Email address is already in use'];
+          formState.errors.username = ['Username is already taken.'];
         } else {
           setUnknownError(formState);
         }
@@ -83,12 +76,9 @@ export const changeEmailAction = async (
     }
   }
 
-  if (formState.success) {
-    // Sign the user out to force re-authentication with new email
-    await signOut({ redirect: false }); // User is redirected
-
+  if (formState.success && formState.fields) {
     return redirect(
-      `/success/change-email?email=${encodeURIComponent(formState.fields!.email as string)}`
+      `/success/change-username?username=${encodeURIComponent(formState.fields.username as string)}`
     );
   }
 
