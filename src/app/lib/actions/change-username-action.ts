@@ -5,7 +5,6 @@ import { auth } from '../../../../auth';
 import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import getActionState from '@/app/lib/utils/auth/get-action-state';
 import changeUsernameSchema from '@/app/lib/validation/change-username-schema';
-import { redirect } from 'next/navigation';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
@@ -77,10 +76,10 @@ export const changeUsernameAction = async (
   }
 
   if (formState.success && formState.fields) {
-    return redirect(
-      `/success/change-username?username=${encodeURIComponent(formState.fields.username as string)}`
-    );
+    return formState;
   }
+
+  setUnknownError(formState);
 
   return formState;
 };

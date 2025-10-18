@@ -55,7 +55,7 @@ export default function ProfileForm() {
   );
   const [isTransitionPending, startTransition] = useTransition();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
@@ -155,7 +155,7 @@ export default function ProfileForm() {
     });
   };
 
-  const onEditUsernameSubmit = (data: ChangeUsernameFormData) => {
+  const onSubmitEditUsername = (data: ChangeUsernameFormData) => {
     if (data.username === user?.username) {
       // No change in username, do nothing
       setIsEditingUsername(false);
@@ -164,10 +164,18 @@ export default function ProfileForm() {
 
     const formData = new FormData();
     formData.append('username', data.username || '');
+    formData.append('confirmUsername', data.confirmUsername || '');
 
     // Use startTransition to properly handle the async action
-    startTransition(() => {
+    startTransition(async () => {
       usernameFormAction(formData);
+
+      await update({
+        user: {
+          ...session?.user,
+          username: data.username,
+        },
+      });
     });
   };
 
@@ -272,11 +280,20 @@ export default function ProfileForm() {
     }
     if (emailFormState.success) {
       toast.success('Your email has been updated successfully.');
+      setIsEditingUserEmail(false);
     }
     if (usernameFormState.success) {
       toast.success('Your username has been updated successfully.');
+      // Reset the editing state after successful update
+      setIsEditingUsername(false);
     }
-  }, [formState.success, formState.errors, emailFormState.success, usernameFormState.success]);
+  }, [
+    formState.success,
+    formState.errors,
+    emailFormState.success,
+    usernameFormState.success,
+    usernameFormState,
+  ]);
 
   if (status === 'loading' || !user) {
     return (
@@ -295,10 +312,6 @@ export default function ProfileForm() {
     } else if (id === 'change-username-change-button') {
       setIsEditingUsername(!isEditingUsername);
     }
-  }
-
-  function handleEditUsernameClick(): void {
-    setIsEditingUsername(!isEditingUsername);
   }
 
   return (
@@ -494,24 +507,24 @@ export default function ProfileForm() {
             className="flex h-[1px] bg-gray-200 mt-6 mb-3"
             decorative
           />
-          <Form {...changeEmailForm}>
+          <Form {...changeUsernameForm}>
             <form
               className="flex flex-wrap items-center justify-between py-2"
               noValidate
-              onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
+              onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
             >
               <div className="flex font-medium">Username</div>
               <ChangeFieldButtons<ChangeUsernameFormData>
                 id="change-username"
                 isEditingField={isEditingUsername}
-                handleEditFieldButtonClick={handleEditUsernameClick}
+                handleEditFieldButtonClick={handleEditFieldButtonClick}
                 changeFieldForm={changeUsernameForm}
                 isPending={isUsernamePending}
                 isTransitionPending={isTransitionPending}
               />
               {!isEditingUsername && (
                 <div className="text-sm text-muted-foreground w-full">
-                  {`@${user.username}` || 'Not set'}
+                  {`@${usernameFormState.fields.username ?? user.username}` || 'Not set'}
                 </div>
               )}
               {isEditingUsername && (
