@@ -493,28 +493,33 @@ export default function ProfileForm() {
             className="flex h-[1px] bg-gray-200 mt-6 mb-3"
             decorative
           />
-          <div className="flex items-center justify-between py-2">
-            <div className="flex font-medium">Username</div>
-            <ChangeFieldButtons<ChangeUsernameFormData>
-              isEditingField={isEditingUsername}
-              handleEditFieldClick={handleEditUsernameClick}
-              changeFieldForm={changeUsernameForm}
-              isPending={isUsernamePending}
-              isTransitionPending={isTransitionPending}
-            />
-            {!isEditingUsername && (
-              <div className="text-sm text-muted-foreground">
-                {`@${user.username}` || 'Not set'}
-              </div>
-            )}
-            {isEditingUsername && (
-              <div>
-                <div className="text-sm w-full space-y-3 mt-2">
+          <Form {...changeEmailForm}>
+            <form
+              className="flex flex-wrap items-center justify-between py-2"
+              noValidate
+              onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
+            >
+              <div className="flex font-medium">Username</div>
+              <ChangeFieldButtons<ChangeUsernameFormData>
+                id="change-username"
+                isEditingField={isEditingUsername}
+                handleEditFieldButtonClick={handleEditUsernameClick}
+                changeFieldForm={changeUsernameForm}
+                isPending={isUsernamePending}
+                isTransitionPending={isTransitionPending}
+              />
+              {!isEditingUsername && (
+                <div className="text-sm text-muted-foreground w-full">
+                  {`@${user.username}` || 'Not set'}
+                </div>
+              )}
+              {isEditingUsername && (
+                <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
                   <TextField
                     control={changeUsernameForm.control}
                     name="username"
                     type="text"
-                    label="Email"
+                    label="Username"
                     labelClassName="sr-only"
                     placeholder="Enter your username"
                     setValue={changeUsernameForm.setValue}
@@ -529,9 +534,9 @@ export default function ProfileForm() {
                     setValue={changeUsernameForm.setValue}
                   />
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
