@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState, useTransition } from 'react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useActionState } from 'react';
 import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
@@ -32,6 +32,7 @@ import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
 import { Separator } from '@radix-ui/react-separator';
 import { toast } from 'sonner';
 import ChangeFieldButtons from './change-email-form';
+import { GenerateUsernameButton } from '../auth/generate-username-button';
 
 const initialFormState: FormState = {
   errors: {},
@@ -514,26 +515,32 @@ export default function ProfileForm() {
                 </div>
               )}
               {isEditingUsername && (
-                <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
-                  <TextField
-                    control={changeUsernameForm.control}
-                    name="username"
-                    type="text"
-                    label="Username"
-                    labelClassName="sr-only"
-                    placeholder="Enter your username"
-                    setValue={changeUsernameForm.setValue}
+                <>
+                  <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
+                    <TextField
+                      control={changeUsernameForm.control}
+                      name="username"
+                      type="text"
+                      label="Username"
+                      labelClassName="sr-only"
+                      placeholder="Enter your username"
+                      setValue={changeUsernameForm.setValue}
+                    />
+                    <TextField
+                      control={changeUsernameForm.control}
+                      name="confirmUsername"
+                      type="text"
+                      label="Confirm username"
+                      labelClassName="sr-only"
+                      placeholder="Confirm your username"
+                      setValue={changeUsernameForm.setValue}
+                    />
+                  </div>
+                  <GenerateUsernameButton
+                    form={changeUsernameForm}
+                    fieldsToPopulate={['username', 'confirmUsername']}
                   />
-                  <TextField
-                    control={changeUsernameForm.control}
-                    name="confirmUsername"
-                    type="text"
-                    label="Confirm username"
-                    labelClassName="sr-only"
-                    placeholder="Confirm your username"
-                    setValue={changeUsernameForm.setValue}
-                  />
-                </div>
+                </>
               )}
             </form>
           </Form>
