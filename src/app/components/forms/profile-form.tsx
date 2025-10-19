@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from 'react';
+import { useActionState, useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
@@ -95,26 +95,6 @@ export default function ProfileForm() {
     },
   });
 
-  // Watch all form values to check if form has any content
-  const watchedValues = personalProfileForm.watch();
-
-  // Check if all personal profile fields are empty
-  const hasFormContent = useCallback(() => {
-    const values = watchedValues;
-    return !!(
-      values.firstName?.trim() ||
-      values.lastName?.trim() ||
-      values.phone?.trim() ||
-      values.addressLine1?.trim() ||
-      values.addressLine2?.trim() ||
-      values.city?.trim() ||
-      values.state?.trim() ||
-      values.zipCode?.trim() ||
-      values.country?.trim() ||
-      values.allowSmsNotifications
-    );
-  }, [watchedValues]);
-
   const onSubmitPersonalProfileForm = (data: ProfileFormData) => {
     const formData = new FormData();
     formData.append('firstName', data.firstName || '');
@@ -154,37 +134,30 @@ export default function ProfileForm() {
     });
   };
 
-  const setFormValues = useCallback(
-    (user: ProfileFormData) => {
-      if (!areFormValuesSet) {
-        const hasChanges = Object.keys(personalProfileForm.formState.dirtyFields).length > 0;
-
-        if (!hasChanges && hasFormContent()) {
-          personalProfileForm.reset(user);
-          setAreFormValuesSet(true);
-        }
-      }
-    },
-    [areFormValuesSet, personalProfileForm, hasFormContent]
-  );
-
+  // Populate form with user data when it becomes available
   useEffect(() => {
     if (user && !areFormValuesSet) {
       const fallbackNames = splitFullName(user.name);
-      setFormValues({
-        firstName: user.firstName || fallbackNames.firstName || '',
-        lastName: user.lastName || fallbackNames.lastName || '',
-        phone: user.phone ?? '',
-        addressLine1: user.addressLine1 ?? '',
-        addressLine2: user.addressLine2 ?? '',
-        city: user.city ?? '',
-        state: user.state ?? '',
-        zipCode: user.zipCode ?? '',
-        country: user.country ?? '',
-        allowSmsNotifications: user.allowSmsNotifications ?? false,
-      });
+      const hasChanges = Object.keys(personalProfileForm.formState.dirtyFields).length > 0;
+
+      if (!hasChanges) {
+        const userData = {
+          firstName: user.firstName || fallbackNames.firstName || '',
+          lastName: user.lastName || fallbackNames.lastName || '',
+          phone: user.phone ?? '',
+          addressLine1: user.addressLine1 ?? '',
+          addressLine2: user.addressLine2 ?? '',
+          city: user.city ?? '',
+          state: user.state ?? '',
+          zipCode: user.zipCode ?? '',
+          country: user.country ?? '',
+          allowSmsNotifications: user.allowSmsNotifications ?? false,
+        };
+        personalProfileForm.reset(userData, { keepDefaultValues: false });
+        setAreFormValuesSet(true);
+      }
     }
-  }, [areFormValuesSet, setFormValues, user]);
+  }, [user, areFormValuesSet, personalProfileForm]);
 
   // Update email form when user session changes
   useEffect(() => {
@@ -192,14 +165,16 @@ export default function ProfileForm() {
       changeEmailForm.setValue('email', user.email);
       changeEmailForm.setValue('previousEmail', user.email);
     }
-  }, [user?.email, changeEmailForm, isEditingUserEmail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, isEditingUserEmail]);
 
   // Update username form when user session changes
   useEffect(() => {
     if (user?.username && !isEditingUsername) {
       changeUsernameForm.setValue('username', user.username);
     }
-  }, [user?.username, changeUsernameForm, isEditingUsername]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username, isEditingUsername]);
 
   // Watch email fields and clear errors when they match
   const watchedEmail = changeEmailForm.watch('email');
@@ -223,12 +198,18 @@ export default function ProfileForm() {
   useEffect(() => {
     if (formState.success) {
       toast.success('Your profile has been updated successfully.');
+      // Reset the form to mark it as pristine after successful save
+      personalProfileForm.reset(personalProfileForm.getValues());
+      void update();
     }
     if (formState.errors?.general) {
       toast.error(formState.errors.general[0]);
     }
     if (emailFormState.success) {
       toast.success('Your email has been updated successfully.');
+      // Reset the editing state after successful update
+      setIsEditingUserEmail(false);
+      void update();
     }
     if (usernameFormState.success) {
       toast.success('Your username has been updated successfully.');
@@ -237,13 +218,8 @@ export default function ProfileForm() {
       // Update the session to reflect the new username
       void update();
     }
-  }, [
-    formState.success,
-    formState.errors,
-    emailFormState.success,
-    usernameFormState.success,
-    update,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState.success, formState.errors, emailFormState.success, usernameFormState.success]);
 
   if (status === 'loading' || !user) {
     return (
@@ -268,9 +244,21 @@ export default function ProfileForm() {
     const fieldName = target.getAttribute('data-field');
 
     if (fieldName === 'email') {
+      const isCurrentlyEditing = isEditingUserEmail;
       setIsEditingUserEmail(!isEditingUserEmail);
+
+      // Clear errors when canceling (going from editing to not editing)
+      if (isCurrentlyEditing) {
+        changeEmailForm.clearErrors();
+      }
     } else if (fieldName === 'username') {
+      const isCurrentlyEditing = isEditingUsername;
       setIsEditingUsername(!isEditingUsername);
+
+      // Clear errors when canceling (going from editing to not editing)
+      if (isCurrentlyEditing) {
+        changeUsernameForm.clearErrors();
+      }
     }
   }
 
@@ -288,6 +276,7 @@ export default function ProfileForm() {
               onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
               className="space-y-4"
               data-testid="form"
+              noValidate
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <TextField
@@ -344,7 +333,12 @@ export default function ProfileForm() {
                 label="Allow SMS notifications"
                 id="allowSmsNotifications"
               />
-              <Button type="submit" disabled={isPending || isTransitionPending}>
+              <Button
+                type="submit"
+                disabled={
+                  !personalProfileForm.formState.isDirty || isPending || isTransitionPending
+                }
+              >
                 {isPending || isTransitionPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </form>
@@ -366,6 +360,7 @@ export default function ProfileForm() {
               onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
               className="space-y-4"
               data-testid="form"
+              noValidate
             >
               <TextField
                 control={changeEmailForm.control}
@@ -397,7 +392,12 @@ export default function ProfileForm() {
                   {isEditingUserEmail ? 'Cancel' : 'Edit Email'}
                 </Button>
                 {isEditingUserEmail && (
-                  <Button type="submit" disabled={isEmailPending || isTransitionPending}>
+                  <Button
+                    type="submit"
+                    disabled={
+                      !changeEmailForm.formState.isDirty || isEmailPending || isTransitionPending
+                    }
+                  >
                     {isEmailPending || isTransitionPending ? 'Saving...' : 'Save Email'}
                   </Button>
                 )}
@@ -421,6 +421,7 @@ export default function ProfileForm() {
               onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
               className="space-y-4"
               data-testid="form"
+              noValidate
             >
               <TextField
                 control={changeUsernameForm.control}
@@ -453,7 +454,14 @@ export default function ProfileForm() {
                   {isEditingUsername ? 'Cancel' : 'Edit Username'}
                 </Button>
                 {isEditingUsername && (
-                  <Button type="submit" disabled={isUsernamePending || isTransitionPending}>
+                  <Button
+                    type="submit"
+                    disabled={
+                      !changeUsernameForm.formState.isDirty ||
+                      isUsernamePending ||
+                      isTransitionPending
+                    }
+                  >
                     {isUsernamePending || isTransitionPending ? 'Saving...' : 'Save Username'}
                   </Button>
                 )}

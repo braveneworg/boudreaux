@@ -6,7 +6,6 @@ import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import profileSchema from '@/app/lib/validation/profile-schema';
 import type { FormState } from '../types/form-state';
 import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 export const updateProfileAction = async (
@@ -79,15 +78,9 @@ export const updateProfileAction = async (
 
       // Revalidate the profile page to show updated data
       revalidatePath('/profile');
-    } catch (error: unknown) {
+    } catch {
       formState.success = false;
-
-      // Handle specific database errors
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        setUnknownError(formState);
-      } else {
-        setUnknownError(formState);
-      }
+      setUnknownError(formState);
     }
   }
 
