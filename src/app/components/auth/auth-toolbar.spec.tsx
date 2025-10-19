@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import AuthToolbar from './auth-toolbar';
 
@@ -112,10 +111,18 @@ describe('AuthToolbar', () => {
       });
     });
 
-    it('renders signed in toolbar', () => {
+    it('renders loading state', () => {
       render(<AuthToolbar />);
 
-      expect(screen.getByTestId('signout-toolbar')).toBeInTheDocument();
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+    });
+
+    it('does not render sign in/up links or signed in toolbar while loading', () => {
+      render(<AuthToolbar />);
+
+      expect(screen.queryByTestId('signin-link')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('signup-link')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('signout-toolbar')).not.toBeInTheDocument();
     });
   });
 });

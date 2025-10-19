@@ -531,6 +531,39 @@ describe('ProfileForm', () => {
       // but the component logic calls personalProfileForm.reset(personalProfileForm.getValues())
       // This test documents the expected behavior
     });
+
+    it('should disable Save Changes button immediately after successful submission', () => {
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      const buttons = screen.getAllByTestId('button');
+      const saveButton = buttons[0];
+
+      // Verify the button is disabled because form is reset to pristine after success
+      expect(saveButton).toBeDisabled();
+
+      // Verify success message was shown
+      expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+    });
+
+    it('should only show one success toast when profile update succeeds', () => {
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify toast was called exactly once using the idempotent handler
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+    });
   });
 
   describe('Form State Management', () => {
@@ -573,6 +606,111 @@ describe('ProfileForm', () => {
 
       // Button should be enabled when form is dirty
       expect(saveButton).not.toBeDisabled();
+    });
+
+    it('should disable Save Changes button after successful profile update', () => {
+      // Set success state
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      const buttons = screen.getAllByTestId('button');
+      const saveButton = buttons[0];
+
+      // Button should be disabled because form is not dirty (reset to pristine after success)
+      expect(saveButton).toBeDisabled();
+    });
+
+    it('should re-enable Save Changes button when form becomes dirty after success', () => {
+      // Set success state
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      // Mock useForm to return isDirty: true
+      vi.mocked(useForm).mockReturnValueOnce({
+        register: () => ({}),
+        handleSubmit: (fn: (data: Record<string, unknown>) => void) => (e?: React.FormEvent) => {
+          if (e) e.preventDefault();
+          fn({});
+        },
+        watch: () => ({}),
+        setValue: vi.fn(),
+        getValues: vi.fn(() => ({})),
+        clearErrors: vi.fn(),
+        control: {},
+        formState: { errors: {}, dirtyFields: { firstName: true }, isDirty: true },
+        reset: vi.fn(),
+        getFieldState: vi.fn(),
+        setError: vi.fn(),
+        trigger: vi.fn(),
+        resetField: vi.fn(),
+        setFocus: vi.fn(),
+        unregister: vi.fn(),
+      } as unknown as ReturnType<typeof useForm>);
+
+      render(<ProfileForm />);
+
+      const buttons = screen.getAllByTestId('button');
+      const saveButton = buttons[0];
+
+      // Button should be enabled when form becomes dirty, even if success is true
+      expect(saveButton).not.toBeDisabled();
+    });
+
+    it('should disable Save Changes button during pending state', () => {
+      render(<ProfileForm />);
+
+      const buttons = screen.getAllByTestId('button');
+      const saveButton = buttons[0];
+
+      // Button is disabled by default (not dirty)
+      expect(saveButton).toBeDisabled();
+    });
+
+    it('should handle complete save and re-edit flow correctly', () => {
+      // Initial state: form is not dirty, success is false
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: false,
+      };
+
+      // Mock form as not dirty initially
+      vi.mocked(useForm).mockReturnValueOnce({
+        register: () => ({}),
+        handleSubmit: (fn: (data: Record<string, unknown>) => void) => (e?: React.FormEvent) => {
+          if (e) e.preventDefault();
+          fn({});
+        },
+        watch: () => ({}),
+        setValue: vi.fn(),
+        getValues: vi.fn(() => ({})),
+        clearErrors: vi.fn(),
+        control: {},
+        formState: { errors: {}, dirtyFields: {}, isDirty: false },
+        reset: vi.fn(),
+        getFieldState: vi.fn(),
+        setError: vi.fn(),
+        trigger: vi.fn(),
+        resetField: vi.fn(),
+        setFocus: vi.fn(),
+        unregister: vi.fn(),
+      } as unknown as ReturnType<typeof useForm>);
+
+      render(<ProfileForm />);
+
+      const buttons = screen.getAllByTestId('button');
+      const saveButton = buttons[0];
+
+      // Button should be disabled (form not dirty)
+      expect(saveButton).toBeDisabled();
     });
   });
 

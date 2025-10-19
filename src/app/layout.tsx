@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { SessionProvider } from 'next-auth/react';
 import { Toaster } from '@/components/ui/sonner';
+import { Providers } from './components/providers';
 import './globals.css';
 
 // Server-side environment validation on startup
@@ -50,9 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SessionProvider refetchInterval={0} refetchOnWindowFocus={true} refetchWhenOffline={false}>
-          {children}
-        </SessionProvider>
+        <Providers>{children}</Providers>
         <Toaster />
       </body>
     </html>

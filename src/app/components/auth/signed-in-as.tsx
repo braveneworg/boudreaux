@@ -9,7 +9,14 @@ const SignedInAs = () => {
   const isMobile = useIsMobile();
   const username = session?.user?.username;
 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[SignedInAs] Session:', session);
+    console.log('[SignedInAs] User:', session?.user);
+    console.log('[SignedInAs] Username:', username);
+  }
+
   if (!username) {
+    console.warn('[SignedInAs] No username found, returning null');
     return null;
   }
 

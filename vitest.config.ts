@@ -21,6 +21,57 @@ export default defineConfig({
     globals: true,
     watch: false,
     setupFiles: ['./setupTests.ts'],
+
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov', 'clover'],
+      exclude: [
+        // Configuration files
+        '**/*.config.{ts,js,mjs,cjs}',
+        '**/vitest.config.ts',
+        '**/next.config.ts',
+        '**/postcss.config.mjs',
+        '**/eslint.config.mjs',
+        '**/tsconfig*.json',
+
+        // Type declarations and interfaces
+        '**/*.d.ts',
+        '**/types/**',
+
+        // Prisma
+        '**/prisma/**',
+        '**/*.prisma',
+
+        // Setup and tooling
+        '**/setupTests.ts',
+        '**/auth.ts',
+
+        // Build outputs and dependencies
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/.next/**',
+        '**/coverage/**',
+
+        // Test files themselves
+        '**/*.{test,spec}.{ts,tsx,js,jsx}',
+
+        // Scripts and utilities that don't need testing
+        '**/scripts/**',
+
+        // Middleware (already has its own test)
+        // Add more specific exclusions as needed
+      ],
+    },
+
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '**/*.config.{ts,js,mjs,cjs}',
+      '**/setupTests.ts',
+    ],
   },
 
   resolve: {
