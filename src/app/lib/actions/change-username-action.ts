@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import type { FormState } from '../types/form-state';
 import { AdapterUser } from 'next-auth/adapters';
+import { revalidatePath } from 'next/cache';
 
 export const changeUsernameAction = async (
   _initialState: FormState,
@@ -24,7 +25,7 @@ export const changeUsernameAction = async (
       const session = await auth();
 
       if (!session?.user?.id) {
-        throw Error('You must be logged in to change your username');
+        throw new Error('You must be logged in to change your username');
       }
 
       const adapter = CustomPrismaAdapter(prisma);
@@ -39,6 +40,9 @@ export const changeUsernameAction = async (
       } as Pick<AdapterUser, 'username' | 'id'>);
 
       formState.success = true;
+
+      // Revalidate the profile page to reflect the username change
+      revalidatePath('/profile');
     } catch (error: unknown) {
       formState.success = false;
       // Check for MongoDB timeout errors
@@ -68,18 +72,8 @@ export const changeUsernameAction = async (
       } else {
         setUnknownError(formState);
       }
-    } finally {
-      if (!formState.success && formState.errors && Object.keys(formState.errors).length > 0) {
-        setUnknownError(formState);
-      }
     }
   }
-
-  if (formState.success && formState.fields) {
-    return formState;
-  }
-
-  setUnknownError(formState);
 
   return formState;
 };

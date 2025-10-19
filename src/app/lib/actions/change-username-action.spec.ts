@@ -3,6 +3,7 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockUpdateUser = vi.hoisted(() => vi.fn());
+const mockRevalidatePath = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -20,6 +21,10 @@ vi.mock('@/app/lib/prisma-adapter', () => ({
 
 vi.mock('../prisma', () => ({
   prisma: {},
+}));
+
+vi.mock('next/cache', () => ({
+  revalidatePath: mockRevalidatePath,
 }));
 
 vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
@@ -433,7 +438,7 @@ describe('changeUsernameAction', () => {
       expect(result.errors).toEqual({ confirmUsername: ['Usernames do not match'] });
     });
 
-    it('should call setUnknownError in finally block when errors exist but success is false', async () => {
+    it('should handle duplicate username error without calling setUnknownError', async () => {
       const mockFormState: FormState = {
         fields: { username: 'newusername', confirmUsername: 'newusername' },
         success: false,
@@ -467,7 +472,8 @@ describe('changeUsernameAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.username).toEqual(['Username is already taken.']);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      // Should NOT call setUnknownError for specific username duplicate error
+      expect(mockSetUnknownError).not.toHaveBeenCalled();
     });
 
     it('should handle empty username strings', async () => {

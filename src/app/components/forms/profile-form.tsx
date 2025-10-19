@@ -1,21 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useState, useTransition } from 'react';
+import { useActionState, useCallback, useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useActionState } from 'react';
-import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
-import changeEmailSchema, {
-  type ChangeEmailFormData,
-} from '@/app/lib/validation/change-email-schema';
-import usernameSchema, {
-  type ChangeUsernameFormData,
-} from '@/app/lib/validation/change-username-schema';
+import { useSession } from 'next-auth/react';
 import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
-import type { FormState } from '@/app/lib/types/form-state';
-import { splitFullName } from '@/app/lib/utils/profile-utils';
-
-import { Form } from '@/app/components/ui/form';
+import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -24,15 +15,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
-import { Skeleton } from '../ui/skeleton';
-import { useSession } from 'next-auth/react';
-import { TextField, CheckboxField, StateField, CountryField } from './fields';
-import { changeEmailAction } from '@/app/lib/actions/change-email-action';
-import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
 import { Separator } from '@radix-ui/react-separator';
+import { Skeleton } from '@/app/components/ui/skeleton';
+import { CheckboxField, StateField, TextField, CountryField } from '@/app/components/forms/fields';
+import { splitFullName } from '@/app/lib/utils/profile-utils';
+import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
+import changeEmailSchema, {
+  type ChangeEmailFormData,
+} from '@/app/lib/validation/change-email-schema';
+import usernameSchema, {
+  type ChangeUsernameFormData,
+} from '@/app/lib/validation/change-username-schema';
+import type { FormState } from '@/app/lib/types/form-state';
 import { toast } from 'sonner';
-import ChangeFieldButtons from './change-email-form';
-import { GenerateUsernameButton } from '../auth/generate-username-button';
+import { GenerateUsernameButton } from '@/app/components/auth/generate-username-button';
 
 const initialFormState: FormState = {
   errors: {},
@@ -54,7 +50,6 @@ export default function ProfileForm() {
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const { data: session, status, update } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
@@ -103,7 +98,7 @@ export default function ProfileForm() {
   const watchedValues = personalProfileForm.watch();
 
   // Check if all personal profile fields are empty
-  const hasFormContent = () => {
+  const hasFormContent = useCallback(() => {
     const values = watchedValues;
     return !!(
       values.firstName?.trim() ||
@@ -117,7 +112,7 @@ export default function ProfileForm() {
       values.country?.trim() ||
       values.allowSmsNotifications
     );
-  };
+  }, [watchedValues]);
 
   const onSubmitPersonalProfileForm = (data: ProfileFormData) => {
     const formData = new FormData();
@@ -130,127 +125,87 @@ export default function ProfileForm() {
     formData.append('state', data.state || '');
     formData.append('zipCode', data.zipCode || '');
     formData.append('country', data.country || '');
-    formData.append('allowSmsNotifications', data.allowSmsNotifications ? 'true' : 'false');
+    formData.append('allowSmsNotifications', String(data.allowSmsNotifications));
 
-    // Use startTransition to properly handle the async action
     startTransition(() => {
       profileFormAction(formData);
     });
   };
 
   const onEditEmailSubmit = (data: ChangeEmailFormData) => {
-    if (data.email === user?.email) {
-      // No change in email, do nothing
-      setIsEditingUserEmail(false);
-      return;
-    }
-
     const formData = new FormData();
-    formData.append('email', data.email || '');
-    formData.append('confirmEmail', data.confirmEmail || '');
-    formData.append('previousEmail', user?.email || '');
-    // Use startTransition to properly handle the async action
+    formData.append('email', data.email);
+    formData.append('confirmEmail', data.confirmEmail);
+    formData.append('previousEmail', data.previousEmail ?? '');
+
     startTransition(() => {
       emailFormAction(formData);
     });
   };
 
   const onSubmitEditUsername = (data: ChangeUsernameFormData) => {
-    if (data.username === user?.username) {
-      // No change in username, do nothing
-      setIsEditingUsername(false);
-      return;
-    }
-
     const formData = new FormData();
-    formData.append('username', data.username || '');
-    formData.append('confirmUsername', data.confirmUsername || '');
+    formData.append('username', data.username);
+    formData.append('confirmUsername', data.confirmUsername);
 
-    // Use startTransition to properly handle the async action
-    startTransition(async () => {
+    startTransition(() => {
       usernameFormAction(formData);
-
-      await update({
-        user: {
-          ...session?.user,
-          username: data.username,
-        },
-      });
     });
   };
 
   const setFormValues = useCallback(
     (user: ProfileFormData) => {
-      if (user && !areFormValuesSet) {
-        Object.entries(user).forEach(([key, value]) => {
-          // Only set the form value if the user has interacted with the form
-          if (hasUserInteracted) return;
+      if (!areFormValuesSet) {
+        const hasChanges = Object.keys(personalProfileForm.formState.dirtyFields).length > 0;
 
-          // Ensure the key exists in the form schema
-          if (key in watchedValues) {
-            // For boolean fields, ensure proper boolean conversion
-            if (key === 'allowSmsNotifications') {
-              if (value === 'true' || value === true) {
-                personalProfileForm.setValue(key as keyof ProfileFormData, true);
-              } else {
-                personalProfileForm.setValue(key as keyof ProfileFormData, false);
-              }
-            } else {
-              personalProfileForm.setValue(
-                key as keyof ProfileFormData,
-                value as unknown as string
-              );
-            }
-          }
-        });
-        setAreFormValuesSet(true);
+        if (!hasChanges && hasFormContent()) {
+          personalProfileForm.reset(user);
+          setAreFormValuesSet(true);
+        }
       }
     },
-    [areFormValuesSet, hasUserInteracted, watchedValues, personalProfileForm]
+    [areFormValuesSet, personalProfileForm, hasFormContent]
   );
 
   useEffect(() => {
-    if (!areFormValuesSet) {
-      // Get the current user values to bind to the form
-      setFormValues(user as ProfileFormData);
+    if (user && !areFormValuesSet) {
+      const fallbackNames = splitFullName(user.name);
+      setFormValues({
+        firstName: user.firstName || fallbackNames.firstName || '',
+        lastName: user.lastName || fallbackNames.lastName || '',
+        phone: user.phone ?? '',
+        addressLine1: user.addressLine1 ?? '',
+        addressLine2: user.addressLine2 ?? '',
+        city: user.city ?? '',
+        state: user.state ?? '',
+        zipCode: user.zipCode ?? '',
+        country: user.country ?? '',
+        allowSmsNotifications: user.allowSmsNotifications ?? false,
+      });
     }
-  }, [areFormValuesSet, personalProfileForm.formState.dirtyFields, setFormValues, user]);
+  }, [areFormValuesSet, setFormValues, user]);
 
   // Update email form when user session changes
   useEffect(() => {
-    if (user?.username && user?.email && !isEditingUsername && !isEditingUserEmail) {
-      // Only update if the current email value is different from the user's email
-      const username = changeUsernameForm.getValues('username');
-      if (username !== user.username) {
-        changeUsernameForm.setValue('username', user.username, { shouldValidate: false });
-      }
-      const email = changeEmailForm.getValues('email');
-      if (email !== user.email) {
-        changeEmailForm.setValue('email', user.email, { shouldValidate: false });
-      }
+    if (user?.email && !isEditingUserEmail) {
+      changeEmailForm.setValue('email', user.email);
+      changeEmailForm.setValue('previousEmail', user.email);
     }
-  }, [
-    user?.username,
-    changeUsernameForm,
-    isEditingUsername,
-    user?.email,
-    isEditingUserEmail,
-    changeEmailForm,
-  ]);
+  }, [user?.email, changeEmailForm, isEditingUserEmail]);
+
+  // Update username form when user session changes
+  useEffect(() => {
+    if (user?.username && !isEditingUsername) {
+      changeUsernameForm.setValue('username', user.username);
+    }
+  }, [user?.username, changeUsernameForm, isEditingUsername]);
 
   // Watch email fields and clear errors when they match
   const watchedEmail = changeEmailForm.watch('email');
   const watchedConfirmEmail = changeEmailForm.watch('confirmEmail');
   useEffect(() => {
-    // If both fields have values and they match, clear any existing errors
     if (watchedEmail && watchedConfirmEmail && watchedEmail === watchedConfirmEmail) {
-      // Clear specific field errors for email and confirmEmail
-      const currentErrors = changeEmailForm.formState.errors;
-
-      if (currentErrors.email || currentErrors.confirmEmail) {
-        // Clear the errors by triggering validation
-        changeEmailForm.clearErrors(['email', 'confirmEmail']);
-      }
+      changeEmailForm.clearErrors('confirmEmail');
     }
   }, [watchedEmail, watchedConfirmEmail, changeEmailForm]);
 
@@ -258,15 +213,8 @@ export default function ProfileForm() {
   const watchedUsername = changeUsernameForm.watch('username');
   const watchedConfirmUsername = changeUsernameForm.watch('confirmUsername');
   useEffect(() => {
-    // If both fields have values and they match, clear any existing errors
     if (watchedUsername && watchedConfirmUsername && watchedUsername === watchedConfirmUsername) {
-      // Clear specific field errors for username and confirmUsername
-      const currentErrors = changeUsernameForm.formState.errors;
-
-      if (currentErrors.username || currentErrors.confirmUsername) {
-        // Clear the errors by triggering validation
-        changeUsernameForm.clearErrors(['username', 'confirmUsername']);
-      }
+      changeUsernameForm.clearErrors('confirmUsername');
     }
   }, [watchedUsername, watchedConfirmUsername, changeUsernameForm]);
 
@@ -280,283 +228,231 @@ export default function ProfileForm() {
     }
     if (emailFormState.success) {
       toast.success('Your email has been updated successfully.');
-      setIsEditingUserEmail(false);
     }
     if (usernameFormState.success) {
       toast.success('Your username has been updated successfully.');
       // Reset the editing state after successful update
       setIsEditingUsername(false);
+      // Update the session to reflect the new username
+      void update();
     }
   }, [
     formState.success,
     formState.errors,
     emailFormState.success,
     usernameFormState.success,
-    usernameFormState,
+    update,
   ]);
 
   if (status === 'loading' || !user) {
     return (
-      <div className="flex flex-col flex-wrap">
-        {Array.from({ length: 7 }).map((_, index) => (
-          <Skeleton key={index} className="h-8 w-full mb-4" />
-        ))}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   function handleEditFieldButtonClick(event: React.MouseEvent<HTMLButtonElement>): void {
-    const id = event.currentTarget.id;
-    if (id === 'change-email-change-button') {
+    const target = event.target as HTMLButtonElement;
+    const fieldName = target.getAttribute('data-field');
+
+    if (fieldName === 'email') {
       setIsEditingUserEmail(!isEditingUserEmail);
-    } else if (id === 'change-username-change-button') {
+    } else if (fieldName === 'username') {
       setIsEditingUsername(!isEditingUsername);
     }
   }
 
   return (
     <div className="space-y-6">
+      {/* Personal Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information (Optional)</CardTitle>
-          <CardDescription>Update your personal details and contact information.</CardDescription>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your personal details</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...personalProfileForm}>
-            <form
-              onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
-              noValidate
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TextField
-                  control={personalProfileForm.control}
-                  name="firstName"
-                  label="First Name"
-                  placeholder="Enter your first name"
-                  onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={personalProfileForm.setValue}
-                />
-
-                <TextField
-                  control={personalProfileForm.control}
-                  name="lastName"
-                  label="Last Name"
-                  placeholder="Enter your last name"
-                  onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={personalProfileForm.setValue}
-                />
-              </div>
-
+          <form
+            onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
+            className="space-y-4"
+            data-testid="form"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
               <TextField
                 control={personalProfileForm.control}
-                name="phone"
-                label="Phone Number"
-                placeholder="(555) 123-4567"
-                type="tel"
-                onUserInteraction={() => setHasUserInteracted(true)}
-                setValue={personalProfileForm.setValue}
+                name="firstName"
+                label="First Name"
+                placeholder="John"
               />
-
-              <CheckboxField
+              <TextField
                 control={personalProfileForm.control}
-                name="allowSmsNotifications"
-                id="allow-sms-notifications"
-                label={
-                  <>
-                    <strong>
-                      Allow us to send text messages to your mobile phone occasionally?
-                    </strong>
-                    <br />
-                    <em className="inline-block mt-3">(Carrier charges may apply)</em>
-                  </>
-                }
-                onUserInteraction={() => setHasUserInteracted(true)}
-                setValue={personalProfileForm.setValue}
+                name="lastName"
+                label="Last Name"
+                placeholder="Doe"
               />
-
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Address Information</h3>
-
-                <TextField
-                  control={personalProfileForm.control}
-                  name="addressLine1"
-                  label="Address"
-                  placeholder="123 Main Street"
-                  onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={personalProfileForm.setValue}
-                />
-
-                <TextField
-                  control={personalProfileForm.control}
-                  name="addressLine2"
-                  label="Address Line 2"
-                  placeholder="Apartment, suite, unit, etc."
-                  onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={personalProfileForm.setValue}
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <TextField
-                    control={personalProfileForm.control}
-                    name="city"
-                    label="City"
-                    placeholder="New York"
-                    onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={personalProfileForm.setValue}
-                  />
-
-                  <StateField
-                    control={personalProfileForm.control}
-                    onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={personalProfileForm.setValue}
-                  />
-
-                  <TextField
-                    control={personalProfileForm.control}
-                    name="zipCode"
-                    label="ZIP / Postal Code"
-                    placeholder="12345"
-                    onUserInteraction={() => setHasUserInteracted(true)}
-                    setValue={personalProfileForm.setValue}
-                  />
-                </div>
-
-                <CountryField
-                  control={personalProfileForm.control}
-                  onUserInteraction={() => setHasUserInteracted(true)}
-                  setValue={personalProfileForm.setValue}
-                />
-              </div>
-
-              <Button
-                size="sm"
-                type="submit"
-                disabled={
-                  !personalProfileForm.formState.isDirty ||
-                  isPending ||
-                  isTransitionPending ||
-                  !hasUserInteracted ||
-                  !hasFormContent()
-                }
-              >
-                {isPending || isTransitionPending ? 'Updating...' : 'Update Profile'}
-              </Button>
-            </form>
-          </Form>
+            </div>
+            <TextField
+              control={personalProfileForm.control}
+              name="phone"
+              label="Phone Number"
+              placeholder="+1 (555) 000-0000"
+              type="tel"
+            />
+            <TextField
+              control={personalProfileForm.control}
+              name="addressLine1"
+              label="Address Line 1"
+              placeholder="123 Main St"
+            />
+            <TextField
+              control={personalProfileForm.control}
+              name="addressLine2"
+              label="Address Line 2"
+              placeholder="Apt 4B"
+            />
+            <div className="grid gap-4 md:grid-cols-3">
+              <TextField
+                control={personalProfileForm.control}
+                name="city"
+                label="City"
+                placeholder="New York"
+              />
+              <StateField control={personalProfileForm.control} />
+              <TextField
+                control={personalProfileForm.control}
+                name="zipCode"
+                label="ZIP Code"
+                placeholder="10001"
+              />
+            </div>
+            <CountryField control={personalProfileForm.control} />
+            <CheckboxField
+              control={personalProfileForm.control}
+              name="allowSmsNotifications"
+              label="Allow SMS notifications"
+              id="allowSmsNotifications"
+            />
+            <Button type="submit" disabled={isPending || isTransitionPending}>
+              {isPending || isTransitionPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
+      <Separator />
+
+      {/* Email */}
       <Card>
         <CardHeader>
-          <CardTitle>Account Settings</CardTitle>
-          <CardDescription>
-            <p>Manage your account credentials and preferences.</p>
-            <p>
-              <strong>Note:</strong> <em>Changing your email or username</em> will require you to
-              sign in again.
-            </p>
-            <p>Make sure you have access to messages at the new email address.</p>
-          </CardDescription>
+          <CardTitle>Email Address</CardTitle>
+          <CardDescription>Manage your email address</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...changeEmailForm}>
-            <form
-              className="flex flex-wrap items-center justify-between"
-              noValidate
-              onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
-            >
-              <div className="flex font-medium">Email Address</div>
-              <ChangeFieldButtons<ChangeEmailFormData>
-                id="change-email"
-                isEditingField={isEditingUserEmail}
-                handleEditFieldButtonClick={handleEditFieldButtonClick}
-                changeFieldForm={changeEmailForm}
-                isPending={isEmailPending}
-                isTransitionPending={isTransitionPending}
-              />
-              {!isEditingUserEmail && (
-                <div className="text-sm text-muted-foreground w-full">{user.email}</div>
-              )}
+          <form
+            onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
+            className="space-y-4"
+            data-testid="form"
+          >
+            <TextField
+              control={changeEmailForm.control}
+              name="email"
+              label="Email"
+              placeholder="john@example.com"
+              type="email"
+              disabled={!isEditingUserEmail}
+            />
+            {isEditingUserEmail && (
+              <>
+                <TextField
+                  control={changeEmailForm.control}
+                  name="confirmEmail"
+                  label="Confirm Email"
+                  placeholder="john@example.com"
+                  type="email"
+                />
+                <input type="hidden" {...changeEmailForm.register('previousEmail')} />
+              </>
+            )}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEditFieldButtonClick}
+                data-field="email"
+              >
+                {isEditingUserEmail ? 'Cancel' : 'Edit Email'}
+              </Button>
               {isEditingUserEmail && (
-                <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
-                  <TextField
-                    control={changeEmailForm.control}
-                    name="email"
-                    type="email"
-                    label="Email"
-                    labelClassName="sr-only"
-                    placeholder="Enter your email address"
-                    setValue={changeEmailForm.setValue}
-                  />
-                  <TextField
-                    control={changeEmailForm.control}
-                    name="confirmEmail"
-                    type="email"
-                    label="Confirm Email"
-                    labelClassName="sr-only"
-                    placeholder="Confirm your email address"
-                    setValue={changeEmailForm.setValue}
-                  />
-                </div>
+                <Button type="submit" disabled={isEmailPending || isTransitionPending}>
+                  {isEmailPending || isTransitionPending ? 'Saving...' : 'Save Email'}
+                </Button>
               )}
-            </form>
-          </Form>
-          <Separator
-            orientation="horizontal"
-            className="flex h-[1px] bg-gray-200 mt-6 mb-3"
-            decorative
-          />
-          <Form {...changeUsernameForm}>
-            <form
-              className="flex flex-wrap items-center justify-between py-2"
-              noValidate
-              onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
-            >
-              <div className="flex font-medium">Username</div>
-              <ChangeFieldButtons<ChangeUsernameFormData>
-                id="change-username"
-                isEditingField={isEditingUsername}
-                handleEditFieldButtonClick={handleEditFieldButtonClick}
-                changeFieldForm={changeUsernameForm}
-                isPending={isUsernamePending}
-                isTransitionPending={isTransitionPending}
-              />
-              {!isEditingUsername && (
-                <div className="text-sm text-muted-foreground w-full">
-                  {`@${usernameFormState.fields.username ?? user.username}` || 'Not set'}
-                </div>
-              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Username */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Username</CardTitle>
+          <CardDescription>Update your username</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
+            className="space-y-4"
+            data-testid="form"
+          >
+            <TextField
+              control={changeUsernameForm.control}
+              name="username"
+              label="Username"
+              placeholder="johndoe"
+              disabled={!isEditingUsername}
+            />
+            {isEditingUsername && (
+              <>
+                <TextField
+                  control={changeUsernameForm.control}
+                  name="confirmUsername"
+                  label="Confirm Username"
+                  placeholder="johndoe"
+                />
+                <GenerateUsernameButton
+                  form={changeUsernameForm}
+                  fieldsToPopulate={['username', 'confirmUsername']}
+                />
+              </>
+            )}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEditFieldButtonClick}
+                data-field="username"
+              >
+                {isEditingUsername ? 'Cancel' : 'Edit Username'}
+              </Button>
               {isEditingUsername && (
-                <>
-                  <div className="text-sm text-muted-foreground w-full space-y-3 mt-2">
-                    <TextField
-                      control={changeUsernameForm.control}
-                      name="username"
-                      type="text"
-                      label="Username"
-                      labelClassName="sr-only"
-                      placeholder="Enter your username"
-                      setValue={changeUsernameForm.setValue}
-                    />
-                    <TextField
-                      control={changeUsernameForm.control}
-                      name="confirmUsername"
-                      type="text"
-                      label="Confirm username"
-                      labelClassName="sr-only"
-                      placeholder="Confirm your username"
-                      setValue={changeUsernameForm.setValue}
-                    />
-                  </div>
-                  <GenerateUsernameButton
-                    form={changeUsernameForm}
-                    fieldsToPopulate={['username', 'confirmUsername']}
-                  />
-                </>
+                <Button type="submit" disabled={isUsernamePending || isTransitionPending}>
+                  {isUsernamePending || isTransitionPending ? 'Saving...' : 'Save Username'}
+                </Button>
               )}
-            </form>
-          </Form>
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>

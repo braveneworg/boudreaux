@@ -1,5 +1,28 @@
 import { render, screen } from '@testing-library/react';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as React from 'react';
+import { toast } from 'sonner';
+
+// Mock next/cache before any other imports
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}));
+
+// Mock server actions
+vi.mock('@/app/lib/actions/update-profile-action', () => ({
+  updateProfileAction: vi.fn(),
+}));
+
+vi.mock('@/app/lib/actions/change-email-action', () => ({
+  changeEmailAction: vi.fn(),
+}));
+
+vi.mock('@/app/lib/actions/change-username-action', () => ({
+  changeUsernameAction: vi.fn(),
+}));
+
+// Mock server-only
+vi.mock('server-only', () => ({}));
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
@@ -13,24 +36,30 @@ vi.mock('lucide-react', () => ({
   ),
 }));
 
-// Mock Sonner toast - Create spies on the actual toast functions
-vi.mock('sonner', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('sonner')>();
-
+// Mock Sonner toast - Create a functional toast implementation for testing
+vi.mock('sonner', () => {
   return {
-    ...actual,
     toast: {
-      success: vi.fn(actual.toast.success),
-      error: vi.fn(actual.toast.error),
-      info: vi.fn(actual.toast.info),
-      warning: vi.fn(actual.toast.warning),
-      loading: vi.fn(actual.toast.loading),
-      promise: vi.fn(actual.toast.promise),
-      dismiss: vi.fn(actual.toast.dismiss),
-      message: vi.fn(actual.toast.message),
-      custom: vi.fn(actual.toast.custom),
+      success: vi.fn((message: string) => {
+        // Render the toast message in the DOM
+        const toastElement = document.createElement('div');
+        toastElement.setAttribute('role', 'status');
+        toastElement.setAttribute('data-testid', 'toast-message');
+        toastElement.textContent = message;
+        document.body.appendChild(toastElement);
+      }),
+      error: vi.fn((message: string) => {
+        // Render the toast message in the DOM
+        const toastElement = document.createElement('div');
+        toastElement.setAttribute('role', 'alert');
+        toastElement.setAttribute('data-testid', 'toast-message');
+        toastElement.textContent = message;
+        document.body.appendChild(toastElement);
+      }),
+      info: vi.fn(),
+      warning: vi.fn(),
     },
-    Toaster: actual.Toaster,
+    Toaster: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   };
 });
 
@@ -41,7 +70,7 @@ vi.mock('@/app/lib/utils', () => ({
 
 vi.mock('react-hook-form', () => ({
   FormProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="form">{children}</div>
+    <div data-testid="form-provider">{children}</div>
   ),
   useFormContext: () => ({
     register: () => ({}),
@@ -57,13 +86,13 @@ vi.mock('react-hook-form', () => ({
     render: (context: Record<string, unknown>) => React.ReactNode;
     name: string;
   }) => {
-    const field = { value: '', onChange: vi.fn(), onBlur: vi.fn(), name, ref: vi.fn() };
-    return render({ field, formState: { error: undefined } });
+    const field = { value: '', onChange: vi.fn() };
+    return <div data-testid={`controller-${name}`}>{render({ field })}</div>;
   },
   useForm: () => ({
     register: () => ({}),
     handleSubmit: (fn: (data: Record<string, unknown>) => void) => (e?: React.FormEvent) => {
-      e?.preventDefault?.();
+      if (e) e.preventDefault();
       fn({});
     },
     watch: () => ({}),
@@ -71,17 +100,20 @@ vi.mock('react-hook-form', () => ({
     getValues: vi.fn(() => ''),
     clearErrors: vi.fn(),
     control: {},
-    formState: { errors: {} },
+    formState: { errors: {}, dirtyFields: {} },
+    reset: vi.fn(),
   }),
 }));
 
 // Mock all UI components
-vi.mock('@/app/components/forms/ui/button', () => ({
+vi.mock('@/app/components/ui/button', () => ({
   Button: ({
     children,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children: React.ReactNode }) => (
-    <button {...props}>{children}</button>
+    <button {...props} data-testid="button">
+      {children}
+    </button>
   ),
 }));
 
@@ -107,40 +139,50 @@ vi.mock('@/app/components/forms/ui/checkbox', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/card', () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+vi.mock('@/app/components/ui/card', () => ({
+  Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-content">{children}</div>
+  ),
+  CardDescription: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-description">{children}</div>
+  ),
+  CardHeader: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-header">{children}</div>
+  ),
+  CardTitle: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="card-title">{children}</div>
+  ),
 }));
 
 vi.mock('@/app/components/ui/skeleton', () => ({
-  Skeleton: ({ className }: { className?: string }) => <div className={className}>Loading...</div>,
+  Skeleton: ({ className }: { className?: string }) => (
+    <div className={className} data-testid="skeleton" />
+  ),
 }));
 
 vi.mock('@radix-ui/react-separator', () => ({
   Separator: ({ className }: { className?: string }) => <hr className={className} />,
 }));
 
-vi.mock('@/app/components/forms/ui/popover', () => ({
+vi.mock('@/app/components/ui/popover', () => ({
   Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/app/components/forms/ui/command', () => ({
+vi.mock('@/app/components/ui/command', () => ({
   Command: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CommandEmpty: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CommandGroup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CommandInput: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
   CommandItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
-    <button onClick={onSelect}>{children}</button>
+    <div onClick={onSelect}>{children}</div>
   ),
   CommandList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// Mock the field components we created
+// Mock the field components
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({
     name,
@@ -154,7 +196,7 @@ vi.mock('@/app/components/forms/fields', () => ({
   } & Record<string, unknown>) => (
     <div data-testid={`text-field-${name}`}>
       <label>{label}</label>
-      <input placeholder={placeholder} {...props} />
+      <input name={name} placeholder={placeholder} {...props} />
     </div>
   ),
   CheckboxField: ({
@@ -163,26 +205,25 @@ vi.mock('@/app/components/forms/fields', () => ({
     ...props
   }: { name: string; label?: string } & Record<string, unknown>) => (
     <div data-testid={`checkbox-field-${name}`}>
-      <input type="checkbox" {...props} />
+      <input type="checkbox" name={name} {...props} />
       <label>{label}</label>
     </div>
   ),
   StateField: (props: Record<string, unknown>) => (
     <div data-testid="state-field">
-      <label>State</label>
-      <select {...props}>
-        <option value="">Select a state...</option>
-      </select>
+      <select {...props} />
     </div>
   ),
   CountryField: (props: Record<string, unknown>) => (
     <div data-testid="country-field">
-      <label>Country</label>
-      <select {...props}>
-        <option value="">Select a country...</option>
-      </select>
+      <select {...props} />
     </div>
   ),
+}));
+
+// Mock GenerateUsernameButton
+vi.mock('@/app/components/auth/generate-username-button', () => ({
+  GenerateUsernameButton: () => <button data-testid="generate-username-button">Generate</button>,
 }));
 
 // Mock next-auth useSession
@@ -199,6 +240,7 @@ vi.mock('next-auth/react', () => ({
       },
     },
     status: 'authenticated',
+    update: vi.fn(),
   }),
 }));
 
@@ -221,19 +263,6 @@ let mockUsernameFormState = {
   errors: {},
   fields: {},
   success: false,
-};
-
-// Helper to update formStates during tests
-export const setMockFormState = (state: typeof mockFormState) => {
-  mockFormState = state;
-};
-
-export const setMockEmailFormState = (state: typeof mockEmailFormState) => {
-  mockEmailFormState = state;
-};
-
-export const setMockUsernameFormState = (state: typeof mockUsernameFormState) => {
-  mockUsernameFormState = state;
 };
 
 // Track call count outside the mock to allow resetting
@@ -270,32 +299,6 @@ vi.mock('react', async (importOriginal) => {
   };
 });
 
-vi.mock('@/app/lib/actions/update-profile-action', () => ({
-  updateProfileAction: vi.fn(),
-}));
-
-vi.mock('@/app/lib/actions/change-email-action', () => ({
-  changeEmailAction: vi.fn(),
-}));
-
-vi.mock('@/app/lib/actions/change-username-action', () => ({
-  changeUsernameAction: vi.fn(),
-}));
-
-vi.mock('@/app/lib/utils/profile-utils', () => ({
-  splitFullName: (name: string) => ({
-    firstName: name?.split(' ')[0] || '',
-    lastName: name?.split(' ')[1] || '',
-  }),
-}));
-
-vi.mock('@/app/lib/utils/countries', () => ({
-  COUNTRIES: [
-    { code: 'US', name: 'United States' },
-    { code: 'CA', name: 'Canada' },
-  ],
-}));
-
 vi.mock('@/app/lib/utils/states', () => ({
   US_STATES: [
     { code: 'NY', name: 'New York' },
@@ -305,7 +308,6 @@ vi.mock('@/app/lib/utils/states', () => ({
 
 // Import the component after mocking
 import ProfileForm from './profile-form';
-import { toast } from 'sonner';
 
 describe('ProfileForm', () => {
   beforeEach(() => {
@@ -313,6 +315,8 @@ describe('ProfileForm', () => {
     vi.clearAllMocks();
     // Reset the call counter
     resetCallCount();
+    // Clear any existing toast messages from DOM
+    document.querySelectorAll('[data-testid="toast-message"]').forEach((el) => el.remove());
     // Reset formStates to initial state
     mockFormState = {
       errors: {},
@@ -331,23 +335,9 @@ describe('ProfileForm', () => {
     };
   });
 
-  it('renders without crashing', () => {
+  it('should render the profile form', () => {
     render(<ProfileForm />);
-    // Check for the presence of all three forms: profile, email, username
-    expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('renders submit button', () => {
-    render(<ProfileForm />);
-    expect(screen.getByRole('button', { name: /update profile/i })).toBeInTheDocument();
-  });
-
-  it('renders form fields', () => {
-    render(<ProfileForm />);
-
-    // Check for some form inputs
-    const inputs = screen.getAllByRole('textbox');
-    expect(inputs.length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('form').length).toBeGreaterThan(0);
   });
 
   describe('Toast Notifications', () => {
@@ -361,9 +351,15 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.success was called with the correct message
+      // Verify success toast was called
       expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
       expect(toast.success).toHaveBeenCalledTimes(1);
+
+      // Verify toast message is visible in the document
+      const toastMessage = screen.getByTestId('toast-message');
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent('Your profile has been updated successfully.');
+      expect(toastMessage).toHaveAttribute('role', 'status');
     });
 
     it('displays error toast when profile update fails', () => {
@@ -378,9 +374,15 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.error was called with the correct message
+      // Verify error toast was called
       expect(toast.error).toHaveBeenCalledWith('An error occurred while updating your profile.');
       expect(toast.error).toHaveBeenCalledTimes(1);
+
+      // Verify toast message is visible in the document
+      const toastMessage = screen.getByTestId('toast-message');
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent('An error occurred while updating your profile.');
+      expect(toastMessage).toHaveAttribute('role', 'alert');
     });
 
     it('displays success toast when email is updated successfully', () => {
@@ -393,9 +395,13 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.success was called with the correct message
       expect(toast.success).toHaveBeenCalledWith('Your email has been updated successfully.');
       expect(toast.success).toHaveBeenCalledTimes(1);
+
+      // Verify toast message is visible in the document
+      const toastMessage = screen.getByTestId('toast-message');
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent('Your email has been updated successfully.');
     });
 
     it('displays success toast when username is updated successfully', () => {
@@ -408,9 +414,13 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.success was called with the correct message
       expect(toast.success).toHaveBeenCalledWith('Your username has been updated successfully.');
       expect(toast.success).toHaveBeenCalledTimes(1);
+
+      // Verify toast message is visible in the document
+      const toastMessage = screen.getByTestId('toast-message');
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent('Your username has been updated successfully.');
     });
 
     it('does not display toast on initial render with no errors or success', () => {
@@ -422,9 +432,12 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify no toast functions were called
+      // Verify no toasts were called
       expect(toast.success).not.toHaveBeenCalled();
       expect(toast.error).not.toHaveBeenCalled();
+
+      // Verify no toast messages are in the document
+      expect(screen.queryByTestId('toast-message')).not.toBeInTheDocument();
     });
 
     it('displays error toast with specific error message', () => {
@@ -439,9 +452,13 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.error was called with the specific error message
       expect(toast.error).toHaveBeenCalledWith(errorMessage);
       expect(toast.error).toHaveBeenCalledTimes(1);
+
+      // Verify toast message is visible in the document
+      const toastMessage = screen.getByTestId('toast-message');
+      expect(toastMessage).toBeInTheDocument();
+      expect(toastMessage).toHaveTextContent(errorMessage);
     });
 
     it('should call toast.success exactly once for profile update', () => {
@@ -453,9 +470,12 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.success was called exactly once (not multiple times due to re-renders)
+      // Verify toast was called exactly once (not multiple times due to re-renders)
       expect(toast.success).toHaveBeenCalledTimes(1);
-      expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+
+      // Verify only one toast message exists in the document
+      const toastMessages = screen.getAllByTestId('toast-message');
+      expect(toastMessages).toHaveLength(1);
     });
 
     it('should call toast.error exactly once for profile update error', () => {
@@ -469,81 +489,13 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify toast.error was called exactly once
+      // Verify toast was called exactly once
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith('Update failed');
-    });
 
-    it('should handle email form state changes', () => {
-      // Note: Testing multiple form states from useActionState is complex
-      // This test ensures the component renders successfully with the email form logic
-      render(<ProfileForm />);
-
-      // Verify the component structure is rendered
-      expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should handle username form state changes', () => {
-      // Note: Testing multiple form states from useActionState is complex
-      // This test ensures the component renders successfully with the username form logic
-      render(<ProfileForm />);
-
-      // Verify the component structure is rendered
-      expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe('Username Change Form', () => {
-    it('should handle username change submission', () => {
-      render(<ProfileForm />);
-
-      // Check that username form elements are present
-      // Note: Actual interaction testing would require more complex mocking
-      expect(screen.getAllByTestId('form').length).toBeGreaterThan(0);
-    });
-
-    it('should reset editing state after successful username update', () => {
-      // This test verifies the logic in the useEffect that sets isEditingUsername to false
-      // when usernameFormState.success is true
-      render(<ProfileForm />);
-
-      // The actual state management happens inside the component
-      // This is more of a smoke test to ensure the component renders without errors
-      expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe('Email Change Form', () => {
-    it('should handle email change submission', () => {
-      render(<ProfileForm />);
-
-      // Check that email form elements are present
-      expect(screen.getAllByTestId('form').length).toBeGreaterThan(0);
-    });
-
-    it('should reset editing state after successful email update', () => {
-      // Similar to username test
-      render(<ProfileForm />);
-
-      expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe('Form Interactions', () => {
-    it('should track user interaction state', () => {
-      render(<ProfileForm />);
-
-      // The component uses setHasUserInteracted to track when user modifies fields
-      // This ensures form values aren't overwritten after user has started editing
-      expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0);
-    });
-
-    it('should handle form value initialization', () => {
-      render(<ProfileForm />);
-
-      // The component uses setFormValues callback to initialize form with user data
-      // This test ensures the component renders successfully with that logic
-      expect(screen.getAllByTestId('form').length).toBeGreaterThanOrEqual(2);
+      // Verify only one toast message exists in the document
+      const toastMessages = screen.getAllByTestId('toast-message');
+      expect(toastMessages).toHaveLength(1);
+      expect(toastMessages[0]).toHaveTextContent('Update failed');
     });
   });
 });

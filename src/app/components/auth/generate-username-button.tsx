@@ -18,27 +18,22 @@ export const GenerateUsernameButton = <T extends FieldValues>({
   const [isConfirmUsernameCleared, setIsConfirmUsernameCleared] = useState(false);
 
   const handleGenerateUsername = async () => {
-    try {
-      // Generate a random username
-      const newUsername = generateUsername('', 4);
+    // Generate a random username
+    const newUsername = generateUsername('', 4);
 
-      // Update both username and confirmUsername fields
-      form.setValue(fieldsToPopulate[0], newUsername as T[Path<T>], {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+    // Update both username and confirmUsername fields
+    form.setValue(fieldsToPopulate[0], newUsername as T[Path<T>], {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
 
-      form.setValue(fieldsToPopulate[1], newUsername as T[Path<T>], {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+    form.setValue(fieldsToPopulate[1], newUsername as T[Path<T>], {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
 
-      // Trigger validation to clear any errors
-      await form.trigger(fieldsToPopulate);
-    } catch {
-      // Silently handle validation errors - the form will still have the generated values
-      // This prevents unhandled promise rejections while maintaining functionality
-    }
+    // Trigger validation to clear any errors
+    await form.trigger(fieldsToPopulate);
   };
 
   const usernameValue = form.getValues(fieldsToPopulate[0]);

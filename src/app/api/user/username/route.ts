@@ -7,11 +7,11 @@ import { Prisma } from '@prisma/client';
 export const POST = withAuth(async (request: NextRequest, _context, session) => {
   try {
     const body = await request.json();
-    const { username, confirmUsername } = body;
+    const { username: usernameInput, confirmUsername } = body;
 
     // Validate the username using the change-username-schema
     const validationResult = changeUsernameSchema.safeParse({
-      username,
+      username: usernameInput,
       confirmUsername,
     });
 
@@ -19,7 +19,7 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
       return NextResponse.json(
         {
           error: 'Invalid username format',
-          details: validationResult.error.errors,
+          details: validationResult.error.issues,
         },
         { status: 400 }
       );

@@ -19,6 +19,7 @@ interface TextFieldProps<
   onUserInteraction?: () => void;
   value?: string;
   setValue?: UseFormSetValue<TFieldValues>;
+  disabled?: boolean;
 }
 
 export default function TextField<
@@ -35,6 +36,7 @@ export default function TextField<
   onUserInteraction,
   setValue,
   value = '',
+  disabled = false,
 }: TextFieldProps<TFieldValues, TName>) {
   useEffect(() => {
     if (setValue && value) {
@@ -57,6 +59,7 @@ export default function TextField<
               {...field}
               placeholder={placeholder}
               type={type}
+              disabled={disabled}
               onChange={(e) => {
                 onUserInteraction?.();
                 if (setValue) {
