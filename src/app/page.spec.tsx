@@ -12,15 +12,7 @@ vi.mock('./lib/utils/database-utils', () => ({
 
 // Mock Next.js Image component
 vi.mock('next/image', () => ({
-  default: ({
-    src,
-    alt,
-    ...props
-  }: {
-    src: string;
-    alt: string;
-    [key: string]: unknown;
-  }) => {
+  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) => {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt} {...props} />;
   },
@@ -267,16 +259,14 @@ describe('Home Page - Health Check', () => {
 
   describe('Network Errors', () => {
     it('should retry on network errors', async () => {
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            status: 'healthy',
-            database: 'connected',
-            latency: 100,
-          }),
-        });
+      mockFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'healthy',
+          database: 'connected',
+          latency: 100,
+        }),
+      });
 
       render(<Home />);
 
