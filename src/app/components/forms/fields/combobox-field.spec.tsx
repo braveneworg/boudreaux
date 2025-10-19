@@ -542,7 +542,7 @@ describe('ComboboxField', () => {
       // Focus first (opens popover)
       fireEvent.focus(trigger);
       expect(popover).toHaveAttribute('data-open', 'true');
-      
+
       // Search input should start empty and be ready for typing
       expect(commandInput).toHaveValue('');
       expect(commandInput).toBeInTheDocument();
