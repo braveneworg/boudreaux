@@ -1,4 +1,4 @@
-FROM nginx:lts-alpine
+FROM nginx:alpine
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
