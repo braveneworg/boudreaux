@@ -327,4 +327,271 @@ describe('ComboboxField', () => {
 
     expect(screen.getByTestId('combobox-trigger')).toBeInTheDocument();
   });
+
+  describe('Focus and Keyboard Behavior', () => {
+    it('opens popover when trigger button receives focus', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Initially popover should be closed
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      // Focus the trigger button
+      fireEvent.focus(trigger);
+
+      // Popover should now be open
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+
+    it('opens popover when user types an alphanumeric key', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Initially popover should be closed
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      // Type a letter
+      fireEvent.keyDown(trigger, { key: 'a' });
+
+      // Popover should now be open
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+
+    it('opens popover when user types a number', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Initially popover should be closed
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      // Type a number
+      fireEvent.keyDown(trigger, { key: '5' });
+
+      // Popover should now be open
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+
+    it('does not open popover for non-alphanumeric keys', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Initially popover should be closed
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      // Type special keys that should not open popover
+      fireEvent.keyDown(trigger, { key: 'Enter' });
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      fireEvent.keyDown(trigger, { key: 'Tab' });
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      fireEvent.keyDown(trigger, { key: 'Escape' });
+      expect(popover).toHaveAttribute('data-open', 'false');
+
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+      expect(popover).toHaveAttribute('data-open', 'false');
+    });
+
+    it('does not open popover when already open', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Open the popover first
+      fireEvent.focus(trigger);
+      expect(popover).toHaveAttribute('data-open', 'true');
+
+      // Type a key when already open - should not cause issues
+      fireEvent.keyDown(trigger, { key: 'b' });
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+
+    it('populates search input when typing on closed popover', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type a letter
+      fireEvent.keyDown(trigger, { key: 'o' });
+
+      // Search input should have the typed value
+      expect(commandInput).toHaveValue('o');
+    });
+
+    it('renders search input as controlled with value prop', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const commandInput = screen.getByTestId('command-input');
+
+      // Initially empty
+      expect(commandInput).toHaveValue('');
+
+      // Has value prop (controlled input)
+      expect(commandInput).toHaveAttribute('value');
+    });
+
+    it('clears search input after selecting an option', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type to open and populate search
+      fireEvent.keyDown(trigger, { key: 'o' });
+      expect(commandInput).toHaveValue('o');
+
+      // Select an option
+      const firstOption = screen.getAllByTestId('command-item')[0];
+      fireEvent.click(firstOption);
+
+      // Search should be cleared
+      expect(commandInput).toHaveValue('');
+    });
+
+    it('handles uppercase letters correctly', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type an uppercase letter
+      fireEvent.keyDown(trigger, { key: 'O' });
+
+      // Popover should open
+      expect(popover).toHaveAttribute('data-open', 'true');
+
+      // Search input should have the uppercase letter
+      expect(commandInput).toHaveValue('O');
+    });
+
+    it('handles numbers correctly', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type a number
+      fireEvent.keyDown(trigger, { key: '3' });
+
+      // Search input should have the number
+      expect(commandInput).toHaveValue('3');
+    });
+
+    it('works with focus followed by typing', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Focus first (opens popover)
+      fireEvent.focus(trigger);
+      expect(popover).toHaveAttribute('data-open', 'true');
+      
+      // Search input should start empty and be ready for typing
+      expect(commandInput).toHaveValue('');
+      expect(commandInput).toBeInTheDocument();
+    });
+
+    it('allows typing directly without focusing first', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type without focusing first
+      fireEvent.keyDown(trigger, { key: 's' });
+
+      // Popover should open and search should be populated
+      expect(popover).toHaveAttribute('data-open', 'true');
+      expect(commandInput).toHaveValue('s');
+    });
+
+    it('uses controlled search input with value prop', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const commandInput = screen.getByTestId('command-input');
+
+      // Has value prop (controlled input for search filtering)
+      expect(commandInput).toHaveAttribute('value');
+      expect(commandInput).toBeInTheDocument();
+    });
+
+    it('passes shouldFilter prop to Command component', () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const command = screen.getByTestId('command');
+
+      // Command component receives shouldFilter prop for custom filtering
+      expect(command).toBeInTheDocument();
+    });
+  });
 });

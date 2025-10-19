@@ -53,6 +53,20 @@ export default function ComboboxField<
   setValue,
 }: ComboboxFieldProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
+
+  const handleFocus = () => {
+    setOpen(true);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Open popover on any alphanumeric key press
+    if (!open && event.key.length === 1 && /^[a-z0-9_-]$/i.test(event.key)) {
+      setOpen(true);
+      // Set the search value to the pressed key
+      setSearchValue(event.key);
+    }
+  };
 
   return (
     <FormField
@@ -69,6 +83,8 @@ export default function ComboboxField<
                   role="combobox"
                   aria-expanded={open}
                   className="w-full justify-between"
+                  onFocus={handleFocus}
+                  onKeyDown={handleKeyDown}
                 >
                   {field.value
                     ? options.find((option) => option.value === field.value)?.label
@@ -78,8 +94,12 @@ export default function ComboboxField<
               </FormControl>
             </PopoverTrigger>
             <PopoverContent className={`${popoverWidth} p-0`} align="start">
-              <Command>
-                <CommandInput placeholder={searchPlaceholder} />
+              <Command shouldFilter>
+                <CommandInput
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onValueChange={setSearchValue}
+                />
                 <CommandEmpty>{emptyMessage}</CommandEmpty>
                 <CommandList>
                   <CommandGroup>
@@ -101,6 +121,7 @@ export default function ComboboxField<
                             }
                             field.onChange(selectedOption.value);
                           }
+                          setSearchValue('');
                           setOpen(false);
                         }}
                       >
