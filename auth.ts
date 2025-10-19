@@ -45,6 +45,15 @@ import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 // - The `@@index` attribute is used to create an index on a field or fields.
 // - The `@@unique` attribute is used to create a unique index on a field or fields.
 
+// Validate AUTH_SECRET exists and is sufficiently long
+if (!process.env.AUTH_SECRET) {
+  throw new Error('AUTH_SECRET environment variable is required');
+}
+
+if (process.env.AUTH_SECRET.length < 32) {
+  throw new Error('AUTH_SECRET must be at least 32 characters long for security');
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomPrismaAdapter(prisma),
   providers: [
@@ -113,7 +122,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.user = freshUser;
           }
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          // Log error safely without exposing sensitive data
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error fetching user data:', error);
+          } else {
+            console.error(
+              'Error fetching user data:',
+              error instanceof Error ? error.message : 'Unknown error'
+            );
+          }
           // Keep existing token data if database fetch fails
         }
       }
@@ -135,9 +152,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   secret: process.env.AUTH_SECRET,
   pages: {
     signIn: '/signin',
   },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
+  // Enable CSRF protection
+  useSecureCookies: process.env.NODE_ENV === 'production',
 });

@@ -43,10 +43,12 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
       );
     } catch (error) {
       // Handle duplicate username error
+      // Note: While this reveals username existence, it's necessary for UX
+      // Consider adding rate limiting to prevent enumeration attacks
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return NextResponse.json(
           {
-            error: 'Username is already taken. Please try again.',
+            error: 'This username is not available. Please choose another.',
           },
           { status: 409 }
         );
@@ -55,7 +57,15 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
       throw error;
     }
   } catch (error) {
-    console.error('Error updating username:', error);
+    // Log safely - don't expose error details in production
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error updating username:', error);
+    } else {
+      console.error(
+        'Error updating username:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
     return NextResponse.json(
       {
         error: 'An error occurred while updating the username',
