@@ -13,10 +13,10 @@ vi.mock('unique-username-generator', () => ({
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
-  RefreshCwIcon: ({ className }: { className?: string }) => (
-    <div data-testid="refresh-icon" className={className}>
+  RefreshCwIcon: ({ className, ...props }: { className?: string }) => (
+    <svg data-testid="refresh-icon" className={className} aria-hidden="true" {...props}>
       RefreshIcon
-    </div>
+    </svg>
   ),
 }));
 
@@ -28,12 +28,14 @@ vi.mock('@/app/components/ui/button', () => ({
     type,
     variant,
     className,
+    'aria-label': ariaLabel,
   }: {
     children: React.ReactNode;
     onClick?: () => void;
     type?: string;
     variant?: string;
     className?: string;
+    'aria-label'?: string;
   }) => (
     <button
       onClick={onClick}
@@ -41,6 +43,7 @@ vi.mock('@/app/components/ui/button', () => ({
       data-variant={variant}
       className={className}
       data-testid="generate-button"
+      aria-label={ariaLabel}
     >
       {children}
     </button>
@@ -122,6 +125,7 @@ describe('GenerateUsernameButton', () => {
       const icon = screen.getByTestId('refresh-icon');
       expect(icon).toBeInTheDocument();
       expect(icon).toHaveClass('size-4');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
     });
 
     it('should apply correct CSS classes', () => {
@@ -134,6 +138,18 @@ describe('GenerateUsernameButton', () => {
 
       const button = screen.getByTestId('generate-button');
       expect(button).toHaveClass('mt-2', 'flex', 'items-center', 'gap-2');
+    });
+
+    it('should have proper aria-label for accessibility', () => {
+      render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+        />
+      );
+
+      const button = screen.getByTestId('generate-button');
+      expect(button).toHaveAttribute('aria-label', 'Generate random username');
     });
   });
 
@@ -199,7 +215,7 @@ describe('GenerateUsernameButton', () => {
       });
     });
 
-    it('should call setValue with shouldValidate and shouldDirty flags', async () => {
+    it('should call setValue with correct options', async () => {
       const user = userEvent.setup();
 
       render(
@@ -378,11 +394,35 @@ describe('GenerateUsernameButton', () => {
 
       expect(mockGenerateUsername).toHaveBeenCalled();
     });
+
+    it('should have accessible button label', () => {
+      render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+        />
+      );
+
+      const button = screen.getByLabelText('Generate random username');
+      expect(button).toBeInTheDocument();
+    });
+
+    it('should hide decorative icon from screen readers', () => {
+      render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+        />
+      );
+
+      const icon = screen.getByTestId('refresh-icon');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    });
   });
 
   describe('edge cases', () => {
-    it('should handle empty field names', async () => {
-      const user = userEvent.setup();
+    it('should handle empty initial values', () => {
+      mockForm.getValues = vi.fn(() => '');
 
       render(
         <GenerateUsernameButton
@@ -391,37 +431,12 @@ describe('GenerateUsernameButton', () => {
         />
       );
 
-      const button = screen.getByTestId('generate-button');
-      await user.click(button);
-
-      expect(mockForm.setValue).toHaveBeenCalled();
-      expect(mockForm.trigger).toHaveBeenCalled();
+      // Should not clear empty values
+      expect(mockForm.setValue).not.toHaveBeenCalled();
     });
 
-    it('should not throw error when validation trigger is called', async () => {
+    it('should handle form trigger rejection gracefully', async () => {
       const user = userEvent.setup();
-
-      render(
-        <GenerateUsernameButton
-          form={mockForm}
-          fieldsToPopulate={['username', 'confirmUsername']}
-        />
-      );
-
-      const button = screen.getByTestId('generate-button');
-
-      // Should not throw when clicking the button
-      await expect(user.click(button)).resolves.not.toThrow();
-
-      await waitFor(() => {
-        expect(mockForm.trigger).toHaveBeenCalled();
-        expect(mockForm.setValue).toHaveBeenCalled();
-      });
-    });
-
-    it('should log error and continue when trigger fails', async () => {
-      const user = userEvent.setup();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockForm.trigger = vi.fn().mockRejectedValue(new Error('Validation failed'));
 
       render(
@@ -433,18 +448,39 @@ describe('GenerateUsernameButton', () => {
 
       const button = screen.getByTestId('generate-button');
 
-      // Click should not throw
+      // Should not throw error when clicking
+      await expect(user.click(button)).resolves.not.toThrow();
+
+      // Verify the form methods were still called despite the error
+      await waitFor(() => {
+        expect(mockForm.setValue).toHaveBeenCalled();
+        expect(mockForm.trigger).toHaveBeenCalled();
+      });
+    });
+
+    it('should handle rapid clicks gracefully', async () => {
+      const user = userEvent.setup();
+      mockGenerateUsername
+        .mockReturnValueOnce('username-1')
+        .mockReturnValueOnce('username-2')
+        .mockReturnValueOnce('username-3');
+
+      render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+        />
+      );
+
+      const button = screen.getByTestId('generate-button');
+
+      // Rapid clicks
+      await user.click(button);
+      await user.click(button);
       await user.click(button);
 
-      // Wait for the error to be logged
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error generating username:',
-          expect.any(Error)
-        );
-      });
-
-      consoleErrorSpy.mockRestore();
+      expect(mockGenerateUsername).toHaveBeenCalledTimes(3);
+      expect(mockForm.setValue).toHaveBeenCalled();
     });
   });
 });

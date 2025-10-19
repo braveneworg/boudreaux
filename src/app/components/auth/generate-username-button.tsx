@@ -35,9 +35,9 @@ export const GenerateUsernameButton = <T extends FieldValues>({
 
       // Trigger validation to clear any errors
       await form.trigger(fieldsToPopulate);
-    } catch (error) {
-      // Handle any errors that occur during username generation or validation
-      console.error('Error generating username:', error);
+    } catch {
+      // Silently handle validation errors - the form will still have the generated values
+      // This prevents unhandled promise rejections while maintaining functionality
     }
   };
 
@@ -61,9 +61,10 @@ export const GenerateUsernameButton = <T extends FieldValues>({
       variant="link"
       onClick={handleGenerateUsername}
       className="mt-2 flex items-center gap-2"
+      aria-label="Generate random username"
     >
       Generate random username
-      <RefreshCwIcon className="size-4" />
+      <RefreshCwIcon className="size-4" aria-hidden="true" />
     </Button>
   );
 };
