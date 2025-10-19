@@ -87,10 +87,6 @@ export const changeEmailAction = async (
       } else {
         setUnknownError(formState);
       }
-    } finally {
-      if (!formState.success && formState.errors && Object.keys(formState.errors).length > 0) {
-        setUnknownError(formState);
-      }
     }
   }
 
