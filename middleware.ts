@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
     /^\/signup/, // /register and sub-routes
     /^\/signout/,
     /^\/success\/.*/, // /success/* with wildcard
+    /^\/api\/health/, // Health check endpoint should be public
   ];
 
   const token = await getToken({
@@ -75,6 +76,7 @@ export const config = {
     /*
      * Match all request paths except:
      * - api/auth (Auth.js routes)
+     * - api/health (Health check endpoint)
      * - _next/static (static files)
      * - _next/image (image optimization)
      * - favicon.ico (favicon)
@@ -83,6 +85,6 @@ export const config = {
      */
     '/admin/:path*',
     '/api/admin/:path*',
-    '/((?!api/auth|_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|public).*)',
   ],
 };

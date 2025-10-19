@@ -145,6 +145,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Aim for 90-95%+ coverage on all testable files
 - Exclude configuration files, types, and interfaces from coverage
 - Exclude prisma schema files from coverage
+- Never do the following code in tests: `import { describe, it, expect, vi } from 'vitest';` (assume they are globally available)
 
 ## Never Do
 
@@ -152,3 +153,5 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't mix Server/Client Component patterns incorrectly
 - Don't skip Zod validation in Server Actions
 - Don't create new UI primitives (use shadcn/ui)
+- Never do the following code in tests: `import { describe, it, expect, vi } from 'vitest';` (assume they are globally available)
+- Never use new in before Error in typescript code (use Error('message') instead of new Error('message'))

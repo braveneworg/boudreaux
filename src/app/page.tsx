@@ -5,9 +5,12 @@ import { useEffect, useState } from 'react';
 import AuthToolbar from './components/auth/auth-toolbar';
 
 export default function Home() {
-  const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(
-    null
-  );
+  const [healthStatus, setHealthStatus] = useState<{
+    status: string;
+    database: string;
+    latency?: number;
+    error?: string;
+  } | null>(null);
 
   const fetchHealthStatus = async () => {
     try {
@@ -17,10 +20,19 @@ export default function Home() {
         const data = await response.json();
         setHealthStatus(data);
       } else {
-        setHealthStatus({ status: 'error', message: 'Failed to fetch health status' });
+        const errorData = await response.json();
+        setHealthStatus({
+          status: 'error',
+          database: errorData.database || 'Failed to fetch health status',
+          error: errorData.error,
+        });
       }
     } catch (error) {
-      setHealthStatus({ status: 'error', message: (error as Error).message });
+      setHealthStatus({
+        status: 'error',
+        database: 'Failed to fetch health status',
+        error: (error as Error).message,
+      });
     }
   };
 
@@ -34,8 +46,17 @@ export default function Home() {
     <div className="font-sans grid grid-rows-[20px_1fr_20px] justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2">
         <div className="flex flex-col justify-center items-center sm:items-center">
-          <h1>DB health status:&nbsp; {healthStatus?.status === 'error' ? '❌' : '✅'}</h1>
-          <p className="border-b-2">{healthStatus?.message}</p>
+          <h1>
+            DB health status:&nbsp;{' '}
+            {healthStatus?.status === 'healthy' || healthStatus?.status === 'ok' ? '✅' : '❌'}
+          </h1>
+          <p className="border-b-2">
+            {healthStatus?.database}
+            {healthStatus?.latency && ` (${healthStatus.latency}ms)`}
+            {healthStatus?.error && process.env.NODE_ENV === 'development'
+              ? ` - ${healthStatus.error}`
+              : ''}
+          </p>
         </div>
         <AuthToolbar />
         <Image

@@ -80,6 +80,7 @@ describe('middleware', () => {
       '/success/signup',
       '/success/change-email',
       '/success/signout',
+      '/api/health',
     ];
 
     it.each(publicRoutes)('should allow access to public route: %s', async (route) => {
@@ -346,7 +347,7 @@ describe('middleware', () => {
       expect(config.matcher).toContain('/admin/:path*');
       expect(config.matcher).toContain('/api/admin/:path*');
       expect(config.matcher).toContain(
-        '/((?!api/auth|_next/static|_next/image|favicon.ico|public).*)'
+        '/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|public).*)'
       );
     });
   });
