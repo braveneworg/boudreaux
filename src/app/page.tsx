@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import AuthToolbar from './components/auth/auth-toolbar';
+import { getApiBaseUrl } from './lib/utils/database-utils';
 
 export default function Home() {
   const [healthStatus, setHealthStatus] = useState<{
@@ -14,20 +15,39 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchHealthStatus = async (retryCount = 0): Promise<void> => {
-    console.log(`[Health Check] Attempt ${retryCount + 1}/6 starting...`);
+    console.log(`[Health Check] Attempt ${retryCount + 1}/10 starting...`);
     console.log(
       `[Health Check] Current URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`
     );
+    console.log(
+      `[Health Check] Protocol: ${typeof window !== 'undefined' ? window.location.protocol : 'N/A'}`
+    );
+    console.log(
+      `[Health Check] Hostname: ${typeof window !== 'undefined' ? window.location.hostname : 'N/A'}`
+    );
+    console.log(`[Health Check] NODE_ENV: ${process.env.NODE_ENV}`);
+
+    // Get the correct base URL (forces HTTP in development)
+    const baseUrl = getApiBaseUrl();
+    const apiUrl = `${baseUrl}/api/health`;
+    console.log(`[Health Check] Using API URL: ${apiUrl}`);
 
     try {
-      const response = await fetch('/api/health', {
+      // Add a timeout to prevent infinite hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(apiUrl, {
         cache: 'no-store',
         credentials: 'same-origin',
         headers: {
           'Cache-Control': 'no-cache',
           Pragma: 'no-cache',
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       console.log(`[Health Check] Response received:`, {
         ok: response.ok,
@@ -38,8 +58,10 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json();
         console.log(`[Health Check] Success! Data:`, data);
+        console.log(`[Health Check] Setting healthStatus and isLoading=false`);
         setHealthStatus(data);
         setIsLoading(false);
+        console.log(`[Health Check] State updated successfully`);
         return;
       } else {
         // Try to parse error response
@@ -51,9 +73,12 @@ export default function Home() {
         }
 
         // Retry on 500 errors (server issues) but not on 404 or other client errors
-        if (response.status >= 500 && retryCount < 5) {
-          const delay = Math.pow(2, retryCount) * 500;
-          console.log(`Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
+        if (response.status >= 500 && retryCount < 10) {
+          const delay =
+            retryCount < 3
+              ? 500 // First 3 attempts: 500ms each
+              : Math.pow(2, retryCount - 3) * 1000; // Later attempts: exponential backoff
+          console.log(`Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/10)`);
           setTimeout(() => {
             fetchHealthStatus(retryCount + 1);
           }, delay);
@@ -70,6 +95,8 @@ export default function Home() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorName = error instanceof Error ? error.name : 'Unknown';
+      const isAbortError = errorName === 'AbortError' || errorMessage.includes('aborted');
+      const isNetworkError = errorMessage.includes('fetch') || errorMessage.includes('network');
 
       console.error('[Health Check] Fetch error:', {
         name: errorName,
@@ -77,15 +104,25 @@ export default function Home() {
         error,
         retryCount,
         currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
-        isAbortError: errorName === 'AbortError',
-        isNetworkError: errorMessage.includes('fetch') || errorMessage.includes('network'),
+        isAbortError,
+        isNetworkError,
       });
 
-      // Retry up to 5 times with exponential backoff (useful during dev when routes are compiling)
-      if (retryCount < 5) {
-        const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s, 4s, 8s
+      // Handle timeout separately - treat as temporary failure, retry with backoff
+      if (isAbortError) {
+        console.warn('[Health Check] Request timed out after 5 seconds');
+      }
+
+      // Retry up to 10 times with progressive backoff
+      // First few attempts are quick to handle route compilation
+      // Later attempts use exponential backoff for network issues
+      if (retryCount < 10) {
+        const delay =
+          retryCount < 3
+            ? 500 // First 3 attempts: 500ms each (for route compilation)
+            : Math.pow(2, retryCount - 3) * 1000; // Later attempts: 1s, 2s, 4s, 8s, 16s, 32s, 64s
         console.log(
-          `Retrying health check in ${delay}ms... (attempt ${retryCount + 1}/5) - Error: ${errorMessage}`
+          `Retrying health check in ${delay}ms... (attempt ${retryCount + 1}/10) - Error: ${errorMessage}`
         );
         setTimeout(() => {
           fetchHealthStatus(retryCount + 1);
@@ -111,14 +148,30 @@ export default function Home() {
     // Reset state on mount/refresh
     setIsLoading(true);
     setHealthStatus(null);
+    let isMounted = true;
 
-    // Longer delay to ensure route is fully compiled
-    // In development, Turbopack compiles routes on-demand
-    const timer = setTimeout(() => {
-      fetchHealthStatus();
-    }, 1000); // Increased from 300ms to 1000ms
+    // Start health check immediately
+    // The retry logic will handle route compilation delays
+    console.log('[Health Check] Starting health check...');
+    fetchHealthStatus();
 
-    return () => clearTimeout(timer);
+    // Failsafe: If still loading after 60 seconds, show error
+    const failsafeTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.error('[Health Check] Failsafe triggered: Still loading after 60 seconds');
+        setHealthStatus({
+          status: 'error',
+          database: 'Health check timed out',
+          error: 'The health check took too long. Please refresh the page.',
+        });
+        setIsLoading(false);
+      }
+    }, 60000); // 60 seconds
+
+    return () => {
+      isMounted = false;
+      clearTimeout(failsafeTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

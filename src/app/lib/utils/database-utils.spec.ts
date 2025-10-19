@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { checkDatabaseHealth, withRetry } from './database-utils';
+import { checkDatabaseHealth, withRetry, getApiBaseUrl } from './database-utils';
 import { prisma } from '../prisma';
 
 // Mock the prisma client
@@ -252,6 +252,108 @@ describe('Database Utils', () => {
       await expect(withRetry(operation, { maxRetries: 2, initialDelay: 10 })).rejects.toThrow(
         'string error with timeout'
       );
+    });
+  });
+
+  describe('getApiBaseUrl', () => {
+    const originalWindow = global.window;
+
+    afterEach(() => {
+      global.window = originalWindow;
+      vi.unstubAllEnvs();
+    });
+
+    it('should return HTTP localhost URL in development on client-side', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      global.window = {
+        location: {
+          hostname: 'localhost',
+          port: '3000',
+        },
+      } as Window & typeof globalThis;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('http://localhost:3000');
+    });
+
+    it('should force HTTP even if page loaded via HTTPS in development', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      global.window = {
+        location: {
+          protocol: 'https:',
+          hostname: 'localhost',
+          port: '3000',
+        },
+      } as Window & typeof globalThis;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('http://localhost:3000');
+    });
+
+    it('should use window.location.origin in production on client-side', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      global.window = {
+        location: {
+          origin: 'https://example.com',
+          hostname: 'example.com',
+          port: '',
+        },
+      } as Window & typeof globalThis;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('https://example.com');
+    });
+
+    it('should handle custom ports in development', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      global.window = {
+        location: {
+          hostname: 'localhost',
+          port: '4000',
+        },
+      } as Window & typeof globalThis;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('http://localhost:4000');
+    });
+
+    it('should handle no port specified', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      global.window = {
+        location: {
+          hostname: 'localhost',
+          port: '',
+        },
+      } as Window & typeof globalThis;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('http://localhost');
+    });
+
+    it('should return server-side localhost URL when window is undefined', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      // @ts-expect-error - Simulating server-side environment
+      global.window = undefined;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('http://localhost:3000');
+    });
+
+    it('should use NEXTAUTH_URL on server-side in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXTAUTH_URL', 'https://prod.example.com');
+      // @ts-expect-error - Simulating server-side environment
+      global.window = undefined;
+
+      const result = getApiBaseUrl();
+
+      expect(result).toBe('https://prod.example.com');
     });
   });
 

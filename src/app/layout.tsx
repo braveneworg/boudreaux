@@ -12,6 +12,17 @@ if (typeof window === 'undefined') {
   });
 }
 
+// Client-side: Detect and warn about HTTPS/HTTP mismatch in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  if (window.location.protocol === 'https:' && window.location.hostname === 'localhost') {
+    console.error(
+      '🚨 HTTPS DETECTED: You are accessing localhost via HTTPS. ' +
+        'This will cause authentication and API issues. ' +
+        'Please use http://localhost:3000 instead.'
+    );
+  }
+}
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -39,7 +50,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider refetchInterval={0} refetchOnWindowFocus={true} refetchWhenOffline={false}>
+          {children}
+        </SessionProvider>
         <Toaster />
       </body>
     </html>

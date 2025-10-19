@@ -30,6 +30,26 @@ const nextConfig = {
 
   // Configure headers
   async headers() {
+    // Build Content-Security-Policy based on environment
+    const cspParts = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://challenges.cloudflare.com",
+      "frame-src 'self' https://challenges.cloudflare.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ];
+
+    // Only upgrade insecure requests in production
+    if (process.env.NODE_ENV === 'production') {
+      cspParts.push('upgrade-insecure-requests');
+    }
+
     return [
       {
         source: '/(.*)',
@@ -60,20 +80,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data:",
-              "connect-src 'self' https://challenges.cloudflare.com",
-              "frame-src 'self' https://challenges.cloudflare.com",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'none'",
-              'upgrade-insecure-requests',
-            ].join('; '),
+            value: cspParts.join('; '),
           },
         ],
       },

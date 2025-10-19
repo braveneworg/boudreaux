@@ -4,6 +4,38 @@
 
 import { prisma } from '../prisma';
 
+/**
+ * Get the base URL for API calls based on environment
+ * In development, always use HTTP to avoid SSL issues
+ */
+export function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    // Server-side: use localhost
+    return process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000'
+      : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  }
+
+  // Client-side: Check if we're in development by looking at hostname
+  // Development is typically localhost, 127.0.0.1, or *.local
+  const { hostname, port } = window.location;
+  const isDevelopment =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.local') ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    process.env.NODE_ENV === 'development';
+
+  // In development, always force HTTP
+  if (isDevelopment) {
+    return `http://${hostname}${port ? `:${port}` : ''}`;
+  }
+
+  // Production: use current origin
+  return window.location.origin;
+}
+
 interface HealthCheckResult {
   healthy: boolean;
   latency?: number;
