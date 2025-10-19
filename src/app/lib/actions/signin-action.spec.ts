@@ -1,13 +1,30 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach } from 'vitest';
 
 // Get the mocked functions using hoisted
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
+const mockHeaders = vi.hoisted(() =>
+  vi.fn(() => ({
+    get: vi.fn(() => '127.0.0.1'),
+  }))
+);
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
+
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
+// Mock rate limiter
+vi.mock('@/app/lib/utils/rate-limit', () => ({
+  rateLimit: vi.fn(() => ({
+    check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
+  })),
+}));
 
 // Mock dependencies
 vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({
@@ -23,7 +40,7 @@ vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
 }));
 
 vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     setUnknownError: mockSetUnknownError,
@@ -58,7 +75,7 @@ describe('signinAction', () => {
       const mockFormState: FormState = {
         fields: { email: 'test@example.com' },
         success: false,
-        errors: {}
+        errors: {},
       };
 
       const mockParsed = {
@@ -156,7 +173,9 @@ describe('signinAction', () => {
 
       const mockParsed = {
         success: false,
-        error: { issues: [{ path: ['email'], message: 'Invalid email format' }] },
+        error: {
+          issues: [{ path: ['email'], message: 'Invalid email format' }],
+        },
       };
 
       vi.mocked(mockGetActionState).mockReturnValue({
@@ -359,7 +378,10 @@ describe('signinAction', () => {
 
       const result = await signinAction(mockInitialState, mockFormData);
 
-      expect(result.fields).toEqual({ email: 'test@example.com', rememberMe: 'true' });
+      expect(result.fields).toEqual({
+        email: 'test@example.com',
+        rememberMe: 'true',
+      });
       expect(result).toHaveProperty('success');
       expect(result).toHaveProperty('errors');
       expect(result).toHaveProperty('fields');
@@ -394,7 +416,9 @@ describe('signinAction', () => {
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      expect(mockRedirect).toHaveBeenCalledWith(`/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`);
+      expect(mockRedirect).toHaveBeenCalledWith(
+        `/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`
+      );
     });
   });
 });

@@ -1,8 +1,8 @@
 import NextAuth from 'next-auth';
-import type { User } from "next-auth"
-import type { AdapterUser } from "next-auth/adapters"
+import type { User } from 'next-auth';
+import type { AdapterUser } from 'next-auth/adapters';
 import Nodemailer from 'next-auth/providers/nodemailer';
-import GoogleProvider from "next-auth/providers/google"
+import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from '@/app/lib/prisma';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 
@@ -45,6 +45,15 @@ import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 // - The `@@index` attribute is used to create an index on a field or fields.
 // - The `@@unique` attribute is used to create a unique index on a field or fields.
 
+// Validate AUTH_SECRET exists and is sufficiently long
+if (!process.env.AUTH_SECRET) {
+  throw new Error('AUTH_SECRET environment variable is required');
+}
+
+if (process.env.AUTH_SECRET.length < 32) {
+  throw new Error('AUTH_SECRET must be at least 32 characters long for security');
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomPrismaAdapter(prisma),
   providers: [
@@ -65,13 +74,80 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        // Don't return the password or email
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { email, ...newUser } = user as User;
+    async jwt({ token, user, trigger, session }) {
+      // Handle session updates (when user profile is updated)
+      if (trigger === 'update' && session) {
+        // Merge the updated session data into the token
+        token.user = {
+          ...((token.user as object) || {}),
+          ...((session as object) || {}),
+        };
+        return token;
+      }
 
-        token.user = newUser;
+      // Initial sign in - store user data in token
+      if (user) {
+        token.user = user as User;
+      }
+
+      // On subsequent requests, refresh user data from database
+      // This ensures session stays in sync with latest user data
+      if (token.user && typeof token.user === 'object' && 'id' in token.user && !trigger) {
+        try {
+          const userId = (token.user as { id: string }).id;
+          const freshUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              image: true,
+              email: true,
+              emailVerified: true,
+              role: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              addressLine1: true,
+              addressLine2: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              country: true,
+              allowSmsNotifications: true,
+              // Add other fields you want in the session
+            },
+          });
+
+          if (freshUser) {
+            // Security: Check if role has changed - force re-authentication if so
+            const oldRole = (token.user as { role?: string }).role;
+            if (oldRole && freshUser.role !== oldRole) {
+              // Clear token to force re-login when role changes
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('User role changed - re-authentication required', {
+                  userId: freshUser.id,
+                  oldRole,
+                  newRole: freshUser.role,
+                });
+              }
+              throw new Error('Role changed - re-authentication required');
+            }
+
+            token.user = freshUser;
+          }
+        } catch (error) {
+          // Log error safely without exposing sensitive data
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error fetching user data:', error);
+          } else {
+            console.error(
+              'Error fetching user data:',
+              error instanceof Error ? error.message : 'Unknown error'
+            );
+          }
+          // Keep existing token data if database fetch fails
+        }
       }
 
       return token;
@@ -82,16 +158,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      session && (session.user = token.user as User & AdapterUser & { id: string; username: string });
+      session &&
+        (session.user = token.user as User &
+          AdapterUser & { id: string; username: string; email: string; role: string });
 
       return session;
     },
   },
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   secret: process.env.AUTH_SECRET,
   pages: {
     signIn: '/signin',
   },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? `__Secure-next-auth.session-token`
+          : `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
+  // Enable CSRF protection
+  useSecureCookies: process.env.NODE_ENV === 'production',
 });

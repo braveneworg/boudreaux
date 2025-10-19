@@ -9,17 +9,26 @@ const SignedInAs = () => {
   const isMobile = useIsMobile();
   const username = session?.user?.username;
 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[SignedInAs] Session:', session);
+    console.log('[SignedInAs] User:', session?.user);
+    console.log('[SignedInAs] Username:', username);
+  }
+
   if (!username) {
+    console.warn('[SignedInAs] No username found, returning null');
     return null;
   }
 
-  return <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, "flex items-center gap-2")}>
-    <div className="flex flex-row gap-2">
-      <KeyIcon size={16} />
-      <span className="text-sm">Signed in as:{' '}</span>
+  return (
+    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, 'flex items-center gap-2')}>
+      <div className="flex flex-row gap-2">
+        <KeyIcon size={16} />
+        <span className="text-sm">Signed in as: </span>
+      </div>
+      <UsernameLink username={username} />
     </div>
-    <UsernameLink username={username} />
-  </div>
+  );
 };
 
 export default SignedInAs;

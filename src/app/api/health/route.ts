@@ -1,41 +1,70 @@
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
+import { checkDatabaseHealth } from '@/app/lib/utils/database-utils';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    // Check if mongoose is already connected
-    if (mongoose.connection.readyState === 1) {
-      return NextResponse.json({
+    const dbHealth = await checkDatabaseHealth();
+
+    if (!dbHealth.healthy) {
+      return NextResponse.json(
+        {
+          status: 'unhealthy',
+          database: 'connection failed',
+          timestamp: new Date().toISOString(),
+          // Only include error details in development
+          ...(process.env.NODE_ENV === 'development' && {
+            error: dbHealth.error,
+          }),
+        },
+        {
+          status: 500,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
         status: 'healthy',
         database: 'connected',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // If not connected, attempt to connect
-    if (!process.env.MONGODB_URI) {
-      return NextResponse.json({
-        status: 'unhealthy',
-        database: 'no connection string',
-        timestamp: new Date().toISOString()
-      }, { status: 500 });
-    }
-
-    await mongoose.connect(process.env.MONGODB_URI);
-
-    return NextResponse.json({
-      status: 'healthy',
-      database: 'connected',
-      timestamp: new Date().toISOString()
-    });
-
+        latency: dbHealth.latency,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    );
   } catch (error) {
-    console.error('Database connection error:', error);
-    return NextResponse.json({
-      status: 'unhealthy',
-      database: 'connection failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    console.error('Health check error:', error);
+    return NextResponse.json(
+      {
+        status: 'unhealthy',
+        database: 'health check failed',
+        timestamp: new Date().toISOString(),
+        // Only include error details in development
+        ...(process.env.NODE_ENV === 'development' && {
+          error: error instanceof Error ? error.message : 'Unspecified error occurred',
+        }),
+      },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    );
   }
 }

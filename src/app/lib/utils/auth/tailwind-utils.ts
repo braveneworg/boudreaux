@@ -1,4 +1,4 @@
-import { type ClassValue,clsx } from 'clsx';
+import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   // Deduplicate identical classes while preserving order
   const classes = result.split(' ').filter(Boolean);
   const seen = new Set();
-  const deduped = classes.filter(cls => {
+  const deduped = classes.filter((cls) => {
     if (seen.has(cls)) {
       return false;
     }

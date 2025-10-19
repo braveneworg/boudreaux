@@ -1,12 +1,19 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
 import type { FormState } from '@/app/lib/types/form-state';
+import type { Control } from 'react-hook-form';
 import React from 'react';
 
+// Common type for both signin and signup schemas (matching the form component)
+type BaseFormSchema = {
+  email: string;
+  general?: string;
+  termsAndConditions?: boolean;
+};
+
 // Mock all dependencies
-vi.mock('@/app/components/forms/ui/form-input', () => ({
+vi.mock('@/app/components/ui/form-input', () => ({
   default: ({ id, placeholder, type, ...props }: FormInputProps) => (
     <input
       data-testid={`form-input-${id}`}
@@ -18,30 +25,50 @@ vi.mock('@/app/components/forms/ui/form-input', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/form', () => ({
-  FormField: ({ name, render }: { name: string; render: (context: any) => React.ReactNode }) => {
+vi.mock('@/app/components/ui/form', () => ({
+  FormField: ({
+    name,
+    render,
+  }: {
+    name: string;
+    render: (context: Record<string, unknown>) => React.ReactNode;
+  }) => {
     const field = {
       value: '',
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
-      ref: vi.fn()
+      ref: vi.fn(),
     };
     return render({ field });
   },
   FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className} data-testid="form-item">{children}</div>
+    <div className={className} data-testid="form-item">
+      {children}
+    </div>
   ),
-  FormLabel: ({ children, htmlFor, className }: { children: React.ReactNode; htmlFor?: string; className?: string }) => (
-    <label htmlFor={htmlFor} className={className} data-testid="form-label">{children}</label>
+  FormLabel: ({
+    children,
+    htmlFor,
+    className,
+  }: {
+    children: React.ReactNode;
+    htmlFor?: string;
+    className?: string;
+  }) => (
+    <label htmlFor={htmlFor} className={className} data-testid="form-label">
+      {children}
+    </label>
   ),
   FormControl: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   FormMessage: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className} data-testid="form-message">{children}</div>
+    <div className={className} data-testid="form-message">
+      {children}
+    </div>
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/switch', () => ({
+vi.mock('@/app/components/ui/switch', () => ({
   Switch: ({ id, checked, onCheckedChange, required, ...props }: SwitchProps) => (
     <input
       type="checkbox"
@@ -55,32 +82,23 @@ vi.mock('@/app/components/forms/ui/switch', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/button', () => ({
+vi.mock('@/app/components/ui/button', () => ({
   Button: ({ children, disabled, size, ...props }: ButtonProps) => (
-    <button
-      disabled={disabled}
-      data-testid="submit-button"
-      data-size={size}
-      {...props}
-    >
+    <button disabled={disabled} data-testid="submit-button" data-size={size} {...props}>
       {children}
     </button>
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/turnstile-widget', () => ({
+vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
-    <div
-      data-testid="turnstile-widget"
-      onClick={() => setIsVerified?.(true)}
-      {...props}
-    >
+    <div data-testid="turnstile-widget" onClick={() => setIsVerified?.(true)} {...props}>
       Turnstile Widget
     </div>
   ),
 }));
 
-vi.mock('@/app/components/forms/ui/status-indicator', () => ({
+vi.mock('@/app/components/ui/status-indicator', () => ({
   default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) => (
     <div
       data-testid="status-indicator"
@@ -129,16 +147,43 @@ interface TurnstileWidgetProps {
 
 // Mock next/link
 vi.mock('next/link', () => ({
-  default: ({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) => (
+  default: ({
+    href,
+    className,
+    children,
+  }: {
+    href: string;
+    className?: string;
+    children: React.ReactNode;
+  }) => (
     <a href={href} className={className} data-testid="next-link">
       {children}
     </a>
   ),
 }));
 
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/signup',
+}));
+
+// Mock react-hook-form
+vi.mock('react-hook-form', () => ({
+  Controller: ({ render }: { render: (context: Record<string, unknown>) => React.ReactNode }) => {
+    const field = {
+      value: '',
+      onChange: vi.fn(),
+      onBlur: vi.fn(),
+      name: 'test',
+      ref: vi.fn(),
+    };
+    return render({ field });
+  },
+}));
+
 describe('SignupSigninForm', () => {
   const defaultProps = {
-    control: {} as any, // Simple mock since FormField component is mocked
+    control: {} as Control<BaseFormSchema>, // Simple mock since FormField component is mocked
     hasTermsAndConditions: true,
     isPending: false,
     setIsVerified: vi.fn(),
@@ -159,7 +204,10 @@ describe('SignupSigninForm', () => {
 
       expect(screen.getByTestId('form-input-email')).toBeInTheDocument();
       expect(screen.getByTestId('form-input-email')).toHaveAttribute('type', 'email');
-      expect(screen.getByTestId('form-input-email')).toHaveAttribute('placeholder', 'Email address');
+      expect(screen.getByTestId('form-input-email')).toHaveAttribute(
+        'placeholder',
+        'Email address'
+      );
     });
 
     it('should display email validation errors', () => {
@@ -196,7 +244,7 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
       const formMessages = screen.getAllByTestId('form-message');
-      const emailFormMessage = formMessages.find(msg => msg.textContent?.includes('email'));
+      const emailFormMessage = formMessages.find((msg) => msg.textContent?.includes('email'));
       expect(emailFormMessage?.textContent?.trim() || '').toBe('');
     });
   });
@@ -222,7 +270,9 @@ describe('SignupSigninForm', () => {
         ...defaultProps,
         state: {
           ...defaultProps.state,
-          errors: { termsAndConditions: ['You must accept terms and conditions'] },
+          errors: {
+            termsAndConditions: ['You must accept terms and conditions'],
+          },
         },
       };
 
@@ -297,13 +347,7 @@ describe('SignupSigninForm', () => {
         hasTimeout: true,
       };
 
-      render(
-        <SignupSigninForm
-          {...defaultProps}
-          state={stateWithErrors}
-          isPending={true}
-        />
-      );
+      render(<SignupSigninForm {...defaultProps} state={stateWithErrors} isPending={true} />);
 
       const statusIndicator = screen.getByTestId('status-indicator');
       expect(statusIndicator).toHaveAttribute('data-success', 'false');
@@ -393,8 +437,8 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
       const termsLabels = screen.getAllByTestId('form-label');
-      const termsLabel = termsLabels.find(label =>
-        label.getAttribute('for') === 'terms-and-conditions'
+      const termsLabel = termsLabels.find(
+        (label) => label.getAttribute('for') === 'terms-and-conditions'
       );
 
       expect(termsLabel).toBeDefined();
@@ -407,7 +451,7 @@ describe('SignupSigninForm', () => {
   describe('component integration', () => {
     it('should handle all props correctly', () => {
       const completeProps = {
-        control: {} as any,
+        control: {} as Control<BaseFormSchema>,
         hasTermsAndConditions: true,
         isPending: true,
         setIsVerified: vi.fn(),
@@ -415,7 +459,7 @@ describe('SignupSigninForm', () => {
           errors: {
             email: ['Invalid email'],
             termsAndConditions: ['Required'],
-            general: ['Server error']
+            general: ['Server error'],
           },
           fields: { email: 'test@example.com' },
           success: false,

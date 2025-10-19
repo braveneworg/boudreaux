@@ -29,6 +29,13 @@
     },
     "types": ["vitest/globals", "node"]
   },
-  "include": ["testSetup.ts", "types/next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".github/workflows/auth.ts"],
+  "include": [
+    "testSetup.ts",
+    "types/next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".github/workflows/auth.ts"
+  ],
   "exclude": ["node_modules"]
 }

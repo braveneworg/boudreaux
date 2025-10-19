@@ -1,6 +1,6 @@
-import * as path from "node:path";
-import { defineConfig } from "vitest/config";
-import packageJson from "./package.json" with { type: "json" };
+import * as path from 'node:path';
+import { defineConfig } from 'vitest/config';
+import packageJson from './package.json' with { type: 'json' };
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,16 +11,67 @@ export default defineConfig({
   test: {
     root: import.meta.dirname,
     name: packageJson.name,
-    environment: "jsdom",
+    environment: 'jsdom',
 
     typecheck: {
       enabled: true,
-      tsconfig: path.join(import.meta.dirname, "tsconfig.json"),
+      tsconfig: path.join(import.meta.dirname, 'tsconfig.json'),
     },
 
     globals: true,
     watch: false,
-    setupFiles: ["./setupTests.ts"],
+    setupFiles: ['./setupTests.ts'],
+
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov', 'clover'],
+      exclude: [
+        // Configuration files
+        '**/*.config.{ts,js,mjs,cjs}',
+        '**/vitest.config.ts',
+        '**/next.config.ts',
+        '**/postcss.config.mjs',
+        '**/eslint.config.mjs',
+        '**/tsconfig*.json',
+
+        // Type declarations and interfaces
+        '**/*.d.ts',
+        '**/types/**',
+
+        // Prisma
+        '**/prisma/**',
+        '**/*.prisma',
+
+        // Setup and tooling
+        '**/setupTests.ts',
+        '**/auth.ts',
+
+        // Build outputs and dependencies
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/.next/**',
+        '**/coverage/**',
+
+        // Test files themselves
+        '**/*.{test,spec}.{ts,tsx,js,jsx}',
+
+        // Scripts and utilities that don't need testing
+        '**/scripts/**',
+
+        // Middleware (already has its own test)
+        // Add more specific exclusions as needed
+      ],
+    },
+
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '**/*.config.{ts,js,mjs,cjs}',
+      '**/setupTests.ts',
+    ],
   },
 
   resolve: {

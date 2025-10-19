@@ -1,44 +1,230 @@
 'use client';
 
-import Image from "next/image";
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { useEffect, useState, useRef } from 'react';
 import AuthToolbar from './components/auth/auth-toolbar';
-import { SessionProvider } from 'next-auth/react';
+import { getApiBaseUrl } from './lib/utils/database-utils';
 
 export default function Home() {
-  const [healthStatus, setHealthStatus] = useState<{ status: string; message: string } | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{
+    status: string;
+    database: string;
+    latency?: number;
+    error?: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const failsafeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchHealthStatus = async () => {
+  const fetchHealthStatus = async (retryCount = 0): Promise<void> => {
+    console.log(`[Health Check] Attempt ${retryCount + 1}/10 starting...`);
+    console.log(
+      `[Health Check] Current URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`
+    );
+    console.log(
+      `[Health Check] Protocol: ${typeof window !== 'undefined' ? window.location.protocol : 'N/A'}`
+    );
+    console.log(
+      `[Health Check] Hostname: ${typeof window !== 'undefined' ? window.location.hostname : 'N/A'}`
+    );
+    console.log(`[Health Check] NODE_ENV: ${process.env.NODE_ENV}`);
+
+    // Get the correct base URL (forces HTTP in development)
+    const baseUrl = getApiBaseUrl();
+    const apiUrl = `${baseUrl}/api/health`;
+    console.log(`[Health Check] Using API URL: ${apiUrl}`);
+
     try {
-      const response = await fetch('/api/health');
+      // Add a timeout to prevent infinite hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(apiUrl, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log(`[Health Check] Response received:`, {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+      });
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`[Health Check] Success! Data:`, data);
+        console.log(`[Health Check] Setting healthStatus and isLoading=false`);
         setHealthStatus(data);
+        setIsLoading(false);
+        // Clear the failsafe timeout on success
+        if (failsafeTimeoutRef.current) {
+          clearTimeout(failsafeTimeoutRef.current);
+          failsafeTimeoutRef.current = null;
+        }
+        console.log(`[Health Check] State updated successfully`);
+        return;
       } else {
-        setHealthStatus({ status: 'error', message: 'Failed to fetch health status' });
+        // Try to parse error response
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { database: 'Failed to parse response', status: 'error' };
+        }
+
+        // Retry on 500 errors (server issues) but not on 404 or other client errors
+        if (response.status >= 500 && retryCount < 10) {
+          const delay =
+            retryCount < 3
+              ? 500 // First 3 attempts: 500ms each
+              : Math.pow(2, retryCount - 3) * 1000; // Later attempts: exponential backoff
+          console.log(`Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/10)`);
+          setTimeout(() => {
+            fetchHealthStatus(retryCount + 1);
+          }, delay);
+          return;
+        }
+
+        setHealthStatus({
+          status: 'error',
+          database: errorData.database || 'Failed to fetch health status',
+          error: errorData.error,
+        });
+        setIsLoading(false);
+        // Clear the failsafe timeout on error
+        if (failsafeTimeoutRef.current) {
+          clearTimeout(failsafeTimeoutRef.current);
+          failsafeTimeoutRef.current = null;
+        }
       }
     } catch (error) {
-      setHealthStatus({ status: 'error', message: (error as Error).message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const isAbortError = errorName === 'AbortError' || errorMessage.includes('aborted');
+      const isNetworkError = errorMessage.includes('fetch') || errorMessage.includes('network');
+
+      console.error('[Health Check] Fetch error:', {
+        name: errorName,
+        message: errorMessage,
+        error,
+        retryCount,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+        isAbortError,
+        isNetworkError,
+      });
+
+      // Handle timeout separately - treat as temporary failure, retry with backoff
+      if (isAbortError) {
+        console.warn('[Health Check] Request timed out after 5 seconds');
+      }
+
+      // Retry up to 10 times with progressive backoff
+      // First few attempts are quick to handle route compilation
+      // Later attempts use exponential backoff for network issues
+      if (retryCount < 10) {
+        const delay =
+          retryCount < 3
+            ? 500 // First 3 attempts: 500ms each (for route compilation)
+            : Math.pow(2, retryCount - 3) * 1000; // Later attempts: 1s, 2s, 4s, 8s, 16s, 32s, 64s
+        console.log(
+          `Retrying health check in ${delay}ms... (attempt ${retryCount + 1}/10) - Error: ${errorMessage}`
+        );
+        setTimeout(() => {
+          fetchHealthStatus(retryCount + 1);
+        }, delay);
+        return; // Keep loading state while retrying
+      }
+
+      // Only set error state after all retries exhausted
+      console.error('All retry attempts exhausted. Showing error to user.');
+      setHealthStatus({
+        status: 'error',
+        database: 'Failed to fetch health status',
+        error:
+          errorMessage.includes('SSL') || errorMessage.includes('ERR_')
+            ? 'Connection error - Please check your network or try using http://localhost:3000'
+            : errorMessage,
+      });
+      setIsLoading(false);
+      // Clear the failsafe timeout on error
+      if (failsafeTimeoutRef.current) {
+        clearTimeout(failsafeTimeoutRef.current);
+        failsafeTimeoutRef.current = null;
+      }
     }
   };
 
   useEffect(() => {
-    (async () => { await fetchHealthStatus(); })();
+    // Reset state on mount/refresh
+    setIsLoading(true);
+    setHealthStatus(null);
+    let isMounted = true;
+
+    // Start health check immediately
+    // The retry logic will handle route compilation delays
+    console.log('[Health Check] Starting health check...');
+    fetchHealthStatus();
+
+    // Failsafe: If still loading after 60 seconds, show error
+    failsafeTimeoutRef.current = setTimeout(() => {
+      if (isMounted) {
+        console.error('[Health Check] Failsafe triggered: Still loading after 60 seconds');
+        setHealthStatus({
+          status: 'error',
+          database: 'Health check timed out',
+          error: 'The health check took too long. Please refresh the page.',
+        });
+        setIsLoading(false);
+      }
+    }, 60000); // 60 seconds
+
+    return () => {
+      isMounted = false;
+      if (failsafeTimeoutRef.current) {
+        clearTimeout(failsafeTimeoutRef.current);
+        failsafeTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2">
         <div className="flex flex-col justify-center items-center sm:items-center">
-          <h1>DB health status:&nbsp; {healthStatus?.status === 'error' ? '❌' : '✅'}</h1>
-          <p className="border-b-2">{healthStatus?.message}</p>
+          <h1>
+            DB health status:&nbsp;{' '}
+            {isLoading
+              ? '⏳'
+              : healthStatus?.status === 'healthy'
+                ? '✅'
+                : healthStatus?.status === 'error' || healthStatus?.status === 'unhealthy'
+                  ? '❌'
+                  : '⏳'}
+          </h1>
+          <p className="border-b-2">
+            {isLoading ? (
+              'Checking database connection...'
+            ) : healthStatus ? (
+              <>
+                {healthStatus.database}
+                {healthStatus.latency && ` (${healthStatus.latency}ms)`}
+                {healthStatus.error && process.env.NODE_ENV === 'development'
+                  ? ` - ${healthStatus.error}`
+                  : ''}
+              </>
+            ) : (
+              'Initializing...'
+            )}
+          </p>
         </div>
-
-        <SessionProvider>
-          <AuthToolbar />
-        </SessionProvider>
-
+        <AuthToolbar />
         <Image
           className="dark:invert"
           src="/media/next.svg"
@@ -49,17 +235,14 @@ export default function Home() {
         />
         <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
           <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
+            Get started by editing{' '}
             <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
               src/app/page.tsx
             </code>
             .
           </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
+          <li className="tracking-[-.01em]">Save and see your changes instantly.</li>
         </ol>
-
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           <a
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
@@ -93,13 +276,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/file.svg" alt="File icon" width={16} height={16} />
           Learn
         </a>
         <a
@@ -108,13 +285,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/window.svg" alt="Window icon" width={16} height={16} />
           Examples
         </a>
         <a
@@ -123,13 +294,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/media/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/media/globe.svg" alt="Globe icon" width={16} height={16} />
           Go to nextjs.org →
         </a>
       </footer>

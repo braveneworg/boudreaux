@@ -7,11 +7,32 @@ import signinSchema from '@/app/lib/validation/signin-schema';
 import { redirect } from 'next/navigation';
 import { signIn } from '../../../../auth';
 import type { FormState } from '../types/form-state';
+import { rateLimit } from '@/app/lib/utils/rate-limit';
+import { headers } from 'next/headers';
+
+// Rate limiter: 5 signin attempts per minute per IP
+const limiter = rateLimit({
+  interval: 60 * 1000, // 60 seconds
+  uniqueTokenPerInterval: 500,
+});
 
 export const signinAction = async (_initialState: FormState, payload: FormData) => {
-  const permittedFieldNames = [
-    'email',
-  ];
+  // Get IP address for rate limiting
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'anonymous';
+
+  // Check rate limit
+  try {
+    await limiter.check(5, ip); // 5 requests per minute per IP
+  } catch {
+    return {
+      success: false,
+      errors: { general: ['Too many signin attempts. Please try again later.'] },
+      fields: {},
+    };
+  }
+
+  const permittedFieldNames = ['email'];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signinSchema);
   if (parsed.success) {
@@ -23,7 +44,6 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
       await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
 
       formState.success = true;
-
     } catch {
       formState.success = false;
     } finally {
@@ -34,7 +54,9 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   }
 
   if (formState.success) {
-    return redirect(`/success/signin?email=${encodeURIComponent(formState.fields.email as string)}`);
+    return redirect(
+      `/success/signin?email=${encodeURIComponent(formState.fields.email as string)}`
+    );
   }
 
   return formState;

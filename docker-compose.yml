@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NODE_ENV: ${NODE_ENV}
-      MONGODB_URI: ${MONGODB_URI}
+      DATABASE_URL: ${DATABASE_URL}
     expose:
       - "3000"
     restart: unless-stopped
