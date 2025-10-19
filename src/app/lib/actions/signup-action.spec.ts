@@ -1,14 +1,39 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 // Get the mocked functions using hoisted
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockGenerateUsername = vi.hoisted(() => vi.fn(() => 'test-user-1234'));
+const mockHeaders = vi.hoisted(() =>
+  vi.fn(() => ({
+    get: vi.fn(() => '127.0.0.1'),
+  }))
+);
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
+
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
+// Mock rate limiter
+vi.mock('@/app/lib/utils/rate-limit', () => ({
+  rateLimit: vi.fn(() => ({
+    check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
+  })),
+}));
+
+// Mock email security
+vi.mock('@/app/lib/utils/email-security', () => ({
+  validateEmailSecurity: vi.fn(() => ({ isValid: true })),
+}));
+
+// Mock audit logging
+vi.mock('@/app/lib/utils/audit-log', () => ({
+  logSecurityEvent: vi.fn(),
+}));
 
 // Mock dependencies
 vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({
@@ -36,7 +61,7 @@ vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
 }));
 
 vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     setUnknownError: mockSetUnknownError,
@@ -91,7 +116,10 @@ describe('signupAction', () => {
       });
 
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
-      mockAdapter.createUser.mockResolvedValue({ id: '1', email: 'test@example.com' });
+      mockAdapter.createUser.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+      });
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
@@ -160,7 +188,9 @@ describe('signupAction', () => {
 
       const mockParsed = {
         success: false,
-        error: { issues: [{ path: ['email'], message: 'Invalid email format' }] },
+        error: {
+          issues: [{ path: ['email'], message: 'Invalid email format' }],
+        },
       };
 
       vi.mocked(mockGetActionState).mockReturnValue({
@@ -243,7 +273,10 @@ describe('signupAction', () => {
 
         vi.mocked(mockGetActionState).mockReturnValue({
           formState: mockFormState,
-          parsed: { success: true, data: { email: 'test@example.com', termsAndConditions: true } },
+          parsed: {
+            success: true,
+            data: { email: 'test@example.com', termsAndConditions: true },
+          },
         });
 
         mockAdapter.createUser.mockRejectedValue(error);
@@ -256,13 +289,10 @@ describe('signupAction', () => {
     });
 
     it('should handle unknown Prisma errors', async () => {
-      const unknownError = new Prisma.PrismaClientKnownRequestError(
-        'Unknown error',
-        {
-          code: 'P1000',
-          clientVersion: '4.0.0',
-        }
-      );
+      const unknownError = new Prisma.PrismaClientKnownRequestError('Unknown error', {
+        code: 'P1000',
+        clientVersion: '4.0.0',
+      });
 
       mockAdapter.createUser.mockRejectedValue(unknownError);
 
@@ -360,7 +390,10 @@ describe('signupAction', () => {
 
       const result = await signupAction(mockInitialState, mockFormData);
 
-      expect(result.fields).toEqual({ email: 'test@example.com', termsAndConditions: false });
+      expect(result.fields).toEqual({
+        email: 'test@example.com',
+        termsAndConditions: false,
+      });
       expect(result.errors).toEqual({ termsAndConditions: ['Required field'] });
     });
   });

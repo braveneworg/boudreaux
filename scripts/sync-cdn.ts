@@ -6,7 +6,12 @@
  */
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
-import { S3Client, ListObjectsV2Command, HeadObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  ListObjectsV2Command,
+  HeadObjectCommand,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { execSync, spawn } from 'child_process';
 import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
@@ -37,7 +42,7 @@ const colors = {
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
-  reset: '\x1b[0m'
+  reset: '\x1b[0m',
 };
 
 // Configuration interface
@@ -84,7 +89,7 @@ class CDNSync {
       skipBuild: process.env.SKIP_BUILD === 'true',
       skipInvalidation: process.env.SKIP_INVALIDATION === 'true',
       skipCleanup: process.env.SKIP_CLEANUP === 'true',
-      awsRegion: process.env.AWS_REGION || 'us-east-1'
+      awsRegion: process.env.AWS_REGION || 'us-east-1',
     };
   }
 
@@ -93,7 +98,7 @@ class CDNSync {
       info: colors.blue,
       success: colors.green,
       warning: colors.yellow,
-      error: colors.red
+      error: colors.red,
     };
 
     console.log(`${colorMap[type]}[CDN-SYNC]${colors.reset} ${message}`);
@@ -104,7 +109,7 @@ class CDNSync {
       const result = execSync(command, {
         encoding: 'utf8',
         stdio: options.quiet ? 'pipe' : 'inherit',
-        cwd: process.cwd() // Ensure we're in the right directory
+        cwd: process.cwd(), // Ensure we're in the right directory
       });
       return result.toString().trim();
     } catch (error: unknown) {
@@ -144,7 +149,10 @@ class CDNSync {
 
     // Check if AWS credentials are available in environment
     if (!process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_PROFILE) {
-      this.log('No AWS credentials found. Please set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or AWS_PROFILE', 'error');
+      this.log(
+        'No AWS credentials found. Please set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or AWS_PROFILE',
+        'error'
+      );
       this.log('You can also run: aws configure', 'error');
       process.exit(1);
     }
@@ -152,18 +160,27 @@ class CDNSync {
     try {
       // Test S3 connection by trying to list objects (this will validate credentials)
       this.log(`Testing access to S3 bucket: ${this.config.s3Bucket}`);
-      await this.s3Client.send(new ListObjectsV2Command({
-        Bucket: this.config.s3Bucket,
-        MaxKeys: 1
-      }));
+      await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: this.config.s3Bucket,
+          MaxKeys: 1,
+        })
+      );
       this.log('AWS credentials and S3 access validated', 'success');
     } catch (error: unknown) {
-      const err = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+      const err = error as {
+        name?: string;
+        message?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
 
       this.log(`AWS validation failed with error: ${err.name}`, 'error');
 
       if (err.name === 'NoSuchBucket') {
-        this.log(`S3 bucket '${this.config.s3Bucket}' does not exist or is not accessible`, 'error');
+        this.log(
+          `S3 bucket '${this.config.s3Bucket}' does not exist or is not accessible`,
+          'error'
+        );
         this.log('Please verify the bucket name and that it exists in your AWS account', 'error');
       } else if (err.name === 'AccessDenied') {
         this.log('AWS credentials do not have permission to access this S3 bucket', 'error');
@@ -197,7 +214,7 @@ class CDNSync {
     return new Promise((resolve, reject) => {
       const child = spawn('npm', ['run', 'build'], {
         stdio: 'inherit',
-        cwd: process.cwd()
+        cwd: process.cwd(),
       });
 
       child.on('close', (code) => {
@@ -217,7 +234,10 @@ class CDNSync {
 
   private validateBuildDirectory(): void {
     if (!existsSync(this.config.buildDir)) {
-      this.log(`Build directory '${this.config.buildDir}' not found. Make sure to run 'npm run build' first.`, 'error');
+      this.log(
+        `Build directory '${this.config.buildDir}' not found. Make sure to run 'npm run build' first.`,
+        'error'
+      );
       process.exit(1);
     }
   }
@@ -233,7 +253,7 @@ class CDNSync {
 
     const filesToUpload = this.getFilesToUpload(staticDir, 'media/_next/static', {
       cacheControl: 'public, max-age=31536000, immutable',
-      excludePatterns: ['*.map', '*.DS_Store']
+      excludePatterns: ['*.map', '*.DS_Store'],
     });
 
     await this.uploadFiles(filesToUpload);
@@ -251,14 +271,14 @@ class CDNSync {
     // Sync non-HTML files with longer cache
     const regularFiles = this.getFilesToUpload(this.config.mediaDir, 'media', {
       cacheControl: 'public, max-age=86400',
-      excludePatterns: ['*.html', '*.DS_Store']
+      excludePatterns: ['*.html', '*.DS_Store'],
     });
 
     // Sync HTML files with shorter cache
     const htmlFiles = this.getFilesToUpload(this.config.mediaDir, 'media', {
       cacheControl: 'public, max-age=300',
-      excludePatterns: ['*.DS_Store']
-    }).filter(file => file.localPath.endsWith('.html'));
+      excludePatterns: ['*.DS_Store'],
+    }).filter((file) => file.localPath.endsWith('.html'));
 
     const allFiles = [...regularFiles, ...htmlFiles];
 
@@ -283,7 +303,7 @@ class CDNSync {
 
         const files = this.getFilesToUpload(dir, `media/${dir}`, {
           cacheControl: 'public, max-age=86400',
-          excludePatterns: ['*.DS_Store', '*.tmp']
+          excludePatterns: ['*.DS_Store', '*.tmp'],
         });
 
         if (files.length > 0) {
@@ -317,7 +337,7 @@ class CDNSync {
           const stat = statSync(fullPath);
 
           // Check if file should be excluded
-          const shouldExclude = excludePatterns.some(pattern => {
+          const shouldExclude = excludePatterns.some((pattern) => {
             const regex = new RegExp(pattern.replace('*', '.*'));
             return regex.test(item);
           });
@@ -334,7 +354,7 @@ class CDNSync {
               localPath: fullPath,
               s3Key,
               contentType,
-              cacheControl: options.cacheControl
+              cacheControl: options.cacheControl,
             });
           }
         }
@@ -357,8 +377,8 @@ class CDNSync {
             Key: file.s3Key,
             Body: createReadStream(file.localPath),
             ContentType: file.contentType,
-            CacheControl: file.cacheControl
-          }
+            CacheControl: file.cacheControl,
+          },
         });
 
         await upload.done();
@@ -379,7 +399,7 @@ class CDNSync {
       // List all objects with the 'media/' prefix
       const listCommand = new ListObjectsV2Command({
         Bucket: this.config.s3Bucket,
-        Prefix: 'media/'
+        Prefix: 'media/',
       });
 
       const response = await this.s3Client.send(listCommand);
@@ -390,14 +410,14 @@ class CDNSync {
       }
 
       // Delete objects in batches (S3 allows max 1000 objects per delete request)
-      const objectsToDelete = response.Contents.map(obj => ({ Key: obj.Key! }));
+      const objectsToDelete = response.Contents.map((obj) => ({ Key: obj.Key! }));
 
       const deleteCommand = new DeleteObjectsCommand({
         Bucket: this.config.s3Bucket,
         Delete: {
           Objects: objectsToDelete,
-          Quiet: false
-        }
+          Quiet: false,
+        },
       });
 
       const deleteResponse = await this.s3Client.send(deleteCommand);
@@ -409,7 +429,7 @@ class CDNSync {
 
       if (errorCount > 0) {
         this.log(`Failed to delete ${errorCount} files`, 'warning');
-        deleteResponse.Errors?.forEach(error => {
+        deleteResponse.Errors?.forEach((error) => {
           this.log(`Error deleting ${error.Key}: ${error.Message}`, 'error');
         });
       }
@@ -419,9 +439,11 @@ class CDNSync {
         this.log('More files to delete, continuing...', 'info');
         await this.clearS3MediaDirectory(); // Recursive call for remaining files
       }
-
     } catch (error: unknown) {
-      this.log(`Failed to clear S3 media directory: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      this.log(
+        `Failed to clear S3 media directory: ${error instanceof Error ? error.message : String(error)}`,
+        'error'
+      );
       throw error;
     }
   }
@@ -451,10 +473,10 @@ class CDNSync {
         InvalidationBatch: {
           Paths: {
             Quantity: 1,
-            Items: ['/*']
+            Items: ['/*'],
           },
-          CallerReference: `cdn-sync-${Date.now()}`
-        }
+          CallerReference: `cdn-sync-${Date.now()}`,
+        },
       });
 
       const response = await this.cloudFrontClient.send(command);
@@ -473,14 +495,14 @@ class CDNSync {
     const testFiles = [
       'media/_next/static/chunks/webpack.js',
       'media/next.svg', // from public/media directory
-      'media/index.html' // if you have HTML files
+      'media/index.html', // if you have HTML files
     ];
 
     for (const sampleFile of testFiles) {
       try {
         const command = new HeadObjectCommand({
           Bucket: this.config.s3Bucket,
-          Key: sampleFile
+          Key: sampleFile,
         });
 
         await this.s3Client.send(command);
@@ -518,7 +540,7 @@ class CDNSync {
       // Sync files
       await this.syncMediaFiles();
       await this.syncStaticFiles();
-      await this.syncMediaAssets()  ;
+      await this.syncMediaAssets();
 
       // Optimize
       await this.setContentTypes();
@@ -533,7 +555,6 @@ class CDNSync {
       this.log('CDN sync completed successfully!', 'success');
       this.log(`Static assets are now available at: ${this.config.cdnDomain}`, 'success');
       this.log('Sync process finished');
-
     } catch (error) {
       this.log(`Sync failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
       process.exit(1);
@@ -560,9 +581,13 @@ if (!existsSync(publicMediaDir)) {
 
 if (existsSync(cdnMediaDir)) {
   execSync(`cp -r ${cdnMediaDir}/* ${publicMediaDir}/`);
-  console.log(`${colors.green}[CDN-SYNC]${colors.reset} Copied media files from ${cdnMediaDir} to ${publicMediaDir}`);
+  console.log(
+    `${colors.green}[CDN-SYNC]${colors.reset} Copied media files from ${cdnMediaDir} to ${publicMediaDir}`
+  );
 } else {
-  console.log(`${colors.yellow}[CDN-SYNC]${colors.reset} No media files found at ${cdnMediaDir}, skipping copy`);
+  console.log(
+    `${colors.yellow}[CDN-SYNC]${colors.reset} No media files found at ${cdnMediaDir}, skipping copy`
+  );
 }
 
 export default CDNSync;

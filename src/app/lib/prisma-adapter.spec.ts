@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
-import type { AdapterUser } from 'next-auth/adapters';
+import type { AdapterUser, Adapter } from 'next-auth/adapters';
 
 // Mock @auth/prisma-adapter
 vi.mock('@auth/prisma-adapter', () => ({
@@ -19,6 +17,22 @@ vi.mock('@auth/prisma-adapter', () => ({
   })),
 }));
 
+// Mock Prisma user operations
+interface MockPrismaUser {
+  create: ReturnType<typeof vi.fn>;
+  findUnique: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+}
+
+interface MockPrismaAccount {
+  findUnique: ReturnType<typeof vi.fn>;
+}
+
+interface MockPrismaClient {
+  user: MockPrismaUser;
+  account: MockPrismaAccount;
+}
+
 // Mock PrismaClient
 vi.mock('@prisma/client', () => ({
   PrismaClient: vi.fn(() => ({
@@ -33,9 +47,18 @@ vi.mock('@prisma/client', () => ({
   })),
 }));
 
+// Type guard to ensure required methods exist
+type RequiredAdapter = Adapter & {
+  createUser: NonNullable<Adapter['createUser']>;
+  getUser: NonNullable<Adapter['getUser']>;
+  getUserByEmail: NonNullable<Adapter['getUserByEmail']>;
+  getUserByAccount: NonNullable<Adapter['getUserByAccount']>;
+  updateUser: NonNullable<Adapter['updateUser']>;
+};
+
 describe('CustomPrismaAdapter', () => {
-  let mockPrisma: unknown;
-  let adapter: any;
+  let mockPrisma: MockPrismaClient;
+  let adapter: RequiredAdapter;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,7 +74,7 @@ describe('CustomPrismaAdapter', () => {
       },
     };
 
-    adapter = CustomPrismaAdapter(mockPrisma as never);
+    adapter = CustomPrismaAdapter(mockPrisma as never) as RequiredAdapter;
   });
 
   describe('createUser', () => {
@@ -72,11 +95,11 @@ describe('CustomPrismaAdapter', () => {
         username: null,
       };
 
-      ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
+      mockPrisma.user.create.mockResolvedValue(createdUser);
 
-      const result = await adapter!.createUser(userData);
+      const result = await adapter.createUser(userData);
 
-      expect(((mockPrisma as any)).user.create).toHaveBeenCalledWith({
+      expect(mockPrisma.user.create).toHaveBeenCalledWith({
         data: userData,
       });
 
@@ -109,11 +132,11 @@ describe('CustomPrismaAdapter', () => {
         termsAndConditions: true,
       };
 
-      ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
+      mockPrisma.user.create.mockResolvedValue(createdUser);
 
-      const result = await adapter!.createUser(userData);
+      const result = await adapter.createUser(userData);
 
-      expect(((mockPrisma as any)).user.create).toHaveBeenCalledWith({
+      expect(mockPrisma.user.create).toHaveBeenCalledWith({
         data: userData,
       });
 
@@ -136,9 +159,9 @@ describe('CustomPrismaAdapter', () => {
       };
 
       const dbError = new Error('Database connection failed');
-      ((mockPrisma as any)).user.create.mockRejectedValue(dbError);
+      mockPrisma.user.create.mockRejectedValue(dbError);
 
-      await expect(adapter!.createUser(userData)).rejects.toThrow('Database connection failed');
+      await expect(adapter.createUser(userData)).rejects.toThrow('Database connection failed');
     });
 
     it('should return only specified fields in user object', async () => {
@@ -159,9 +182,9 @@ describe('CustomPrismaAdapter', () => {
         extraField: 'should not be included',
       };
 
-      ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
+      mockPrisma.user.create.mockResolvedValue(createdUser);
 
-      const result = await adapter!.createUser(userData);
+      const result = await adapter.createUser(userData);
 
       expect(result).toEqual({
         id: '1',
@@ -187,11 +210,11 @@ describe('CustomPrismaAdapter', () => {
         username: null,
       };
 
-      ((mockPrisma as any)).user.findUnique.mockResolvedValue(user);
+      mockPrisma.user.findUnique.mockResolvedValue(user);
 
-      const result = await adapter!.getUser('1');
+      const result = await adapter.getUser('1');
 
-      expect(((mockPrisma as any)).user.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: '1' },
       });
 
@@ -206,18 +229,18 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null when user not found', async () => {
-      ((mockPrisma as any)).user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      const result = await adapter!.getUser('nonexistent');
+      const result = await adapter.getUser('nonexistent');
 
       expect(result).toBeNull();
     });
 
     it('should handle database errors during user fetch', async () => {
       const dbError = new Error('Database timeout');
-      ((mockPrisma as any)).user.findUnique.mockRejectedValue(dbError);
+      mockPrisma.user.findUnique.mockRejectedValue(dbError);
 
-      await expect(adapter!.getUser('1')).rejects.toThrow('Database timeout');
+      await expect(adapter.getUser('1')).rejects.toThrow('Database timeout');
     });
   });
 
@@ -232,11 +255,11 @@ describe('CustomPrismaAdapter', () => {
         username: null,
       };
 
-      ((mockPrisma as any)).user.findUnique.mockResolvedValue(user);
+      mockPrisma.user.findUnique.mockResolvedValue(user);
 
-      const result = await adapter!.getUserByEmail('test@example.com');
+      const result = await adapter.getUserByEmail('test@example.com');
 
-      expect(((mockPrisma as any)).user.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
       });
 
@@ -251,9 +274,9 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null when user with email not found', async () => {
-      ((mockPrisma as any)).user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      const result = await adapter!.getUserByEmail('nonexistent@example.com');
+      const result = await adapter.getUserByEmail('nonexistent@example.com');
 
       expect(result).toBeNull();
     });
@@ -267,11 +290,11 @@ describe('CustomPrismaAdapter', () => {
         image: null,
       };
 
-      ((mockPrisma as any)).user.findUnique.mockResolvedValue(user);
+      mockPrisma.user.findUnique.mockResolvedValue(user);
 
-      await adapter!.getUserByEmail('Test@Example.Com');
+      await adapter.getUserByEmail('Test@Example.Com');
 
-      expect(((mockPrisma as any)).user.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'Test@Example.Com' },
       });
     });
@@ -290,16 +313,16 @@ describe('CustomPrismaAdapter', () => {
 
       const account = { user };
 
-      ((mockPrisma as any)).account.findUnique.mockResolvedValue(account);
+      mockPrisma.account.findUnique.mockResolvedValue(account);
 
       const providerAccountId = {
         provider: 'google',
         providerAccountId: '12345',
       };
 
-      const result = await adapter!.getUserByAccount(providerAccountId);
+      const result = await adapter.getUserByAccount(providerAccountId);
 
-      expect(((mockPrisma as any)).account.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.account.findUnique).toHaveBeenCalledWith({
         where: { provider_providerAccountId: providerAccountId },
         select: { user: true },
       });
@@ -315,34 +338,34 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null when account not found', async () => {
-      ((mockPrisma as any)).account.findUnique.mockResolvedValue(null);
+      mockPrisma.account.findUnique.mockResolvedValue(null);
 
       const providerAccountId = {
         provider: 'google',
         providerAccountId: 'nonexistent',
       };
 
-      const result = await adapter!.getUserByAccount(providerAccountId);
+      const result = await adapter.getUserByAccount(providerAccountId);
 
       expect(result).toBeNull();
     });
 
     it('should return null when account exists but has no user', async () => {
-      ((mockPrisma as any)).account.findUnique.mockResolvedValue({ user: null });
+      mockPrisma.account.findUnique.mockResolvedValue({ user: null });
 
       const providerAccountId = {
         provider: 'google',
         providerAccountId: '12345',
       };
 
-      const result = await adapter!.getUserByAccount(providerAccountId);
+      const result = await adapter.getUserByAccount(providerAccountId);
 
       expect(result).toBeNull();
     });
 
     it('should handle different provider types', async () => {
       const user = { id: '1', email: 'test@example.com' };
-      ((mockPrisma as any)).account.findUnique.mockResolvedValue({ user });
+      mockPrisma.account.findUnique.mockResolvedValue({ user });
 
       const providers = [
         { provider: 'google', providerAccountId: '12345' },
@@ -351,8 +374,8 @@ describe('CustomPrismaAdapter', () => {
       ];
 
       for (const providerAccount of providers) {
-        await adapter!.getUserByAccount(providerAccount);
-        expect(((mockPrisma as any)).account.findUnique).toHaveBeenCalledWith({
+        await adapter.getUserByAccount(providerAccount);
+        expect(mockPrisma.account.findUnique).toHaveBeenCalledWith({
           where: { provider_providerAccountId: providerAccount },
           select: { user: true },
         });
@@ -361,7 +384,7 @@ describe('CustomPrismaAdapter', () => {
   });
 
   describe('updateUser', () => {
-    it('should update user data', async () => {
+    it('should update user data using id when no previousEmail provided', async () => {
       const updateData = {
         id: '1',
         name: 'Updated Name',
@@ -377,11 +400,11 @@ describe('CustomPrismaAdapter', () => {
         username: null,
       };
 
-      ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
 
-      const result = await adapter!.updateUser(updateData);
+      const result = await adapter.updateUser(updateData);
 
-      expect(((mockPrisma as any)).user.update).toHaveBeenCalledWith({
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: {
           name: 'Updated Name',
@@ -399,10 +422,51 @@ describe('CustomPrismaAdapter', () => {
       });
     });
 
-    it('should exclude id from update data', async () => {
+    it('should update user data using id and include previousEmail in data when provided', async () => {
       const updateData = {
         id: '1',
         name: 'Updated Name',
+        email: 'new@example.com',
+        previousEmail: 'old@example.com',
+      };
+
+      const updatedUser = {
+        id: '1',
+        name: 'Updated Name',
+        email: 'new@example.com',
+        emailVerified: null,
+        image: null,
+        username: null,
+      };
+
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await adapter.updateUser(updateData);
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          name: 'Updated Name',
+          email: 'new@example.com',
+          previousEmail: 'old@example.com',
+        },
+      });
+
+      expect(result).toEqual({
+        id: '1',
+        name: 'Updated Name',
+        email: 'new@example.com',
+        emailVerified: null,
+        image: null,
+        username: '',
+      });
+    });
+
+    it('should exclude id but include previousEmail in update data', async () => {
+      const updateData = {
+        id: '1',
+        name: 'Updated Name',
+        previousEmail: 'old@example.com',
         someExtraField: 'value',
       };
 
@@ -414,14 +478,15 @@ describe('CustomPrismaAdapter', () => {
         image: null,
       };
 
-      ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
 
-      await adapter!.updateUser(updateData);
+      await adapter.updateUser(updateData);
 
-      expect(((mockPrisma as any)).user.update).toHaveBeenCalledWith({
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: {
           name: 'Updated Name',
+          previousEmail: 'old@example.com',
           someExtraField: 'value',
         },
       });
@@ -430,6 +495,7 @@ describe('CustomPrismaAdapter', () => {
     it('should handle partial updates', async () => {
       const updateData = {
         id: '1',
+        email: 'test@example.com',
         emailVerified: new Date(),
       };
 
@@ -442,9 +508,17 @@ describe('CustomPrismaAdapter', () => {
         username: null,
       };
 
-      ((mockPrisma as any)).user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
 
-      const result = await adapter!.updateUser(updateData);
+      const result = await adapter.updateUser(updateData);
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          email: 'test@example.com',
+          emailVerified: updateData.emailVerified,
+        },
+      });
 
       expect(result).toEqual({
         id: '1',
@@ -463,9 +537,9 @@ describe('CustomPrismaAdapter', () => {
       };
 
       const dbError = new Error('User not found');
-      ((mockPrisma as any)).user.update.mockRejectedValue(dbError);
+      mockPrisma.user.update.mockRejectedValue(dbError);
 
-      await expect(adapter!.updateUser(updateData)).rejects.toThrow('User not found');
+      await expect(adapter.updateUser(updateData)).rejects.toThrow('User not found');
     });
   });
 
@@ -486,11 +560,11 @@ describe('CustomPrismaAdapter', () => {
 
     it('should override specific methods while keeping others', () => {
       // Our custom methods should be functions
-      expect(typeof adapter!.createUser).toBe('function');
-      expect(typeof adapter!.getUser).toBe('function');
-      expect(typeof adapter!.getUserByEmail).toBe('function');
-      expect(typeof adapter!.getUserByAccount).toBe('function');
-      expect(typeof adapter!.updateUser).toBe('function');
+      expect(typeof adapter.createUser).toBe('function');
+      expect(typeof adapter.getUser).toBe('function');
+      expect(typeof adapter.getUserByEmail).toBe('function');
+      expect(typeof adapter.getUserByAccount).toBe('function');
+      expect(typeof adapter.updateUser).toBe('function');
     });
   });
 
@@ -511,9 +585,9 @@ describe('CustomPrismaAdapter', () => {
         image: null,
       };
 
-      ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
+      mockPrisma.user.create.mockResolvedValue(createdUser);
 
-      const result = await adapter!.createUser(minimalUserData);
+      const result = await adapter.createUser(minimalUserData);
 
       expect(result.id).toBe('1');
       expect(result.email).toBe('test@example.com');
@@ -538,9 +612,9 @@ describe('CustomPrismaAdapter', () => {
         image: null,
       };
 
-      ((mockPrisma as any)).user.create.mockResolvedValue(createdUser);
+      mockPrisma.user.create.mockResolvedValue(createdUser);
 
-      const result = await adapter!.createUser(userData);
+      const result = await adapter.createUser(userData);
 
       expect(result.emailVerified).toEqual(verifiedDate);
     });

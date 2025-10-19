@@ -1,7 +1,11 @@
 import type { ZodType } from 'zod';
 import type { FormState } from '../../types/form-state';
 
-const getActionState = <TForm>(data: FormData, permittedFieldNames: string[], formSchema: ZodType<TForm>) => {
+const getActionState = <TForm>(
+  data: FormData,
+  permittedFieldNames: string[],
+  formSchema: ZodType<TForm>
+) => {
   // Preserve the values entered into the fields
   const fields: Record<string, boolean | string> = {};
   // Every form in this application should follow this formState initial state
@@ -20,9 +24,9 @@ const getActionState = <TForm>(data: FormData, permittedFieldNames: string[], fo
     let value: boolean | string = formData[key]!.toString();
 
     // Convert checkbox/switch "on" values to boolean
-    if (value === 'on') {
+    if (value === 'true' || value === 'on') {
       value = true;
-    } else if (value === 'off' || (key === 'termsAndConditions' && value === 'false')) {
+    } else if (value === 'false' || value === 'off') {
       value = false;
     }
 
