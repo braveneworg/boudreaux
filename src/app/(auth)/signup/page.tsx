@@ -10,7 +10,7 @@ import signinSchema, {
   type FormSchemaType as SigninSchemaType,
 } from '@/lib/validation/signin-schema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useState, useCallback } from 'react';
 import { useForm, FormProvider, Control } from 'react-hook-form';
 import { signinAction } from '@/app/lib/actions/signin-action';
 
@@ -19,7 +19,6 @@ const SignupPage = () => {
     ? SignupSchemaType
     : SigninSchemaType;
   const path = globalThis.window?.location?.pathname;
-  const formReference = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<FormState, FormData>(signupAction, {
     errors: {},
     fields: {},
@@ -38,32 +37,37 @@ const SignupPage = () => {
     resolver: zodResolver(isSignupPath ? signupSchema : signinSchema),
   });
 
-  const handleSubmit = async () => {
-    if (isVerified) {
-      const formData = new FormData(formReference.current!);
-      const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
+  const handleSubmit = useCallback(
+    async (data: SigninOrSignupSchema<FormState>) => {
+      if (isVerified) {
+        // Create FormData from the validated form data instead of reading from ref
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+          }
+        });
 
-      if (!result.success) {
-        // Update the form state with the new state returned from the action
-        form.reset(undefined, { keepValues: true });
+        const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
 
-        if (result.errors?.email) {
-          form.setError('email', { message: result.errors.email[0] });
+        if (!result.success) {
+          // Update the form state with the new state returned from the action
+          form.reset(undefined, { keepValues: true });
+
+          if (result.errors?.email) {
+            form.setError('email', { message: result.errors.email.join(', ') });
+          }
         }
+      } else {
+        form.setError('general', { message: 'Please refresh the app and try again.' });
       }
-    } else {
-      form.setError('general', { message: 'Please refresh the app and try again.' });
-    }
-  };
+    },
+    [isVerified, isSignupPath, state, form]
+  );
 
   return (
     <FormProvider {...form}>
-      <form
-        action={formAction}
-        noValidate
-        onSubmit={form.handleSubmit(handleSubmit)}
-        ref={formReference}
-      >
+      <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)}>
         <SignupSigninForm
           control={
             form.control as Control<{

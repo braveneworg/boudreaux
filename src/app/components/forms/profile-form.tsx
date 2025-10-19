@@ -135,10 +135,9 @@ export default function ProfileForm() {
       formData.append('country', data.country || '');
       formData.append('allowSmsNotifications', String(data.allowSmsNotifications));
 
-      // Reset the handled flag before submitting to ensure toast shows on this submission
-      handledSuccessStatesRef.current.profile = false;
-
       startTransition(() => {
+        // Reset the handled flag right before the action to ensure toast shows on this submission
+        handledSuccessStatesRef.current.profile = false;
         profileFormAction(formData);
       });
     },
@@ -153,6 +152,8 @@ export default function ProfileForm() {
       formData.append('previousEmail', data.previousEmail ?? '');
 
       startTransition(() => {
+        // Reset the handled flag right before the action to ensure toast shows on this submission
+        handledSuccessStatesRef.current.email = false;
         emailFormAction(formData);
       });
     },
@@ -166,6 +167,8 @@ export default function ProfileForm() {
       formData.append('confirmUsername', data.confirmUsername);
 
       startTransition(() => {
+        // Reset the handled flag right before the action to ensure toast shows on this submission
+        handledSuccessStatesRef.current.username = false;
         usernameFormAction(formData);
       });
     },
@@ -233,7 +236,12 @@ export default function ProfileForm() {
   // Show toast notifications for form state changes
   useEffect(() => {
     // Show success toast only when success transitions from false to true
-    if (formState.success && !handledSuccessStatesRef.current.profile) {
+    if (
+      formState.success &&
+      !handledSuccessStatesRef.current.profile &&
+      !isPending &&
+      !isTransitionPending
+    ) {
       handledSuccessStatesRef.current.profile = true;
       toast.success('Your profile has been updated successfully.');
       // Reset to pristine state after successful save
@@ -251,45 +259,65 @@ export default function ProfileForm() {
     if (formState.errors?.general) {
       toast.error(formState.errors.general[0]);
     }
-  }, [formState.success, formState.errors, update]);
+  }, [formState.success, formState.errors, isPending, isTransitionPending, update]);
 
   useEffect(() => {
-    if (emailFormState.success && !handledSuccessStatesRef.current.email) {
+    if (
+      emailFormState.success &&
+      !handledSuccessStatesRef.current.email &&
+      !isEmailPending &&
+      !isTransitionPending
+    ) {
       handledSuccessStatesRef.current.email = true;
       toast.success('Your email has been updated successfully.');
       // Reset editing state
       setIsEditingUserEmail(false);
-      // Clear confirmation field
-      changeEmailFormRef.current.setValue('confirmEmail', '');
-      // Clear any errors
-      changeEmailFormRef.current.clearErrors();
+      // Get current values and clear confirmEmail
+      const currentValues = changeEmailFormRef.current.getValues();
+      // Reset to pristine state after successful save
+      changeEmailFormRef.current.reset(
+        {
+          ...currentValues,
+          confirmEmail: '', // Clear confirmEmail after successful save
+        },
+        {
+          keepDefaultValues: false,
+          keepValues: true,
+        }
+      );
       // Update session
       void update();
     }
-    // Reset handled flag when success becomes false
-    if (!emailFormState.success && handledSuccessStatesRef.current.email) {
-      handledSuccessStatesRef.current.email = false;
-    }
-  }, [emailFormState.success, update]);
+  }, [emailFormState.success, isEmailPending, isTransitionPending, update]);
 
   useEffect(() => {
-    if (usernameFormState.success && !handledSuccessStatesRef.current.username) {
+    if (
+      usernameFormState.success &&
+      !handledSuccessStatesRef.current.username &&
+      !isUsernamePending &&
+      !isTransitionPending
+    ) {
       handledSuccessStatesRef.current.username = true;
       toast.success('Your username has been updated successfully.');
       // Reset editing state
       setIsEditingUsername(false);
-      // Clear confirmation field
-      changeUsernameFormRef.current.setValue('confirmUsername', '');
-      // Clear any errors
-      changeUsernameFormRef.current.clearErrors();
+      // Get current values and clear confirmUsername
+      const currentValues = changeUsernameFormRef.current.getValues();
+      // Reset to pristine state after successful save
+      changeUsernameFormRef.current.reset(
+        {
+          ...currentValues,
+          confirmUsername: '', // Clear confirmUsername after successful save
+        },
+        {
+          keepDefaultValues: false,
+          keepValues: true,
+        }
+      );
       // Update session
       void update();
     }
-    // Reset handled flag when success becomes false
-    if (!usernameFormState.success && handledSuccessStatesRef.current.username) {
-      handledSuccessStatesRef.current.username = false;
-    }
-  }, [usernameFormState.success, update]);
+  }, [usernameFormState.success, isUsernamePending, isTransitionPending, update]);
 
   const handleEditFieldButtonClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>): void => {

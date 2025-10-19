@@ -291,7 +291,7 @@ describe('GenerateUsernameButton', () => {
   });
 
   describe('confirmUsername clearing behavior', () => {
-    it('should clear confirmUsername when usernames do not match on mount', () => {
+    it('should clear confirmUsername when usernames do not match on mount', async () => {
       mockForm.getValues = vi.fn((field?: string | string[]) => {
         if (field === 'username') return 'username1';
         if (field === 'confirmUsername') return 'username2';
@@ -308,9 +308,11 @@ describe('GenerateUsernameButton', () => {
         />
       );
 
-      expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', '', {
-        shouldValidate: false,
-        shouldDirty: false,
+      await waitFor(() => {
+        expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', '', {
+          shouldValidate: false,
+          shouldDirty: false,
+        });
       });
     });
 
@@ -334,7 +336,7 @@ describe('GenerateUsernameButton', () => {
       expect(mockForm.setValue).not.toHaveBeenCalledWith('confirmUsername', '', expect.any(Object));
     });
 
-    it('should only clear confirmUsername once', () => {
+    it('should only clear confirmUsername once', async () => {
       mockForm.getValues = vi.fn((field?: string | string[]) => {
         if (field === 'username') return 'username1';
         if (field === 'confirmUsername') return 'username2';
@@ -351,7 +353,9 @@ describe('GenerateUsernameButton', () => {
         />
       );
 
-      expect(mockForm.setValue).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(mockForm.setValue).toHaveBeenCalledTimes(1);
+      });
 
       // Rerender the component
       rerender(
