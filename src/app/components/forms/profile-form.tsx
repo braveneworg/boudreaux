@@ -17,6 +17,7 @@ import {
 } from '@/app/components/ui/card';
 import { Separator } from '@radix-ui/react-separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { Form } from '@/app/components/ui/form';
 import { CheckboxField, StateField, TextField, CountryField } from '@/app/components/forms/fields';
 import { splitFullName } from '@/app/lib/utils/profile-utils';
 import profileSchema, { type ProfileFormData } from '@/app/lib/validation/profile-schema';
@@ -282,70 +283,72 @@ export default function ProfileForm() {
           <CardDescription>Update your personal details</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
-            className="space-y-4"
-            data-testid="form"
-          >
-            <div className="grid gap-4 md:grid-cols-2">
+          <Form {...personalProfileForm}>
+            <form
+              onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
+              className="space-y-4"
+              data-testid="form"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  control={personalProfileForm.control}
+                  name="firstName"
+                  label="First Name"
+                  placeholder="John"
+                />
+                <TextField
+                  control={personalProfileForm.control}
+                  name="lastName"
+                  label="Last Name"
+                  placeholder="Doe"
+                />
+              </div>
               <TextField
                 control={personalProfileForm.control}
-                name="firstName"
-                label="First Name"
-                placeholder="John"
+                name="phone"
+                label="Phone Number"
+                placeholder="+1 (555) 000-0000"
+                type="tel"
               />
               <TextField
                 control={personalProfileForm.control}
-                name="lastName"
-                label="Last Name"
-                placeholder="Doe"
+                name="addressLine1"
+                label="Address Line 1"
+                placeholder="123 Main St"
               />
-            </div>
-            <TextField
-              control={personalProfileForm.control}
-              name="phone"
-              label="Phone Number"
-              placeholder="+1 (555) 000-0000"
-              type="tel"
-            />
-            <TextField
-              control={personalProfileForm.control}
-              name="addressLine1"
-              label="Address Line 1"
-              placeholder="123 Main St"
-            />
-            <TextField
-              control={personalProfileForm.control}
-              name="addressLine2"
-              label="Address Line 2"
-              placeholder="Apt 4B"
-            />
-            <div className="grid gap-4 md:grid-cols-3">
               <TextField
                 control={personalProfileForm.control}
-                name="city"
-                label="City"
-                placeholder="New York"
+                name="addressLine2"
+                label="Address Line 2"
+                placeholder="Apt 4B"
               />
-              <StateField control={personalProfileForm.control} />
-              <TextField
+              <div className="grid gap-4 md:grid-cols-3">
+                <TextField
+                  control={personalProfileForm.control}
+                  name="city"
+                  label="City"
+                  placeholder="New York"
+                />
+                <StateField control={personalProfileForm.control} />
+                <TextField
+                  control={personalProfileForm.control}
+                  name="zipCode"
+                  label="ZIP Code"
+                  placeholder="10001"
+                />
+              </div>
+              <CountryField control={personalProfileForm.control} />
+              <CheckboxField
                 control={personalProfileForm.control}
-                name="zipCode"
-                label="ZIP Code"
-                placeholder="10001"
+                name="allowSmsNotifications"
+                label="Allow SMS notifications"
+                id="allowSmsNotifications"
               />
-            </div>
-            <CountryField control={personalProfileForm.control} />
-            <CheckboxField
-              control={personalProfileForm.control}
-              name="allowSmsNotifications"
-              label="Allow SMS notifications"
-              id="allowSmsNotifications"
-            />
-            <Button type="submit" disabled={isPending || isTransitionPending}>
-              {isPending || isTransitionPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </form>
+              <Button type="submit" disabled={isPending || isTransitionPending}>
+                {isPending || isTransitionPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
@@ -358,47 +361,49 @@ export default function ProfileForm() {
           <CardDescription>Manage your email address</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
-            className="space-y-4"
-            data-testid="form"
-          >
-            <TextField
-              control={changeEmailForm.control}
-              name="email"
-              label="Email"
-              placeholder="john@example.com"
-              type="email"
-              disabled={!isEditingUserEmail}
-            />
-            {isEditingUserEmail && (
-              <>
-                <TextField
-                  control={changeEmailForm.control}
-                  name="confirmEmail"
-                  label="Confirm Email"
-                  placeholder="john@example.com"
-                  type="email"
-                />
-                <input type="hidden" {...changeEmailForm.register('previousEmail')} />
-              </>
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleEditFieldButtonClick}
-                data-field="email"
-              >
-                {isEditingUserEmail ? 'Cancel' : 'Edit Email'}
-              </Button>
+          <Form {...changeEmailForm}>
+            <form
+              onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
+              className="space-y-4"
+              data-testid="form"
+            >
+              <TextField
+                control={changeEmailForm.control}
+                name="email"
+                label="Email"
+                placeholder="john@example.com"
+                type="email"
+                disabled={!isEditingUserEmail}
+              />
               {isEditingUserEmail && (
-                <Button type="submit" disabled={isEmailPending || isTransitionPending}>
-                  {isEmailPending || isTransitionPending ? 'Saving...' : 'Save Email'}
-                </Button>
+                <>
+                  <TextField
+                    control={changeEmailForm.control}
+                    name="confirmEmail"
+                    label="Confirm Email"
+                    placeholder="john@example.com"
+                    type="email"
+                  />
+                  <input type="hidden" {...changeEmailForm.register('previousEmail')} />
+                </>
               )}
-            </div>
-          </form>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEditFieldButtonClick}
+                  data-field="email"
+                >
+                  {isEditingUserEmail ? 'Cancel' : 'Edit Email'}
+                </Button>
+                {isEditingUserEmail && (
+                  <Button type="submit" disabled={isEmailPending || isTransitionPending}>
+                    {isEmailPending || isTransitionPending ? 'Saving...' : 'Save Email'}
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
@@ -411,48 +416,50 @@ export default function ProfileForm() {
           <CardDescription>Update your username</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
-            className="space-y-4"
-            data-testid="form"
-          >
-            <TextField
-              control={changeUsernameForm.control}
-              name="username"
-              label="Username"
-              placeholder="johndoe"
-              disabled={!isEditingUsername}
-            />
-            {isEditingUsername && (
-              <>
-                <TextField
-                  control={changeUsernameForm.control}
-                  name="confirmUsername"
-                  label="Confirm Username"
-                  placeholder="johndoe"
-                />
-                <GenerateUsernameButton
-                  form={changeUsernameForm}
-                  fieldsToPopulate={['username', 'confirmUsername']}
-                />
-              </>
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleEditFieldButtonClick}
-                data-field="username"
-              >
-                {isEditingUsername ? 'Cancel' : 'Edit Username'}
-              </Button>
+          <Form {...changeUsernameForm}>
+            <form
+              onSubmit={changeUsernameForm.handleSubmit(onSubmitEditUsername)}
+              className="space-y-4"
+              data-testid="form"
+            >
+              <TextField
+                control={changeUsernameForm.control}
+                name="username"
+                label="Username"
+                placeholder="johndoe"
+                disabled={!isEditingUsername}
+              />
               {isEditingUsername && (
-                <Button type="submit" disabled={isUsernamePending || isTransitionPending}>
-                  {isUsernamePending || isTransitionPending ? 'Saving...' : 'Save Username'}
-                </Button>
+                <>
+                  <TextField
+                    control={changeUsernameForm.control}
+                    name="confirmUsername"
+                    label="Confirm Username"
+                    placeholder="johndoe"
+                  />
+                  <GenerateUsernameButton
+                    form={changeUsernameForm}
+                    fieldsToPopulate={['username', 'confirmUsername']}
+                  />
+                </>
               )}
-            </div>
-          </form>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEditFieldButtonClick}
+                  data-field="username"
+                >
+                  {isEditingUsername ? 'Cancel' : 'Edit Username'}
+                </Button>
+                {isEditingUsername && (
+                  <Button type="submit" disabled={isUsernamePending || isTransitionPending}>
+                    {isUsernamePending || isTransitionPending ? 'Saving...' : 'Save Username'}
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
