@@ -18,22 +18,27 @@ export const GenerateUsernameButton = <T extends FieldValues>({
   const [isConfirmUsernameCleared, setIsConfirmUsernameCleared] = useState(false);
 
   const handleGenerateUsername = async () => {
-    // Generate a random username
-    const newUsername = generateUsername('', 4);
+    try {
+      // Generate a random username
+      const newUsername = generateUsername('', 4);
 
-    // Update both username and confirmUsername fields
-    form.setValue(fieldsToPopulate[0], newUsername as never, {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+      // Update both username and confirmUsername fields
+      form.setValue(fieldsToPopulate[0], newUsername as T[Path<T>], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
 
-    form.setValue(fieldsToPopulate[1], newUsername as never, {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+      form.setValue(fieldsToPopulate[1], newUsername as T[Path<T>], {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
 
-    // Trigger validation to clear any errors
-    await form.trigger(fieldsToPopulate);
+      // Trigger validation to clear any errors
+      await form.trigger(fieldsToPopulate);
+    } catch (error) {
+      // Handle any errors that occur during username generation or validation
+      console.error('Error generating username:', error);
+    }
   };
 
   const usernameValue = form.getValues(fieldsToPopulate[0]);
@@ -42,7 +47,7 @@ export const GenerateUsernameButton = <T extends FieldValues>({
   useLayoutEffect(() => {
     // Clear out confirm username from last generation if usernames don't match
     if (!isConfirmUsernameCleared && usernameValue !== confirmUsernameValue) {
-      form.setValue(fieldsToPopulate[1], '', {
+      form.setValue(fieldsToPopulate[1], '' as T[Path<T>], {
         shouldValidate: false,
         shouldDirty: false,
       });

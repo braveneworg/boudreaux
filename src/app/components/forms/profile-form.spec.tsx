@@ -13,16 +13,26 @@ vi.mock('lucide-react', () => ({
   ),
 }));
 
-// Mock Sonner toast - using inline object creation to avoid hoisting issues
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warning: vi.fn(),
-  },
-  Toaster: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-}));
+// Mock Sonner toast - Create spies on the actual toast functions
+vi.mock('sonner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('sonner')>();
+
+  return {
+    ...actual,
+    toast: {
+      success: vi.fn(actual.toast.success),
+      error: vi.fn(actual.toast.error),
+      info: vi.fn(actual.toast.info),
+      warning: vi.fn(actual.toast.warning),
+      loading: vi.fn(actual.toast.loading),
+      promise: vi.fn(actual.toast.promise),
+      dismiss: vi.fn(actual.toast.dismiss),
+      message: vi.fn(actual.toast.message),
+      custom: vi.fn(actual.toast.custom),
+    },
+    Toaster: actual.Toaster,
+  };
+});
 
 // Mock all external dependencies to avoid complex setup
 vi.mock('@/app/lib/utils', () => ({
@@ -194,23 +204,62 @@ vi.mock('next-auth/react', () => ({
 
 type UseStateReturn<T> = [T, React.Dispatch<React.SetStateAction<T>>];
 
-// Create a mutable formState for testing
+// Create mutable formStates for testing
 let mockFormState = {
   errors: {},
   fields: {},
   success: false,
 };
 
-// Helper to update formState during tests
+let mockEmailFormState = {
+  errors: {},
+  fields: {},
+  success: false,
+};
+
+let mockUsernameFormState = {
+  errors: {},
+  fields: {},
+  success: false,
+};
+
+// Helper to update formStates during tests
 export const setMockFormState = (state: typeof mockFormState) => {
   mockFormState = state;
+};
+
+export const setMockEmailFormState = (state: typeof mockEmailFormState) => {
+  mockEmailFormState = state;
+};
+
+export const setMockUsernameFormState = (state: typeof mockUsernameFormState) => {
+  mockUsernameFormState = state;
+};
+
+// Track call count outside the mock to allow resetting
+let callCount = 0;
+export const resetCallCount = () => {
+  callCount = 0;
 };
 
 vi.mock('react', async (importOriginal) => {
   const actual = (await importOriginal()) as typeof React;
   return {
     ...actual,
-    useActionState: () => [mockFormState, vi.fn(), false],
+    useActionState: () => {
+      callCount++;
+      const currentCall = callCount;
+      // First call is for profile form
+      if (currentCall === 1) {
+        return [mockFormState, vi.fn(), false];
+      }
+      // Second call is for email form
+      if (currentCall === 2) {
+        return [mockEmailFormState, vi.fn(), false];
+      }
+      // Third call is for username form
+      return [mockUsernameFormState, vi.fn(), false];
+    },
     useTransition: () => [false, vi.fn()],
     useState: (initial: unknown) => {
       // Handle specific state variables that affect loading
@@ -262,8 +311,20 @@ describe('ProfileForm', () => {
   beforeEach(() => {
     // Reset mocks before each test
     vi.clearAllMocks();
-    // Reset formState to initial state
+    // Reset the call counter
+    resetCallCount();
+    // Reset formStates to initial state
     mockFormState = {
+      errors: {},
+      fields: {},
+      success: false,
+    };
+    mockEmailFormState = {
+      errors: {},
+      fields: {},
+      success: false,
+    };
+    mockUsernameFormState = {
       errors: {},
       fields: {},
       success: false,
@@ -300,8 +361,9 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify success toast was called
+      // Verify toast.success was called with the correct message
       expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+      expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
     it('displays error toast when profile update fails', () => {
@@ -316,8 +378,39 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify error toast was called
+      // Verify toast.error was called with the correct message
       expect(toast.error).toHaveBeenCalledWith('An error occurred while updating your profile.');
+      expect(toast.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('displays success toast when email is updated successfully', () => {
+      // Set email success state
+      mockEmailFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify toast.success was called with the correct message
+      expect(toast.success).toHaveBeenCalledWith('Your email has been updated successfully.');
+      expect(toast.success).toHaveBeenCalledTimes(1);
+    });
+
+    it('displays success toast when username is updated successfully', () => {
+      // Set username success state
+      mockUsernameFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify toast.success was called with the correct message
+      expect(toast.success).toHaveBeenCalledWith('Your username has been updated successfully.');
+      expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
     it('does not display toast on initial render with no errors or success', () => {
@@ -329,7 +422,7 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
-      // Verify no toasts were called
+      // Verify no toast functions were called
       expect(toast.success).not.toHaveBeenCalled();
       expect(toast.error).not.toHaveBeenCalled();
     });
@@ -346,7 +439,39 @@ describe('ProfileForm', () => {
 
       render(<ProfileForm />);
 
+      // Verify toast.error was called with the specific error message
       expect(toast.error).toHaveBeenCalledWith(errorMessage);
+      expect(toast.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call toast.success exactly once for profile update', () => {
+      mockFormState = {
+        errors: {},
+        fields: {},
+        success: true,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify toast.success was called exactly once (not multiple times due to re-renders)
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      expect(toast.success).toHaveBeenCalledWith('Your profile has been updated successfully.');
+    });
+
+    it('should call toast.error exactly once for profile update error', () => {
+      mockFormState = {
+        errors: {
+          general: ['Update failed'],
+        },
+        fields: {},
+        success: false,
+      };
+
+      render(<ProfileForm />);
+
+      // Verify toast.error was called exactly once
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith('Update failed');
     });
 
     it('should handle email form state changes', () => {
