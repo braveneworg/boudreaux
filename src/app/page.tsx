@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import AuthToolbar from './components/auth/auth-toolbar';
 import { getApiBaseUrl } from './lib/utils/database-utils';
 
@@ -13,6 +13,7 @@ export default function Home() {
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const failsafeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchHealthStatus = async (retryCount = 0): Promise<void> => {
     console.log(`[Health Check] Attempt ${retryCount + 1}/10 starting...`);
@@ -61,6 +62,11 @@ export default function Home() {
         console.log(`[Health Check] Setting healthStatus and isLoading=false`);
         setHealthStatus(data);
         setIsLoading(false);
+        // Clear the failsafe timeout on success
+        if (failsafeTimeoutRef.current) {
+          clearTimeout(failsafeTimeoutRef.current);
+          failsafeTimeoutRef.current = null;
+        }
         console.log(`[Health Check] State updated successfully`);
         return;
       } else {
@@ -91,6 +97,11 @@ export default function Home() {
           error: errorData.error,
         });
         setIsLoading(false);
+        // Clear the failsafe timeout on error
+        if (failsafeTimeoutRef.current) {
+          clearTimeout(failsafeTimeoutRef.current);
+          failsafeTimeoutRef.current = null;
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -141,6 +152,11 @@ export default function Home() {
             : errorMessage,
       });
       setIsLoading(false);
+      // Clear the failsafe timeout on error
+      if (failsafeTimeoutRef.current) {
+        clearTimeout(failsafeTimeoutRef.current);
+        failsafeTimeoutRef.current = null;
+      }
     }
   };
 
@@ -156,7 +172,7 @@ export default function Home() {
     fetchHealthStatus();
 
     // Failsafe: If still loading after 60 seconds, show error
-    const failsafeTimeout = setTimeout(() => {
+    failsafeTimeoutRef.current = setTimeout(() => {
       if (isMounted) {
         console.error('[Health Check] Failsafe triggered: Still loading after 60 seconds');
         setHealthStatus({
@@ -170,7 +186,10 @@ export default function Home() {
 
     return () => {
       isMounted = false;
-      clearTimeout(failsafeTimeout);
+      if (failsafeTimeoutRef.current) {
+        clearTimeout(failsafeTimeoutRef.current);
+        failsafeTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
