@@ -7,7 +7,6 @@ export function validateEnvironment() {
   const required = [
     'DATABASE_URL',
     'AUTH_SECRET',
-    'NEXTAUTH_SECRET',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
     'EMAIL_SERVER_HOST',
@@ -28,11 +27,6 @@ export function validateEnvironment() {
   // Validate AUTH_SECRET length
   if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
     throw new Error('AUTH_SECRET must be at least 32 characters for security');
-  }
-
-  // Validate NEXTAUTH_SECRET length
-  if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length < 32) {
-    throw new Error('NEXTAUTH_SECRET must be at least 32 characters for security');
   }
 
   // Validate DATABASE_URL format (basic check)

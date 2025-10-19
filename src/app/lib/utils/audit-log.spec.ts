@@ -113,8 +113,7 @@ describe('Audit Log', () => {
     });
 
     it('should use JSON.stringify in production mode', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       const consoleInfoSpy = vi.spyOn(console, 'info');
 
       logSecurityEvent({
@@ -128,7 +127,7 @@ describe('Audit Log', () => {
       expect(typeof logCall[1]).toBe('string');
       expect(() => JSON.parse(logCall[1] as string)).not.toThrow();
 
-      process.env.NODE_ENV = originalEnv;
+      vi.unstubAllEnvs();
     });
   });
 

@@ -104,6 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               image: true,
               email: true,
               emailVerified: true,
+              role: true,
               firstName: true,
               lastName: true,
               phone: true,
@@ -119,6 +120,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
           if (freshUser) {
+            // Security: Check if role has changed - force re-authentication if so
+            const oldRole = (token.user as { role?: string }).role;
+            if (oldRole && freshUser.role !== oldRole) {
+              // Clear token to force re-login when role changes
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('User role changed - re-authentication required', {
+                  userId: freshUser.id,
+                  oldRole,
+                  newRole: freshUser.role,
+                });
+              }
+              throw new Error('Role changed - re-authentication required');
+            }
+
             token.user = freshUser;
           }
         } catch (error) {

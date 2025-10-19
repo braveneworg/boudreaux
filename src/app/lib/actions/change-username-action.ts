@@ -9,8 +9,9 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import type { FormState } from '../types/form-state';
-import { AdapterUser } from 'next-auth/adapters';
+import type { AdapterUser } from 'next-auth/adapters';
 import { revalidatePath } from 'next/cache';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 
 export const changeUsernameAction = async (
   _initialState: FormState,
@@ -34,10 +35,22 @@ export const changeUsernameAction = async (
 
       const { id } = session.user;
       const { username } = parsed.data;
+      const previousUsername = session.user.username;
+
       await adapter.updateUser!({
         id,
         username,
       } as Pick<AdapterUser, 'username' | 'id'>);
+
+      // Log username change for security audit
+      await logSecurityEvent({
+        event: 'user.username.changed',
+        userId: id,
+        metadata: {
+          previousUsername,
+          newUsername: username,
+        },
+      });
 
       formState.success = true;
 

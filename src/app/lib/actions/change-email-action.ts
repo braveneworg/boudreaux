@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import type { FormState } from '../types/form-state';
 import { AdapterUser } from 'next-auth/adapters';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 
 export const changeEmailAction = async (
   _initialState: FormState,
@@ -45,6 +46,16 @@ export const changeEmailAction = async (
         email: parsed.data.email,
         previousEmail: previousEmail,
       } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
+
+      // Log email change for security audit
+      await logSecurityEvent({
+        event: 'user.email.changed',
+        userId: session.user.id,
+        metadata: {
+          previousEmail,
+          newEmail: parsed.data.email,
+        },
+      });
 
       formState.success = true;
     } catch (error: unknown) {

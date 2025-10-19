@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
 
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.AUTH_SECRET,
   });
   const isPublicRoute = publicRoutes.some((route) => route.test(pathname));
 
@@ -51,7 +51,19 @@ export async function middleware(request: NextRequest) {
     }
 
     if (token.role !== 'admin') {
-      return NextResponse.redirect(new URL('/signin', request.url));
+      // Log unauthorized access attempt (dynamic import for edge runtime compatibility)
+      // Note: In production, integrate with your logging service
+      console.warn('Unauthorized admin access attempt:', {
+        userId: token.sub,
+        attemptedPath: pathname,
+        userRole: token.role || 'none',
+        ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+        timestamp: new Date().toISOString(),
+      });
+
+      // Return 403 Forbidden instead of redirecting to signin
+      // This prevents revealing the existence of admin routes
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }
 

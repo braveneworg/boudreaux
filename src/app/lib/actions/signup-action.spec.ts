@@ -4,9 +4,36 @@ const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockGenerateUsername = vi.hoisted(() => vi.fn(() => 'test-user-1234'));
+const mockHeaders = vi.hoisted(() =>
+  vi.fn(() => ({
+    get: vi.fn(() => '127.0.0.1'),
+  }))
+);
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
+
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
+// Mock rate limiter
+vi.mock('@/app/lib/utils/rate-limit', () => ({
+  rateLimit: vi.fn(() => ({
+    check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
+  })),
+}));
+
+// Mock email security
+vi.mock('@/app/lib/utils/email-security', () => ({
+  validateEmailSecurity: vi.fn(() => ({ isValid: true })),
+}));
+
+// Mock audit logging
+vi.mock('@/app/lib/utils/audit-log', () => ({
+  logSecurityEvent: vi.fn(),
+}));
 
 // Mock dependencies
 vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({

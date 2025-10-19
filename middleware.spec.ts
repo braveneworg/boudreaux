@@ -4,6 +4,9 @@ import { getToken } from 'next-auth/jwt';
 import type { JWT } from 'next-auth/jwt';
 import { middleware } from './middleware';
 
+// Mock response type for testing
+type MockResponse = { type: string; url?: string; data?: unknown; init?: { status: number } };
+
 // Mock next-auth/jwt
 vi.mock('next-auth/jwt');
 const mockGetToken = getToken as MockedFunction<typeof getToken>;
@@ -51,7 +54,10 @@ describe('middleware', () => {
     return {
       nextUrl: mockUrl,
       url: mockUrl.toString(),
-    } as NextRequest;
+      headers: {
+        get: vi.fn().mockReturnValue(null),
+      },
+    } as unknown as NextRequest;
   };
 
   const createMockToken = (overrides: Partial<JWT> = {}): JWT =>
@@ -248,10 +254,12 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
-      const result = await middleware(request);
+      const result = (await middleware(request)) as unknown as MockResponse;
 
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/signin');
+      // Updated: Now returns 403 JSON instead of redirect
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
+      expect(result.init).toEqual({ status: 403 });
     });
   });
 
@@ -305,10 +313,12 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
-      const result = await middleware(request);
+      const result = (await middleware(request)) as unknown as MockResponse;
 
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/signin');
+      // Updated: Now returns 403 JSON instead of redirect
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
+      expect(result.init).toEqual({ status: 403 });
     });
 
     it('should handle token with null role property', async () => {
@@ -318,10 +328,12 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
-      const result = await middleware(request);
+      const result = (await middleware(request)) as unknown as MockResponse;
 
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/signin');
+      // Updated: Now returns 403 JSON instead of redirect
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
+      expect(result.init).toEqual({ status: 403 });
     });
   });
 

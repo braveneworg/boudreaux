@@ -37,8 +37,11 @@ export async function GET() {
       {
         status: 'unhealthy',
         database: 'connection failed',
-        error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
+        // Only include error details in development
+        ...(process.env.NODE_ENV === 'development' && {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }),
       },
       { status: 500 }
     );

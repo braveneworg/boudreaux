@@ -2,8 +2,6 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import type { Adapter } from 'next-auth/adapters';
 
-const prisma = new PrismaClient();
-
 export function CustomPrismaAdapter(p: PrismaClient): Adapter {
   const baseAdapter = PrismaAdapter(p);
 
@@ -96,6 +94,3 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
     },
   } as Adapter;
 }
-
-// Export the prisma instance
-export { prisma };

@@ -36,21 +36,23 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
 
       return NextResponse.json(
         {
+          available: true,
           success: true,
+          message: 'Username updated successfully',
           username,
         },
         { status: 200 }
       );
     } catch (error) {
       // Handle duplicate username error
-      // Note: While this reveals username existence, it's necessary for UX
-      // Consider adding rate limiting to prevent enumeration attacks
+      // Always return 200 with available flag to prevent enumeration
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return NextResponse.json(
           {
+            available: false,
             error: 'This username is not available. Please choose another.',
           },
-          { status: 409 }
+          { status: 200 }
         );
       }
 

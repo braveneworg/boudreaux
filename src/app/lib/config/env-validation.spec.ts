@@ -21,7 +21,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-google-client-id',
         GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -38,7 +37,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: undefined,
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -57,7 +55,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: undefined,
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -76,7 +73,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: undefined,
         AUTH_SECRET: undefined,
-        NEXTAUTH_SECRET: undefined,
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -86,7 +82,7 @@ describe('Environment Validation', () => {
       };
 
       expect(() => validateEnvironment()).toThrow(
-        'Missing required environment variables: DATABASE_URL, AUTH_SECRET, NEXTAUTH_SECRET'
+        'Missing required environment variables: DATABASE_URL, AUTH_SECRET'
       );
     });
 
@@ -95,7 +91,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'short',
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -106,25 +101,6 @@ describe('Environment Validation', () => {
 
       expect(() => validateEnvironment()).toThrow(
         'AUTH_SECRET must be at least 32 characters for security'
-      );
-    });
-
-    it('should throw error when NEXTAUTH_SECRET is too short', () => {
-      process.env = {
-        ...process.env,
-        DATABASE_URL: 'mongodb://localhost:27017/test',
-        AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'short',
-        GOOGLE_CLIENT_ID: 'test-id',
-        GOOGLE_CLIENT_SECRET: 'test-secret',
-        EMAIL_SERVER_HOST: 'smtp.example.com',
-        EMAIL_SERVER_USER: 'user@example.com',
-        EMAIL_SERVER_PASSWORD: 'password',
-        EMAIL_FROM: 'noreply@example.com',
-      };
-
-      expect(() => validateEnvironment()).toThrow(
-        'NEXTAUTH_SECRET must be at least 32 characters for security'
       );
     });
 
@@ -169,7 +145,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'postgresql://localhost:5432/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -197,7 +172,6 @@ describe('Environment Validation', () => {
           ...process.env,
           DATABASE_URL: url,
           AUTH_SECRET: 'a'.repeat(32),
-          NEXTAUTH_SECRET: 'b'.repeat(32),
           GOOGLE_CLIENT_ID: 'test-id',
           GOOGLE_CLIENT_SECRET: 'test-secret',
           EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -215,7 +189,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -235,7 +208,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -258,7 +230,6 @@ describe('Environment Validation', () => {
           ...process.env,
           DATABASE_URL: 'mongodb://localhost:27017/test',
           AUTH_SECRET: 'a'.repeat(32),
-          NEXTAUTH_SECRET: 'b'.repeat(32),
           GOOGLE_CLIENT_ID: 'test-id',
           GOOGLE_CLIENT_SECRET: 'test-secret',
           EMAIL_SERVER_HOST: 'smtp.example.com',
@@ -279,7 +250,6 @@ describe('Environment Validation', () => {
         ...process.env,
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
-        NEXTAUTH_SECRET: 'b'.repeat(32),
         GOOGLE_CLIENT_ID: 'test-id',
         GOOGLE_CLIENT_SECRET: 'test-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',

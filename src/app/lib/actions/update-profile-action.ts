@@ -7,6 +7,7 @@ import profileSchema from '@/app/lib/validation/profile-schema';
 import type { FormState } from '../types/form-state';
 import { prisma } from '../prisma';
 import { revalidatePath } from 'next/cache';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 
 export const updateProfileAction = async (
   _initialState: FormState,
@@ -71,6 +72,17 @@ export const updateProfileAction = async (
           zipCode,
           country,
           allowSmsNotifications,
+        },
+      });
+
+      // Log profile update for security audit
+      await logSecurityEvent({
+        event: 'user.profile.updated',
+        userId: session.user.id,
+        metadata: {
+          updatedFields: Object.keys(parsed.data).filter(
+            (key) => parsed.data[key as keyof typeof parsed.data] !== undefined
+          ),
         },
       });
 

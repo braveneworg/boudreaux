@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 
 interface HealthCheckResult {
   healthy: boolean;
@@ -18,7 +19,10 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
 
   try {
     // Simple query to check connection
-    await prisma.$queryRaw`SELECT 1`;
+    // Type assertion needed because PrismaClient type doesn't include $queryRaw in some configurations
+    await (prisma as unknown as { $queryRaw: (sql: Prisma.Sql) => Promise<unknown> }).$queryRaw(
+      Prisma.sql`SELECT 1`
+    );
 
     const latency = Date.now() - start;
 

@@ -8,28 +8,32 @@ generator client {
 }
 
 model User {
-  id            String          @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String?         @unique
-  emailVerified DateTime?
-  previousEmail String?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  name               String?
+  email              String?   @unique
+  emailVerified      DateTime?
+  previousEmail      String?
+  image              String?
+  accounts           Account[]
+  sessions           Session[]
   termsAndConditions Boolean   @default(false)
-  username     String?         @unique
-  role         String?
+  username           String?   @unique
+  role               String?
+
+  // Security fields for account lockout
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   // Profile fields
-  firstName     String?
-  lastName      String?
-  phone         String?
-  addressLine1  String?
-  addressLine2  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String?
+  firstName             String?
+  lastName              String?
+  phone                 String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String?
   allowSmsNotifications Boolean? @default(false)
 
   // Optional for WebAuthn support
@@ -37,6 +41,10 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Indexes for performance
+  @@index([failedLoginAttempts])
+  @@index([lockedUntil])
 }
 
 model Account {

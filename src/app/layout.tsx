@@ -4,6 +4,14 @@ import { SessionProvider } from 'next-auth/react';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
+// Server-side environment validation on startup
+if (typeof window === 'undefined') {
+  // Dynamic import to avoid bundling in client
+  import('@/app/lib/config/env-validation').then(({ validateEnvironment }) => {
+    validateEnvironment();
+  });
+}
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
