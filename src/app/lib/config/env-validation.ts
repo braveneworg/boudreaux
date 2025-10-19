@@ -7,8 +7,8 @@ export function validateEnvironment() {
   const required = [
     'DATABASE_URL',
     'AUTH_SECRET',
-    'GOOGLE_CLIENT_ID',
-    'GOOGLE_CLIENT_SECRET',
+    // 'GOOGLE_CLIENT_ID',
+    // 'GOOGLE_CLIENT_SECRET',
     'EMAIL_SERVER_HOST',
     'EMAIL_SERVER_USER',
     'EMAIL_SERVER_PASSWORD',

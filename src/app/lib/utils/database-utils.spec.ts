@@ -5,13 +5,13 @@ import { prisma } from '../prisma';
 // Mock the prisma client
 vi.mock('../prisma', () => ({
   prisma: {
-    $queryRaw: vi.fn(),
+    $runCommandRaw: vi.fn(),
   },
 }));
 
 // Create a typed mock
 const mockedPrisma = prisma as unknown as {
-  $queryRaw: ReturnType<typeof vi.fn>;
+  $runCommandRaw: ReturnType<typeof vi.fn>;
 };
 
 describe('Database Utils', () => {
@@ -21,7 +21,7 @@ describe('Database Utils', () => {
 
   describe('checkDatabaseHealth', () => {
     it('should return healthy status when database connection succeeds', async () => {
-      mockedPrisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+      mockedPrisma.$runCommandRaw.mockResolvedValue({ ok: 1 });
 
       const result = await checkDatabaseHealth();
 
@@ -33,10 +33,10 @@ describe('Database Utils', () => {
     });
 
     it('should measure latency correctly', async () => {
-      mockedPrisma.$queryRaw.mockImplementation(
+      mockedPrisma.$runCommandRaw.mockImplementation(
         () =>
           new Promise((resolve) => {
-            setTimeout(() => resolve([{ '?column?': 1 }]), 100);
+            setTimeout(() => resolve({ ok: 1 }), 100);
           })
       );
 
@@ -48,7 +48,7 @@ describe('Database Utils', () => {
 
     it('should return unhealthy status when database connection fails', async () => {
       const errorMessage = 'Connection timeout';
-      mockedPrisma.$queryRaw.mockRejectedValue(new Error(errorMessage));
+      mockedPrisma.$runCommandRaw.mockRejectedValue(new Error(errorMessage));
 
       const result = await checkDatabaseHealth();
 
@@ -58,7 +58,7 @@ describe('Database Utils', () => {
     });
 
     it('should handle non-Error objects in catch block', async () => {
-      mockedPrisma.$queryRaw.mockRejectedValue('String error');
+      mockedPrisma.$runCommandRaw.mockRejectedValue('String error');
 
       const result = await checkDatabaseHealth();
 
@@ -66,12 +66,13 @@ describe('Database Utils', () => {
       expect(result.error).toBe('Unknown database error');
     });
 
-    it('should execute raw SQL query', async () => {
-      mockedPrisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    it('should execute MongoDB ping command', async () => {
+      mockedPrisma.$runCommandRaw.mockResolvedValue({ ok: 1 });
 
       await checkDatabaseHealth();
 
-      expect(mockedPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(mockedPrisma.$runCommandRaw).toHaveBeenCalledTimes(1);
+      expect(mockedPrisma.$runCommandRaw).toHaveBeenCalledWith({ ping: 1 });
     });
   });
 

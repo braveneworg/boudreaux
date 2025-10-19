@@ -162,5 +162,33 @@ describe('Health Check API', () => {
 
       expect(data.latency).toBe(testLatency);
     });
+
+    it('should include no-cache headers in response', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({
+        healthy: true,
+        latency: 25,
+      });
+
+      const response = await GET();
+
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      expect(response.headers.get('Cache-Control')).toContain('no-cache');
+      expect(response.headers.get('Pragma')).toBe('no-cache');
+      expect(response.headers.get('Expires')).toBe('0');
+    });
+
+    it('should include no-cache headers in error response', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({
+        healthy: false,
+        error: 'Connection failed',
+      });
+
+      const response = await GET();
+
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      expect(response.headers.get('Cache-Control')).toContain('no-cache');
+      expect(response.headers.get('Pragma')).toBe('no-cache');
+      expect(response.headers.get('Expires')).toBe('0');
+    });
   });
 });

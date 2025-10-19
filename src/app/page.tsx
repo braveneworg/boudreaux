@@ -11,35 +11,115 @@ export default function Home() {
     latency?: number;
     error?: string;
   } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchHealthStatus = async () => {
+  const fetchHealthStatus = async (retryCount = 0): Promise<void> => {
+    console.log(`[Health Check] Attempt ${retryCount + 1}/6 starting...`);
+    console.log(
+      `[Health Check] Current URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`
+    );
+
     try {
-      const response = await fetch('/api/health');
+      const response = await fetch('/api/health', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+
+      console.log(`[Health Check] Response received:`, {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+      });
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`[Health Check] Success! Data:`, data);
         setHealthStatus(data);
+        setIsLoading(false);
+        return;
       } else {
-        const errorData = await response.json();
+        // Try to parse error response
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { database: 'Failed to parse response', status: 'error' };
+        }
+
+        // Retry on 500 errors (server issues) but not on 404 or other client errors
+        if (response.status >= 500 && retryCount < 5) {
+          const delay = Math.pow(2, retryCount) * 500;
+          console.log(`Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
+          setTimeout(() => {
+            fetchHealthStatus(retryCount + 1);
+          }, delay);
+          return;
+        }
+
         setHealthStatus({
           status: 'error',
           database: errorData.database || 'Failed to fetch health status',
           error: errorData.error,
         });
+        setIsLoading(false);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+
+      console.error('[Health Check] Fetch error:', {
+        name: errorName,
+        message: errorMessage,
+        error,
+        retryCount,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+        isAbortError: errorName === 'AbortError',
+        isNetworkError: errorMessage.includes('fetch') || errorMessage.includes('network'),
+      });
+
+      // Retry up to 5 times with exponential backoff (useful during dev when routes are compiling)
+      if (retryCount < 5) {
+        const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s, 4s, 8s
+        console.log(
+          `Retrying health check in ${delay}ms... (attempt ${retryCount + 1}/5) - Error: ${errorMessage}`
+        );
+        setTimeout(() => {
+          fetchHealthStatus(retryCount + 1);
+        }, delay);
+        return; // Keep loading state while retrying
+      }
+
+      // Only set error state after all retries exhausted
+      console.error('All retry attempts exhausted. Showing error to user.');
       setHealthStatus({
         status: 'error',
         database: 'Failed to fetch health status',
-        error: (error as Error).message,
+        error:
+          errorMessage.includes('SSL') || errorMessage.includes('ERR_')
+            ? 'Connection error - Please check your network or try using http://localhost:3000'
+            : errorMessage,
       });
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    (async () => {
-      await fetchHealthStatus();
-    })();
+    // Reset state on mount/refresh
+    setIsLoading(true);
+    setHealthStatus(null);
+
+    // Longer delay to ensure route is fully compiled
+    // In development, Turbopack compiles routes on-demand
+    const timer = setTimeout(() => {
+      fetchHealthStatus();
+    }, 1000); // Increased from 300ms to 1000ms
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -48,14 +128,28 @@ export default function Home() {
         <div className="flex flex-col justify-center items-center sm:items-center">
           <h1>
             DB health status:&nbsp;{' '}
-            {healthStatus?.status === 'healthy' || healthStatus?.status === 'ok' ? '✅' : '❌'}
+            {isLoading
+              ? '⏳'
+              : healthStatus?.status === 'healthy'
+                ? '✅'
+                : healthStatus?.status === 'error' || healthStatus?.status === 'unhealthy'
+                  ? '❌'
+                  : '⏳'}
           </h1>
           <p className="border-b-2">
-            {healthStatus?.database}
-            {healthStatus?.latency && ` (${healthStatus.latency}ms)`}
-            {healthStatus?.error && process.env.NODE_ENV === 'development'
-              ? ` - ${healthStatus.error}`
-              : ''}
+            {isLoading ? (
+              'Checking database connection...'
+            ) : healthStatus ? (
+              <>
+                {healthStatus.database}
+                {healthStatus.latency && ` (${healthStatus.latency}ms)`}
+                {healthStatus.error && process.env.NODE_ENV === 'development'
+                  ? ` - ${healthStatus.error}`
+                  : ''}
+              </>
+            ) : (
+              'Initializing...'
+            )}
           </p>
         </div>
         <AuthToolbar />

@@ -3,7 +3,6 @@
  */
 
 import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
 
 interface HealthCheckResult {
   healthy: boolean;
@@ -18,11 +17,9 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
   const start = Date.now();
 
   try {
-    // Simple query to check connection
-    // Type assertion needed because PrismaClient type doesn't include $queryRaw in some configurations
-    await (prisma as unknown as { $queryRaw: (sql: Prisma.Sql) => Promise<unknown> }).$queryRaw(
-      Prisma.sql`SELECT 1`
-    );
+    // For MongoDB, we use $runCommandRaw to check connection
+    // This is the MongoDB-compatible way to verify the database is accessible
+    await prisma.$runCommandRaw({ ping: 1 });
 
     const latency = Date.now() - start;
 
