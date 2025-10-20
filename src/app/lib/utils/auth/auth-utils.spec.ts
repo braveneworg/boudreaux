@@ -1,4 +1,5 @@
 import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from './auth-utils';
+
 import type { FormState } from '../../types/form-state';
 
 describe('auth-utils', () => {

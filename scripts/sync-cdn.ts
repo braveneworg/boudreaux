@@ -5,6 +5,10 @@
  * This script syncs static assets to S3 and invalidates CloudFront using AWS SDK
  */
 
+import { execSync, spawn } from 'child_process';
+import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
+import { join } from 'path';
+
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import {
   S3Client,
@@ -13,11 +17,8 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
-import { execSync, spawn } from 'child_process';
-import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
-import { join } from 'path';
-import * as mime from 'mime';
 import dotenv from 'dotenv';
+import * as mime from 'mime';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -101,7 +102,7 @@ class CDNSync {
       error: colors.red,
     };
 
-    console.log(`${colorMap[type]}[CDN-SYNC]${colors.reset} ${message}`);
+    console.info(`${colorMap[type]}[CDN-SYNC]${colors.reset} ${message}`);
   }
 
   private async execCommand(command: string, options: { quiet?: boolean } = {}): Promise<string> {
@@ -576,16 +577,16 @@ const publicMediaDir = join(process.cwd(), 'public', 'media');
 
 if (!existsSync(publicMediaDir)) {
   execSync(`mkdir -p ${publicMediaDir}`);
-  console.log(`${colors.green}[CDN-SYNC]${colors.reset} Created directory: ${publicMediaDir}`);
+  console.info(`${colors.green}[CDN-SYNC]${colors.reset} Created directory: ${publicMediaDir}`);
 }
 
 if (existsSync(cdnMediaDir)) {
   execSync(`cp -r ${cdnMediaDir}/* ${publicMediaDir}/`);
-  console.log(
+  console.info(
     `${colors.green}[CDN-SYNC]${colors.reset} Copied media files from ${cdnMediaDir} to ${publicMediaDir}`
   );
 } else {
-  console.log(
+  console.info(
     `${colors.yellow}[CDN-SYNC]${colors.reset} No media files found at ${cdnMediaDir}, skipping copy`
   );
 }

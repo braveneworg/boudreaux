@@ -1,5 +1,6 @@
-import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 import { z } from 'zod';
+
+import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 
 const termsAndConditionsMessage = 'You must accept the terms and conditions';
 

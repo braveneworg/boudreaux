@@ -1,5 +1,6 @@
-import { UserIcon } from 'lucide-react';
 import Link from 'next/link';
+
+import { UserIcon } from 'lucide-react';
 
 const EditProfileButton = () => {
   return (

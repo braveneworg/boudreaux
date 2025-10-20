@@ -1,5 +1,6 @@
-import { FieldValues, UseFormReturn } from 'react-hook-form';
 import { Button } from '../ui/button';
+
+import type { FieldValues, UseFormReturn } from 'react-hook-form';
 
 interface ChangeFieldFormProps<T extends FieldValues> {
   id: string;

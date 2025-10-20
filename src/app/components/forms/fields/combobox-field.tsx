@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
+
+import { Check, ChevronsUpDown } from 'lucide-react';
+
 import { Button } from '@/app/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -13,7 +13,10 @@ import {
   CommandItem,
   CommandList,
 } from '@/app/components/ui/command';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
+import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+
+import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 
 interface ComboboxOption {
   value: string;

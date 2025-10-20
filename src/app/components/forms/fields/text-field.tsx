@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
+
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
+
+import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 
 interface TextFieldProps<
   TFieldValues extends FieldValues = FieldValues,

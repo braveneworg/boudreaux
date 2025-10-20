@@ -1,8 +1,10 @@
 import React from 'react';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import { useTurnstile } from 'react-turnstile';
+
+import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 
 // Mock react-turnstile
 vi.mock('react-turnstile', () => ({

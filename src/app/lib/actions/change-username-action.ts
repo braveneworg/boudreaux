@@ -1,17 +1,21 @@
 'use server';
 
 import 'server-only';
-import { auth } from '../../../../auth';
+import { revalidatePath } from 'next/cache';
+
+import { Prisma } from '@prisma/client';
+
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import getActionState from '@/app/lib/utils/auth/get-action-state';
 import changeUsernameSchema from '@/app/lib/validation/change-username-schema';
+
+import { auth } from '../../../../auth';
 import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
-import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+
 import type { FormState } from '../types/form-state';
 import type { AdapterUser } from 'next-auth/adapters';
-import { revalidatePath } from 'next/cache';
-import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 
 export const changeUsernameAction = async (
   _initialState: FormState,

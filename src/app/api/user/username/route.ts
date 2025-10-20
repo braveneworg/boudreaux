@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
+import { Prisma } from '@prisma/client';
+
 import { withAuth } from '@/app/lib/decorators/with-auth';
 import { prisma } from '@/app/lib/prisma';
 import changeUsernameSchema from '@/app/lib/validation/change-username-schema';
-import { Prisma } from '@prisma/client';
 
 export const POST = withAuth(async (request: NextRequest, _context, session) => {
   try {

@@ -1,19 +1,23 @@
 'use server';
 
-import getActionState from '@/app/lib/utils/auth/get-action-state';
-import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
-import signupSchema from '@/app/lib/validation/signup-schema';
-import { redirect } from 'next/navigation';
-import { generateUsername } from 'unique-username-generator';
-import { signIn } from '../../../../auth';
-import type { FormState } from '../types/form-state';
-import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
-import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
-import { rateLimit } from '@/app/lib/utils/rate-limit';
-import { validateEmailSecurity } from '@/app/lib/utils/email-security';
-import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+
+import { Prisma } from '@prisma/client';
+import { generateUsername } from 'unique-username-generator';
+
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
+import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
+import getActionState from '@/app/lib/utils/auth/get-action-state';
+import { validateEmailSecurity } from '@/app/lib/utils/email-security';
+import { rateLimit } from '@/app/lib/utils/rate-limit';
+import signupSchema from '@/app/lib/validation/signup-schema';
+
+import { signIn } from '../../../../auth';
+import { prisma } from '../prisma';
+
+import type { FormState } from '../types/form-state';
 
 // Rate limiter: 5 signup attempts per minute per IP
 const limiter = rateLimit({

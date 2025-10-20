@@ -1,16 +1,18 @@
 import React from 'react';
-import FormInput from '@/app/components/ui/form-input';
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
-import StatusIndicator from '@/app/components/ui/status-indicator';
-import type { FormState } from '@/app/lib/types/form-state';
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+
 import Link from 'next/link';
-import type { Control } from 'react-hook-form';
+import { usePathname } from 'next/navigation';
 
 import { Button } from '@/app/components/ui/button';
-import { Switch } from '@/app/components/ui/switch';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import { usePathname } from 'next/navigation';
+import FormInput from '@/app/components/ui/form-input';
+import StatusIndicator from '@/app/components/ui/status-indicator';
+import { Switch } from '@/app/components/ui/switch';
+import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import type { FormState } from '@/app/lib/types/form-state';
+import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+
+import type { Control } from 'react-hook-form';
 
 // Common type for both signin and signup schemas
 type BaseFormSchema = {

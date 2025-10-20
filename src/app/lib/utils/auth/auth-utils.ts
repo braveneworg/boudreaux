@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { FormState } from '../../types/form-state';
+
+import type { FormState } from '../../types/form-state';
 
 interface ResponseError {
   errors: {

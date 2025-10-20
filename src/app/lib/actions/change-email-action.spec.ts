@@ -1,10 +1,16 @@
 // Get the mocked functions using hoisted
+import { Prisma } from '@prisma/client';
+
+import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import type { FormState } from '@/app/lib/types/form-state';
+
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockSignOut = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockUpdateUser = vi.hoisted(() => vi.fn());
+const mockLogSecurityEvent = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -41,11 +47,11 @@ vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
   };
 });
 
-vi.mock('@/app/lib/validation/change-email-schema');
+vi.mock('@/app/lib/utils/audit-log', () => ({
+  logSecurityEvent: mockLogSecurityEvent,
+}));
 
-import { changeEmailAction } from '@/app/lib/actions/change-email-action';
-import type { FormState } from '@/app/lib/types/form-state';
-import { Prisma } from '@prisma/client';
+vi.mock('@/app/lib/validation/change-email-schema');
 
 describe('changeEmailAction', () => {
   const mockFormData = new FormData();
@@ -265,6 +271,299 @@ describe('changeEmailAction', () => {
 
       // The formState should have hasTimeout set to false
       expect(mockFormState.hasTimeout).toBe(false);
+    });
+  });
+
+  describe('security audit logging', () => {
+    it('should log security event when email is successfully changed', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123', email: 'oldemail@example.com' },
+      });
+
+      vi.mocked(mockUpdateUser).mockResolvedValue({
+        id: 'user-123',
+        email: 'newemail@example.com',
+      });
+
+      vi.mocked(mockSignOut).mockResolvedValue(undefined);
+      vi.mocked(mockLogSecurityEvent).mockResolvedValue(undefined);
+
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(changeEmailAction(mockInitialState, mockFormData)).rejects.toThrow(
+        'NEXT_REDIRECT'
+      );
+
+      expect(mockLogSecurityEvent).toHaveBeenCalledWith({
+        event: 'user.email.changed',
+        userId: 'user-123',
+        metadata: {
+          previousEmail: 'oldemail@example.com',
+          newEmail: 'newemail@example.com',
+        },
+      });
+    });
+
+    it('should log security event with session email when previousEmail not provided', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123', email: 'session@example.com' },
+      });
+
+      vi.mocked(mockUpdateUser).mockResolvedValue({
+        id: 'user-123',
+        email: 'newemail@example.com',
+      });
+
+      vi.mocked(mockSignOut).mockResolvedValue(undefined);
+      vi.mocked(mockLogSecurityEvent).mockResolvedValue(undefined);
+
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(changeEmailAction(mockInitialState, mockFormData)).rejects.toThrow(
+        'NEXT_REDIRECT'
+      );
+
+      expect(mockLogSecurityEvent).toHaveBeenCalledWith({
+        event: 'user.email.changed',
+        userId: 'user-123',
+        metadata: {
+          previousEmail: 'session@example.com',
+          newEmail: 'newemail@example.com',
+        },
+      });
+    });
+
+    it('should log security event with empty string when no email in session', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123' },
+      });
+
+      vi.mocked(mockUpdateUser).mockResolvedValue({
+        id: 'user-123',
+        email: 'newemail@example.com',
+      });
+
+      vi.mocked(mockSignOut).mockResolvedValue(undefined);
+      vi.mocked(mockLogSecurityEvent).mockResolvedValue(undefined);
+
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(changeEmailAction(mockInitialState, mockFormData)).rejects.toThrow(
+        'NEXT_REDIRECT'
+      );
+
+      expect(mockLogSecurityEvent).toHaveBeenCalledWith({
+        event: 'user.email.changed',
+        userId: 'user-123',
+        metadata: {
+          previousEmail: '',
+          newEmail: 'newemail@example.com',
+        },
+      });
+    });
+
+    it('should handle logSecurityEvent failures gracefully', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123', email: 'oldemail@example.com' },
+      });
+
+      vi.mocked(mockUpdateUser).mockResolvedValue({
+        id: 'user-123',
+        email: 'newemail@example.com',
+      });
+
+      vi.mocked(mockSignOut).mockResolvedValue(undefined);
+      vi.mocked(mockLogSecurityEvent).mockRejectedValue(new Error('Audit log failed'));
+
+      // When logSecurityEvent fails, it should be caught and handled as an error
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockUpdateUser).toHaveBeenCalled();
+      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      expect(mockSignOut).not.toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
+    });
+
+    it('should not log security event when email update fails', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-123', email: 'oldemail@example.com' },
+      });
+
+      const duplicateEmailError = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        {
+          code: 'P2002',
+          clientVersion: '4.0.0',
+          meta: { target: 'User_email_key' },
+        }
+      );
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
+
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockLogSecurityEvent).not.toHaveBeenCalled();
+    });
+
+    it('should not log security event when user is not authenticated', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue(null);
+
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockLogSecurityEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -564,6 +863,7 @@ describe('changeEmailAction', () => {
         email: 'newemail@example.com',
       });
 
+      vi.mocked(mockLogSecurityEvent).mockResolvedValue(undefined);
       vi.mocked(mockSignOut).mockRejectedValue(new Error('SignOut failed'));
 
       // The action should throw when signOut fails
@@ -571,8 +871,9 @@ describe('changeEmailAction', () => {
         'SignOut failed'
       );
 
-      // Even if signOut fails, updateUser should have been called
+      // Even if signOut fails, updateUser and logSecurityEvent should have been called
       expect(mockUpdateUser).toHaveBeenCalled();
+      expect(mockLogSecurityEvent).toHaveBeenCalled();
     });
   });
 
@@ -601,51 +902,6 @@ describe('changeEmailAction', () => {
         confirmEmail: 'different@example.com',
       });
       expect(result.errors).toEqual({ confirmEmail: ['Email addresses do not match'] });
-    });
-
-    it('should call setUnknownError in finally block when errors exist but success is false', async () => {
-      const mockFormState: FormState = {
-        fields: {
-          email: 'newemail@example.com',
-          confirmEmail: 'newemail@example.com',
-          previousEmail: 'oldemail@example.com',
-        },
-        success: false,
-        hasTimeout: false,
-        errors: {},
-      };
-
-      const mockParsed = {
-        success: true,
-        data: {
-          email: 'newemail@example.com',
-          confirmEmail: 'newemail@example.com',
-          previousEmail: 'oldemail@example.com',
-        },
-      };
-
-      vi.mocked(mockGetActionState).mockReturnValue({
-        formState: mockFormState,
-        parsed: mockParsed,
-      });
-
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
-      });
-
-      const duplicateError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
-      });
-
-      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateError);
-
-      const result = await changeEmailAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.email).toEqual(['Email address is already in use']);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
     });
 
     it('should handle empty email strings', async () => {

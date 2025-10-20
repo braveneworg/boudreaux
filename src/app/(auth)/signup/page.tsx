@@ -1,25 +1,28 @@
 'use client';
 
+import { useActionState, useState, useCallback } from 'react';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, FormProvider } from 'react-hook-form';
+
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
+import { signinAction } from '@/app/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
-import signupSchema, {
-  type FormSchemaType as SignupSchemaType,
-} from '@/lib/validation/signup-schema';
 import signinSchema, {
   type FormSchemaType as SigninSchemaType,
 } from '@/lib/validation/signin-schema';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useActionState, useRef, useState } from 'react';
-import { useForm, FormProvider, Control } from 'react-hook-form';
-import { signinAction } from '@/app/lib/actions/signin-action';
+import signupSchema, {
+  type FormSchemaType as SignupSchemaType,
+} from '@/lib/validation/signup-schema';
+
+import type { Control } from 'react-hook-form';
 
 const SignupPage = () => {
   type SigninOrSignupSchema<T> = T extends { termsAndConditions: true }
     ? SignupSchemaType
     : SigninSchemaType;
   const path = globalThis.window?.location?.pathname;
-  const formReference = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<FormState, FormData>(signupAction, {
     errors: {},
     fields: {},
@@ -38,32 +41,37 @@ const SignupPage = () => {
     resolver: zodResolver(isSignupPath ? signupSchema : signinSchema),
   });
 
-  const handleSubmit = async () => {
-    if (isVerified) {
-      const formData = new FormData(formReference.current!);
-      const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
+  const handleSubmit = useCallback(
+    async (data: SigninOrSignupSchema<FormState>) => {
+      if (isVerified) {
+        // Create FormData from the validated form data instead of reading from ref
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+          }
+        });
 
-      if (!result.success) {
-        // Update the form state with the new state returned from the action
-        form.reset(undefined, { keepValues: true });
+        const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
 
-        if (result.errors?.email) {
-          form.setError('email', { message: result.errors.email[0] });
+        if (!result.success) {
+          // Update the form state with the new state returned from the action
+          form.reset(undefined, { keepValues: true });
+
+          if (result.errors?.email) {
+            form.setError('email', { message: result.errors.email.join(', ') });
+          }
         }
+      } else {
+        form.setError('general', { message: 'Please refresh the app and try again.' });
       }
-    } else {
-      form.setError('general', { message: 'Please refresh the app and try again.' });
-    }
-  };
+    },
+    [isVerified, isSignupPath, state, form]
+  );
 
   return (
     <FormProvider {...form}>
-      <form
-        action={formAction}
-        noValidate
-        onSubmit={form.handleSubmit(handleSubmit)}
-        ref={formReference}
-      >
+      <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)}>
         <SignupSigninForm
           control={
             form.control as Control<{

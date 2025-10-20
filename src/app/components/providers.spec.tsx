@@ -1,8 +1,9 @@
 'use client';
 
 import { render, screen } from '@testing-library/react';
-import { Providers } from './providers';
 import { useSession } from 'next-auth/react';
+
+import { Providers } from './providers';
 
 vi.mock('next-auth/react', () => ({
   SessionProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
