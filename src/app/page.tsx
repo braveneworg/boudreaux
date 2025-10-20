@@ -14,12 +14,13 @@ export default function Home(): JSX.Element {
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const failsafeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  const MAX_RETRY_ATTEMPTS = 10;
   const fetchHealthStatus = async (retryCount = 0): Promise<void> => {
-    console.info(`[Health Check] Attempt ${retryCount + 1}/10 starting...`);
+    console.info(`[Health Check] Attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS} starting...`);
     console.info(
       `[Health Check] Current URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`
     );
+
     console.info(
       `[Health Check] Protocol: ${typeof window !== 'undefined' ? window.location.protocol : 'N/A'}`
     );
