@@ -85,7 +85,9 @@ export default function Home(): JSX.Element {
             retryCount < 3
               ? 500 // First 3 attempts: 500ms each
               : Math.pow(2, retryCount - 3) * 1000; // Later attempts: exponential backoff
-          console.info(`Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/10)`);
+          console.info(
+            `Server error, retrying in ${delay}ms... (attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`
+          );
           setTimeout(() => {
             void fetchHealthStatus(retryCount + 1);
           }, delay);
