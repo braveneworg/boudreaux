@@ -1,10 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Control, UseFormSetValue } from 'react-hook-form';
-import ComboboxField from './combobox-field';
+
 import { COUNTRIES } from '@/app/lib/utils/countries';
-import { ProfileFormData } from '@/app/lib/validation/profile-schema';
+import type { ProfileFormData } from '@/app/lib/validation/profile-schema';
+
+import ComboboxField from './combobox-field';
+
+import type { Control, UseFormSetValue } from 'react-hook-form';
 
 interface CountryFieldProps {
   control: Control<ProfileFormData>;

@@ -1,4 +1,9 @@
 // Get the mocked functions using hoisted
+import { Prisma } from '@prisma/client';
+
+import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import type { FormState } from '@/app/lib/types/form-state';
+
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockSignOut = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
@@ -47,10 +52,6 @@ vi.mock('@/app/lib/utils/audit-log', () => ({
 }));
 
 vi.mock('@/app/lib/validation/change-email-schema');
-
-import { changeEmailAction } from '@/app/lib/actions/change-email-action';
-import type { FormState } from '@/app/lib/types/form-state';
-import { Prisma } from '@prisma/client';
 
 describe('changeEmailAction', () => {
   const mockFormData = new FormData();

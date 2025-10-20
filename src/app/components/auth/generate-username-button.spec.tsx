@@ -1,9 +1,24 @@
+import React from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
+
+import { createMockedForm } from '@/app/lib/types/test-utils';
+
 import { GenerateUsernameButton } from './generate-username-button';
+
 import type { UseFormReturn } from 'react-hook-form';
+
+// Type-safe setValue options for testing
+const DEFAULT_SET_VALUE_OPTIONS = {
+  shouldValidate: true,
+  shouldDirty: true,
+} as const;
+
+const CLEAR_OPTIONS = {
+  shouldValidate: false,
+  shouldDirty: false,
+} as const;
 
 // Mock unique-username-generator
 const mockGenerateUsername = vi.fn();
@@ -61,19 +76,15 @@ describe('GenerateUsernameButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Create a mock form object
-    mockForm = {
+    // Create a type-safe mock form object using our utility type
+    mockForm = createMockedForm<MockFormData>({
       setValue: vi.fn(),
-      getValues: vi.fn((field?: string | string[]) => {
-        if (field === 'username') return 'existing-username';
-        if (field === 'confirmUsername') return 'existing-username';
-        if (Array.isArray(field)) return ['existing-username', 'existing-username'];
-        if (!field) return { username: 'existing-username', confirmUsername: 'existing-username' };
-        return '';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any,
-      trigger: vi.fn().mockResolvedValue(true),
-    } as unknown as UseFormReturn<MockFormData>;
+      getValues: vi.fn(() => ({
+        username: 'existing-username',
+        confirmUsername: 'existing-username',
+      })),
+      trigger: vi.fn<[], Promise<boolean>>().mockResolvedValue(true),
+    });
 
     // Set default mock return value
     mockGenerateUsername.mockReturnValue('generated-username-1234');
@@ -233,12 +244,9 @@ describe('GenerateUsernameButton', () => {
 
       await waitFor(() => {
         expect(mockForm.setValue).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.any(String),
-          expect.objectContaining({
-            shouldValidate: true,
-            shouldDirty: true,
-          })
+          'username',
+          'generated-username-1234',
+          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
         );
       });
     });
@@ -264,7 +272,7 @@ describe('GenerateUsernameButton', () => {
         expect(mockForm.setValue).toHaveBeenCalledWith(
           'username',
           'username-1111',
-          expect.any(Object)
+          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
         );
       });
 
@@ -273,7 +281,7 @@ describe('GenerateUsernameButton', () => {
         expect(mockForm.setValue).toHaveBeenCalledWith(
           'username',
           'username-2222',
-          expect.any(Object)
+          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
         );
       });
 
@@ -282,7 +290,7 @@ describe('GenerateUsernameButton', () => {
         expect(mockForm.setValue).toHaveBeenCalledWith(
           'username',
           'username-3333',
-          expect.any(Object)
+          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
         );
       });
 
@@ -292,14 +300,11 @@ describe('GenerateUsernameButton', () => {
 
   describe('confirmUsername clearing behavior', () => {
     it('should clear confirmUsername when usernames do not match on mount', async () => {
-      mockForm.getValues = vi.fn((field?: string | string[]) => {
-        if (field === 'username') return 'username1';
-        if (field === 'confirmUsername') return 'username2';
-        if (Array.isArray(field)) return ['username1', 'username2'];
-        if (!field) return { username: 'username1', confirmUsername: 'username2' };
-        return '';
+      mockForm.getValues = vi.fn(() => ({
+        username: 'username1',
+        confirmUsername: 'username2',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any;
+      })) as any;
 
       render(
         <GenerateUsernameButton
@@ -309,22 +314,16 @@ describe('GenerateUsernameButton', () => {
       );
 
       await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', '', {
-          shouldValidate: false,
-          shouldDirty: false,
-        });
+        expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', '', CLEAR_OPTIONS);
       });
     });
 
     it('should not clear confirmUsername when usernames match', () => {
-      mockForm.getValues = vi.fn((field?: string | string[]) => {
-        if (field === 'username') return 'matching-username';
-        if (field === 'confirmUsername') return 'matching-username';
-        if (Array.isArray(field)) return ['matching-username', 'matching-username'];
-        if (!field) return { username: 'matching-username', confirmUsername: 'matching-username' };
-        return '';
+      mockForm.getValues = vi.fn(() => ({
+        username: 'matching-username',
+        confirmUsername: 'matching-username',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any;
+      })) as any;
 
       render(
         <GenerateUsernameButton
@@ -333,18 +332,19 @@ describe('GenerateUsernameButton', () => {
         />
       );
 
-      expect(mockForm.setValue).not.toHaveBeenCalledWith('confirmUsername', '', expect.any(Object));
+      expect(mockForm.setValue).not.toHaveBeenCalledWith(
+        'confirmUsername',
+        '',
+        expect.objectContaining(CLEAR_OPTIONS)
+      );
     });
 
     it('should only clear confirmUsername once', async () => {
-      mockForm.getValues = vi.fn((field?: string | string[]) => {
-        if (field === 'username') return 'username1';
-        if (field === 'confirmUsername') return 'username2';
-        if (Array.isArray(field)) return ['username1', 'username2'];
-        if (!field) return { username: 'username1', confirmUsername: 'username2' };
-        return '';
+      mockForm.getValues = vi.fn(() => ({
+        username: 'username1',
+        confirmUsername: 'username2',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any;
+      })) as any;
 
       const { rerender } = render(
         <GenerateUsernameButton
@@ -438,12 +438,11 @@ describe('GenerateUsernameButton', () => {
 
   describe('edge cases', () => {
     it('should handle empty initial values', () => {
-      mockForm.getValues = vi.fn((field?: string | string[]) => {
-        if (Array.isArray(field)) return ['', ''];
-        if (!field) return { username: '', confirmUsername: '' };
-        return '';
+      mockForm.getValues = vi.fn(() => ({
+        username: '',
+        confirmUsername: '',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any;
+      })) as any;
 
       render(
         <GenerateUsernameButton

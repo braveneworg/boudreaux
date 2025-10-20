@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { isDisposableEmail, validateEmailSecurity } from './email-security';
 
 describe('Email Security', () => {

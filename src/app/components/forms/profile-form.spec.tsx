@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as React from 'react';
+
+import { render, screen } from '@testing-library/react';
+import { useSession } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Import the component after mocking
+import ProfileForm from './profile-form';
 
 // Mock next/cache before any other imports
 vi.mock('next/cache', () => ({
@@ -114,6 +120,7 @@ vi.mock('react-hook-form', () => ({
     formState: { errors: {}, dirtyFields: {}, isDirty: false },
     reset: vi.fn(),
   })),
+  useWatch: vi.fn(() => ''),
 }));
 
 // Mock all UI components
@@ -320,11 +327,6 @@ vi.mock('@/app/lib/utils/states', () => ({
     { code: 'CA', name: 'California' },
   ],
 }));
-
-// Import the component after mocking
-import ProfileForm from './profile-form';
-import { useSession } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
 
 describe('ProfileForm', () => {
   beforeEach(() => {

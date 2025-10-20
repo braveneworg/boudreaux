@@ -1,5 +1,6 @@
-import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 import * as z from 'zod';
+
+import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 
 const emailRegex = z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' });
 const changeEmailSchema = z

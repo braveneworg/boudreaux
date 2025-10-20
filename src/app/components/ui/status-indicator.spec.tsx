@@ -1,4 +1,7 @@
+import React from 'react';
+
 import { render, screen } from '@testing-library/react';
+
 import StatusIndicator from '@/app/components/ui/status-indicator';
 
 // Mock lucide-react icons
@@ -20,8 +23,6 @@ vi.mock('lucide-react', () => ({
     }),
 }));
 
-import React from 'react';
-
 describe('StatusIndicator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,7 +30,7 @@ describe('StatusIndicator', () => {
 
   describe('pending state', () => {
     it('should render loading spinner when isPending is true', () => {
-      render(<StatusIndicator isPending={true} />);
+      render(<StatusIndicator isPending />);
 
       const loader = screen.getByTestId('loader-icon');
       expect(loader).toBeInTheDocument();
@@ -37,16 +38,14 @@ describe('StatusIndicator', () => {
     });
 
     it('should apply custom className when provided', () => {
-      render(<StatusIndicator isPending={true} className="custom-class" />);
+      render(<StatusIndicator isPending className="custom-class" />);
 
       const container = screen.getByTestId('loader-icon').parentElement;
       expect(container).toHaveClass('custom-class');
     });
 
     it('should prioritize pending state over other states', () => {
-      render(
-        <StatusIndicator isPending={true} isSuccess={true} hasError={true} hasTimeout={true} />
-      );
+      render(<StatusIndicator isPending isSuccess hasError hasTimeout />);
 
       expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
       expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
@@ -56,7 +55,7 @@ describe('StatusIndicator', () => {
 
   describe('timeout state', () => {
     it('should render error icon when hasTimeout is true', () => {
-      render(<StatusIndicator hasTimeout={true} />);
+      render(<StatusIndicator hasTimeout />);
 
       const errorIcon = screen.getByTestId('x-icon');
       expect(errorIcon).toBeInTheDocument();
@@ -64,14 +63,14 @@ describe('StatusIndicator', () => {
     });
 
     it('should apply red background styling for timeout', () => {
-      render(<StatusIndicator hasTimeout={true} />);
+      render(<StatusIndicator hasTimeout />);
 
       const container = screen.getByTestId('x-icon').parentElement;
       expect(container).toHaveClass('bg-red-100', 'rounded-full');
     });
 
     it('should prioritize timeout over error and success states', () => {
-      render(<StatusIndicator hasTimeout={true} hasError={true} isSuccess={true} />);
+      render(<StatusIndicator hasTimeout hasError isSuccess />);
 
       expect(screen.getByTestId('x-icon')).toBeInTheDocument();
       // Should only render one error icon, not multiple
@@ -81,7 +80,7 @@ describe('StatusIndicator', () => {
 
   describe('error state', () => {
     it('should render error icon when hasError is true', () => {
-      render(<StatusIndicator hasError={true} />);
+      render(<StatusIndicator hasError />);
 
       const errorIcon = screen.getByTestId('x-icon');
       expect(errorIcon).toBeInTheDocument();
@@ -89,14 +88,14 @@ describe('StatusIndicator', () => {
     });
 
     it('should apply red background styling for error', () => {
-      render(<StatusIndicator hasError={true} />);
+      render(<StatusIndicator hasError />);
 
       const container = screen.getByTestId('x-icon').parentElement;
       expect(container).toHaveClass('bg-red-100', 'rounded-full');
     });
 
     it('should prioritize error over success state', () => {
-      render(<StatusIndicator hasError={true} isSuccess={true} />);
+      render(<StatusIndicator hasError isSuccess />);
 
       expect(screen.getByTestId('x-icon')).toBeInTheDocument();
       expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
@@ -105,7 +104,7 @@ describe('StatusIndicator', () => {
 
   describe('success state', () => {
     it('should render check icon when isSuccess is true', () => {
-      render(<StatusIndicator isSuccess={true} />);
+      render(<StatusIndicator isSuccess />);
 
       const checkIcon = screen.getByTestId('check-icon');
       expect(checkIcon).toBeInTheDocument();
@@ -113,14 +112,14 @@ describe('StatusIndicator', () => {
     });
 
     it('should apply green background styling for success', () => {
-      render(<StatusIndicator isSuccess={true} />);
+      render(<StatusIndicator isSuccess />);
 
       const container = screen.getByTestId('check-icon').parentElement;
       expect(container).toHaveClass('bg-green-100', 'rounded-full');
     });
 
     it('should apply custom className when provided', () => {
-      render(<StatusIndicator isSuccess={true} className="success-custom" />);
+      render(<StatusIndicator isSuccess className="success-custom" />);
 
       const container = screen.getByTestId('check-icon').parentElement;
       expect(container).toHaveClass('success-custom');
@@ -148,21 +147,21 @@ describe('StatusIndicator', () => {
 
   describe('styling and layout', () => {
     it('should apply consistent size classes', () => {
-      render(<StatusIndicator isSuccess={true} />);
+      render(<StatusIndicator isSuccess />);
 
       const container = screen.getByTestId('check-icon').parentElement;
       expect(container).toHaveClass('w-6', 'h-6', 'flex', 'items-center', 'justify-center');
     });
 
     it('should merge custom className with default classes', () => {
-      render(<StatusIndicator hasError={true} className="border-2" />);
+      render(<StatusIndicator hasError className="border-2" />);
 
       const container = screen.getByTestId('x-icon').parentElement;
       expect(container).toHaveClass('border-2', 'w-6', 'h-6', 'bg-red-100');
     });
 
     it('should apply correct icon sizes', () => {
-      render(<StatusIndicator isSuccess={true} />);
+      render(<StatusIndicator isSuccess />);
 
       const icon = screen.getByTestId('check-icon');
       expect(icon).toHaveClass('w-4', 'h-4');
@@ -200,7 +199,7 @@ describe('StatusIndicator', () => {
 
   describe('accessibility', () => {
     it('should be focusable when needed', () => {
-      render(<StatusIndicator isSuccess={true} />);
+      render(<StatusIndicator isSuccess />);
 
       const container = screen.getByTestId('check-icon').parentElement;
       expect(container).toBeInTheDocument();

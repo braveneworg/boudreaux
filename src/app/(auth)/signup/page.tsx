@@ -1,18 +1,22 @@
 'use client';
 
+import { useActionState, useState, useCallback } from 'react';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, FormProvider } from 'react-hook-form';
+
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
+import { signinAction } from '@/app/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
-import signupSchema, {
-  type FormSchemaType as SignupSchemaType,
-} from '@/lib/validation/signup-schema';
 import signinSchema, {
   type FormSchemaType as SigninSchemaType,
 } from '@/lib/validation/signin-schema';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useActionState, useState, useCallback } from 'react';
-import { useForm, FormProvider, Control } from 'react-hook-form';
-import { signinAction } from '@/app/lib/actions/signin-action';
+import signupSchema, {
+  type FormSchemaType as SignupSchemaType,
+} from '@/lib/validation/signup-schema';
+
+import type { Control } from 'react-hook-form';
 
 const SignupPage = () => {
   type SigninOrSignupSchema<T> = T extends { termsAndConditions: true }

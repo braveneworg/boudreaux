@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { validateEnvironment } from './env-validation';
 
 describe('Environment Validation', () => {
@@ -244,7 +245,7 @@ describe('Environment Validation', () => {
     });
 
     it('should log success message after validation', () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
       process.env = {
         ...process.env,
@@ -260,7 +261,7 @@ describe('Environment Validation', () => {
 
       validateEnvironment();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('✅ Environment validation passed');
+      expect(consoleInfoSpy).toHaveBeenCalledWith('✅ Environment validation passed');
     });
   });
 });

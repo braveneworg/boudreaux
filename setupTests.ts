@@ -1,8 +1,9 @@
-import { afterEach, expect } from 'vitest';
+import React from 'react';
+
+import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import React from 'react';
+import { afterEach, expect } from 'vitest';
 
 // Make React available globally for tests
 // This is required by vitest when testing React components

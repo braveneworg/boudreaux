@@ -1,5 +1,6 @@
-import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 import * as z from 'zod';
+
+import { EMAIL_REGEX } from '@/app/lib/utils/auth/auth-utils';
 
 const formSchema = z.object({
   email: z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' }),

@@ -1,19 +1,21 @@
 import { useSession } from 'next-auth/react';
-import SignInLink from './signin-link';
-import SignUpLink from './signup-link';
-import SignedinToolbar from './signout-button';
-import VerticalSeparator from '../ui/vertical-separator';
+
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+
+import SignInLink from './signin-link';
+import SignedinToolbar from './signout-button';
+import SignUpLink from './signup-link';
+import VerticalSeparator from '../ui/vertical-separator';
 
 const AuthToolbar = ({ className }: { className?: string }) => {
   const { data: session, status } = useSession();
 
   // Debug logging in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('[AuthToolbar] Session status:', status);
-    console.log('[AuthToolbar] Session data:', session);
-    console.log('[AuthToolbar] User data:', session?.user);
-    console.log('[AuthToolbar] Username:', session?.user?.username);
+    console.info('[AuthToolbar] Session status:', status);
+    console.info('[AuthToolbar] Session data:', session);
+    console.info('[AuthToolbar] User data:', session?.user);
+    console.info('[AuthToolbar] Username:', session?.user?.username);
   }
 
   // Show loading state or nothing while checking authentication
@@ -27,12 +29,12 @@ const AuthToolbar = ({ className }: { className?: string }) => {
 
   // Show authenticated toolbar if user is logged in
   if (status === 'authenticated' && session) {
-    console.log('[AuthToolbar] Rendering authenticated toolbar');
+    console.info('[AuthToolbar] Rendering authenticated toolbar');
     return <SignedinToolbar className={className} />;
   }
 
   // Show sign in/up links for unauthenticated users
-  console.log('[AuthToolbar] Rendering unauthenticated links');
+  console.info('[AuthToolbar] Rendering unauthenticated links');
   return (
     <div className={cn('flex items-center justify-center gap-2', className)}>
       <SignInLink />

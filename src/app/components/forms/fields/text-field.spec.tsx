@@ -1,7 +1,11 @@
-import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider, Control, FieldPath, FieldValues } from 'react-hook-form';
+
+import { render, screen, fireEvent } from '@testing-library/react';
+import { useForm, FormProvider } from 'react-hook-form';
+
 import TextField from './text-field';
+
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({

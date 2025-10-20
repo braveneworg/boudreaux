@@ -1,8 +1,12 @@
-import { type MockedFunction } from 'vitest';
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
 import { getToken } from 'next-auth/jwt';
-import type { JWT } from 'next-auth/jwt';
+import { type MockedFunction } from 'vitest';
+
 import { middleware } from './middleware';
+
+import type { JWT } from 'next-auth/jwt';
 
 // Mock response type for testing
 type MockResponse = { type: string; url?: string; data?: unknown; init?: { status: number } };

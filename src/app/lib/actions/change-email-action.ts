@@ -1,17 +1,21 @@
 'use server';
 
 import 'server-only';
-import { auth, signOut } from '../../../../auth';
+import { redirect } from 'next/navigation';
+
+import { Prisma } from '@prisma/client';
+
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+import { logSecurityEvent } from '@/app/lib/utils/audit-log';
 import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
 import getActionState from '@/app/lib/utils/auth/get-action-state';
 import changeEmailSchema from '@/app/lib/validation/change-email-schema';
-import { redirect } from 'next/navigation';
+
+import { auth, signOut } from '../../../../auth';
 import { prisma } from '../prisma';
-import { Prisma } from '@prisma/client';
-import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+
 import type { FormState } from '../types/form-state';
-import { AdapterUser } from 'next-auth/adapters';
-import { logSecurityEvent } from '@/app/lib/utils/audit-log';
+import type { AdapterUser } from 'next-auth/adapters';
 
 export const changeEmailAction = async (
   _initialState: FormState,
@@ -44,7 +48,7 @@ export const changeEmailAction = async (
       await adapter.updateUser!({
         id: session.user.id,
         email: parsed.data.email,
-        previousEmail: previousEmail,
+        previousEmail,
       } as Pick<AdapterUser, 'email' | 'id'> & { previousEmail: string });
 
       // Log email change for security audit

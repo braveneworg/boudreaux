@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { RefreshCwIcon } from 'lucide-react';
-import { Button } from '@/app/components/ui/button';
 import { generateUsername } from 'unique-username-generator';
+
+import { Button } from '@/app/components/ui/button';
 import { cn } from '@/app/lib/utils';
+
 import type { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 
 interface UsernameGeneratorProps<T extends FieldValues> {

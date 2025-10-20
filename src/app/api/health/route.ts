@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import { checkDatabaseHealth } from '@/app/lib/utils/database-utils';
 
 export const dynamic = 'force-dynamic';

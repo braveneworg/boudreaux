@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  */
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));

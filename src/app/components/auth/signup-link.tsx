@@ -1,5 +1,6 @@
-import { UserPlus } from 'lucide-react';
 import Link from 'next/link';
+
+import { UserPlus } from 'lucide-react';
 
 const SignUpLink = () => (
   <Link href="/signup" className="flex items-center gap-2 text-sm">

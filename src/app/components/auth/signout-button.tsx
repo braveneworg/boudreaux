@@ -1,12 +1,15 @@
-import { Button } from '../ui/button';
-import SignedInAs from './signed-in-as';
-import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+
 import { LogOutIcon } from 'lucide-react';
-import VerticalSeparator from '../ui/vertical-separator';
-import EditProfileButton from './edit-profile-button';
+import { signOut } from 'next-auth/react';
+
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
-import { useRouter } from 'next/navigation';
+
+import EditProfileButton from './edit-profile-button';
+import SignedInAs from './signed-in-as';
+import { Button } from '../ui/button';
+import VerticalSeparator from '../ui/vertical-separator';
 
 // Use in hamburger menu on mobile
 const SignedinToolbar = ({ className }: { className?: string }) => {

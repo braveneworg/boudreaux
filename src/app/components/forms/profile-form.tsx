@@ -9,12 +9,15 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { useForm } from 'react-hook-form';
+
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Separator } from '@radix-ui/react-separator';
 import { useSession } from 'next-auth/react';
-import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
-import { changeEmailAction } from '@/app/lib/actions/change-email-action';
-import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
+import { useForm, useWatch } from 'react-hook-form';
+import { toast } from 'sonner';
+
+import { GenerateUsernameButton } from '@/app/components/auth/generate-username-button';
+import { CheckboxField, StateField, TextField, CountryField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -24,21 +27,20 @@ import {
   CardTitle,
 } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
-import { Separator } from '@radix-ui/react-separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { CheckboxField, StateField, TextField, CountryField } from '@/app/components/forms/fields';
-import { splitFullName } from '@/app/lib/utils/auth/split-full-name';
-import profileSchema from '@/app/lib/validation/profile-schema';
-import changeEmailSchema from '@/app/lib/validation/change-email-schema';
-import usernameSchema from '@/app/lib/validation/change-username-schema';
+import { changeEmailAction } from '@/app/lib/actions/change-email-action';
+import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
+import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
 import type {
   ProfileFormData,
   ChangeEmailFormData,
   ChangeUsernameFormData,
 } from '@/app/lib/types/form-data';
 import type { FormState } from '@/app/lib/types/form-state';
-import { toast } from 'sonner';
-import { GenerateUsernameButton } from '@/app/components/auth/generate-username-button';
+import { splitFullName } from '@/app/lib/utils/auth/split-full-name';
+import changeEmailSchema from '@/app/lib/validation/change-email-schema';
+import usernameSchema from '@/app/lib/validation/change-username-schema';
+import profileSchema from '@/app/lib/validation/profile-schema';
 
 const initialFormState: FormState = {
   errors: {},
@@ -104,22 +106,12 @@ export default function ProfileForm() {
     },
   });
 
-  // Create stable references to form instances to avoid infinite loops
-  const personalProfileFormRef = useRef(personalProfileForm);
-  const changeEmailFormRef = useRef(changeEmailForm);
-  const changeUsernameFormRef = useRef(changeUsernameForm);
-
   // Track which success states we've already handled to prevent infinite loops
   const handledSuccessStatesRef = useRef({
     profile: false,
     email: false,
     username: false,
   });
-
-  // Update refs on each render
-  personalProfileFormRef.current = personalProfileForm;
-  changeEmailFormRef.current = changeEmailForm;
-  changeUsernameFormRef.current = changeUsernameForm;
 
   const onSubmitPersonalProfileForm = useCallback(
     (data: ProfileFormData) => {
@@ -179,11 +171,10 @@ export default function ProfileForm() {
   useEffect(() => {
     if (user && !areFormValuesSet) {
       const fallbackNames = splitFullName(user.name ?? '');
-      const hasChanges =
-        Object.keys(personalProfileFormRef.current.formState.dirtyFields).length > 0;
+      const hasChanges = Object.keys(personalProfileForm.formState.dirtyFields).length > 0;
 
       if (!hasChanges) {
-        personalProfileFormRef.current.reset({
+        personalProfileForm.reset({
           firstName: user.firstName || fallbackNames.firstName || '',
           lastName: user.lastName || fallbackNames.lastName || '',
           phone: user.phone ?? '',
@@ -198,40 +189,52 @@ export default function ProfileForm() {
         setAreFormValuesSet(true);
       }
     }
-  }, [user, areFormValuesSet]);
+  }, [user, areFormValuesSet, personalProfileForm]);
 
   // Update email form when user session changes
   useEffect(() => {
     if (user?.email && !isEditingUserEmail) {
-      changeEmailFormRef.current.setValue('email', user.email);
-      changeEmailFormRef.current.setValue('previousEmail', user.email);
+      changeEmailForm.setValue('email', user.email);
+      changeEmailForm.setValue('previousEmail', user.email);
     }
-  }, [user?.email, isEditingUserEmail]);
+  }, [user?.email, isEditingUserEmail, changeEmailForm]);
 
   // Update username form when user session changes
   useEffect(() => {
     if (user?.username && !isEditingUsername) {
-      changeUsernameFormRef.current.setValue('username', user.username);
+      changeUsernameForm.setValue('username', user.username);
     }
-  }, [user?.username, isEditingUsername]);
+  }, [user?.username, isEditingUsername, changeUsernameForm]);
 
   // Watch email fields and clear errors when they match
-  const watchedEmail = changeEmailForm.watch('email');
-  const watchedConfirmEmail = changeEmailForm.watch('confirmEmail');
+  const watchedEmail = useWatch({
+    control: changeEmailForm.control,
+    name: 'email',
+  });
+  const watchedConfirmEmail = useWatch({
+    control: changeEmailForm.control,
+    name: 'confirmEmail',
+  });
   useEffect(() => {
     if (watchedEmail && watchedConfirmEmail && watchedEmail === watchedConfirmEmail) {
-      changeEmailFormRef.current.clearErrors('confirmEmail');
+      changeEmailForm.clearErrors('confirmEmail');
     }
-  }, [watchedEmail, watchedConfirmEmail]);
+  }, [watchedEmail, watchedConfirmEmail, changeEmailForm]);
 
   // Watch username fields and clear errors when they match
-  const watchedUsername = changeUsernameForm.watch('username');
-  const watchedConfirmUsername = changeUsernameForm.watch('confirmUsername');
+  const watchedUsername = useWatch({
+    control: changeUsernameForm.control,
+    name: 'username',
+  });
+  const watchedConfirmUsername = useWatch({
+    control: changeUsernameForm.control,
+    name: 'confirmUsername',
+  });
   useEffect(() => {
     if (watchedUsername && watchedConfirmUsername && watchedUsername === watchedConfirmUsername) {
-      changeUsernameFormRef.current.clearErrors('confirmUsername');
+      changeUsernameForm.clearErrors('confirmUsername');
     }
-  }, [watchedUsername, watchedConfirmUsername]);
+  }, [watchedUsername, watchedConfirmUsername, changeUsernameForm]);
 
   // Show toast notifications for form state changes
   useEffect(() => {
@@ -246,8 +249,8 @@ export default function ProfileForm() {
       toast.success('Your profile has been updated successfully.');
       // Reset to pristine state after successful save
       // Get current values to ensure they match exactly
-      const currentValues = personalProfileFormRef.current.getValues();
-      personalProfileFormRef.current.reset(currentValues, {
+      const currentValues = personalProfileForm.getValues();
+      personalProfileForm.reset(currentValues, {
         keepDefaultValues: false,
         keepValues: true,
       });
@@ -259,7 +262,14 @@ export default function ProfileForm() {
     if (formState.errors?.general) {
       toast.error(formState.errors.general[0]);
     }
-  }, [formState.success, formState.errors, isPending, isTransitionPending, update]);
+  }, [
+    formState.success,
+    formState.errors,
+    isPending,
+    isTransitionPending,
+    update,
+    personalProfileForm,
+  ]);
 
   useEffect(() => {
     if (
@@ -273,9 +283,9 @@ export default function ProfileForm() {
       // Reset editing state
       setIsEditingUserEmail(false);
       // Get current values and clear confirmEmail
-      const currentValues = changeEmailFormRef.current.getValues();
+      const currentValues = changeEmailForm.getValues();
       // Reset to pristine state after successful save
-      changeEmailFormRef.current.reset(
+      changeEmailForm.reset(
         {
           ...currentValues,
           confirmEmail: '', // Clear confirmEmail after successful save
@@ -288,7 +298,7 @@ export default function ProfileForm() {
       // Update session
       void update();
     }
-  }, [emailFormState.success, isEmailPending, isTransitionPending, update]);
+  }, [emailFormState.success, isEmailPending, isTransitionPending, update, changeEmailForm]);
 
   useEffect(() => {
     if (
@@ -302,9 +312,9 @@ export default function ProfileForm() {
       // Reset editing state
       setIsEditingUsername(false);
       // Get current values and clear confirmUsername
-      const currentValues = changeUsernameFormRef.current.getValues();
+      const currentValues = changeUsernameForm.getValues();
       // Reset to pristine state after successful save
-      changeUsernameFormRef.current.reset(
+      changeUsernameForm.reset(
         {
           ...currentValues,
           confirmUsername: '', // Clear confirmUsername after successful save
@@ -317,7 +327,13 @@ export default function ProfileForm() {
       // Update session
       void update();
     }
-  }, [usernameFormState.success, isUsernamePending, isTransitionPending, update]);
+  }, [
+    usernameFormState.success,
+    isUsernamePending,
+    isTransitionPending,
+    update,
+    changeUsernameForm,
+  ]);
 
   const handleEditFieldButtonClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>): void => {
@@ -331,8 +347,8 @@ export default function ProfileForm() {
 
         // Clear errors when canceling (after determining we're canceling)
         if (wasEditing) {
-          changeEmailFormRef.current.clearErrors();
-          changeEmailFormRef.current.setValue('confirmEmail', '');
+          changeEmailForm.clearErrors();
+          changeEmailForm.setValue('confirmEmail', '');
         }
       } else if (fieldName === 'username') {
         // Check current state before toggling
@@ -341,12 +357,12 @@ export default function ProfileForm() {
 
         // Clear errors when canceling (after determining we're canceling)
         if (wasEditing) {
-          changeUsernameFormRef.current.clearErrors();
-          changeUsernameFormRef.current.setValue('confirmUsername', '');
+          changeUsernameForm.clearErrors();
+          changeUsernameForm.setValue('confirmUsername', '');
         }
       }
     },
-    [isEditingUserEmail, isEditingUsername]
+    [isEditingUserEmail, isEditingUsername, changeEmailForm, changeUsernameForm]
   );
 
   if (status === 'loading' || !user) {
