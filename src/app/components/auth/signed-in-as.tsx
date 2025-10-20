@@ -1,8 +1,10 @@
 import { KeyIcon } from 'lucide-react';
-import UsernameLink from './username-link';
 import { useSession } from 'next-auth/react';
+
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/app/lib/utils';
+
+import UsernameLink from './username-link';
 
 const SignedInAs = () => {
   const { data: session } = useSession();
@@ -10,9 +12,9 @@ const SignedInAs = () => {
   const username = session?.user?.username;
 
   if (process.env.NODE_ENV === 'development') {
-    console.log('[SignedInAs] Session:', session);
-    console.log('[SignedInAs] User:', session?.user);
-    console.log('[SignedInAs] Username:', username);
+    console.info('[SignedInAs] Session:', session);
+    console.info('[SignedInAs] User:', session?.user);
+    console.info('[SignedInAs] Username:', username);
   }
 
   if (!username) {

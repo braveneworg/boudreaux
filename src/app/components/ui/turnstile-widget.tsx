@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+
 import Turnstile, { useTurnstile } from 'react-turnstile';
 
 const TurnstileWidget = ({ setIsVerified }: { setIsVerified: (isVerified: boolean) => void }) => {

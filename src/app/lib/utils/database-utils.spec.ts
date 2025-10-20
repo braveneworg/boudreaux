@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { checkDatabaseHealth, withRetry, getApiBaseUrl } from './database-utils';
+
+import type { MockPrismaClient } from '@/app/lib/types/test-utils';
+
+import { checkDatabaseHealth, getApiBaseUrl, withRetry } from './database-utils';
 import { prisma } from '../prisma';
 
 // Mock the prisma client
@@ -9,10 +12,10 @@ vi.mock('../prisma', () => ({
   },
 }));
 
-// Create a typed mock
-const mockedPrisma = prisma as unknown as {
+// Create a typed mock using our utility type
+const mockedPrisma = prisma as unknown as MockPrismaClient<{
   $runCommandRaw: ReturnType<typeof vi.fn>;
-};
+}>;
 
 describe('Database Utils', () => {
   beforeEach(() => {
@@ -337,8 +340,8 @@ describe('Database Utils', () => {
 
     it('should return server-side localhost URL when window is undefined', () => {
       vi.stubEnv('NODE_ENV', 'development');
-      // @ts-expect-error - Simulating server-side environment
-      global.window = undefined;
+      // Simulate server-side environment by setting window to undefined
+      (global as { window?: Window & typeof globalThis }).window = undefined;
 
       const result = getApiBaseUrl();
 
@@ -348,8 +351,8 @@ describe('Database Utils', () => {
     it('should use NEXTAUTH_URL on server-side in production', () => {
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('NEXTAUTH_URL', 'https://prod.example.com');
-      // @ts-expect-error - Simulating server-side environment
-      global.window = undefined;
+      // Simulate server-side environment by setting window to undefined
+      (global as { window?: Window & typeof globalThis }).window = undefined;
 
       const result = getApiBaseUrl();
 

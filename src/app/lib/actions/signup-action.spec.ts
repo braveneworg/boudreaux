@@ -1,4 +1,10 @@
 // Get the mocked functions using hoisted
+import { Prisma } from '@prisma/client';
+
+import { signupAction } from '@/app/lib/actions/signup-action';
+import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+import type { FormState } from '@/app/lib/types/form-state';
+
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
@@ -69,11 +75,6 @@ vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
 });
 
 vi.mock('@/app/lib/validation/signup-schema');
-
-import { signupAction } from '@/app/lib/actions/signup-action';
-import type { FormState } from '@/app/lib/types/form-state';
-import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
-import { Prisma } from '@prisma/client';
 
 describe('signupAction', () => {
   const mockFormData = new FormData();

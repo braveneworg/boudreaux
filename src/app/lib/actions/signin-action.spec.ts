@@ -1,5 +1,7 @@
 import { beforeEach } from 'vitest';
 
+import { signinAction } from '@/app/lib/actions/signin-action';
+
 // Get the mocked functions using hoisted
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
@@ -48,8 +50,6 @@ vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
 });
 
 vi.mock('@/app/lib/validation/signin-schema');
-
-import { signinAction } from '@/app/lib/actions/signin-action';
 
 type FormState = {
   fields: Record<string, string>;

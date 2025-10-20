@@ -1,5 +1,5 @@
-import type { ZodType } from 'zod';
 import type { FormState } from '../../types/form-state';
+import type { ZodType } from 'zod';
 
 const getActionState = <TForm>(
   data: FormData,

@@ -1,12 +1,11 @@
 'use client';
 
 import * as React from 'react';
+
 import { Slot } from '@radix-ui/react-slot';
-import { cva, VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import { PanelLeftIcon } from 'lucide-react';
 
-import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Separator } from '@/app/components/ui/separator';
@@ -24,6 +23,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
+import { cn } from '@/app/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+import type { VariantProps } from 'class-variance-authority';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -588,9 +591,17 @@ function SidebarMenuSkeleton({
   showIcon?: boolean;
 }) {
   // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+  // Use useState with lazy initializer to ensure Math.random() is only called once on mount
+  const SKELETON_WIDTH_MIN = 50;
+  const SKELETON_WIDTH_RANGE = 40;
+
+  // ... (keep existing code) ...
+
+  // Random width between 50 to 90%.
+  // Use useState with lazy initializer to ensure Math.random() is only called once on mount
+  const [width] = React.useState(
+    () => `${Math.floor(Math.random() * SKELETON_WIDTH_RANGE) + SKELETON_WIDTH_MIN}%`
+  );
 
   return (
     <div

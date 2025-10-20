@@ -1,8 +1,11 @@
 import React from 'react';
+
 import { render, screen } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
-import CountryField from './country-field';
+
 import { type ProfileFormData } from '@/app/lib/validation/profile-schema';
+
+import CountryField from './country-field';
 
 // Mock the ComboboxField component
 vi.mock('./combobox-field', () => ({

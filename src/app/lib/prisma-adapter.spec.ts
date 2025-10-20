@@ -1,4 +1,5 @@
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+
 import type { AdapterUser, Adapter } from 'next-auth/adapters';
 
 // Mock @auth/prisma-adapter

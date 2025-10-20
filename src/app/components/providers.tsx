@@ -4,7 +4,7 @@ import { SessionProvider } from 'next-auth/react';
 
 export const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SessionProvider refetchInterval={0} refetchOnWindowFocus={true} refetchWhenOffline={false}>
+    <SessionProvider refetchInterval={0} refetchOnWindowFocus refetchWhenOffline={false}>
       {children}
     </SessionProvider>
   );

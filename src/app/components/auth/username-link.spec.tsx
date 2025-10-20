@@ -1,6 +1,8 @@
+import React from 'react';
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
+
 import UsernameLink from './username-link';
 
 // Mock Next.js Link

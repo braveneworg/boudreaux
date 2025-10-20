@@ -41,7 +41,7 @@ export function logSecurityEvent(entry: Omit<AuditLogEntry, 'timestamp'>): void 
     // TODO: Implement production logging
     console.info('[SECURITY_AUDIT]', JSON.stringify(logEntry));
   } else {
-    console.log('[SECURITY_AUDIT]', logEntry);
+    console.info('[SECURITY_AUDIT]', logEntry);
   }
 
   // Consider also storing critical events in database for compliance

@@ -1,7 +1,11 @@
-import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { useForm, FormProvider, Control, FieldValues } from 'react-hook-form';
+
+import { render, screen, fireEvent } from '@testing-library/react';
+import { useForm, FormProvider } from 'react-hook-form';
+
 import StateField from './state-field';
+
+import type { Control, FieldValues } from 'react-hook-form';
 
 interface ComboboxOption {
   value: string;

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+
 import Home from './page';
 
 // Mock the dependencies

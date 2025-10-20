@@ -1,10 +1,12 @@
 import NextAuth from 'next-auth';
-import type { User } from 'next-auth';
-import type { AdapterUser } from 'next-auth/adapters';
-import Nodemailer from 'next-auth/providers/nodemailer';
 import GoogleProvider from 'next-auth/providers/google';
+import Nodemailer from 'next-auth/providers/nodemailer';
+
 import { prisma } from '@/app/lib/prisma';
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+
+import type { User } from 'next-auth';
+import type { AdapterUser } from 'next-auth/adapters';
 
 //keywords: auth, next-auth, mongodb, mongodb-adapter
 //docs: https://authjs.dev/reference/adapters/mongodb-adapter

@@ -1,9 +1,12 @@
+import React from 'react';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
 import type { FormState } from '@/app/lib/types/form-state';
+
 import type { Control } from 'react-hook-form';
-import React from 'react';
 
 // Common type for both signin and signup schemas (matching the form component)
 type BaseFormSchema = {
@@ -251,7 +254,7 @@ describe('SignupSigninForm', () => {
 
   describe('terms and conditions field', () => {
     it('should render terms and conditions when hasTermsAndConditions is true', () => {
-      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={true} />);
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
 
       expect(screen.getByTestId('switch-terms-and-conditions')).toBeInTheDocument();
       expect(screen.getByTestId('next-link')).toBeInTheDocument();
@@ -326,7 +329,7 @@ describe('SignupSigninForm', () => {
     });
 
     it('should disable submit button when pending', () => {
-      render(<SignupSigninForm {...defaultProps} isPending={true} />);
+      render(<SignupSigninForm {...defaultProps} isPending />);
 
       const submitButton = screen.getByTestId('submit-button');
       expect(submitButton).toBeDisabled();
@@ -347,7 +350,7 @@ describe('SignupSigninForm', () => {
         hasTimeout: true,
       };
 
-      render(<SignupSigninForm {...defaultProps} state={stateWithErrors} isPending={true} />);
+      render(<SignupSigninForm {...defaultProps} state={stateWithErrors} isPending />);
 
       const statusIndicator = screen.getByTestId('status-indicator');
       expect(statusIndicator).toHaveAttribute('data-success', 'false');

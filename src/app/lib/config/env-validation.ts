@@ -42,7 +42,7 @@ export function validateEnvironment() {
     }
   }
 
-  console.log('✅ Environment validation passed');
+  console.info('✅ Environment validation passed');
 }
 
 // For production builds

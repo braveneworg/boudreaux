@@ -1,13 +1,16 @@
 'use server';
 
-import { auth } from '../../../../auth';
-import getActionState from '@/app/lib/utils/auth/get-action-state';
-import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
-import profileSchema from '@/app/lib/validation/profile-schema';
-import type { FormState } from '../types/form-state';
-import { prisma } from '../prisma';
 import { revalidatePath } from 'next/cache';
+
 import { logSecurityEvent } from '@/app/lib/utils/audit-log';
+import { setUnknownError } from '@/app/lib/utils/auth/auth-utils';
+import getActionState from '@/app/lib/utils/auth/get-action-state';
+import profileSchema from '@/app/lib/validation/profile-schema';
+
+import { auth } from '../../../../auth';
+import { prisma } from '../prisma';
+
+import type { FormState } from '../types/form-state';
 
 export const updateProfileAction = async (
   _initialState: FormState,

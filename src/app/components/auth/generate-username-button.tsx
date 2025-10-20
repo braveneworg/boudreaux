@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { RefreshCwIcon } from 'lucide-react';
-import { Button } from '@/app/components/ui/button';
 import { generateUsername } from 'unique-username-generator';
+
+import { Button } from '@/app/components/ui/button';
 import { cn } from '@/app/lib/utils';
+
 import type { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 
 interface UsernameGeneratorProps<T extends FieldValues> {
@@ -53,18 +56,22 @@ export const GenerateUsernameButton = <T extends FieldValues>({
   // Reset generating state when form succeeds
   useEffect(() => {
     if (wasSuccessful) {
-      setIsGenerating(false);
+      // Use a microtask to avoid setState during render
+      Promise.resolve().then(() => setIsGenerating(false));
     }
   }, [wasSuccessful]);
 
   useEffect(() => {
     // Clear out confirm username from last generation if usernames don't match
     if (!isConfirmUsernameCleared && usernameValue !== confirmUsernameValue) {
-      form.setValue(fieldsToPopulate[1], '' as T[Path<T>], {
-        shouldValidate: false,
-        shouldDirty: false,
+      // Use a microtask to avoid setState during render
+      Promise.resolve().then(() => {
+        form.setValue(fieldsToPopulate[1], '' as T[Path<T>], {
+          shouldValidate: false,
+          shouldDirty: false,
+        });
+        setIsConfirmUsernameCleared(true);
       });
-      setIsConfirmUsernameCleared(true);
     }
   }, [form, fieldsToPopulate, isConfirmUsernameCleared, usernameValue, confirmUsernameValue]);
 

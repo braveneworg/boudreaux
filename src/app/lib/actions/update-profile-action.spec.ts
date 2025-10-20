@@ -1,4 +1,9 @@
 // Get the mocked functions using hoisted
+import { Prisma } from '@prisma/client';
+
+import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
+import type { FormState } from '@/app/lib/types/form-state';
+
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
@@ -38,10 +43,6 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/app/lib/validation/profile-schema');
-
-import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
-import type { FormState } from '@/app/lib/types/form-state';
-import { Prisma } from '@prisma/client';
 
 describe('updateProfileAction', () => {
   const mockFormData = new FormData();

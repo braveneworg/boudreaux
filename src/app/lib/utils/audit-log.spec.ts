@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { logSecurityEvent, extractRequestMetadata, type AuditEvent } from './audit-log';
 
 describe('Audit Log', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'info').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
   });
 
   describe('logSecurityEvent', () => {
     it('should log security events with timestamp', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
 
       logSecurityEvent({
         event: 'auth.signin.success',
@@ -29,7 +30,7 @@ describe('Audit Log', () => {
     });
 
     it('should log all audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
       const events: AuditEvent[] = [
         'auth.signin.success',
         'auth.signin.failed',
@@ -52,7 +53,7 @@ describe('Audit Log', () => {
     });
 
     it('should include optional metadata', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
       const metadata = {
         action: 'update',
         previousValue: 'old@example.com',
@@ -71,7 +72,7 @@ describe('Audit Log', () => {
     });
 
     it('should include IP address when provided', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
 
       logSecurityEvent({
         event: 'auth.signin.success',
@@ -85,7 +86,7 @@ describe('Audit Log', () => {
     });
 
     it('should include user agent when provided', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
       const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 
       logSecurityEvent({
@@ -100,7 +101,7 @@ describe('Audit Log', () => {
     });
 
     it('should work without optional fields', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
 
       logSecurityEvent({
         event: 'api.rate_limit.exceeded',
@@ -216,7 +217,7 @@ describe('Audit Log', () => {
 
   describe('Event Type Coverage', () => {
     it('should support all defined audit event types', () => {
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'info');
       const eventTypes: AuditEvent[] = [
         'auth.signin.success',
         'auth.signin.failed',
