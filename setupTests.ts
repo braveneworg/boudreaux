@@ -10,6 +10,20 @@ import { afterEach, expect } from 'vitest';
 // Next.js doesn't require this, but our test environment does
 globalThis.React = React;
 
+// Mock ResizeObserver which is not available in Node.js test environment
+// This is commonly needed for components that use responsive layouts or size detection
+global.ResizeObserver = class ResizeObserver {
+  observe() {
+    // Mock implementation - do nothing
+  }
+  unobserve() {
+    // Mock implementation - do nothing
+  }
+  disconnect() {
+    // Mock implementation - do nothing
+  }
+};
+
 expect.extend(matchers); // Add custom jest matchers from jest-dom
 
 // Clean up the DOM after each test to prevent memory leaks

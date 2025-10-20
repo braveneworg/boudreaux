@@ -12,20 +12,26 @@ export interface SetValueOptions {
 
 /**
  * Utility type for creating partial mocks of UseFormReturn
- * Allows mocking only the methods you need while maintaining type safety
+ * Uses a mapped type with explicit unknown values for better type safety
+ * while still allowing flexible mocking in tests
  */
 export type MockedFormReturn<TFieldValues extends FieldValues = FieldValues> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K in keyof UseFormReturn<TFieldValues>]?: any;
+  [K in keyof UseFormReturn<TFieldValues>]?: unknown;
 } & {
   setValue?: Mock;
   getValues?: Mock;
   trigger?: Mock<[], Promise<boolean>>;
+  watch?: Mock;
+  reset?: Mock;
+  handleSubmit?: Mock;
+  formState?: Partial<UseFormReturn<TFieldValues>['formState']>;
 };
 
 /**
  * Creates a partial mock of UseFormReturn with proper typing
- * Returns the mock as UseFormReturn to satisfy component type requirements
+ * Uses type assertion to satisfy component requirements while maintaining
+ * compile-time safety through the MockedFormReturn constraint
+ *
  * @example
  * ```typescript
  * const mockForm = createMockedForm<{ username: string }>({
@@ -37,8 +43,10 @@ export type MockedFormReturn<TFieldValues extends FieldValues = FieldValues> = {
 export function createMockedForm<TFieldValues extends FieldValues = FieldValues>(
   overrides: MockedFormReturn<TFieldValues>
 ): UseFormReturn<TFieldValues> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return overrides as any as UseFormReturn<TFieldValues>;
+  // Type assertion is necessary here because we're converting a partial mock
+  // to a full UseFormReturn type. This is safe in test contexts where we only
+  // interact with the mocked properties.
+  return overrides as unknown as UseFormReturn<TFieldValues>;
 }
 
 /**

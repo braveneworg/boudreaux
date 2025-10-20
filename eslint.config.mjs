@@ -12,6 +12,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
 import nextPlugin from '@next/eslint-plugin-next';
 import globals from 'globals';
+import unusedImports from 'eslint-plugin-unused-imports';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +61,7 @@ const eslintConfig = [
       'jsx-a11y': jsxA11y,
       import: importPlugin,
       prettier: prettierPlugin,
+      'unused-imports': unusedImports,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -87,6 +89,18 @@ const eslintConfig = [
       },
     },
     rules: {
+      'react/jsx-boolean-value': ['error', 'never'],
+      'no-unused-vars': 'off', // Disable the core ESLint rule
+      'unused-imports/no-unused-imports': 'error', // Report unused imports
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+        },
+      ],
       'prettier/prettier': 'error',
       // Add any custom rules here
       // TypeScript rules

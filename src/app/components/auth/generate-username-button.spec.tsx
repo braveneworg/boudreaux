@@ -303,8 +303,7 @@ describe('GenerateUsernameButton', () => {
       mockForm.getValues = vi.fn(() => ({
         username: 'username1',
         confirmUsername: 'username2',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      })) as any;
+      })) as unknown as UseFormReturn<MockFormData>['getValues'];
 
       render(
         <GenerateUsernameButton
@@ -322,8 +321,7 @@ describe('GenerateUsernameButton', () => {
       mockForm.getValues = vi.fn(() => ({
         username: 'matching-username',
         confirmUsername: 'matching-username',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      })) as any;
+      })) as unknown as UseFormReturn<MockFormData>['getValues'];
 
       render(
         <GenerateUsernameButton
@@ -343,8 +341,7 @@ describe('GenerateUsernameButton', () => {
       mockForm.getValues = vi.fn(() => ({
         username: 'username1',
         confirmUsername: 'username2',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      })) as any;
+      })) as unknown as UseFormReturn<MockFormData>['getValues'];
 
       const { rerender } = render(
         <GenerateUsernameButton
@@ -441,8 +438,7 @@ describe('GenerateUsernameButton', () => {
       mockForm.getValues = vi.fn(() => ({
         username: '',
         confirmUsername: '',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      })) as any;
+      })) as unknown as UseFormReturn<MockFormData>['getValues'];
 
       render(
         <GenerateUsernameButton

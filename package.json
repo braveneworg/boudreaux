@@ -118,6 +118,7 @@
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.0",
+    "eslint-plugin-unused-imports": "^4.3.0",
     "jsdom": "^26.0.0",
     "mime": "^4.0.4",
     "prettier": "^3.6.2",

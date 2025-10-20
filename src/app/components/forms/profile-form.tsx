@@ -13,11 +13,11 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Separator } from '@radix-ui/react-separator';
 import { useSession } from 'next-auth/react';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { GenerateUsernameButton } from '@/app/components/auth/generate-username-button';
-import { CheckboxField, StateField, TextField, CountryField } from '@/app/components/forms/fields';
+import { StateField, TextField, CountryField } from '@/app/components/forms/fields';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -41,6 +41,8 @@ import { splitFullName } from '@/app/lib/utils/auth/split-full-name';
 import changeEmailSchema from '@/app/lib/validation/change-email-schema';
 import usernameSchema from '@/app/lib/validation/change-username-schema';
 import profileSchema from '@/app/lib/validation/profile-schema';
+
+import { Switch } from '../ui/switch';
 
 const initialFormState: FormState = {
   errors: {},
@@ -393,7 +395,10 @@ export default function ProfileForm() {
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your personal details</CardDescription>
+          <CardDescription>
+            Update your personal details. This will not be shared publicly with anyone. They&apos;re
+            only used to enhance your experience.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...personalProfileForm}>
@@ -451,12 +456,24 @@ export default function ProfileForm() {
                 />
               </div>
               <CountryField control={personalProfileForm.control} />
-              <CheckboxField
-                control={personalProfileForm.control}
-                name="allowSmsNotifications"
-                label="Allow SMS notifications"
-                id="allowSmsNotifications"
-              />
+              <div className="flex items-center rounded-lg p-4">
+                <Controller
+                  name="allowSmsNotifications"
+                  control={personalProfileForm.control}
+                  render={({ field }) => (
+                    <Switch
+                      id="allowSmsNotifications"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <div className="ml-2 space-y-0.5">
+                  <label htmlFor="allowSmsNotifications" className="text-sm font-medium">
+                    Allow SMS notifications
+                  </label>
+                </div>
+              </div>
               <Button
                 type="submit"
                 disabled={!isPersonalFormDirty || isPending || isTransitionPending}
@@ -474,7 +491,10 @@ export default function ProfileForm() {
       <Card>
         <CardHeader>
           <CardTitle>Email Address</CardTitle>
-          <CardDescription>Manage your email address</CardDescription>
+          <CardDescription>
+            Manage your email address. This will not be shared publicly with anyone. We may contact
+            you from time to time to keep you up-to-date.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...changeEmailForm}>
