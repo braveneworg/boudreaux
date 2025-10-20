@@ -390,7 +390,7 @@ export default function ProfileForm() {
   const isUsernameFormDirty = changeUsernameForm.formState.isDirty;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden">
       {/* Personal Information */}
       <Card>
         <CardHeader>
@@ -407,7 +407,7 @@ export default function ProfileForm() {
               className="space-y-4"
               data-testid="form"
             >
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
                 <TextField
                   control={personalProfileForm.control}
                   name="firstName"
@@ -440,7 +440,7 @@ export default function ProfileForm() {
                 label="Address Line 2"
                 placeholder="Apt 4B"
               />
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 <TextField
                   control={personalProfileForm.control}
                   name="city"

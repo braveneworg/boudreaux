@@ -1,5 +1,5 @@
-@import "tw-animate-css";
-@import "tailwindcss";
+@import 'tw-animate-css';
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -54,7 +54,7 @@
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --popover-foreground: #fff;
   --primary: oklch(0.21 0.006 285.885);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.967 0.001 286.375);
@@ -120,12 +120,19 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    @apply overflow-x-hidden;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
   }
   a {
     @apply underline-offset-4;
-    &:hover { @apply underline }
-    &:visited { @apply text-[var(--color-rebecca-purple)] }
+    &:hover {
+      @apply underline;
+    }
+    &:visited {
+      @apply text-[var(--color-rebecca-purple)];
+    }
   }
 }
