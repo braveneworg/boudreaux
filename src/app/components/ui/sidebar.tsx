@@ -592,7 +592,16 @@ function SidebarMenuSkeleton({
 }) {
   // Random width between 50 to 90%.
   // Use useState with lazy initializer to ensure Math.random() is only called once on mount
-  const [width] = React.useState(() => `${Math.floor(Math.random() * 40) + 50}%`);
+  const SKELETON_WIDTH_MIN = 50;
+  const SKELETON_WIDTH_RANGE = 40;
+
+  // ... (keep existing code) ...
+
+  // Random width between 50 to 90%.
+  // Use useState with lazy initializer to ensure Math.random() is only called once on mount
+  const [width] = React.useState(
+    () => `${Math.floor(Math.random() * SKELETON_WIDTH_RANGE) + SKELETON_WIDTH_MIN}%`
+  );
 
   return (
     <div
