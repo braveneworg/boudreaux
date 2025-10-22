@@ -137,35 +137,46 @@ describe('SignedinToolbar', () => {
   });
 
   describe('sign out functionality', () => {
-    it('calls signOut with redirect: false when sign out button is clicked', () => {
+    it('calls signOut with redirect: false and callbackUrl when sign out button is clicked', async () => {
       mockUseIsMobile.mockReturnValue(false);
+      mockSignOut.mockResolvedValue({ url: '/' });
       render(<SignedinToolbar />);
 
       const signOutButton = screen.getByRole('button', { name: /sign out/i });
       fireEvent.click(signOutButton);
 
-      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+      // Wait for async signOut to be called
+      await vi.waitFor(() => {
+        expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
+      });
     });
 
-    it('navigates to success/signout page after sign out', () => {
+    it('navigates to URL returned from signOut', async () => {
       mockUseIsMobile.mockReturnValue(false);
+      mockSignOut.mockResolvedValue({ url: '/custom-url' });
       render(<SignedinToolbar />);
 
       const signOutButton = screen.getByRole('button', { name: /sign out/i });
       fireEvent.click(signOutButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/success/signout');
+      // Wait for async operations to complete
+      await vi.waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/custom-url');
+      });
     });
 
-    it('handles sign out click on mobile', () => {
+    it('handles sign out click on mobile', async () => {
       mockUseIsMobile.mockReturnValue(true);
+      mockSignOut.mockResolvedValue({ url: '/' });
       render(<SignedinToolbar />);
 
       const signOutButton = screen.getByRole('button', { name: /sign out/i });
       fireEvent.click(signOutButton);
 
-      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
-      expect(mockPush).toHaveBeenCalledWith('/success/signout');
+      await vi.waitFor(() => {
+        expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
+        expect(mockPush).toHaveBeenCalledWith('/');
+      });
     });
   });
 

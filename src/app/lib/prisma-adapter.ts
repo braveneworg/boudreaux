@@ -10,9 +10,11 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
     ...baseAdapter,
     ...baseAdapter,
     createUser: async (data) => {
+      // Exclude id from data to let MongoDB auto-generate ObjectId
+      const { id: _id, ...userData } = data;
       const user = await p.user.create({
         data: {
-          ...data,
+          ...userData,
         },
       });
       return {
@@ -21,7 +23,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
-        username: user.username || '',
+        username: user.username ?? undefined,
       };
     },
 
@@ -38,7 +40,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
-        username: user.username || '',
+        username: user.username ?? undefined,
       };
     },
 
@@ -55,7 +57,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
-        username: user.username || '',
+        username: user.username ?? undefined,
       };
     },
 
@@ -73,7 +75,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: account.user.email!,
         emailVerified: account.user.emailVerified,
         image: account.user.image,
-        username: account.user.username || '',
+        username: account.user.username ?? undefined,
       };
     },
 
@@ -90,7 +92,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         email: user.email!,
         emailVerified: user.emailVerified,
         image: user.image,
-        username: user.username || '',
+        username: user.username ?? undefined,
       };
     },
   } as Adapter;

@@ -100,8 +100,10 @@ describe('CustomPrismaAdapter', () => {
 
       const result = await adapter.createUser(userData);
 
+      // id should be excluded from the data passed to Prisma (MongoDB auto-generates ObjectId)
+      const { id: _id, ...expectedData } = userData;
       expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: userData,
+        data: expectedData,
       });
 
       expect(result).toEqual({
@@ -110,7 +112,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -137,8 +139,10 @@ describe('CustomPrismaAdapter', () => {
 
       const result = await adapter.createUser(userData);
 
+      // id should be excluded from the data passed to Prisma (MongoDB auto-generates ObjectId)
+      const { id: _id, ...expectedData } = userData;
       expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: userData,
+        data: expectedData,
       });
 
       expect(result).toEqual({
@@ -193,7 +197,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: createdUser.emailVerified,
         image: 'avatar.jpg',
-        username: '',
+        username: undefined,
       });
 
       expect(result).not.toHaveProperty('extraField');
@@ -225,7 +229,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -270,7 +274,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -334,7 +338,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -419,7 +423,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'updated@example.com',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -459,7 +463,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'new@example.com',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -527,7 +531,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: updateData.emailVerified,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 

@@ -28,9 +28,9 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
       {!isMobile && <VerticalSeparator />}
       <Button
         variant="link:narrow"
-        onClick={() => {
-          signOut({ redirect: false });
-          router.push('/success/signout');
+        onClick={async () => {
+          const { url } = await signOut({ redirect: false, callbackUrl: '/' });
+          router.push(url);
         }}
       >
         <LogOutIcon />
