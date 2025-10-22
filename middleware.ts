@@ -17,12 +17,12 @@ export async function middleware(request: NextRequest) {
     /^\/success\/.*/, // /success/* with wildcard
     /^\/api\/health/, // Health check endpoint should be public
   ];
+  const isPublicRoute = publicRoutes.some((route) => route.test(pathname));
 
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
   });
-  const isPublicRoute = publicRoutes.some((route) => route.test(pathname));
 
   // Return early for public routes
   if (isPublicRoute) {

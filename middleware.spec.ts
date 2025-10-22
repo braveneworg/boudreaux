@@ -193,8 +193,7 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/dashboard');
       const result = await middleware(request);
 
-      // First it hits the redirect to callbackUrl logic, then admin logic
-      // Since user is authenticated but route isn't public and callbackUrl !== pathname
+      // Middleware redirects to callbackUrl ('/' by default) before checking admin role
       expect(result.type).toBe('redirect');
       expect(result.url).toBe('https://example.com/');
     });
@@ -255,13 +254,13 @@ describe('middleware', () => {
     it('should reject non-admin users when callbackUrl matches pathname', async () => {
       mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
 
-      // Set callbackUrl to match pathname to avoid redirect
+      // Set callbackUrl to match pathname to avoid redirect at line 39
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
       const result = (await middleware(request)) as unknown as MockResponse;
 
-      // Updated: Now returns 403 JSON instead of redirect
+      // When callbackUrl matches, falls through to admin check which returns 403
       expect(result.type).toBe('json');
       expect(result.data).toEqual({ error: 'Forbidden' });
       expect(result.init).toEqual({ status: 403 });
@@ -314,13 +313,13 @@ describe('middleware', () => {
     it('should handle token with missing role property', async () => {
       mockGetToken.mockResolvedValue(createMockToken({ role: undefined } as unknown as JWT));
 
-      // Set callbackUrl to match pathname to avoid redirect
+      // Set callbackUrl to match pathname to reach admin check
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
       const result = (await middleware(request)) as unknown as MockResponse;
 
-      // Updated: Now returns 403 JSON instead of redirect
+      // Falls through to admin check which returns 403 for missing role
       expect(result.type).toBe('json');
       expect(result.data).toEqual({ error: 'Forbidden' });
       expect(result.init).toEqual({ status: 403 });
@@ -329,13 +328,13 @@ describe('middleware', () => {
     it('should handle token with null role property', async () => {
       mockGetToken.mockResolvedValue(createMockToken({ role: null } as unknown as JWT));
 
-      // Set callbackUrl to match pathname to avoid redirect
+      // Set callbackUrl to match pathname to reach admin check
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
       });
       const result = (await middleware(request)) as unknown as MockResponse;
 
-      // Updated: Now returns 403 JSON instead of redirect
+      // Falls through to admin check which returns 403 for null role
       expect(result.type).toBe('json');
       expect(result.data).toEqual({ error: 'Forbidden' });
       expect(result.init).toEqual({ status: 403 });
@@ -353,6 +352,287 @@ describe('middleware', () => {
       expect(config.matcher).toContain(
         '/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|public).*)'
       );
+    });
+  });
+
+  describe('security logging', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let consoleWarnSpy: any;
+
+    beforeEach(() => {
+      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should log unauthorized admin access attempts with user details', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: 'user', sub: '123' }));
+
+      const request = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      await middleware(request);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Unauthorized admin access attempt:',
+        expect.objectContaining({
+          userId: '123',
+          attemptedPath: '/admin/dashboard',
+          userRole: 'user',
+          timestamp: expect.any(String),
+        })
+      );
+    });
+
+    it('should log IP address from x-forwarded-for header', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
+
+      const mockRequest = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      mockRequest.headers.get = vi.fn((header) =>
+        header === 'x-forwarded-for' ? '192.168.1.100' : null
+      );
+
+      await middleware(mockRequest);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Unauthorized admin access attempt:',
+        expect.objectContaining({
+          ip: '192.168.1.100',
+        })
+      );
+    });
+
+    it('should log IP address from x-real-ip header when x-forwarded-for is not available', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
+
+      const mockRequest = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      mockRequest.headers.get = vi.fn((header) => (header === 'x-real-ip' ? '10.0.0.50' : null));
+
+      await middleware(mockRequest);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Unauthorized admin access attempt:',
+        expect.objectContaining({
+          ip: '10.0.0.50',
+        })
+      );
+    });
+
+    it('should log "none" for userRole when role is undefined', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: undefined } as unknown as JWT));
+
+      const request = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      await middleware(request);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Unauthorized admin access attempt:',
+        expect.objectContaining({
+          userRole: 'none',
+        })
+      );
+    });
+  });
+
+  describe('advanced edge cases', () => {
+    it('should handle double-encoded URLs', async () => {
+      mockGetToken.mockResolvedValue(null);
+
+      const doubleEncodedPath = encodeURIComponent(encodeURIComponent('/profile'));
+      const request = createMockRequest(`/${doubleEncodedPath}`);
+      const result = await middleware(request);
+
+      // Should still redirect to signin regardless of encoding
+      expect(result.type).toBe('redirect');
+    });
+
+    it('should handle URLs with special characters', async () => {
+      mockGetToken.mockResolvedValue(createMockToken());
+
+      const request = createMockRequest('/profile?name=John%20Doe&email=test%40example.com', {
+        searchParams: { callbackUrl: '/profile' },
+      });
+      const result = await middleware(request);
+
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('should handle requests with hash fragments', async () => {
+      mockGetToken.mockResolvedValue(createMockToken());
+
+      const request = createMockRequest('/profile#section', {
+        searchParams: { callbackUrl: '/profile' },
+      });
+      const result = await middleware(request);
+
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('should handle very long pathnames', async () => {
+      mockGetToken.mockResolvedValue(createMockToken());
+
+      const longPath = '/profile/' + 'a'.repeat(1000);
+      const request = createMockRequest(longPath, {
+        searchParams: { callbackUrl: longPath },
+      });
+      const result = await middleware(request);
+
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('should handle multiple query parameters correctly', async () => {
+      mockGetToken.mockResolvedValue(null);
+
+      const request = createMockRequest('/profile?sort=asc&filter=active&page=2');
+      const result = await middleware(request);
+
+      expect(result.type).toBe('redirect');
+      const url = new URL(result.url);
+      expect(url.pathname).toBe('/signin');
+      // Current middleware only preserves pathname, not query params
+      expect(url.searchParams.get('callbackUrl')).toBe('/profile');
+    });
+  });
+
+  describe('security - open redirect prevention', () => {
+    it('should handle callbackUrl with absolute external URL', async () => {
+      mockGetToken.mockResolvedValue(null);
+
+      const request = createMockRequest('/profile', {
+        searchParams: { callbackUrl: 'https://evil.com/phishing' },
+      });
+      const result = await middleware(request);
+
+      // The middleware will still redirect, but URL constructor ensures same-origin
+      expect(result.type).toBe('redirect');
+      // Verify it doesn't redirect to external domain
+      const url = new URL(result.url);
+      expect(url.hostname).toBe('example.com');
+    });
+
+    it('should handle callbackUrl with protocol-relative URL', async () => {
+      mockGetToken.mockResolvedValue(null);
+
+      const request = createMockRequest('/profile', {
+        searchParams: { callbackUrl: '//evil.com/phishing' },
+      });
+      const result = await middleware(request);
+
+      expect(result.type).toBe('redirect');
+      const url = new URL(result.url);
+      expect(url.hostname).toBe('example.com');
+    });
+
+    it('should sanitize javascript: protocol in callbackUrl', async () => {
+      mockGetToken.mockResolvedValue(null);
+
+      const request = createMockRequest('/profile', {
+        searchParams: { callbackUrl: 'javascript:alert(1)' },
+      });
+
+      // Current middleware doesn't explicitly validate - URL constructor handles it
+      // This test documents behavior but may throw depending on URL parsing
+      const result = await middleware(request);
+      
+      // If it doesn't throw, it should redirect to signin
+      expect(result.type).toBe('redirect');
+    });
+  });
+
+  describe('performance and reliability', () => {
+    it('should handle concurrent requests without race conditions', async () => {
+      mockGetToken.mockResolvedValue(createMockToken());
+
+      const requests = Array.from({ length: 10 }, () =>
+        createMockRequest('/profile', {
+          searchParams: { callbackUrl: '/profile' },
+        })
+      );
+
+      const results = await Promise.all(requests.map((req) => middleware(req)));
+
+      // All should return the same result
+      results.forEach((result) => {
+        expect(result).toEqual({ type: 'next' });
+      });
+    });
+
+    it('should complete token verification within reasonable time', async () => {
+      mockGetToken.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(createMockToken()), 10))
+      );
+
+      const request = createMockRequest('/profile', {
+        searchParams: { callbackUrl: '/profile' },
+      });
+
+      const start = Date.now();
+      await middleware(request);
+      const duration = Date.now() - start;
+
+      // Should complete within 100ms (including the 10ms mock delay)
+      expect(duration).toBeLessThan(100);
+    });
+
+    it('should handle getToken timeout gracefully', async () => {
+      mockGetToken.mockImplementation(
+        () => new Promise((_, reject) => setTimeout(() => reject(Error('Token fetch timeout')), 50))
+      );
+
+      const request = createMockRequest('/profile');
+
+      await expect(async () => {
+        await middleware(request);
+      }).rejects.toThrow('Token fetch timeout');
+    });
+  });
+
+  describe('role-based access variations', () => {
+    it('should reject admin access with empty string role', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: '' } as unknown as JWT));
+
+      const request = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      const result = (await middleware(request)) as unknown as MockResponse;
+
+      // Falls through to admin check which returns 403 for invalid role
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
+      expect(result.init).toEqual({ status: 403 });
+    });
+
+    it('should reject admin access with incorrect role casing', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: 'ADMIN' } as unknown as JWT));
+
+      const request = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      const result = (await middleware(request)) as unknown as MockResponse;
+
+      // Strict role matching - 'ADMIN' !== 'admin', returns 403
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
+    });
+
+    it('should handle numeric role values', async () => {
+      mockGetToken.mockResolvedValue(createMockToken({ role: 123 } as unknown as JWT));
+
+      const request = createMockRequest('/admin/dashboard', {
+        searchParams: { callbackUrl: '/admin/dashboard' },
+      });
+      const result = (await middleware(request)) as unknown as MockResponse;
+
+      // Numeric role doesn't match 'admin' string, returns 403
+      expect(result.type).toBe('json');
+      expect(result.data).toEqual({ error: 'Forbidden' });
     });
   });
 });
