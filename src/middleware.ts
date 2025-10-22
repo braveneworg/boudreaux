@@ -6,7 +6,11 @@ import { getToken } from 'next-auth/jwt';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const callbackUrl = request.nextUrl.searchParams.get('callbackUrl') || '/';
+  const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+  });
 
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -18,24 +22,25 @@ export async function middleware(request: NextRequest) {
     /^\/api\/health/, // Health check endpoint should be public
   ];
   const isPublicRoute = publicRoutes.some((route) => route.test(pathname));
+  const privateRoutes = [
+    /^\/profile/, // /profile and sub-routes
+  ];
+  const isPrivateRoute = privateRoutes.some((route) => route.test(pathname));
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
+  // Redirect unauthenticated users trying to access private routes
+  if (isPrivateRoute && !token) {
+    const signinUrl = new URL('/signin', request.url);
+    signinUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(signinUrl);
+  }
 
   // Return early for public routes
   if (isPublicRoute) {
     return NextResponse.next();
   }
 
-  // Redirect to the callbackUrl if on a public route with a callbackUrl and no token
-  if (callbackUrl && isPublicRoute && !token) {
-    return NextResponse.redirect(new URL(callbackUrl, request.url));
-  }
-
-  // Redirect to private callback url route if user is authenticated and the route isn't public
-  if (token && !isPublicRoute && callbackUrl && callbackUrl !== pathname) {
+  // Redirect to private callback url route if user is authenticated and has an explicit callbackUrl
+  if (token && callbackUrl && callbackUrl !== pathname) {
     return NextResponse.redirect(new URL(callbackUrl, request.url));
   }
 
@@ -75,17 +80,15 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - api/auth (Auth.js routes)
-     * - api/health (Health check endpoint)
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico (favicon)
-     * - public files (e.g., robots.txt, humans.txt)
-     * Also, specifically match /admin and /api/admin routes for role-based access
+     * Match authentication-protected routes explicitly.
+     * - /profile and all sub-routes
+     * - /admin and all sub-routes
+     * - /api/admin and all sub-routes
      */
+    '/profile',
+    '/profile/:path*',
+    '/admin',
     '/admin/:path*',
     '/api/admin/:path*',
-    '/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|public).*)',
   ],
 };

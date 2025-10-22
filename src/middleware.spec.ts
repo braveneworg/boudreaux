@@ -125,14 +125,12 @@ describe('middleware', () => {
     it('should allow authenticated users to access private routes', async () => {
       mockGetToken.mockResolvedValue(createMockToken());
 
-      // The middleware will redirect to callbackUrl (which defaults to '/') if user is authenticated
-      // and route isn't public and callbackUrl !== pathname
-      const request = createMockRequest('/profile'); // callbackUrl defaults to '/', pathname is '/profile'
+      const request = createMockRequest('/profile');
       const result = await middleware(request);
 
-      // This will redirect to '/' because callbackUrl='/' and pathname='/profile'
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/');
+      // Authenticated users should be allowed to access private routes
+      expect(result.type).toBe('next');
+      expect(mockNextResponse.next).toHaveBeenCalled();
     });
   });
 
@@ -187,15 +185,15 @@ describe('middleware', () => {
       expect(result.url).toBe('https://example.com/signin?callbackUrl=%2Fadmin%2Fdashboard');
     });
 
-    it('should redirect non-admin users trying to access admin routes', async () => {
+    it('should reject non-admin users trying to access admin routes with 403', async () => {
       mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
 
       const request = createMockRequest('/admin/dashboard');
-      const result = await middleware(request);
+      const result = (await middleware(request)) as unknown as MockResponse;
 
-      // Middleware redirects to callbackUrl ('/' by default) before checking admin role
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/');
+      // Non-admin users get 403 Forbidden
+      expect(result.type).toBe('json');
+      expect(result.init?.status).toBe(403);
     });
 
     it('should allow admin users to access admin routes', async () => {
@@ -210,9 +208,9 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/dashboard');
       const result = await middleware(request);
 
-      // Will redirect to callbackUrl first before checking admin role
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/');
+      // Admin users should be allowed through
+      expect(result.type).toBe('next');
+      expect(mockNextResponse.next).toHaveBeenCalled();
     });
 
     it('should handle nested admin routes', async () => {
@@ -227,9 +225,9 @@ describe('middleware', () => {
       const request = createMockRequest('/admin/users/manage');
       const result = await middleware(request);
 
-      // Will redirect to callbackUrl first
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/');
+      // Admin users should be allowed through
+      expect(result.type).toBe('next');
+      expect(mockNextResponse.next).toHaveBeenCalled();
     });
 
     it('should properly handle admin access when callbackUrl matches pathname', async () => {
@@ -347,11 +345,11 @@ describe('middleware', () => {
 
       expect(config).toBeDefined();
       expect(config.matcher).toBeInstanceOf(Array);
+      expect(config.matcher).toContain('/profile');
+      expect(config.matcher).toContain('/profile/:path*');
+      expect(config.matcher).toContain('/admin');
       expect(config.matcher).toContain('/admin/:path*');
       expect(config.matcher).toContain('/api/admin/:path*');
-      expect(config.matcher).toContain(
-        '/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|public).*)'
-      );
     });
   });
 
