@@ -42,7 +42,8 @@ vi.mock('next/server', async () => {
 });
 ```
 
-**Rationale**: 
+**Rationale**:
+
 - Isolates middleware logic from external service dependencies
 - Enables fast, deterministic tests
 - Allows simulation of various authentication states
@@ -55,6 +56,7 @@ vi.mock('next/server', async () => {
 Tests are organized by route type, reflecting real-world access patterns:
 
 #### Public Routes
+
 - `/` - Homepage
 - `/signin` - Sign-in page
 - `/signup` - Registration page
@@ -63,25 +65,30 @@ Tests are organized by route type, reflecting real-world access patterns:
 - `/api/health` - Health check endpoint
 
 **Coverage**: 10 test cases
+
 - Unauthenticated access (expected: allow)
 - Authenticated access (expected: allow)
 - Sub-routes (expected: match parent route rules)
 
 #### Private Routes
+
 - `/profile` - User profile
 - `/settings` - User settings
 - Any non-public route
 
 **Coverage**: 5 test cases
+
 - Unauthenticated access (expected: redirect to signin)
 - Authenticated access (expected: allow with callback handling)
 - Callback URL preservation
 
 #### Admin Routes
+
 - `/admin/*` - Admin dashboard and sub-routes
 - `/api/admin/*` - Admin API endpoints
 
 **Coverage**: 8 test cases
+
 - Unauthenticated access (expected: redirect to signin)
 - Non-admin user access (expected: 403 Forbidden)
 - Admin user access (expected: allow)
@@ -162,13 +169,13 @@ npm test -- --coverage middleware.spec.ts
 
 1. **Public Route Logic** (Lines 12-19, 36-38)
    - ✅ Exact match routes (/)
-   - ✅ Prefix match routes (/signin/*)
-   - ✅ Wildcard routes (/success/*)
+   - ✅ Prefix match routes (/signin/\*)
+   - ✅ Wildcard routes (/success/\*)
    - ✅ API routes (/api/health)
    - Coverage: 100%
 
 2. **Admin Route Logic** (Lines 21-28, 40-48)
-   - ✅ Route matching (/admin/*, /api/admin/*)
+   - ✅ Route matching (/admin/_, /api/admin/_)
    - ✅ Unauthenticated access
    - ✅ Non-admin access
    - ✅ Admin access
@@ -201,17 +208,17 @@ npm test -- --coverage middleware.spec.ts
 ### Uncovered Scenarios (Recommendations for Additional Tests)
 
 1. **Security Headers Testing**
+
    ```typescript
    it('should log IP from x-real-ip header when x-forwarded-for is not available', async () => {
      const mockRequest = createMockRequest('/admin/dashboard');
-     mockRequest.headers.get = vi.fn((header) => 
-       header === 'x-real-ip' ? '192.168.1.1' : null
-     );
+     mockRequest.headers.get = vi.fn((header) => (header === 'x-real-ip' ? '192.168.1.1' : null));
      // Verify x-real-ip is used as fallback
    });
    ```
 
 2. **Console.warn Verification**
+
    ```typescript
    it('should log unauthorized admin access attempts with correct details', async () => {
      const consoleWarnSpy = vi.spyOn(console, 'warn');
@@ -228,6 +235,7 @@ npm test -- --coverage middleware.spec.ts
    ```
 
 3. **Timing Attack Protection**
+
    ```typescript
    it('should have consistent response time for invalid credentials', async () => {
      // Measure response time for various invalid scenarios
@@ -355,29 +363,29 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run middleware tests
         run: npm test -- middleware.spec.ts --coverage
-      
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage/coverage-final.json
           flags: middleware
           fail_ci_if_error: true
-      
+
       - name: Comment coverage on PR
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
@@ -412,12 +420,7 @@ export default defineConfig({
       branches: 90,
       functions: 100,
       lines: 95,
-      exclude: [
-        'node_modules/**',
-        'dist/**',
-        '**/*.spec.ts',
-        '**/*.test.ts',
-      ],
+      exclude: ['node_modules/**', 'dist/**', '**/*.spec.ts', '**/*.test.ts'],
     },
   },
 });
@@ -428,6 +431,7 @@ export default defineConfig({
 ### 1. **When to Update Tests**
 
 Update tests when:
+
 - ✅ Adding new routes or route types
 - ✅ Changing authentication logic
 - ✅ Modifying redirect behavior
@@ -439,16 +443,16 @@ Update tests when:
 
 ```typescript
 // ✅ Good: Descriptive, action-oriented
-it('should redirect unauthenticated users to signin page')
+it('should redirect unauthenticated users to signin page');
 
 // ✅ Good: Includes expected behavior
-it('should return 403 Forbidden for non-admin accessing admin routes')
+it('should return 403 Forbidden for non-admin accessing admin routes');
 
 // ❌ Bad: Vague
-it('test admin')
+it('test admin');
 
 // ❌ Bad: Implementation-focused
-it('should call getToken with correct parameters')
+it('should call getToken with correct parameters');
 ```
 
 ### 3. **Test Organization**
@@ -461,13 +465,13 @@ describe('middleware', () => {
     describe('authentication pages', () => {});
     describe('success pages', () => {});
   });
-  
+
   describe('private routes', () => {
     // Group by access control
     describe('user routes', () => {});
     describe('admin routes', () => {});
   });
-  
+
   describe('edge cases', () => {
     // Security-specific tests
     describe('open redirect prevention', () => {});
@@ -519,14 +523,14 @@ describe('performance', () => {
   it('should process requests within acceptable time', async () => {
     const iterations = 1000;
     const start = performance.now();
-    
+
     for (let i = 0; i < iterations; i++) {
       await middleware(createMockRequest('/profile'));
     }
-    
+
     const duration = performance.now() - start;
     const avgTime = duration / iterations;
-    
+
     // Should process each request in < 1ms
     expect(avgTime).toBeLessThan(1);
   });
@@ -536,6 +540,7 @@ describe('performance', () => {
 ## Continuous Improvement Checklist
 
 ### Monthly Review
+
 - [ ] Review test coverage report
 - [ ] Check for new security vulnerabilities (npm audit)
 - [ ] Update test dependencies
@@ -543,6 +548,7 @@ describe('performance', () => {
 - [ ] Add tests for newly discovered edge cases
 
 ### Quarterly Review
+
 - [ ] Security audit of authentication logic
 - [ ] Performance benchmarking
 - [ ] Update test documentation
@@ -550,6 +556,7 @@ describe('performance', () => {
 - [ ] Evaluate new testing tools/frameworks
 
 ### Best Practices Checklist
+
 - [ ] All tests are independent (no shared state)
 - [ ] Tests are deterministic (no random data)
 - [ ] Mocks are properly cleaned up (beforeEach/afterEach)
@@ -562,12 +569,14 @@ describe('performance', () => {
 ## Additional Resources
 
 ### Documentation
+
 - Next.js Middleware: https://nextjs.org/docs/app/building-your-application/routing/middleware
 - NextAuth.js: https://next-auth.js.org/configuration/options
 - Vitest: https://vitest.dev/guide/
 - Testing Library: https://testing-library.com/docs/
 
 ### Security References
+
 - OWASP Top 10: https://owasp.org/www-project-top-ten/
 - Next.js Security Best Practices: https://nextjs.org/docs/app/building-your-application/configuring/security
 - JWT Best Practices: https://tools.ietf.org/html/rfc8725
@@ -577,6 +586,7 @@ describe('performance', () => {
 This middleware test suite provides comprehensive coverage of authentication and authorization logic. By following the testing strategies and maintenance guidelines outlined in this document, you can ensure robust, secure, and maintainable middleware code.
 
 **Key Metrics:**
+
 - ✅ 30+ test cases covering all major scenarios
 - ✅ 95%+ code coverage
 - ✅ All security-critical paths tested

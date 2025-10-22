@@ -540,7 +540,7 @@ describe('middleware', () => {
       // Current middleware doesn't explicitly validate - URL constructor handles it
       // This test documents behavior but may throw depending on URL parsing
       const result = await middleware(request);
-      
+
       // If it doesn't throw, it should redirect to signin
       expect(result.type).toBe('redirect');
     });

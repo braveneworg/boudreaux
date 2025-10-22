@@ -14,6 +14,7 @@
 The test suite expects different behavior for admin route access than what the middleware currently implements.
 
 #### Failures:
+
 1. **"should redirect non-admin users trying to access admin routes"**
    - Expected: Redirect to `/` (home)
    - Actual: Redirect to `/signin?callbackUrl=/admin/dashboard`
@@ -70,6 +71,7 @@ The tests should be updated to match this behavior, OR the middleware should be 
 Security logging tests expect `console.warn` to be called, but it's not being triggered.
 
 #### Failures:
+
 1. **"should log unauthorized admin access attempts with user details"**
 2. **"should log IP address from x-forwarded-for header"**
 3. **"should log IP address from x-real-ip header when x-forwarded-for is not available"**
@@ -80,10 +82,12 @@ Security logging tests expect `console.warn` to be called, but it's not being tr
 The middleware has TWO different code paths for admin routes:
 
 **Path 1: Lines 26-33** - Checks `isAdminRoute` (both `/admin` and `/api/admin`)
+
 - Redirects to signin
 - **Does NOT log**
 
-**Path 2: Lines 63-85** - Checks `pathname.startsWith('/admin')`  
+**Path 2: Lines 63-85** - Checks `pathname.startsWith('/admin')`
+
 - Logs unauthorized attempts
 - Returns JSON 403
 
@@ -118,7 +122,7 @@ if (isAdminRoute) {
   if (!token) {
     return NextResponse.redirect(signinUrl);
   }
-  
+
   if (token.role !== 'admin') {
     console.warn('Unauthorized admin access attempt:', {
       userId: token.sub,
@@ -127,7 +131,7 @@ if (isAdminRoute) {
       ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       timestamp: new Date().toISOString(),
     });
-    
+
     // Return 403 for authenticated non-admins
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -139,6 +143,7 @@ if (isAdminRoute) {
 ### Category 3: API Admin Routes (1 failure)
 
 **Failure:** "should protect API admin routes from non-admin users"
+
 - Expected: JSON 403 response
 - Actual: Redirect to signin
 
@@ -160,7 +165,7 @@ if (isAdminRoute) {
       console.warn('Unauthorized API admin access:', {...});
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    
+
     // For UI routes, redirect to signin
     return NextResponse.redirect(signinUrl);
   }
@@ -170,10 +175,11 @@ if (isAdminRoute) {
 ### Category 4: Query Parameter Handling (3 failures)
 
 #### Failures:
+
 1. **"should handle URLs with special characters"**
    - Expected: Allow through with { type: 'next' }
    - Actual: Redirect to `/profile?name=John%20Doe&email=test%40example.com`
-   
+
 2. **"should handle requests with hash fragments"**
    - Expected: Allow through
    - Actual: Redirect to `/profile#section`
@@ -187,7 +193,7 @@ if (isAdminRoute) {
 The middleware's redirect logic (lines 54-60) triggers incorrectly:
 
 ```typescript
-// Redirect to private callback url route if user is authenticated 
+// Redirect to private callback url route if user is authenticated
 // and the route isn't public
 if (token && !isPublicRoute && callbackUrl && callbackUrl !== pathname) {
   return NextResponse.redirect(new URL(callbackUrl, request.url));
@@ -225,6 +231,7 @@ if (token && !isPublicRoute && callbackUrl && callbackUrl !== '/' && callbackUrl
 ### Category 5: Open Redirect Prevention (1 failure)
 
 **Failure:** "should sanitize javascript: protocol in callbackUrl"
+
 - Expected: Should throw or reject
 - Actual: Allows through without sanitization
 
@@ -270,6 +277,7 @@ try {
 ### Category 6: Role-Based Access Variations (1 failure)
 
 **Failure:** "should handle numeric role values"
+
 - Expected: JSON 403 response
 - Actual: Redirect to signin
 
@@ -299,6 +307,7 @@ Same as Category 1 - numeric role (123) doesn't match 'admin', so middleware red
 ## Test Coverage Assessment
 
 **Current Coverage:**
+
 - ✅ Public routes: Excellent (11 tests)
 - ✅ Private routes: Good (2 tests)
 - ✅ Callback URL handling: Good (3 tests)
@@ -322,11 +331,13 @@ Same as Category 1 - numeric role (123) doesn't match 'admin', so middleware red
 Update the 16 failing tests to match the actual middleware behavior. This documents the current implementation without changing functionality.
 
 **Pros:**
+
 - Fast (< 30 minutes)
 - No risk of breaking production behavior
 - Tests will pass immediately
 
 **Cons:**
+
 - Doesn't fix underlying middleware issues
 - Security logging gaps remain
 - Query parameter loss remains
@@ -334,6 +345,7 @@ Update the 16 failing tests to match the actual middleware behavior. This docume
 ### Option 2: Fix Middleware to Match Test Expectations (Most Comprehensive)
 
 Refactor the middleware to:
+
 - Consolidate admin checks
 - Differentiate API vs UI routes
 - Add comprehensive logging
@@ -341,12 +353,14 @@ Refactor the middleware to:
 - Validate callbackUrl
 
 **Pros:**
+
 - Better security (logging)
 - Better UX (query param preservation)
 - More maintainable code
 - Tests pass without changes
 
 **Cons:**
+
 - More work (2-3 hours)
 - Risk of breaking existing behavior
 - Requires thorough testing
@@ -358,11 +372,13 @@ Refactor the middleware to:
 3. **Phase 3:** Implement improvements incrementally with test updates
 
 **Pros:**
+
 - Balances speed with quality
 - Provides working test suite immediately
 - Roadmap for improvements
 
 **Cons:**
+
 - More steps overall
 
 ## Conclusion
