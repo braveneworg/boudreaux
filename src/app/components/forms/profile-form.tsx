@@ -217,6 +217,7 @@ export default function ProfileForm() {
     control: changeEmailForm.control,
     name: 'confirmEmail',
   });
+
   useEffect(() => {
     if (watchedEmail && watchedConfirmEmail && watchedEmail === watchedConfirmEmail) {
       changeEmailForm.clearErrors('confirmEmail');
@@ -228,6 +229,7 @@ export default function ProfileForm() {
     control: changeUsernameForm.control,
     name: 'username',
   });
+
   const watchedConfirmUsername = useWatch({
     control: changeUsernameForm.control,
     name: 'confirmUsername',
@@ -406,6 +408,7 @@ export default function ProfileForm() {
               onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
               className="space-y-4"
               data-testid="form"
+              noValidate
             >
               <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
                 <TextField
@@ -502,6 +505,7 @@ export default function ProfileForm() {
               onSubmit={changeEmailForm.handleSubmit(onEditEmailSubmit)}
               className="space-y-4"
               data-testid="form"
+              noValidate
             >
               <TextField
                 control={changeEmailForm.control}
