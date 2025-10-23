@@ -84,6 +84,8 @@ describe('middleware', () => {
       '/success/signup',
       '/success/change-email',
       '/success/signout',
+      '/api/auth/session',
+      '/api/auth/signin',
       '/api/health',
     ];
 

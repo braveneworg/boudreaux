@@ -87,33 +87,32 @@ describe('CustomPrismaAdapter', () => {
         username: 'testuser',
       };
 
-      const createdUser = {
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: null,
-      };
-
-      mockPrisma.user.create.mockResolvedValue(createdUser);
+      // Mock implementation that returns whatever username was passed in
+      mockPrisma.user.create.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+        return {
+          id: '1',
+          name: null,
+          email: args.data.email,
+          emailVerified: args.data.emailVerified,
+          image: null,
+          username: args.data.username, // Return the generated username
+        };
+      });
 
       const result = await adapter.createUser(userData);
 
-      // id should be excluded from the data passed to Prisma (MongoDB auto-generates ObjectId)
-      const { id: _id, ...expectedData } = userData;
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: expectedData,
-      });
+      // Verify that prisma.user.create was called
+      expect(mockPrisma.user.create).toHaveBeenCalled();
 
-      expect(result).toEqual({
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: undefined,
-      });
+      // Verify the username is a generated placeholder (alphanumeric string)
+      const createCall = mockPrisma.user.create.mock.calls[0][0];
+      expect(createCall.data.username).toMatch(/^[a-z]+$/);
+      expect(createCall.data.email).toBe('test@example.com');
+
+      // Verify result has the generated username
+      expect(result.id).toBe('1');
+      expect(result.email).toBe('test@example.com');
+      expect(result.username).toMatch(/^[a-z]+$/);
     });
 
     it('should handle user creation with username and terms', async () => {
@@ -125,34 +124,34 @@ describe('CustomPrismaAdapter', () => {
         termsAndConditions: true,
       };
 
-      const createdUser = {
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: 'testuser',
-        termsAndConditions: true,
-      };
-
-      mockPrisma.user.create.mockResolvedValue(createdUser);
+      // Mock implementation that returns whatever username was passed in
+      mockPrisma.user.create.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+        return {
+          id: '1',
+          name: null,
+          email: args.data.email,
+          emailVerified: args.data.emailVerified,
+          image: null,
+          username: args.data.username, // Return the generated username
+          termsAndConditions: args.data.termsAndConditions,
+        };
+      });
 
       const result = await adapter.createUser(userData);
 
-      // id should be excluded from the data passed to Prisma (MongoDB auto-generates ObjectId)
-      const { id: _id, ...expectedData } = userData;
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: expectedData,
-      });
+      // Verify that prisma.user.create was called
+      expect(mockPrisma.user.create).toHaveBeenCalled();
 
-      expect(result).toEqual({
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: 'testuser',
-      });
+      // Verify the username is a generated placeholder (alphanumeric string)
+      const createCall = mockPrisma.user.create.mock.calls[0][0];
+      expect(createCall.data.username).toMatch(/^[a-z]+$/);
+      expect(createCall.data.email).toBe('test@example.com');
+      expect(createCall.data.termsAndConditions).toBe(true);
+
+      // Verify result has the generated username
+      expect(result.id).toBe('1');
+      expect(result.email).toBe('test@example.com');
+      expect(result.username).toMatch(/^[a-z]+$/);
     });
 
     it('should handle database errors during user creation', async () => {

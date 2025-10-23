@@ -19,6 +19,7 @@ export async function middleware(request: NextRequest) {
     /^\/signup/, // /register and sub-routes
     /^\/signout/,
     /^\/success\/.*/, // /success/* with wildcard
+    /^\/api\/auth/, // NextAuth.js API routes
     /^\/api\/health/, // Health check endpoint should be public
   ];
   const isPublicRoute = publicRoutes.some((route) => route.test(pathname));
