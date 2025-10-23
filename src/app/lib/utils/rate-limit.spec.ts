@@ -8,128 +8,126 @@ import { rateLimit } from './rate-limit';
  * In production, these would typically be IP addresses, user IDs, or session tokens.
  * The rate limiter only uses these as unique identifiers for tracking request counts.
  */
-describe('rate-limit', () => {
-  describe('rateLimit', () => {
-    it('should allow requests within limit', async () => {
-      const limiter = rateLimit({
-        interval: 60000, // 1 minute
-        uniqueTokenPerInterval: 500,
-      });
-
-      const token = 'test-token-1';
-
-      // Should allow 3 requests if limit is 3
-      await expect(limiter.check(3, token)).resolves.toBeUndefined();
-      await expect(limiter.check(3, token)).resolves.toBeUndefined();
-      await expect(limiter.check(3, token)).resolves.toBeUndefined();
+describe('rateLimit', () => {
+  it('should allow requests within limit', async () => {
+    const limiter = rateLimit({
+      interval: 60000, // 1 minute
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should reject requests exceeding limit', async () => {
-      const limiter = rateLimit({
-        interval: 60000,
-        uniqueTokenPerInterval: 500,
-      });
+    const token = 'test-token-1';
 
-      const token = 'test-token-2';
+    // Should allow 3 requests if limit is 3
+    await expect(limiter.check(3, token)).resolves.toBeUndefined();
+    await expect(limiter.check(3, token)).resolves.toBeUndefined();
+    await expect(limiter.check(3, token)).resolves.toBeUndefined();
+  });
 
-      // Use up the limit
-      await limiter.check(2, token);
-      await limiter.check(2, token);
-
-      // This should be rejected
-      await expect(limiter.check(2, token)).rejects.toThrow('Rate limit exceeded');
+  it('should reject requests exceeding limit', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should track different tokens independently', async () => {
-      const limiter = rateLimit({
-        interval: 60000,
-        uniqueTokenPerInterval: 500,
-      });
+    const token = 'test-token-2';
 
-      const token1 = 'user-a';
-      const token2 = 'user-b';
+    // Use up the limit
+    await limiter.check(2, token);
+    await limiter.check(2, token);
 
-      // Each token should have its own limit
-      await expect(limiter.check(1, token1)).resolves.toBeUndefined();
-      await expect(limiter.check(1, token2)).resolves.toBeUndefined();
+    // This should be rejected
+    await expect(limiter.check(2, token)).rejects.toThrow('Rate limit exceeded');
+  });
 
-      // token1 should be rate limited, but not token2
-      await expect(limiter.check(1, token1)).rejects.toThrow('Rate limit exceeded');
-      await expect(limiter.check(1, token2)).rejects.toThrow('Rate limit exceeded');
+  it('should track different tokens independently', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should handle zero limit', async () => {
-      const limiter = rateLimit({
-        interval: 60000,
-        uniqueTokenPerInterval: 500,
-      });
+    const token1 = 'user-a';
+    const token2 = 'user-b';
 
-      const token = 'test-token-zero';
+    // Each token should have its own limit
+    await expect(limiter.check(1, token1)).resolves.toBeUndefined();
+    await expect(limiter.check(1, token2)).resolves.toBeUndefined();
 
-      // With limit of 0, first request should fail
-      await expect(limiter.check(0, token)).rejects.toThrow('Rate limit exceeded');
+    // token1 should be rate limited, but not token2
+    await expect(limiter.check(1, token1)).rejects.toThrow('Rate limit exceeded');
+    await expect(limiter.check(1, token2)).rejects.toThrow('Rate limit exceeded');
+  });
+
+  it('should handle zero limit', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should handle high limit', async () => {
-      const limiter = rateLimit({
-        interval: 60000,
-        uniqueTokenPerInterval: 500,
-      });
+    const token = 'test-token-zero';
 
-      const token = 'test-token-high';
+    // With limit of 0, first request should fail
+    await expect(limiter.check(0, token)).rejects.toThrow('Rate limit exceeded');
+  });
 
-      // Should allow many requests
-      for (let i = 0; i < 100; i++) {
-        await expect(limiter.check(100, token)).resolves.toBeUndefined();
-      }
-
-      // 101st should fail
-      await expect(limiter.check(100, token)).rejects.toThrow('Rate limit exceeded');
+  it('should handle high limit', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should handle concurrent requests from same token', async () => {
-      const limiter = rateLimit({
-        interval: 60000,
-        uniqueTokenPerInterval: 500,
-      });
+    const token = 'test-token-high';
 
-      const token = 'concurrent-user';
+    // Should allow many requests
+    for (let i = 0; i < 100; i++) {
+      await expect(limiter.check(100, token)).resolves.toBeUndefined();
+    }
 
-      // Make concurrent requests
-      const requests = [
-        limiter.check(3, token),
-        limiter.check(3, token),
-        limiter.check(3, token),
-        limiter.check(3, token), // This one should fail
-      ];
+    // 101st should fail
+    await expect(limiter.check(100, token)).rejects.toThrow('Rate limit exceeded');
+  });
 
-      const results = await Promise.allSettled(requests);
-
-      // First 3 should succeed, 4th should fail
-      expect(results[0].status).toBe('fulfilled');
-      expect(results[1].status).toBe('fulfilled');
-      expect(results[2].status).toBe('fulfilled');
-      expect(results[3].status).toBe('rejected');
+  it('should handle concurrent requests from same token', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
     });
 
-    it('should use configured interval and token limit', async () => {
-      const limiter = rateLimit({
-        interval: 30000, // 30 seconds
-        uniqueTokenPerInterval: 100,
-      });
+    const token = 'concurrent-user';
 
-      const token = 'config-test-token';
+    // Make concurrent requests
+    const requests = [
+      limiter.check(3, token),
+      limiter.check(3, token),
+      limiter.check(3, token),
+      limiter.check(3, token), // This one should fail
+    ];
 
-      // Should work with provided values
-      await expect(limiter.check(5, token)).resolves.toBeUndefined();
-      await expect(limiter.check(5, token)).resolves.toBeUndefined();
-      await expect(limiter.check(5, token)).resolves.toBeUndefined();
-      await expect(limiter.check(5, token)).resolves.toBeUndefined();
-      await expect(limiter.check(5, token)).resolves.toBeUndefined();
+    const results = await Promise.allSettled(requests);
 
-      // 6th request should fail
-      await expect(limiter.check(5, token)).rejects.toThrow('Rate limit exceeded');
+    // First 3 should succeed, 4th should fail
+    expect(results[0].status).toBe('fulfilled');
+    expect(results[1].status).toBe('fulfilled');
+    expect(results[2].status).toBe('fulfilled');
+    expect(results[3].status).toBe('rejected');
+  });
+
+  it('should use configured interval and token limit', async () => {
+    const limiter = rateLimit({
+      interval: 30000, // 30 seconds
+      uniqueTokenPerInterval: 100,
     });
+
+    const token = 'config-test-token';
+
+    // Should work with provided values
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+
+    // 6th request should fail
+    await expect(limiter.check(5, token)).rejects.toThrow('Rate limit exceeded');
   });
 
   describe('real-world scenarios', () => {
