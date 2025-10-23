@@ -18,7 +18,7 @@ export default async function ProfilePage() {
           />
         </StickyBreadcrumbWrapper>
         <div className="mb-4">
-          <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+          <h1>Profile</h1>
           <p className="text-muted-foreground">
             Manage your account settings and personal information. We <strong>DO NOT sell</strong>{' '}
             your information.
