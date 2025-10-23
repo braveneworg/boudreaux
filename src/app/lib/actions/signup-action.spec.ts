@@ -179,16 +179,9 @@ describe('signupAction', () => {
     });
   });
 
-  describe('rate limiting', () => {
-    // Note: The rate limiter is created at module load time as a singleton,
-    // making it difficult to test the rate limit exceeded path in isolation.
-    // The rate limit error path (lines 40-45) is covered by integration tests.
-    it.skip('should return error when rate limit is exceeded', async () => {
-      // This test is skipped due to architectural limitations with mocking
-      // a singleton rate limiter that's created at module load time.
-      // The rate limit error handling is tested in integration tests instead.
-    });
-  });
+  // Note: Rate limiting is tested separately in src/app/lib/utils/rate-limit.spec.ts
+  // The rate limit error path in signup action (lines 40-45) requires integration testing
+  // due to architectural limitations with the singleton rate limiter created at module load time.
 
   describe('validation failures', () => {
     it('should return form state with errors when validation fails', async () => {
