@@ -208,6 +208,46 @@ describe('CheckboxField', () => {
     expect(screen.getByTestId('checkbox-input')).toBeInTheDocument();
   });
 
+  it('calls setValue with correct parameters when checkbox is changed', () => {
+    const setValue = vi.fn();
+    render(
+      <TestWrapper>
+        <CheckboxField {...defaultProps} setValue={setValue} />
+      </TestWrapper>
+    );
+
+    const checkbox = screen.getByTestId('checkbox-input');
+    fireEvent.click(checkbox);
+
+    expect(setValue).toHaveBeenCalledWith('testCheckbox', true, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  });
+
+  it('calls both setValue and onUserInteraction when both provided', () => {
+    const setValue = vi.fn();
+    const onUserInteraction = vi.fn();
+    render(
+      <TestWrapper>
+        <CheckboxField
+          {...defaultProps}
+          setValue={setValue}
+          onUserInteraction={onUserInteraction}
+        />
+      </TestWrapper>
+    );
+
+    const checkbox = screen.getByTestId('checkbox-input');
+    fireEvent.click(checkbox);
+
+    expect(onUserInteraction).toHaveBeenCalledTimes(1);
+    expect(setValue).toHaveBeenCalledWith('testCheckbox', true, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  });
+
   it('handles checkbox state changes', () => {
     render(
       <TestWrapper>

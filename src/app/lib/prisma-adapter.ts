@@ -9,6 +9,44 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
 
   return {
     ...baseAdapter,
+    // Override useVerificationToken to ensure emailVerified is updated
+    useVerificationToken: async (params) => {
+      try {
+        // Call the base adapter's useVerificationToken to consume the token
+        if (!baseAdapter.useVerificationToken) {
+          console.error('[CustomPrismaAdapter] useVerificationToken not found on base adapter');
+          return null;
+        }
+
+        const verificationToken = await baseAdapter.useVerificationToken(params);
+
+        if (verificationToken) {
+          // Update the user's emailVerified field when they use the token
+          try {
+            const user = await p.user.findUnique({
+              where: { email: params.identifier },
+            });
+
+            if (user && !user.emailVerified) {
+              await p.user.update({
+                where: { id: user.id },
+                data: { emailVerified: new Date() },
+              });
+            }
+          } catch (error) {
+            // Log error but don't fail the verification
+            console.error('[CustomPrismaAdapter] Error updating emailVerified:', error);
+          }
+        }
+
+        return verificationToken;
+      } catch (error) {
+        // Log and rethrow to maintain original behavior
+        console.error('[CustomPrismaAdapter] Error in useVerificationToken:', error);
+        throw error;
+      }
+    },
+
     createUser: async (data) => {
       // Exclude id from data to let MongoDB auto-generate ObjectId
       const { id: _id, ...userData } = data;
@@ -21,6 +59,24 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         });
 
         if (existingUser) {
+          // Update emailVerified if provided in data (e.g., from magic link verification)
+          // This ensures the user's email is marked as verified when they click the magic link
+          if (userData.emailVerified && userData.emailVerified !== existingUser.emailVerified) {
+            const updatedUser = await p.user.update({
+              where: { id: existingUser.id },
+              data: { emailVerified: userData.emailVerified },
+            });
+
+            return {
+              id: updatedUser.id,
+              name: updatedUser.name,
+              email: updatedUser.email!,
+              emailVerified: updatedUser.emailVerified,
+              image: updatedUser.image,
+              username: updatedUser.username ?? undefined,
+            };
+          }
+
           return {
             id: existingUser.id,
             name: existingUser.name,

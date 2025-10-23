@@ -201,6 +201,120 @@ describe('CustomPrismaAdapter', () => {
 
       expect(result).not.toHaveProperty('extraField');
     });
+
+    it('should update emailVerified for existing user when provided', async () => {
+      const newVerificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: null, // Not yet verified
+        image: null,
+        username: 'existinguser',
+      };
+
+      const updatedUser = {
+        ...existingUser,
+        emailVerified: newVerificationDate,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should update the existing user's emailVerified
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'existing-id' },
+        data: { emailVerified: newVerificationDate },
+      });
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        image: null,
+        username: 'existinguser',
+      });
+    });
+
+    it('should not update emailVerified if it has not changed', async () => {
+      const verificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate, // Already verified with same date
+        image: null,
+        username: 'existinguser',
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should NOT call update since emailVerified is the same
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        image: null,
+        username: 'existinguser',
+      });
+    });
+
+    it('should not update emailVerified if new value is null', async () => {
+      const oldVerificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: null,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: oldVerificationDate, // Already verified
+        image: null,
+        username: 'existinguser',
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should NOT call update when emailVerified is null
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: oldVerificationDate,
+        image: null,
+        username: 'existinguser',
+      });
+    });
   });
 
   describe('getUser', () => {

@@ -205,6 +205,69 @@ describe('signupAction', () => {
       expect(mockAdapter.createUser).not.toHaveBeenCalled();
       expect(mockSignIn).not.toHaveBeenCalled();
     });
+
+    it('should return error when email security validation fails', async () => {
+      const mockFormState: FormState = {
+        fields: { email: 'disposable@tempmail.com', termsAndConditions: true },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'disposable@tempmail.com', termsAndConditions: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      // Mock email security to fail
+      const { validateEmailSecurity } = await import('@/app/lib/utils/email-security');
+      vi.mocked(validateEmailSecurity).mockReturnValueOnce({
+        isValid: false,
+        error: 'Disposable email addresses are not allowed',
+      });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.email).toEqual(['Disposable email addresses are not allowed']);
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it('should return generic error when email security validation fails without error message', async () => {
+      const mockFormState: FormState = {
+        fields: { email: 'invalid@example.com', termsAndConditions: true },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'invalid@example.com', termsAndConditions: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      // Mock email security to fail without specific error
+      const { validateEmailSecurity } = await import('@/app/lib/utils/email-security');
+      vi.mocked(validateEmailSecurity).mockReturnValueOnce({
+        isValid: false,
+      });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.email).toEqual(['Invalid email address']);
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('database errors', () => {
@@ -245,6 +308,60 @@ describe('signupAction', () => {
       expect(result.errors?.email).toEqual(['Account with this email already exists']);
     });
 
+    it('should handle duplicate email errors when formState.errors is undefined', async () => {
+      const duplicateEmailError = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        {
+          code: 'P2002',
+          clientVersion: '4.0.0',
+          meta: { target: 'User_email_key' },
+        }
+      );
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com', termsAndConditions: true },
+        success: false,
+        hasTimeout: false,
+        // errors property is undefined
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com', termsAndConditions: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.email).toEqual(['Account with this email already exists']);
+    });
+
+    it('should handle P2002 error with different target (not email)', async () => {
+      const duplicateUsernameError = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        {
+          code: 'P2002',
+          clientVersion: '4.0.0',
+          meta: { target: 'User_username_key' },
+        }
+      );
+
+      mockAdapter.createUser.mockRejectedValue(duplicateUsernameError);
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+    });
+
     it('should handle timeout errors', async () => {
       const timeoutError = new Error('Connection ETIMEOUT');
       mockAdapter.createUser.mockRejectedValue(timeoutError);
@@ -253,6 +370,36 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.hasTimeout).toBe(true);
+      expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
+    });
+
+    it('should handle timeout errors when formState.errors is undefined', async () => {
+      const timeoutError = new Error('timeout exceeded');
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com', termsAndConditions: true },
+        success: false,
+        hasTimeout: false,
+        // errors property is undefined
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com', termsAndConditions: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockAdapter.createUser.mockRejectedValue(timeoutError);
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.hasTimeout).toBe(true);
+      expect(result.errors).toBeDefined();
       expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
     });
 
