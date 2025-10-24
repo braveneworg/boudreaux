@@ -1,4 +1,4 @@
-import { Spinner } from '@/app/components/ui/spinners/spinner-ring-circle';
+import { SpinnerRingCircle } from '@/app/components/ui/spinners/spinner-ring-circle';
 
 export default function TestSpinnerPage() {
   return (
@@ -9,21 +9,21 @@ export default function TestSpinnerPage() {
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-lg">Small - Default</h2>
           <div className="flex h-24 w-24 items-center justify-center bg-slate-100">
-            <Spinner size="sm" variant="default" />
+            <SpinnerRingCircle size="sm" variant="default" />
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-lg">Medium - Primary</h2>
           <div className="flex h-24 w-24 items-center justify-center bg-slate-100">
-            <Spinner size="md" variant="primary" />
+            <SpinnerRingCircle size="md" variant="primary" />
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-lg">Large - Accent</h2>
           <div className="flex h-32 w-32 items-center justify-center bg-slate-100">
-            <Spinner size="lg" variant="accent" />
+            <SpinnerRingCircle size="lg" variant="accent" />
           </div>
         </div>
       </div>

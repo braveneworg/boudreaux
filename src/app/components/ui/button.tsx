@@ -55,13 +55,13 @@ function Button({
   const Comp = asChild ? Slot : 'button';
   const router = useRouter();
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = (e: React.MouseEvent<HTMLElement>) => {
     try {
       if (href && (variant === 'link' || variant === 'link:narrow')) {
         e.preventDefault();
         router.push(href);
       }
-      onClick?.(e);
+      onClick?.(e as React.MouseEvent<HTMLButtonElement>);
     } catch (error) {
       // Log error but don't break the UI
       console.error('Button click error:', error);
