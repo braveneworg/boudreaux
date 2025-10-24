@@ -1,40 +1,48 @@
 import { useSession } from 'next-auth/react';
 
+import { CONSTANTS } from '@/app/lib/constants';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { log } from '@/app/lib/utils/console-logger';
 
 import SignInLink from './signin-link';
 import SignedinToolbar from './signout-button';
 import SignUpLink from './signup-link';
+import { LoadingSpinner } from '../ui/loading-spinner';
 import VerticalSeparator from '../ui/vertical-separator';
 
 const AuthToolbar = ({ className }: { className?: string }) => {
   const { data: session, status } = useSession();
+  const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
+  const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
+  const loggingPrefix = '[AuthToolbar]';
 
   // Debug logging in development
-  if (process.env.NODE_ENV === 'development') {
-    console.info('[AuthToolbar] Session status:', status);
-    console.info('[AuthToolbar] Session data:', session);
-    console.info('[AuthToolbar] User data:', session?.user);
-    console.info('[AuthToolbar] Username:', session?.user?.username);
+  if (isDevelopment) {
+    log(loggingPrefix, 'Session status:', status);
+    log(loggingPrefix, 'Session data:', session);
+    log(loggingPrefix, 'User data:', session?.user);
+    log(loggingPrefix, 'Username:', session?.user?.username);
   }
 
   // Show loading state or nothing while checking authentication
-  if (status === 'loading') {
-    return (
-      <div className={cn('flex items-center justify-center gap-2', className)}>
-        <span className="text-sm text-muted-foreground">Loading...</span>
-      </div>
-    );
+  if (status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
+    return <LoadingSpinner />;
   }
 
   // Show authenticated toolbar if user is logged in
-  if (status === 'authenticated' && session) {
-    console.info('[AuthToolbar] Rendering authenticated toolbar');
+  if (status === CONSTANTS.AUTHENTICATION.STATUS.AUTHENTICATED && session) {
+    if (isAdmin) {
+      if (isDevelopment) {
+        log(loggingPrefix, 'User role:', session.user.role || CONSTANTS.NA);
+      }
+    }
+
+    log(loggingPrefix, 'Rendering authenticated toolbar');
     return <SignedinToolbar className={className} />;
   }
 
   // Show sign in/up links for unauthenticated users
-  console.info('[AuthToolbar] Rendering unauthenticated links');
+  log(loggingPrefix, 'Rendering unauthenticated links');
   return (
     <div className={cn('flex items-center justify-center gap-2', className)}>
       <SignInLink />

@@ -1,4 +1,8 @@
+'use client';
+
 import * as React from 'react';
+
+import { useRouter } from 'next/navigation';
 
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
@@ -40,17 +44,35 @@ function Button({
   variant,
   size,
   asChild = false,
+  href,
+  onClick,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    href?: string;
   }) {
   const Comp = asChild ? Slot : 'button';
+  const router = useRouter();
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    try {
+      if (href && (variant === 'link' || variant === 'link:narrow')) {
+        e.preventDefault();
+        router.push(href);
+      }
+      onClick?.(e);
+    } catch (error) {
+      // Log error but don't break the UI
+      console.error('Button click error:', error);
+    }
+  };
 
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={handleClick}
       {...props}
     />
   );

@@ -64,14 +64,23 @@ describe('middleware', () => {
     } as unknown as NextRequest;
   };
 
-  const createMockToken = (overrides: Partial<JWT> = {}): JWT =>
-    ({
+  const createMockToken = (overrides: Partial<JWT> = {}): JWT => {
+    const { role, email, name, ...rest } = overrides;
+    const hasRole = 'role' in overrides;
+
+    return {
       sub: '1',
-      email: 'test@example.com',
-      name: 'Test User',
-      role: 'user',
-      ...overrides,
-    }) as JWT;
+      email: email || 'test@example.com',
+      name: name || 'Test User',
+      user: {
+        id: '1',
+        email: email || 'test@example.com',
+        name: name || 'Test User',
+        ...(hasRole && role !== undefined ? { role } : hasRole ? {} : { role: 'user' }),
+      },
+      ...rest,
+    } as JWT;
+  };
 
   describe('public routes', () => {
     const publicRoutes = [

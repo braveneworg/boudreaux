@@ -1,9 +1,13 @@
+import { StickyBreadcrumbWrapper } from '@/app/components/ui/sticky-breadcrumb-wrapper';
+
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 
 export default function AdminPage() {
   return (
     <div>
-      <BreadcrumbMenu items={[{ anchorText: 'Admin', url: '/admin', isActive: true }]} />
+      <StickyBreadcrumbWrapper>
+        <BreadcrumbMenu items={[{ anchorText: 'Admin', url: '/admin', isActive: true }]} />
+      </StickyBreadcrumbWrapper>
       <h1>Admin Dashboard</h1>
       <h2>Releases 🎉</h2>
       {/* Release management components would go here */}

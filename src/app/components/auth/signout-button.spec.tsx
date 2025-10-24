@@ -7,8 +7,10 @@ import SignedinToolbar from './signout-button';
 
 // Mock next-auth
 const mockSignOut = vi.fn();
+const mockUseSession = vi.fn();
 vi.mock('next-auth/react', () => ({
   signOut: (options?: { redirect?: boolean }) => mockSignOut(options),
+  useSession: () => mockUseSession(),
 }));
 
 // Mock next/navigation
@@ -81,6 +83,18 @@ vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
 describe('SignedinToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set up default session mock
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: '1',
+          email: 'test@example.com',
+          name: 'Test User',
+          role: 'user',
+        },
+      },
+      status: 'authenticated',
+    });
   });
 
   describe('rendering', () => {

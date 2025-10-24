@@ -1,19 +1,29 @@
 import { useRouter } from 'next/navigation';
 
 import { LogOutIcon } from 'lucide-react';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
+import { CONSTANTS } from '@/app/lib/constants';
 import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 
+import AdminLink from './admin-link';
 import EditProfileButton from './edit-profile-button';
 import SignedInAs from './signed-in-as';
 import { Button } from '../ui/button';
 import VerticalSeparator from '../ui/vertical-separator';
 
+const Separator = () => {
+  const isMobile = useIsMobile();
+
+  return !isMobile ? <VerticalSeparator /> : null;
+};
+
 // Use in hamburger menu on mobile
 const SignedinToolbar = ({ className }: { className?: string }) => {
+  const { data: session } = useSession();
   const isMobile = useIsMobile();
+  const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
   const router = useRouter();
 
   return (
@@ -25,7 +35,7 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
       )}
     >
       <SignedInAs />
-      {!isMobile && <VerticalSeparator />}
+      <Separator />
       <Button
         variant="link:narrow"
         onClick={async () => {
@@ -36,8 +46,15 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
         <LogOutIcon />
         Sign Out
       </Button>
-      {!isMobile && <VerticalSeparator />}
+      <Separator />
       <EditProfileButton />
+      {isAdmin && (
+        <>
+          {' '}
+          <Separator />
+          <AdminLink />{' '}
+        </>
+      )}
     </div>
   );
 };
