@@ -116,7 +116,7 @@ describe('AuthToolbar', () => {
     it('renders loading state', () => {
       render(<AuthToolbar />);
 
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.getByText('Loading')).toBeInTheDocument();
     });
 
     it('does not render sign in/up links or signed in toolbar while loading', () => {

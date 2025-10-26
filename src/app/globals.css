@@ -1,6 +1,16 @@
 @import 'tw-animate-css';
 @import 'tailwindcss';
 
+@keyframes fadeIn {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @theme {
   --color-rebecca-purple: #639;
 }
