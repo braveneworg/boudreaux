@@ -16,16 +16,27 @@ type BaseFormSchema = {
 };
 
 // Mock all dependencies
+let lastFormInputProps: FormInputProps | null = null;
+
 vi.mock('@/app/components/ui/form-input', () => ({
-  default: ({ id, placeholder, type, ...props }: FormInputProps) => (
-    <input
-      data-testid={`form-input-${id}`}
-      id={id}
-      placeholder={placeholder}
-      type={type}
-      {...props}
-    />
-  ),
+  default: (props: FormInputProps) => {
+    const { id, placeholder, type, autoFocus, ...rest } = props;
+    lastFormInputProps = props; // Store props for testing
+
+    const inputProps: Record<string, unknown> = {
+      'data-testid': `form-input-${id}`,
+      id,
+      placeholder,
+      type,
+      ...rest,
+    };
+
+    if (autoFocus) {
+      inputProps.autoFocus = true;
+    }
+
+    return <input {...inputProps} />;
+  },
 }));
 
 vi.mock('@/app/components/ui/form', () => ({
@@ -119,6 +130,7 @@ interface FormInputProps {
   id: string;
   placeholder: string;
   type: string;
+  autoFocus?: boolean;
   [key: string]: unknown;
 }
 
@@ -211,6 +223,17 @@ describe('SignupSigninForm', () => {
         'placeholder',
         'Email address'
       );
+    });
+
+    it('should autofocus email input field on page load', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+
+      // Verify that the FormInput component received the autoFocus prop
+      // Note: JSDOM doesn't fully support autofocus behavior, but we can verify
+      // that the component is configured correctly
+      expect(lastFormInputProps).not.toBeNull();
+      expect(lastFormInputProps?.autoFocus).toBe(true);
+      expect(lastFormInputProps?.id).toBe('email');
     });
 
     it('should display email validation errors', () => {

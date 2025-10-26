@@ -51,7 +51,13 @@ const SignupSigninForm = ({
                 Email
               </FormLabel>
               <FormControl>
-                <FormInput id="email" placeholder="Email address" type="email" {...field} />
+                <FormInput
+                  id="email"
+                  placeholder="Email address"
+                  type="email"
+                  {...field}
+                  autoFocus
+                />
               </FormControl>
               <FormMessage>
                 {state.errors?.email && state.errors.email.length > 0 && state.errors.email[0]}

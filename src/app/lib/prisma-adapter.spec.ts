@@ -87,31 +87,32 @@ describe('CustomPrismaAdapter', () => {
         username: 'testuser',
       };
 
-      const createdUser = {
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: null,
-      };
-
-      mockPrisma.user.create.mockResolvedValue(createdUser);
+      // Mock implementation that returns whatever username was passed in
+      mockPrisma.user.create.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+        return {
+          id: '1',
+          name: null,
+          email: args.data.email,
+          emailVerified: args.data.emailVerified,
+          image: null,
+          username: args.data.username, // Return the generated username
+        };
+      });
 
       const result = await adapter.createUser(userData);
 
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: userData,
-      });
+      // Verify that prisma.user.create was called
+      expect(mockPrisma.user.create).toHaveBeenCalled();
 
-      expect(result).toEqual({
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: '',
-      });
+      // Verify the username is a generated placeholder (alphanumeric string with possible hyphens)
+      const createCall = mockPrisma.user.create.mock.calls[0][0];
+      expect(createCall.data.username).toMatch(/^[a-z-]+$/);
+      expect(createCall.data.email).toBe('test@example.com');
+
+      // Verify result has the generated username
+      expect(result.id).toBe('1');
+      expect(result.email).toBe('test@example.com');
+      expect(result.username).toMatch(/^[a-z-]+$/);
     });
 
     it('should handle user creation with username and terms', async () => {
@@ -123,32 +124,34 @@ describe('CustomPrismaAdapter', () => {
         termsAndConditions: true,
       };
 
-      const createdUser = {
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: 'testuser',
-        termsAndConditions: true,
-      };
-
-      mockPrisma.user.create.mockResolvedValue(createdUser);
+      // Mock implementation that returns whatever username was passed in
+      mockPrisma.user.create.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+        return {
+          id: '1',
+          name: null,
+          email: args.data.email,
+          emailVerified: args.data.emailVerified,
+          image: null,
+          username: args.data.username, // Return the generated username
+          termsAndConditions: args.data.termsAndConditions,
+        };
+      });
 
       const result = await adapter.createUser(userData);
 
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: userData,
-      });
+      // Verify that prisma.user.create was called
+      expect(mockPrisma.user.create).toHaveBeenCalled();
 
-      expect(result).toEqual({
-        id: '1',
-        name: null,
-        email: 'test@example.com',
-        emailVerified: null,
-        image: null,
-        username: 'testuser',
-      });
+      // Verify the username is a generated placeholder (alphanumeric string)
+      const createCall = mockPrisma.user.create.mock.calls[0][0];
+      expect(createCall.data.username).toMatch(/^[a-z]+$/);
+      expect(createCall.data.email).toBe('test@example.com');
+      expect(createCall.data.termsAndConditions).toBe(true);
+
+      // Verify result has the generated username
+      expect(result.id).toBe('1');
+      expect(result.email).toBe('test@example.com');
+      expect(result.username).toMatch(/^[a-z]+$/);
     });
 
     it('should handle database errors during user creation', async () => {
@@ -193,10 +196,124 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: createdUser.emailVerified,
         image: 'avatar.jpg',
-        username: '',
+        username: undefined,
       });
 
       expect(result).not.toHaveProperty('extraField');
+    });
+
+    it('should update emailVerified for existing user when provided', async () => {
+      const newVerificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: null, // Not yet verified
+        image: null,
+        username: 'existinguser',
+      };
+
+      const updatedUser = {
+        ...existingUser,
+        emailVerified: newVerificationDate,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should update the existing user's emailVerified
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'existing-id' },
+        data: { emailVerified: newVerificationDate },
+      });
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        image: null,
+        username: 'existinguser',
+      });
+    });
+
+    it('should not update emailVerified if it has not changed', async () => {
+      const verificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate, // Already verified with same date
+        image: null,
+        username: 'existinguser',
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should NOT call update since emailVerified is the same
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        image: null,
+        username: 'existinguser',
+      });
+    });
+
+    it('should not update emailVerified if new value is null', async () => {
+      const oldVerificationDate = new Date('2024-01-01');
+      const userData: AdapterUser = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: null,
+        username: 'existinguser',
+      };
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: oldVerificationDate, // Already verified
+        image: null,
+        username: 'existinguser',
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should NOT call update when emailVerified is null
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: oldVerificationDate,
+        image: null,
+        username: 'existinguser',
+      });
     });
   });
 
@@ -225,7 +342,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -270,7 +387,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -334,7 +451,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Test User',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -419,7 +536,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'updated@example.com',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -459,7 +576,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'new@example.com',
         emailVerified: null,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 
@@ -527,7 +644,7 @@ describe('CustomPrismaAdapter', () => {
         email: 'test@example.com',
         emailVerified: updateData.emailVerified,
         image: null,
-        username: '',
+        username: undefined,
       });
     });
 

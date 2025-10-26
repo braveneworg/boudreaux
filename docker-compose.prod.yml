@@ -1,10 +1,10 @@
 services:
   website:
-    image: '${NEXT_APP_WEBSITE_IMAGE}'
+    image: "${NEXT_APP_WEBSITE_IMAGE}"
     container_name: website
     restart: unless-stopped
     expose:
-      - '3000'
+      - "3000"
     networks:
       - app-network
 
@@ -16,12 +16,12 @@ services:
       context: .
       dockerfile: ./nginx/Dockerfile
       cache_from:
-        - '${NEXT_APP_NGINX_IMAGE}'
+        - "${NEXT_APP_NGINX_IMAGE}"
     container_name: nginx
-    image: '${NEXT_APP_NGINX_IMAGE}'
+    image: "${NEXT_APP_NGINX_IMAGE}"
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     depends_on:
       - website
     restart: always
