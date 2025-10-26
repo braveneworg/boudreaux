@@ -114,6 +114,26 @@ describe('Home Page - Health Check', () => {
       );
     });
 
+    it('should display error icon for unhealthy status', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'unhealthy',
+          database: 'degraded',
+        }),
+      });
+
+      render(<Home />);
+
+      await waitFor(
+        () => {
+          const heading = screen.getByRole('heading', { name: /DB health status/ });
+          expect(heading.textContent).toContain('❌');
+        },
+        { timeout: 10000 }
+      );
+    });
+
     it('should display latency when available', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -347,6 +367,7 @@ describe('Home Page - Health Check', () => {
   describe('Component Lifecycle', () => {
     it('should clear failsafe timeout on component unmount', () => {
       const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
 
       mockFetch.mockImplementation(
         () =>
@@ -356,6 +377,9 @@ describe('Home Page - Health Check', () => {
       );
 
       const { unmount } = render(<Home />);
+
+      // Wait for setTimeout to be called for failsafe
+      expect(setTimeoutSpy).toHaveBeenCalled();
 
       unmount();
 
