@@ -2,17 +2,21 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { FlatCompat } from '@eslint/eslintrc';
 import prettierConfig from 'eslint-config-prettier';
-import prettierPlugin from 'eslint-plugin-prettier';
 import js from '@eslint/js';
 import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
+import nextPlugin from '@next/eslint-plugin-next';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
-import nextPlugin from '@next/eslint-plugin-next';
-import globals from 'globals';
+import prettierPlugin from 'eslint-plugin-prettier';
 import unusedImports from 'eslint-plugin-unused-imports';
+import vitest from '@vitest/eslint-plugin';
+import pluginSecurity from 'eslint-plugin-security';
+import pluginPerfectionist from 'eslint-plugin-perfectionist';
+import tailwind from 'eslint-plugin-tailwindcss';
+import globals from 'globals';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,7 +56,7 @@ const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   // Prettier integration and custom rules
   {
-    files: ['**/*.{js,jsx,ts,tsx,json,css,md}'],
+    files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: {
       '@typescript-eslint': typescript,
       '@next/next': nextPlugin,
@@ -62,6 +66,9 @@ const eslintConfig = [
       import: importPlugin,
       prettier: prettierPlugin,
       'unused-imports': unusedImports,
+      security: pluginSecurity,
+      perfectionist: pluginPerfectionist,
+      tailwindcss: tailwind,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -84,14 +91,23 @@ const eslintConfig = [
         version: '19',
       },
       'import/resolver': {
-        typescript: true,
+        typescript: {
+          alwaysTryTypes: true,
+          project: ['./tsconfig.json', './tsconfig.*.json'],
+        },
         node: true,
+      },
+      tailwindcss: {
+        callees: ['cn'],
+        config: false, // Tailwind v4 uses CSS-based config, not JS config file
+        cssFiles: ['./src/app/globals.css'],
+        cssFilesRefreshRate: 5_000,
       },
     },
     rules: {
       'react/jsx-boolean-value': ['error', 'never'],
-      'no-unused-vars': 'off', // Disable the core ESLint rule
-      'unused-imports/no-unused-imports': 'error', // Report unused imports
+      'no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
         {
@@ -102,8 +118,6 @@ const eslintConfig = [
         },
       ],
       'prettier/prettier': 'error',
-      // Add any custom rules here
-      // TypeScript rules
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -122,27 +136,27 @@ const eslintConfig = [
       ],
       '@typescript-eslint/no-empty-interface': 'warn',
       '@typescript-eslint/no-inferrable-types': 'warn',
-
-      // React rules
-      'react/react-in-jsx-scope': 'off', // Not needed in React 17+
-      'react/prop-types': 'off', // Using TypeScript
+      '@typescript-eslint/no-empty-function': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unused-expressions': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
       'react/jsx-uses-react': 'off',
       'react/jsx-uses-vars': 'error',
-      'react/self-closing-comp': 'error',
-      'react/jsx-curly-brace-presence': ['error', { props: 'never', children: 'never' }],
-      'react/jsx-boolean-value': ['error', 'never'],
+      'react/self-closing-comp': ['error', { component: true, html: false }],
+      'react/jsx-curly-brace-presence': [
+        'error',
+        { props: 'never', children: 'never', propElementValues: 'always' },
+      ],
       'react/jsx-no-target-blank': 'error',
       'react/no-array-index-key': 'warn',
       'react/no-unstable-nested-components': 'error',
-
-      // React Hooks rules
+      'react/jsx-key': ['warn', { checkFragmentShorthand: true, checkKeyMustBeforeSpread: true }],
+      'react/jsx-no-useless-fragment': ['warn', { allowExpressions: true }],
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      //  Disable the refs rule - false positive with react-hook-form's handleSubmit pattern
-      // when callbacks are properly memoized with useCallback
       'react-hooks/refs': 'off',
-
-      // Accessibility rules
       'jsx-a11y/alt-text': 'error',
       'jsx-a11y/anchor-is-valid': [
         'error',
@@ -157,19 +171,17 @@ const eslintConfig = [
       'jsx-a11y/aria-unsupported-elements': 'error',
       'jsx-a11y/role-has-required-aria-props': 'error',
       'jsx-a11y/role-supports-aria-props': 'error',
-
-      // Import rules and sorting
       'import/order': [
         'error',
         {
           groups: [
-            'builtin', // Node.js built-in modules
-            'external', // npm packages
-            'internal', // Internal modules
-            ['parent', 'sibling'], // Parent and sibling imports
-            'index', // Index imports
+            'builtin',
+            'external',
+            'internal',
+            ['parent', 'sibling'],
+            'index',
             'object',
-            'type', // Type imports
+            'type',
           ],
           pathGroups: [
             {
@@ -197,12 +209,19 @@ const eslintConfig = [
         },
       ],
       'import/no-duplicates': 'error',
-      'import/no-unresolved': 'off', // TypeScript handles this
+      'import/no-unresolved': 'off',
       'import/first': 'error',
       'import/newline-after-import': 'error',
       'import/no-anonymous-default-export': 'warn',
-
-      // General best practices
+      'import/named': 'off',
+      'import/export': 'off',
+      'import/namespace': 'off',
+      'import/no-named-as-default': 'off',
+      'import/no-named-as-default-member': 'off',
+      'import/no-cycle': [
+        'off',
+        { maxDepth: Infinity, ignoreExternal: false, allowUnsafeDynamicCyclicDependency: false },
+      ],
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
       'no-debugger': 'warn',
       'prefer-const': 'error',
@@ -210,7 +229,103 @@ const eslintConfig = [
       'object-shorthand': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-unneeded-ternary': 'error',
+      'no-constant-condition': 'warn',
+      'default-case': 'warn',
+      'default-case-last': 'warn',
+      'consistent-return': 'warn',
+      'func-names': 'warn',
+      'no-useless-rename': 'warn',
+      'lines-around-directive': [
+        'warn',
+        {
+          before: 'always',
+          after: 'always',
+        },
+      ],
+      'prefer-destructuring': 'warn',
+      'arrow-body-style': ['warn', 'as-needed', { requireReturnForObjectLiteral: false }],
+      'arrow-parens': ['warn', 'always'],
+      'no-duplicate-imports': 'warn',
+      'no-multi-assign': 'warn',
+      'no-multi-str': 'warn',
+      'perfectionist/sort-jsx-props': [
+        'error',
+        {
+          type: 'alphabetical',
+        },
+      ],
+      'perfectionist/sort-named-imports': ['warn', { type: 'alphabetical', order: 'asc' }],
+      'perfectionist/sort-imports': [
+        'warn',
+        {
+          type: 'alphabetical',
+          order: 'asc',
+          ignoreCase: true,
+          environment: 'node',
+          maxLineLength: 120,
+          internalPattern: ['^src/.+', '^@/.+'],
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            'sibling',
+            'parent',
+            'index',
+            'object',
+            'unknown',
+          ],
+        },
+      ],
+      'security/detect-object-injection': 'off',
+      'security/detect-non-literal-regexp': 'warn',
+      'security/detect-unsafe-regex': 'error',
+      'security/detect-buffer-noassert': 'error',
+      'security/detect-child-process': 'warn',
+      'security/detect-disable-mustache-escape': 'error',
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-no-csrf-before-method-override': 'error',
+      'security/detect-non-literal-fs-filename': 'off',
+      'security/detect-non-literal-require': 'warn',
+      'security/detect-possible-timing-attacks': 'warn',
+      'security/detect-pseudoRandomBytes': 'error',
+
+      // Tailwind CSS rules
+      'tailwindcss/classnames-order': 'warn',
+      'tailwindcss/enforces-negative-arbitrary-values': 'warn',
+      'tailwindcss/enforces-shorthand': 'warn',
+      'tailwindcss/migration-from-tailwind-2': 'off',
+      'tailwindcss/no-arbitrary-value': 'off',
+      'tailwindcss/no-contradicting-classname': 'error',
+      'tailwindcss/no-custom-classname': 'off',
+
       ...prettierConfig.rules,
+    },
+  },
+  // Vitest testing configuration
+  {
+    files: ['**/*.spec.tsx', '**/*.spec.ts'],
+    plugins: {
+      vitest,
+    },
+    languageOptions: {
+      parser: typescriptParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: ['./tsconfig.json', './tsconfig.test.json'],
+      },
+      globals: {
+        ...vitest.environments.env.globals,
+      },
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      'vitest/max-nested-describe': ['error', { max: 3 }],
+    },
+    settings: {
+      vitest: {
+        typecheck: true,
+      },
     },
   },
 ];
