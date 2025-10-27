@@ -6,6 +6,7 @@ import { Providers } from './components/providers';
 
 import type { Metadata } from 'next';
 import './globals.css';
+import Header from './components/header/header';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
@@ -53,7 +54,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Header />
+          <div className="flex font-sans justify-center min-h-screen">
+            <main>{children}</main>
+          </div>
+        </Providers>
         <Toaster />
       </body>
     </html>

@@ -197,38 +197,35 @@ export default function Home(): JSX.Element {
   }, []);
 
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <Header />
-      <main className="flex flex-col gap-[32px] row-start-2">
-        <div className="flex flex-col justify-center items-center sm:items-center">
-          <h1>
-            DB health status:&nbsp;{' '}
-            {isLoading
-              ? '⏳'
-              : healthStatus?.status === 'healthy'
-                ? '✅'
-                : healthStatus?.status === 'error' || healthStatus?.status === 'unhealthy'
-                  ? '❌'
-                  : '⏳'}
-          </h1>
-          <p className="border-b-2">
-            {isLoading ? (
-              'Checking database connection...'
-            ) : healthStatus ? (
-              <>
-                {healthStatus.database}
-                {healthStatus.latency && ` (${healthStatus.latency}ms)`}
-                {healthStatus.error && process.env.NODE_ENV === 'development'
-                  ? ` - ${healthStatus.error}`
-                  : ''}
-              </>
-            ) : (
-              'Initializing...'
-            )}
-          </p>
-        </div>
-        <AuthToolbar />
-      </main>
-    </div>
+    <>
+      <div className="flex flex-col justify-center items-center sm:items-center">
+        <h1>
+          DB health status:&nbsp;{' '}
+          {isLoading
+            ? '⏳'
+            : healthStatus?.status === 'healthy'
+              ? '✅'
+              : healthStatus?.status === 'error' || healthStatus?.status === 'unhealthy'
+                ? '❌'
+                : '⏳'}
+        </h1>
+        <p className="border-b-2">
+          {isLoading ? (
+            'Checking database connection...'
+          ) : healthStatus ? (
+            <>
+              {healthStatus.database}
+              {healthStatus.latency && ` (${healthStatus.latency}ms)`}
+              {healthStatus.error && process.env.NODE_ENV === 'development'
+                ? ` - ${healthStatus.error}`
+                : ''}
+            </>
+          ) : (
+            'Initializing...'
+          )}
+        </p>
+      </div>
+      <AuthToolbar />
+    </>
   );
 }

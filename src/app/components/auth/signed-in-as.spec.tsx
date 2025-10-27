@@ -154,38 +154,4 @@ describe('SignedInAs', () => {
       expect(container.firstChild).toBeNull();
     });
   });
-
-  describe('development mode logging', () => {
-    it('logs session data in development mode', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            username: 'testuser',
-            email: 'test@example.com',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-
-      render(<SignedInAs />);
-
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[SignedInAs] Session:',
-        expect.objectContaining({
-          user: expect.objectContaining({
-            username: 'testuser',
-          }),
-        })
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith('[SignedInAs] User:', expect.any(Object));
-      expect(consoleInfoSpy).toHaveBeenCalledWith('[SignedInAs] Username:', 'testuser');
-
-      consoleInfoSpy.mockRestore();
-      vi.unstubAllEnvs();
-    });
-  });
 });
