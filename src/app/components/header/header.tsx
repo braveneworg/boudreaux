@@ -1,7 +1,7 @@
-import Image from 'next/image';
 import { headers } from 'next/headers';
-import { userAgentFromString } from 'next/server'; // For App Router
+import Image from 'next/image';
 import Link from 'next/link';
+import { userAgentFromString } from 'next/server'; // For App Router
 
 const Header = async () => {
   const userAgent = (await headers()).get('user-agent') || '';
