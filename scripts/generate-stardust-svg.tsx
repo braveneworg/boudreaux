@@ -25,7 +25,6 @@ interface Config {
   width: number;
   height: number;
   output: string;
-  bgColor: string;
   particleCounts: ParticleCounts;
   brightnessMin: number;
   brightnessMax: number;
@@ -38,7 +37,6 @@ const defaultConfig: Config = {
   width: 500,
   height: 1000,
   output: 'stardust.svg',
-  bgColor: 'black',
   particleCounts: {
     dot: 4,
     diamond: 5,
@@ -210,7 +208,7 @@ function parseArgs(args: string[]): Config {
 
 // Print help message
 function printHelp(): void {
-  console.info(`
+  console.log(`
 Stardust SVG Generator
 
 Usage: npx tsx generate-stardust.ts [options]
@@ -250,49 +248,27 @@ function main(): void {
   // Generate SVG
   const svg = generateSVG(config);
 
-  // Determine output path in public/media directory
-  const mediaDir = path.resolve(process.cwd(), 'public/media');
-
-  // Ensure the directory exists
-  if (!fs.existsSync(mediaDir)) {
-    fs.mkdirSync(mediaDir, { recursive: true });
-  }
-
-  // Default filename
-  const baseFilename = 'stardust-on-slate';
-  const extension = '.svg';
-
-  // Find available filename with serial number if needed
-  let outputFilename = `${baseFilename}${extension}`;
-  let outputPath = path.join(mediaDir, outputFilename);
-  let serialNumber = 1;
-
-  while (fs.existsSync(outputPath)) {
-    outputFilename = `${baseFilename}-${serialNumber}${extension}`;
-    outputPath = path.join(mediaDir, outputFilename);
-    serialNumber++;
-  }
-
   // Write to file
+  const outputPath = path.resolve(process.cwd(), config.output);
   fs.writeFileSync(outputPath, svg, 'utf-8');
 
   // Calculate total particles
   const total = Object.values(config.particleCounts).reduce((sum, count) => sum + count, 0);
 
   // Print success message
-  console.info('✨ Stardust SVG generated successfully!');
-  console.info(`📄 File: ${outputPath}`);
-  console.info(`📊 Total particles: ${total}`);
-  console.info(
+  console.log('✨ Stardust SVG generated successfully!');
+  console.log(`📄 File: ${outputPath}`);
+  console.log(`📊 Total particles: ${total}`);
+  console.log(
     `   └─ dots: ${config.particleCounts.dot}, diamonds: ${config.particleCounts.diamond}, triangles: ${config.particleCounts.triangle}`
   );
-  console.info(
+  console.log(
     `   └─ wedges: ${config.particleCounts.wedge}, crescents: ${config.particleCounts.crescent}, arcs: ${config.particleCounts.arc}`
   );
-  console.info(`🎨 Background: ${config.bgColor}`);
-  console.info(`📐 Dimensions: ${config.width}x${config.height}`);
-  console.info(`✓ Brightness range: ${config.brightnessMin} - ${config.brightnessMax}`);
-  console.info(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
+  console.log(`🎨 Background: ${config.bgColor}`);
+  console.log(`📐 Dimensions: ${config.width}x${config.height}`);
+  console.log(`✓ Brightness range: ${config.brightnessMin} - ${config.brightnessMax}`);
+  console.log(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
 }
 
 // Run if called directly

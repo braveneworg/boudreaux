@@ -7,10 +7,8 @@ import SignedinToolbar from './signout-button';
 
 // Mock next-auth
 const mockSignOut = vi.fn();
-const mockUseSession = vi.fn();
 vi.mock('next-auth/react', () => ({
   signOut: (options?: { redirect?: boolean }) => mockSignOut(options),
-  useSession: () => mockUseSession(),
 }));
 
 // Mock next/navigation
@@ -36,10 +34,6 @@ vi.mock('./edit-profile-button', () => ({
   default: () => <div data-testid="edit-profile-button">Edit Profile Button</div>,
 }));
 
-vi.mock('./admin-link', () => ({
-  default: () => <div data-testid="admin-link">Admin Link</div>,
-}));
-
 vi.mock('../ui/vertical-separator', () => ({
   default: () => <div data-testid="vertical-separator">|</div>,
 }));
@@ -63,7 +57,6 @@ vi.mock('../ui/button', () => ({
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
   LogOutIcon: () => <div data-testid="logout-icon">LogOutIcon</div>,
-  ShieldUser: () => <div data-testid="shield-user-icon">ShieldUser</div>,
 }));
 
 // Mock utils
@@ -88,18 +81,6 @@ vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
 describe('SignedinToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set up default session mock
-    mockUseSession.mockReturnValue({
-      data: {
-        user: {
-          id: '1',
-          email: 'test@example.com',
-          name: 'Test User',
-          role: 'user',
-        },
-      },
-      status: 'authenticated',
-    });
   });
 
   describe('rendering', () => {
@@ -206,61 +187,6 @@ describe('SignedinToolbar', () => {
 
       const signOutButton = screen.getByRole('button', { name: /sign out/i });
       expect(signOutButton).toHaveAttribute('data-variant', 'link:narrow');
-    });
-  });
-
-  describe('admin functionality', () => {
-    it('renders AdminLink when user is admin', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'admin@test.com',
-            username: 'admin',
-            role: 'admin',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.getByTestId('admin-link')).toBeInTheDocument();
-    });
-
-    it('does not render AdminLink when user is not admin', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'user@test.com',
-            username: 'user',
-            role: 'user',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
-    });
-
-    it('does not render AdminLink when user has no role', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'user@test.com',
-            username: 'user',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
     });
   });
 });

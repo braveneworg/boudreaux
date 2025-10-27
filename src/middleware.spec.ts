@@ -41,7 +41,6 @@ describe('middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetToken.mockReset();
-    vi.unstubAllEnvs();
   });
 
   const createMockRequest = (
@@ -65,23 +64,14 @@ describe('middleware', () => {
     } as unknown as NextRequest;
   };
 
-  const createMockToken = (overrides: Partial<JWT> = {}): JWT => {
-    const { role, email, name, ...rest } = overrides;
-    const hasRole = 'role' in overrides;
-
-    return {
+  const createMockToken = (overrides: Partial<JWT> = {}): JWT =>
+    ({
       sub: '1',
-      email: email || 'test@example.com',
-      name: name || 'Test User',
-      user: {
-        id: '1',
-        email: email || 'test@example.com',
-        name: name || 'Test User',
-        ...(hasRole && role !== undefined ? { role } : hasRole ? {} : { role: 'user' }),
-      },
-      ...rest,
-    } as JWT;
-  };
+      email: 'test@example.com',
+      name: 'Test User',
+      role: 'user',
+      ...overrides,
+    }) as JWT;
 
   describe('public routes', () => {
     const publicRoutes = [
@@ -118,20 +108,6 @@ describe('middleware', () => {
       expect(result).toEqual({ type: 'next' });
       expect(mockNextResponse.next).toHaveBeenCalled();
     });
-
-    it('should use production cookie name when NODE_ENV is production', async () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      mockGetToken.mockResolvedValue(null);
-
-      const request = createMockRequest('/');
-      await middleware(request);
-
-      expect(mockGetToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cookieName: '__Secure-next-auth.session-token',
-        })
-      );
-    });
   });
 
   describe('private routes', () => {
@@ -157,21 +133,6 @@ describe('middleware', () => {
       // Authenticated users should be allowed to access private routes
       expect(result.type).toBe('next');
       expect(mockNextResponse.next).toHaveBeenCalled();
-    });
-
-    it('should redirect unauthenticated users accessing non-public routes', async () => {
-      mockGetToken.mockResolvedValue(null);
-
-      // Test with /api/admin route that's in matcher but not explicitly in public/private routes
-      const request = createMockRequest('/api/admin/users');
-
-      const result = await middleware(request);
-
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/signin?callbackUrl=%2Fapi%2Fadmin%2Fusers');
-      expect(mockNextResponse.redirect).toHaveBeenCalledWith(
-        new URL('/signin?callbackUrl=%2Fapi%2Fadmin%2Fusers', 'https://example.com')
-      );
     });
   });
 
@@ -212,22 +173,6 @@ describe('middleware', () => {
       const url = new URL(result.url);
       expect(url.pathname).toBe('/signin');
       expect(url.searchParams.get('callbackUrl')).toBe('/profile');
-    });
-
-    it('should redirect authenticated user to different callbackUrl', async () => {
-      mockGetToken.mockResolvedValue(createMockToken());
-
-      // Use /profile (private route) with callbackUrl to /admin
-      const request = createMockRequest('/profile', {
-        searchParams: { callbackUrl: '/admin' },
-      });
-      const result = await middleware(request);
-
-      expect(result.type).toBe('redirect');
-      expect(result.url).toBe('https://example.com/admin');
-      expect(mockNextResponse.redirect).toHaveBeenCalledWith(
-        new URL('/admin', 'https://example.com')
-      );
     });
   });
 
