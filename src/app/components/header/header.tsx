@@ -3,38 +3,45 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { userAgentFromString } from 'next/server'; // For App Router
 
+import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+
 const Header = async () => {
   const userAgent = (await headers()).get('user-agent') || '';
   const { device } = userAgentFromString(userAgent);
   const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
 
   return (
-    <div className="md:fixed z-[100] opacity-95 w-screen bg-zinc-950 url('/media/stardust.svg') bg-cover bg-center">
-      <div className="mx-auto w-full max-w-[1920px] px-2 md:px-8 py-2 md:py-4">
-        <header className="flex h-[30px] md:h-[144px] w-full justify-between 2xl:min-w-[1864px]">
-          <Link className="block" href="/">
+    <div className="fixed top-0 left-0 right-0 z-[100] py-2.5 opacity-95 w-screen bg-zinc-950 url('/media/stardust.svg') bg-cover bg-center">
+      <div className="mx-auto w-full max-w-[1920px] px-1 pb-1 md:px-8 md:py-4">
+        <header className="flex justify-between h-[22px] md:h-[144px] w-full 2xl:min-w-[1864px]">
+          <Link className="flex pl-1" href="/">
             <Image
               alt="Fake Four Inc. Logo"
-              className="mt-0 size-[33px] md:size-[144px] rounded-full border-2 border-solid border-zinc-900 bg-white p-0"
-              height={100}
+              className={cn(
+                { 'relative -top-0.75': isMobile },
+                'size-[32px] md:size-[144px] rounded-full bg-white'
+              )}
+              height={44}
               priority
               src={
                 isMobile
                   ? '/media/fake-four-inc-black-hand-logo.svg'
                   : '/media/fake-four-inc-black-stardust-hand-logo.svg'
               }
-              width={100}
+              width={44}
             />
-            {isMobile && (
+          </Link>
+          {isMobile && (
+            <div className="flex relative -top-[1px] right-8 items-center justify-center">
               <Image
                 alt="Fake Four Inc. Words"
-                className="absolute w-[244px] top-0 right-8 inline-block ml-2"
+                className="w-[244px] mx-auto"
                 height={44}
                 src="/media/fake-four-inc-words.png"
                 width={444}
               />
-            )}
-          </Link>
+            </div>
+          )}
         </header>
       </div>
     </div>
