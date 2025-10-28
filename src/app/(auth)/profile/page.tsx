@@ -1,12 +1,19 @@
+import { headers } from 'next/headers';
+import { userAgentFromString } from 'next/server';
+
 import ProfileForm from '@/app/components/forms/profile-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { StickyBreadcrumbWrapper } from '@/app/components/ui/sticky-breadcrumb-wrapper';
 
 export default async function ProfilePage() {
+  const userAgent = (await headers()).get('user-agent') || '';
+  const { device } = userAgentFromString(userAgent);
+  const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
+
   return (
     <>
-      <div className="container mx-auto w-full max-w-full px-4 pt-8 pb-0">
-        <StickyBreadcrumbWrapper offsetTop={32}>
+      <div className="container mx-auto w-full max-w-full px-4 pb-0">
+        <StickyBreadcrumbWrapper isVisible={!isMobile} offsetTop={32}>
           <BreadcrumbMenu
             items={[
               {

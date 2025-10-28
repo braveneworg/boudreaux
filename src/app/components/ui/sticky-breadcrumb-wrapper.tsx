@@ -5,9 +5,14 @@ import { useEffect, useState } from 'react';
 type StickyBreadcrumbWrapperProps = {
   children: React.ReactNode;
   offsetTop?: number;
+  isVisible?: boolean;
 };
 
-export function StickyBreadcrumbWrapper({ children, offsetTop = 0 }: StickyBreadcrumbWrapperProps) {
+export function StickyBreadcrumbWrapper({
+  children,
+  offsetTop = 0,
+  isVisible = true,
+}: StickyBreadcrumbWrapperProps) {
   const [isSticky, setIsSticky] = useState(false);
 
   useEffect(() => {
@@ -20,6 +25,10 @@ export function StickyBreadcrumbWrapper({ children, offsetTop = 0 }: StickyBread
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [offsetTop]);
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div

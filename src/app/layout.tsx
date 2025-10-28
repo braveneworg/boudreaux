@@ -2,11 +2,12 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import { Toaster } from '@/components/ui/sonner';
 
+import Header from './components/header/header';
 import { Providers } from './components/providers';
 
 import type { Metadata } from 'next';
+
 import './globals.css';
-import Header from './components/header/header';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
@@ -56,7 +57,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
           <Header />
-          <div className="flex font-sans justify-center min-h-screen">
+          <div className="flex font-sans justify-center min-h-screen pt-[32px] md:pt-[180px]">
             <main>{children}</main>
           </div>
         </Providers>

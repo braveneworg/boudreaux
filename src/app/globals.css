@@ -91,7 +91,7 @@
     @apply bg-background text-foreground overflow-x-hidden;
   }
   h1 {
-    @apply text-3xl font-bold tracking-tight;
+    @apply text-3xl font-bold tracking-tight relative mt-4;
   }
   a {
     @apply underline-offset-4;

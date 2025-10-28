@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import { Check, ChevronsUpDown } from 'lucide-react';
 
@@ -57,17 +57,44 @@ export default function ComboboxField<
 }: ComboboxFieldProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFocus = () => {
-    setOpen(true);
-  };
+  // Auto-focus the input when the popover opens
+  useEffect(() => {
+    if (open && inputRef.current) {
+      // Use setTimeout to ensure the input is rendered and visible
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [open]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Don't open popover on Enter key
+    if (event.key === 'Enter') {
+      return;
+    }
     // Open popover on any alphanumeric key press
     if (!open && event.key.length === 1 && /^[a-z0-9_-]$/i.test(event.key)) {
-      setOpen(true);
-      // Set the search value to the pressed key
+      event.preventDefault();
+      // Set the search value first, before opening
       setSearchValue(event.key);
+      setOpen(true);
+    }
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setSearchValue('');
+    }
+  };
+
+  const handleValueChange = (value: string) => {
+    setSearchValue(value);
+    // Close popover if user deletes all text
+    if (value === '' && open) {
+      setOpen(false);
     }
   };
 
@@ -78,7 +105,7 @@ export default function ComboboxField<
       render={({ field }) => (
         <FormItem>
           <FormLabel>{label}</FormLabel>
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
               <FormControl>
                 <Button
@@ -86,7 +113,6 @@ export default function ComboboxField<
                   role="combobox"
                   aria-expanded={open}
                   className="w-full justify-between"
-                  onFocus={handleFocus}
                   onKeyDown={handleKeyDown}
                 >
                   {field.value
@@ -97,12 +123,8 @@ export default function ComboboxField<
               </FormControl>
             </PopoverTrigger>
             <PopoverContent className={`${popoverWidth} p-0`} align="start">
-              <Command shouldFilter>
-                <CommandInput
-                  placeholder={searchPlaceholder}
-                  value={searchValue}
-                  onValueChange={setSearchValue}
-                />
+              <Command shouldFilter value={searchValue} onValueChange={handleValueChange}>
+                <CommandInput ref={inputRef} placeholder={searchPlaceholder} />
                 <CommandEmpty>{emptyMessage}</CommandEmpty>
                 <CommandList>
                   <CommandGroup>
