@@ -30,6 +30,7 @@ interface Config {
   brightnessMax: number;
   scaleMin: number;
   scaleMax: number;
+  bgColor: string;
 }
 
 // Default configuration
@@ -49,6 +50,7 @@ const defaultConfig: Config = {
   brightnessMax: 0.95,
   scaleMin: 0.5,
   scaleMax: 2.0,
+  bgColor: 'black',
 };
 
 // Particle shape definitions
@@ -208,7 +210,7 @@ function parseArgs(args: string[]): Config {
 
 // Print help message
 function printHelp(): void {
-  console.log(`
+  console.info(`
 Stardust SVG Generator
 
 Usage: npx tsx generate-stardust.ts [options]
@@ -255,19 +257,19 @@ function main(): void {
   const total = Object.values(config.particleCounts).reduce((sum, count) => sum + count, 0);
 
   // Print success message
-  console.log('✨ Stardust SVG generated successfully!');
-  console.log(`📄 File: ${outputPath}`);
-  console.log(`📊 Total particles: ${total}`);
-  console.log(
+  console.info('✨ Stardust SVG generated successfully!');
+  console.info(`📄 File: ${outputPath}`);
+  console.info(`📊 Total particles: ${total}`);
+  console.info(
     `   └─ dots: ${config.particleCounts.dot}, diamonds: ${config.particleCounts.diamond}, triangles: ${config.particleCounts.triangle}`
   );
-  console.log(
+  console.info(
     `   └─ wedges: ${config.particleCounts.wedge}, crescents: ${config.particleCounts.crescent}, arcs: ${config.particleCounts.arc}`
   );
-  console.log(`🎨 Background: ${config.bgColor}`);
-  console.log(`📐 Dimensions: ${config.width}x${config.height}`);
-  console.log(`✓ Brightness range: ${config.brightnessMin} - ${config.brightnessMax}`);
-  console.log(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
+  console.info(`🎨 Background: ${config.bgColor}`);
+  console.info(`📐 Dimensions: ${config.width}x${config.height}`);
+  console.info(`✓ Brightness range: ${config.brightnessMin} - ${config.brightnessMax}`);
+  console.info(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
 }
 
 // Run if called directly

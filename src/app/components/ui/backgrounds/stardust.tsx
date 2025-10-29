@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
 
+type ParticleCounts = {
+  dot: number;
+  diamond: number;
+  triangle: number;
+  wedge: number;
+  crescent: number;
+  arc: number;
+};
+
 const StardustSVG = ({
   width = 1000,
   height = 2000,
@@ -126,7 +135,7 @@ export default function StardustDemo() {
   const [bgColor, setBgColor] = useState('black');
   const [seed, setSeed] = useState(0);
 
-  const updateCount = (type, value) => {
+  const updateCount = (type: keyof ParticleCounts, value: string) => {
     setCounts((prev) => ({ ...prev, [type]: Math.max(0, parseInt(value) || 0) }));
   };
 
@@ -143,16 +152,16 @@ export default function StardustDemo() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '15px',
+          gap: '12px',
           marginBottom: '20px',
         }}
       >
-        {Object.entries(counts).map(([type, count]) => (
+        {(Object.entries(counts) as [keyof ParticleCounts, number][]).map(([type, count]) => (
           <div
             key={type}
             style={{
               background: 'white',
-              padding: '12px',
+              padding: '15px',
               borderRadius: '8px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             }}
@@ -307,8 +316,8 @@ export default function StardustDemo() {
       >
         <h3 style={{ marginTop: 0 }}>How to Export</h3>
         <p>
-          Right-click the SVG above and "Save image as..." or inspect the element and copy the SVG
-          markup to save as a .svg file.
+          Right-click the SVG above and &quot;Save image as...&quot; or inspect the element and copy
+          the SVG markup to save as a .svg file.
         </p>
       </div>
     </div>
