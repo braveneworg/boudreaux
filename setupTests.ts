@@ -3,7 +3,7 @@ import React from 'react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, expect } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 
 // Make React available globally for tests
 // This is required by vitest when testing React components
@@ -23,6 +23,22 @@ global.ResizeObserver = class ResizeObserver {
     // Mock implementation - do nothing
   }
 };
+
+// Mock window.matchMedia which is not available in Node.js test environment
+// This is commonly needed for components that use media queries or responsive hooks
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // Deprecated
+    removeListener: vi.fn(), // Deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
 
 expect.extend(matchers); // Add custom jest matchers from jest-dom
 

@@ -26,7 +26,7 @@ const AuthToolbar = ({ className }: { className?: string }) => {
 
   // Show loading state or nothing while checking authentication
   if (status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
-    return <MessageSpinner />;
+    return <MessageSpinner title="Loading..." size="sm" variant="default" />;
   }
 
   // Show authenticated toolbar if user is logged in

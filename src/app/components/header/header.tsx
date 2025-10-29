@@ -12,35 +12,33 @@ const Header = async () => {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] py-2.5 opacity-95 w-screen bg-zinc-950 url('/media/stardust.svg') bg-cover bg-center">
-      <div className="mx-auto w-full max-w-[1920px] px-1 pb-1 md:px-8 md:py-4">
-        <header className="flex justify-between h-[22px] md:h-[144px] w-full 2xl:min-w-[1864px]">
-          <Link className="flex pl-1" href="/">
+      <div className="mx-auto w-full max-w-[1920px] px-1 pb-1 md:px-8">
+        <header className="flex justify-start h-[56px] md:h-[144px] 2xl:min-w-[1864px]">
+          <Link className="flex" href="/">
             <Image
               alt="Fake Four Inc. Logo"
               className={cn(
-                { 'relative -top-0.75': isMobile },
-                'size-[32px] md:size-[144px] rounded-full bg-white'
+                'relative top-0.5 ml-2 size-[56px] md:size-[144px] rounded-full bg-white'
               )}
-              height={44}
+              height={56}
               priority
               src={
                 isMobile
                   ? '/media/fake-four-inc-black-hand-logo.svg'
                   : '/media/fake-four-inc-black-stardust-hand-logo.svg'
               }
-              width={44}
+              width={56}
             />
           </Link>
           {isMobile && (
-            <div className="flex relative -top-[1px] right-8 items-center justify-center">
-              <Image
-                alt="Fake Four Inc. Words"
-                className="w-[244px] mx-auto"
-                height={44}
-                src="/media/fake-four-inc-words.png"
-                width={444}
-              />
-            </div>
+            <Image
+              alt="Fake Four Inc. Words"
+              className="w-[300px] ml-1.5"
+              height={72}
+              priority
+              src="/media/fake-four-inc-words.png"
+              width={300}
+            />
           )}
         </header>
       </div>

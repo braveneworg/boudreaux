@@ -13,12 +13,6 @@ import SignedInAs from './signed-in-as';
 import { Button } from '../ui/button';
 import VerticalSeparator from '../ui/vertical-separator';
 
-const Separator = () => {
-  const isMobile = useIsMobile();
-
-  return !isMobile ? <VerticalSeparator /> : null;
-};
-
 // Use in hamburger menu on mobile
 const SignedinToolbar = ({ className }: { className?: string }) => {
   const { data: session } = useSession();
@@ -27,15 +21,9 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div
-      className={cn(
-        { 'flex-col': isMobile, 'flex-row': !isMobile },
-        'flex items-center',
-        className
-      )}
-    >
+    <div className={cn(isMobile ? 'items-center' : 'flex items-center', className)}>
       <SignedInAs />
-      <Separator />
+      {!isMobile && <VerticalSeparator />}
       <Button
         variant="link:narrow"
         onClick={async () => {
@@ -46,13 +34,12 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
         <LogOutIcon />
         Sign Out
       </Button>
-      <Separator />
+      {!isMobile && <VerticalSeparator />}
       <EditProfileButton />
       {isAdmin && (
         <>
-          {' '}
-          <Separator />
-          <AdminLink />{' '}
+          {!isMobile && <VerticalSeparator />}
+          <AdminLink />
         </>
       )}
     </div>

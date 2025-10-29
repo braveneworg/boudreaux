@@ -1,6 +1,15 @@
+// Mock bcrypt to speed up tests
 import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from './auth-utils';
 
 import type { FormState } from '../../types/form-state';
+
+vi.mock('bcrypt', () => ({
+  hash: vi
+    .fn()
+    .mockImplementation((password: string) =>
+      Promise.resolve(`hashed_${password}_${Math.random().toString(36).substring(7)}`)
+    ),
+}));
 
 describe('auth-utils', () => {
   describe('EMAIL_REGEX', () => {
