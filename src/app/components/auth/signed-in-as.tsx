@@ -23,13 +23,18 @@ const SignedInAs = () => {
   }
 
   return (
-    <div className={cn({ 'flex-col': isMobile, 'flex-row': !isMobile }, 'flex items-center gap-2')}>
-      <div className="flex flex-row gap-2">
-        <KeyIcon size={16} />
-        <span className="text-sm">Signed in as: </span>
+    <>
+      <div className={cn('flex items-center gap-2')}>
+        {!isMobile && (
+          <div className="flex flex-row gap-2">
+            <KeyIcon size={16} />
+            <span className="text-sm">Signed in as: </span>
+          </div>
+        )}
+        <KeyIcon size={16} className="md:hidden" />
+        <UsernameLink username={username} />
       </div>
-      <UsernameLink username={username} />
-    </div>
+    </>
   );
 };
 

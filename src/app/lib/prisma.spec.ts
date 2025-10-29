@@ -1,4 +1,16 @@
+// Mock PrismaClient to avoid real database connections
 import { prisma } from './prisma';
+
+vi.mock('@prisma/client', () => ({
+  PrismaClient: vi.fn().mockImplementation(() => ({
+    $connect: vi.fn(),
+    $disconnect: vi.fn(),
+    user: {},
+    session: {},
+    verificationToken: {},
+    account: {},
+  })),
+}));
 
 describe('prisma', () => {
   it('should export a prisma client object', () => {

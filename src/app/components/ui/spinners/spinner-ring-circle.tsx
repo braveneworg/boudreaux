@@ -1,6 +1,6 @@
 import { type VariantProps, cva } from 'class-variance-authority';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/app/lib/utils';
 
 const spinnerRingCircleVariants = cva(
   'animate-spin rounded-full border-2 [border-top-color:rgb(140,140,145)] [border-right-color:rgb(90,90,95)] [border-bottom-color:rgb(40,40,45)] [border-left-color:rgb(10,10,15)]',
@@ -41,7 +41,11 @@ const SpinnerRingCircle = ({
 }: SpinnerRingCircleProps) => {
   return (
     <div
-      className={cn(spinnerRingCircleVariants({ size, variant }), className)}
+      className={cn(
+        'flex justify-center items-center',
+        spinnerRingCircleVariants({ size, variant }),
+        className
+      )}
       aria-label="Loading spinner"
       {...props}
     />

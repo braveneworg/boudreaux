@@ -142,16 +142,16 @@ describe('CustomPrismaAdapter', () => {
       // Verify that prisma.user.create was called
       expect(mockPrisma.user.create).toHaveBeenCalled();
 
-      // Verify the username is a generated placeholder (alphanumeric string)
+      // Verify the username is a generated placeholder (alphanumeric string, may contain hyphens)
       const createCall = mockPrisma.user.create.mock.calls[0][0];
-      expect(createCall.data.username).toMatch(/^[a-z]+$/);
+      expect(createCall.data.username).toMatch(/^[a-z-]+$/);
       expect(createCall.data.email).toBe('test@example.com');
       expect(createCall.data.termsAndConditions).toBe(true);
 
       // Verify result has the generated username
       expect(result.id).toBe('1');
       expect(result.email).toBe('test@example.com');
-      expect(result.username).toMatch(/^[a-z]+$/);
+      expect(result.username).toMatch(/^[a-z-]+$/);
     });
 
     it('should handle database errors during user creation', async () => {

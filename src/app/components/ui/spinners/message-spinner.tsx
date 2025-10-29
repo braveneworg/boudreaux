@@ -7,19 +7,31 @@ export type SpinnerVariant = 'default' | 'primary' | 'accent';
 
 interface MessageSpinnerProps {
   className?: string;
-  title: string;
-  size: SpinnerSize;
-  variant: SpinnerVariant;
+  title?: string;
+  size?: SpinnerSize;
+  variant?: SpinnerVariant;
 }
 
-export const MessageSpinner = ({ title, size, variant, className }: MessageSpinnerProps) => {
-  const containerSize = size === 'sm' ? 'h-24 w-24' : size === 'md' ? 'h-24 w-24' : 'h-32 w-32';
+export const MessageSpinner = ({
+  title = 'Loading...',
+  size = 'sm',
+  variant = 'default',
+  className,
+}: Readonly<MessageSpinnerProps>) => {
+  // Size-variant gap and text classes
+  const gapClass = size === 'sm' ? 'gap-2' : size === 'md' ? 'gap-4' : 'gap-6';
+  const textClass = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-lg' : 'text-2xl';
+  const containerSize = size === 'sm' ? 'h-6 w-6' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
+  const spinnerContainerSize =
+    size === 'sm' ? 'h-[16px] w-[16px]' : size === 'md' ? 'h-[28px] w-[28px]' : 'h-[36px] w-[36px]';
 
   return (
-    <div className={cn('flex flex-col items-center gap-4', className)}>
-      <h2 className="text-lg">{title}</h2>
-      <div className={`flex items-center justify-center bg-slate-100 ${containerSize}`}>
+    <div className={cn('flex items-center justify-center mt-2', gapClass, className)}>
+      <div className={cn('flex items-center justify-center rounded-lg', spinnerContainerSize)}>
         <SpinnerRingCircle size={size} variant={variant} />
+      </div>
+      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
+        <h2 className={cn('text-muted-foreground', textClass)}>{title}</h2>
       </div>
     </div>
   );
