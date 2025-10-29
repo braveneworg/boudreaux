@@ -57,7 +57,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
           <Header />
-          <div className="flex font-sans justify-center min-h-screen pt-[72px] px-1.5 md:pt-[180px]">
+          <div className="flex font-sans justify-center min-h-screen pt-[80px] px-1.5 md:pt-[180px] touch-auto">
             <main>{children}</main>
           </div>
         </Providers>

@@ -9,11 +9,13 @@ type ParticleCounts = {
   arc: number;
 };
 
-const StardustSVG = ({
+const ParticleGenerator = ({
   width = 1000,
   height = 2000,
   bgColor = 'black',
+  bgOpacity = 1,
   particleColor = 'white',
+  particleOpacity = 1,
   particleCounts = {
     dot: 4,
     diamond: 5,
@@ -85,7 +87,7 @@ const StardustSVG = ({
           href={`#particle-${type}`}
           transform={`scale(${scaleX.toFixed(2)}, ${scaleY.toFixed(2)}) rotate(${rotation.toFixed(1)}, ${x.toFixed(0)}, ${y.toFixed(0)}) translate(${x.toFixed(0)}, ${y.toFixed(0)})`}
           color={particleColor}
-          opacity={brightness.toFixed(2)}
+          opacity={(brightness * particleOpacity).toFixed(2)}
         />
       );
     });
@@ -100,27 +102,23 @@ const StardustSVG = ({
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox={`0 0 ${width} ${height}`}
-      style={{
-        width: '100%',
-        height: 'auto',
-        border: '1px solid #333',
-        background: bgColor,
-      }}
+      className="w-full h-auto border border-gray-700"
     >
+      <rect width={width} height={height} fill={bgColor} opacity={bgOpacity} />
       <defs>
         {Object.entries(particleShapes).map(([type, shape]) => (
-          <g fill="#FFFFFF" key={type} id={`particle-${type}`}>
+          <g key={type} id={`particle-${type}`}>
             {shape}
           </g>
         ))}
       </defs>
-      <g id="texture-stardust">{allParticles}</g>
+      <g id="texture-particles">{allParticles}</g>
     </svg>
   );
 };
 
 // Demo component with controls
-export default function StardustDemo() {
+export default function ParticleGeneratorDemo() {
   const [counts, setCounts] = useState({
     dot: 4,
     diamond: 5,
@@ -131,8 +129,11 @@ export default function StardustDemo() {
   });
 
   const [brightnessRange, setBrightnessRange] = useState([0.1, 0.95]);
-  const [scaleRange, setScaleRange] = useState([0.5, 2.0]);
+  const [scaleRange, setScaleRange] = useState([0.1, 5.0]);
   const [bgColor, setBgColor] = useState('black');
+  const [bgOpacity, setBgOpacity] = useState(1);
+  const [particleColor, setParticleColor] = useState('white');
+  const [particleOpacity, setParticleOpacity] = useState(1);
   const [seed, setSeed] = useState(0);
 
   const updateCount = (type: keyof ParticleCounts, value: string) => {
@@ -142,95 +143,114 @@ export default function StardustDemo() {
   const totalParticles = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'system-ui, sans-serif', background: '#f5f5f5' }}>
-      <h1 style={{ marginBottom: '10px' }}>Stardust SVG Generator</h1>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
+    <div className="p-5 font-sans bg-gray-100 touch-auto">
+      <h1 className="mb-2.5">Particle SVG Generator</h1>
+      <p className="text-gray-600 mb-5">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
       </p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
-          marginBottom: '20px',
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-5">
         {(Object.entries(counts) as [keyof ParticleCounts, number][]).map(([type, count]) => (
-          <div
-            key={type}
-            style={{
-              background: 'white',
-              padding: '15px',
-              borderRadius: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            }}
-          >
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                textTransform: 'capitalize',
-                fontWeight: '500',
-              }}
-            >
+          <div key={type} className="bg-white p-4 rounded-lg shadow-sm">
+            <label className="block mb-2 capitalize font-medium">
               {type}: {count}
             </label>
             <input
               type="range"
               min="0"
-              max="20"
+              max="500"
               value={count}
               onChange={(e) => updateCount(type, e.target.value)}
-              style={{ width: '100%' }}
+              className="w-full"
+            />
+            <input
+              type="number"
+              min="0"
+              max="500"
+              value={count}
+              onChange={(e) => updateCount(type, e.target.value)}
+              className="w-full mt-2 px-1 py-1 border border-gray-300 rounded"
             />
           </div>
         ))}
       </div>
 
-      <div
-        style={{
-          background: 'white',
-          padding: '15px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Global Parameters</h3>
+      <div className="bg-white p-4 rounded-lg mb-5 shadow-sm">
+        <h3 className="mt-0">Global Parameters</h3>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-            Background Color
-          </label>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="mb-4">
+          <div className="mb-4">
+            <label className="block mb-1.5 font-medium">Particle Color</label>
+            <div className="flex gap-2.5 items-center">
+              <input
+                type="color"
+                value={particleColor === 'white' ? '#ffffff' : particleColor}
+                onChange={(e) => setParticleColor(e.target.value)}
+                className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
+              />
+              <input
+                type="text"
+                value={particleColor}
+                onChange={(e) => setParticleColor(e.target.value)}
+                placeholder="e.g., white, #ffffff, rgb(255,255,255)"
+                className="flex-1 px-2 py-2 border border-gray-300 rounded"
+              />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block mb-1.5 font-medium">
+              Particle Opacity: {particleOpacity.toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={particleOpacity}
+              onChange={(e) => setParticleOpacity(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <label className="block mb-1.5 font-medium">Background Color</label>
+          <div className="flex gap-2.5 items-center">
             <input
               type="color"
               value={bgColor === 'black' ? '#000000' : bgColor}
               onChange={(e) => setBgColor(e.target.value)}
-              style={{
-                width: '60px',
-                height: '40px',
-                cursor: 'pointer',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
+              className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
             />
             <input
               type="text"
               value={bgColor}
               onChange={(e) => setBgColor(e.target.value)}
               placeholder="e.g., black, #000000, rgb(0,0,0)"
-              style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              className="flex-1 px-2 py-2 border border-gray-300 rounded"
             />
           </div>
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+        <div className="mb-4">
+          <label className="block mb-1.5 font-medium">
+            Background Opacity: {bgOpacity.toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={bgOpacity}
+            onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
+            className="w-full"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block mb-1.5 font-medium">
             Brightness Range: {brightnessRange[0].toFixed(2)} - {brightnessRange[1].toFixed(2)}
           </label>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="flex gap-2.5">
             <input
               type="range"
               min="0"
@@ -238,7 +258,7 @@ export default function StardustDemo() {
               step="0.05"
               value={brightnessRange[0]}
               onChange={(e) => setBrightnessRange([parseFloat(e.target.value), brightnessRange[1]])}
-              style={{ flex: 1 }}
+              className="flex-1"
             />
             <input
               type="range"
@@ -247,74 +267,60 @@ export default function StardustDemo() {
               step="0.05"
               value={brightnessRange[1]}
               onChange={(e) => setBrightnessRange([brightnessRange[0], parseFloat(e.target.value)])}
-              style={{ flex: 1 }}
+              className="flex-1"
             />
           </div>
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+        <div className="mb-4">
+          <label className="block mb-1.5 font-medium">
             Scale Range: {scaleRange[0].toFixed(2)} - {scaleRange[1].toFixed(2)}
           </label>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="flex gap-2.5">
             <input
               type="range"
               min="0.1"
-              max="3"
+              max="10"
               step="0.1"
               value={scaleRange[0]}
               onChange={(e) => setScaleRange([parseFloat(e.target.value), scaleRange[1]])}
-              style={{ flex: 1 }}
+              className="flex-1"
             />
             <input
               type="range"
               min="0.1"
-              max="3"
+              max="10"
               step="0.1"
               value={scaleRange[1]}
               onChange={(e) => setScaleRange([scaleRange[0], parseFloat(e.target.value)])}
-              style={{ flex: 1 }}
+              className="flex-1"
             />
           </div>
         </div>
 
         <button
           onClick={() => setSeed(seed + 1)}
-          style={{
-            padding: '10px 20px',
-            background: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '500',
-          }}
+          className="px-5 py-2.5 bg-blue-600 text-white border-0 rounded-md cursor-pointer font-medium hover:bg-blue-700 transition-colors"
         >
           Regenerate (New Random Positions)
         </button>
       </div>
-
-      <div
-        style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        }}
-      >
-        <StardustSVG
+      <div className="bg-white p-5 rounded-lg shadow-sm">
+        <ParticleGenerator
           key={seed}
           particleCounts={counts}
           brightnessRange={brightnessRange}
           scaleRange={scaleRange}
           bgColor={bgColor}
+          bgOpacity={bgOpacity}
+          particleColor={particleColor}
+          particleOpacity={particleOpacity}
+          seed={seed}
         />
       </div>
 
-      <div
-        style={{ marginTop: '20px', padding: '15px', background: '#e3f2fd', borderRadius: '8px' }}
-      >
-        <h3 style={{ marginTop: 0 }}>How to Export</h3>
+      <div className="mt-5 p-4 bg-blue-50 rounded-lg">
+        <h3 className="mt-0">How to Export</h3>
         <p>
           Right-click the SVG above and &quot;Save image as...&quot; or inspect the element and copy
           the SVG markup to save as a .svg file.

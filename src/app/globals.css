@@ -90,8 +90,46 @@
   body {
     @apply bg-background text-foreground overflow-x-hidden;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
   h1 {
-    @apply text-3xl font-bold tracking-tight relative mt-4;
+    @apply text-4xl font-bold leading-tight mb-4 mt-5;
+  }
+  h2 {
+    @apply text-3xl leading-snug mb-3 mt-4;
+  }
+  h3 {
+    @apply text-2xl leading-snug mb-3 mt-4;
+  }
+  h4 {
+    @apply text-xl leading-normal mb-2 mt-3;
+  }
+  h5 {
+    @apply text-lg tracking-normal leading-normal mb-2 mt-3;
+  }
+  h6 {
+    @apply text-base tracking-normal leading-normal mb-2 mt-2;
+  }
+  h2 {
+    @apply text-3xl leading-snug mb-5 mt-7;
+  }
+  h3 {
+    @apply text-2xl leading-snug mb-4 mt-6;
+  }
+  h4 {
+    @apply text-xl leading-normal mb-3 mt-5;
+  }
+  h5 {
+    @apply text-lg tracking-normal leading-normal mb-3 mt-4;
+  }
+  h6 {
+    @apply text-base tracking-normal leading-normal mb-2 mt-3;
   }
   a {
     @apply underline-offset-4;
