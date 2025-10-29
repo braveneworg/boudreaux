@@ -37,7 +37,7 @@ interface Config {
 const defaultConfig: Config = {
   width: 500,
   height: 1000,
-  output: 'stardust.svg',
+  output: 'particles.svg',
   particleCounts: {
     dot: 4,
     diamond: 5,

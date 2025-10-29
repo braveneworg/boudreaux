@@ -21,7 +21,13 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div className={cn(isMobile ? 'items-center' : 'flex items-center', className)}>
+    <div
+      className={cn(
+        { 'justify-center': isMobile, 'gap-4': isMobile },
+        'flex items-center',
+        className
+      )}
+    >
       <SignedInAs />
       {!isMobile && <VerticalSeparator />}
       <Button
