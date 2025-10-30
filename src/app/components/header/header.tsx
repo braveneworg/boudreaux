@@ -11,7 +11,7 @@ const Header = async () => {
   const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
 
   return (
-    <div className="fixed before:content[''] before:absolute before:top-0 before:left-0 before:right-0 before:opacity-90 z-[100] py-2.5 w-screen transparent bg-[url('/media/particles-3.svg')] bg-cover bg-center bg-no-repeat touch-auto">
+    <div className="fixed before:content[''] before:absolute before:top-0 before:left-0 before:right-0 before:opacity-90 z-[100] py-2.5 w-screen transparent bg-[url('/media/particles-4.svg')] bg-cover bg-center bg-no-repeat">
       <div className="mx-auto w-full max-w-[1920px] px-1 pb-1 md:px-8">
         <header className="flex justify-start h-[56px] md:h-[144px] 2xl:min-w-[1864px]">
           <Link className="flex" href="/">
