@@ -19,6 +19,6 @@ export default function Home(): JSX.Element {
           <DataStoreHealthStatus />
         </>
       )}
-    </>j
+    </>
   );
 }
