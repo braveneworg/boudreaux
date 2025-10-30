@@ -15,6 +15,9 @@ export default defineConfig({
     name: packageJson.name,
     environment: 'jsdom',
 
+    // Reduce overhead
+    css: false, // Don't process CSS in tests
+
     typecheck: {
       enabled: true,
       tsconfig: path.join(import.meta.dirname, 'tsconfig.json'),
