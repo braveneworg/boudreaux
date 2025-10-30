@@ -11,6 +11,10 @@ vi.mock('./components/ui/backgrounds/stardust', () => ({
   default: () => <div data-testid="stardust">Stardust</div>,
 }));
 
+vi.mock('./components/ui/backgrounds/particle-generator', () => ({
+  default: () => <div data-testid="particle-generator">Particle Generator</div>,
+}));
+
 // Mock health status sub-components
 vi.mock('./components/health-status-icon', () => ({
   default: ({ status, isLoading }: { status: string | null; isLoading: boolean }) => (
@@ -60,10 +64,13 @@ describe('Home Page - Health Check', () => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
     global.fetch = mockFetch as unknown as typeof fetch;
+    // Set NODE_ENV to development to ensure DataStoreHealthStatus is rendered
+    vi.stubEnv('NODE_ENV', 'development');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('Successful Health Check', () => {

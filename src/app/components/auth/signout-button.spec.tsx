@@ -133,15 +133,19 @@ describe('SignedinToolbar', () => {
       const wrapper = container.firstChild as HTMLElement;
       expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).not.toHaveClass('justify-center');
+      expect(wrapper).not.toHaveClass('gap-4');
     });
 
-    it('does not apply flex layout on mobile', () => {
+    it('applies flex layout with additional classes on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
       const { container } = render(<SignedinToolbar />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).not.toHaveClass('flex');
+      expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).toHaveClass('justify-center');
+      expect(wrapper).toHaveClass('gap-4');
     });
 
     it('applies custom className when provided', () => {
