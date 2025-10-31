@@ -1,3 +1,5 @@
+'use client';
+
 import { useSession } from 'next-auth/react';
 
 import { CONSTANTS } from '@/app/lib/constants';

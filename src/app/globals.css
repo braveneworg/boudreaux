@@ -85,10 +85,10 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply overflow-x-hidden h-full;
+    @apply overflow-x-hidden;
   }
   body {
-    @apply bg-background text-foreground overflow-x-hidden overflow-y-auto h-full;
+    @apply bg-background text-foreground overflow-x-hidden overflow-y-auto;
   }
   h1,
   h2,
