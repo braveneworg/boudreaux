@@ -22,20 +22,7 @@ export default function HamburgerMenu() {
 
   return (
     <header className="fixed border-t-4 border-t-zinc-900 top-0 left-0 right-0 z-6 py-4 flex justify-end">
-      <HamburgerMenuSheet
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        menuItems={menuItems}
-        side="right"
-        textSize="text-2xl"
-        fontWeight="font-light"
-        hoverTextColor="hover:text-gray-400"
-        paddingTop="pt-0"
-        paddingX="px-8"
-        listPaddingTop="pt-4"
-        itemSpacing="space-y-6"
-        staggerDelay={0.1}
-      >
+      <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative right-2 z-[9999]" asChild>
           <Button>
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
