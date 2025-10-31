@@ -2,13 +2,13 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import { Toaster } from '@/components/ui/sonner';
 
+import AuthToolbar from './components/auth/auth-toolbar';
 import Header from './components/header/header';
 import { Providers } from './components/providers';
 
 import type { Metadata } from 'next';
 
 import './globals.css';
-import AuthToolbar from './components/auth/auth-toolbar';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
