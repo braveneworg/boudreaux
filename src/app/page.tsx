@@ -10,13 +10,13 @@ export default function Home(): JSX.Element {
   const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
 
   return (
-    <>
+    <div suppressHydrationWarning>
       {isDevelopment && (
         <>
           <ParticleGeneratorPlayGround />
           <DataStoreHealthStatus />
         </>
       )}
-    </>
+    </div>
   );
 }

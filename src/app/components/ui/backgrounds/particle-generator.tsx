@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 
 type ParticleCounts = {
   dot: number;
@@ -121,6 +121,12 @@ const ParticleGenerator = ({
 
 // Demo component with controls
 export default function ParticleGeneratorDemo() {
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   const [counts, setCounts] = useState({
     dot: 4,
     diamond: 5,
@@ -144,8 +150,16 @@ export default function ParticleGeneratorDemo() {
 
   const totalParticles = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
+  if (!isClient) {
+    return null;
+  }
+
   return (
-    <div className="p-5 font-sans bg-gray-100 touch-auto">
+    <div
+      className="p-5 font-sans bg-gray-100 touch-auto"
+      key="client-only"
+      suppressHydrationWarning
+    >
       <h1 className="mb-2.5">Particle SVG Generator</h1>
       <p className="text-gray-600 mb-5">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
