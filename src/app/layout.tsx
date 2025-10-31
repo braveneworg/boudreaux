@@ -8,6 +8,7 @@ import { Providers } from './components/providers';
 import type { Metadata } from 'next';
 
 import './globals.css';
+import AuthToolbar from './components/auth/auth-toolbar';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
@@ -57,7 +58,8 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
           <Header />
-          <div className="flex font-sans justify-center min-h-screen pt-[80px] px-1.5 md:pt-[180px]">
+          <div className="flex flex-col font-sans justify-center min-h-screen pt-[80px] px-1.5 md:pt-[180px]">
+            <AuthToolbar />
             <main>{children}</main>
           </div>
         </Providers>

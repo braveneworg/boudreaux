@@ -1,0 +1,50 @@
+'use client';
+
+import { useState } from 'react';
+
+import { Button } from '@/app/components/ui/button';
+import HamburgerMenuSheet from '@/app/components/ui/hamburger-menu-sheet';
+import HamburgerPatty from '@/app/components/ui/hamburger-patty';
+
+import { SheetTrigger } from './sheet';
+
+export default function HamburgerMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const menuItems = [
+    { name: 'Home', href: '#home' },
+    { name: 'Releases', href: '#about' },
+    { name: 'Tours', href: '#services' },
+    { name: 'Merch', href: '#portfolio' },
+    { name: 'About', href: '#about' },
+    { name: 'Contact us', href: '#contact' },
+  ];
+
+  return (
+    <header className="fixed border-t-4 border-t-zinc-900 top-0 left-0 right-0 z-6 py-4 flex justify-end">
+      <HamburgerMenuSheet
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+        menuItems={menuItems}
+        side="right"
+        textSize="text-2xl"
+        fontWeight="font-light"
+        hoverTextColor="hover:text-gray-400"
+        paddingTop="pt-0"
+        paddingX="px-8"
+        listPaddingTop="pt-4"
+        itemSpacing="space-y-6"
+        staggerDelay={0.1}
+      >
+        <SheetTrigger className="relative right-2 z-[9999]" asChild>
+          <Button>
+            <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
+            <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
+            <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
+            <HamburgerPatty isOpen={isOpen} rotateOpen={-45} yOffset={8} duration={0.3} />
+          </Button>
+        </SheetTrigger>
+      </HamburgerMenuSheet>
+    </header>
+  );
+}

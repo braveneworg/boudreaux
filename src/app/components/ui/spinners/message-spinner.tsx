@@ -21,16 +21,23 @@ export const MessageSpinner = ({
   // Size-variant gap and text classes
   const gapClass = size === 'sm' ? 'gap-2' : size === 'md' ? 'gap-4' : 'gap-6';
   const textClass = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-lg' : 'text-2xl';
-  const containerSize = size === 'sm' ? 'h-6 w-6' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
-  const spinnerContainerSize =
-    size === 'sm' ? 'h-[16px] w-[16px]' : size === 'md' ? 'h-[28px] w-[28px]' : 'h-[36px] w-[36px]';
+  const containerSize =
+    size === 'sm' ? 'h-[16px] w-[16px] leading-[16px]' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
+  const spinnerContainerSize = 'h-[16px] w-full relative -left-3 leading-[16px]';
 
   return (
-    <div className={cn('flex items-center justify-center mt-2', gapClass, className)}>
-      <div className={cn('flex items-center justify-center rounded-lg', spinnerContainerSize)}>
+    <div
+      className={cn(
+        'flex items-center justify-center my-3',
+        gapClass,
+        className,
+        spinnerContainerSize
+      )}
+    >
+      <div>
         <SpinnerRingCircle size={size} variant={variant} />
       </div>
-      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
+      <div className={cn(`flex justify-center items-center -mt-2 pl-8 ${containerSize}`)}>
         <h2 className={cn('text-muted-foreground', textClass)}>{title}</h2>
       </div>
     </div>
