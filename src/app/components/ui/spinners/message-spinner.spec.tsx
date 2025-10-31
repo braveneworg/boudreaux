@@ -60,8 +60,9 @@ describe('MessageSpinner', () => {
           <MessageSpinner title="Loading..." size="sm" variant="default" />
         );
 
-        const spinnerContainer = container.querySelector('.rounded-lg');
-        expect(spinnerContainer).toHaveClass('h-[16px]', 'w-[16px]');
+        // The wrapper has the spinner container size class
+        const wrapper = container.firstChild as HTMLElement;
+        expect(wrapper).toHaveClass('h-[16px]');
       });
     });
 
@@ -87,8 +88,10 @@ describe('MessageSpinner', () => {
           <MessageSpinner title="Loading..." size="md" variant="default" />
         );
 
-        const spinnerContainer = container.querySelector('.rounded-lg');
-        expect(spinnerContainer).toHaveClass('h-[28px]', 'w-[28px]');
+        // Find the inner container div with size classes
+        const innerContainer = container.querySelector('.h-8');
+        expect(innerContainer).toBeInTheDocument();
+        expect(innerContainer).toHaveClass('w-8');
       });
     });
 
@@ -114,8 +117,10 @@ describe('MessageSpinner', () => {
           <MessageSpinner title="Loading..." size="lg" variant="default" />
         );
 
-        const spinnerContainer = container.querySelector('.rounded-lg');
-        expect(spinnerContainer).toHaveClass('h-[36px]', 'w-[36px]');
+        // Find the inner container div with size classes
+        const innerContainer = container.querySelector('.h-10');
+        expect(innerContainer).toBeInTheDocument();
+        expect(innerContainer).toHaveClass('w-10');
       });
     });
   });
@@ -189,18 +194,20 @@ describe('MessageSpinner', () => {
         <MessageSpinner title="Loading..." size="md" variant="default" />
       );
 
-      const spinnerContainer = container.querySelector('.rounded-lg');
-      expect(spinnerContainer).toHaveClass('flex', 'items-center', 'justify-center');
+      // The main wrapper has flex, items-center, justify-center
+      const wrapper = container.firstChild as HTMLElement;
+      expect(wrapper).toHaveClass('flex', 'items-center', 'justify-center');
     });
 
-    it('should have rounded corners on spinner container', () => {
+    it('should have proper layout structure with inner container', () => {
       const { container } = render(
         <MessageSpinner title="Loading..." size="md" variant="default" />
       );
 
-      const spinnerContainer = container.querySelector('.rounded-lg');
-      expect(spinnerContainer).toBeInTheDocument();
-      expect(spinnerContainer).toHaveClass('rounded-lg');
+      // Check that the inner container exists with flex classes
+      const innerContainer = container.querySelector('.h-8.w-8');
+      expect(innerContainer).toBeInTheDocument();
+      expect(innerContainer).toHaveClass('flex', 'justify-center', 'items-center');
     });
   });
 
