@@ -24,7 +24,7 @@ export default function HamburgerMenu() {
     <header className="fixed border-t-4 border-t-zinc-900 top-0 left-0 right-0 z-6 py-4 flex justify-end">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative right-2 z-[9999]" asChild>
-          <Button>
+          <Button className="relative -top-1.5">
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
             <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
             <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
