@@ -10,7 +10,7 @@ import StatusIndicator from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/app/lib/types/form-state';
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 import type { Control } from 'react-hook-form';
 

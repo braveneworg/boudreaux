@@ -62,7 +62,7 @@ vi.mock('lucide-react', () => ({
 }));
 
 // Mock utils
-vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
+vi.mock('@/app/lib/utils/tailwind-utils', () => ({
   cn: (...args: Array<string | Record<string, boolean> | undefined>) => {
     return args
       .filter(Boolean)

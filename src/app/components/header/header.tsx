@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { userAgentFromString } from 'next/server'; // For App Router
 
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 import HamburgerMenu from '../ui/hamburger-menu';
 
