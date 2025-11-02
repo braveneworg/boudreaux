@@ -41,7 +41,7 @@ vi.mock('../ui/spinners/message-spinner', () => ({
   ),
 }));
 
-vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
+vi.mock('@/app/lib/utils/tailwind-utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 

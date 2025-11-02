@@ -131,7 +131,7 @@ vi.mock('./signout-button');
 vi.mock('../ui/vertical-separator');
 
 // Utilities
-vi.mock('@/app/lib/utils/auth/tailwind-utils');
+vi.mock('@/app/lib/utils/tailwind-utils');
 vi.mock('@/app/lib/utils/console-logger');
 ```
 

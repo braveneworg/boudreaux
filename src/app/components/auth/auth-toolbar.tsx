@@ -3,8 +3,8 @@
 import { useSession } from 'next-auth/react';
 
 import { CONSTANTS } from '@/app/lib/constants';
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
 import { log } from '@/app/lib/utils/console-logger';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 import SignInLink from './signin-link';
 import SignedinToolbar from './signout-button';

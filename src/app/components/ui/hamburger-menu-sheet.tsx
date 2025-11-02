@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 
 import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
 
+import SocialMediaIconLinks from './social-media-icon-links';
+
 export interface MenuItem {
   name: string;
   href: string;
@@ -36,13 +38,14 @@ export default function HamburgerMenuSheet({
       <div className="relative z-[40] size-[40px]">{children}</div>
       <SheetContent
         side="right"
-        className="w-[100vw] top-[68.5px] border-0 z-[200] pt-0 px-8 absolute bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-4.svg)] bg-cover bg-center opacity-95  bg-no-repeat z-10"
+        className="w-[100vw] top-[68.5px] border-0 z-[200] pt-0 px-8 absolute bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-4.svg)] bg-cover bg-center opacity-95 bg-no-repeat z-10"
         aria-label="Navigation menu"
         isOpen={isOpen}
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav aria-label="Main navigation">
-          <ul className="space-y-6 pt-6" role="list">
+          <SocialMediaIconLinks className="justify-center mt-0" />
+          <ul className="space-y-6 pt-" role="list">
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}

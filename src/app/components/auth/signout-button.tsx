@@ -5,7 +5,7 @@ import { signOut, useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { CONSTANTS } from '@/app/lib/constants';
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 import AdminLink from './admin-link';
 import EditProfileButton from './edit-profile-button';
