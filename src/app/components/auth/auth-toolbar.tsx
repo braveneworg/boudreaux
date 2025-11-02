@@ -33,10 +33,8 @@ const AuthToolbar = ({ className }: { className?: string }) => {
 
   // Show authenticated toolbar if user is logged in
   if (status === CONSTANTS.AUTHENTICATION.STATUS.AUTHENTICATED && session) {
-    if (isAdmin) {
-      if (isDevelopment) {
-        log(loggingPrefix, 'User role:', session.user.role || CONSTANTS.NA);
-      }
+    if (isAdmin && isDevelopment) {
+      log(loggingPrefix, 'User role:', session.user.role || CONSTANTS.NA);
     }
 
     log(loggingPrefix, 'Rendering authenticated toolbar');
