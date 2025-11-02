@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
 
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
+import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { signinAction } from '@/app/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
@@ -70,23 +71,30 @@ const SignupPage = () => {
   );
 
   return (
-    <FormProvider {...form}>
-      <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)}>
-        <SignupSigninForm
-          control={
-            form.control as Control<{
-              email: string;
-              general?: string;
-              termsAndConditions?: boolean;
-            }>
-          }
-          isPending={isPending}
-          setIsVerified={setIsVerified}
-          state={state}
-          hasTermsAndConditions={isSignupPath}
-        />
-      </form>
-    </FormProvider>
+    <>
+      <BreadcrumbMenu
+        className="mt-2"
+        items={[{ anchorText: 'Sign Up', url: '#', isActive: true }]}
+      />
+      <h1>Sign Up</h1>
+      <FormProvider {...form}>
+        <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)}>
+          <SignupSigninForm
+            control={
+              form.control as Control<{
+                email: string;
+                general?: string;
+                termsAndConditions?: boolean;
+              }>
+            }
+            isPending={isPending}
+            setIsVerified={setIsVerified}
+            state={state}
+            hasTermsAndConditions={isSignupPath}
+          />
+        </form>
+      </FormProvider>
+    </>
   );
 };
 
