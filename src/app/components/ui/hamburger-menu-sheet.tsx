@@ -44,8 +44,8 @@ export default function HamburgerMenuSheet({
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav aria-label="Main navigation">
-          <SocialMediaIconLinks className="justify-center mt-0" />
-          <ul className="space-y-6 pt-" role="list">
+          <SocialMediaIconLinks className="justify-center" />
+          <ul className="space-y-6" role="list">
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}

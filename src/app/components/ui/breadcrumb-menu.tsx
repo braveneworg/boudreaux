@@ -10,6 +10,7 @@ import {
   BreadcrumbSeparator,
   BreadcrumbPage,
 } from '@/app/components/ui/breadcrumb';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 type BreadcrumbItem = {
   anchorText: string;
@@ -19,11 +20,12 @@ type BreadcrumbItem = {
 
 type BreadcrumbMenuProps = {
   items: BreadcrumbItem[];
+  className?: string;
 };
 
-export function BreadcrumbMenu({ items }: BreadcrumbMenuProps) {
+export function BreadcrumbMenu({ items, className }: BreadcrumbMenuProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn('flex items-center gap-2', className)}>
       <Link href="/" className="hover:text-foreground text-muted-foreground transition-colors">
         <Home className="size-5" />
         <span className="sr-only">Home</span>
