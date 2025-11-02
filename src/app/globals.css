@@ -85,10 +85,15 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply overflow-x-hidden;
+    height: 100%;
+    overflow: hidden;
   }
   body {
-    @apply bg-background text-foreground overflow-x-hidden overflow-y-auto;
+    @apply bg-background text-foreground;
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
   }
   h1,
   h2,
