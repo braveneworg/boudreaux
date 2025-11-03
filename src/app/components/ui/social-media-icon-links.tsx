@@ -42,13 +42,11 @@ const menuLinks = [
 ];
 
 const SocialMediaIconLinks = ({ className }: { className: string }) => (
-  <div
-    className={cn(['flex flex-wrap py-1 mb-4 justify-end border-b-1 border-b-white', className])}
-  >
+  <div className={cn(['flex flex-wrap py-1 justify-end', className])}>
     {menuLinks.map((link) => (
       <Link
         aria-label={link.label}
-        className="w-[40px] px-2 transition-transform md:hover:scale-[107.5%]"
+        className="w-[40px] h-[40px] px-2 transition-transform md:hover:scale-[107.5%]"
         data-testid={`${link.label.toLowerCase()}-icon`}
         href={link.href}
         key={link.href}

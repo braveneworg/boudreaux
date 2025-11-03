@@ -43,9 +43,9 @@ export default function HamburgerMenuSheet({
         isOpen={isOpen}
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-        <nav aria-label="Main navigation">
-          <SocialMediaIconLinks className="justify-center" />
-          <ul className="space-y-6" role="list">
+        <nav className="flex flex-col" aria-label="Main navigation">
+          <SocialMediaIconLinks className="justify-center border-b-1 border-b-accent" />
+          <ul className="pt-4 space-y-4" role="list">
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}
@@ -56,10 +56,9 @@ export default function HamburgerMenuSheet({
               >
                 <a
                   href={item.href}
-                  className="text-white text-2xl font-light hover:text-gray-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
+                  className="text-white text-shadow-sm text-2xl font-light hover:text-gray-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
                   style={{
-                    textShadow:
-                      '0 0 12px rgba(255, 255, 255, 0.8), 0 0 24px rgba(255, 255, 255, 0.5), 0 0 36px rgba(255, 255, 255, 0.3)',
+                    textShadow: '0 2px 18px rgba(255, 255, 255, 0.8)',
                   }}
                   onClick={() => onOpenChange(false)}
                   tabIndex={0}
