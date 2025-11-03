@@ -20,9 +20,7 @@ const AuthToolbar = ({ className }: { className?: string }) => {
   const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
   const loggingPrefix = '[AuthToolbar]';
   const pathName = usePathname();
-  console.log(`23: auth-toolbar > pathName >>>`, pathName);
   const isSigninOrSignupPage = /(signin|signup)/gi.test(pathName);
-  console.log(`25: auth-toolbar > isSigninOrSignupPage >>>`, isSigninOrSignupPage);
 
   // Debug logging in development
   if (isDevelopment) {
@@ -50,14 +48,16 @@ const AuthToolbar = ({ className }: { className?: string }) => {
   // Show sign in/up links for unauthenticated users
   log(loggingPrefix, 'Rendering unauthenticated links');
   return (
-    <div
-      className={cn('flex items-center justify-center gap-2 py-2', className, {
-        hidden: isSigninOrSignupPage,
-      })}
-    >
-      <SignInLink />
-      <VerticalSeparator />
-      <SignUpLink />
+    <div className={cn('h-[20px] my-2', className, { hidden: isSigninOrSignupPage })}>
+      <div
+        className={cn('flex h-[20px] items-center relative justify-center gap-2', className, {
+          hidden: isSigninOrSignupPage,
+        })}
+      >
+        <SignInLink />
+        <VerticalSeparator />
+        <SignUpLink />
+      </div>
     </div>
   );
 };

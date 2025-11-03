@@ -1,5 +1,17 @@
-const PageContainer = ({ children }: { children: React.ReactNode }) => {
-  return <div className="mx-auto w-[calc(100%-theme(spacing.4))]">{children}</div>;
+import { cn } from '@/lib/utils';
+
+const PageContainer = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  return (
+    <div className={cn('mx-auto min-h-full flex flex-col w-full flex-1', className)}>
+      {children}
+    </div>
+  );
 };
 
 export default PageContainer;

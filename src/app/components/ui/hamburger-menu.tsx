@@ -21,7 +21,7 @@ export default function HamburgerMenu() {
   ];
 
   return (
-    <header className="fixed border-t-4 border-t-zinc-900 top-0 left-0 right-0 z-[15002] py-4 flex justify-end">
+    <header className="fixed top-0 left-0 right-0 z-[15002] py-4 flex justify-end">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative right-2 z-[15001]" asChild>
           <Button className="relative -top-0.5">

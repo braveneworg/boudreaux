@@ -9,12 +9,12 @@ type ContentContainerProps = {
 
 export const ContentContainer = ({ children, className }: ContentContainerProps) => {
   return (
-    <div
-      className={cn('p-5 font-sans bg-gray-100 touch-auto', className)}
+    <section
+      className={cn('font-sans bg-zinc-100 min-h-full flex flex-col flex-1 w-full', className)}
       key="client-only"
       suppressHydrationWarning
     >
       {children}
-    </div>
+    </section>
   );
 };

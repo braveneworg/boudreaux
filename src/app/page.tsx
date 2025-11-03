@@ -1,22 +1,15 @@
 'use client';
 
-import type { JSX } from 'react';
-
 import DataStoreHealthStatus from './components/data-store-health-status';
-import ParticleGeneratorPlayGround from './components/ui/backgrounds/particle-generator';
-import { CONSTANTS } from './lib/constants';
+import { ContentContainer } from './components/ui/content-container';
+import PageContainer from './components/ui/page-container';
 
-export default function Home(): JSX.Element {
-  const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
-
+export default function Home() {
   return (
-    <div suppressHydrationWarning>
-      {isDevelopment && (
-        <>
-          <ParticleGeneratorPlayGround />
-          <DataStoreHealthStatus />
-        </>
-      )}
-    </div>
+    <PageContainer>
+      <ContentContainer>
+        <DataStoreHealthStatus />
+      </ContentContainer>
+    </PageContainer>
   );
 }

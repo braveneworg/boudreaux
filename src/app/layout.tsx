@@ -65,24 +65,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
         suppressHydrationWarning
       >
         <Providers>
-          <div
-            className="fixed inset-0 overflow-y-auto overflow-x-hidden flex flex-col"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <Header />
-            <div className="flex-1 flex flex-col font-sans min-w-screen md:pt-[152px] px-1.5">
-              <main className="flex-1">
-                <AuthToolbar />
-                <Separator className="my-0 h-px bg-zinc-300" />
-                {children}
-              </main>
-            </div>
-            <Footer />
-          </div>
+          <Header />
+          <main className="font-sans md:pt-[152px] px-1.5 flex flex-col flex-1 border-4 border-zinc-900">
+            <AuthToolbar />
+            <Separator className="my-0 h-px bg-zinc-300" />
+            {children}
+          </main>
+          <Footer />
         </Providers>
         <Toaster />
       </body>
