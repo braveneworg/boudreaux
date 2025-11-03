@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 
+import { Separator } from '@radix-ui/react-separator';
+
 import { Toaster } from '@/components/ui/sonner';
 
 import AuthToolbar from './components/auth/auth-toolbar';
@@ -9,7 +11,6 @@ import { Providers } from './components/providers';
 import type { Metadata } from 'next';
 
 import './globals.css';
-import { Separator } from '@radix-ui/react-separator';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
@@ -72,7 +73,7 @@ export default function RootLayout({
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
             <Header />
-            <div className="flex font-sans justify-center min-h-screen md:pt-[152px] px-1.5">
+            <div className="flex font-sans min-w-screen min-h-screen md:pt-[152px] px-1.5">
               <main>
                 <AuthToolbar />
                 <Separator className="my-0 h-px bg-slate-300" />
