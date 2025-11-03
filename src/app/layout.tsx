@@ -5,6 +5,7 @@ import { Separator } from '@radix-ui/react-separator';
 import { Toaster } from '@/components/ui/sonner';
 
 import AuthToolbar from './components/auth/auth-toolbar';
+import Footer from './components/footer/footer';
 import Header from './components/header/header';
 import { Providers } from './components/providers';
 
@@ -69,17 +70,18 @@ export default function RootLayout({
       >
         <Providers>
           <div
-            className="fixed inset-0 overflow-y-auto overflow-x-hidden"
+            className="fixed inset-0 overflow-y-auto overflow-x-hidden flex flex-col"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
             <Header />
-            <div className="flex font-sans min-w-screen min-h-screen md:pt-[152px] px-1.5">
-              <main>
+            <div className="flex-1 flex flex-col font-sans min-w-screen md:pt-[152px] px-1.5">
+              <main className="flex-1">
                 <AuthToolbar />
-                <Separator className="my-0 h-px bg-slate-300" />
+                <Separator className="my-0 h-px bg-zinc-300" />
                 {children}
               </main>
             </div>
+            <Footer />
           </div>
         </Providers>
         <Toaster />

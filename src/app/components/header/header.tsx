@@ -1,10 +1,8 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
-import Link from 'next/link';
 import { userAgentFromString } from 'next/server'; // For App Router
 
-import { cn } from '@/app/lib/utils/tailwind-utils';
-
+import Logo from './logo';
 import HamburgerMenu from '../ui/hamburger-menu';
 
 const Header = async () => {
@@ -24,20 +22,7 @@ const Header = async () => {
     >
       <div className="relative mx-auto w-full max-w-[1920px] px-1 pb-0 md:px-8">
         <header className="flex justify-start h-[64px] md:h-[144px] 2xl:min-w-[1864px]">
-          <Link className="flex" href="/">
-            <Image
-              alt="Fake Four Inc. Logo"
-              className={cn('ml-2 mt-1 size-[56px] md:size-[144px] rounded-full bg-white')}
-              height={56}
-              priority
-              src={
-                isMobile
-                  ? '/media/fake-four-inc-black-hand-logo.svg'
-                  : '/media/fake-four-inc-black-stardust-hand-logo.svg'
-              }
-              width={56}
-            />
-          </Link>
+          <Logo isMobile={isMobile} />
           {isMobile && (
             <>
               <Image

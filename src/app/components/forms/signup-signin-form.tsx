@@ -12,6 +12,7 @@ import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/app/lib/types/form-state';
 import { cn } from '@/app/lib/utils/tailwind-utils';
 
+import PageContainer from '../ui/page-container';
 import { Skeleton } from '../ui/skeleton';
 
 import type { Control } from 'react-hook-form';
@@ -44,15 +45,15 @@ const SignupSigninForm = ({
   const isSigningIn = pathName === '/signin/';
 
   return (
-    <>
+    <PageContainer>
       {!isVerified && <Skeleton className="h-10 w-full mx-auto" />}
       {isVerified && (
-        <div className={cn('mt-8')}>
+        <>
           <FormField
             control={control}
             name="email"
             render={({ field }) => (
-              <FormItem className={cn(isSigningIn ? 'mb-5' : 'mb-0', 'mt-4')}>
+              <FormItem className={cn(isSigningIn ? 'mb-5' : 'mb-0', 'mt-0')}>
                 <FormLabel className="sr-only" htmlFor="email">
                   Email
                 </FormLabel>
@@ -105,7 +106,7 @@ const SignupSigninForm = ({
               )}
             />
           )}
-        </div>
+        </>
       )}
       <TurnstileWidget isVerified={isVerified} setIsVerified={setIsVerified} />
       <div className="flex items-center gap-3 mt-4">
@@ -134,7 +135,7 @@ const SignupSigninForm = ({
           <FormMessage className="text-red-600">{state.errors.general[0]}</FormMessage>
         </div>
       )}
-    </>
+    </PageContainer>
   );
 };
 

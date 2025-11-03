@@ -25,7 +25,7 @@ type BreadcrumbMenuProps = {
 
 export function BreadcrumbMenu({ items, className }: BreadcrumbMenuProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn('flex items-center gap-2 my-2', className)}>
       <Link href="/" className="hover:text-foreground text-muted-foreground transition-colors">
         <Home className="size-5" />
         <span className="sr-only">Home</span>

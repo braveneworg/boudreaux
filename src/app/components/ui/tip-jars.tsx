@@ -7,7 +7,7 @@ export const TipJarsLink = () => {
       href="https://campsite.bio/ceschi"
       rel="noopener"
       target="_blank"
-      className="mt-2 text-xl text-slate-50 visited:text-slate-50 pb-3 flex items-center justify-center"
+      className="mt-2 text-xl text-zinc-50 visited:text-zinc-50 pb-3 flex items-center justify-center"
     >
       Tip Jars
       <Image

@@ -2,6 +2,8 @@
 
 import React, { useState, useSyncExternalStore } from 'react';
 
+import { ContentContainer } from '@/app/components/ui/content-container';
+
 type ParticleCounts = {
   dot: number;
   diamond: number;
@@ -155,12 +157,8 @@ export default function ParticleGeneratorDemo() {
   }
 
   return (
-    <div
-      className="p-5 font-sans bg-gray-100 touch-auto"
-      key="client-only"
-      suppressHydrationWarning
-    >
-      <h1 className="mb-2.5">Particle SVG Generator</h1>
+    <ContentContainer>
+      <h1>Particle SVG Generator</h1>
       <p className="text-gray-600 mb-5">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
       </p>
@@ -342,6 +340,6 @@ export default function ParticleGeneratorDemo() {
           the SVG markup to save as a .svg file.
         </p>
       </div>
-    </div>
+    </ContentContainer>
   );
 }
