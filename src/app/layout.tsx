@@ -1,4 +1,6 @@
 import { Dawning_of_a_New_Day } from 'next/font/google';
+import { headers } from 'next/headers';
+import { userAgentFromString } from 'next/server';
 
 import { Separator } from '@radix-ui/react-separator';
 
@@ -66,11 +68,15 @@ export const viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const userAgent = (await headers()).get('user-agent') || '';
+  const { device } = userAgentFromString(userAgent);
+  const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
+
   return (
     <html lang="en">
       <body
@@ -78,7 +84,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <Header />
+          <Header isMobile={isMobile} />
           <main className="font-sans px-1.5 flex flex-col flex-1 w-full max-w-full overflow-x-hidden">
             <AuthToolbar />
             <Separator className="my-0 h-px bg-zinc-300" />

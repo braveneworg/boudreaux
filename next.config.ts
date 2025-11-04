@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
+  devIndicators: false,
 
   // Configure images for CDN
   images: {
