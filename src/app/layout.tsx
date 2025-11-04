@@ -46,6 +46,8 @@ const dawningOfANewDay = Dawning_of_a_New_Day({
   variable: '--font-dawning-of-a-new-day',
   subsets: ['latin'],
   weight: '400',
+  display: 'swap',
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
@@ -55,12 +57,13 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

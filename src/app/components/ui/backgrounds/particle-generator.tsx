@@ -142,6 +142,7 @@ export default function ParticleGeneratorDemo() {
   const [scaleRange, setScaleRange] = useState([0.1, 5.0]);
   const [bgColor, setBgColor] = useState('black');
   const [bgOpacity, setBgOpacity] = useState(1);
+  const [isTransparent, setIsTransparent] = useState(false);
   const [particleColor, setParticleColor] = useState('white');
   const [particleOpacity, setParticleOpacity] = useState(1);
   const [seed, setSeed] = useState(0);

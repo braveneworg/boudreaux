@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 import { Card } from '../components/ui/card';
@@ -11,19 +12,20 @@ export default function AboutPage() {
   return (
     <PageContainer className="flex-1">
       <ContentContainer className="flex-1">
-        <BreadcrumbMenu items={[{ anchorText: 'Admin', url: '/admin', isActive: true }]} />
+        <BreadcrumbMenu items={[{ anchorText: 'About', url: '/about', isActive: true }]} />
         <Card>
           <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
             <h1 id="about-fake-four-inc" className="leading-tight text-4xl">
               About fake four inc.
             </h1>
-            <PageSectionParagraph className="mb-8 mt-0 pt-0 text-lg leading-relaxed text-zinc-700">
+            <PageSectionParagraph>
               <Image
                 width={92}
                 height={92}
                 src="/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg"
-                alt="Ceschi and David Ramos, founders of Fake Four Inc."
-                className="inline-block float-right ml-4 rounded-md shadow-md shape-around border-[1px] border-zinc-700"
+                alt="Ceschi and David Ramos, founders of Fake Four Inc. in 2008"
+                className="inline-block float-right ml-4 rounded-full shadow-md border-2 border-zinc-50"
+                priority
               />
               <strong>Fake Four Inc.</strong> is an independent record label based in New Haven,
               Connecticut. Founded in 2008 by brothers <strong>Ceschi and David Ramos</strong>, the
@@ -37,6 +39,15 @@ export default function AboutPage() {
                 friends.
               </PageSectionParagraph>
               <PageSectionParagraph>
+                <Link href="https://davidramos.bandcamp.com/album/this-up-here">
+                  <Image
+                    src="/media/listen-david-ramos-this-up-there-bc.png"
+                    alt="Listen to David Ramos' This Up Here on Bandcamp"
+                    width={380}
+                    height={42}
+                    className="float-left mr-4 mb-2 rounded-md shadow-md border-2 border-zinc-50"
+                  />
+                </Link>
                 The first full-length release came with <em>This Up Here</em> by David Ramos on May
                 20, 2008. David Ramos, a co-founder of the label, was recognized by Modern Drummer
                 magazine as one of the Top 10 Progressive drummers.
