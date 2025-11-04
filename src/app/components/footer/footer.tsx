@@ -15,15 +15,24 @@ const Footer = () => {
             All rights reserved.
           </div>
           <nav className="flex flex-wrap items-center justify-center">
-            <Link className="text-zinc-50 text-sm hover:underline px-2 py-1" href="/terms">
+            <Link
+              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              href="/legal/terms-and-conditions"
+            >
               Terms and Conditions
             </Link>
             <VerticalSeparator className="h-4!" />
-            <Link className="text-zinc-50 text-sm hover:underline px-2 py-1" href="/privacy">
+            <Link
+              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              href="/legal/privacy-policy"
+            >
               Privacy Policy
             </Link>
             <VerticalSeparator className="h-4!" />
-            <Link className="text-zinc-50 text-sm hover:underline px-2 py-1" href="/cookies">
+            <Link
+              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              href="/legal/cookies-policy"
+            >
               Cookies Policy
             </Link>
           </nav>

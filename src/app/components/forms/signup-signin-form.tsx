@@ -91,8 +91,8 @@ const SignupSigninForm = ({
                   </FormControl>
                   <FormLabel htmlFor="terms-and-conditions">
                     <Link
-                      className=":hover:no-underline :visited:text-rebeccapurple underline text-blue-800"
-                      href="/terms-and-conditions"
+                      className=":hover:no-underline :visited:text-rebeccapurple underline"
+                      href="/legal/terms-and-conditions"
                     >
                       Accept terms and conditions?
                     </Link>
