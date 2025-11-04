@@ -21,33 +21,35 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div
-      className={cn(
-        { 'justify-center': isMobile, 'gap-4': isMobile },
-        'flex items-center',
-        className
-      )}
-    >
-      <SignedInAs />
-      {!isMobile && <VerticalSeparator />}
-      <Button
-        variant="link:narrow"
-        onClick={async () => {
-          const { url } = await signOut({ redirect: false, callbackUrl: '/' });
-          router.push(url);
-        }}
+    <div className={cn('h-[20px] my-2', className)}>
+      <div
+        className={cn(
+          'flex h-[20px] items-center relative justify-center gap-2',
+          { 'gap-4': isMobile },
+          className
+        )}
       >
-        <LogOutIcon />
-        Sign Out
-      </Button>
-      {!isMobile && <VerticalSeparator />}
-      <EditProfileButton />
-      {isAdmin && (
-        <>
-          {!isMobile && <VerticalSeparator />}
-          <AdminLink />
-        </>
-      )}
+        <SignedInAs />
+        <VerticalSeparator />
+        <Button
+          variant="link:narrow"
+          onClick={async () => {
+            const { url } = await signOut({ redirect: false, callbackUrl: '/' });
+            router.push(url);
+          }}
+        >
+          <LogOutIcon />
+          Sign Out
+        </Button>
+        {!isMobile && <VerticalSeparator />}
+        <EditProfileButton />
+        {isAdmin && (
+          <>
+            <VerticalSeparator />
+            <AdminLink />
+          </>
+        )}
+      </div>
     </div>
   );
 };
