@@ -19,7 +19,7 @@ const Header = async () => {
             <>
               <Image
                 alt="Fake Four Inc. Words"
-                className="relative right-12 w-[300px] h-[56px]"
+                className="relative right-1 w-[300px] h-[56px]"
                 height={56}
                 priority
                 src="/media/fake-four-inc-words.png"
