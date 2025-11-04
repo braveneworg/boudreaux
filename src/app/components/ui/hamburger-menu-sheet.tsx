@@ -35,10 +35,10 @@ export default function HamburgerMenuSheet({
 }: HamburgerMenuSheetProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <div className="relative z-[40] size-[40px]">{children}</div>
+      <div className="relative size-[40px]">{children}</div>
       <SheetContent
         side="right"
-        className="w-[100vw] top-[66.5px] border-0 z-[200] pt-0 px-8 absolute bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-4.svg)] bg-cover bg-center opacity-95 bg-no-repeat z-10"
+        className="w-[100vw] h-[calc(100vh-70px)] md:h-[calc(100vh-144px)] top-[70px] md:top-[144px] border-0 z-[200] pt-0 px-8 fixed bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-4.svg)] bg-cover bg-center opacity-95 bg-no-repeat pointer-events-auto"
         aria-label="Navigation menu"
         isOpen={isOpen}
       >

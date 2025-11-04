@@ -12,19 +12,19 @@ export default function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
-    { name: 'Home', href: '#home' },
-    { name: 'Releases', href: '#about' },
-    { name: 'Tours', href: '#services' },
-    { name: 'Merch', href: '#portfolio' },
-    { name: 'About', href: '#about' },
-    { name: 'Contact us', href: '#contact' },
+    { name: 'Home', href: '/' },
+    { name: 'Releases', href: '/releases' },
+    { name: 'Tours', href: '/tours' },
+    { name: 'Merch', href: '/merch' },
+    { name: 'About', href: '/about' },
+    { name: 'Contact us', href: '/contact' },
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[15002] py-4 flex justify-end">
+    <div className="flex justify-end pointer-events-none">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
-        <SheetTrigger className="relative right-2 z-[15001]" asChild>
-          <Button className="relative -top-0.5">
+        <SheetTrigger className="relative" asChild>
+          <Button className="pointer-events-auto">
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
             <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
             <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
@@ -32,6 +32,6 @@ export default function HamburgerMenu() {
           </Button>
         </SheetTrigger>
       </HamburgerMenuSheet>
-    </header>
+    </div>
   );
 }

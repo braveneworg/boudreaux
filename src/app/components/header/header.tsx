@@ -11,23 +11,15 @@ const Header = async () => {
   const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
 
   return (
-    <div
-      className="sticky top-0 left-0 right-0 z-[100] w-full bg-[url('/media/particles-4.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none"
-      style={
-        {
-          WebkitTransform: 'translateZ(0)',
-          transform: 'translateZ(0)',
-        } as React.CSSProperties
-      }
-    >
-      <div className="relative mx-auto w-full max-w-[1920px] px-1 pb-1.5 md:px-8">
-        <header className="flex md:h-[144px] 2xl:min-w-[1864px]">
+    <div className="sticky top-0 left-0 right-0 z-[100] w-full bg-[url('/media/particles-4.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none">
+      <div className="relative mx-auto w-full max-w-[1920px] px-1 pb-1.5 md:px-8 overflow-hidden">
+        <header className="flex items-center justify-between md:h-[144px] w-full min-w-0">
           <Logo isMobile={isMobile} />
           {isMobile && (
             <>
               <Image
                 alt="Fake Four Inc. Words"
-                className="w-[300px] ml-1.5"
+                className="relative right-12 w-[300px] h-[56px]"
                 height={56}
                 priority
                 src="/media/fake-four-inc-words.png"

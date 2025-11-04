@@ -50,7 +50,7 @@
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
+  --card: oklch(0.94 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -98,13 +98,15 @@
   h4,
   h5,
   h6 {
-    @apply font-semibold tracking-tight;
+    /* [word-spacing:-20px] */
+    font-family: var(--font-dawning-of-a-new-day), serif;
+    @apply font-semibold tracking-[0.2rem] relative -top-6 lowercase text-shadow-sm  text-shadow-zinc-400;
   }
   h1 {
-    @apply text-3xl font-bold leading-tight mb-4;
+    @apply text-4xl font-bold leading-tight mb-2 text-zinc-800!;
   }
   h2 {
-    @apply text-2xl leading-snug mb-3 mt-4;
+    @apply text-2xl leading-snug mb-3 mt-4 text-zinc-700!;
   }
   h3 {
     @apply text-xl leading-snug mb-3 mt-4;

@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Dawning_of_a_New_Day } from 'next/font/google';
 
 import { Separator } from '@radix-ui/react-separator';
 
@@ -32,14 +32,20 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   }
 }
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
+// const geistSans = Geist({
+//   variable: '--font-geist-sans',
+//   subsets: ['latin'],
+// });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+// const geistMono = Geist_Mono({
+//   variable: '--font-geist-mono',
+//   subsets: ['latin'],
+// });
+
+const dawningOfANewDay = Dawning_of_a_New_Day({
+  variable: '--font-dawning-of-a-new-day',
   subsets: ['latin'],
+  weight: '400',
 });
 
 export const metadata: Metadata = {
@@ -65,12 +71,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+        className={`${dawningOfANewDay.variable} antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full`}
         suppressHydrationWarning
       >
         <Providers>
           <Header />
-          <main className="font-sans md:pt-[152px] px-1.5 flex flex-col flex-1 border-4 border-zinc-900">
+          <main className="font-sans px-1.5 flex flex-col flex-1 w-full max-w-full overflow-x-hidden">
             <AuthToolbar />
             <Separator className="my-0 h-px bg-zinc-300" />
             {children}
