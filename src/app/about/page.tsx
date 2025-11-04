@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
-import { Card } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { ContentContainer } from '../components/ui/content-container';
 import PageContainer from '../components/ui/page-container';
 import { PageSection } from '../components/ui/page-section';
@@ -10,14 +10,12 @@ import { PageSectionParagraph } from '../components/ui/page-section-paragraph';
 
 export default function AboutPage() {
   return (
-    <PageContainer className="flex-1">
-      <ContentContainer className="flex-1">
+    <PageContainer>
+      <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'About', url: '/about', isActive: true }]} />
         <Card>
-          <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-            <h1 id="about-fake-four-inc" className="leading-tight text-4xl">
-              About fake four inc.
-            </h1>
+          <CardContent>
+            <h1 id="about-fake-four-inc">About fake four inc.</h1>
             <PageSectionParagraph>
               <Image
                 width={92}
@@ -137,7 +135,7 @@ export default function AboutPage() {
                 boundaries of underground hip-hop and experimental music.
               </PageSectionParagraph>
             </PageSection>
-          </div>
+          </CardContent>
         </Card>
       </ContentContainer>
     </PageContainer>

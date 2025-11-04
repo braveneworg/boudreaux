@@ -8,7 +8,7 @@ const PageContainer = ({
   className?: string;
 }) => {
   return (
-    <div className={cn('mx-auto min-h-full flex flex-col w-full flex-1', className)}>
+    <div className={cn('flex-1 mx-auto min-h-full flex flex-col w-full', className)}>
       {children}
     </div>
   );

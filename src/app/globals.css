@@ -96,6 +96,7 @@
   input[type='text'],
   input[type='email'],
   input[type='password'],
+  input,
   textarea,
   select {
     @apply bg-zinc-50! border-zinc-300 text-zinc-900! placeholder:text-zinc-500! shadow-sm;
