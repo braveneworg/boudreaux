@@ -159,13 +159,13 @@ export default function ParticleGeneratorDemo() {
   return (
     <ContentContainer>
       <h1>Particle SVG Generator</h1>
-      <p className="text-gray-600 mb-5">
+      <p className="text-gray-600 mb-5 bg-zinc-50 p-4 rounded-lg shadow-sm">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
       </p>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-5">
         {(Object.entries(counts) as [keyof ParticleCounts, number][]).map(([type, count]) => (
-          <div key={type} className="bg-white p-4 rounded-lg shadow-sm">
+          <div key={type} className="bg-zinc-50 p-4 rounded-lg shadow-sm">
             <label className="block mb-2 capitalize font-medium">
               {type}: {count}
             </label>
@@ -227,97 +227,119 @@ export default function ParticleGeneratorDemo() {
             />
           </div>
 
-          <label className="block mb-1.5 font-medium">Background Color</label>
-          <div className="flex gap-2.5 items-center">
-            <input
-              type="color"
-              value={bgColor === 'black' ? '#000000' : bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
-            />
-            <input
-              type="text"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              placeholder="e.g., black, #000000, rgb(0,0,0)"
-              className="flex-1 px-2 py-2 border border-gray-300 rounded"
-            />
+          <div className="mb-4">
+            <label className="flex items-center gap-2 mb-2 font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isTransparent}
+                onChange={(e) => setIsTransparent(e.target.checked)}
+                className="w-4 h-4"
+              />
+              Transparent Background
+            </label>
           </div>
-        </div>
 
-        <div className="mb-4">
-          <label className="block mb-1.5 font-medium">
-            Background Opacity: {bgOpacity.toFixed(2)}
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={bgOpacity}
-            onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
-            className="w-full"
-          />
-        </div>
+          {!isTransparent && (
+            <>
+              <div className="mb-4">
+                <label className="block mb-1.5 font-medium">Background Color</label>
+                <div className="flex gap-2.5 items-center">
+                  <input
+                    type="color"
+                    value={bgColor === 'black' ? '#000000' : bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
+                  />
+                  <input
+                    type="text"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    placeholder="e.g., black, #000000, rgb(0,0,0)"
+                    className="flex-1 px-2 py-2 border border-gray-300 rounded"
+                  />
+                </div>
+              </div>
 
-        <div className="mb-4">
-          <label className="block mb-1.5 font-medium">
-            Brightness Range: {brightnessRange[0].toFixed(2)} - {brightnessRange[1].toFixed(2)}
-          </label>
-          <div className="flex gap-2.5">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={brightnessRange[0]}
-              onChange={(e) => setBrightnessRange([parseFloat(e.target.value), brightnessRange[1]])}
-              className="flex-1"
-            />
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={brightnessRange[1]}
-              onChange={(e) => setBrightnessRange([brightnessRange[0], parseFloat(e.target.value)])}
-              className="flex-1"
-            />
+              <div className="mb-4">
+                <label className="block mb-1.5 font-medium">
+                  Background Opacity: {bgOpacity.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={bgOpacity}
+                  onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="mb-4">
+            <label className="block mb-1.5 font-medium">
+              Brightness Range: {brightnessRange[0].toFixed(2)} - {brightnessRange[1].toFixed(2)}
+            </label>
+            <div className="flex gap-2.5">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={brightnessRange[0]}
+                onChange={(e) =>
+                  setBrightnessRange([parseFloat(e.target.value), brightnessRange[1]])
+                }
+                className="flex-1"
+              />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={brightnessRange[1]}
+                onChange={(e) =>
+                  setBrightnessRange([brightnessRange[0], parseFloat(e.target.value)])
+                }
+                className="flex-1"
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="mb-4">
-          <label className="block mb-1.5 font-medium">
-            Scale Range: {scaleRange[0].toFixed(2)} - {scaleRange[1].toFixed(2)}
-          </label>
-          <div className="flex gap-2.5">
-            <input
-              type="range"
-              min="0.1"
-              max="10"
-              step="0.1"
-              value={scaleRange[0]}
-              onChange={(e) => setScaleRange([parseFloat(e.target.value), scaleRange[1]])}
-              className="flex-1"
-            />
-            <input
-              type="range"
-              min="0.1"
-              max="10"
-              step="0.1"
-              value={scaleRange[1]}
-              onChange={(e) => setScaleRange([scaleRange[0], parseFloat(e.target.value)])}
-              className="flex-1"
-            />
+          <div className="mb-4">
+            <label className="block mb-1.5 font-medium">
+              Scale Range: {scaleRange[0].toFixed(2)} - {scaleRange[1].toFixed(2)}
+            </label>
+            <div className="flex gap-2.5">
+              <input
+                type="range"
+                min="0.1"
+                max="10"
+                step="0.1"
+                value={scaleRange[0]}
+                onChange={(e) => setScaleRange([parseFloat(e.target.value), scaleRange[1]])}
+                className="flex-1"
+              />
+              <input
+                type="range"
+                min="0.1"
+                max="10"
+                step="0.1"
+                value={scaleRange[1]}
+                onChange={(e) => setScaleRange([scaleRange[0], parseFloat(e.target.value)])}
+                className="flex-1"
+              />
+            </div>
           </div>
-        </div>
 
-        <button
-          onClick={() => setSeed(seed + 1)}
-          className="px-5 py-2.5 bg-blue-600 text-white border-0 rounded-md cursor-pointer font-medium hover:bg-blue-700 transition-colors"
-        >
-          Regenerate (New Random Positions)
-        </button>
+          <button
+            onClick={() => setSeed(seed + 1)}
+            className="px-5 py-2.5 bg-blue-600 text-white border-0 rounded-md cursor-pointer font-medium hover:bg-blue-700 transition-colors"
+          >
+            Regenerate (New Random Positions)
+          </button>
+        </div>
       </div>
       <div className="bg-white p-5 rounded-lg shadow-sm">
         <ParticleGenerator
@@ -325,8 +347,8 @@ export default function ParticleGeneratorDemo() {
           particleCounts={counts}
           brightnessRange={brightnessRange}
           scaleRange={scaleRange}
-          bgColor={bgColor}
-          bgOpacity={bgOpacity}
+          bgColor={isTransparent ? 'transparent' : bgColor}
+          bgOpacity={isTransparent ? 0 : bgOpacity}
           particleColor={particleColor}
           particleOpacity={particleOpacity}
           seed={seed}

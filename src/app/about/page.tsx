@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 import { Card } from '../components/ui/card';
 import { ContentContainer } from '../components/ui/content-container';
@@ -16,6 +18,13 @@ export default function AboutPage() {
               About fake four inc.
             </h1>
             <PageSectionParagraph className="mb-8 mt-0 pt-0 text-lg leading-relaxed text-zinc-700">
+              <Image
+                width={92}
+                height={92}
+                src="/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg"
+                alt="Ceschi and David Ramos, founders of Fake Four Inc."
+                className="inline-block float-right ml-4 rounded-md shadow-md shape-around border-[1px] border-zinc-700"
+              />
               <strong>Fake Four Inc.</strong> is an independent record label based in New Haven,
               Connecticut. Founded in 2008 by brothers <strong>Ceschi and David Ramos</strong>, the
               label has become a significant force in progressive hip-hop and experimental music.
