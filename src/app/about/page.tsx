@@ -87,24 +87,80 @@ export default function AboutPage() {
               </PageSectionParagraph>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <ul className="list-inside list-disc text-zinc-700">
-                  <li>Astronautalis</li>
-                  <li>Blue Sky Black Death</li>
-                  <li>Busdriver</li>
-                  <li>Ceschi</li>
-                  <li>Dark Time Sunshine</li>
+                  <li>
+                    <Link href="https://astronautalis.bandcamp.com" className="hover:underline">
+                      Astronautalis
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://blueskyblackdeath.bandcamp.com" className="hover:underline">
+                      Blue Sky Black Death
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://busdriver-thumbs.bandcamp.com" className="hover:underline">
+                      Busdriver
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://ceschi.bandcamp.com" className="hover:underline">
+                      Ceschi
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://darktimesunshine.bandcamp.com" className="hover:underline">
+                      Dark Time Sunshine
+                    </Link>
+                  </li>
                 </ul>
                 <ul className="list-inside list-disc text-zinc-700">
-                  <li>Electric President</li>
-                  <li>Factor Chandelier</li>
-                  <li>Myka 9</li>
-                  <li>Noah23</li>
-                  <li>Open Mike Eagle</li>
+                  <li>
+                    <Link href="https://electricpresident.bandcamp.com" className="hover:underline">
+                      Electric President
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://factorchandelier.bandcamp.com" className="hover:underline">
+                      Factor Chandelier
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://myka9.bandcamp.com" className="hover:underline">
+                      Myka 9
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://noah23.bandcamp.com" className="hover:underline">
+                      Noah23
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://openmikeeagle.bandcamp.com" className="hover:underline">
+                      Open Mike Eagle
+                    </Link>
+                  </li>
                 </ul>
                 <ul className="list-inside list-disc text-zinc-700">
-                  <li>Onry Ozzborn</li>
-                  <li>Sadistik</li>
-                  <li>Sole</li>
-                  <li>Gregory Pepper</li>
+                  <li>
+                    <Link href="https://onryozzborn.bandcamp.com" className="hover:underline">
+                      Onry Ozzborn
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://sadistik.bandcamp.com" className="hover:underline">
+                      Sadistik
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://soleillinoise.bandcamp.com" className="hover:underline">
+                      Sole
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://gregorypepper.bandcamp.com" className="hover:underline">
+                      Gregory Pepper
+                    </Link>
+                  </li>
                   <li>And many more...</li>
                 </ul>
               </div>

@@ -92,10 +92,6 @@
     @apply bg-background text-foreground;
     min-height: 100%;
   }
-  input[data-slot='input'],
-  input[type='text'],
-  input[type='email'],
-  input[type='password'],
   input,
   textarea,
   select {
