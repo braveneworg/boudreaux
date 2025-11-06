@@ -13,7 +13,7 @@ export default function AboutPage() {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'About', url: '/about', isActive: true }]} />
-        <Card>
+        <Card className="bg-[url('/media/particles-blackish-on-transparent.svg')]">
           <CardContent>
             <h1 id="about-fake-four-inc">About fake four inc.</h1>
             <PageSectionParagraph>

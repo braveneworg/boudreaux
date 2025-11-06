@@ -34,29 +34,25 @@ const ParticleGenerator = ({
 }) => {
   // Particle shape definitions
   const particleShapes = {
-    dot: <circle cx="0" cy="1.25" r="1.25" fill="currentColor" />,
-    diamond: (
-      <path d="M0,2.5 L1.615,1.923 L3,1.25 L1.615,0.577 L0,0 L0,1.25 Z" fill="currentColor" />
-    ),
-    triangle: (
-      <path d="M1.25,1.5 L1.923,0.808 L2.5,0 L1.25,0 L0,0 L0.577,0.808 Z" fill="currentColor" />
-    ),
+    dot: <circle cx="0" cy="1.25" r="1.25" fill="inherit" />,
+    diamond: <path d="M0,2.5 L1.615,1.923 L3,1.25 L1.615,0.577 L0,0 L0,1.25 Z" fill="inherit" />,
+    triangle: <path d="M1.25,1.5 L1.923,0.808 L2.5,0 L1.25,0 L0,0 L0.577,0.808 Z" fill="inherit" />,
     wedge: (
       <path
         d="M1.619,2 C1.81,2 2,1.5 2,1 L2,0 L0.952,0 L0,0 L0.571,1 C0.857,1.5 1.333,2 1.619,2 Z"
-        fill="currentColor"
+        fill="inherit"
       />
     ),
     crescent: (
       <path
         d="M1.196,1.745 C1.957,1.312 2.5,0.773 2.5,0.449 C2.5,-0.414 1.522,0.017 0.761,1.312 L0,2.5 L1.196,1.745 Z"
-        fill="currentColor"
+        fill="inherit"
       />
     ),
     arc: (
       <path
         d="M2,3 L1.4,1.539 C0.7,-0.215 0,-0.507 0,0.857 C0,1.441 0.4,2.123 1,2.416 L2,3 Z"
-        fill="currentColor"
+        fill="inherit"
       />
     ),
   };
@@ -90,7 +86,7 @@ const ParticleGenerator = ({
           key={`${type}-${i}`}
           href={`#particle-${type}`}
           transform={`scale(${scaleX.toFixed(2)}, ${scaleY.toFixed(2)}) rotate(${rotation.toFixed(1)}, ${x.toFixed(0)}, ${y.toFixed(0)}) translate(${x.toFixed(0)}, ${y.toFixed(0)})`}
-          color={particleColor}
+          fill={particleColor}
           opacity={(brightness * particleOpacity).toFixed(2)}
         />
       );
