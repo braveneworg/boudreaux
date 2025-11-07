@@ -14,6 +14,16 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config: { module: { rules: unknown[] } }, { isServer }: { isServer: boolean }) => {
+    // Handle Video.js worker files
+    if (!isServer) {
+      config.module.rules.push({
+        test: /\.worker\.js$/,
+        use: { loader: 'worker-loader' },
+      });
+    }
+    return config;
+  },
 
   // Output configuration
   output: 'standalone',

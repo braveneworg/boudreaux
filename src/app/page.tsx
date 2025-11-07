@@ -1,37 +1,38 @@
 'use client';
 
 import DataStoreHealthStatus from './components/data-store-health-status';
-import AudioPlayer from './components/ui/audio-player';
+import { MobileCardPlayer } from './components/ui/audio/mobile-first-players';
 import { Card } from './components/ui/card';
 import { ContentContainer } from './components/ui/content-container';
 import PageContainer from './components/ui/page-container';
-import { PageSectionParagraph } from './components/ui/page-section-paragraph';
+
+const DEFAULT_POSTER = '/media/ceschi/we-are-enough.jpg';
+
+const tracks = [
+  {
+    songTitle: 'We Are Enough',
+    artist: 'Ceschi',
+    audioSrc:
+      '/media/ceschi/mp3s/Ceschi - Bring Us The Head Of Francisco False (Part 1) - 03 We Are Enough (produced by Danny T Levin).mp3',
+    album:
+      'Bring Us The Head Of Francisco False (Part 1): The Day You Realize That You Mean Nothing is Everything.',
+    albumArt: DEFAULT_POSTER,
+  },
+];
 
 export default function Home() {
-  const audioSrc =
-    '/media/ceschi/mp3s/Ceschi - Bring Us The Head Of Francisco False (Part 1) - 03 We Are Enough (produced by Danny T Levin).mp3'; // Replace with your audio file URL
-  const posterSrc = '/media/ceschi/we-are-enough.jpg'; // Replace with your album art image URL
-
   return (
     <PageContainer>
       <ContentContainer>
         <Card className="mb-6">
-          <h1>Featured releases</h1>
-          <AudioPlayer audioSrc={audioSrc} posterSrc={posterSrc} />
-          {/* <Image
-            src="/media/bandcamp/factor-chandelier/as-dark-as-today.jpg"
-            alt="As Dark As Today album cover"
-            width={380}
-            height={380}
-            className="inline-block ml-2 mr-1 mb-1 rounded-sm shadow-sm border-2 border-zinc-50"
-          /> */}
-        </Card>
-        <Card className="mb-6">
-          <h1>Featured artists</h1>
-          <PageSectionParagraph>
-            Explore the diverse talents that define Fake Four Inc., showcasing artists who push the
-            boundaries of music and creativity.
-          </PageSectionParagraph>
+          <h1 className="pt-4 px-4">Featured artists</h1>
+          <MobileCardPlayer
+            audioSrc={tracks[0].audioSrc}
+            albumArt={tracks[0].albumArt}
+            album={tracks[0].album}
+            songTitle={tracks[0].songTitle}
+            artist={tracks[0].artist}
+          />
         </Card>
         <Card>
           <DataStoreHealthStatus />

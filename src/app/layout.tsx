@@ -14,6 +14,7 @@ import { Providers } from './components/providers';
 import type { Metadata } from 'next';
 
 import './globals.css';
+import 'video.js/dist/video-js.css';
 
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
