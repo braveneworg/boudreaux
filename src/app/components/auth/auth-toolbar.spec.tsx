@@ -95,8 +95,17 @@ describe('AuthToolbar', () => {
     it('applies correct CSS classes to container', () => {
       const { container } = render(<AuthToolbar />);
 
-      const mainDiv = container.querySelector('div');
-      expect(mainDiv).toHaveClass('flex', 'items-center', 'justify-center', 'gap-2');
+      // Get the inner div (second div, child of the first)
+      const outerDiv = container.querySelector('div');
+      const innerDiv = outerDiv?.querySelector('div');
+      expect(innerDiv).toHaveClass(
+        'flex',
+        'h-[20px]',
+        'items-center',
+        'relative',
+        'justify-center',
+        'gap-2'
+      );
     });
   });
 

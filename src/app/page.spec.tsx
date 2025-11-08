@@ -1,52 +1,52 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import Home from './page';
 
-// Mock the dependencies
-vi.mock('./components/auth/auth-toolbar', () => ({
-  default: () => <div data-testid="auth-toolbar">Auth Toolbar</div>,
-}));
-
-vi.mock('./components/ui/backgrounds/stardust', () => ({
-  default: () => <div data-testid="stardust">Stardust</div>,
-}));
-
-vi.mock('./components/ui/backgrounds/particle-generator', () => ({
-  default: () => <div data-testid="particle-generator">Particle Generator</div>,
-}));
-
-// Mock health status sub-components
-vi.mock('./components/health-status-icon', () => ({
-  default: ({ status, isLoading }: { status: string | null; isLoading: boolean }) => (
-    <span data-testid="health-status-icon">
-      {isLoading ? '⏳' : status === 'healthy' ? '✅' : '❌'}
-    </span>
-  ),
-}));
-
-vi.mock('./components/health-status-message', () => ({
-  default: ({
-    healthStatus,
-    isLoading,
+// Mock the audio player component
+vi.mock('./components/ui/audio/mobile-first-players', () => ({
+  MobileCardPlayer: ({
+    audioSrc,
+    albumArt,
+    album,
+    songTitle,
+    artist,
   }: {
-    healthStatus: { status?: string; database?: string; latency?: number; error?: string } | null;
-    isLoading: boolean;
+    audioSrc: string;
+    albumArt: string;
+    album: string;
+    songTitle: string;
+    artist: string;
   }) => (
-    <span data-testid="health-status-message">
-      {isLoading
-        ? 'Loading...'
-        : healthStatus?.status === 'healthy'
-          ? `${healthStatus.database}${healthStatus.latency !== undefined ? ` (${healthStatus.latency}ms)` : ''}`
-          : (healthStatus?.error ?? healthStatus?.database ?? 'Unknown error')}
-    </span>
+    <div data-testid="mobile-card-player">
+      <div data-testid="song-title">{songTitle}</div>
+      <div data-testid="artist">{artist}</div>
+      <div data-testid="album">{album}</div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={albumArt} alt={album} data-testid="album-art" />
+      <audio src={audioSrc} data-testid="audio-element" />
+    </div>
   ),
 }));
 
-// Import the actual DataStoreHealthStatus component - don't mock it
-// The tests need to test its real behavior with mocked fetch
+// Mock UI components
+vi.mock('./components/ui/card', () => ({
+  Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={className} data-testid="card">
+      {children}
+    </div>
+  ),
+}));
 
-vi.mock('./lib/utils/database-utils', () => ({
-  getApiBaseUrl: vi.fn(() => 'http://localhost:3000'),
+vi.mock('./components/ui/content-container', () => ({
+  ContentContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="content-container">{children}</div>
+  ),
+}));
+
+vi.mock('./components/ui/page-container', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="page-container">{children}</div>
+  ),
 }));
 
 // Mock Next.js Image component
@@ -57,391 +57,58 @@ vi.mock('next/image', () => ({
   },
 }));
 
-describe('Home Page - Health Check', () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+describe('Home Page', () => {
+  it('should render page structure', () => {
+    render(<Home />);
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFetch = vi.fn();
-    global.fetch = mockFetch as unknown as typeof fetch;
-    // Set NODE_ENV to development to ensure DataStoreHealthStatus is rendered
-    vi.stubEnv('NODE_ENV', 'development');
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+    expect(screen.getByTestId('content-container')).toBeInTheDocument();
+    expect(screen.getByTestId('card')).toBeInTheDocument();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
+  it('should render featured artists heading', () => {
+    render(<Home />);
+
+    expect(screen.getByRole('heading', { name: 'Featured artists' })).toBeInTheDocument();
   });
 
-  describe('Successful Health Check', () => {
-    it('should display loading state initially', () => {
-      mockFetch.mockImplementation(
-        () =>
-          new Promise(() => {
-            // Never resolve - simulate loading
-          })
-      );
+  it('should render mobile card player', () => {
+    render(<Home />);
 
-      render(<Home />);
-
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
-      expect(screen.getByText(/DB health status:/)).toBeInTheDocument();
-    });
-
-    it('should display success status after successful health check', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/connected/)).toBeInTheDocument();
-          expect(screen.getByText(/100ms/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-    });
-
-    it('should clear failsafe timeout on successful health check', async () => {
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/connected/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      // Should have cleared the failsafe timeout
-      expect(clearTimeoutSpy).toHaveBeenCalled();
-    });
-
-    it('should display success icon after successful health check', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('health-status-icon')).toHaveTextContent('✅');
-        },
-        { timeout: 10000 }
-      );
-    });
-
-    // Skip - test times out, needs investigation of component lifecycle
-    it.skip('should display latency when available', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 250,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/250ms/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-    });
+    expect(screen.getByTestId('mobile-card-player')).toBeInTheDocument();
   });
 
-  describe('Failed Health Check', () => {
-    // Skip - test times out, needs investigation
-    it.skip('should display error after failed health check with non-500 error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({
-          status: 'error',
-          database: 'Not found',
-          error: 'Endpoint not found',
-        }),
-      });
+  it('should display correct track information', () => {
+    render(<Home />);
 
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Not found/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-    });
-
-    it('should clear failsafe timeout after error', async () => {
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({
-          status: 'error',
-          database: 'Not found',
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Not found/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      expect(clearTimeoutSpy).toHaveBeenCalled();
-    });
-
-    it('should show error icon after failed health check', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({
-          status: 'error',
-          database: 'Not found',
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('health-status-icon')).toHaveTextContent('❌');
-        },
-        { timeout: 10000 }
-      );
-    });
-
-    it('should not retry on 404 errors', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({ status: 'error', database: 'Not found' }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Not found/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      // Should only have made 1 attempt
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
+    expect(screen.getByTestId('song-title')).toHaveTextContent('We Are Enough');
+    expect(screen.getByTestId('artist')).toHaveTextContent('Ceschi');
+    expect(screen.getByTestId('album')).toHaveTextContent(
+      'Bring Us The Head Of Francisco False (Part 1): The Day You Realize That You Mean Nothing is Everything.'
+    );
   });
 
-  describe('Retry Logic', () => {
-    it('should retry on 500 errors', async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          json: async () => ({ status: 'error', database: 'Server error' }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            status: 'healthy',
-            database: 'connected',
-            latency: 100,
-          }),
-        });
+  it('should render album art', () => {
+    render(<Home />);
 
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/connected/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      // Should have retried
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-    });
-
-    // Note: Full retry exhaustion test (10 attempts with exponential backoff)
-    // would take ~128 seconds to complete, so we skip it in unit tests.
-    // This is tested via integration tests or manual testing.
+    const albumArt = screen.getByTestId('album-art') as HTMLImageElement;
+    expect(albumArt).toBeInTheDocument();
+    expect(albumArt.src).toContain('/media/ceschi/we-are-enough.jpg');
   });
 
-  describe('Network Errors', () => {
-    it('should retry on network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
+  it('should render audio element with correct source', () => {
+    render(<Home />);
 
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/connected/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-    });
-
-    // Note: Testing full retry exhaustion (10 attempts) would take ~128 seconds
-    // These scenarios are covered by integration tests
+    const audioElement = screen.getByTestId('audio-element') as HTMLAudioElement;
+    expect(audioElement).toBeInTheDocument();
+    expect(audioElement.src).toContain(
+      '/media/ceschi/mp3s/Ceschi%20-%20Bring%20Us%20The%20Head%20Of%20Francisco%20False%20(Part%201)%20-%2003%20We%20Are%20Enough%20(produced%20by%20Danny%20T%20Levin).mp3'
+    );
   });
 
-  describe('API URL Construction', () => {
-    it('should use getApiBaseUrl to construct API URL', async () => {
-      const { getApiBaseUrl } = await import('./lib/utils/database-utils');
+  it('should apply correct CSS class to card', () => {
+    render(<Home />);
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(getApiBaseUrl).toHaveBeenCalled();
-          expect(mockFetch).toHaveBeenCalledWith(
-            'http://localhost:3000/api/health',
-            expect.objectContaining({
-              cache: 'no-store',
-              credentials: 'same-origin',
-            })
-          );
-        },
-        { timeout: 10000 }
-      );
-    });
-
-    it('should include no-cache headers', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'healthy',
-          database: 'connected',
-          latency: 100,
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(mockFetch).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({
-              headers: {
-                'Cache-Control': 'no-cache',
-                Pragma: 'no-cache',
-              },
-            })
-          );
-        },
-        { timeout: 10000 }
-      );
-    });
-  });
-
-  describe('Component Lifecycle', () => {
-    it('should clear failsafe timeout on component unmount', () => {
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-      mockFetch.mockImplementation(
-        () =>
-          new Promise(() => {
-            // Never resolve
-          })
-      );
-
-      const { unmount } = render(<Home />);
-
-      unmount();
-
-      expect(clearTimeoutSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe('UI State Display', () => {
-    it('should show loading icon during health check', () => {
-      mockFetch.mockImplementation(
-        () =>
-          new Promise(() => {
-            // Never resolve - simulate loading
-          })
-      );
-
-      render(<Home />);
-
-      expect(screen.getByText(/DB health status:/)).toBeInTheDocument();
-      expect(screen.getByTestId('health-status-icon')).toHaveTextContent('⏳');
-    });
-
-    it('should display error details in development mode', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({
-          status: 'error',
-          database: 'Not found',
-          error: 'Detailed error message',
-        }),
-      });
-
-      render(<Home />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Detailed error message/)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-
-      vi.unstubAllEnvs();
-    });
+    expect(screen.getByTestId('card')).toHaveClass('mb-6');
   });
 });

@@ -116,7 +116,8 @@ describe('SignedinToolbar', () => {
       expect(screen.getByTestId('signed-in-as')).toBeInTheDocument();
       expect(screen.getByTestId('edit-profile-button')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
-      expect(screen.queryAllByTestId('vertical-separator')).toHaveLength(0);
+      // Mobile has 1 separator (after SignedInAs), not 2
+      expect(screen.queryAllByTestId('vertical-separator')).toHaveLength(1);
     });
 
     it('renders logout icon', () => {
@@ -130,18 +131,20 @@ describe('SignedinToolbar', () => {
       mockUseIsMobile.mockReturnValue(false);
       const { container } = render(<SignedinToolbar />);
 
-      const wrapper = container.firstChild as HTMLElement;
+      // Get the inner div with flex classes (child of the wrapper)
+      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
       expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('items-center');
-      expect(wrapper).not.toHaveClass('justify-center');
-      expect(wrapper).not.toHaveClass('gap-4');
+      expect(wrapper).toHaveClass('justify-center');
+      expect(wrapper).toHaveClass('gap-2');
     });
 
     it('applies flex layout with additional classes on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
       const { container } = render(<SignedinToolbar />);
 
-      const wrapper = container.firstChild as HTMLElement;
+      // Get the inner div with flex classes (child of the wrapper)
+      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
       expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('items-center');
       expect(wrapper).toHaveClass('justify-center');
