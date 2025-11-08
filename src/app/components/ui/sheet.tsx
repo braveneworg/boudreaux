@@ -22,31 +22,9 @@ function SheetPortal({ ...props }: React.ComponentProps<typeof SheetPrimitive.Po
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
-function SheetOverlay({
-  className,
-  isOpen = false,
-  ...props
-}: React.ComponentProps<typeof SheetPrimitive.Overlay> & { isOpen?: boolean }) {
-  return (
-    <SheetPrimitive.Overlay
-      data-slot="sheet-overlay"
-      className={cn(
-        {
-          'transition-[backdrop-filter] duration-750 ease-in-out backdrop-blur-[4px] fixed inset-0 z-50':
-            isOpen,
-        },
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50',
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
 function SheetContent({
   className,
   children,
-  isOpen = false,
   side = 'right',
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {

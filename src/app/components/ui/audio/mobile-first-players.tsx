@@ -317,11 +317,14 @@ export function FullScreenMobilePlayer({
       </div>
 
       {/* Album Art - Fills Available Space */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8">
-        <img
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 relative">
+        <Image
           src={albumArt}
           alt={`${album} by ${artist}`}
-          className="w-full max-w-lg aspect-square object-cover rounded-2xl shadow-2xl"
+          fill
+          className="object-contain rounded-2xl shadow-2xl"
+          sizes="(max-width: 768px) 90vw, 512px"
+          priority
         />
       </div>
 
@@ -411,11 +414,14 @@ export function CompactMobilePlayer({
       </div>
 
       {/* Album Art */}
-      <div className="px-4 mb-4">
-        <img
+      <div className="px-4 mb-4 relative aspect-square">
+        <Image
           src={albumArt}
           alt={`${album} by ${artist}`}
-          className="w-full aspect-square object-cover rounded-xl shadow-md"
+          fill
+          className="object-cover rounded-xl shadow-md"
+          sizes="100vw"
+          priority
         />
       </div>
 
@@ -521,16 +527,19 @@ export function SwipeableMobilePlayer({
 
       {/* Swipeable Album Art */}
       <div
-        className="mb-6 touch-pan-y"
+        className="mb-6 touch-pan-y relative aspect-square"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <img
+        <Image
           src={albumArt}
           alt={`${album} by ${artist}`}
-          className="w-full aspect-square object-cover rounded-2xl shadow-lg select-none"
+          fill
+          className="object-cover rounded-2xl shadow-lg select-none"
           draggable={false}
+          sizes="100vw"
+          priority
         />
         <p className="text-xs text-center text-gray-400 mt-2">← Swipe for tracks →</p>
       </div>
@@ -608,11 +617,14 @@ export function MinimalMobilePlayer({
       </div>
 
       {/* Album Art */}
-      <div className="mb-6">
-        <img
+      <div className="mb-6 relative aspect-square">
+        <Image
           src={albumArt}
           alt={`${album} by ${artist}`}
-          className="w-full aspect-square object-cover"
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
         />
       </div>
 
@@ -710,11 +722,15 @@ export function BottomSheetPlayer({
             </div>
 
             {/* Large Album Art */}
-            <div className="flex-1 flex items-center justify-center px-6">
-              <img
+            <div className="flex-1 flex items-center justify-center px-6 relative">
+              <Image
                 src={albumArt}
                 alt={`${album} by ${artist}`}
+                width={512}
+                height={512}
                 className="w-full max-w-md aspect-square object-cover rounded-2xl shadow-2xl"
+                sizes="(max-width: 768px) 90vw, 512px"
+                priority
               />
             </div>
 
@@ -737,11 +753,15 @@ export function BottomSheetPlayer({
               onClick={() => setIsExpanded(true)}
               className="w-full p-4 flex items-center space-x-3"
             >
-              <img
-                src={albumArt}
-                alt={`${album} by ${artist}`}
-                className="w-12 h-12 rounded object-cover"
-              />
+              <div className="relative w-12 h-12">
+                <Image
+                  src={albumArt}
+                  alt={`${album} by ${artist}`}
+                  fill
+                  className="rounded object-cover"
+                  sizes="48px"
+                />
+              </div>
               <div className="flex-1 text-left">
                 <p className="font-medium text-gray-900 truncate">{songTitle}</p>
                 <p className="text-sm text-gray-600 truncate">{artist}</p>
@@ -838,7 +858,14 @@ export function StoryStylePlayer({
 
       {/* Full Height Album Art */}
       <div className="relative aspect-[9/16]">
-        <img src={albumArt} alt={`${album} by ${artist}`} className="w-full h-full object-cover" />
+        <Image
+          src={albumArt}
+          alt={`${album} by ${artist}`}
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
+        />
 
         {/* Gradient Overlay at Bottom */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent h-32" />
@@ -922,8 +949,15 @@ export function ResponsiveGridPlayer({
       </div>
 
       {/* Album Art - Responsive */}
-      <div className="flex-1 bg-gray-100">
-        <img src={albumArt} alt={`${album} by ${artist}`} className="w-full h-full object-cover" />
+      <div className="flex-1 bg-gray-100 relative">
+        <Image
+          src={albumArt}
+          alt={`${album} by ${artist}`}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 50vw"
+          priority
+        />
       </div>
 
       {/* Audio Player */}

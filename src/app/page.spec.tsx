@@ -21,8 +21,10 @@ vi.mock('./components/ui/audio/mobile-first-players', () => ({
       <div data-testid="song-title">{songTitle}</div>
       <div data-testid="artist">{artist}</div>
       <div data-testid="album">{album}</div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={albumArt} alt={album} data-testid="album-art" />
+      <div data-testid="album-art" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={albumArt} alt={album} />
+      </div>
       <audio src={audioSrc} data-testid="audio-element" />
     </div>
   ),
@@ -91,7 +93,9 @@ describe('Home Page', () => {
   it('should render album art', () => {
     render(<Home />);
 
-    const albumArt = screen.getByTestId('album-art') as HTMLImageElement;
+    const albumArtContainer = screen.getByTestId('album-art');
+    expect(albumArtContainer).toBeInTheDocument();
+    const albumArt = albumArtContainer.querySelector('img') as HTMLImageElement;
     expect(albumArt).toBeInTheDocument();
     expect(albumArt.src).toContain('/media/ceschi/we-are-enough.jpg');
   });
