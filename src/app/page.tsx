@@ -1,6 +1,5 @@
 'use client';
 
-import DataStoreHealthStatus from './components/data-store-health-status';
 import { MobileCardPlayer } from './components/ui/audio/mobile-first-players';
 import { Card } from './components/ui/card';
 import { ContentContainer } from './components/ui/content-container';
@@ -34,9 +33,9 @@ export default function Home() {
             artist={tracks[0].artist}
           />
         </Card>
-        <Card>
+        {/* <Card>
           <DataStoreHealthStatus />
-        </Card>
+        </Card> */}
       </ContentContainer>
     </PageContainer>
   );

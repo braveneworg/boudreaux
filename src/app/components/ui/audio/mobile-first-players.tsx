@@ -15,7 +15,10 @@ import videojs from 'video.js';
 import type Player from 'video.js/dist/types/player';
 import 'video.js/dist/video-js.css';
 
-// Type for Video.js control bar and button components
+// Constants
+const SKIP_TIME = 10; // seconds for rewind/fast-forward
+
+// Type definitions for Video.js
 interface VideoJsControlBar {
   addChild: (component: string, options?: { clickHandler?: () => void }) => VideoJsComponent;
   getChild: (name: string) => VideoJsComponent | undefined;
@@ -41,83 +44,37 @@ interface CustomControlsOptions {
 const addCustomControls = (player: Player, options?: CustomControlsOptions) => {
   const controlBar = (player as VideoJsPlayerWithControls).controlBar;
   if (!controlBar) return;
-
   const playButton = controlBar.getChild('playToggle');
+
   if (!playButton) return;
+  const playButtonEl = playButton.el();
 
-  // Remove any existing custom buttons to prevent duplicates (one-time cleanup)
-  const existingPrevious = controlBar.el().querySelector('.vjs-icon-previous-item');
-  const existingRewind = controlBar.el().querySelector('.vjs-icon-replay-10');
-  const existingForward = controlBar.el().querySelector('.vjs-icon-forward-10');
-  const existingNext = controlBar.el().querySelector('.vjs-icon-next-item');
+  playButtonEl.style.position = 'relative';
+  playButtonEl.style.top = '-16px';
 
-  if (existingPrevious) existingPrevious.remove();
-  if (existingRewind) existingRewind.remove();
-  if (existingForward) existingForward.remove();
-  if (existingNext) existingNext.remove();
+  // Get volume control to move it to the end
+  const volumePanel = controlBar.getChild('volumePanel');
 
-  // Function to remove only Video.js default skip buttons (NOT our custom ones)
-  const removeUnwantedButtons = () => {
-    const allButtons = controlBar.el().querySelectorAll('button');
-    allButtons.forEach((btn) => {
-      // Skip if it's one of our custom buttons
-      if (
-        btn.classList.contains('vjs-icon-previous-item') ||
-        btn.classList.contains('vjs-icon-replay-10') ||
-        btn.classList.contains('vjs-icon-forward-10') ||
-        btn.classList.contains('vjs-icon-next-item')
-      ) {
-        return; // Don't remove our custom buttons
-      }
+  // Get progress control and other elements to hide or reposition
+  const progressControl = controlBar.getChild('progressControl');
 
-      // Check if it's a Video.js default skip button
-      const hasSkipClass =
-        btn.className.includes('skip') ||
-        btn.className.includes('seek') ||
-        (btn.className.includes('backward') && !btn.classList.contains('vjs-icon-replay-10')) ||
-        (btn.className.includes('forward') && !btn.classList.contains('vjs-icon-forward-10'));
-      const hasNumberText = btn.textContent?.trim() === '10';
-      const hasSvgWithText = btn.querySelector('svg text');
+  // Center the control bar content
+  const controlBarEl = controlBar.el();
+  controlBarEl.style.justifyContent = 'center';
+  controlBarEl.style.display = 'flex';
+  controlBarEl.style.alignItems = 'center';
 
-      // Remove Video.js default buttons
-      if (hasSkipClass || (hasNumberText && hasSvgWithText)) {
-        btn.remove();
-      }
-    });
-  };
+  // Create a wrapper for centered controls
+  const centerWrapper = document.createElement('div');
+  centerWrapper.style.display = 'flex';
+  centerWrapper.style.alignItems = 'center';
+  centerWrapper.style.gap = '0.5rem';
+  centerWrapper.style.position = 'absolute';
+  centerWrapper.style.left = '50%';
+  centerWrapper.style.transform = 'translateX(-50%)';
+  centerWrapper.style.zIndex = '10';
 
-  // Run immediately
-  removeUnwantedButtons();
-
-  // Add CSS to hide specific Video.js default skip/seek buttons
-  const style = document.createElement('style');
-  style.textContent = `
-    .vjs-skip-backward-5,
-    .vjs-skip-backward-10,
-    .vjs-skip-backward-30,
-    .vjs-skip-forward-5,
-    .vjs-skip-forward-10,
-    .vjs-skip-forward-30,
-    .vjs-seek-button {
-      display: none !important;
-    }
-  `;
-  if (!document.head.querySelector('#hide-videojs-defaults')) {
-    style.id = 'hide-videojs-defaults';
-    document.head.appendChild(style);
-  }
-
-  // Use MutationObserver to continuously remove any skip buttons Video.js adds
-  const observer = new MutationObserver(() => {
-    removeUnwantedButtons();
-  });
-
-  observer.observe(controlBar.el(), {
-    childList: true,
-    subtree: true,
-  });
-
-  // Add previous track button (if callback provided)
+  // Add previous track button (skip back) - if callback provided
   if (options?.onPreviousTrack) {
     const previousTrackButton = controlBar.addChild('button', {
       clickHandler: options.onPreviousTrack,
@@ -125,14 +82,52 @@ const addCustomControls = (player: Player, options?: CustomControlsOptions) => {
     previousTrackButton.addClass('vjs-icon-previous-item');
     previousTrackButton.controlText('Previous track');
     previousTrackButton.el().innerHTML = `
-      <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 3em; height: 3em;">
+      <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 2em; height: 2em;">
         <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
       </svg>
     `;
-    controlBar.el().insertBefore(previousTrackButton.el(), playButton.el());
+    centerWrapper.appendChild(previousTrackButton.el());
   }
 
-  // Add next track button (if callback provided)
+  // Add rewind button (10 seconds back) - before skip back
+  const rewindButton = controlBar.addChild('button', {
+    clickHandler: () => {
+      const currentTime = player.currentTime() || 0;
+      player.currentTime(Math.max(0, currentTime - SKIP_TIME));
+    },
+  });
+  rewindButton.addClass('vjs-icon-replay-10');
+  rewindButton.controlText('Rewind 10 seconds');
+  rewindButton.el().innerHTML = `
+    <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 2em; height: 2em;">
+      <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+      <text x="12" y="15" text-anchor="middle" font-size="7" font-weight="bold" fill="currentColor">10</text>
+    </svg>
+  `;
+  centerWrapper.appendChild(rewindButton.el());
+
+  // Move play button to center wrapper
+  centerWrapper.appendChild(playButton.el());
+
+  // Add fast forward button (10 seconds ahead) - after play
+  const fastForwardButton = controlBar.addChild('button', {
+    clickHandler: () => {
+      const currentTime = player.currentTime() || 0;
+      const duration = player.duration() || 0;
+      player.currentTime(Math.min(duration, currentTime + SKIP_TIME));
+    },
+  });
+  fastForwardButton.addClass('vjs-icon-forward-10');
+  fastForwardButton.controlText('Fast forward 10 seconds');
+  fastForwardButton.el().innerHTML = `
+    <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 2em; height: 2em;">
+      <path d="M4 18l8.5-6L4 6v12zm10.5 0L23 12l-8.5-6v12z"/>
+      <text x="12" y="15" text-anchor="middle" font-size="7" font-weight="bold" fill="currentColor">10</text>
+    </svg>
+  `;
+  centerWrapper.appendChild(fastForwardButton.el());
+
+  // Add next track button (skip forward) - after fast forward
   if (options?.onNextTrack) {
     const nextTrackButton = controlBar.addChild('button', {
       clickHandler: options.onNextTrack,
@@ -140,11 +135,33 @@ const addCustomControls = (player: Player, options?: CustomControlsOptions) => {
     nextTrackButton.addClass('vjs-icon-next-item');
     nextTrackButton.controlText('Next track');
     nextTrackButton.el().innerHTML = `
-      <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 3em; height: 3em;">
+      <svg class="vjs-svg-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 2em; height: 2em;">
         <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
       </svg>
     `;
-    controlBar.el().insertBefore(nextTrackButton.el(), playButton.el().nextSibling);
+    centerWrapper.appendChild(nextTrackButton.el());
+  }
+
+  // Add the center wrapper to the control bar
+  controlBarEl.appendChild(centerWrapper);
+
+  // Move volume control to the far right if it exists
+  if (volumePanel) {
+    const volumeEl = volumePanel.el();
+    volumeEl.style.position = 'absolute';
+    volumeEl.style.right = '0.5rem';
+    volumeEl.style.zIndex = '10';
+  }
+
+  // Hide progress control from button area but keep it functional
+  if (progressControl) {
+    const progressEl = progressControl.el();
+    progressEl.style.position = 'absolute';
+    progressEl.style.top = '0';
+    progressEl.style.left = '0';
+    progressEl.style.right = '0';
+    progressEl.style.height = '0.25rem';
+    progressEl.style.zIndex = '1';
   }
 };
 
@@ -187,21 +204,6 @@ export function MobileCardPlayer({
       controlBar: {
         fullscreenToggle: false,
         pictureInPictureToggle: false,
-        skipButtons: false,
-        volumePanel: {
-          inline: false,
-          vertical: true,
-        },
-        currentTimeDisplay: true,
-        timeDivider: true,
-        durationDisplay: true,
-        progressControl: {
-          seekBar: {
-            playProgressBar: {
-              timeTooltip: true,
-            },
-          },
-        },
       },
     });
 
