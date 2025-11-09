@@ -48,7 +48,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
-      "connect-src 'self' https://challenges.cloudflare.com",
+      "connect-src 'self' https://challenges.cloudflare.com https://cdn.fakefourrecords.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "object-src 'none'",
       "base-uri 'self'",
