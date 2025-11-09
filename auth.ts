@@ -1,5 +1,4 @@
 import NextAuth from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
 import Nodemailer from 'next-auth/providers/nodemailer';
 
 import { prisma } from '@/app/lib/prisma';
@@ -59,10 +58,6 @@ if (process.env.AUTH_SECRET.length < 32) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomPrismaAdapter(prisma),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
     Nodemailer({
       server: {
         host: process.env.EMAIL_SERVER_HOST,
