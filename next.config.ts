@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
+  devIndicators: false,
 
   // Configure images for CDN
   images: {
@@ -12,6 +13,16 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config: { module: { rules: unknown[] } }, { isServer }: { isServer: boolean }) => {
+    // Handle Video.js worker files
+    if (!isServer) {
+      config.module.rules.push({
+        test: /\.worker\.js$/,
+        use: { loader: 'worker-loader' },
+      });
+    }
+    return config;
   },
 
   // Output configuration

@@ -10,7 +10,10 @@ import StatusIndicator from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/app/lib/types/form-state';
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { cn } from '@/app/lib/utils/tailwind-utils';
+
+import PageContainer from '../ui/page-container';
+import { Skeleton } from '../ui/skeleton';
 
 import type { Control } from 'react-hook-form';
 
@@ -25,6 +28,7 @@ interface SignupSigninFormProps {
   control: Control<BaseFormSchema>;
   hasTermsAndConditions: boolean;
   isPending: boolean;
+  isVerified: boolean;
   setIsVerified: (isVerified: boolean) => void;
   state: FormState;
 }
@@ -33,6 +37,7 @@ const SignupSigninForm = ({
   control,
   hasTermsAndConditions = true, // Should be true when signing up
   isPending,
+  isVerified,
   setIsVerified,
   state,
 }: SignupSigninFormProps) => {
@@ -40,69 +45,77 @@ const SignupSigninForm = ({
   const isSigningIn = pathName === '/signin/';
 
   return (
-    <>
-      <div className={cn('mt-8 max-w-96')}>
-        <FormField
-          control={control}
-          name="email"
-          render={({ field }) => (
-            <FormItem className={cn(isSigningIn ? 'mb-5' : 'mb-0', 'mt-4')}>
-              <FormLabel className="sr-only" htmlFor="email">
-                Email
-              </FormLabel>
-              <FormControl>
-                <FormInput
-                  id="email"
-                  placeholder="Email address"
-                  type="email"
-                  {...field}
-                  autoFocus
-                />
-              </FormControl>
-              <FormMessage>
-                {state.errors?.email && state.errors.email.length > 0 && state.errors.email[0]}
-              </FormMessage>
-            </FormItem>
-          )}
-        />
-        {hasTermsAndConditions && !isSigningIn && (
+    <PageContainer>
+      {!isVerified && <Skeleton className="h-10 w-full mx-auto" />}
+      {isVerified && (
+        <>
           <FormField
             control={control}
-            name="termsAndConditions"
+            name="email"
             render={({ field }) => (
-              <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
-                <FormControl>
-                  <Switch
-                    name="termsAndConditions"
-                    id="terms-and-conditions"
-                    checked={!!field.value || false}
-                    onCheckedChange={field.onChange}
-                    required
-                  />
-                </FormControl>
-                <FormLabel htmlFor="terms-and-conditions">
-                  <Link
-                    className=":hover:no-underline :visited:text-rebeccapurple underline text-blue-800"
-                    href="/terms-and-conditions"
-                  >
-                    Accept terms and conditions?
-                  </Link>
+              <FormItem className={cn(isSigningIn ? 'mb-5' : 'mb-0', 'mt-0')}>
+                <FormLabel className="sr-only" htmlFor="email">
+                  Email
                 </FormLabel>
-                <FormMessage className="relative -top-1.5">
-                  {state.errors?.termsAndConditions &&
-                    state.errors.termsAndConditions.length > 0 &&
-                    state.errors.termsAndConditions[0]}
+                <FormControl>
+                  {isVerified && (
+                    <FormInput
+                      id="email"
+                      placeholder="Email address"
+                      type="email"
+                      {...field}
+                      autoFocus
+                    />
+                  )}
+                </FormControl>
+                <FormMessage>
+                  {state.errors?.email && state.errors.email.length > 0 && state.errors.email[0]}
                 </FormMessage>
               </FormItem>
             )}
           />
-        )}
-      </div>
-      <TurnstileWidget setIsVerified={setIsVerified} />
+          {hasTermsAndConditions && !isSigningIn && (
+            <FormField
+              control={control}
+              name="termsAndConditions"
+              render={({ field }) => (
+                <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
+                  <FormControl>
+                    <Switch
+                      name="termsAndConditions"
+                      id="terms-and-conditions"
+                      checked={!!field.value || false}
+                      onCheckedChange={field.onChange}
+                      required
+                    />
+                  </FormControl>
+                  <FormLabel htmlFor="terms-and-conditions">
+                    <Link
+                      className=":hover:no-underline :visited:text-rebeccapurple underline"
+                      href="/legal/terms-and-conditions"
+                    >
+                      Accept terms and conditions?
+                    </Link>
+                  </FormLabel>
+                  <FormMessage className="relative -top-1.5">
+                    {state.errors?.termsAndConditions &&
+                      state.errors.termsAndConditions.length > 0 &&
+                      state.errors.termsAndConditions[0]}
+                  </FormMessage>
+                </FormItem>
+              )}
+            />
+          )}
+        </>
+      )}
+      <TurnstileWidget isVerified={isVerified} setIsVerified={setIsVerified} />
       <div className="flex items-center gap-3 mt-4">
-        <Button disabled={isPending} size="lg">
-          Submit
-        </Button>
+        {!isVerified && <Skeleton className="h-10 w-24" />}
+        {isVerified && (
+          <Button disabled={isPending} size="lg">
+            Submit
+          </Button>
+        )}
         <StatusIndicator
           isSuccess={state.success}
           hasError={!!(state.errors && Object.keys(state.errors).length > 0)}
@@ -122,7 +135,7 @@ const SignupSigninForm = ({
           <FormMessage className="text-red-600">{state.errors.general[0]}</FormMessage>
         </div>
       )}
-    </>
+    </PageContainer>
   );
 };
 

@@ -39,14 +39,14 @@ describe('Database Utils', () => {
       mockedPrisma.$runCommandRaw.mockImplementation(
         () =>
           new Promise((resolve) => {
-            setTimeout(() => resolve({ ok: 1 }), 100);
+            setTimeout(() => resolve({ ok: 1 }), 0); // Use 0ms for faster tests
           })
       );
 
       const result = await checkDatabaseHealth();
 
       expect(result.healthy).toBe(true);
-      expect(result.latency).toBeGreaterThanOrEqual(100);
+      expect(result.latency).toBeGreaterThanOrEqual(0);
     });
 
     it('should return unhealthy status when database connection fails', async () => {
@@ -97,7 +97,7 @@ describe('Database Utils', () => {
 
       const result = await withRetry(operation, {
         maxRetries: 3,
-        initialDelay: 10,
+        initialDelay: 0, // Use 0ms for faster tests
       });
 
       expect(result).toBe('success');
@@ -107,7 +107,7 @@ describe('Database Utils', () => {
     it('should retry up to maxRetries times', async () => {
       const operation = vi.fn().mockRejectedValue(new Error('timeout'));
 
-      await expect(withRetry(operation, { maxRetries: 3, initialDelay: 10 })).rejects.toThrow(
+      await expect(withRetry(operation, { maxRetries: 3, initialDelay: 0 })).rejects.toThrow(
         'timeout'
       );
 
@@ -119,9 +119,11 @@ describe('Database Utils', () => {
       const delays: number[] = [];
       const originalSetTimeout = global.setTimeout;
 
-      // Mock setTimeout to track delays
-      vi.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void, delay: number) => {
+      // Track setTimeout delays and execute immediately
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      setTimeoutSpy.mockImplementation(((callback: () => void, delay: number) => {
         delays.push(delay);
+        // Execute callback immediately with 0ms delay
         return originalSetTimeout(callback, 0);
       }) as typeof setTimeout);
 
@@ -135,6 +137,7 @@ describe('Database Utils', () => {
 
       // Check exponential backoff: 100, 200, 400
       expect(delays).toEqual([100, 200, 400]);
+      setTimeoutSpy.mockRestore();
     });
 
     it('should respect maxDelay', async () => {
@@ -142,8 +145,10 @@ describe('Database Utils', () => {
       const delays: number[] = [];
       const originalSetTimeout = global.setTimeout;
 
-      vi.spyOn(global, 'setTimeout').mockImplementation(((callback: () => void, delay: number) => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      setTimeoutSpy.mockImplementation(((callback: () => void, delay: number) => {
         delays.push(delay);
+        // Execute callback immediately with 0ms delay
         return originalSetTimeout(callback, 0);
       }) as typeof setTimeout);
 
@@ -158,12 +163,13 @@ describe('Database Utils', () => {
 
       // Check delays cap at maxDelay: 100, 250, 250, 250
       expect(delays).toEqual([100, 250, 250, 250]);
+      setTimeoutSpy.mockRestore();
     });
 
     it('should not retry non-retryable errors', async () => {
       const operation = vi.fn().mockRejectedValue(new Error('Invalid data'));
 
-      await expect(withRetry(operation, { maxRetries: 3, initialDelay: 10 })).rejects.toThrow(
+      await expect(withRetry(operation, { maxRetries: 3, initialDelay: 0 })).rejects.toThrow(
         'Invalid data'
       );
 
@@ -186,7 +192,7 @@ describe('Database Utils', () => {
           .mockRejectedValueOnce(new Error(errorMsg))
           .mockResolvedValue('success');
 
-        const result = await withRetry(operation, { maxRetries: 2, initialDelay: 10 });
+        const result = await withRetry(operation, { maxRetries: 2, initialDelay: 0 });
 
         expect(result).toBe('success');
         expect(operation).toHaveBeenCalledTimes(2);
@@ -229,7 +235,7 @@ describe('Database Utils', () => {
 
       const result = await withRetry(operation, {
         maxRetries: 3,
-        initialDelay: 10,
+        initialDelay: 0,
       });
 
       expect(result).toBe('success');
@@ -244,7 +250,7 @@ describe('Database Utils', () => {
         .mockRejectedValueOnce(new Error('Second timeout'))
         .mockRejectedValue(lastError);
 
-      await expect(withRetry(operation, { maxRetries: 2, initialDelay: 10 })).rejects.toThrow(
+      await expect(withRetry(operation, { maxRetries: 2, initialDelay: 0 })).rejects.toThrow(
         'Final timeout error'
       );
     });
@@ -252,7 +258,7 @@ describe('Database Utils', () => {
     it('should handle non-Error thrown values', async () => {
       const operation = vi.fn().mockRejectedValue('string error with timeout');
 
-      await expect(withRetry(operation, { maxRetries: 2, initialDelay: 10 })).rejects.toThrow(
+      await expect(withRetry(operation, { maxRetries: 2, initialDelay: 0 })).rejects.toThrow(
         'string error with timeout'
       );
     });

@@ -41,7 +41,11 @@ const SpinnerRingCircle = ({
 }: SpinnerRingCircleProps) => {
   return (
     <div
-      className={cn(spinnerRingCircleVariants({ size, variant }), className)}
+      className={cn(
+        'flex justify-center items-center',
+        spinnerRingCircleVariants({ size, variant }),
+        className
+      )}
       aria-label="Loading spinner"
       {...props}
     />

@@ -5,21 +5,32 @@ import { useEffect, useState } from 'react';
 type StickyBreadcrumbWrapperProps = {
   children: React.ReactNode;
   offsetTop?: number;
+  isVisible?: boolean;
 };
 
-export function StickyBreadcrumbWrapper({ children, offsetTop = 0 }: StickyBreadcrumbWrapperProps) {
+export function StickyBreadcrumbWrapper({
+  children,
+  offsetTop = 0,
+  isVisible = true,
+}: StickyBreadcrumbWrapperProps) {
   const [isSticky, setIsSticky] = useState(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleScroll = () => {
       setIsSticky(window.scrollY > offsetTop);
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Check initial state
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [offsetTop]);
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div

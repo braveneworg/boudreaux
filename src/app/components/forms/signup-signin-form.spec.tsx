@@ -201,6 +201,7 @@ describe('SignupSigninForm', () => {
     control: {} as Control<BaseFormSchema>, // Simple mock since FormField component is mocked
     hasTermsAndConditions: true,
     isPending: false,
+    isVerified: true,
     setIsVerified: vi.fn(),
     state: {
       errors: {},
@@ -311,7 +312,7 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} />);
 
       const link = screen.getByTestId('next-link');
-      expect(link).toHaveAttribute('href', '/terms-and-conditions');
+      expect(link).toHaveAttribute('href', '/legal/terms-and-conditions');
     });
 
     it('should mark terms switch as required', () => {
@@ -480,6 +481,7 @@ describe('SignupSigninForm', () => {
         control: {} as Control<BaseFormSchema>,
         hasTermsAndConditions: true,
         isPending: true,
+        isVerified: true,
         setIsVerified: vi.fn(),
         state: {
           errors: {

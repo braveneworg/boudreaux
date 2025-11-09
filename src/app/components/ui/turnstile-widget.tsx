@@ -4,7 +4,15 @@ import React from 'react';
 
 import Turnstile, { useTurnstile } from 'react-turnstile';
 
-const TurnstileWidget = ({ setIsVerified }: { setIsVerified: (isVerified: boolean) => void }) => {
+import { Skeleton } from './skeleton';
+
+const TurnstileWidget = ({
+  isVerified,
+  setIsVerified,
+}: {
+  isVerified: boolean;
+  setIsVerified: (isVerified: boolean) => void;
+}) => {
   const turnstile = useTurnstile();
 
   const getSiteKey = () => {
@@ -20,15 +28,18 @@ const TurnstileWidget = ({ setIsVerified }: { setIsVerified: (isVerified: boolea
   };
 
   return (
-    <Turnstile
-      onError={handleReset}
-      onExpire={handleReset}
-      onTimeout={handleReset}
-      onVerify={() => {
-        setIsVerified(true);
-      }}
-      sitekey={getSiteKey()}
-    />
+    <>
+      {!isVerified && <Skeleton className="h-10 py-2 w-full mx-auto" />}
+      <Turnstile
+        onError={handleReset}
+        onExpire={handleReset}
+        onTimeout={handleReset}
+        onVerify={() => {
+          setIsVerified(true);
+        }}
+        sitekey={getSiteKey()}
+      />
+    </>
   );
 };
 

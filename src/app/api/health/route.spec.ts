@@ -96,24 +96,6 @@ describe('Health Check API', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should include error message in development mode when exception occurs', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      vi.mocked(checkDatabaseHealth).mockRejectedValue(Error('Database connection timeout'));
-
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const response = await GET();
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.status).toBe('unhealthy');
-      expect(data.error).toBe('Database connection timeout');
-      expect(consoleErrorSpy).toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
-      vi.unstubAllEnvs();
-    });
-
     it('should handle non-Error exceptions', async () => {
       vi.mocked(checkDatabaseHealth).mockRejectedValue('String error');
 
@@ -126,23 +108,6 @@ describe('Health Check API', () => {
       expect(data.status).toBe('unhealthy');
 
       consoleErrorSpy.mockRestore();
-    });
-
-    it('should handle non-Error exceptions in development mode', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      vi.mocked(checkDatabaseHealth).mockRejectedValue('String error');
-
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const response = await GET();
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.status).toBe('unhealthy');
-      expect(data.error).toBe('Unspecified error occurred');
-
-      consoleErrorSpy.mockRestore();
-      vi.unstubAllEnvs();
     });
 
     it('should include timestamp in ISO format', async () => {

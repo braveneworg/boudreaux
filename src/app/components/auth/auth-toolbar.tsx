@@ -1,7 +1,12 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+
 import { useSession } from 'next-auth/react';
 
-import { cn } from '@/app/lib/utils/auth/tailwind-utils';
+import { CONSTANTS } from '@/app/lib/constants';
 import { log } from '@/app/lib/utils/console-logger';
+import { cn } from '@/app/lib/utils/tailwind-utils';
 
 import SignInLink from './signin-link';
 import SignedinToolbar from './signout-button';
@@ -9,47 +14,13 @@ import SignUpLink from './signup-link';
 import { MessageSpinner } from '../ui/spinners/message-spinner';
 import VerticalSeparator from '../ui/vertical-separator';
 
-type Roles = {
-  readonly admin: 'admin';
-};
-
-type AuthenticationStatus = {
-  readonly authenticated: 'authenticated';
-  readonly loading: 'loading';
-};
-
-type Authentication = {
-  readonly status: AuthenticationStatus;
-};
-
-type Environment = {
-  readonly development: 'development';
-};
-
-const ROLES = {
-  admin: 'admin',
-} as const satisfies Roles;
-
-const AUTHENTICATION_STATUS = {
-  authenticated: 'authenticated',
-  loading: 'loading',
-} as const satisfies AuthenticationStatus;
-
-const AUTHENTICATION = {
-  status: AUTHENTICATION_STATUS,
-} as const satisfies Authentication;
-
-const ENVIRONMENT = {
-  development: 'development',
-} as const satisfies Environment;
-
-const NOT_AVAILABLE = 'N/A' as const;
-
 const AuthToolbar = ({ className }: { className?: string }) => {
   const { data: session, status } = useSession();
-  const isAdmin = session?.user?.role === ROLES.admin;
-  const isDevelopment = process.env.NODE_ENV === ENVIRONMENT.development;
+  const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
+  const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
   const loggingPrefix = '[AuthToolbar]';
+  const pathName = usePathname();
+  const isSigninOrSignupPage = /(signin|signup)/gi.test(pathName);
 
   // Debug logging in development
   if (isDevelopment) {
@@ -60,16 +31,14 @@ const AuthToolbar = ({ className }: { className?: string }) => {
   }
 
   // Show loading state or nothing while checking authentication
-  if (status === AUTHENTICATION.status.loading) {
-    return <MessageSpinner />;
+  if (status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
+    return <MessageSpinner title="Loading..." size="sm" variant="default" />;
   }
 
   // Show authenticated toolbar if user is logged in
-  if (status === AUTHENTICATION.status.authenticated && session) {
-    if (isAdmin) {
-      if (isDevelopment) {
-        log(loggingPrefix, 'User role:', session.user.role || NOT_AVAILABLE);
-      }
+  if (status === CONSTANTS.AUTHENTICATION.STATUS.AUTHENTICATED && session) {
+    if (isAdmin && isDevelopment) {
+      log(loggingPrefix, 'User role:', session.user.role || CONSTANTS.NA);
     }
 
     log(loggingPrefix, 'Rendering authenticated toolbar');
@@ -79,10 +48,16 @@ const AuthToolbar = ({ className }: { className?: string }) => {
   // Show sign in/up links for unauthenticated users
   log(loggingPrefix, 'Rendering unauthenticated links');
   return (
-    <div className={cn('flex items-center justify-center gap-2', className)}>
-      <SignInLink />
-      <VerticalSeparator />
-      <SignUpLink />
+    <div className={cn('h-[20px] my-2', className, { hidden: isSigninOrSignupPage })}>
+      <div
+        className={cn('flex h-[20px] items-center relative justify-center gap-2', className, {
+          hidden: isSigninOrSignupPage,
+        })}
+      >
+        <SignInLink />
+        <VerticalSeparator />
+        <SignUpLink />
+      </div>
     </div>
   );
 };

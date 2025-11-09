@@ -37,7 +37,7 @@ import type {
   ChangeUsernameFormData,
 } from '@/app/lib/types/form-data';
 import type { FormState } from '@/app/lib/types/form-state';
-import { splitFullName } from '@/app/lib/utils/auth/split-full-name';
+import { splitFullName } from '@/app/lib/utils/split-full-name';
 import changeEmailSchema from '@/app/lib/validation/change-email-schema';
 import usernameSchema from '@/app/lib/validation/change-username-schema';
 import profileSchema from '@/app/lib/validation/profile-schema';
@@ -64,7 +64,7 @@ export default function ProfileForm() {
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const { data: session, status, update } = useSession();
+  const { data: session, update } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
@@ -369,7 +369,7 @@ export default function ProfileForm() {
     [isEditingUserEmail, isEditingUsername, changeEmailForm, changeUsernameForm]
   );
 
-  if (status === 'loading' || !user) {
+  if (!user) {
     return (
       <div className="space-y-6">
         <Card>
@@ -392,17 +392,18 @@ export default function ProfileForm() {
   const isUsernameFormDirty = changeUsernameForm.formState.isDirty;
 
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
+    <>
       {/* Personal Information */}
       <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
-            Update your personal details. This will not be shared publicly with anyone. They&apos;re
-            only used to enhance your experience.
-          </CardDescription>
-        </CardHeader>
         <CardContent>
+          <h1>Profile</h1>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+            <CardDescription>
+              Update your personal details. This will not be shared publicly with anyone.
+              They&apos;re only used to enhance your experience.
+            </CardDescription>
+          </CardHeader>
           <Form {...personalProfileForm}>
             <form
               onSubmit={personalProfileForm.handleSubmit(onSubmitPersonalProfileForm)}
@@ -610,6 +611,6 @@ export default function ProfileForm() {
           </Form>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }

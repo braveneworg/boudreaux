@@ -36,10 +36,6 @@ vi.mock('./edit-profile-button', () => ({
   default: () => <div data-testid="edit-profile-button">Edit Profile Button</div>,
 }));
 
-vi.mock('./admin-link', () => ({
-  default: () => <div data-testid="admin-link">Admin Link</div>,
-}));
-
 vi.mock('../ui/vertical-separator', () => ({
   default: () => <div data-testid="vertical-separator">|</div>,
 }));
@@ -63,11 +59,10 @@ vi.mock('../ui/button', () => ({
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
   LogOutIcon: () => <div data-testid="logout-icon">LogOutIcon</div>,
-  ShieldUser: () => <div data-testid="shield-user-icon">ShieldUser</div>,
 }));
 
 // Mock utils
-vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
+vi.mock('@/app/lib/utils/tailwind-utils', () => ({
   cn: (...args: Array<string | Record<string, boolean> | undefined>) => {
     return args
       .filter(Boolean)
@@ -88,18 +83,19 @@ vi.mock('@/app/lib/utils/auth/tailwind-utils', () => ({
 describe('SignedinToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set up default session mock
+    // Setup default session mock
     mockUseSession.mockReturnValue({
       data: {
         user: {
           id: '1',
-          email: 'test@example.com',
           name: 'Test User',
+          email: 'test@example.com',
           role: 'user',
         },
       },
       status: 'authenticated',
     });
+    mockUseIsMobile.mockReturnValue(false);
   });
 
   describe('rendering', () => {
@@ -120,7 +116,8 @@ describe('SignedinToolbar', () => {
       expect(screen.getByTestId('signed-in-as')).toBeInTheDocument();
       expect(screen.getByTestId('edit-profile-button')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
-      expect(screen.queryAllByTestId('vertical-separator')).toHaveLength(0);
+      // Mobile has 1 separator (after SignedInAs), not 2
+      expect(screen.queryAllByTestId('vertical-separator')).toHaveLength(1);
     });
 
     it('renders logout icon', () => {
@@ -130,20 +127,28 @@ describe('SignedinToolbar', () => {
       expect(screen.getByTestId('logout-icon')).toBeInTheDocument();
     });
 
-    it('applies flex-row layout on desktop', () => {
+    it('applies flex layout on desktop', () => {
       mockUseIsMobile.mockReturnValue(false);
       const { container } = render(<SignedinToolbar />);
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('flex-row');
+      // Get the inner div with flex classes (child of the wrapper)
+      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
+      expect(wrapper).toHaveClass('flex');
+      expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).toHaveClass('justify-center');
+      expect(wrapper).toHaveClass('gap-2');
     });
 
-    it('applies flex-col layout on mobile', () => {
+    it('applies flex layout with additional classes on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
       const { container } = render(<SignedinToolbar />);
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('flex-col');
+      // Get the inner div with flex classes (child of the wrapper)
+      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
+      expect(wrapper).toHaveClass('flex');
+      expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).toHaveClass('justify-center');
+      expect(wrapper).toHaveClass('gap-4');
     });
 
     it('applies custom className when provided', () => {
@@ -206,61 +211,6 @@ describe('SignedinToolbar', () => {
 
       const signOutButton = screen.getByRole('button', { name: /sign out/i });
       expect(signOutButton).toHaveAttribute('data-variant', 'link:narrow');
-    });
-  });
-
-  describe('admin functionality', () => {
-    it('renders AdminLink when user is admin', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'admin@test.com',
-            username: 'admin',
-            role: 'admin',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.getByTestId('admin-link')).toBeInTheDocument();
-    });
-
-    it('does not render AdminLink when user is not admin', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'user@test.com',
-            username: 'user',
-            role: 'user',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
-    });
-
-    it('does not render AdminLink when user has no role', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: '1',
-            email: 'user@test.com',
-            username: 'user',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
     });
   });
 });

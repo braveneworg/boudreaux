@@ -81,9 +81,10 @@ describe('SignedInAs', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
-      const icon = screen.getByTestId('key-icon');
-      expect(icon).toBeInTheDocument();
-      expect(icon).toHaveAttribute('data-size', '16');
+      // Desktop mode shows KeyIcon in the desktop section
+      const icons = screen.getAllByTestId('key-icon');
+      expect(icons.length).toBeGreaterThan(0);
+      expect(icons[0]).toHaveAttribute('data-size', '16');
     });
 
     it('renders the username link', () => {
@@ -94,20 +95,24 @@ describe('SignedInAs', () => {
       expect(screen.getByText('@testuser')).toBeInTheDocument();
     });
 
-    it('applies mobile layout when on mobile', () => {
+    it('applies consistent flex layout', () => {
       mockUseIsMobile.mockReturnValue(true);
       const { container } = render(<SignedInAs />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('flex-col');
+      expect(wrapper).toHaveClass('flex');
+      expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).toHaveClass('gap-2');
     });
 
-    it('applies desktop layout when not on mobile', () => {
+    it('shows appropriate content based on screen size', () => {
       mockUseIsMobile.mockReturnValue(false);
       const { container } = render(<SignedInAs />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('flex-row');
+      expect(wrapper).toHaveClass('flex');
+      expect(wrapper).toHaveClass('items-center');
+      expect(wrapper).toHaveClass('gap-2');
     });
   });
 
@@ -152,40 +157,6 @@ describe('SignedInAs', () => {
 
       const { container } = render(<SignedInAs />);
       expect(container.firstChild).toBeNull();
-    });
-  });
-
-  describe('development mode logging', () => {
-    it('logs session data in development mode', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            username: 'testuser',
-            email: 'test@example.com',
-          },
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-
-      render(<SignedInAs />);
-
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[SignedInAs] Session:',
-        expect.objectContaining({
-          user: expect.objectContaining({
-            username: 'testuser',
-          }),
-        })
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith('[SignedInAs] User:', expect.any(Object));
-      expect(consoleInfoSpy).toHaveBeenCalledWith('[SignedInAs] Username:', 'testuser');
-
-      consoleInfoSpy.mockRestore();
-      vi.unstubAllEnvs();
     });
   });
 });

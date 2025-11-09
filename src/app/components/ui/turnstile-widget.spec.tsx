@@ -39,6 +39,10 @@ const originalEnv = process.env;
 
 describe('TurnstileWidget', () => {
   const mockSetIsVerified = vi.fn();
+  const defaultProps = {
+    isVerified: false,
+    setIsVerified: mockSetIsVerified,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,7 +59,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'prod-site-key');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-site-key');
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'prod-site-key');
@@ -66,7 +70,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'prod-site-key');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-site-key');
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'test-site-key');
@@ -78,7 +82,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-site-key');
       process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY = 'test-site-key';
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'test-site-key');
@@ -87,7 +91,7 @@ describe('TurnstileWidget', () => {
 
   describe('verification handling', () => {
     it('should call setIsVerified with true when verification succeeds', async () => {
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       await userEvent.click(widget);
@@ -97,7 +101,7 @@ describe('TurnstileWidget', () => {
     });
 
     it('should provide onVerify callback to Turnstile component', () => {
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toBeInTheDocument();
@@ -113,7 +117,7 @@ describe('TurnstileWidget', () => {
       const mockReset = vi.fn();
       vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
 
@@ -130,7 +134,7 @@ describe('TurnstileWidget', () => {
       const mockReset = vi.fn();
       vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
 
@@ -143,7 +147,7 @@ describe('TurnstileWidget', () => {
       const mockReset = vi.fn();
       vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
 
@@ -158,7 +162,7 @@ describe('TurnstileWidget', () => {
       const mockReset = vi.fn();
       vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       // Verify the hook is being used
       expect(useTurnstile).toHaveBeenCalled();
@@ -168,7 +172,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NODE_ENV', 'test');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-key-123');
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'test-key-123');
@@ -179,7 +183,7 @@ describe('TurnstileWidget', () => {
     it('should accept and use setIsVerified callback properly', () => {
       const customCallback = vi.fn();
 
-      render(<TurnstileWidget setIsVerified={customCallback} />);
+      render(<TurnstileWidget isVerified={false} setIsVerified={customCallback} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       fireEvent.click(widget); // Simulate verification
@@ -188,7 +192,7 @@ describe('TurnstileWidget', () => {
     });
 
     it('should handle multiple verification events', async () => {
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
 
@@ -209,7 +213,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NODE_ENV', 'production');
 
       expect(() => {
-        render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+        render(<TurnstileWidget {...defaultProps} />);
       }).not.toThrow();
     });
 
@@ -218,7 +222,7 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'production-key');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-key');
 
-      render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      render(<TurnstileWidget {...defaultProps} />);
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'production-key');
@@ -228,12 +232,12 @@ describe('TurnstileWidget', () => {
   describe('component lifecycle', () => {
     it('should render without crashing', () => {
       expect(() => {
-        render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+        render(<TurnstileWidget {...defaultProps} />);
       }).not.toThrow();
     });
 
     it('should be unmountable without errors', () => {
-      const { unmount } = render(<TurnstileWidget setIsVerified={mockSetIsVerified} />);
+      const { unmount } = render(<TurnstileWidget {...defaultProps} />);
 
       expect(() => {
         unmount();

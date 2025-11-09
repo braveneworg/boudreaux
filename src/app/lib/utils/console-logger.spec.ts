@@ -1,12 +1,11 @@
 import { error, log, LogMethods, warn } from './console-logger';
 
+import type { SpyInstance } from 'vitest';
+
 describe('console-logger', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let consoleInfoSpy: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let consoleWarnSpy: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let consoleErrorSpy: any;
+  let consoleInfoSpy: SpyInstance<Parameters<Console['info']>, ReturnType<Console['info']>>;
+  let consoleWarnSpy: SpyInstance<Parameters<Console['warn']>, ReturnType<Console['warn']>>;
+  let consoleErrorSpy: SpyInstance<Parameters<Console['error']>, ReturnType<Console['error']>>;
 
   beforeEach(() => {
     // Spy on console methods

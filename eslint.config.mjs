@@ -13,6 +13,7 @@ import importPlugin from 'eslint-plugin-import';
 import nextPlugin from '@next/eslint-plugin-next';
 import globals from 'globals';
 import unusedImports from 'eslint-plugin-unused-imports';
+import vitest from '@vitest/eslint-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -211,6 +212,27 @@ const eslintConfig = [
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-unneeded-ternary': 'error',
       ...prettierConfig.rules,
+    },
+  },
+  // Vitest testing configuration
+  {
+    files: ['tests/**'], // or any other pattern
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules, // or vitest.configs.all.rules
+      'vitest/max-nested-describe': ['error', { max: 3 }],
+    },
+    settings: {
+      vitest: {
+        typecheck: true, // if using type-testing feature
+      },
+    },
+    languageOptions: {
+      globals: {
+        ...vitest.environments.env.globals,
+      },
     },
   },
 ];

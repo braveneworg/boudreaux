@@ -1,18 +1,9 @@
 @import 'tw-animate-css';
 @import 'tailwindcss';
 
-@keyframes fadeIn {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @theme {
   --color-rebecca-purple: #639;
+  --animate-spin-slow: rotate(360deg) 1.5s linear infinite;
 }
 
 @theme inline {
@@ -59,7 +50,7 @@
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
+  --card: oklch(0.94 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -73,7 +64,7 @@
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
+  --input: oklch(0.75 0.008 286.32);
   --ring: oklch(0.705 0.015 286.067);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -95,10 +86,16 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply overflow-x-hidden;
+    height: 100%;
   }
   body {
-    @apply bg-background text-foreground overflow-x-hidden;
+    @apply bg-background text-foreground;
+    min-height: 100%;
+  }
+  input,
+  textarea,
+  select {
+    @apply bg-zinc-50! border-zinc-300 text-zinc-900! placeholder:text-zinc-500! shadow-sm;
   }
   h1,
   h2,
@@ -106,28 +103,29 @@
   h4,
   h5,
   h6 {
-    @apply font-semibold tracking-tight;
+    font-family: var(--font-dawning-of-a-new-day), serif;
+    @apply font-semibold tracking-[0.2rem] relative -top-6 lowercase text-shadow-sm  text-shadow-zinc-400;
   }
   h1 {
-    @apply text-4xl font-bold leading-tight mb-6 mt-8;
+    @apply text-4xl font-bold leading-tight mb-2 text-zinc-900!;
   }
   h2 {
-    @apply text-3xl leading-snug mb-5 mt-7;
+    @apply text-3xl leading-tight mb-0 pb-0 mt-0 text-zinc-800!;
   }
   h3 {
-    @apply text-2xl leading-snug mb-4 mt-6;
+    @apply text-2xl leading-snug mb-3 mt-4;
   }
   h4 {
-    @apply text-xl leading-normal mb-3 mt-5;
+    @apply text-xl leading-normal mb-2 mt-3;
   }
   h5 {
-    @apply text-lg tracking-normal leading-normal mb-3 mt-4;
+    @apply text-lg tracking-normal leading-normal mb-2 mt-3;
   }
   h6 {
-    @apply text-base tracking-normal leading-normal mb-2 mt-3;
+    @apply text-base tracking-normal leading-normal mb-2 mt-2;
   }
   a {
-    @apply underline-offset-4;
+    @apply text-blue-700 underline-offset-4;
     &:hover {
       @apply underline;
     }
@@ -135,4 +133,335 @@
       @apply text-[var(--color-rebecca-purple)];
     }
   }
+}
+
+/* Particle Animation Styles */
+@keyframes bg-particle-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  25% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.98;
+  }
+  75% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+}
+
+@keyframes bg-particle-shimmer {
+  0% {
+    filter: brightness(1) contrast(1);
+  }
+  25% {
+    filter: brightness(1.1) contrast(1.05);
+  }
+  50% {
+    filter: brightness(1.2) contrast(1.1);
+  }
+  75% {
+    filter: brightness(1.1) contrast(1.05);
+  }
+  100% {
+    filter: brightness(1) contrast(1);
+  }
+}
+
+@keyframes sparkle-pulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes extinguish-fade {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+    filter: brightness(1.2);
+  }
+  50% {
+    transform: scale(0.7);
+    opacity: 0.4;
+    filter: brightness(0.8);
+  }
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+    filter: brightness(0.3);
+  }
+}
+
+.particles-animate {
+  animation:
+    bg-particle-pulse 3s ease-in-out 0s 1,
+    bg-particle-shimmer 2.5s ease-in-out 0.5s 1;
+}
+
+.particles-animate::before {
+  animation: bg-particle-shimmer 2s ease-in-out 0.3s 1;
+}
+
+.particle-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  animation: sparkle-pulse 1s ease-in-out;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.particle-sparkle::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: sparkle-pulse 1s ease-in-out;
+}
+
+.particle-extinguish {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.3) 40%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  animation: extinguish-fade 1.5s ease-out;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.particle-extinguish::before {
+  content: '';
+  position: absolute;
+  top: -0.5px;
+  left: -0.5px;
+  right: -0.5px;
+  bottom: -0.5px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
+  border-radius: 50%;
+  animation: extinguish-fade 1.5s ease-out;
+}
+
+.vjs-fluid:not(.vjs-audio-only-mode),
+.video-js.vjs-9-16:not(.vjs-audio-only-mode),
+.vjs_video_671-dimensions.vjs-fluid:not(.vjs-audio-only-mode) {
+  padding: 0 !important;
+}
+
+/* .vjs-9-16 {
+  width: 380px !important;
+  height: 110px !important;
+} */
+
+/* Mobile-First Video.js Customizations */
+
+/* Ensure audio player wrapper maintains visibility */
+.audio-player-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 60px;
+}
+
+/* Force controls to always be visible */
+.video-js.vjs-audio .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure vjs-has-started keeps controls visible */
+.video-js.vjs-has-started .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Remove user-state hiding of controls */
+.video-js.vjs-user-inactive .vjs-control-bar,
+.video-js.vjs-user-active .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Larger touch targets for mobile */
+.video-js .vjs-button {
+  width: 44px;
+  height: 44px;
+}
+
+/* Bigger play button on mobile */
+.video-js .vjs-play-control {
+  width: 48px;
+}
+
+/* Larger progress bar for easier touching */
+.video-js .vjs-progress-control {
+  height: 30px;
+}
+
+.video-js .vjs-progress-holder {
+  height: 8px;
+}
+
+/* Remove hover effects on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .video-js .vjs-progress-holder:hover {
+    height: 8px;
+  }
+}
+
+/* Optimize for small screens */
+@media (max-width: 640px) {
+  .video-js .vjs-time-control {
+    font-size: 12px;
+    padding: 0 0.5em;
+  }
+
+  .video-js .vjs-remaining-time {
+    display: block;
+  }
+
+  .video-js .vjs-current-time,
+  .video-js .vjs-duration,
+  .video-js .vjs-time-divider {
+    display: none;
+  }
+}
+
+/* Clean audio player styling */
+.video-js.vjs-audio {
+  height: 60px;
+  /* background: transparent; */
+}
+
+.video-js.vjs-audio .vjs-control-bar {
+  height: 60px;
+  /* background: rgba(0, 0, 0, 0.05); */
+  border-radius: 12px;
+  position: relative;
+}
+
+.video-js.vjs-audio .vjs-progress-control {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 4px;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Smooth animations */
+.video-js .vjs-play-progress {
+  transition: width 0.2s ease;
+}
+
+/* Better touch feedback */
+.video-js button:active {
+  transform: scale(0.95);
+}
+
+/* Prevent controls from fading out */
+.video-js .vjs-control-bar {
+  transition: none !important;
+  @apply pt-3;
+}
+.vjs-icon-forward-10 {
+  fill: currentColor;
+  background: currentColor;
+}
+
+/* Ensure touch scrolling is smooth */
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+/* Prevent text selection on mobile */
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Video.js Mobile Optimizations */
+.video-js .vjs-control-bar {
+  height: 44px !important;
+}
+
+.video-js button {
+  outline: none !important;
+}
+
+.video-js .vjs-play-control .vjs-icon-placeholder:before {
+  font-size: 2em;
+}
+
+/* Ensure controls are always visible on mobile */
+.video-js.vjs-has-started .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Remove desktop hover states on mobile */
+@media (hover: none) {
+  .video-js:hover .vjs-control-bar {
+    display: flex;
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+/* iOS-specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .video-js {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .video-js button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.nextjs-portal {
+  display: none !important;
 }
