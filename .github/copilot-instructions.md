@@ -163,3 +163,16 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't create new UI primitives (use shadcn/ui)
 - Never do the following code in tests: `import { describe, it, expect, vi } from 'vitest';` (assume they are globally available)
 - Never use new in before Error in typescript code (use Error('message') instead of new Error('message'))
+- Never create documentation from files that are not located in this repository
+- Never expose secrets or sensitive information in the codebase
+- Don't commit generated files or build artifacts
+- Don't use any type in TypeScript code
+- Don't disable ESLint or Prettier rules globally
+- Don't write large functions or components (break them down)
+- Don't ignore TypeScript errors or warnings
+- Don't use inline styles in JSX
+- Don't use deprecated APIs or packages
+- Don't write tests that are brittle or hard to maintain
+- Don't mock implementation details in tests (mock behavior instead)
+- Don't test implementation details (test behavior and output instead)
+- Don't rely solely on code coverage metrics (focus on meaningful tests)
