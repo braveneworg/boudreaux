@@ -538,7 +538,7 @@ class CDNSync {
 
       // Build process
       await this.buildApplication();
-      
+
       // Only validate build directory if we're not skipping build
       // Media files can be synced without a build
       if (!this.config.skipBuild) {
