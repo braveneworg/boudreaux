@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack 2>&1 | grep -v 'SyntaxError: Expected property name'",
+    "build": "next build 2>&1 | grep -v 'SyntaxError: Expected property name'",
     "build:cdn": "npm run build && npm run sync:cdn",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
