@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   website:
     container_name: website
@@ -8,15 +8,14 @@ services:
       args:
         NODE_ENV: production
       cache_from:
-        - '${NEXT_APP_WEBSITE_IMAGE}'
-    image: '${NEXT_APP_WEBSITE_IMAGE}'
-    env_file:
-      - ./.env
+        - "${NEXT_APP_WEBSITE_IMAGE}"
+    image: "${NEXT_APP_WEBSITE_IMAGE}"
     expose:
-      - '3000'
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - SKIP_ENV_VALIDATION=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://website:3000/api/health"]
@@ -28,16 +27,16 @@ services:
       - app-network
 
   nginx:
-    image: '${NEXT_APP_NGINX_IMAGE}'
+    image: "${NEXT_APP_NGINX_IMAGE}"
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     container_name: nginx
     build:
       context: .
       dockerfile: ./nginx/Dockerfile
       cache_from:
-        - '${NEXT_APP_NGINX_IMAGE}'
+        - "${NEXT_APP_NGINX_IMAGE}"
     depends_on:
       website:
         condition: service_healthy

@@ -14,6 +14,8 @@ COPY . .
 
 # Set NODE_ENV for build
 ENV NODE_ENV=production
+# Skip environment validation during build (vars only available at runtime)
+ENV SKIP_ENV_VALIDATION=true
 
 # Generate Prisma Client
 RUN npx prisma generate

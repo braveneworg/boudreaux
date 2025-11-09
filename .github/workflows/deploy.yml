@@ -55,6 +55,7 @@ jobs:
           echo 'EMAIL_SERVER_PASSWORD="${{ secrets.EMAIL_SERVER_PASSWORD }}"' >> .env
           echo 'EMAIL_FROM="${{ secrets.EMAIL_FROM }}"' >> .env
           echo 'NEXT_PUBLIC_CLOUDFLARE_SITE_KEY="${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}"' >> .env
+          echo 'CLOUDFLARE_SECRET="${{ secrets.CLOUDFLARE_SECRET }}"' >> .env
       - name: Add the private SSH key to the ssh-agent
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
