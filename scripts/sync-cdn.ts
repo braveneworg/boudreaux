@@ -388,6 +388,7 @@ class CDNSync {
             Body: createReadStream(file.localPath),
             ContentType: file.contentType,
             CacheControl: file.cacheControl,
+            // Note: ACL removed - bucket uses bucket policy for public access instead
           },
         });
 
