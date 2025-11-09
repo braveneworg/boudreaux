@@ -24,7 +24,7 @@ export default function HamburgerMenu() {
     <div className="flex justify-end pointer-events-none">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative" asChild>
-          <Button className="pointer-events-auto">
+          <Button className="relative pointer-events-auto top-1 right-1">
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
             <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />
             <HamburgerPatty isOpen={isOpen} opacityOpen={0} yOffset={0} duration={0.2} />
