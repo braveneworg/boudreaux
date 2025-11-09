@@ -40,6 +40,25 @@ jobs:
     steps:
       - name: Checkout main
         uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync media files to CDN
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+        run: npm run sync:cdn:no-build
+
       - name: Add environment variables to .env
         run: |
           echo 'NEXT_APP_WEBSITE_IMAGE="${{ env.NEXT_APP_WEBSITE_IMAGE }}"' >> .env
