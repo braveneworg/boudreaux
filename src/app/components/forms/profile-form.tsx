@@ -64,7 +64,7 @@ export default function ProfileForm() {
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const { data: session, status, update } = useSession();
+  const { data: session, update } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
