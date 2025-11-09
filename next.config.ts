@@ -44,10 +44,10 @@ const nextConfig = {
     // Build Content-Security-Policy based on environment
     const cspParts = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cdn.fakefourrecords.com",
+      "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       "img-src 'self' data: https: blob:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://cdn.fakefourrecords.com",
       "connect-src 'self' https://challenges.cloudflare.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "object-src 'none'",
