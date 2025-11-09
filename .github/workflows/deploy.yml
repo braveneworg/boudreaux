@@ -54,8 +54,6 @@ jobs:
           echo 'EMAIL_SERVER_USER="${{ secrets.EMAIL_SERVER_USER }}"' >> .env
           echo 'EMAIL_SERVER_PASSWORD="${{ secrets.EMAIL_SERVER_PASSWORD }}"' >> .env
           echo 'EMAIL_FROM="${{ secrets.EMAIL_FROM }}"' >> .env
-          echo 'GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"' >> .env
-          echo 'GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"' >> .env
           echo 'NEXT_PUBLIC_CLOUDFLARE_SITE_KEY="${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}"' >> .env
       - name: Add the private SSH key to the ssh-agent
         env:
