@@ -7,6 +7,7 @@ When using `assetPrefix` to serve Next.js static files (JS, CSS) from CloudFront
 ## Current Solution
 
 We've removed `assetPrefix` and commented out the NGINX redirect for `/_next/static/` files. This means:
+
 - ✅ Next.js static files (JS, CSS, fonts) are served from your domain (no CORS issues)
 - ✅ Media files (images, videos) are still served from CDN
 - ⚠️ Static files aren't cached globally (only images are on CDN)
@@ -41,7 +42,7 @@ To serve ALL assets from CDN (including Next.js static files), you need to confi
 
 1. Go to your CloudFront distribution (`E2QCL9RZEM5RZE`)
 2. Click the **Behaviors** tab
-3. Select the **Default (*)** behavior
+3. Select the **Default (\*)** behavior
 4. Click **Edit**
 5. Scroll to **Response headers policy**
 6. Select your new policy: `NextJS-CORS-Policy`
@@ -58,6 +59,7 @@ curl -I https://cdn.fakefourrecords.com/media/_next/static/chunks/main.js
 ```
 
 You should see:
+
 ```
 access-control-allow-origin: https://www.fakefourrecords.com
 access-control-allow-methods: GET, HEAD, OPTIONS
@@ -71,7 +73,7 @@ Once CORS is configured, update `next.config.ts`:
 const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
   // ...
-}
+};
 ```
 
 And uncomment NGINX redirect:
@@ -104,12 +106,14 @@ This prevents direct S3 access and forces all traffic through CloudFront.
 ## Current Trade-offs
 
 Without `assetPrefix`:
+
 - Static files (JS, CSS) served from your EC2 instance
 - More load on your server
 - Higher bandwidth usage
 - But: No CORS issues, simpler setup
 
 With CDN properly configured:
+
 - All assets served globally
 - Minimal server load
 - But: Requires CloudFront CORS setup
