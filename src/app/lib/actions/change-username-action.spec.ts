@@ -1,5 +1,5 @@
 // Get the mocked functions using hoisted
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
 import type { FormState } from '@/app/lib/types/form-state';
@@ -267,14 +267,11 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle duplicate username errors', async () => {
-      const duplicateUsernameError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '4.0.0',
-          meta: { target: 'User_username_key' },
-        }
-      );
+      const duplicateUsernameError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_username_key' },
+      });
 
       vi.mocked(mockUpdateUser).mockRejectedValue(duplicateUsernameError);
 
@@ -329,7 +326,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle unknown Prisma errors with P2002 but different target', async () => {
-      const unknownError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      const unknownError = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '4.0.0',
         meta: { target: 'User_email_key' },
@@ -344,7 +341,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle other Prisma errors', async () => {
-      const unknownError = new Prisma.PrismaClientKnownRequestError('Database error', {
+      const unknownError = new PrismaClientKnownRequestError('Database error', {
         code: 'P1000',
         clientVersion: '4.0.0',
       });
@@ -461,7 +458,7 @@ describe('changeUsernameAction', () => {
         user: { id: 'user-123', email: 'test@example.com' },
       });
 
-      const duplicateError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      const duplicateError = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '4.0.0',
         meta: { target: 'User_username_key' },

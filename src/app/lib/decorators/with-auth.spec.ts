@@ -40,7 +40,7 @@ describe('withAuth decorator', () => {
       headers: new Headers(),
     }) as NextRequest;
 
-  const createMockContext = (params = {}) => ({ params });
+  const createMockContext = (params = {}) => ({ params: Promise.resolve(params) });
 
   const createMockSession = (overrides = {}) => ({
     user: {
@@ -242,7 +242,7 @@ describe('withAdmin decorator', () => {
       headers: new Headers(),
     }) as NextRequest;
 
-  const createMockContext = (params = {}) => ({ params });
+  const createMockContext = (params = {}) => ({ params: Promise.resolve(params) });
 
   const createMockSession = (overrides = {}) => ({
     user: {

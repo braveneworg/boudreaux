@@ -51,7 +51,14 @@ vi.mock('@/app/components/ui/button', () => ({
 }));
 
 vi.mock('@/app/components/ui/popover', () => ({
-  Popover: ({ children, open }: { children?: React.ReactNode; open?: boolean }) => (
+  Popover: ({
+    children,
+    open,
+  }: {
+    children?: React.ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  }) => (
     <div data-testid="popover" data-open={open?.toString()}>
       {children}
     </div>
@@ -66,36 +73,70 @@ vi.mock('@/app/components/ui/popover', () => ({
   ),
 }));
 
-vi.mock('@/app/components/ui/command', () => ({
-  Command: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="command">{children}</div>
-  ),
-  CommandEmpty: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="command-empty">{children}</div>
-  ),
-  CommandGroup: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="command-group">{children}</div>
-  ),
-  CommandInput: ({ placeholder, ...props }: { placeholder?: string } & Record<string, unknown>) => (
-    <input data-testid="command-input" placeholder={placeholder} {...props} />
-  ),
-  CommandItem: ({
-    children,
-    onSelect,
-    value,
-  }: {
-    children?: React.ReactNode;
-    onSelect?: (value?: string) => void;
-    value?: string;
-  }) => (
-    <button data-testid="command-item" data-value={value} onClick={() => onSelect?.(value)}>
-      {children}
-    </button>
-  ),
-  CommandList: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="command-list">{children}</div>
-  ),
-}));
+vi.mock('@/app/components/ui/command', () => {
+  const CommandInputMock = React.forwardRef<
+    HTMLInputElement,
+    { placeholder?: string; value?: string } & Record<string, unknown>
+  >(function CommandInput({ placeholder, value, ...props }, ref) {
+    return (
+      <input
+        ref={ref}
+        data-testid="command-input"
+        placeholder={placeholder as string}
+        value={(value as string) || ''}
+        {...props}
+      />
+    );
+  });
+
+  return {
+    Command: ({
+      children,
+      value,
+    }: {
+      children: React.ReactNode;
+      shouldFilter?: boolean;
+      value?: string;
+      onValueChange?: (value: string) => void;
+    }) => {
+      // Pass value context to children by cloning CommandInput elements
+      const enhancedChildren = React.Children.map(children, (child) => {
+        if (React.isValidElement(child) && child.type === CommandInputMock) {
+          return React.cloneElement(child as React.ReactElement<{ value?: string }>, { value });
+        }
+        return child;
+      });
+      return (
+        <div data-testid="command" data-value={value}>
+          {enhancedChildren}
+        </div>
+      );
+    },
+    CommandEmpty: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="command-empty">{children}</div>
+    ),
+    CommandGroup: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="command-group">{children}</div>
+    ),
+    CommandInput: CommandInputMock,
+    CommandItem: ({
+      children,
+      onSelect,
+      value,
+    }: {
+      children?: React.ReactNode;
+      onSelect?: (value?: string) => void;
+      value?: string;
+    }) => (
+      <button data-testid="command-item" data-value={value} onClick={() => onSelect?.(value)}>
+        {children}
+      </button>
+    ),
+    CommandList: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="command-list">{children}</div>
+    ),
+  };
+});
 
 vi.mock('lucide-react', () => ({
   Check: (props: Record<string, unknown>) => (
@@ -372,28 +413,6 @@ describe('ComboboxField', () => {
     });
   });
 
-  // Skip - requires real popover behavior that mocks can't simulate
-  it.skip('handles case when selected option is not found', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <TestWrapper>
-        <ComboboxField {...defaultProps} />
-      </TestWrapper>
-    );
-
-    const trigger = screen.getByTestId('combobox-trigger');
-
-    // Open the popover
-    await user.click(trigger);
-
-    // The component should handle gracefully when option not found
-    // This tests the if (selectedOption) branch
-    await waitFor(() => {
-      expect(screen.getByTestId('popover')).toHaveAttribute('data-open', 'true');
-    });
-  });
-
   it('calls both setValue and field.onChange when option selected', async () => {
     const setValue = vi.fn();
     const user = userEvent.setup();
@@ -414,30 +433,7 @@ describe('ComboboxField', () => {
     expect(setValue).toHaveBeenCalled();
   });
 
-  // Skip these integration tests - they require real component behavior that mocks can't simulate
-  describe.skip('Focus and Keyboard Behavior', () => {
-    it('opens popover when trigger button receives focus', async () => {
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-      const popover = screen.getByTestId('popover');
-
-      // Initially popover should be closed
-      expect(popover).toHaveAttribute('data-open', 'false');
-
-      // Focus the trigger button
-      fireEvent.focus(trigger);
-
-      // Popover should now be open
-      await waitFor(() => {
-        expect(popover).toHaveAttribute('data-open', 'true');
-      });
-    });
-
+  describe('Focus and Keyboard Behavior', () => {
     it('opens popover when user types an alphanumeric key', async () => {
       render(
         <TestWrapper>
@@ -509,29 +505,6 @@ describe('ComboboxField', () => {
       expect(popover).toHaveAttribute('data-open', 'false');
     });
 
-    it('does not open popover when already open', async () => {
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-      const popover = screen.getByTestId('popover');
-
-      // Open the popover first
-      fireEvent.focus(trigger);
-      await waitFor(() => {
-        expect(popover).toHaveAttribute('data-open', 'true');
-      });
-
-      // Type a key when already open - should not cause issues
-      fireEvent.keyDown(trigger, { key: 'b' });
-      await waitFor(() => {
-        expect(popover).toHaveAttribute('data-open', 'true');
-      });
-    });
-
     it('populates search input when typing on closed popover', async () => {
       render(
         <TestWrapper>
@@ -546,7 +519,9 @@ describe('ComboboxField', () => {
       fireEvent.keyDown(trigger, { key: 'o' });
 
       // Search input should have the typed value
-      expect(commandInput).toHaveValue('o');
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('o');
+      });
     });
 
     it('renders search input as controlled with value prop', () => {
@@ -565,7 +540,7 @@ describe('ComboboxField', () => {
       expect(commandInput).toHaveAttribute('value');
     });
 
-    it('clears search input after selecting an option', () => {
+    it('clears search input after selecting an option', async () => {
       render(
         <TestWrapper>
           <ComboboxField {...defaultProps} />
@@ -577,7 +552,10 @@ describe('ComboboxField', () => {
 
       // Type to open and populate search
       fireEvent.keyDown(trigger, { key: 'o' });
-      expect(commandInput).toHaveValue('o');
+
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('o');
+      });
 
       // Select an option
       const firstOption = screen.getAllByTestId('command-item')[0];
@@ -587,7 +565,7 @@ describe('ComboboxField', () => {
       expect(commandInput).toHaveValue('');
     });
 
-    it('handles uppercase letters correctly', () => {
+    it('handles uppercase letters correctly', async () => {
       render(
         <TestWrapper>
           <ComboboxField {...defaultProps} />
@@ -602,13 +580,17 @@ describe('ComboboxField', () => {
       fireEvent.keyDown(trigger, { key: 'O' });
 
       // Popover should open
-      expect(popover).toHaveAttribute('data-open', 'true');
+      await waitFor(() => {
+        expect(popover).toHaveAttribute('data-open', 'true');
+      });
 
       // Search input should have the uppercase letter
-      expect(commandInput).toHaveValue('O');
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('O');
+      });
     });
 
-    it('handles numbers correctly', () => {
+    it('handles numbers correctly', async () => {
       render(
         <TestWrapper>
           <ComboboxField {...defaultProps} />
@@ -622,30 +604,12 @@ describe('ComboboxField', () => {
       fireEvent.keyDown(trigger, { key: '3' });
 
       // Search input should have the number
-      expect(commandInput).toHaveValue('3');
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('3');
+      });
     });
 
-    it('works with focus followed by typing', () => {
-      render(
-        <TestWrapper>
-          <ComboboxField {...defaultProps} />
-        </TestWrapper>
-      );
-
-      const trigger = screen.getByTestId('combobox-trigger');
-      const popover = screen.getByTestId('popover');
-      const commandInput = screen.getByTestId('command-input');
-
-      // Focus first (opens popover)
-      fireEvent.focus(trigger);
-      expect(popover).toHaveAttribute('data-open', 'true');
-
-      // Search input should start empty and be ready for typing
-      expect(commandInput).toHaveValue('');
-      expect(commandInput).toBeInTheDocument();
-    });
-
-    it('allows typing directly without focusing first', () => {
+    it('populates search input when typing on closed popover', async () => {
       render(
         <TestWrapper>
           <ComboboxField {...defaultProps} />
@@ -660,8 +624,10 @@ describe('ComboboxField', () => {
       fireEvent.keyDown(trigger, { key: 's' });
 
       // Popover should open and search should be populated
-      expect(popover).toHaveAttribute('data-open', 'true');
-      expect(commandInput).toHaveValue('s');
+      await waitFor(() => {
+        expect(popover).toHaveAttribute('data-open', 'true');
+        expect(commandInput).toHaveValue('s');
+      });
     });
 
     it('uses controlled search input with value prop', () => {

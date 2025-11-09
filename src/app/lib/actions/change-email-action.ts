@@ -3,7 +3,7 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
 
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
 import { logSecurityEvent } from '@/app/lib/utils/audit-log';
@@ -77,8 +77,8 @@ export const changeEmailAction = async (
           formState.errors = {};
         }
         formState.errors.general = ['Connection timed out. Please try again.'];
-      } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const duplicateKeyError = error as Prisma.PrismaClientKnownRequestError;
+      } else if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+        const duplicateKeyError = error as PrismaClientKnownRequestError;
 
         if (duplicateKeyError?.meta?.target === 'User_email_key') {
           if (!formState.errors) {

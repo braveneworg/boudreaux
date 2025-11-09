@@ -12,8 +12,15 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
+# Set NODE_ENV for build
+ENV NODE_ENV=production
+
+# Generate Prisma Client
+RUN npx prisma generate
+
 # Build the Next.js app - this will create .next/standalone
-RUN npm run build
+# Use npx next build directly to avoid the grep pipe in package.json
+RUN npx next build
 
 # Stage 2: Create final image
 FROM ${NODE} AS runner
@@ -29,9 +36,11 @@ RUN adduser --system --uid 1001 appuser
 WORKDIR /app
 
 # Copy necessary files from builder
-COPY --from=builder /app/package.json ./package.json
+# First copy the standalone output which includes server.js and dependencies
 COPY --from=builder --chown=appuser:nodegroup /app/.next/standalone ./
+# Then copy the static files to the correct location
 COPY --from=builder --chown=appuser:nodegroup /app/.next/static ./.next/static
+# Copy public files
 COPY --from=builder --chown=appuser:nodegroup /app/public ./public
 
 USER appuser

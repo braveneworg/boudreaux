@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { withAuth } from '@/app/lib/decorators/with-auth';
 import { prisma } from '@/app/lib/prisma';
@@ -49,7 +49,7 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
     } catch (error) {
       // Handle duplicate username error
       // Always return 200 with available flag to prevent enumeration
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
         return NextResponse.json(
           {
             available: false,

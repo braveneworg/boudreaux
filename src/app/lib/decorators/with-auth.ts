@@ -23,7 +23,7 @@ interface Session {
 
 type AuthenticatedHandler = (
   request: NextRequest,
-  context: { params: unknown },
+  context: { params: Promise<unknown> },
   session: Session
 ) => Promise<NextResponse> | NextResponse;
 
@@ -31,7 +31,7 @@ type AuthenticatedHandler = (
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
 export function withAuth(handler: AuthenticatedHandler) {
-  return async (request: NextRequest, context: { params: unknown }) => {
+  return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
 
     // Check authentication
@@ -48,7 +48,7 @@ export function withAuth(handler: AuthenticatedHandler) {
 // Usage: Wrap API route handlers that require admin role
 // Example: export const GET = withAdmin(async (req, res, session) => { ... });
 export async function withAdmin(handler: AuthenticatedHandler) {
-  return async (request: NextRequest, context: { params: unknown }) => {
+  return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
     const role = 'admin';
 

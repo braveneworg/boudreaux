@@ -1,5 +1,5 @@
 // Get the mocked functions using hoisted
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { changeEmailAction } from '@/app/lib/actions/change-email-action';
 import type { FormState } from '@/app/lib/types/form-state';
@@ -517,14 +517,11 @@ describe('changeEmailAction', () => {
         user: { id: 'user-123', email: 'oldemail@example.com' },
       });
 
-      const duplicateEmailError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '4.0.0',
-          meta: { target: 'User_email_key' },
-        }
-      );
+      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_email_key' },
+      });
 
       vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
 
@@ -713,14 +710,11 @@ describe('changeEmailAction', () => {
     });
 
     it('should handle duplicate email errors', async () => {
-      const duplicateEmailError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '4.0.0',
-          meta: { target: 'User_email_key' },
-        }
-      );
+      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_email_key' },
+      });
 
       vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
 
@@ -778,7 +772,7 @@ describe('changeEmailAction', () => {
     });
 
     it('should handle unknown Prisma errors with P2002 but different target', async () => {
-      const unknownError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      const unknownError = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '4.0.0',
         meta: { target: 'User_username_key' },
@@ -794,7 +788,7 @@ describe('changeEmailAction', () => {
     });
 
     it('should handle other Prisma errors', async () => {
-      const unknownError = new Prisma.PrismaClientKnownRequestError('Database error', {
+      const unknownError = new PrismaClientKnownRequestError('Database error', {
         code: 'P1000',
         clientVersion: '4.0.0',
       });

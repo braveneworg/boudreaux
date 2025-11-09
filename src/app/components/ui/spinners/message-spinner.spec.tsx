@@ -270,28 +270,6 @@ describe('MessageSpinner', () => {
     });
   });
 
-  // Skip - spinnerPosition prop not yet implemented in component
-  describe.skip('spinner position', () => {
-    it('should render spinner before message by default', () => {
-      const { container } = render(
-        <MessageSpinner title="Loading..." size="md" variant="default" />
-      );
-
-      const heading = screen.getByText(/Loading/i);
-      const spinner = screen.getByTestId('spinner-ring-circle');
-
-      // Get all children and find their positions
-      const wrapper = container.firstChild as HTMLElement;
-      const children = Array.from(wrapper.children);
-
-      // Find which child contains the heading and which contains the spinner
-      const headingParentIndex = children.findIndex((child) => child.contains(heading));
-      const spinnerParentIndex = children.findIndex((child) => child.contains(spinner));
-
-      expect(spinnerParentIndex).toBeLessThan(headingParentIndex);
-    });
-  });
-
   describe('Accessibility', () => {
     it('should use default variant when not provided', () => {
       render(<MessageSpinner title="Loading..." size="md" />);
