@@ -4,6 +4,13 @@
  */
 
 export function validateEnvironment() {
+  // Skip validation during Docker build (secrets not available yet)
+  if (process.env.SKIP_ENV_VALIDATION === 'true') {
+    console.warn('⚠️  Environment validation skipped (SKIP_ENV_VALIDATION=true)');
+    console.warn('   Variables will be validated at runtime when container starts');
+    return;
+  }
+
   const required = [
     'DATABASE_URL',
     'AUTH_SECRET',
@@ -20,7 +27,7 @@ export function validateEnvironment() {
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}\n` +
-        'Please check your .env.local file and ensure all required variables are set.'
+        'Please check your environment configuration and ensure all required variables are set.'
     );
   }
 
