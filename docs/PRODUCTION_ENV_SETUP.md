@@ -1,12 +1,15 @@
 # Production Environment Variables Setup Guide
 
 ## Problem
+
 The application fails in production with:
+
 ```
 Error: Missing required environment variables: DATABASE_URL, AUTH_SECRET, EMAIL_SERVER_HOST, EMAIL_SERVER_USER, EMAIL_SERVER_PASSWORD, EMAIL_FROM
 ```
 
 ## Solution Overview
+
 Store sensitive environment variables as GitHub Secrets and inject them during deployment to AWS EC2.
 
 ## Step-by-Step Setup
@@ -19,24 +22,24 @@ Add the following secrets:
 
 #### Required Secrets
 
-| Secret Name | Description | Example Value |
-|-------------|-------------|---------------|
-| `DATABASE_URL` | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/db?retryWrites=true&w=majority` |
-| `AUTH_SECRET` | 32+ character random string for auth | Generate with: `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Your production URL | `https://yourdomain.com` |
-| `EMAIL_SERVER_HOST` | SMTP server hostname | `smtp.sendgrid.net` or `smtp.gmail.com` |
-| `EMAIL_SERVER_USER` | SMTP username | `apikey` (SendGrid) or your email |
-| `EMAIL_SERVER_PASSWORD` | SMTP password | Your SMTP password or API key |
-| `EMAIL_FROM` | From email address | `noreply@yourdomain.com` |
+| Secret Name             | Description                          | Example Value                                                                |
+| ----------------------- | ------------------------------------ | ---------------------------------------------------------------------------- |
+| `DATABASE_URL`          | MongoDB connection string            | `mongodb+srv://user:pass@cluster.mongodb.net/db?retryWrites=true&w=majority` |
+| `AUTH_SECRET`           | 32+ character random string for auth | Generate with: `openssl rand -base64 32`                                     |
+| `NEXTAUTH_URL`          | Your production URL                  | `https://yourdomain.com`                                                     |
+| `EMAIL_SERVER_HOST`     | SMTP server hostname                 | `smtp.sendgrid.net` or `smtp.gmail.com`                                      |
+| `EMAIL_SERVER_USER`     | SMTP username                        | `apikey` (SendGrid) or your email                                            |
+| `EMAIL_SERVER_PASSWORD` | SMTP password                        | Your SMTP password or API key                                                |
+| `EMAIL_FROM`            | From email address                   | `noreply@yourdomain.com`                                                     |
 
 #### Optional Secrets
 
-| Secret Name | Description | Default |
-|-------------|-------------|---------|
-| `EMAIL_SERVER_PORT` | SMTP port | `587` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | - |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | - |
-| `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` | Cloudflare Turnstile key | - |
+| Secret Name                       | Description              | Default |
+| --------------------------------- | ------------------------ | ------- |
+| `EMAIL_SERVER_PORT`               | SMTP port                | `587`   |
+| `GOOGLE_CLIENT_ID`                | Google OAuth client ID   | -       |
+| `GOOGLE_CLIENT_SECRET`            | Google OAuth secret      | -       |
+| `NEXT_PUBLIC_CLOUDFLARE_SITE_KEY` | Cloudflare Turnstile key | -       |
 
 ### 2. Generate Strong AUTH_SECRET
 
@@ -93,6 +96,7 @@ EMAIL_FROM=verified@yourdomain.com
 ### 4. Verify GitHub Actions Workflow
 
 The workflow (`.github/workflows/deploy.yml`) has been updated to:
+
 1. Read secrets from GitHub
 2. Create a `.env` file with all variables
 3. Copy the `.env` file to EC2
@@ -109,6 +113,7 @@ git push origin main
 ```
 
 GitHub Actions will automatically:
+
 1. Build Docker images
 2. Push to GitHub Container Registry
 3. Deploy to AWS EC2 with environment variables
@@ -148,6 +153,7 @@ docker exec website env | grep AUTH_SECRET
 ## Security Best Practices
 
 ### ✅ DO
+
 - Store all secrets in GitHub Secrets
 - Use different secrets for production vs development
 - Rotate secrets regularly (especially AUTH_SECRET)
@@ -156,6 +162,7 @@ docker exec website env | grep AUTH_SECRET
 - Restrict EC2 SSH access to specific IPs
 
 ### ❌ DON'T
+
 - Commit `.env` files to git (already in `.gitignore`)
 - Share secrets in Slack/email
 - Use the same AUTH_SECRET across environments
@@ -169,6 +176,7 @@ docker exec website env | grep AUTH_SECRET
 **Cause**: Secrets not added to GitHub or not passed to container
 
 **Fix**:
+
 1. Verify secrets exist in GitHub repository settings
 2. Check the GitHub Actions workflow completed successfully
 3. SSH to EC2 and verify `.env` file exists
@@ -179,6 +187,7 @@ docker exec website env | grep AUTH_SECRET
 **Cause**: MongoDB connection string is malformed
 
 **Fix**:
+
 - Ensure URL is properly encoded
 - Special characters in password must be URL-encoded
 - Format: `mongodb+srv://username:password@host/database?options`
@@ -188,6 +197,7 @@ docker exec website env | grep AUTH_SECRET
 **Cause**: Wrong email credentials or server
 
 **Fix**:
+
 - Verify EMAIL_SERVER_HOST is correct
 - For Gmail, ensure you're using an App Password (not your regular password)
 - For SendGrid, username should be literally "apikey"
@@ -198,6 +208,7 @@ docker exec website env | grep AUTH_SECRET
 **Cause**: Docker compose not reading .env file
 
 **Fix**:
+
 ```bash
 # On EC2, manually test docker compose
 cd ~
@@ -212,6 +223,7 @@ docker compose -f docker-compose.prod.yml up -d
 Complete list of all environment variables the application uses:
 
 ### Required (Application will fail without these)
+
 - `DATABASE_URL` - MongoDB connection string
 - `AUTH_SECRET` - Authentication secret (32+ chars)
 - `EMAIL_SERVER_HOST` - SMTP server
@@ -220,6 +232,7 @@ Complete list of all environment variables the application uses:
 - `EMAIL_FROM` - Sender email address
 
 ### Optional (Has defaults or gracefully degrades)
+
 - `NODE_ENV` - Environment (`production`, `development`) - Default: `development`
 - `NEXTAUTH_URL` - Application URL - Default: `http://localhost:3000`
 - `EMAIL_SERVER_PORT` - SMTP port - Default: `587`
@@ -229,6 +242,7 @@ Complete list of all environment variables the application uses:
 - `NEXT_TELEMETRY_DISABLED` - Disable Next.js telemetry - Default: `1`
 
 ### AWS/CDN (Used by scripts, not runtime)
+
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_REGION`
