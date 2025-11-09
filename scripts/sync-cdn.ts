@@ -246,6 +246,15 @@ class CDNSync {
   private async syncStaticFiles(): Promise<void> {
     this.log('Syncing Next.js static files...');
 
+    // Check if build directory exists before trying to sync static files
+    if (!existsSync(this.config.buildDir)) {
+      this.log(
+        `Build directory '${this.config.buildDir}' not found. Skipping static files sync.`,
+        'warning'
+      );
+      return;
+    }
+
     const staticDir = join(this.config.buildDir, 'static');
     if (!existsSync(staticDir)) {
       this.log('No static files found to sync', 'warning');
@@ -529,7 +538,12 @@ class CDNSync {
 
       // Build process
       await this.buildApplication();
-      this.validateBuildDirectory();
+      
+      // Only validate build directory if we're not skipping build
+      // Media files can be synced without a build
+      if (!this.config.skipBuild) {
+        this.validateBuildDirectory();
+      }
 
       // Clear existing media files first (unless skipped)
       if (!this.config.skipCleanup) {
