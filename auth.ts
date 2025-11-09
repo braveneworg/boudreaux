@@ -47,12 +47,15 @@ import type { AdapterUser } from 'next-auth/adapters';
 // - The `@@unique` attribute is used to create a unique index on a field or fields.
 
 // Validate AUTH_SECRET exists and is sufficiently long
-if (!process.env.AUTH_SECRET) {
-  throw new Error('AUTH_SECRET environment variable is required');
-}
+// Skip validation during build when SKIP_ENV_VALIDATION is set
+if (process.env.SKIP_ENV_VALIDATION !== 'true') {
+  if (!process.env.AUTH_SECRET) {
+    throw new Error('AUTH_SECRET environment variable is required');
+  }
 
-if (process.env.AUTH_SECRET.length < 32) {
-  throw new Error('AUTH_SECRET must be at least 32 characters long for security');
+  if (process.env.AUTH_SECRET.length < 32) {
+    throw new Error('AUTH_SECRET must be at least 32 characters long for security');
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
