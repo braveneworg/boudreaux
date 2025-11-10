@@ -20,9 +20,14 @@ ENV SKIP_ENV_VALIDATION=true
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build the Next.js app - this will create .next/standalone
-# Use npx next build directly to avoid the grep pipe in package.json
-RUN npx next build
+# Check if pre-built .next exists (from CI/CD), otherwise build from scratch
+RUN if [ -f .next-build.tar.gz ]; then \
+      echo "Using pre-built .next from CI/CD"; \
+      tar -xzf .next-build.tar.gz; \
+    else \
+      echo "Building Next.js from scratch"; \
+      npx next build; \
+    fi
 
 # Stage 2: Create final image
 FROM ${NODE} AS runner

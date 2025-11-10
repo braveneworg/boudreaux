@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Use CDN for all static assets in production
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
+  // Use full CDN URL for all static assets in production
+  // This eliminates the need for NGINX redirects and avoids 301 caching issues
+  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://cdn.fakefourrecords.com/media' : '',
   devIndicators: false,
 
   // Configure images for CDN
