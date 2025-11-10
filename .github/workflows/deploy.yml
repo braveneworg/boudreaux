@@ -33,6 +33,7 @@ jobs:
         env:
           SKIP_ENV_VALIDATION: "true"
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
 
       - name: Sync to CDN (includes _next/static)
         env:
@@ -56,6 +57,8 @@ jobs:
         run: echo "$PERSONAL_ACCESS_TOKEN" | docker login ghcr.io -u ${{ secrets.NAMESPACE }} --password-stdin
 
       - name: Build Docker images
+        env:
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: docker compose -f docker-compose.ci.yml build
 
       - name: Push images

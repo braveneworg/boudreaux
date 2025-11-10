@@ -17,6 +17,11 @@ ENV NODE_ENV=production
 # Skip environment validation during build (vars only available at runtime)
 ENV SKIP_ENV_VALIDATION=true
 
+# Build-time arguments for NEXT_PUBLIC_* variables
+# These must be available during build because Next.js bakes them into the client bundle
+ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
+ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
+
 # Generate Prisma Client
 RUN npx prisma generate
 
