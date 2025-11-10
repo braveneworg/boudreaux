@@ -6,14 +6,7 @@ To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub
 
 ## Set github secrets
 
-- AWS_CERTIFICATE - the certificate exported ACM certificate in PEM format
-- AWS_EC2_IP_ADDRESS - the public IP address of the EC2 instance (elastic IP recommended)
-- AWS_HOST_USER - the SSH user for the EC2 instance (usually "ec2-user" or "ubuntu")
-- AWS_PRIVATE_KEY - the private key for the EC2 instance, in PEM format
-- NAMESPACE - arbitrary but should jive with your project name or effort
-- NGINX_SERVER_NAME - the server_name directive for nginx (e.g. example.com or www.example.com)
-- PERSONAL_ACCESS_TOKEN - a GitHub personal access token with `read:packages` and `write:packages` permissions
-  runner.
+See `.env.example` for required variables.
 
 # EC 2 instance setup
 
