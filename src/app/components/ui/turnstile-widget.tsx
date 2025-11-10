@@ -4,10 +4,8 @@ import React from 'react';
 
 import Turnstile, { useTurnstile } from 'react-turnstile';
 
-import { Skeleton } from './skeleton';
-
 const TurnstileWidget = ({
-  isVerified,
+  isVerified: _isVerified,
   setIsVerified,
 }: {
   isVerified: boolean;
@@ -28,8 +26,7 @@ const TurnstileWidget = ({
   };
 
   return (
-    <>
-      {!isVerified && <Skeleton className="h-10 py-2 w-full mx-auto" />}
+    <div className="w-full flex justify-center">
       <Turnstile
         onError={handleReset}
         onExpire={handleReset}
@@ -38,8 +35,10 @@ const TurnstileWidget = ({
           setIsVerified(true);
         }}
         sitekey={getSiteKey()}
+        theme="light"
+        size="normal"
       />
-    </>
+    </div>
   );
 };
 
