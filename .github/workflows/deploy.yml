@@ -19,7 +19,7 @@ jobs:
         run: |
           echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/website" >> $GITHUB_ENV
           echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/nginx" >> $GITHUB_ENV
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -34,11 +34,19 @@ jobs:
           SKIP_ENV_VALIDATION: "true"
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
 
+      - name: Verify build output exists
+        run: |
+          echo "Checking .next directory..."
+          ls -la .next/ || echo ".next directory not found!"
+          echo "Checking .next/static..."
+          ls -la .next/static/ || echo ".next/static not found!"
+
       - name: Upload build artifacts for CDN sync
         uses: actions/upload-artifact@v4
         with:
           name: nextjs-build
-          path: .next/
+          path: |
+            .next/static/
           retention-days: 1
 
       - name: Log in to GitHub Packages
@@ -50,7 +58,7 @@ jobs:
       - name: Build Docker images (reusing existing .next build)
         run: |
           docker compose -f docker-compose.ci.yml build
-      
+
       - name: Push images
         run: |
           docker push ${{ env.NEXT_APP_WEBSITE_IMAGE }}
@@ -76,7 +84,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nextjs-build
-          path: .next/
+          path: .
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Checking downloaded .next directory..."
+          ls -la .next/ || echo ".next not found!"
+          ls -la .next/static/ || echo ".next/static not found!"
 
       - name: Sync CDN with SAME build that's in Docker
         env:
