@@ -44,7 +44,7 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
-      - name: Cache .next build for Docker
+      - name: Package .next build for Docker
         run: |
           # Create a tarball of the .next directory to include in Docker build context
           tar -czf .next-build.tar.gz .next
