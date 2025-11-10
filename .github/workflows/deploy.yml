@@ -86,7 +86,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nextjs-build
-          path: .next/
+          path: .
 
       - name: Verify downloaded artifacts
         run: |
