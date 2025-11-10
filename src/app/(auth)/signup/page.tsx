@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 import { usePathname } from 'next/navigation';
 
@@ -29,16 +29,19 @@ const SignupPage = () => {
     ? SignupSchemaType
     : SigninSchemaType;
   const path = usePathname();
-  const [state, formAction, isPending] = useActionState<FormState, FormData>(signupAction, {
+  const isSignupPath = path === '/signup/';
+
+  // Cloudflare Turnstile verification
+  const [isVerified, setIsVerified] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [state, setState] = useState<FormState>({
     errors: {},
     fields: {},
     success: false,
     hasTimeout: false,
   });
 
-  // Cloudflare Turnstile verification
-  const [isVerified, setIsVerified] = useState(false);
-  const isSignupPath = path === '/signup/';
   const form = useForm<SigninOrSignupSchema<FormState>>({
     defaultValues: {
       email: '',
@@ -49,8 +52,17 @@ const SignupPage = () => {
 
   const handleSubmit = useCallback(
     async (data: SigninOrSignupSchema<FormState>) => {
-      if (isVerified) {
-        // Create FormData from the validated form data instead of reading from ref
+      if (!isVerified) {
+        form.setError('general', {
+          message: 'Please verify you are human using the widget above.',
+        });
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      try {
+        // Create FormData from the validated form data
         const formData = new FormData();
         Object.entries(data).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
@@ -60,16 +72,13 @@ const SignupPage = () => {
 
         const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
 
-        if (!result.success) {
-          // Update the form state with the new state returned from the action
-          form.reset(undefined, { keepValues: true });
+        setState(result);
 
-          if (result.errors?.email) {
-            form.setError('email', { message: result.errors.email.join(', ') });
-          }
+        if (!result.success && result.errors?.email) {
+          form.setError('email', { message: result.errors.email.join(', ') });
         }
-      } else {
-        form.setError('general', { message: 'Please refresh the app and try again.' });
+      } finally {
+        setIsSubmitting(false);
       }
     },
     [isVerified, isSignupPath, state, form]
@@ -85,7 +94,7 @@ const SignupPage = () => {
         <Card>
           {isSignupPath ? <h1>Sign Up</h1> : <h1>Sign In</h1>}
           <FormProvider {...form}>
-            <form action={formAction} noValidate onSubmit={form.handleSubmit(handleSubmit)}>
+            <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
               <SignupSigninForm
                 control={
                   form.control as Control<{
@@ -94,7 +103,7 @@ const SignupPage = () => {
                     termsAndConditions?: boolean;
                   }>
                 }
-                isPending={isPending}
+                isPending={isSubmitting}
                 isVerified={isVerified}
                 setIsVerified={setIsVerified}
                 state={state}
