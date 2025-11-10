@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Use CDN for all static assets in production
   assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
   devIndicators: false,
 
