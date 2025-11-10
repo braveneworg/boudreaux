@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_ENV: production
+        NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY}
       cache_from:
         - "${NEXT_APP_WEBSITE_IMAGE}"
     image: "${NEXT_APP_WEBSITE_IMAGE}"

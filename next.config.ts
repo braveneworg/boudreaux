@@ -29,7 +29,9 @@ const nextConfig = {
 
   // Output configuration
   output: 'standalone',
-  trailingSlash: true,
+  // NOTE: trailingSlash set to false because Auth.js API routes don't work with trailing slashes
+  // Auth.js expects /api/auth/session, not /api/auth/session/
+  trailingSlash: false,
 
   // Optimize for production
   compress: true,
