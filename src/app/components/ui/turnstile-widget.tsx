@@ -37,7 +37,7 @@ const TurnstileWidget = ({
         sitekey={getSiteKey()}
         theme="light"
         size="flexible"
-        className="max-w-full"
+        className="max-w-full mt-4"
       />
     </div>
   );
