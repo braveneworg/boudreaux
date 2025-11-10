@@ -8,6 +8,9 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 FROM ${NODE} AS builder
+# Build argument to control whether to use pre-built assets
+ARG USE_PREBUILT_ASSETS=false
+
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
@@ -20,8 +23,8 @@ ENV SKIP_ENV_VALIDATION=true
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Check if pre-built .next exists (from CI/CD), otherwise build from scratch
-RUN if [ -f .next-build.tar.gz ]; then \
+# Build or extract based on build argument
+RUN if [ "${USE_PREBUILT_ASSETS}" = "true" ]; then \
       echo "Using pre-built .next from CI/CD"; \
       tar -xzf .next-build.tar.gz; \
     else \
