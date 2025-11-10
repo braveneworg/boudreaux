@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Note: assetPrefix removed - JS/CSS served from your server to avoid CORS issues
-  // Only media files (images, videos) will use CDN via NGINX redirect
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/media' : '',
   devIndicators: false,
 
   // Configure images for CDN

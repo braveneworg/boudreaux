@@ -49,7 +49,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Sync media files to CDN (images, videos only - not JS/CSS)
+      - name: Build Next.js (same build that goes in Docker)
+        run: npm run build
+        env:
+          SKIP_ENV_VALIDATION: "true"
+          DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
+
+      - name: Sync ALL assets to CDN (media + _next/static from THIS build)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
