@@ -26,7 +26,7 @@ const TurnstileWidget = ({
   };
 
   return (
-    <div className="w-full flex justify-center">
+    <div className="w-full flex justify-center items-center">
       <Turnstile
         onError={handleReset}
         onExpire={handleReset}
@@ -36,7 +36,8 @@ const TurnstileWidget = ({
         }}
         sitekey={getSiteKey()}
         theme="light"
-        size="normal"
+        size="flexible"
+        className="max-w-full"
       />
     </div>
   );
