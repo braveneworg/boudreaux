@@ -47,8 +47,6 @@ jobs:
           name: nextjs-build
           path: |
             .next/static/
-            .next/server/
-            .next/BUILD_ID
           retention-days: 1
 
       - name: Log in to GitHub Packages
