@@ -60,6 +60,9 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomPrismaAdapter(prisma),
+  // Trust host header from reverse proxy (NGINX)
+  // Required when running behind a proxy
+  trustHost: true,
   providers: [
     Nodemailer({
       server: {
