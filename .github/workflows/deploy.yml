@@ -423,6 +423,9 @@ jobs:
             fi
 
             cd ~/boudreaux
+            TARGET_DIR="$(pwd)"
+            LOCAL_USER="$(whoami)"
+            LOCAL_GROUP="$(id -gn)"
 
             # Ensure Docker is installed and running (Ubuntu)
             if ! command -v docker >/dev/null 2>&1; then
@@ -491,13 +494,15 @@ jobs:
 
             # Create symlinks if certificates exist
             if [ -f "$CERT_PATH/fullchain.pem" ]; then
-              sudo ln -sf "$CERT_PATH/fullchain.pem" ~/boudreaux/certificate.pem
-              sudo ln -sf "$CERT_PATH/privkey.pem" ~/boudreaux/private_key.pem
-              sudo chmod 644 ~/boudreaux/certificate.pem ~/boudreaux/private_key.pem
+              sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$TARGET_DIR/certificate.pem"
+              sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$TARGET_DIR/private_key.pem"
+              sudo chmod 644 "$TARGET_DIR/certificate.pem"
+              sudo chmod 600 "$TARGET_DIR/private_key.pem"
 
               # Setup automatic renewal cron (idempotent)
-              if ! sudo crontab -l 2>/dev/null | grep -q "certbot renew"; then
-                (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart nginx'") | sudo crontab -
+              if ! sudo crontab -l 2>/dev/null | grep -Fq "$TARGET_DIR/certificate.pem"; then
+                CRON_CMD="0 3 * * * certbot renew --quiet --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $TARGET_DIR/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $TARGET_DIR/private_key.pem && chmod 600 $TARGET_DIR/private_key.pem && chmod 644 $TARGET_DIR/certificate.pem && (docker restart nginx || true)\""
+                (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
               fi
 
               # If a self-signed marker exists from previous runs, remove it now
