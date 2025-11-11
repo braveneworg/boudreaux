@@ -321,42 +321,57 @@ jobs:
               sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
               sudo systemctl enable docker
               sudo systemctl start docker
-              sudo usermod -aG docker $USER || true
+            fi
+
+            # Ensure user is in docker group (required for non-root Docker access)
+            if ! groups | grep -q docker; then
+              echo "Adding $USER to docker group..."
+              sudo usermod -aG docker $USER
+              echo "User added to docker group. Note: This session will use 'sudo docker' for remaining commands."
+              echo "Subsequent deployments will not need sudo after the user logs out and back in."
+            fi
+
+            # Check if we can access Docker without sudo
+            if docker ps >/dev/null 2>&1; then
+              DOCKER_CMD="docker"
+            else
+              echo "Using sudo for Docker commands (group membership not yet active in this session)"
+              DOCKER_CMD="sudo docker"
             fi
 
             # Move env into place
             mv -f .env.deploy .env
 
             # Login to GHCR using aligned credentials
-            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
+            echo '${{ secrets.GHCR_TOKEN }}' | $DOCKER_CMD login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
 
             WEBSITE_IMAGE='${{ env.WEBSITE_IMAGE }}'
             NGINX_IMAGE='${{ env.NGINX_IMAGE }}'
 
             # Capture previously deployed digests (if present)
-            PREV_WEBSITE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
-            PREV_NGINX_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+            PREV_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
+            PREV_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
 
             # If digests are provided, pin to those; otherwise, use latest and capture digests
             if [ -n "${WEBSITE_DIGEST:-}" ] && [ -n "${NGINX_DIGEST:-}" ]; then
               echo "Using provided digests for deployment"
-              docker pull "$WEBSITE_DIGEST" || true
-              docker pull "$NGINX_DIGEST" || true
-              docker tag "$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
-              docker tag "$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+              $DOCKER_CMD pull "$WEBSITE_DIGEST" || true
+              $DOCKER_CMD pull "$NGINX_DIGEST" || true
+              $DOCKER_CMD tag "$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+              $DOCKER_CMD tag "$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
               NEW_WEBSITE_DIGEST="$WEBSITE_DIGEST"
               NEW_NGINX_DIGEST="$NGINX_DIGEST"
             else
               echo "No digests provided; using latest tags"
-              docker pull "$WEBSITE_IMAGE" || true
-              docker pull "$NGINX_IMAGE" || true
-              NEW_WEBSITE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
-              NEW_NGINX_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+              $DOCKER_CMD pull "$WEBSITE_IMAGE" || true
+              $DOCKER_CMD pull "$NGINX_IMAGE" || true
+              NEW_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
+              NEW_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
             fi
 
             # Restart stack
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker compose -f docker-compose.prod.yml up -d
+            $DOCKER_CMD compose -f docker-compose.prod.yml down --remove-orphans || true
+            $DOCKER_CMD compose -f docker-compose.prod.yml up -d
 
             # Basic health check
             sleep 5
@@ -366,15 +381,15 @@ jobs:
               # Roll back to previous digests if we have them
               if [ -n "$PREV_WEBSITE_DIGEST" ]; then
                 # Ensure previous digest is present and retag as :latest
-                docker pull "$PREV_WEBSITE_DIGEST" || true
-                docker tag "$PREV_WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+                $DOCKER_CMD pull "$PREV_WEBSITE_DIGEST" || true
+                $DOCKER_CMD tag "$PREV_WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
               fi
               if [ -n "$PREV_NGINX_DIGEST" ]; then
-                docker pull "$PREV_NGINX_DIGEST" || true
-                docker tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+                $DOCKER_CMD pull "$PREV_NGINX_DIGEST" || true
+                $DOCKER_CMD tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
               fi
 
-              docker compose -f docker-compose.prod.yml up -d --force-recreate
+              $DOCKER_CMD compose -f docker-compose.prod.yml up -d --force-recreate
               sleep 5
               if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
                 echo 'Rollback health check failed - manual intervention required'
@@ -399,7 +414,7 @@ jobs:
             }
             JSON
 
-            docker system prune -f || true
+            $DOCKER_CMD system prune -f || true
 
       - name: Revoke runner IP
         if: always()
