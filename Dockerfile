@@ -17,9 +17,6 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 
-# Generate Prisma Client (before copying source to maximize cache hits)
-RUN npx prisma generate
-
 # Now copy source code (changes most frequently)
 COPY . .
 
@@ -42,6 +39,8 @@ RUN if [ -f next-build.tar.gz ]; then \
       echo "Using existing pre-built .next directory"; \
     else \
       echo "Building Next.js from scratch"; \
+      echo "Generating Prisma Client..."; \
+      npx prisma generate; \
       npx next build; \
     fi
 

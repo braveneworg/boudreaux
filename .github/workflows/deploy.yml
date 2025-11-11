@@ -43,6 +43,8 @@ jobs:
               core.setFailed('No workflow_run.id found on event payload.');
               return;
             }
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            core.info(`CI run URL: ${runUrl}`);
             const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
