@@ -1,4 +1,4 @@
-m v name: CI/CD - Build, Publish, Deploy (Clean)
+name: CI/CD - Build, Publish, Deploy (Clean)
 
 on:
   push:
@@ -11,9 +11,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_REPO: ${{ env.REGISTRY }}/${{ github.repository_owner }}/boudreaux
-  WEBSITE_IMAGE: ${{ env.IMAGE_REPO }}/website
-  NGINX_IMAGE: ${{ env.IMAGE_REPO }}/nginx
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/boudreaux
+  WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
+  NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
 
 permissions:
   contents: read
@@ -96,8 +96,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      WEBSITE_IMAGE: ${{ env.IMAGE_REPO }}/website
-      NGINX_IMAGE: ${{ env.IMAGE_REPO }}/nginx
+      WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
+      NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
       # Align secret names: ensure AWS_SECURITY_GROUP_ID exists in repo secrets
       AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
     steps:
