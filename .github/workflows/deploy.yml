@@ -59,7 +59,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -83,67 +83,81 @@ jobs:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: |
           set -e
-          TOK1='${{ secrets.GHCR_TOKEN }}'; USR1='${{ secrets.GHCR_USERNAME }}'
-          TOK2='${{ secrets.GITHUB_TOKEN }}'; USR2='${{ github.actor }}'
+          TOK='${{ secrets.GHCR_TOKEN }}'
+          USR='${{ secrets.GHCR_USERNAME }}'
+
+          if [ -z "$TOK" ] || [ -z "$USR" ]; then
+            echo "Error: GHCR_TOKEN and GHCR_USERNAME secrets must be set"
+            exit 1
+          fi
+
           success=0
-          for cred in 1 2; do
-            TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
-            TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
-            if [ -z "$TOK" ] || [ -z "$USR" ]; then
-              echo "Skipping credential #$cred (missing token or username)"
-              continue
+          for i in 1 2 3; do
+            echo "Attempt $i: Logging in to GHCR..."
+            echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
+
+            if docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
+              --provenance=false \
+              --sbom=false \
+              --cache-from type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache \
+              --cache-to type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache,mode=max \
+              -t ${{ env.WEBSITE_IMAGE }}:latest \
+              -f Dockerfile \
+              --push .; then
+              echo "Website image buildx push succeeded"
+              success=1
+              break
             fi
-            echo "Trying website push with credentials #$cred ($USR)"
-            for i in 1 2 3; do
-              echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
-              if docker buildx build \
-                --platform linux/amd64,linux/arm64 \
-                --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
-                --provenance=false \
-                --sbom=false \
-                --cache-from type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache \
-                --cache-to type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache,mode=max \
-                -t ${{ env.WEBSITE_IMAGE }}:latest \
-                -f Dockerfile \
-                --push .; then
-                echo "Website image buildx push succeeded with credential #$cred"; success=1; break; fi
-              echo "Attempt $i (cred #$cred) failed; retrying in $((i*10))s..."; sleep $((i*10));
-            done
-            [ "$success" = 1 ] && break
+
+            echo "Attempt $i failed; retrying in $((i*10))s..."
+            sleep $((i*10))
           done
-          [ "$success" = 1 ] || { echo "Website image buildx push failed with all credentials"; exit 1; }
+
+          if [ "$success" != 1 ]; then
+            echo "Website image buildx push failed after 3 attempts"
+            exit 1
+          fi
 
       - name: Build multi-arch nginx image (with retry)
         run: |
           set -e
-          TOK1='${{ secrets.GHCR_TOKEN }}'; USR1='${{ secrets.GHCR_USERNAME }}'
-          TOK2='${{ secrets.GITHUB_TOKEN }}'; USR2='${{ github.actor }}'
+          TOK='${{ secrets.GHCR_TOKEN }}'
+          USR='${{ secrets.GHCR_USERNAME }}'
+
+          if [ -z "$TOK" ] || [ -z "$USR" ]; then
+            echo "Error: GHCR_TOKEN and GHCR_USERNAME secrets must be set"
+            exit 1
+          fi
+
           success=0
-          for cred in 1 2; do
-            TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
-            TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
-            if [ -z "$TOK" ] || [ -z "$USR" ]; then
-              echo "Skipping credential #$cred (missing token or username)"
-              continue
+          for i in 1 2 3; do
+            echo "Attempt $i: Logging in to GHCR..."
+            echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
+
+            if docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --provenance=false \
+              --sbom=false \
+              --cache-from type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache \
+              --cache-to type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache,mode=max \
+              -t ${{ env.NGINX_IMAGE }}:latest \
+              -f nginx/Dockerfile \
+              --push .; then
+              echo "Nginx image buildx push succeeded"
+              success=1
+              break
             fi
-            echo "Trying nginx push with credentials #$cred ($USR)"
-            for i in 1 2 3; do
-              echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
-              if docker buildx build \
-                --platform linux/amd64,linux/arm64 \
-                --provenance=false \
-                --sbom=false \
-                --cache-from type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache \
-                --cache-to type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache,mode=max \
-                -t ${{ env.NGINX_IMAGE }}:latest \
-                -f nginx/Dockerfile \
-                --push .; then
-                echo "Nginx image buildx push succeeded with credential #$cred"; success=1; break; fi
-              echo "Attempt $i (cred #$cred) failed; retrying in $((i*10))s..."; sleep $((i*10));
-            done
-            [ "$success" = 1 ] && break
+
+            echo "Attempt $i failed; retrying in $((i*10))s..."
+            sleep $((i*10))
           done
-          [ "$success" = 1 ] || { echo "Nginx image buildx push failed with all credentials"; exit 1; }
+
+          if [ "$success" != 1 ]; then
+            echo "Nginx image buildx push failed after 3 attempts"
+            exit 1
+          fi
 
       - name: Retry website image push (redundant safety)
         run: |
