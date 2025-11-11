@@ -483,12 +483,13 @@ jobs:
               sudo apt-get install -y certbot
             fi
 
-            # Setup Let's Encrypt certificates (only if missing)
+            # Setup Let's Encrypt certificates
             DOMAIN="fakefourrecords.com"
             CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
 
+            # Initial standalone issuance (only if Let's Encrypt cert doesn't exist)
             if [ ! -f "$CERT_PATH/fullchain.pem" ]; then
-              echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
+              echo "Obtaining Let's Encrypt certificate for $DOMAIN using standalone mode..."
               # Stop containers that might be using port 80
               $DOCKER_CMD stop nginx website 2>/dev/null || true
 
@@ -496,12 +497,13 @@ jobs:
               sudo certbot certonly --standalone --non-interactive --agree-tos \
                 --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
                 -d "$DOMAIN" -d "www.$DOMAIN" || {
-                echo "WARNING: Certificate acquisition failed. Attempting deployment without new cert."
+                echo "WARNING: Standalone certificate acquisition failed."
               }
             fi
 
-            # Create symlinks if certificates exist
+            # Copy Let's Encrypt cert to deployment directory if available
             if [ -f "$CERT_PATH/fullchain.pem" ]; then
+              echo "Installing Let's Encrypt certificate to deployment directory..."
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$TARGET_DIR/certificate.pem"
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$TARGET_DIR/private_key.pem"
               sudo chmod 644 "$TARGET_DIR/certificate.pem"
@@ -513,16 +515,14 @@ jobs:
                 (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
               fi
 
-              # If a self-signed marker exists from previous runs, remove it now
+              # Remove self-signed marker if present
               if [ -f "$HOME/boudreaux/.selfsigned" ]; then
                 rm -f "$HOME/boudreaux/.selfsigned"
                 echo "Removed self-signed marker; Let's Encrypt certs are active."
               fi
-            else
-              echo "WARNING: Let's Encrypt certificates not found. HTTPS may not work."
             fi
 
-            # Fallback: ensure certificate files exist to satisfy docker-compose secrets
+            # Fallback: create self-signed cert if no valid cert exists
             if [ ! -f "$HOME/boudreaux/certificate.pem" ] || [ ! -f "$HOME/boudreaux/private_key.pem" ]; then
               echo "Generating temporary self-signed certificate to satisfy compose secrets..."
               # Ensure openssl is available
@@ -537,10 +537,9 @@ jobs:
                 -out "$HOME/boudreaux/certificate.pem"
               sudo chmod 600 "$HOME/boudreaux/private_key.pem" || true
               sudo chmod 644 "$HOME/boudreaux/certificate.pem" || true
-              # Mark that we're using a temporary self-signed cert so health checks can tolerate it
+              # Mark that we're using a temporary self-signed cert
               touch "$HOME/boudreaux/.selfsigned"
-            else
-              echo "TLS files already present: $HOME/boudreaux/certificate.pem and private_key.pem"
+              echo "Self-signed certificate created; will attempt Let's Encrypt issuance after containers start."
             fi
 
             # Move env into place and secure permissions
@@ -615,9 +614,9 @@ jobs:
               fi
             fi
 
-            # Attempt Let's Encrypt issuance via webroot if still using self-signed cert
+            # Attempt Let's Encrypt webroot issuance if using self-signed cert
             if [ -f "$HOME/boudreaux/.selfsigned" ]; then
-              echo "Attempting Let's Encrypt certificate issuance via webroot with retries..."
+              echo "Self-signed certificate detected; attempting Let's Encrypt issuance via webroot with retries..."
 
               # Pre-flight checks before issuance
               echo "=== Pre-flight checks ==="
@@ -673,9 +672,10 @@ jobs:
 
               if [ -f "$CERT_PATH/fullchain.pem" ]; then
                 echo "Webroot issuance succeeded; activating Let's Encrypt certificate."
-                sudo ln -sf "$CERT_PATH/fullchain.pem" "$HOME/boudreaux/certificate.pem"
-                sudo ln -sf "$CERT_PATH/privkey.pem" "$HOME/boudreaux/private_key.pem"
-                sudo chmod 644 "$HOME/boudreaux/certificate.pem" "$HOME/boudreaux/private_key.pem" || true
+                sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$HOME/boudreaux/certificate.pem"
+                sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$HOME/boudreaux/private_key.pem"
+                sudo chmod 644 "$HOME/boudreaux/certificate.pem"
+                sudo chmod 600 "$HOME/boudreaux/private_key.pem"
                 rm -f "$HOME/boudreaux/.selfsigned" || true
                 # Restart nginx to pick up new secrets
                 $DOCKER_CMD restart nginx || true
