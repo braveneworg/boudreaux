@@ -8,38 +8,6 @@ To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub
 
 See `.env.example` for required variables.
 
-# EC 2 instance setup
-
-- Launch an EC2 instance (I used Ubuntu 24.04 LTS in this instance)
-- Assign an elastic IP address to the instance
-  How?
-  - Go to EC2 Dashboard > Elastic IPs > Allocate Elastic IP address
-  - Select the new elastic IP, then Actions > Associate Elastic IP address
-  - Select your instance and associate
-- Open port 22 (SSH), 80 (HTTP), and 443 (HTTPS)
-  - How?
-    - Go to EC2 Dashboard > Security Groups > Create Security Group
-    - Add Inbound rules for SSH, HTTP, and HTTPS
-    - Assign the security group to your EC2 instance
-- Be sure to add ssh user to sudoers file
-  `sudo usermod -aG sudo your-ssh-user`
-- Also remove any password requirement for sudo
-  `sudo passwd -d your-ssh-user`
-
-## Publish to ghcr.io
-
-```bash
-docker build -t ghcr.io/org-or-user/repo-name/website .
-docker push ghcr.io/org-or-user/repo-name/website
-docker build -t ghcr.io/org-or-user/repo-name/nginx .
-docker push ghcr.io/org-or-user/repo-name/nginx
-```
-
-\*\*Make sure the following .env variables are set:
-
-- NEXT_APP_WEBSITE_IMAGE=ghcr.io/org-or-user/repo-name/website
-- NEXT_APP_NGINX_IMAGE=ghcr.io/org-or-user/repo-name/nginx
-
 ## Getting Started
 
 First, run the development server:
