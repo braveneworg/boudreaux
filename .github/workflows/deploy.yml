@@ -75,6 +75,20 @@ jobs:
       - name: Show buildx platforms
         run: docker buildx ls
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: network=host
+
+      - name: Set up QEMU for cross-arch builds
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Show buildx platforms
+        run: docker buildx ls
+
       - name: Package .next build for Docker context
         run: tar -czf .next-build.tar.gz .next
 
