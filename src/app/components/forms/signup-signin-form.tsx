@@ -42,7 +42,7 @@ const SignupSigninForm = ({
   state,
 }: SignupSigninFormProps) => {
   const pathName = usePathname();
-  const isSigningIn = pathName === '/signin/';
+  const isSigningIn = pathName === '/signin';
 
   return (
     <PageContainer>
@@ -53,7 +53,7 @@ const SignupSigninForm = ({
             control={control}
             name="email"
             render={({ field }) => (
-              <FormItem className={cn(isSigningIn ? 'mb-5' : 'mb-0', 'mt-0')}>
+              <FormItem className={cn(isSigningIn ? 'mb-2' : 'mb-0', 'mt-0')}>
                 <FormLabel className="sr-only" htmlFor="email">
                   Email
                 </FormLabel>

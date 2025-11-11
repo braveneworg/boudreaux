@@ -1,41 +1,50 @@
-name: Continuous Integration and Delivery
+m v name: CI/CD - Build, Publish, Deploy (Clean)
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cicd-${{ github.ref_name }}
+  cancel-in-progress: true
+
 env:
-  NEXT_APP_WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
-  NEXT_APP_NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
   REGISTRY: ghcr.io
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/boudreaux
+  WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
+  NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
-    name: Build Docker Images and Sync CDN
+    name: Build Next.js, sync CDN, build & push images
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v3
-
-      - name: Set environment variables
-        run: |
-          echo "NEXT_APP_WEBSITE_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/website" >> $GITHUB_ENV
-          echo "NEXT_APP_NGINX_IMAGE=ghcr.io/${{ github.repository_owner }}/boudreaux/nginx" >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build Next.js
-        run: npm run build
         env:
           SKIP_ENV_VALIDATION: "true"
+          # Use a placeholder DB URL; build shouldn't require a live DB connection
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+        run: npm run build
 
-      - name: Sync to CDN (includes _next/static)
+      - name: Sync to CDN (includes .next/static)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -45,143 +54,234 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
-      - name: Package .next build for Docker
-        run: |
-          # Create a tarball of the .next directory to include in Docker build context
-          tar -czf .next-build.tar.gz .next
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to GitHub Packages
-        env:
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          NGINX_SERVER_NAME: ${{ secrets.NGINX_SERVER_NAME }}
-        run: echo "$PERSONAL_ACCESS_TOKEN" | docker login ghcr.io -u ${{ secrets.NAMESPACE }} --password-stdin
+      - name: Package .next build for Docker context
+        run: tar -czf .next-build.tar.gz .next
 
-      - name: Build Docker images
+      - name: Build images with Docker Compose
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: docker compose -f docker-compose.ci.yml build
 
       - name: Push images
         run: |
-          docker push ${{ env.NEXT_APP_WEBSITE_IMAGE }}
-          docker push ${{ env.NEXT_APP_NGINX_IMAGE }}
+          docker push ${{ env.WEBSITE_IMAGE }}
+          docker push ${{ env.NGINX_IMAGE }}
+
+      - name: Capture pushed image digests
+        run: |
+          WEBSITE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.WEBSITE_IMAGE }})
+          NGINX_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.NGINX_IMAGE }})
+          echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
+          echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
+          printf '{"website":"%s","nginx":"%s"}' "$WEBSITE_DIGEST" "$NGINX_DIGEST" > image-digests.json
+
+      - name: Upload image digest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digests
+          path: image-digests.json
 
   deploy:
-    name: Deploy to AWS EC2
+    name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
+      NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
+      # Align secret names: ensure AWS_SECURITY_GROUP_ID exists in repo secrets
+      AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Add environment variables to .env
+      - name: Download image digests artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-digests
+          path: .
+
+      - name: Export digest environment variables
+        shell: bash
         run: |
-          echo 'NEXT_APP_WEBSITE_IMAGE="${{ env.NEXT_APP_WEBSITE_IMAGE }}"' >> .env
-          echo 'NEXT_APP_NGINX_IMAGE="${{ env.NEXT_APP_NGINX_IMAGE }}"' >> .env
-          echo 'NAMESPACE="${{ secrets.NAMESPACE }}"' >> .env
-          echo 'PERSONAL_ACCESS_TOKEN="${{ secrets.PERSONAL_ACCESS_TOKEN }}"' >> .env
-          echo 'DATABASE_URL="${{ secrets.DATABASE_URL }}"' >> .env
-          echo 'AUTH_SECRET="${{ secrets.AUTH_SECRET }}"' >> .env
-          echo 'NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}"' >> .env
-          echo 'EMAIL_SERVER_HOST="${{ secrets.EMAIL_SERVER_HOST }}"' >> .env
-          echo 'EMAIL_SERVER_PORT="${{ secrets.EMAIL_SERVER_PORT }}"' >> .env
-          echo 'EMAIL_SERVER_USER="${{ secrets.EMAIL_SERVER_USER }}"' >> .env
-          echo 'EMAIL_SERVER_PASSWORD="${{ secrets.EMAIL_SERVER_PASSWORD }}"' >> .env
-          echo 'EMAIL_FROM="${{ secrets.EMAIL_FROM }}"' >> .env
-          echo 'NEXT_PUBLIC_CLOUDFLARE_SITE_KEY="${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}"' >> .env
-          echo 'CLOUDFLARE_SECRET="${{ secrets.CLOUDFLARE_SECRET }}"' >> .env
-      - name: Add the private SSH key to the ssh-agent
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          WEBSITE_DIGEST=$(jq -r '.website' image-digests.json)
+          NGINX_DIGEST=$(jq -r '.nginx' image-digests.json)
+          echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
+          echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get runner public IP
+        id: ip
+        uses: haythem/public-ip@v1.3
+
+      - name: Temporarily whitelist runner IP for SSH
         run: |
-          mkdir -p ~/.ssh
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          ssh-add - <<< "${{ secrets.PRIVATE_KEY }}"
-      - name: Deploy images on AWS EC2
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$AWS_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "${{ steps.ip.outputs.ipv4 }}/32" || true
+
+      - name: Create .env for remote
         run: |
-          echo '${{secrets.PRIVATE_KEY}}' > /tmp/temp_key
-          chmod 600 /tmp/temp_key
-
-          # Delete files on remote server
-          ssh -i /tmp/temp_key -o StrictHostKeyChecking=no ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }} "rm -f .env docker-compose.prod.yml"
-          # Copy files to remote server
-
-          echo '${{secrets.AWS_PRIVATE_KEY}}' > ./private_key.pem
-          echo '${{secrets.AWS_CERTIFICATE}}' > ./certificate.pem
-          chmod 644 ./certificate.pem
-          chmod 600 ./private_key.pem
-          scp -i /tmp/temp_key -o StrictHostKeyChecking=no -r ./.env ./docker-compose.prod.yml ./private_key.pem ./certificate.pem ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }}:
-
-          # SSH and execute deployment commands
-          ssh -i /tmp/temp_key -o StrictHostKeyChecking=no ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }} \
-            NEXT_APP_WEBSITE_IMAGE='${{env.NEXT_APP_WEBSITE_IMAGE}}' NEXT_APP_NGINX_IMAGE='${{env.NEXT_APP_NGINX_IMAGE}}' PERSONAL_ACCESS_TOKEN='${{secrets.PERSONAL_ACCESS_TOKEN}}' NAMESPACE='${{secrets.NAMESPACE}}' \
-            bash << 'EOF'
-            set -e  # Exit on any error
-
-            # Validate required variables
-            if [ -z "${NEXT_APP_WEBSITE_IMAGE}" ] || [ -z "${NEXT_APP_NGINX_IMAGE}" ]; then
-              echo "Error: Required environment variables are missing"
-              exit 1
-            fi
-
-            # Update package lists
-            sudo apt-get update
-
-            # Remove conflicting packages
-            sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
-
-            # Install prerequisites
-            sudo apt-get install -y ca-certificates curl gnupg lsb-release
-
-            # Set up Docker repository (only if not already done)
-            if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
-              sudo install -m 0755 -d /etc/apt/keyrings
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-              sudo chmod a+r /etc/apt/keyrings/docker.gpg
-
-              # Add Docker repository
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-              sudo apt-get update
-            fi
-
-            # Install Docker from official repository (remove docker.io conflict)
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-            # Start Docker service
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            # Add user to docker group
-            sudo usermod -aG docker $USER
-
-            # Stop existing containers and clean up
-            sudo docker compose -f docker-compose.prod.yml down --rmi all -v 2>/dev/null || true
-
-            # Login to container registry
-            echo "${PERSONAL_ACCESS_TOKEN}" | sudo docker login ghcr.io -u "${NAMESPACE}" --password-stdin
-
-            # Pull latest images with proper quoting
-            sudo docker pull "${NEXT_APP_WEBSITE_IMAGE}"
-            sudo docker pull "${NEXT_APP_NGINX_IMAGE}"
-
-            # Deploy with docker compose using .env file
-
-            sudo docker compose -f docker-compose.prod.yml up -d
-
-            # Logout and cleanup
-            sudo docker logout
-
-            # Clean up unused images and containers
-            sudo docker system prune -f
-
-            echo $WORKDIR
-
-            echo "Deployment completed successfully"
+          cat > .env.deploy << 'EOF'
+          NEXT_APP_WEBSITE_IMAGE=${{ env.WEBSITE_IMAGE }}
+          NEXT_APP_NGINX_IMAGE=${{ env.NGINX_IMAGE }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+          # Align secret names: ensure NEXTAUTH_URL exists; if older name used, set alias in repo settings
+          NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+          EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
+          EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}
+          EMAIL_SERVER_USER=${{ secrets.EMAIL_SERVER_USER }}
+          EMAIL_SERVER_PASSWORD=${{ secrets.EMAIL_SERVER_PASSWORD }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+          CLOUDFLARE_SECRET=${{ secrets.CLOUDFLARE_SECRET }}
           EOF
 
-          # Clean up temporary SSH key
-          rm /tmp/temp_key
+      - name: Upload compose + env + certs
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          # Align secret names: EC2_HOST, EC2_USERNAME, SSH_PRIVATE_KEY
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: |
+            docker-compose.prod.yml
+            .env.deploy
+            certificate.pem
+            private_key.pem
+          target: ~/boudreaux
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 60s
+          command_timeout: 30m
+          envs: WEBSITE_DIGEST,NGINX_DIGEST
+          script: |
+            set -euo pipefail
+            cd ~/boudreaux
+
+            # Ensure Docker is installed and running (Ubuntu)
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
+              sudo apt-get install -y ca-certificates curl gnupg lsb-release
+              if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
+                sudo install -m 0755 -d /etc/apt/keyrings
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                sudo chmod a+r /etc/apt/keyrings/docker.gpg
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+                sudo apt-get update
+              fi
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker $USER || true
+            fi
+
+            # Move env into place
+            mv -f .env.deploy .env
+
+            # Login to GHCR using aligned credentials
+            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
+
+            WEBSITE_IMAGE='${{ env.WEBSITE_IMAGE }}'
+            NGINX_IMAGE='${{ env.NGINX_IMAGE }}'
+
+            # Capture previously deployed digests (if present)
+            PREV_WEBSITE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
+            PREV_NGINX_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+
+            # If digests are provided, pin to those; otherwise, use latest and capture digests
+            if [ -n "${WEBSITE_DIGEST:-}" ] && [ -n "${NGINX_DIGEST:-}" ]; then
+              echo "Using provided digests for deployment"
+              docker pull "$WEBSITE_DIGEST" || true
+              docker pull "$NGINX_DIGEST" || true
+              docker tag "$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+              docker tag "$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+              NEW_WEBSITE_DIGEST="$WEBSITE_DIGEST"
+              NEW_NGINX_DIGEST="$NGINX_DIGEST"
+            else
+              echo "No digests provided; using latest tags"
+              docker pull "$WEBSITE_IMAGE" || true
+              docker pull "$NGINX_IMAGE" || true
+              NEW_WEBSITE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
+              NEW_NGINX_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+            fi
+
+            # Restart stack
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+            docker compose -f docker-compose.prod.yml up -d
+
+            # Basic health check
+            sleep 5
+            if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
+              echo 'Health check failed - attempting rollback'
+
+              # Roll back to previous digests if we have them
+              if [ -n "$PREV_WEBSITE_DIGEST" ]; then
+                # Ensure previous digest is present and retag as :latest
+                docker pull "$PREV_WEBSITE_DIGEST" || true
+                docker tag "$PREV_WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+              fi
+              if [ -n "$PREV_NGINX_DIGEST" ]; then
+                docker pull "$PREV_NGINX_DIGEST" || true
+                docker tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+              fi
+
+              docker compose -f docker-compose.prod.yml up -d --force-recreate
+              sleep 5
+              if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
+                echo 'Rollback health check failed - manual intervention required'
+                exit 1
+              else
+                echo 'Rollback successful'
+              fi
+            fi
+
+            # Persist current digests on host for audit/rollback reference
+            mkdir -p .deploy
+            cat > .deploy/digests.json <<JSON
+            {
+              "website": {
+                "prev": "${PREV_WEBSITE_DIGEST}",
+                "current": "${NEW_WEBSITE_DIGEST}"
+              },
+              "nginx": {
+                "prev": "${PREV_NGINX_DIGEST}",
+                "current": "${NEW_NGINX_DIGEST}"
+              }
+            }
+            JSON
+
+            docker system prune -f || true
+
+      - name: Revoke runner IP
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$AWS_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "${{ steps.ip.outputs.ipv4 }}/32" || true
