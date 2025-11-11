@@ -20,9 +20,49 @@ permissions:
   packages: write
 
 jobs:
+  quality-gates:
+    name: Quality Gates (Tests, Lint, Type Check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type checking
+        run: npx tsc --noEmit
+
+      - name: Run ESLint (fail on errors or warnings)
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test -- --run --reporter=verbose
+
+      - name: Generate coverage report
+        if: always()
+        run: npm test -- --run --coverage --reporter=verbose
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   build-nextjs:
     name: Build Next.js app
     runs-on: ubuntu-latest
+    needs: quality-gates
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +84,13 @@ jobs:
         run: npm run build
 
       - name: Package .next build for Docker context
-        run: tar -czf .next-build.tar.gz .next
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory not found!"
+            exit 1
+          fi
+          tar -czf .next-build.tar.gz .next
+          ls -lh .next-build.tar.gz
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -52,6 +98,7 @@ jobs:
           name: nextjs-build
           path: .next-build.tar.gz
           retention-days: 1
+          if-no-files-found: error
 
   sync-cdn:
     name: Sync static assets to CDN
@@ -100,6 +147,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nextjs-build
+
+      - name: Verify and extract artifact
+        run: |
+          if [ ! -f ".next-build.tar.gz" ]; then
+            echo "Error: .next-build.tar.gz not found after download!"
+            ls -la
+            exit 1
+          fi
+          echo "Artifact downloaded successfully:"
+          ls -lh .next-build.tar.gz
+          echo "Extracting artifact..."
+          tar -xzf .next-build.tar.gz
+          echo "Extracted .next directory:"
+          ls -la .next/
 
       - name: Log in to container registry
         uses: docker/login-action@v3
