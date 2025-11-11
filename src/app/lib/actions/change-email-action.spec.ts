@@ -16,7 +16,8 @@ const mockLogSecurityEvent = vi.hoisted(() => vi.fn());
 vi.mock('server-only', () => ({}));
 
 // Mock dependencies
-vi.mock('/Users/cchaos/projects/braveneworg/boudreaux/auth.ts', () => ({
+// Use relative module path consistent with action source import to ensure CI resolution
+vi.mock('../../../../auth', () => ({
   auth: mockAuth,
   signOut: mockSignOut,
 }));
