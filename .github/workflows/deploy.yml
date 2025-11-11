@@ -79,7 +79,6 @@ jobs:
         run: tar -czf .next-build.tar.gz .next
 
       - name: Build multi-arch website image (with retry)
-      - name: Build multi-arch website image (with retry)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: |
