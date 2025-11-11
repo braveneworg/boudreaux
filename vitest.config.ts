@@ -82,7 +82,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), './src'),
+      // Fix Next.js module resolution for ESM
+      'next/server': 'next/dist/server/web/exports/index.js',
+      'next/navigation': 'next/dist/client/components/navigation.js',
     },
+    conditions: ['import', 'module', 'browser', 'default'],
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify('test'),
