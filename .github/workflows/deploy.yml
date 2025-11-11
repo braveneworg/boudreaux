@@ -490,6 +490,12 @@ jobs:
               if ! sudo crontab -l 2>/dev/null | grep -q "certbot renew"; then
                 (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart nginx'") | sudo crontab -
               fi
+
+              # If a self-signed marker exists from previous runs, remove it now
+              if [ -f "$HOME/boudreaux/.selfsigned" ]; then
+                rm -f "$HOME/boudreaux/.selfsigned"
+                echo "Removed self-signed marker; Let's Encrypt certs are active."
+              fi
             else
               echo "WARNING: Let's Encrypt certificates not found. HTTPS may not work."
             fi
@@ -509,6 +515,8 @@ jobs:
                 -out "$HOME/boudreaux/certificate.pem"
               sudo chmod 600 "$HOME/boudreaux/private_key.pem" || true
               sudo chmod 644 "$HOME/boudreaux/certificate.pem" || true
+              # Mark that we're using a temporary self-signed cert so health checks can tolerate it
+              touch "$HOME/boudreaux/.selfsigned"
             else
               echo "TLS files already present: $HOME/boudreaux/certificate.pem and private_key.pem"
             fi
@@ -554,9 +562,14 @@ jobs:
 
             $DOCKER_CMD compose -f docker-compose.prod.yml up -d
 
-            # Basic health check
+            # Basic health check (allow insecure only if using a temporary self-signed cert)
             sleep 5
-            if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
+            CURL_OPTS="-fsS --max-time 10"
+            if [ -f "$HOME/boudreaux/.selfsigned" ]; then
+              echo "Self-signed cert in use; allowing insecure TLS for health check"
+              CURL_OPTS="-k $CURL_OPTS"
+            fi
+            if ! curl $CURL_OPTS https://fakefourrecords.com/api/health; then
               echo 'Health check failed - attempting rollback'
 
               # Roll back to previous digests if we have them
