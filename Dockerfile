@@ -37,9 +37,9 @@ RUN if [ -f .next-build.tar.gz ]; then \
 # Stage 2: Create final image
 FROM ${NODE} AS runner
 
-ENV NODE_ENV production
-ENV PORT 3000
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
