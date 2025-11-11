@@ -90,5 +90,7 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify('test'),
+    'process.env.AUTH_SECRET': JSON.stringify('test-secret-key-for-testing-purposes-only'),
+    'process.env.AUTH_URL': JSON.stringify('http://localhost:3000'),
   },
 });

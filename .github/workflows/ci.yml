@@ -98,4 +98,7 @@ jobs:
           SKIP_ENV_VALIDATION: "true"
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "test-site-key"
+          NODE_ENV: "test"
+          AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
+          AUTH_URL: "http://localhost:3000"
         run: npm run build
