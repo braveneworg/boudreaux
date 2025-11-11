@@ -409,7 +409,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
           command_timeout: 30m
-          envs: WEBSITE_DIGEST,NGINX_DIGEST
+          envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT
           script: |
             set -euo pipefail
 
