@@ -5,34 +5,51 @@
 import { prisma } from '../prisma';
 
 /**
- * Get the base URL for API calls based on environment
- * In development, always use HTTP to avoid SSL issues
+ * Derive a stable API base URL.
+ *
+ * Rules:
+ *  - Development: force http (avoids TLS overhead and self-signed hassles).
+ *  - Production (server): prefer NEXTAUTH_URL if set; otherwise force https + host derived from env or request context.
+ *  - Production (client): always use window.location.origin but ensure protocol is https (rewrite if user loaded over http accidentally).
+ *
+ * We never return http for production to avoid mixed content warnings.
  */
 export function getApiBaseUrl(): string {
+  const isDev = process.env.NODE_ENV === 'development';
+
+  // Server-side context
   if (typeof window === 'undefined') {
-    // Server-side: use localhost
-    return process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000'
-      : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    if (isDev) {
+      return 'http://localhost:3000';
+    }
+    // Production server: use configured NEXTAUTH_URL if provided; otherwise synthesize https://fakefourrecords.com
+    const envUrl = process.env.NEXTAUTH_URL?.trim();
+    if (envUrl) {
+      // Normalize any accidental http to https
+      return envUrl.startsWith('http://') ? envUrl.replace('http://', 'https://') : envUrl;
+    }
+    // Fallback: hard-code domain with https to avoid downgrades
+    return 'https://fakefourrecords.com';
   }
 
-  // Client-side: Check if we're in development by looking at hostname
-  // Development is typically localhost, 127.0.0.1, or *.local
-  const { hostname, port } = window.location;
-  const isDevelopment =
+  // Client-side context
+  const { hostname, port, protocol } = window.location;
+  const localLike =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.endsWith('.local') ||
     hostname.startsWith('192.168.') ||
     hostname.startsWith('10.') ||
-    process.env.NODE_ENV === 'development';
+    isDev;
 
-  // In development, always force HTTP
-  if (isDevelopment) {
+  if (localLike) {
     return `http://${hostname}${port ? `:${port}` : ''}`;
   }
 
-  // Production: use current origin
+  // Enforce https in production client context (in case of proxy / misconfiguration)
+  if (protocol === 'http:') {
+    return `https://${hostname}${port ? `:${port}` : ''}`;
+  }
   return window.location.origin;
 }
 
