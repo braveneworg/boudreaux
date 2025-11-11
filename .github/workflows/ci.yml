@@ -78,7 +78,7 @@ jobs:
         run: npx tsc --noEmit
 
   build:
-    name: Build Check
+    name: Build Next.js app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -97,8 +97,25 @@ jobs:
         env:
           SKIP_ENV_VALIDATION: "true"
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
-          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "test-site-key"
-          NODE_ENV: "test"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+          NODE_ENV: "production"
           AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
           AUTH_URL: "http://localhost:3000"
         run: npm run build
+
+      - name: Package .next build for deploy workflow
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory not found!"
+            exit 1
+          fi
+          tar -czf next-build.tar.gz .next
+          ls -lh next-build.tar.gz
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: next-build.tar.gz
+          retention-days: 1
+          if-no-files-found: error
