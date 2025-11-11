@@ -16,11 +16,11 @@ jobs:
 
       - name: Test SSH connection with timeout
         run: |
-          echo '${{secrets.PRIVATE_KEY}}' > /tmp/temp_key
+          echo '${{secrets.SSH_PRIVATE_KEY}}' > /tmp/temp_key
           chmod 600 /tmp/temp_key
 
           echo "Testing SSH connection to EC2..."
-          echo "Host: ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }}"
+          echo "Host: ${{secrets.EC2_USERNAME}}@${{ secrets.EC2_HOST }}"
 
           # Test with verbose output and shorter timeout
           ssh -i /tmp/temp_key \
@@ -28,7 +28,7 @@ jobs:
             -o ConnectTimeout=10 \
             -o ConnectionAttempts=3 \
             -vvv \
-            ${{secrets.AWS_HOST_USER}}@${{ secrets.AWS_EC2_IP_ADDRESS }} \
+            ${{secrets.EC2_USERNAME}}@${{ secrets.EC2_HOST }} \
             "echo 'SSH connection successful!'; uptime" 2>&1 || echo "SSH failed with exit code $?"
 
           rm /tmp/temp_key
