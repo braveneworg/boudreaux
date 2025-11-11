@@ -334,6 +334,8 @@ jobs:
       NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
       # Align secret names: ensure AWS_SECURITY_GROUP_ID exists in repo secrets
       AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+      # Toggle: set to 'true' to fail deploy if self-signed cert remains after issuance attempts
+      REQUIRE_TRUSTED_CERT: ${{ vars.REQUIRE_TRUSTED_CERT || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -594,6 +596,64 @@ jobs:
               else
                 echo 'Rollback successful'
               fi
+            fi
+
+            # Attempt Let's Encrypt issuance via webroot if still using self-signed cert
+            if [ -f "$HOME/boudreaux/.selfsigned" ]; then
+              echo "Attempting Let's Encrypt certificate issuance via webroot with retries..."
+              attempts=0
+              max_attempts=3
+              backoff_base=30
+              while [ $attempts -lt $max_attempts ]; do
+                echo "Issuance attempt $((attempts+1)) of $max_attempts"
+                sudo certbot certonly --webroot -w "$HOME/boudreaux/certbot-webroot" \
+                  --non-interactive --agree-tos \
+                  --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
+                  -d "$DOMAIN" -d "www.$DOMAIN" && break || {
+                    echo "Issuance attempt $((attempts+1)) failed"
+                  }
+                attempts=$((attempts+1))
+                if [ $attempts -lt $max_attempts ]; then
+                  sleep_duration=$((backoff_base * attempts))
+                  echo "Sleeping $sleep_duration seconds before retry..."
+                  sleep $sleep_duration
+                fi
+              done
+
+              if [ -f "$CERT_PATH/fullchain.pem" ]; then
+                echo "Webroot issuance succeeded; activating Let's Encrypt certificate."
+                sudo ln -sf "$CERT_PATH/fullchain.pem" "$HOME/boudreaux/certificate.pem"
+                sudo ln -sf "$CERT_PATH/privkey.pem" "$HOME/boudreaux/private_key.pem"
+                sudo chmod 644 "$HOME/boudreaux/certificate.pem" "$HOME/boudreaux/private_key.pem" || true
+                rm -f "$HOME/boudreaux/.selfsigned" || true
+                # Restart nginx to pick up new secrets
+                $DOCKER_CMD restart nginx || true
+              else
+                echo "Let's Encrypt certificate still not present after $max_attempts attempts; retaining self-signed cert."
+              fi
+            fi
+
+            # Secondary certificate chain verification (does not block deploy)
+            echo "Verifying presented TLS certificate chain..."
+            if command -v openssl >/dev/null 2>&1; then
+              CERT_INFO=$(echo | openssl s_client -connect fakefourrecords.com:443 -servername fakefourrecords.com -showcerts 2>/dev/null | openssl x509 -noout -issuer -subject || true)
+              if [ -n "$CERT_INFO" ]; then
+                echo "--- Certificate Info ---"
+                echo "$CERT_INFO"
+                SELF_SIGNED=0
+                if echo "$CERT_INFO" | grep -qi "issuer=.*fakefourrecords.com"; then
+                  echo "NOTE: Self-signed certificate still in use (issuer matches domain)."
+                  SELF_SIGNED=1
+                fi
+                if [ "$SELF_SIGNED" -eq 1 ] && [ "$REQUIRE_TRUSTED_CERT" = "true" ]; then
+                  echo "REQUIRE_TRUSTED_CERT=true and self-signed certificate detected; failing deploy."
+                  exit 1
+                fi
+              else
+                echo "WARNING: Unable to retrieve certificate info via openssl."
+              fi
+            else
+              echo "openssl not available; skipping certificate chain verification."
             fi
 
             # Persist current digests on host for audit/rollback reference
