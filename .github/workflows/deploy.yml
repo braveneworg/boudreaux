@@ -1,4 +1,4 @@
-m v name: CI/CD - Build, Publish, Deploy (Clean)
+name: CI/CD - Build, Publish, Deploy (Clean)
 
 on:
   push:
