@@ -420,7 +420,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
           command_timeout: 30m
-          envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT,LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }}
+          envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT,LETSENCRYPT_EMAIL
+        env:
+          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
           script: |
             set -euo pipefail
 
@@ -499,9 +501,12 @@ jobs:
             DOMAIN="fakefourrecords.com"
             CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
 
-            # Guard: ensure we have a registration email for Let's Encrypt
-            if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-              echo "ERROR: LETSENCRYPT_EMAIL is not set. Please add it to repo secrets."
+            # Configure email args for certbot (supports no-email fallback)
+            if [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
+              CERTBOT_EMAIL_ARGS=(--email "$LETSENCRYPT_EMAIL")
+            else
+              echo "WARNING: LETSENCRYPT_EMAIL is not set; proceeding without registration email."
+              CERTBOT_EMAIL_ARGS=(--register-unsafely-without-email)
             fi
 
             # Initial standalone issuance (only if Let's Encrypt cert doesn't exist)
@@ -512,7 +517,7 @@ jobs:
 
               # Request certificate using standalone mode
               sudo certbot certonly --standalone --non-interactive --agree-tos \
-                --email "${LETSENCRYPT_EMAIL}" \
+                "${CERTBOT_EMAIL_ARGS[@]}" \
                 -d "$DOMAIN" -d "www.$DOMAIN" || {
                 echo "WARNING: Standalone certificate acquisition failed."
               }
@@ -677,7 +682,7 @@ jobs:
                 echo "Issuance attempt $((attempts+1)) of $max_attempts"
                 sudo certbot certonly --webroot -w "$HOME/boudreaux/certbot-webroot" \
                   --non-interactive --agree-tos \
-                  --email "${LETSENCRYPT_EMAIL}" \
+                  "${CERTBOT_EMAIL_ARGS[@]}" \
                   -d "$DOMAIN" -d "www.$DOMAIN" && break || {
                     echo "Issuance attempt $((attempts+1)) failed"
                   }
