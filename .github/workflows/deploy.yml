@@ -128,10 +128,7 @@ jobs:
           fi
           echo "Artifact downloaded successfully:"
           ls -lh next-build.tar.gz
-          echo "Extracting artifact..."
-          tar -xzf next-build.tar.gz
-          echo "Extracted .next directory:"
-          ls -la .next/
+          # Do not extract here; Dockerfile will consume next-build.tar.gz to avoid rebuilds
 
       - name: Log in to container registry
         uses: docker/login-action@v3

@@ -33,10 +33,13 @@ ENV SKIP_ENV_VALIDATION=true
 ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 
-# Check if pre-built .next exists (from CI/CD), otherwise build from scratch
-RUN if [ -f .next-build.tar.gz ]; then \
-      echo "Using pre-built .next from CI/CD"; \
-      tar -xzf .next-build.tar.gz; \
+# Use prebuilt Next.js output from CI/CD when available to avoid rebuilding inside Docker
+# Priority: 1) next-build.tar.gz artifact 2) existing .next directory 3) build from scratch
+RUN if [ -f next-build.tar.gz ]; then \
+      echo "Using pre-built .next from CI/CD (next-build.tar.gz)"; \
+      tar -xzf next-build.tar.gz; \
+    elif [ -d .next ]; then \
+      echo "Using existing pre-built .next directory"; \
     else \
       echo "Building Next.js from scratch"; \
       npx next build; \
