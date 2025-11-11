@@ -11,7 +11,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Purpose
 
-To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub Actions, and AWS EC2.
+To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub Actions, AWS EC2, and AWS S3 behind Cloudfront CDN.
 
 ## Set github secrets
 
