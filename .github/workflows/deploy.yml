@@ -204,7 +204,7 @@ jobs:
             mv -f .env.deploy .env
 
             # Login to GHCR using aligned credentials
-            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u 'github' --password-stdin
 
             WEBSITE_IMAGE='${{ env.WEBSITE_IMAGE }}'
             NGINX_IMAGE='${{ env.NGINX_IMAGE }}'
