@@ -87,12 +87,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), './src'),
-      // Fix Next.js module resolution for ESM - use mock shim
+      // Keep only next/server alias - let vi.mock handle next/navigation
       'next/server': path.resolve(process.cwd(), './__mocks__/next/server.js'),
-      'next/navigation': path.resolve(
-        process.cwd(),
-        './node_modules/next/dist/client/components/navigation.js'
-      ),
     },
     conditions: ['import', 'module', 'browser', 'default'],
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
