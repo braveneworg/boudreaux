@@ -40,10 +40,15 @@ services:
     restart: always
     networks:
       - app-network
+    volumes:
+      - certbot-webroot:/var/www/certbot:rw
 
 networks:
   app-network:
     driver: bridge
+volumes:
+  certbot-webroot:
+    driver: local
 secrets:
   ssl_cert:
     file: ./certificate.pem

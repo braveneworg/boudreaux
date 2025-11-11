@@ -517,6 +517,9 @@ jobs:
               sudo chmod 644 "$HOME/boudreaux/certificate.pem" || true
               # Mark that we're using a temporary self-signed cert so health checks can tolerate it
               touch "$HOME/boudreaux/.selfsigned"
+              # Prepare basic ACME challenge directory for future issuance attempts
+              mkdir -p "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge"
+              echo "placeholder" > "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge/_placeholder"
             else
               echo "TLS files already present: $HOME/boudreaux/certificate.pem and private_key.pem"
             fi
