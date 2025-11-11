@@ -1,7 +1,14 @@
-name: CI/CD - Build, Publish, Deploy (Clean)
+name: CI/CD - Build, Publish, Deploy
+
+# This workflow handles deployment to production
+# Quality checks (tests, lint, typecheck) are performed by ci.yml
+# This workflow only runs after ci.yml passes on the main branch
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
     branches: [main]
   workflow_dispatch:
 
@@ -20,49 +27,11 @@ permissions:
   packages: write
 
 jobs:
-  quality-gates:
-    name: Quality Gates (Tests, Lint, Type Check)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run TypeScript type checking
-        run: npx tsc --noEmit
-
-      - name: Run ESLint (fail on errors or warnings)
-        run: npm run lint
-
-      - name: Run unit tests
-        run: npm test -- --run --reporter=verbose
-
-      - name: Generate coverage report
-        if: always()
-        run: npm test -- --run --coverage --reporter=verbose
-
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   build-nextjs:
     name: Build Next.js app
     runs-on: ubuntu-latest
-    needs: quality-gates
+    # Only run if CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
