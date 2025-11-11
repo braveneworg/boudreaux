@@ -24,6 +24,7 @@ env:
 
 permissions:
   contents: read
+  actions: read
   packages: write
 
 jobs:
@@ -33,11 +34,31 @@ jobs:
     # Only run if CI workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - name: Download build artifact from CI workflow
+      - name: Check artifact presence in triggering CI run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = context.payload.workflow_run?.id;
+            if (!runId) {
+              core.setFailed('No workflow_run.id found on event payload.');
+              return;
+            }
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+              per_page: 100,
+            });
+            const names = artifacts.artifacts.map(a => a.name);
+            core.info(`Found artifacts on CI run ${runId}: ${names.join(', ') || '(none)'}`);
+            if (!names.includes('nextjs-build')) {
+              core.setFailed("Missing required artifact 'nextjs-build' from CI run. Ensure ci.yml 'build' job uploaded it.");
+            }
+
+      - name: Download build artifact from triggering CI run
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: ci.yml
-          workflow_conclusion: success
+          run_id: ${{ github.event.workflow_run.id }}
           name: nextjs-build
           path: .
           github_token: ${{ secrets.GITHUB_TOKEN }}
