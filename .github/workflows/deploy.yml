@@ -412,8 +412,10 @@ jobs:
           script: |
             set -euo pipefail
 
-            # Ensure project directory exists
+            # Ensure project directory exists with correct structure
             mkdir -p ~/boudreaux
+            mkdir -p ~/boudreaux/certbot-webroot/.well-known/acme-challenge
+            mkdir -p ~/boudreaux/.deploy
 
             # Ensure SSH authorized_keys has correct permissions
             mkdir -p ~/.ssh
@@ -531,9 +533,6 @@ jobs:
               sudo chmod 644 "$HOME/boudreaux/certificate.pem" || true
               # Mark that we're using a temporary self-signed cert so health checks can tolerate it
               touch "$HOME/boudreaux/.selfsigned"
-              # Prepare basic ACME challenge directory for future issuance attempts
-              mkdir -p "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge"
-              echo "placeholder" > "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge/_placeholder"
             else
               echo "TLS files already present: $HOME/boudreaux/certificate.pem and private_key.pem"
             fi
@@ -642,8 +641,7 @@ jobs:
                   echo "WARNING: Webroot challenge directory is not writable"
                 fi
               else
-                echo "WARNING: Webroot challenge directory does not exist"
-                mkdir -p "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge" || true
+                echo "ERROR: Webroot challenge directory should have been created by deploy setup"
               fi
 
               echo "==========================="
@@ -704,7 +702,6 @@ jobs:
             fi
 
             # Persist current digests on host for audit/rollback reference
-            mkdir -p .deploy
             cat > .deploy/digests.json <<JSON
             {
               "website": {
