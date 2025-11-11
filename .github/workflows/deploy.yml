@@ -339,8 +339,9 @@ jobs:
               DOCKER_CMD="sudo docker"
             fi
 
-            # Move env into place
+            # Move env into place and secure permissions
             mv -f .env.deploy .env
+            chmod 600 .env  # Owner read/write only
 
             # Login to GHCR using aligned credentials
             echo '${{ secrets.GHCR_TOKEN }}' | $DOCKER_CMD login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
@@ -371,8 +372,12 @@ jobs:
               NEW_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE:latest" 2>/dev/null || true)
             fi
 
-            # Restart stack (remove existing containers first to avoid conflicts)
+            # Restart stack (force remove any conflicting containers)
             $DOCKER_CMD compose -f docker-compose.prod.yml down --remove-orphans || true
+
+            # Remove any containers with conflicting names
+            $DOCKER_CMD rm -f website nginx 2>/dev/null || true
+
             $DOCKER_CMD compose -f docker-compose.prod.yml up -d
 
             # Basic health check
