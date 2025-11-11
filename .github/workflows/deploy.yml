@@ -275,18 +275,14 @@ jobs:
           CLOUDFLARE_SECRET=${{ secrets.CLOUDFLARE_SECRET }}
           EOF
 
-      - name: Upload compose + env + certs
+      - name: Upload compose + env
         uses: appleboy/scp-action@v0.1.7
         with:
           # Align secret names: EC2_HOST, EC2_USERNAME, SSH_PRIVATE_KEY
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: |
-            docker-compose.prod.yml
-            .env.deploy
-            certificate.pem
-            private_key.pem
+          source: docker-compose.prod.yml,.env.deploy
           target: ~/boudreaux
 
       - name: Deploy via SSH
@@ -300,6 +296,14 @@ jobs:
           envs: WEBSITE_DIGEST,NGINX_DIGEST
           script: |
             set -euo pipefail
+
+            # Ensure SSH authorized_keys has correct permissions
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            if [ -f ~/.ssh/authorized_keys ]; then
+              chmod 600 ~/.ssh/authorized_keys
+            fi
+
             cd ~/boudreaux
 
             # Ensure Docker is installed and running (Ubuntu)
