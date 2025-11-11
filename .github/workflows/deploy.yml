@@ -11,9 +11,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/boudreaux
-  WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
-  NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
+  IMAGE_REPO: ${{ env.REGISTRY }}/${{ github.repository_owner }}/boudreaux
+  WEBSITE_IMAGE: ${{ env.IMAGE_REPO }}/website
+  NGINX_IMAGE: ${{ env.IMAGE_REPO }}/nginx
 
 permissions:
   contents: read
@@ -54,10 +54,10 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
-      - name: Log in to GHCR
+      - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,8 +96,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
-      NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
+      WEBSITE_IMAGE: ${{ env.IMAGE_REPO }}/website
+      NGINX_IMAGE: ${{ env.IMAGE_REPO }}/nginx
       # Align secret names: ensure AWS_SECURITY_GROUP_ID exists in repo secrets
       AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
     steps:
