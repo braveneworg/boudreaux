@@ -10,6 +10,11 @@ export default defineConfig({
     open: true,
   },
 
+  // SSR configuration to handle Node.js module resolution
+  ssr: {
+    noExternal: ['next-auth'],
+  },
+
   test: {
     root: import.meta.dirname,
     name: packageJson.name,
@@ -82,11 +87,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), './src'),
-      // Fix Next.js module resolution for ESM
-      'next/server': 'next/dist/server/web/exports/index.js',
-      'next/navigation': 'next/dist/client/components/navigation.js',
+      // Fix Next.js module resolution for ESM - use mock shim
+      'next/server': path.resolve(process.cwd(), './__mocks__/next/server.js'),
+      'next/navigation': path.resolve(
+        process.cwd(),
+        './node_modules/next/dist/client/components/navigation.js'
+      ),
     },
     conditions: ['import', 'module', 'browser', 'default'],
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify('test'),
