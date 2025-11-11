@@ -495,7 +495,7 @@ jobs:
             fi
 
             # Fallback: ensure certificate files exist to satisfy docker-compose secrets
-            if [ ! -f "~/boudreaux/certificate.pem" ] || [ ! -f "~/boudreaux/private_key.pem" ]; then
+            if [ ! -f "$HOME/boudreaux/certificate.pem" ] || [ ! -f "$HOME/boudreaux/private_key.pem" ]; then
               echo "Generating temporary self-signed certificate to satisfy compose secrets..."
               # Ensure openssl is available
               if ! command -v openssl >/dev/null 2>&1; then
@@ -505,10 +505,12 @@ jobs:
               # Create self-signed cert valid for 30 days
               openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
                 -subj "/CN=${DOMAIN}" \
-                -keyout ~/boudreaux/private_key.pem \
-                -out ~/boudreaux/certificate.pem
-              sudo chmod 600 ~/boudreaux/private_key.pem || true
-              sudo chmod 644 ~/boudreaux/certificate.pem || true
+                -keyout "$HOME/boudreaux/private_key.pem" \
+                -out "$HOME/boudreaux/certificate.pem"
+              sudo chmod 600 "$HOME/boudreaux/private_key.pem" || true
+              sudo chmod 644 "$HOME/boudreaux/certificate.pem" || true
+            else
+              echo "TLS files already present: $HOME/boudreaux/certificate.pem and private_key.pem"
             fi
 
             # Move env into place and secure permissions
