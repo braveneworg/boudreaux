@@ -608,10 +608,10 @@ jobs:
             # Attempt Let's Encrypt issuance via webroot if still using self-signed cert
             if [ -f "$HOME/boudreaux/.selfsigned" ]; then
               echo "Attempting Let's Encrypt certificate issuance via webroot with retries..."
-              
+
               # Pre-flight checks before issuance
               echo "=== Pre-flight checks ==="
-              
+
               # Check DNS resolution
               RESOLVED_IP=$(dig +short "$DOMAIN" | head -n1 || true)
               if [ -z "$RESOLVED_IP" ]; then
@@ -619,7 +619,7 @@ jobs:
               else
                 echo "DNS: $DOMAIN resolves to $RESOLVED_IP"
               fi
-              
+
               # Check port 80 accessibility from this runner
               if curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://$DOMAIN/.well-known/acme-challenge/_placeholder" | grep -q "200\|404"; then
                 echo "Port 80: Accessible (HTTP responded)"
@@ -627,7 +627,7 @@ jobs:
                 echo "WARNING: Port 80 may be blocked or nginx not serving challenges"
                 echo "Ensure Security Group allows inbound TCP 80 from 0.0.0.0/0"
               fi
-              
+
               # Check if webroot directory exists and is writable
               if [ -d "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge" ]; then
                 echo "Webroot: Challenge directory exists"
@@ -640,9 +640,9 @@ jobs:
                 echo "WARNING: Webroot challenge directory does not exist"
                 mkdir -p "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge" || true
               fi
-              
+
               echo "==========================="
-              
+
               attempts=0
               max_attempts=3
               backoff_base=30
