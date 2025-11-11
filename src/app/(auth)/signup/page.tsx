@@ -74,11 +74,28 @@ const SignupPage = () => {
 
         setState(result);
 
-        if (!result.success && result.errors?.email) {
-          form.setError('email', { message: result.errors.email.join(', ') });
+        if (!result.success) {
+          // Only stop submitting if there was an error
+          // If success, the action will redirect and component will unmount
+          setIsSubmitting(false);
+
+          if (result.errors?.email) {
+            form.setError('email', { message: result.errors.email.join(', ') });
+          }
+
+          if (result.errors?.general) {
+            form.setError('general', { message: result.errors.general.join(', ') });
+          }
         }
-      } finally {
+        // Note: If result.success is true, redirect() is called in the action
+        // and the component will unmount, so no need to set isSubmitting(false)
+      } catch (error) {
+        // Handle unexpected errors
+        console.error('Form submission error:', error);
         setIsSubmitting(false);
+        form.setError('general', {
+          message: 'An unexpected error occurred. Please try again.',
+        });
       }
     },
     [isVerified, isSignupPath, state, form]
