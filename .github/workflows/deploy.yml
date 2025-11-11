@@ -138,13 +138,13 @@ jobs:
             --cidr "${{ steps.ip.outputs.ipv4 }}/32" || true
 
       - name: Create .env for remote
+        # Align secret names: ensure NEXTAUTH_URL exists; if older name used, set alias in repo settings
         run: |
           cat > .env.deploy << 'EOF'
           NEXT_APP_WEBSITE_IMAGE=${{ env.WEBSITE_IMAGE }}
           NEXT_APP_NGINX_IMAGE=${{ env.NGINX_IMAGE }}
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-          # Align secret names: ensure NEXTAUTH_URL exists; if older name used, set alias in repo settings
           NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
           EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
           EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}
