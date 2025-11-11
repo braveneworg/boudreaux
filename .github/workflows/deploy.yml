@@ -323,6 +323,48 @@ jobs:
               sudo systemctl start docker
             fi
 
+            # Install certbot if not present
+            if ! command -v certbot >/dev/null 2>&1; then
+              echo "Installing certbot..."
+              sudo apt-get update
+              sudo apt-get install -y certbot
+            fi
+
+            # Setup Let's Encrypt certificates
+            DOMAIN="fakefourrecords.com"
+            CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
+
+            if [ ! -f "$CERT_PATH/fullchain.pem" ] || [ ! -f "$CERT_PATH/privkey.pem" ]; then
+              echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
+              # Temporarily stop nginx if running to free port 80
+              $DOCKER_CMD stop nginx 2>/dev/null || true
+
+              # Request certificate using standalone mode (requires port 80)
+              sudo certbot certonly --standalone --non-interactive --agree-tos \
+                --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
+                -d "$DOMAIN" -d "www.$DOMAIN" || echo "Certificate already exists or failed to obtain"
+
+              # Restart nginx after cert acquisition
+              $DOCKER_CMD start nginx 2>/dev/null || true
+            else
+              echo "Let's Encrypt certificates already exist at $CERT_PATH"
+            fi
+
+            # Create symlinks in project directory for docker-compose
+            if [ -f "$CERT_PATH/fullchain.pem" ]; then
+              sudo ln -sf "$CERT_PATH/fullchain.pem" ~/boudreaux/certificate.pem
+              sudo ln -sf "$CERT_PATH/privkey.pem" ~/boudreaux/private_key.pem
+              sudo chmod 644 ~/boudreaux/certificate.pem ~/boudreaux/private_key.pem
+            else
+              echo "WARNING: Let's Encrypt certificates not found. HTTPS may not work."
+            fi
+
+            # Setup automatic renewal (if not already configured)
+            if ! sudo crontab -l 2>/dev/null | grep -q certbot; then
+              echo "Setting up automatic certificate renewal..."
+              (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart nginx'") | sudo crontab -
+            fi
+
             # Ensure user is in docker group (required for non-root Docker access)
             if ! groups | grep -q docker; then
               echo "Adding $USER to docker group..."
