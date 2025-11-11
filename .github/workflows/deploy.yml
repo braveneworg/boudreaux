@@ -414,8 +414,14 @@ jobs:
 
             # Ensure project directory exists with correct structure
             mkdir -p ~/boudreaux
-            mkdir -p ~/boudreaux/certbot-webroot/.well-known/acme-challenge
             mkdir -p ~/boudreaux/.deploy
+
+            # Create certbot-webroot with sudo if permission denied
+            if [ ! -d ~/boudreaux/certbot-webroot ]; then
+              sudo mkdir -p ~/boudreaux/certbot-webroot/.well-known/acme-challenge
+              sudo chown -R $(whoami):$(id -gn) ~/boudreaux/certbot-webroot
+              sudo chmod -R 755 ~/boudreaux/certbot-webroot
+            fi
 
             # Ensure SSH authorized_keys has correct permissions
             mkdir -p ~/.ssh
