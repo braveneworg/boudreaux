@@ -66,6 +66,7 @@ jobs:
         with:
           name: nextjs-build
           path: .next-build.tar.gz
+          include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
 
