@@ -458,6 +458,14 @@ jobs:
               DOCKER_CMD="sudo docker"
             fi
 
+            # Log certificate enforcement setting and current mode
+            echo "Certificate enforcement: REQUIRE_TRUSTED_CERT=${REQUIRE_TRUSTED_CERT}"
+            if [ -f "$HOME/boudreaux/.selfsigned" ]; then
+              echo "Current TLS mode: self-signed (marker present)"
+            else
+              echo "Current TLS mode: trusted (no self-signed marker)"
+            fi
+
             # Install certbot if not present (one-time setup)
             if ! command -v certbot >/dev/null 2>&1; then
               echo "Installing certbot..."
