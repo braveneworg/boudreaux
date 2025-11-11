@@ -155,6 +155,13 @@ jobs:
           CLOUDFLARE_SECRET=${{ secrets.CLOUDFLARE_SECRET }}
           EOF
 
+      - name: Create certificate files
+        run: |
+          echo '${{ secrets.AWS_CERTIFICATE }}' > certificate.pem
+          echo '${{ secrets.AWS_PRIVATE_KEY }}' > private_key.pem
+          chmod 644 certificate.pem
+          chmod 600 private_key.pem
+
       - name: Upload compose + env + certs
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -204,7 +211,7 @@ jobs:
             mv -f .env.deploy .env
 
             # Login to GHCR using aligned credentials
-            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u 'github' --password-stdin
+            echo '${{ secrets.GHCR_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USERNAME }}' --password-stdin
 
             WEBSITE_IMAGE='${{ env.WEBSITE_IMAGE }}'
             NGINX_IMAGE='${{ env.NGINX_IMAGE }}'
