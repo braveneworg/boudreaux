@@ -360,6 +360,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Ensure Security Group allows HTTP/HTTPS
+        run: |
+          set -e
+          SG_ID="${{ env.AWS_SECURITY_GROUP_ID }}"
+          echo "Ensuring inbound 80/443 are allowed on $SG_ID (idempotent)..."
+          # Add IPv4 rules if not present (ignore errors if already exist)
+          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 80 --cidr 0.0.0.0/0 || true
+          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 443 --cidr 0.0.0.0/0 || true
+          # Optionally add IPv6 rules (ignore if VPC IPv6 not enabled)
+          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --ip-permissions 'Ipv6Ranges=[{CidrIpv6=::/0}],IpProtocol=tcp,FromPort=80,ToPort=80' || true
+          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --ip-permissions 'Ipv6Ranges=[{CidrIpv6=::/0}],IpProtocol=tcp,FromPort=443,ToPort=443' || true
+
       - name: Get runner public IP
         id: ip
         uses: haythem/public-ip@v1.3
@@ -408,7 +420,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
           command_timeout: 30m
-          envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT
+          envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT,LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }}
           script: |
             set -euo pipefail
 
@@ -487,6 +499,11 @@ jobs:
             DOMAIN="fakefourrecords.com"
             CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
 
+            # Guard: ensure we have a registration email for Let's Encrypt
+            if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+              echo "ERROR: LETSENCRYPT_EMAIL is not set. Please add it to repo secrets."
+            fi
+
             # Initial standalone issuance (only if Let's Encrypt cert doesn't exist)
             if [ ! -f "$CERT_PATH/fullchain.pem" ]; then
               echo "Obtaining Let's Encrypt certificate for $DOMAIN using standalone mode..."
@@ -495,7 +512,7 @@ jobs:
 
               # Request certificate using standalone mode
               sudo certbot certonly --standalone --non-interactive --agree-tos \
-                --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
+                --email "${LETSENCRYPT_EMAIL}" \
                 -d "$DOMAIN" -d "www.$DOMAIN" || {
                 echo "WARNING: Standalone certificate acquisition failed."
               }
@@ -629,8 +646,10 @@ jobs:
                 echo "DNS: $DOMAIN resolves to $RESOLVED_IP"
               fi
 
-              # Check port 80 accessibility from this runner
-              if curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://$DOMAIN/.well-known/acme-challenge/_placeholder" | grep -q "200\|404"; then
+              # Create a test challenge file and verify it is served over HTTP
+              TEST_TOKEN="deploy-$(date +%s)"
+              echo "$TEST_TOKEN" > "$HOME/boudreaux/certbot-webroot/.well-known/acme-challenge/_test"
+              if curl -s --max-time 5 "http://$DOMAIN/.well-known/acme-challenge/_test" | grep -q "$TEST_TOKEN"; then
                 echo "Port 80: Accessible (HTTP responded)"
               else
                 echo "WARNING: Port 80 may be blocked or nginx not serving challenges"
@@ -658,7 +677,7 @@ jobs:
                 echo "Issuance attempt $((attempts+1)) of $max_attempts"
                 sudo certbot certonly --webroot -w "$HOME/boudreaux/certbot-webroot" \
                   --non-interactive --agree-tos \
-                  --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
+                  --email "${LETSENCRYPT_EMAIL}" \
                   -d "$DOMAIN" -d "www.$DOMAIN" && break || {
                     echo "Issuance attempt $((attempts+1)) failed"
                   }
