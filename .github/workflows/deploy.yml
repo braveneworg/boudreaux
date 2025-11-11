@@ -83,35 +83,61 @@ jobs:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: |
           set -e
-          for i in 1 2 3; do
-            echo "(Website) login prior to attempt $i"
-            echo "${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
-            if docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
-              -t ${{ env.WEBSITE_IMAGE }}:latest \
-              -f Dockerfile \
-              --push .; then
-              echo "Website image buildx push succeeded"; break; fi
-            echo "Attempt $i failed; retrying in $((i*10))s..."; sleep $((i*10));
-            if [ $i -eq 3 ]; then echo "Website image buildx push failed after retries"; exit 1; fi
+          TOK1='${{ secrets.GHCR_TOKEN }}'; USR1='${{ secrets.GHCR_USERNAME }}'
+          TOK2='${{ secrets.GITHUB_TOKEN }}'; USR2='${{ github.actor }}'
+          success=0
+          for cred in 1 2; do
+            TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
+            TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
+            [ -z "$TOK" ] && continue
+            echo "Trying website push with credentials #$cred ($USR)"
+            for i in 1 2 3; do
+              echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
+              if docker buildx build \
+                --platform linux/amd64,linux/arm64 \
+                --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
+                --provenance=false \
+                --sbom=false \
+                --cache-from type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache \
+                --cache-to type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache,mode=max \
+                -t ${{ env.WEBSITE_IMAGE }}:latest \
+                -f Dockerfile \
+                --push .; then
+                echo "Website image buildx push succeeded with credential #$cred"; success=1; break; fi
+              echo "Attempt $i (cred #$cred) failed; retrying in $((i*10))s..."; sleep $((i*10));
+            done
+            [ "$success" = 1 ] && break
           done
+          [ "$success" = 1 ] || { echo "Website image buildx push failed with all credentials"; exit 1; }
 
       - name: Build multi-arch nginx image (with retry)
         run: |
           set -e
-          for i in 1 2 3; do
-            echo "(Nginx) login prior to attempt $i"
-            echo "${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
-            if docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              -t ${{ env.NGINX_IMAGE }}:latest \
-              -f nginx/Dockerfile \
-              --push .; then
-              echo "Nginx image buildx push succeeded"; break; fi
-            echo "Attempt $i failed; retrying in $((i*10))s..."; sleep $((i*10));
-            if [ $i -eq 3 ]; then echo "Nginx image buildx push failed after retries"; exit 1; fi
+          TOK1='${{ secrets.GHCR_TOKEN }}'; USR1='${{ secrets.GHCR_USERNAME }}'
+          TOK2='${{ secrets.GITHUB_TOKEN }}'; USR2='${{ github.actor }}'
+          success=0
+          for cred in 1 2; do
+            TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
+            TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
+            [ -z "$TOK" ] && continue
+            echo "Trying nginx push with credentials #$cred ($USR)"
+            for i in 1 2 3; do
+              echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
+              if docker buildx build \
+                --platform linux/amd64,linux/arm64 \
+                --provenance=false \
+                --sbom=false \
+                --cache-from type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache \
+                --cache-to type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache,mode=max \
+                -t ${{ env.NGINX_IMAGE }}:latest \
+                -f nginx/Dockerfile \
+                --push .; then
+                echo "Nginx image buildx push succeeded with credential #$cred"; success=1; break; fi
+              echo "Attempt $i (cred #$cred) failed; retrying in $((i*10))s..."; sleep $((i*10));
+            done
+            [ "$success" = 1 ] && break
           done
+          [ "$success" = 1 ] || { echo "Nginx image buildx push failed with all credentials"; exit 1; }
 
       - name: Retry website image push (redundant safety)
         run: |
