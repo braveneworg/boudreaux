@@ -75,23 +75,10 @@ jobs:
       - name: Show buildx platforms
         run: docker buildx ls
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-          driver-opts: network=host
-
-      - name: Set up QEMU for cross-arch builds
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      - name: Show buildx platforms
-        run: docker buildx ls
-
       - name: Package .next build for Docker context
         run: tar -czf .next-build.tar.gz .next
 
+      - name: Build multi-arch website image (with retry)
       - name: Build multi-arch website image (with retry)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
@@ -103,7 +90,10 @@ jobs:
           for cred in 1 2; do
             TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
             TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
-            [ -z "$TOK" ] && continue
+            if [ -z "$TOK" ] || [ -z "$USR" ]; then
+              echo "Skipping credential #$cred (missing token or username)"
+              continue
+            fi
             echo "Trying website push with credentials #$cred ($USR)"
             for i in 1 2 3; do
               echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
@@ -133,7 +123,10 @@ jobs:
           for cred in 1 2; do
             TOK_VAR="TOK${cred}"; USR_VAR="USR${cred}"
             TOK="${!TOK_VAR}"; USR="${!USR_VAR}"
-            [ -z "$TOK" ] && continue
+            if [ -z "$TOK" ] || [ -z "$USR" ]; then
+              echo "Skipping credential #$cred (missing token or username)"
+              continue
+            fi
             echo "Trying nginx push with credentials #$cred ($USR)"
             for i in 1 2 3; do
               echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
@@ -172,9 +165,21 @@ jobs:
             echo "Attempt $i: verifying nginx image availability"; sleep $((i*5));
             if [ $i -eq 3 ]; then echo "Nginx image not retrievable"; exit 1; fi
           done
+          set -e
+          for i in 1 2 3; do
+            if docker pull ${{ env.NGINX_IMAGE }}:latest >/dev/null 2>&1; then
+              echo "Nginx image available after buildx push"; break; fi
+            echo "Attempt $i: verifying nginx image availability"; sleep $((i*5));
+            if [ $i -eq 3 ]; then echo "Nginx image not retrievable"; exit 1; fi
+          done
 
       - name: Capture multi-arch image digests
         run: |
+          set -e
+          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
+          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
+          echo "Resolved website manifest digest: $WEBSITE_DIGEST"
+          echo "Resolved nginx manifest digest: $NGINX_DIGEST"
           set -e
           WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
           NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
