@@ -355,21 +355,23 @@ jobs:
             # If digests are provided, pin to those; otherwise, use latest and capture digests
             if [ -n "${WEBSITE_DIGEST:-}" ] && [ -n "${NGINX_DIGEST:-}" ]; then
               echo "Using provided digests for deployment"
-              $DOCKER_CMD pull "$WEBSITE_DIGEST" || true
-              $DOCKER_CMD pull "$NGINX_DIGEST" || true
-              $DOCKER_CMD tag "$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
-              $DOCKER_CMD tag "$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
-              NEW_WEBSITE_DIGEST="$WEBSITE_DIGEST"
-              NEW_NGINX_DIGEST="$NGINX_DIGEST"
+              # Pull by fully qualified digest (image@sha256:...)
+              $DOCKER_CMD pull "$WEBSITE_IMAGE@$WEBSITE_DIGEST" || true
+              $DOCKER_CMD pull "$NGINX_IMAGE@$NGINX_DIGEST" || true
+              # Tag with :latest for compose to use
+              $DOCKER_CMD tag "$WEBSITE_IMAGE@$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+              $DOCKER_CMD tag "$NGINX_IMAGE@$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+              NEW_WEBSITE_DIGEST="$WEBSITE_IMAGE@$WEBSITE_DIGEST"
+              NEW_NGINX_DIGEST="$NGINX_IMAGE@$NGINX_DIGEST"
             else
               echo "No digests provided; using latest tags"
-              $DOCKER_CMD pull "$WEBSITE_IMAGE" || true
-              $DOCKER_CMD pull "$NGINX_IMAGE" || true
-              NEW_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
-              NEW_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+              $DOCKER_CMD pull "$WEBSITE_IMAGE:latest" || true
+              $DOCKER_CMD pull "$NGINX_IMAGE:latest" || true
+              NEW_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE:latest" 2>/dev/null || true)
+              NEW_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE:latest" 2>/dev/null || true)
             fi
 
-            # Restart stack
+            # Restart stack (remove existing containers first to avoid conflicts)
             $DOCKER_CMD compose -f docker-compose.prod.yml down --remove-orphans || true
             $DOCKER_CMD compose -f docker-compose.prod.yml up -d
 
