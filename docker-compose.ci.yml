@@ -9,8 +9,8 @@ services:
         NODE_ENV: production
         NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY}
       cache_from:
-        - "${NEXT_APP_WEBSITE_IMAGE}"
-    image: "${NEXT_APP_WEBSITE_IMAGE}"
+        - "${WEBSITE_IMAGE}"
+    image: "${WEBSITE_IMAGE}"
     expose:
       - "3000"
     environment:
@@ -28,7 +28,7 @@ services:
       - app-network
 
   nginx:
-    image: "${NEXT_APP_NGINX_IMAGE}"
+    image: "${NGINX_IMAGE}"
     ports:
       - "80:80"
       - "443:443"
@@ -37,11 +37,11 @@ services:
       context: .
       dockerfile: ./nginx/Dockerfile
       cache_from:
-        - "${NEXT_APP_NGINX_IMAGE}"
+        - "${NGINX_IMAGE}"
     depends_on:
       website:
         condition: service_healthy
-    restart: unlesss-stopped
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://website:3000/health"]
       interval: 30s

@@ -61,23 +61,81 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: network=host
+
+      - name: Set up QEMU for cross-arch builds
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Show buildx platforms
+        run: docker buildx ls
+
       - name: Package .next build for Docker context
         run: tar -czf .next-build.tar.gz .next
 
-      - name: Build images with Docker Compose
+      - name: Build multi-arch website image (with retry)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
-        run: docker compose -f docker-compose.ci.yml build
-
-      - name: Push images
         run: |
-          docker push ${{ env.WEBSITE_IMAGE }}
-          docker push ${{ env.NGINX_IMAGE }}
+          set -e
+          for i in 1 2 3; do
+            if docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
+              -t ${{ env.WEBSITE_IMAGE }}:latest \
+              -f Dockerfile \
+              --push .; then
+              echo "Website image buildx push succeeded"; break; fi
+            echo "Attempt $i failed; retrying in $((i*10))s..."; sleep $((i*10));
+            if [ $i -eq 3 ]; then echo "Website image buildx push failed after retries"; exit 1; fi
+          done
 
-      - name: Capture pushed image digests
+      - name: Build multi-arch nginx image (with retry)
         run: |
-          WEBSITE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.WEBSITE_IMAGE }})
-          NGINX_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.NGINX_IMAGE }})
+          set -e
+          for i in 1 2 3; do
+            if docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              -t ${{ env.NGINX_IMAGE }}:latest \
+              -f nginx/Dockerfile \
+              --push .; then
+              echo "Nginx image buildx push succeeded"; break; fi
+            echo "Attempt $i failed; retrying in $((i*10))s..."; sleep $((i*10));
+            if [ $i -eq 3 ]; then echo "Nginx image buildx push failed after retries"; exit 1; fi
+          done
+
+      - name: Retry website image push (redundant safety)
+        run: |
+          set -e
+          for i in 1 2 3; do
+            if docker pull ${{ env.WEBSITE_IMAGE }}:latest >/dev/null 2>&1; then
+              echo "Website image available after buildx push"; break; fi
+            echo "Attempt $i: verifying website image availability"; sleep $((i*5));
+            if [ $i -eq 3 ]; then echo "Website image not retrievable"; exit 1; fi
+          done
+
+      - name: Retry nginx image push (redundant safety)
+        run: |
+          set -e
+          for i in 1 2 3; do
+            if docker pull ${{ env.NGINX_IMAGE }}:latest >/dev/null 2>&1; then
+              echo "Nginx image available after buildx push"; break; fi
+            echo "Attempt $i: verifying nginx image availability"; sleep $((i*5));
+            if [ $i -eq 3 ]; then echo "Nginx image not retrievable"; exit 1; fi
+          done
+
+      - name: Capture multi-arch image digests
+        run: |
+          set -e
+          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
+          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
+          echo "Resolved website manifest digest: $WEBSITE_DIGEST"
+          echo "Resolved nginx manifest digest: $NGINX_DIGEST"
           echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
           echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
           printf '{"website":"%s","nginx":"%s"}' "$WEBSITE_DIGEST" "$NGINX_DIGEST" > image-digests.json
