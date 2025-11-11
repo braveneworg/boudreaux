@@ -58,15 +58,14 @@ jobs:
             echo "Error: .next directory not found!"
             exit 1
           fi
-          tar -czf .next-build.tar.gz .next
-          ls -lh .next-build.tar.gz
+          tar -czf next-build.tar.gz .next
+          ls -lh next-build.tar.gz
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: nextjs-build
-          path: .next-build.tar.gz
-          include-hidden-files: true
+          path: next-build.tar.gz
           retention-days: 1
           if-no-files-found: error
 
@@ -94,7 +93,7 @@ jobs:
           path: .
 
       - name: Extract build
-        run: tar -xzf .next-build.tar.gz
+        run: tar -xzf next-build.tar.gz
 
       - name: Sync to CDN
         env:
@@ -122,15 +121,15 @@ jobs:
 
       - name: Verify and extract artifact
         run: |
-          if [ ! -f ".next-build.tar.gz" ]; then
-            echo "Error: .next-build.tar.gz not found after download!"
+          if [ ! -f "next-build.tar.gz" ]; then
+            echo "Error: next-build.tar.gz not found after download!"
             ls -la
             exit 1
           fi
           echo "Artifact downloaded successfully:"
-          ls -lh .next-build.tar.gz
+          ls -lh next-build.tar.gz
           echo "Extracting artifact..."
-          tar -xzf .next-build.tar.gz
+          tar -xzf next-build.tar.gz
           echo "Extracted .next directory:"
           ls -la .next/
 
