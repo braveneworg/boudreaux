@@ -20,8 +20,8 @@ permissions:
   packages: write
 
 jobs:
-  build:
-    name: Build Next.js, sync CDN, build & push images
+  build-nextjs:
+    name: Build Next.js app
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,12 +39,46 @@ jobs:
       - name: Build Next.js
         env:
           SKIP_ENV_VALIDATION: "true"
-          # Use a placeholder DB URL; build shouldn't require a live DB connection
           DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: npm run build
 
-      - name: Sync to CDN (includes .next/static)
+      - name: Package .next build for Docker context
+        run: tar -czf .next-build.tar.gz .next
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: .next-build.tar.gz
+          retention-days: 1
+
+  sync-cdn:
+    name: Sync static assets to CDN
+    runs-on: ubuntu-latest
+    needs: build-nextjs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+
+      - name: Extract build
+        run: tar -xzf .next-build.tar.gz
+
+      - name: Sync to CDN
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -54,6 +88,19 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
+  build-images:
+    name: Build & push Docker images
+    runs-on: ubuntu-latest
+    needs: build-nextjs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+
       - name: Log in to container registry
         uses: docker/login-action@v3
         with:
@@ -61,11 +108,22 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME || github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Setup Docker layer caching
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-          driver-opts: network=host
+          driver-opts: |
+            network=host
+            image=moby/buildkit:latest
+          buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
 
       - name: Set up QEMU for cross-arch builds
         uses: docker/setup-qemu-action@v3
@@ -74,9 +132,6 @@ jobs:
 
       - name: Show buildx platforms
         run: docker buildx ls
-
-      - name: Package .next build for Docker context
-        run: tar -czf .next-build.tar.gz .next
 
       - name: Build multi-arch website image (with retry)
         env:
@@ -97,17 +152,22 @@ jobs:
             echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
 
             if docker buildx build \
-              --platform linux/amd64,linux/arm64 \
+              --platform linux/arm64,linux/amd64 \
               --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
               --provenance=false \
               --sbom=false \
+              --cache-from type=local,src=/tmp/.buildx-cache \
               --cache-from type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache \
+              --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --cache-to type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache,mode=max \
               -t ${{ env.WEBSITE_IMAGE }}:latest \
               -f Dockerfile \
               --push .; then
               echo "Website image buildx push succeeded"
               success=1
+              # Move cache to avoid growing cache indefinitely
+              rm -rf /tmp/.buildx-cache
+              mv /tmp/.buildx-cache-new /tmp/.buildx-cache
               break
             fi
 
@@ -119,6 +179,45 @@ jobs:
             echo "Website image buildx push failed after 3 attempts"
             exit 1
           fi
+
+  build-nginx:
+    name: Build nginx image (with retry)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Setup Docker layer caching
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: |
+            network=host
+            image=moby/buildkit:latest
+          buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
+
+      - name: Set up QEMU for cross-arch builds
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Show buildx platforms
+        run: docker buildx ls
 
       - name: Build multi-arch nginx image (with retry)
         run: |
@@ -137,16 +236,21 @@ jobs:
             echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
 
             if docker buildx build \
-              --platform linux/amd64,linux/arm64 \
+              --platform linux/arm64,linux/amd64 \
               --provenance=false \
               --sbom=false \
+              --cache-from type=local,src=/tmp/.buildx-cache \
               --cache-from type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache \
+              --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --cache-to type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache,mode=max \
               -t ${{ env.NGINX_IMAGE }}:latest \
               -f nginx/Dockerfile \
               --push .; then
               echo "Nginx image buildx push succeeded"
               success=1
+              # Move cache to avoid growing cache indefinitely
+              rm -rf /tmp/.buildx-cache
+              mv /tmp/.buildx-cache-new /tmp/.buildx-cache
               break
             fi
 
@@ -159,40 +263,8 @@ jobs:
             exit 1
           fi
 
-      - name: Retry website image push (redundant safety)
-        run: |
-          set -e
-          for i in 1 2 3; do
-            if docker pull ${{ env.WEBSITE_IMAGE }}:latest >/dev/null 2>&1; then
-              echo "Website image available after buildx push"; break; fi
-            echo "Attempt $i: verifying website image availability"; sleep $((i*5));
-            if [ $i -eq 3 ]; then echo "Website image not retrievable"; exit 1; fi
-          done
-
-      - name: Retry nginx image push (redundant safety)
-        run: |
-          set -e
-          for i in 1 2 3; do
-            if docker pull ${{ env.NGINX_IMAGE }}:latest >/dev/null 2>&1; then
-              echo "Nginx image available after buildx push"; break; fi
-            echo "Attempt $i: verifying nginx image availability"; sleep $((i*5));
-            if [ $i -eq 3 ]; then echo "Nginx image not retrievable"; exit 1; fi
-          done
-          set -e
-          for i in 1 2 3; do
-            if docker pull ${{ env.NGINX_IMAGE }}:latest >/dev/null 2>&1; then
-              echo "Nginx image available after buildx push"; break; fi
-            echo "Attempt $i: verifying nginx image availability"; sleep $((i*5));
-            if [ $i -eq 3 ]; then echo "Nginx image not retrievable"; exit 1; fi
-          done
-
       - name: Capture multi-arch image digests
         run: |
-          set -e
-          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
-          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
-          echo "Resolved website manifest digest: $WEBSITE_DIGEST"
-          echo "Resolved nginx manifest digest: $NGINX_DIGEST"
           set -e
           WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
           NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
@@ -211,7 +283,7 @@ jobs:
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-images, sync-cdn]
     permissions:
       contents: read
       id-token: write
@@ -323,48 +395,6 @@ jobs:
               sudo systemctl start docker
             fi
 
-            # Install certbot if not present
-            if ! command -v certbot >/dev/null 2>&1; then
-              echo "Installing certbot..."
-              sudo apt-get update
-              sudo apt-get install -y certbot
-            fi
-
-            # Setup Let's Encrypt certificates
-            DOMAIN="fakefourrecords.com"
-            CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
-
-            if [ ! -f "$CERT_PATH/fullchain.pem" ] || [ ! -f "$CERT_PATH/privkey.pem" ]; then
-              echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
-              # Temporarily stop nginx if running to free port 80
-              $DOCKER_CMD stop nginx 2>/dev/null || true
-
-              # Request certificate using standalone mode (requires port 80)
-              sudo certbot certonly --standalone --non-interactive --agree-tos \
-                --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
-                -d "$DOMAIN" -d "www.$DOMAIN" || echo "Certificate already exists or failed to obtain"
-
-              # Restart nginx after cert acquisition
-              $DOCKER_CMD start nginx 2>/dev/null || true
-            else
-              echo "Let's Encrypt certificates already exist at $CERT_PATH"
-            fi
-
-            # Create symlinks in project directory for docker-compose
-            if [ -f "$CERT_PATH/fullchain.pem" ]; then
-              sudo ln -sf "$CERT_PATH/fullchain.pem" ~/boudreaux/certificate.pem
-              sudo ln -sf "$CERT_PATH/privkey.pem" ~/boudreaux/private_key.pem
-              sudo chmod 644 ~/boudreaux/certificate.pem ~/boudreaux/private_key.pem
-            else
-              echo "WARNING: Let's Encrypt certificates not found. HTTPS may not work."
-            fi
-
-            # Setup automatic renewal (if not already configured)
-            if ! sudo crontab -l 2>/dev/null | grep -q certbot; then
-              echo "Setting up automatic certificate renewal..."
-              (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart nginx'") | sudo crontab -
-            fi
-
             # Ensure user is in docker group (required for non-root Docker access)
             if ! groups | grep -q docker; then
               echo "Adding $USER to docker group..."
@@ -373,12 +403,50 @@ jobs:
               echo "Subsequent deployments will not need sudo after the user logs out and back in."
             fi
 
-            # Check if we can access Docker without sudo
+            # Check if we can access Docker without sudo (define DOCKER_CMD early)
             if docker ps >/dev/null 2>&1; then
               DOCKER_CMD="docker"
             else
               echo "Using sudo for Docker commands (group membership not yet active in this session)"
               DOCKER_CMD="sudo docker"
+            fi
+
+            # Install certbot if not present (one-time setup)
+            if ! command -v certbot >/dev/null 2>&1; then
+              echo "Installing certbot..."
+              sudo apt-get update -qq
+              sudo apt-get install -y certbot
+            fi
+
+            # Setup Let's Encrypt certificates (only if missing)
+            DOMAIN="fakefourrecords.com"
+            CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
+
+            if [ ! -f "$CERT_PATH/fullchain.pem" ]; then
+              echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
+              # Stop containers that might be using port 80
+              $DOCKER_CMD stop nginx website 2>/dev/null || true
+
+              # Request certificate using standalone mode
+              sudo certbot certonly --standalone --non-interactive --agree-tos \
+                --email '${{ secrets.LETSENCRYPT_EMAIL }}' \
+                -d "$DOMAIN" -d "www.$DOMAIN" || {
+                echo "WARNING: Certificate acquisition failed. Attempting deployment without new cert."
+              }
+            fi
+
+            # Create symlinks if certificates exist
+            if [ -f "$CERT_PATH/fullchain.pem" ]; then
+              sudo ln -sf "$CERT_PATH/fullchain.pem" ~/boudreaux/certificate.pem
+              sudo ln -sf "$CERT_PATH/privkey.pem" ~/boudreaux/private_key.pem
+              sudo chmod 644 ~/boudreaux/certificate.pem ~/boudreaux/private_key.pem
+
+              # Setup automatic renewal cron (idempotent)
+              if ! sudo crontab -l 2>/dev/null | grep -q "certbot renew"; then
+                (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart nginx'") | sudo crontab -
+              fi
+            else
+              echo "WARNING: Let's Encrypt certificates not found. HTTPS may not work."
             fi
 
             # Move env into place and secure permissions

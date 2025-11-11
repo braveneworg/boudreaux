@@ -5,11 +5,22 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # Install ALL dependencies (including dev) for building
-RUN npm ci
+# Use cache mount for npm cache to speed up installs
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 FROM ${NODE} AS builder
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
+
+# Copy package files first for Prisma generation
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+
+# Generate Prisma Client (before copying source to maximize cache hits)
+RUN npx prisma generate
+
+# Now copy source code (changes most frequently)
 COPY . .
 
 # Set NODE_ENV for build
@@ -21,9 +32,6 @@ ENV SKIP_ENV_VALIDATION=true
 # These must be available during build because Next.js bakes them into the client bundle
 ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
-
-# Generate Prisma Client
-RUN npx prisma generate
 
 # Check if pre-built .next exists (from CI/CD), otherwise build from scratch
 RUN if [ -f .next-build.tar.gz ]; then \
