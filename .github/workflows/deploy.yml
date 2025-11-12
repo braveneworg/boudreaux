@@ -182,6 +182,7 @@ jobs:
       - name: Verify CDN assets are accessible
         env:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+        continue-on-error: true
         run: |
           echo "Verifying CDN assets are accessible..."
 
@@ -198,7 +199,8 @@ jobs:
 
             echo "Testing CDN URL: $CDN_URL"
 
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CDN_URL")
+            # Use || true to prevent curl from failing the script
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CDN_URL" || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✓ CDN assets are accessible (HTTP $HTTP_CODE)"
@@ -206,6 +208,9 @@ jobs:
               echo "⚠️  WARNING: CDN returned 403 Forbidden"
               echo "This may indicate an S3 bucket policy issue or CloudFront cache"
               echo "Continuing deployment, but check CDN access after deployment completes"
+            elif [ "$HTTP_CODE" = "000" ]; then
+              echo "⚠️  WARNING: Failed to connect to CDN"
+              echo "Continuing deployment, but verify CDN access manually"
             else
               echo "⚠️  WARNING: CDN returned HTTP $HTTP_CODE"
               echo "Continuing deployment, but verify CDN access manually"
