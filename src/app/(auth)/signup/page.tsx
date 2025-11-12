@@ -29,7 +29,7 @@ const SignupPage = () => {
     ? SignupSchemaType
     : SigninSchemaType;
   const path = usePathname();
-  const isSignupPath = path === '/signup/';
+  const isSignupPath = path === '/signup';
 
   // Cloudflare Turnstile verification
   const [isVerified, setIsVerified] = useState(false);
