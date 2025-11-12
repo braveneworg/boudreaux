@@ -107,6 +107,68 @@ jobs:
       - name: Extract build
         run: tar -xzf next-build.tar.gz
 
+      - name: Validate and fix S3 bucket policy for CloudFront OAC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          echo "Validating S3 bucket policy for CloudFront Origin Access Control (OAC)..."
+
+          # Get the CloudFront distribution ARN
+          DISTRIBUTION_ARN=$(aws cloudfront get-distribution \
+            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --query 'Distribution.ARN' \
+            --output text)
+
+          echo "CloudFront Distribution ARN: $DISTRIBUTION_ARN"
+
+          # Get current bucket policy
+          CURRENT_POLICY=$(aws s3api get-bucket-policy \
+            --bucket "$S3_BUCKET" \
+            --query Policy \
+            --output text 2>/dev/null || echo "{}")
+
+          # Check if policy has the case-sensitive typo (AWS:SourceArn instead of aws:SourceArn)
+          if echo "$CURRENT_POLICY" | grep -q '"AWS:SourceArn"'; then
+            echo "⚠️  Found case-sensitive typo in bucket policy (AWS:SourceArn should be aws:SourceArn)"
+            echo "Fixing bucket policy..."
+
+            # Create corrected policy with lowercase aws:SourceArn
+            cat > /tmp/s3-bucket-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "AllowCloudFrontServicePrincipal",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudfront.amazonaws.com"
+                },
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::${S3_BUCKET}/*",
+                "Condition": {
+                  "StringEquals": {
+                    "aws:SourceArn": "${DISTRIBUTION_ARN}"
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+
+            # Apply the corrected policy
+            aws s3api put-bucket-policy \
+              --bucket "$S3_BUCKET" \
+              --policy file:///tmp/s3-bucket-policy.json
+
+            echo "✓ Bucket policy fixed with correct case: aws:SourceArn"
+          else
+            echo "✓ Bucket policy is correct (no case-sensitivity issues found)"
+          fi
+
       - name: Sync to CDN
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -116,6 +178,41 @@ jobs:
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
+
+      - name: Verify CDN assets are accessible
+        env:
+          CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+        run: |
+          echo "Verifying CDN assets are accessible..."
+
+          # Wait a moment for CloudFront to propagate
+          sleep 5
+
+          # Find a CSS file that was just uploaded
+          CSS_FILE=$(find .next/static -name "*.css" -type f | head -1)
+
+          if [ -n "$CSS_FILE" ]; then
+            # Extract the relative path (remove .next/ prefix)
+            RELATIVE_PATH=$(echo "$CSS_FILE" | sed 's|^\.next/||')
+            CDN_URL="https://${CDN_DOMAIN}/media/_next/${RELATIVE_PATH}"
+
+            echo "Testing CDN URL: $CDN_URL"
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CDN_URL")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✓ CDN assets are accessible (HTTP $HTTP_CODE)"
+            elif [ "$HTTP_CODE" = "403" ]; then
+              echo "⚠️  WARNING: CDN returned 403 Forbidden"
+              echo "This may indicate an S3 bucket policy issue or CloudFront cache"
+              echo "Continuing deployment, but check CDN access after deployment completes"
+            else
+              echo "⚠️  WARNING: CDN returned HTTP $HTTP_CODE"
+              echo "Continuing deployment, but verify CDN access manually"
+            fi
+          else
+            echo "No CSS files found to test, skipping CDN verification"
+          fi
 
   build-images:
     name: Build & push Docker images
@@ -363,17 +460,17 @@ jobs:
       - name: Ensure Security Groups allow HTTP/HTTPS on all attached SGs
         run: |
           set -e
-          
+
           # Why: EC2 instances can have multiple Security Groups attached.
           # If ANY Security Group lacks HTTP/HTTPS rules, traffic is blocked (Security Groups are stateful AND gates).
           # We auto-discover all SGs attached to the instance and ensure 80/443 are open on each.
-          
+
           # Discover instance ID by Elastic IP or tag (adjust filter as needed)
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
-          
+
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
             echo "WARNING: Could not auto-discover instance. Falling back to AWS_SECURITY_GROUP_ID if set."
             if [ -n "${{ env.AWS_SECURITY_GROUP_ID }}" ]; then
@@ -390,39 +487,39 @@ jobs:
               --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
               --output text)
           fi
-          
+
           echo "Security Groups to configure: $SG_IDS"
-          
+
           # For each Security Group, ensure HTTP/HTTPS are open
           # Why 0.0.0.0/0? This is a public website; visitors come from any IP globally.
           # Port 80: Needed for Let's Encrypt ACME HTTP-01 challenges and HTTP→HTTPS redirect
           # Port 443: HTTPS traffic for the website
           for SG_ID in $SG_IDS; do
             echo "Ensuring ports 80/443 open on $SG_ID..."
-            
+
             # Add IPv4 rules (idempotent; ignore "already exists" errors)
             aws ec2 authorize-security-group-ingress \
               --group-id "$SG_ID" \
               --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTP for web traffic and Let'\''s Encrypt"}]' \
               2>&1 | grep -v "already exists" || true
-            
+
             aws ec2 authorize-security-group-ingress \
               --group-id "$SG_ID" \
               --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTPS for web traffic"}]' \
               2>&1 | grep -v "already exists" || true
-            
+
             # Optional: Add IPv6 rules (ignore errors if VPC doesn't support IPv6)
             aws ec2 authorize-security-group-ingress \
               --group-id "$SG_ID" \
               --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTP IPv6"}]' \
               2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
-            
+
             aws ec2 authorize-security-group-ingress \
               --group-id "$SG_ID" \
               --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTPS IPv6"}]' \
               2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
           done
-          
+
           echo "Security Group configuration complete."
 
       - name: Get runner public IP
@@ -433,13 +530,13 @@ jobs:
         run: |
           # Why: GitHub Actions runners use dynamic IPs. We temporarily allow SSH from the current runner IP,
           # then revoke it after deployment completes. This must be done on ALL attached Security Groups.
-          
+
           # Reuse the instance discovery logic
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
-          
+
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
             # Fallback to env var if discovery fails
             SG_IDS="${{ env.AWS_SECURITY_GROUP_ID }}"
@@ -449,9 +546,9 @@ jobs:
               --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
               --output text)
           fi
-          
+
           echo "Adding temporary SSH access from ${{ steps.ip.outputs.ipv4 }} to: $SG_IDS"
-          
+
           for SG_ID in $SG_IDS; do
             aws ec2 authorize-security-group-ingress \
               --group-id "$SG_ID" \
@@ -506,6 +603,27 @@ jobs:
             # Ensure project directory exists with correct structure
             mkdir -p ~/boudreaux
             mkdir -p ~/boudreaux/.deploy
+
+            # Check available disk space (fail if less than 2GB free)
+            echo "Checking available disk space..."
+            AVAILABLE_GB=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+            echo "Available disk space: ${AVAILABLE_GB}GB"
+
+            if [ "$AVAILABLE_GB" -lt 2 ]; then
+              echo "⚠️  WARNING: Low disk space (${AVAILABLE_GB}GB available)"
+              echo "Running Docker cleanup to free space..."
+              docker system prune -af --volumes || true
+
+              AVAILABLE_GB=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+              echo "After cleanup: ${AVAILABLE_GB}GB available"
+
+              if [ "$AVAILABLE_GB" -lt 1 ]; then
+                echo "❌ ERROR: Insufficient disk space (${AVAILABLE_GB}GB). Need at least 1GB free."
+                exit 1
+              fi
+            else
+              echo "✓ Sufficient disk space available"
+            fi
 
             # Create certbot-webroot with sudo if permission denied
             if [ ! -d ~/boudreaux/certbot-webroot ]; then
@@ -609,9 +727,14 @@ jobs:
               sudo chmod 600 "$TARGET_DIR/private_key.pem"
 
               # Setup automatic renewal cron (idempotent)
-              if ! sudo crontab -l 2>/dev/null | grep -Fq "$TARGET_DIR/certificate.pem"; then
+              # This ensures certificate auto-renewal even if cert was issued outside of deployment
+              echo "Ensuring automatic certificate renewal cron job is configured..."
+              if ! sudo crontab -l 2>/dev/null | grep -Fq "certbot renew"; then
                 CRON_CMD="0 3 * * * certbot renew --quiet --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $TARGET_DIR/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $TARGET_DIR/private_key.pem && chmod 600 $TARGET_DIR/private_key.pem && chmod 644 $TARGET_DIR/certificate.pem && (docker restart nginx || true)\""
                 (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
+                echo "✓ Cron job added: Certificate will auto-renew daily at 3 AM"
+              else
+                echo "✓ Cron job already configured"
               fi
 
               # Remove self-signed marker if present
@@ -680,10 +803,27 @@ jobs:
             # Remove any containers with conflicting names
             $DOCKER_CMD rm -f website nginx 2>/dev/null || true
 
-            $DOCKER_CMD compose -f docker-compose.prod.yml up -d
+            $DOCKER_CMD compose -f docker-compose.prod.yml up -d --force-recreate
+
+            # Verify containers are running
+            echo "Verifying containers started successfully..."
+            sleep 5
+            RUNNING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -E 'website|nginx' | wc -l)
+            if [ "$RUNNING_CONTAINERS" -lt 2 ]; then
+              echo "ERROR: Expected 2 containers (website, nginx) but found $RUNNING_CONTAINERS"
+              $DOCKER_CMD ps -a
+              $DOCKER_CMD compose -f docker-compose.prod.yml logs --tail=50
+              exit 1
+            fi
+            echo "✓ Both containers are running"
+
+            # Force restart to ensure latest HTML is served (fixes stale CSS references)
+            echo "Restarting containers to ensure fresh HTML with correct asset references..."
+            $DOCKER_CMD restart website nginx
+            sleep 3
 
             # Basic health check (allow insecure only if using a temporary self-signed cert)
-            sleep 5
+            echo "Running health check..."
             CURL_OPTS="-fsS --max-time 10"
             if [ -f "$HOME/boudreaux/.selfsigned" ]; then
               echo "Self-signed cert in use; allowing insecure TLS for health check"
@@ -778,6 +918,18 @@ jobs:
                 sudo chmod 644 "$HOME/boudreaux/certificate.pem"
                 sudo chmod 600 "$HOME/boudreaux/private_key.pem"
                 rm -f "$HOME/boudreaux/.selfsigned" || true
+
+                # Setup automatic certificate renewal cron job (runs daily at 3 AM)
+                # This is idempotent - will only add the cron job if it doesn't exist
+                echo "Setting up automatic certificate renewal cron job..."
+                if ! sudo crontab -l 2>/dev/null | grep -Fq "certbot renew"; then
+                  CRON_CMD="0 3 * * * certbot renew --quiet --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $HOME/boudreaux/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $HOME/boudreaux/private_key.pem && chmod 600 $HOME/boudreaux/private_key.pem && chmod 644 $HOME/boudreaux/certificate.pem && (docker restart nginx || true)\""
+                  (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
+                  echo "✓ Cron job added: Certificate will auto-renew daily at 3 AM"
+                else
+                  echo "✓ Cron job already exists"
+                fi
+
                 # Restart nginx to pick up new secrets
                 $DOCKER_CMD restart nginx || true
               else
@@ -824,17 +976,42 @@ jobs:
 
             $DOCKER_CMD system prune -f || true
 
+      - name: Invalidate CloudFront cache for HTML pages
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          # Invalidate HTML pages to ensure browsers get fresh HTML with correct CSS/JS references
+          # This prevents 403 errors from outdated asset references after deployment
+          echo "Invalidating CloudFront cache for HTML pages..."
+
+          if [ -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
+            echo "WARNING: CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation"
+            exit 0
+          fi
+
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/" "/index.html" "/*.html" \
+            --query 'Invalidation.{Status:Status,Id:Id}' \
+            --output table
+
+          echo "✓ CloudFront cache invalidation initiated"
+          echo "Note: May take 1-5 minutes to complete. HTML pages will be refreshed from origin."
+
       - name: Revoke runner IP from all Security Groups
         if: always()
         run: |
           # Cleanup: Remove the temporary SSH rule we added at the start of deployment.
           # Must revoke from ALL Security Groups to avoid leaving stale rules.
-          
+
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
-          
+
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
             SG_IDS="${{ env.AWS_SECURITY_GROUP_ID }}"
           else
@@ -843,9 +1020,9 @@ jobs:
               --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
               --output text)
           fi
-          
+
           echo "Revoking SSH access from ${{ steps.ip.outputs.ipv4 }} on: $SG_IDS"
-          
+
           for SG_ID in $SG_IDS; do
             aws ec2 revoke-security-group-ingress \
               --group-id "$SG_ID" \
