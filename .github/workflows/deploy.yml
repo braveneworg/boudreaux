@@ -360,29 +360,106 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Ensure Security Group allows HTTP/HTTPS
+      - name: Ensure Security Groups allow HTTP/HTTPS on all attached SGs
         run: |
           set -e
-          SG_ID="${{ env.AWS_SECURITY_GROUP_ID }}"
-          echo "Ensuring inbound 80/443 are allowed on $SG_ID (idempotent)..."
-          # Add IPv4 rules if not present (ignore errors if already exist)
-          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 80 --cidr 0.0.0.0/0 || true
-          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 443 --cidr 0.0.0.0/0 || true
-          # Optionally add IPv6 rules (ignore if VPC IPv6 not enabled)
-          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --ip-permissions 'Ipv6Ranges=[{CidrIpv6=::/0}],IpProtocol=tcp,FromPort=80,ToPort=80' || true
-          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --ip-permissions 'Ipv6Ranges=[{CidrIpv6=::/0}],IpProtocol=tcp,FromPort=443,ToPort=443' || true
+          
+          # Why: EC2 instances can have multiple Security Groups attached.
+          # If ANY Security Group lacks HTTP/HTTPS rules, traffic is blocked (Security Groups are stateful AND gates).
+          # We auto-discover all SGs attached to the instance and ensure 80/443 are open on each.
+          
+          # Discover instance ID by Elastic IP or tag (adjust filter as needed)
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "WARNING: Could not auto-discover instance. Falling back to AWS_SECURITY_GROUP_ID if set."
+            if [ -n "${{ env.AWS_SECURITY_GROUP_ID }}" ]; then
+              SG_IDS="${{ env.AWS_SECURITY_GROUP_ID }}"
+            else
+              echo "ERROR: No instance found and AWS_SECURITY_GROUP_ID not set. Cannot ensure Security Group rules."
+              exit 1
+            fi
+          else
+            echo "Found instance: $INSTANCE_ID"
+            # Get all Security Groups attached to this instance
+            SG_IDS=$(aws ec2 describe-instances \
+              --instance-ids "$INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
+              --output text)
+          fi
+          
+          echo "Security Groups to configure: $SG_IDS"
+          
+          # For each Security Group, ensure HTTP/HTTPS are open
+          # Why 0.0.0.0/0? This is a public website; visitors come from any IP globally.
+          # Port 80: Needed for Let's Encrypt ACME HTTP-01 challenges and HTTP→HTTPS redirect
+          # Port 443: HTTPS traffic for the website
+          for SG_ID in $SG_IDS; do
+            echo "Ensuring ports 80/443 open on $SG_ID..."
+            
+            # Add IPv4 rules (idempotent; ignore "already exists" errors)
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SG_ID" \
+              --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTP for web traffic and Let'\''s Encrypt"}]' \
+              2>&1 | grep -v "already exists" || true
+            
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SG_ID" \
+              --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTPS for web traffic"}]' \
+              2>&1 | grep -v "already exists" || true
+            
+            # Optional: Add IPv6 rules (ignore errors if VPC doesn't support IPv6)
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SG_ID" \
+              --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTP IPv6"}]' \
+              2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
+            
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SG_ID" \
+              --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTPS IPv6"}]' \
+              2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
+          done
+          
+          echo "Security Group configuration complete."
 
       - name: Get runner public IP
         id: ip
         uses: haythem/public-ip@v1.3
 
-      - name: Temporarily whitelist runner IP for SSH
+      - name: Temporarily whitelist runner IP for SSH on all Security Groups
         run: |
-          aws ec2 authorize-security-group-ingress \
-            --group-id "$AWS_SECURITY_GROUP_ID" \
-            --protocol tcp \
-            --port 22 \
-            --cidr "${{ steps.ip.outputs.ipv4 }}/32" || true
+          # Why: GitHub Actions runners use dynamic IPs. We temporarily allow SSH from the current runner IP,
+          # then revoke it after deployment completes. This must be done on ALL attached Security Groups.
+          
+          # Reuse the instance discovery logic
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            # Fallback to env var if discovery fails
+            SG_IDS="${{ env.AWS_SECURITY_GROUP_ID }}"
+          else
+            SG_IDS=$(aws ec2 describe-instances \
+              --instance-ids "$INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
+              --output text)
+          fi
+          
+          echo "Adding temporary SSH access from ${{ steps.ip.outputs.ipv4 }} to: $SG_IDS"
+          
+          for SG_ID in $SG_IDS; do
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$SG_ID" \
+              --protocol tcp \
+              --port 22 \
+              --cidr "${{ steps.ip.outputs.ipv4 }}/32" \
+              2>&1 | grep -v "already exists" || true
+          done
 
       - name: Create .env for remote
         run: |
@@ -747,11 +824,33 @@ jobs:
 
             $DOCKER_CMD system prune -f || true
 
-      - name: Revoke runner IP
+      - name: Revoke runner IP from all Security Groups
         if: always()
         run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id "$AWS_SECURITY_GROUP_ID" \
-            --protocol tcp \
-            --port 22 \
-            --cidr "${{ steps.ip.outputs.ipv4 }}/32" || true
+          # Cleanup: Remove the temporary SSH rule we added at the start of deployment.
+          # Must revoke from ALL Security Groups to avoid leaving stale rules.
+          
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            SG_IDS="${{ env.AWS_SECURITY_GROUP_ID }}"
+          else
+            SG_IDS=$(aws ec2 describe-instances \
+              --instance-ids "$INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
+              --output text)
+          fi
+          
+          echo "Revoking SSH access from ${{ steps.ip.outputs.ipv4 }} on: $SG_IDS"
+          
+          for SG_ID in $SG_IDS; do
+            aws ec2 revoke-security-group-ingress \
+              --group-id "$SG_ID" \
+              --protocol tcp \
+              --port 22 \
+              --cidr "${{ steps.ip.outputs.ipv4 }}/32" \
+              2>&1 | grep -v "does not exist" || true
+          done
