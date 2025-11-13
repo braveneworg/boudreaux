@@ -847,7 +847,7 @@ jobs:
               echo "Using provided digests for deployment"
               echo "  Website: $WEBSITE_DIGEST"
               echo "  Nginx: $NGINX_DIGEST"
-              
+
               # Pull by fully qualified digest (image@sha256:...)
               $DOCKER_CMD pull "$WEBSITE_IMAGE@$WEBSITE_DIGEST" || {
                 echo "❌ Failed to pull website image with digest"
@@ -857,7 +857,7 @@ jobs:
                 echo "❌ Failed to pull nginx image with digest"
                 exit 1
               }
-              
+
               # Tag with :latest for compose to use
               $DOCKER_CMD tag "$WEBSITE_IMAGE@$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest"
               $DOCKER_CMD tag "$NGINX_IMAGE@$NGINX_DIGEST" "$NGINX_IMAGE:latest"
