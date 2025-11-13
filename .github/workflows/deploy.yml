@@ -85,6 +85,8 @@ jobs:
     name: Sync static assets to CDN
     runs-on: ubuntu-latest
     needs: download-build
+    outputs:
+      CHUNKS_HASH: ${{ steps.verify-build.outputs.CHUNKS_HASH }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,6 +110,7 @@ jobs:
         run: tar -xzf next-build.tar.gz
 
       - name: Verify build before sync
+        id: verify-build
         run: |
           echo "=== Verifying Build Artifact Before CDN Sync ==="
           
@@ -116,17 +119,15 @@ jobs:
             exit 1
           fi
           
-          # Show sample chunks that will be uploaded
-          echo "Sample chunk files in build artifact:"
-          ls -lh .next/static/chunks/*.js | head -5
+          # Show ALL chunk files that will be uploaded (not just sample)
+          echo "Chunk files in build artifact:"
+          ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
           
-          # Show webpack chunk specifically (this is failing in verification)
-          WEBPACK_FILE=$(ls .next/static/chunks/webpack-*.js 2>/dev/null | head -1)
-          if [ -n "$WEBPACK_FILE" ]; then
-            echo "Webpack chunk file: $(basename $WEBPACK_FILE)"
-          else
-            echo "⚠️  WARNING: No webpack chunk file found"
-          fi
+                    # Calculate checksum of entire build
+          CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
+          echo "Build artifact checksum: $CHUNKS_HASH"
+          echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_ENV
+          echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_OUTPUT
           
           echo "✓ Build artifact verified and ready for CDN sync"
 
@@ -224,7 +225,7 @@ jobs:
           echo "Artifact downloaded successfully:"
           ls -lh next-build.tar.gz
 
-          # Extract to verify BUILD_ID (Dockerfile will also extract it)
+          # Extract to verify build matches sync-cdn
           echo "Extracting to verify build consistency..."
           tar -xzf next-build.tar.gz
 
@@ -234,9 +235,31 @@ jobs:
             echo "DOCKER_BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           fi
 
-          # Show sample chunks for verification
-          echo "Sample chunks that will be in Docker image:"
-          find .next/static/chunks -name "*.js" 2>/dev/null | head -3 || echo "No chunks found"
+          # Calculate checksum to match sync-cdn
+          echo "Chunk files that will be in Docker image:"
+          ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
+          
+          DOCKER_CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
+          echo "Docker build checksum: $DOCKER_CHUNKS_HASH"
+          echo "DOCKER_CHUNKS_HASH=$DOCKER_CHUNKS_HASH" >> $GITHUB_ENV
+
+          # Compare with sync-cdn checksum if available
+          SYNC_HASH="${{ needs.sync-cdn.outputs.CHUNKS_HASH }}"
+          if [ -n "$SYNC_HASH" ]; then
+            echo "Comparing checksums between jobs:"
+            echo "  sync-cdn:     $SYNC_HASH"
+            echo "  build-images: $DOCKER_CHUNKS_HASH"
+            
+            if [ "$SYNC_HASH" != "$DOCKER_CHUNKS_HASH" ]; then
+              echo "⚠️ WARNING: Build artifact mismatch detected!"
+              echo "sync-cdn uploaded different files than will be in Docker images"
+              echo "This will cause 403 errors on production!"
+              exit 1
+            fi
+            echo "✓ Checksums match - build consistency verified"
+          else
+            echo "⚠️ sync-cdn checksum not available for comparison"
+          fi
 
           # Clean up extraction (Dockerfile will extract fresh)
           rm -rf .next
