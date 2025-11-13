@@ -293,6 +293,7 @@ jobs:
       - name: Build website image (single-arch for speed)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+          BUILD_ID: ${{ env.DOCKER_BUILD_ID }}
         run: |
           set -e
           TOK='${{ secrets.GHCR_TOKEN }}'
@@ -302,6 +303,10 @@ jobs:
             echo "Error: GHCR_TOKEN and GHCR_USERNAME secrets must be set"
             exit 1
           fi
+
+          # Use BUILD_ID or timestamp as cache buster to ensure fresh build extraction
+          CACHE_BUST="${BUILD_ID:-$(date +%s)}"
+          echo "Using CACHE_BUST=${CACHE_BUST} to force fresh artifact extraction"
 
           success=0
           for i in 1 2 3; do
@@ -313,6 +318,7 @@ jobs:
             if docker buildx build \
               --platform linux/amd64 \
               --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
+              --build-arg CACHE_BUST=${CACHE_BUST} \
               --provenance=false \
               --sbom=false \
               --cache-from type=local,src=/tmp/.buildx-cache \

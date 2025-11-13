@@ -30,11 +30,16 @@ ENV SKIP_ENV_VALIDATION=true
 ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 
+# Build argument to bust cache when artifact changes (set to BUILD_ID or timestamp)
+ARG CACHE_BUST
+RUN echo "Cache bust: ${CACHE_BUST}"
+
 # Use prebuilt Next.js output from CI/CD when available to avoid rebuilding inside Docker
 # Priority: 1) next-build.tar.gz artifact 2) existing .next directory 3) build from scratch
 RUN if [ -f next-build.tar.gz ]; then \
       echo "Using pre-built .next from CI/CD (next-build.tar.gz)"; \
       tar -xzf next-build.tar.gz; \
+      echo "Extracted build ID: $(cat .next/BUILD_ID 2>/dev/null || echo 'unknown')"; \
     elif [ -d .next ]; then \
       echo "Using existing pre-built .next directory"; \
     else \
