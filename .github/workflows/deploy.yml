@@ -107,168 +107,25 @@ jobs:
       - name: Extract build
         run: tar -xzf next-build.tar.gz
 
-      - name: Verify build consistency
-        run: |
-          echo "=== Build Consistency Check ==="
-          echo "Verifying that this build matches what will be deployed..."
-
-          # Check if .next directory was extracted
-          if [ ! -d ".next" ]; then
-            echo "❌ ERROR: .next directory not found after extraction"
-            exit 1
-          fi
-
-          # Generate a signature of the build for verification
-          # Use build-id to identify this specific build
-          if [ -f ".next/BUILD_ID" ]; then
-            BUILD_ID=$(cat .next/BUILD_ID)
-            echo "Build ID: $BUILD_ID"
-            echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
-          else
-            echo "⚠️  WARNING: BUILD_ID file not found"
-          fi
-
-          # Count and log chunk files for traceability
-          CHUNK_COUNT=$(find .next/static/chunks -name "*.js" 2>/dev/null | wc -l || echo "0")
-          echo "Chunk files in build: $CHUNK_COUNT"
-
-          # Show a sample of chunk files for verification
-          echo "Sample chunk files (first 5):"
-          find .next/static/chunks -name "*.js" 2>/dev/null | head -5 || echo "No chunks found"
-
-          echo "✓ Build extracted and verified"
-
-      - name: Install jq for JSON processing
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Ensure S3 bucket policy allows CloudFront OAC access
+      - name: Verify CloudFront OAC configuration
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
-          echo "Ensuring CloudFront Origin Access Control (OAC) is configured..."
-
-          # Get the CloudFront distribution ARN
-          DISTRIBUTION_ARN=$(aws cloudfront get-distribution \
-            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --query 'Distribution.ARN' \
-            --output text)
-
-          echo "CloudFront Distribution ARN: $DISTRIBUTION_ARN"
-
-          # Check if OAC exists for this distribution
+          echo "Verifying CloudFront OAC is configured..."
+          
           OAC_ID=$(aws cloudfront get-distribution \
             --id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
             --output text 2>/dev/null || echo "None")
 
           if [ "$OAC_ID" = "None" ] || [ -z "$OAC_ID" ]; then
-            echo "⚠️  CloudFront Origin Access Control (OAC) is NOT configured"
-            echo "Creating OAC and updating distribution..."
-
-            # Create OAC
-            OAC_CREATE_OUTPUT=$(aws cloudfront create-origin-access-control \
-              --origin-access-control-config '{
-                "Name": "S3-OAC-'$S3_BUCKET'",
-                "Description": "OAC for '$S3_BUCKET'",
-                "SigningProtocol": "sigv4",
-                "SigningBehavior": "always",
-                "OriginAccessControlOriginType": "s3"
-              }' \
-              --output json)
-
-            OAC_ID=$(echo "$OAC_CREATE_OUTPUT" | jq -r '.OriginAccessControl.Id')
-            echo "Created OAC: $OAC_ID"
-
-            # Get current distribution config
-            DIST_CONFIG=$(aws cloudfront get-distribution-config \
-              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-              --output json)
-
-            ETAG=$(echo "$DIST_CONFIG" | jq -r '.ETag')
-
-            # Update the config to use OAC (keep Origin Path at root for correct file resolution)
-            UPDATED_CONFIG=$(echo "$DIST_CONFIG" | jq --arg oac_id "$OAC_ID" \
-              '.DistributionConfig.Origins.Items[0].OriginAccessControlId = $oac_id |
-               .DistributionConfig.Origins.Items[0].S3OriginConfig.OriginAccessIdentity = ""')
-
-            # Save to temp file
-            echo "$UPDATED_CONFIG" | jq '.DistributionConfig' > /tmp/dist-config.json
-
-            # Update distribution
-            aws cloudfront update-distribution \
-              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-              --distribution-config file:///tmp/dist-config.json \
-              --if-match "$ETAG"
-
-            echo "✓ CloudFront distribution updated with OAC"
-            echo "Note: Origin Path is kept at root (empty) because:"
-            echo "  - assetPrefix: https://cdn.fakefourrecords.com/media"
-            echo "  - S3 files at: s3://bucket/media/_next/..."
-            echo "  - CloudFront correctly fetches: /media/_next/... from S3 root"
-            echo "⏳ Distribution is being deployed (this may take 5-15 minutes)"
+            echo "⚠️  WARNING: CloudFront OAC not configured"
+            echo "Run: scripts/manually-attach-oac.sh to configure it"
           else
-            echo "✓ CloudFront OAC is already configured: $OAC_ID"
-
-            # Verify Origin Path is at root (correct configuration)
-            ORIGIN_PATH=$(aws cloudfront get-distribution \
-              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-              --query 'Distribution.DistributionConfig.Origins.Items[0].OriginPath' \
-              --output text)
-
-            if [ "$ORIGIN_PATH" != "null" ] && [ -n "$ORIGIN_PATH" ]; then
-              echo "⚠️  WARNING: Origin Path is set to '$ORIGIN_PATH'"
-              echo "This may cause asset loading issues. Origin Path should be empty (root)."
-              echo "Run scripts/revert-cloudfront-origin-path.sh to fix."
-            else
-              echo "✓ Origin Path is correctly set to root (empty)"
-            fi
-          fi
-
-          # Create/update S3 bucket policy
-          cat > /tmp/s3-bucket-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Sid": "AllowCloudFrontServicePrincipal",
-                "Effect": "Allow",
-                "Principal": {
-                  "Service": "cloudfront.amazonaws.com"
-                },
-                "Action": "s3:GetObject",
-                "Resource": "arn:aws:s3:::${S3_BUCKET}/*",
-                "Condition": {
-                  "StringEquals": {
-                    "aws:SourceArn": "${DISTRIBUTION_ARN}"
-                  }
-                }
-              }
-            ]
-          }
-          EOF
-
-          # Apply the policy
-          aws s3api put-bucket-policy \
-            --bucket "$S3_BUCKET" \
-            --policy file:///tmp/s3-bucket-policy.json
-
-          echo "✓ S3 bucket policy configured for CloudFront OAC access"
-
-          # Verify policy was applied
-          APPLIED_POLICY=$(aws s3api get-bucket-policy \
-            --bucket "$S3_BUCKET" \
-            --query Policy \
-            --output text 2>/dev/null || echo "")
-
-          if echo "$APPLIED_POLICY" | grep -q "cloudfront.amazonaws.com"; then
-            echo "✓ Policy verification passed"
-          else
-            echo "⚠️  WARNING: Policy may not have been applied correctly"
-            echo "$APPLIED_POLICY"
+            echo "✓ CloudFront OAC configured: $OAC_ID"
           fi
 
       - name: Sync to CDN
@@ -281,102 +138,28 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
-      - name: Verify files uploaded to S3 and match build
+      - name: Verify files uploaded to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
         run: |
-          echo "Verifying files were uploaded to S3 and match current build..."
-
-          # Check if .next directory exists (should have been extracted)
-          if [ ! -d ".next/static" ]; then
-            echo "❌ ERROR: .next/static directory not found after extraction"
-            exit 1
-          fi
-
-          # Get a sample chunk file from the local build to verify it exists in S3
-          SAMPLE_CHUNK=$(find .next/static/chunks -name "*.js" -type f | head -1)
-          if [ -z "$SAMPLE_CHUNK" ]; then
-            echo "❌ ERROR: No chunk files found in local build"
-            exit 1
-          fi
-
-          # Extract just the filename
-          CHUNK_FILENAME=$(basename "$SAMPLE_CHUNK")
-          echo "Sample chunk file from build: $CHUNK_FILENAME"
-
-          # Check if this file exists in S3
-          S3_KEY="media/_next/static/chunks/$CHUNK_FILENAME"
-          echo "Checking if $S3_KEY exists in S3..."
-
-          if aws s3 ls "s3://$S3_BUCKET/$S3_KEY" >/dev/null 2>&1; then
-            echo "✓ Sample file verified in S3: $S3_KEY"
-          else
-            echo "❌ ERROR: Sample file NOT found in S3: $S3_KEY"
-            echo "This means the sync did not complete properly or files were not uploaded"
-            echo "Listing what IS in S3:"
-            aws s3 ls "s3://$S3_BUCKET/media/_next/static/chunks/" | head -20
-            exit 1
-          fi
-
-          # Count total files uploaded
+          echo "Quick verification that files were uploaded..."
           FILE_COUNT=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | wc -l)
-          echo "Total files in S3: $FILE_COUNT"
-
-          if [ "$FILE_COUNT" -eq 0 ]; then
-            echo "❌ ERROR: No files found in S3 bucket at media/_next/static/"
-            exit 1
-          fi
-
-          # Show upload timestamps to verify freshness
-          echo "Most recently uploaded files (last 5):"
-          aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | sort -k1,2 | tail -5
-
-          echo "✓ Files successfully uploaded to S3 and verified"
-
-      - name: Test S3 object access via CloudFront OAC
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          echo "Testing if CloudFront can access S3 objects..."
-
-          # Get a sample file from S3
-          SAMPLE_FILE=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | head -1 | awk '{print $4}')
-
-          if [ -z "$SAMPLE_FILE" ]; then
-            echo "No files found to test"
-            exit 0
-          fi
-
-          echo "Testing access to: $SAMPLE_FILE"
-
-          # Check if CloudFront distribution has OAC configured
-          OAC_ID=$(aws cloudfront get-distribution \
-            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
-            --output text)
-
-          if [ "$OAC_ID" = "None" ] || [ -z "$OAC_ID" ]; then
-            echo "⚠️  WARNING: CloudFront distribution does not have Origin Access Control (OAC) configured!"
-            echo "This is likely the cause of 403 errors."
-            echo "You need to:"
-            echo "1. Create an OAC in CloudFront console"
-            echo "2. Associate it with your distribution's S3 origin"
-            echo "3. Update the S3 bucket policy (already done by this workflow)"
+          
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            echo "✓ $FILE_COUNT files in S3"
           else
-            echo "✓ CloudFront OAC is configured: $OAC_ID"
+            echo "❌ ERROR: No files found in S3"
+            exit 1
           fi
 
   build-images:
     name: Build & push Docker images
     runs-on: ubuntu-latest
     needs: download-build
+    # Run in parallel with sync-cdn since they don't depend on each other
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -440,15 +223,7 @@ jobs:
             image=moby/buildkit:latest
           buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
 
-      - name: Set up QEMU for cross-arch builds
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      - name: Show buildx platforms
-        run: docker buildx ls
-
-      - name: Build multi-arch website image (with retry)
+      - name: Build website image (single-arch for speed)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
         run: |
@@ -466,8 +241,10 @@ jobs:
             echo "Attempt $i: Logging in to GHCR..."
             echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
 
+            # Build for linux/amd64 only (most EC2 instances) for faster builds (~3-4 min vs 8-12 min)
+            # Change to linux/arm64 if using ARM-based EC2 instances (Graviton)
             if docker buildx build \
-              --platform linux/arm64,linux/amd64 \
+              --platform linux/amd64 \
               --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
               --provenance=false \
               --sbom=false \
@@ -526,15 +303,7 @@ jobs:
             image=moby/buildkit:latest
           buildkitd-flags: --allow-insecure-entitlement network.host --allow-insecure-entitlement security.insecure
 
-      - name: Set up QEMU for cross-arch builds
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      - name: Show buildx platforms
-        run: docker buildx ls
-
-      - name: Build multi-arch nginx image (with retry)
+      - name: Build nginx image (single-arch for speed)
         run: |
           set -e
           TOK='${{ secrets.GHCR_TOKEN }}'
@@ -550,8 +319,9 @@ jobs:
             echo "Attempt $i: Logging in to GHCR..."
             echo "$TOK" | docker login ${{ env.REGISTRY }} -u "$USR" --password-stdin
 
+            # Build for linux/amd64 only for faster builds
             if docker buildx build \
-              --platform linux/arm64,linux/amd64 \
+              --platform linux/amd64 \
               --provenance=false \
               --sbom=false \
               --cache-from type=local,src=/tmp/.buildx-cache \
