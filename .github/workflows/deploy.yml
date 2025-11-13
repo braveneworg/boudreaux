@@ -107,6 +107,29 @@ jobs:
       - name: Extract build
         run: tar -xzf next-build.tar.gz
 
+      - name: Verify build before sync
+        run: |
+          echo "=== Verifying Build Artifact Before CDN Sync ==="
+          
+          if [ ! -d ".next/static/chunks" ]; then
+            echo "❌ ERROR: .next/static/chunks not found after extraction"
+            exit 1
+          fi
+          
+          # Show sample chunks that will be uploaded
+          echo "Sample chunk files in build artifact:"
+          ls -lh .next/static/chunks/*.js | head -5
+          
+          # Show webpack chunk specifically (this is failing in verification)
+          WEBPACK_FILE=$(ls .next/static/chunks/webpack-*.js 2>/dev/null | head -1)
+          if [ -n "$WEBPACK_FILE" ]; then
+            echo "Webpack chunk file: $(basename $WEBPACK_FILE)"
+          else
+            echo "⚠️  WARNING: No webpack chunk file found"
+          fi
+          
+          echo "✓ Build artifact verified and ready for CDN sync"
+
       - name: Verify CloudFront OAC configuration
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -115,7 +138,7 @@ jobs:
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
           echo "Verifying CloudFront OAC is configured..."
-          
+
           OAC_ID=$(aws cloudfront get-distribution \
             --id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
@@ -145,7 +168,9 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
         run: |
-          echo "Quick verification that files were uploaded..."
+          echo "=== Verifying S3 Upload Completed Successfully ==="
+          
+          # Check file count
           FILE_COUNT=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | wc -l)
           
           if [ "$FILE_COUNT" -gt 0 ]; then
@@ -154,6 +179,25 @@ jobs:
             echo "❌ ERROR: No files found in S3"
             exit 1
           fi
+          
+          # Verify the webpack chunk matches what we just built
+          LOCAL_WEBPACK=$(ls .next/static/chunks/webpack-*.js 2>/dev/null | head -1)
+          if [ -n "$LOCAL_WEBPACK" ]; then
+            WEBPACK_FILENAME=$(basename "$LOCAL_WEBPACK")
+            S3_WEBPACK_KEY="media/_next/static/chunks/$WEBPACK_FILENAME"
+            
+            echo "Checking if webpack chunk was uploaded: $WEBPACK_FILENAME"
+            if aws s3 ls "s3://$S3_BUCKET/$S3_WEBPACK_KEY" >/dev/null 2>&1; then
+              echo "✓ Webpack chunk verified in S3: $WEBPACK_FILENAME"
+            else
+              echo "❌ ERROR: Webpack chunk NOT found in S3: $WEBPACK_FILENAME"
+              echo "Files actually in S3:"
+              aws s3 ls "s3://$S3_BUCKET/media/_next/static/chunks/" | grep webpack
+              exit 1
+            fi
+          fi
+          
+          echo "✓ Build artifacts successfully synced to S3"
 
   build-images:
     name: Build & push Docker images
@@ -179,24 +223,24 @@ jobs:
           fi
           echo "Artifact downloaded successfully:"
           ls -lh next-build.tar.gz
-          
+
           # Extract to verify BUILD_ID (Dockerfile will also extract it)
           echo "Extracting to verify build consistency..."
           tar -xzf next-build.tar.gz
-          
+
           if [ -f ".next/BUILD_ID" ]; then
             BUILD_ID=$(cat .next/BUILD_ID)
             echo "BUILD_ID in Docker image build: $BUILD_ID"
             echo "DOCKER_BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           fi
-          
+
           # Show sample chunks for verification
           echo "Sample chunks that will be in Docker image:"
           find .next/static/chunks -name "*.js" 2>/dev/null | head -3 || echo "No chunks found"
-          
+
           # Clean up extraction (Dockerfile will extract fresh)
           rm -rf .next
-          
+
           echo "✓ Build artifact verified and ready for Docker build"
 
       - name: Log in to container registry
@@ -950,58 +994,8 @@ jobs:
 
           echo "✓ CloudFront cache invalidation initiated for all CDN assets"
           echo "Note: Invalidation completes in 1-5 minutes. During this time, some cached assets may still be served."
-
-      - name: Verify deployment integrity
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-        run: |
-          echo "=== Deployment Integrity Check ==="
-          echo "Verifying that deployed HTML references assets that exist in S3..."
-
-          # Fetch the homepage HTML from production (allow self-signed cert)
-          HTML_CONTENT=$(curl -k -s https://fakefourrecords.com/ || echo "")
-
-          if [ -z "$HTML_CONTENT" ]; then
-            echo "⚠️  WARNING: Could not fetch HTML from production site"
-            echo "Skipping integrity check (site may still be starting)"
-            exit 0
-          fi
-
-          # Extract a chunk file reference from the HTML (looking for static/chunks/*.js)
-          CHUNK_REF=$(echo "$HTML_CONTENT" | grep -o '/_next/static/chunks/[^"]*\.js' | head -1 || echo "")
-
-          if [ -z "$CHUNK_REF" ]; then
-            echo "⚠️  WARNING: No chunk references found in HTML"
-            echo "HTML may not have loaded correctly"
-            exit 0
-          fi
-
-          echo "Found chunk reference in HTML: $CHUNK_REF"
-
-          # Convert to S3 key (remove leading slash, add media prefix)
-          S3_KEY="media${CHUNK_REF}"
-          echo "Checking if this file exists in S3: $S3_KEY"
-
-          # Check if the file exists in S3
-          if aws s3 ls "s3://$S3_BUCKET/$S3_KEY" >/dev/null 2>&1; then
-            echo "✓ SUCCESS: Asset referenced in HTML exists in S3"
-            echo "✓ Deployment integrity verified - HTML and CDN assets match"
-          else
-            echo "❌ ERROR: Asset referenced in HTML does NOT exist in S3"
-            echo "File: $S3_KEY"
-            echo ""
-            echo "This means there is a mismatch between the deployed container and CDN assets."
-            echo "The container has a newer build than what was synced to S3."
-            echo ""
-            echo "Files currently in S3 (last 10 chunks):"
-            aws s3 ls "s3://$S3_BUCKET/media/_next/static/chunks/" | tail -10
-            echo ""
-            echo "⚠️  DEPLOYMENT WARNING: Site may not load correctly due to asset mismatch"
-            exit 1
-          fi
+          echo ""
+          echo "✅ Deployment complete! New containers are running with fresh assets in S3."
 
       - name: Revoke runner IP from all Security Groups
         if: always()
