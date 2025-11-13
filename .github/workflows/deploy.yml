@@ -461,7 +461,7 @@ jobs:
 
           echo "✓ Digests captured successfully:"
           cat image-digests.json
-          
+
           echo ""
           echo "These digests will be used for deployment to ensure"
           echo "containers match the build artifacts synced to S3"
@@ -504,7 +504,7 @@ jobs:
           NGINX_DIGEST=$(jq -r '.nginx' image-digests.json)
           echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
           echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
-          
+
           echo "Will deploy with digests:"
           echo "  Website: $WEBSITE_DIGEST"
           echo "  Nginx: $NGINX_DIGEST"
@@ -885,7 +885,7 @@ jobs:
               exit 1
             fi
             echo "✓ Both containers running"
-            
+
             # Give containers time to fully start serving content
             sleep 5
 
