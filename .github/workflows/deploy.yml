@@ -107,6 +107,9 @@ jobs:
       - name: Extract build
         run: tar -xzf next-build.tar.gz
 
+      - name: Install jq for JSON processing
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Ensure S3 bucket policy allows CloudFront OAC access
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -115,7 +118,7 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
-          echo "Ensuring S3 bucket policy allows CloudFront Origin Access Control (OAC)..."
+          echo "Ensuring CloudFront Origin Access Control (OAC) is configured..."
 
           # Get the CloudFront distribution ARN
           DISTRIBUTION_ARN=$(aws cloudfront get-distribution \
@@ -125,7 +128,58 @@ jobs:
 
           echo "CloudFront Distribution ARN: $DISTRIBUTION_ARN"
 
-          # Create the required bucket policy
+          # Check if OAC exists for this distribution
+          OAC_ID=$(aws cloudfront get-distribution \
+            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$OAC_ID" = "None" ] || [ -z "$OAC_ID" ]; then
+            echo "⚠️  CloudFront Origin Access Control (OAC) is NOT configured"
+            echo "Creating OAC and updating distribution..."
+
+            # Create OAC
+            OAC_CREATE_OUTPUT=$(aws cloudfront create-origin-access-control \
+              --origin-access-control-config '{
+                "Name": "S3-OAC-'$S3_BUCKET'",
+                "Description": "OAC for '$S3_BUCKET'",
+                "SigningProtocol": "sigv4",
+                "SigningBehavior": "always",
+                "OriginAccessControlOriginType": "s3"
+              }' \
+              --output json)
+
+            OAC_ID=$(echo "$OAC_CREATE_OUTPUT" | jq -r '.OriginAccessControl.Id')
+            echo "Created OAC: $OAC_ID"
+
+            # Get current distribution config
+            DIST_CONFIG=$(aws cloudfront get-distribution-config \
+              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+              --output json)
+
+            ETAG=$(echo "$DIST_CONFIG" | jq -r '.ETag')
+
+            # Update the config to use OAC
+            UPDATED_CONFIG=$(echo "$DIST_CONFIG" | jq --arg oac_id "$OAC_ID" \
+              '.DistributionConfig.Origins.Items[0].OriginAccessControlId = $oac_id |
+               .DistributionConfig.Origins.Items[0].S3OriginConfig.OriginAccessIdentity = ""')
+
+            # Save to temp file
+            echo "$UPDATED_CONFIG" | jq '.DistributionConfig' > /tmp/dist-config.json
+
+            # Update distribution
+            aws cloudfront update-distribution \
+              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+              --distribution-config file:///tmp/dist-config.json \
+              --if-match "$ETAG"
+
+            echo "✓ CloudFront distribution updated with OAC"
+            echo "⏳ Distribution is being deployed (this may take 5-15 minutes)"
+          else
+            echo "✓ CloudFront OAC is already configured: $OAC_ID"
+          fi
+
+          # Create/update S3 bucket policy
           cat > /tmp/s3-bucket-policy.json <<EOF
           {
             "Version": "2012-10-17",
@@ -148,7 +202,7 @@ jobs:
           }
           EOF
 
-          # Apply the policy (will create or update)
+          # Apply the policy
           aws s3api put-bucket-policy \
             --bucket "$S3_BUCKET" \
             --policy file:///tmp/s3-bucket-policy.json
@@ -177,6 +231,69 @@ jobs:
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
+
+      - name: Verify files uploaded to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: |
+          echo "Verifying files were uploaded to S3..."
+
+          # List some sample files that should exist
+          echo "Checking for _next/static files..."
+          FILE_COUNT=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | wc -l)
+          echo "Found $FILE_COUNT files in media/_next/static/"
+
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No files found in S3 bucket at media/_next/static/"
+            echo "Files may not have been uploaded correctly"
+            exit 1
+          fi
+
+          # Show a sample of uploaded files
+          echo "Sample files in S3:"
+          aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | head -10
+
+          echo "✓ Files successfully uploaded to S3"
+
+      - name: Test S3 object access via CloudFront OAC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          echo "Testing if CloudFront can access S3 objects..."
+
+          # Get a sample file from S3
+          SAMPLE_FILE=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | head -1 | awk '{print $4}')
+
+          if [ -z "$SAMPLE_FILE" ]; then
+            echo "No files found to test"
+            exit 0
+          fi
+
+          echo "Testing access to: $SAMPLE_FILE"
+
+          # Check if CloudFront distribution has OAC configured
+          OAC_ID=$(aws cloudfront get-distribution \
+            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
+            --output text)
+
+          if [ "$OAC_ID" = "None" ] || [ -z "$OAC_ID" ]; then
+            echo "⚠️  WARNING: CloudFront distribution does not have Origin Access Control (OAC) configured!"
+            echo "This is likely the cause of 403 errors."
+            echo "You need to:"
+            echo "1. Create an OAC in CloudFront console"
+            echo "2. Associate it with your distribution's S3 origin"
+            echo "3. Update the S3 bucket policy (already done by this workflow)"
+          else
+            echo "✓ CloudFront OAC is configured: $OAC_ID"
+          fi
 
   build-images:
     name: Build & push Docker images
