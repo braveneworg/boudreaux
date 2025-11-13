@@ -22,16 +22,8 @@ services:
       - app-network
 
   nginx:
-    secrets:
-      - ssl_cert
-      - ssl_key
-    build:
-      context: .
-      dockerfile: ./nginx/Dockerfile
-      cache_from:
-        - "${NEXT_APP_NGINX_IMAGE}"
-    container_name: nginx
     image: "${NEXT_APP_NGINX_IMAGE}"
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
@@ -42,6 +34,9 @@ services:
       - app-network
     volumes:
       - ./certbot-webroot:/var/www/certbot:rw
+    secrets:
+      - ssl_cert
+      - ssl_key
 
 networks:
   app-network:
