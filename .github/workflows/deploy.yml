@@ -113,22 +113,22 @@ jobs:
         id: verify-build
         run: |
           echo "=== Verifying Build Artifact Before CDN Sync ==="
-          
+
           if [ ! -d ".next/static/chunks" ]; then
             echo "❌ ERROR: .next/static/chunks not found after extraction"
             exit 1
           fi
-          
+
           # Show ALL chunk files that will be uploaded (not just sample)
           echo "Chunk files in build artifact:"
           ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
-          
+
                     # Calculate checksum of entire build
           CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
           echo "Build artifact checksum: $CHUNKS_HASH"
           echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_ENV
           echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_OUTPUT
-          
+
           echo "✓ Build artifact verified and ready for CDN sync"
 
       - name: Verify CloudFront OAC configuration
@@ -170,23 +170,23 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
         run: |
           echo "=== Verifying S3 Upload Completed Successfully ==="
-          
+
           # Check file count
           FILE_COUNT=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | wc -l)
-          
+
           if [ "$FILE_COUNT" -gt 0 ]; then
             echo "✓ $FILE_COUNT files in S3"
           else
             echo "❌ ERROR: No files found in S3"
             exit 1
           fi
-          
+
           # Verify the webpack chunk matches what we just built
           LOCAL_WEBPACK=$(ls .next/static/chunks/webpack-*.js 2>/dev/null | head -1)
           if [ -n "$LOCAL_WEBPACK" ]; then
             WEBPACK_FILENAME=$(basename "$LOCAL_WEBPACK")
             S3_WEBPACK_KEY="media/_next/static/chunks/$WEBPACK_FILENAME"
-            
+
             echo "Checking if webpack chunk was uploaded: $WEBPACK_FILENAME"
             if aws s3 ls "s3://$S3_BUCKET/$S3_WEBPACK_KEY" >/dev/null 2>&1; then
               echo "✓ Webpack chunk verified in S3: $WEBPACK_FILENAME"
@@ -197,7 +197,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           echo "✓ Build artifacts successfully synced to S3"
 
   build-images:
@@ -238,7 +238,7 @@ jobs:
           # Calculate checksum to match sync-cdn
           echo "Chunk files that will be in Docker image:"
           ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
-          
+
           DOCKER_CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
           echo "Docker build checksum: $DOCKER_CHUNKS_HASH"
           echo "DOCKER_CHUNKS_HASH=$DOCKER_CHUNKS_HASH" >> $GITHUB_ENV
@@ -249,7 +249,7 @@ jobs:
             echo "Comparing checksums between jobs:"
             echo "  sync-cdn:     $SYNC_HASH"
             echo "  build-images: $DOCKER_CHUNKS_HASH"
-            
+
             if [ "$SYNC_HASH" != "$DOCKER_CHUNKS_HASH" ]; then
               echo "⚠️ WARNING: Build artifact mismatch detected!"
               echo "sync-cdn uploaded different files than will be in Docker images"

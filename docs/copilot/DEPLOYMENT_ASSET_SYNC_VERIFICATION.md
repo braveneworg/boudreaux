@@ -18,6 +18,7 @@ The deployment workflow has three jobs that use the same build artifact:
 3. `deploy` - Deploys containers to EC2
 
 **The issue**: The two jobs were potentially downloading different versions of `next-build.tar.gz`, causing S3 to contain different chunk files than the Docker images. This could happen if:
+
 - GitHub Actions artifact cache serves stale versions
 - Jobs run from different workflow runs
 - Artifact is overwritten between job executions
@@ -59,6 +60,7 @@ sync-cdn:
   outputs:
     CHUNKS_HASH: ${{ steps.verify-build.outputs.CHUNKS_HASH }}
 ```
+
 ### 2. Build-Images Verification
 
 **File**: `.github/workflows/deploy.yml` (build-images job)
@@ -75,7 +77,7 @@ sync-cdn:
     # Show ALL chunks that will be in Docker image
     echo "Chunk files that will be in Docker image:"
     ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
-    
+
     # Calculate checksum to match sync-cdn
     DOCKER_CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
     echo "Docker build checksum: $DOCKER_CHUNKS_HASH"
@@ -87,7 +89,7 @@ sync-cdn:
       echo "Comparing checksums between jobs:"
       echo "  sync-cdn:     $SYNC_HASH"
       echo "  build-images: $DOCKER_CHUNKS_HASH"
-      
+
       if [ "$SYNC_HASH" != "$DOCKER_CHUNKS_HASH" ]; then
         echo "⚠️ WARNING: Build artifact mismatch detected!"
         echo "sync-cdn uploaded different files than will be in Docker images"
@@ -99,6 +101,7 @@ sync-cdn:
 ```
 
 This ensures:
+
 - The Docker image contains the same build that was synced to S3
 - **Fails the deployment if checksums don't match** (prevents 403 errors)
 - Shows all chunk files for debugging
@@ -115,7 +118,7 @@ This ensures:
     WEBPACK_FILE=$(ls .next/static/chunks/webpack-*.js | head -1)
     WEBPACK_FILENAME=$(basename "$WEBPACK_FILE")
     S3_KEY="media/_next/static/chunks/$WEBPACK_FILENAME"
-    
+
     if aws s3 ls "s3://$S3_BUCKET/$S3_KEY" >/dev/null 2>&1; then
       echo "✓ Webpack chunk verified in S3: $S3_KEY"
     else
@@ -219,18 +222,22 @@ Comparing checksums between jobs:
 ✅ **S3 verification succeeds**
 
 ❌ If checksums don't match, deployment will fail with clear error:
+
 ```
 ⚠️ WARNING: Build artifact mismatch detected!
 sync-cdn uploaded different files than will be in Docker images
 This will cause 403 errors on production!
 ```
+
 ```
 
 ### 3. Check Deploy Job
 
 ```
+
 ✓ SUCCESS: Asset referenced in HTML exists in S3
 ✓ Deployment integrity verified - HTML and CDN assets match
+
 ```
 
 ## What Happens if There's a Mismatch
@@ -238,14 +245,16 @@ This will cause 403 errors on production!
 If the verification detects a mismatch:
 
 ```
+
 ❌ ERROR: Asset referenced in HTML does NOT exist in S3
-File: media/_next/static/chunks/817-6239f482aa536b03.js
+File: media/\_next/static/chunks/817-6239f482aa536b03.js
 
 This means there is a mismatch between the deployed container and CDN assets.
 The container has a newer build than what was synced to S3.
 
-⚠️  DEPLOYMENT WARNING: Site may not load correctly due to asset mismatch
-```
+⚠️ DEPLOYMENT WARNING: Site may not load correctly due to asset mismatch
+
+````
 
 The deployment will **FAIL** and prevent broken deployments from reaching production.
 
@@ -265,7 +274,7 @@ aws s3 ls s3://fakefourmedia/media/_next/static/chunks/817-6239f482aa536b03.js
 
 # 4. Check CloudFront status
 aws cloudfront get-distribution --id E2QCL9RZEM5RZE --query 'Distribution.Status'
-```
+````
 
 ## Recovery from Mismatch
 
