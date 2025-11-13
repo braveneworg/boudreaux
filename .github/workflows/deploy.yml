@@ -107,7 +107,7 @@ jobs:
       - name: Extract build
         run: tar -xzf next-build.tar.gz
 
-      - name: Validate and fix S3 bucket policy for CloudFront OAC
+      - name: Ensure S3 bucket policy allows CloudFront OAC access
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -115,7 +115,7 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
-          echo "Validating S3 bucket policy for CloudFront Origin Access Control (OAC)..."
+          echo "Ensuring S3 bucket policy allows CloudFront Origin Access Control (OAC)..."
 
           # Get the CloudFront distribution ARN
           DISTRIBUTION_ARN=$(aws cloudfront get-distribution \
@@ -125,19 +125,8 @@ jobs:
 
           echo "CloudFront Distribution ARN: $DISTRIBUTION_ARN"
 
-          # Get current bucket policy
-          CURRENT_POLICY=$(aws s3api get-bucket-policy \
-            --bucket "$S3_BUCKET" \
-            --query Policy \
-            --output text 2>/dev/null || echo "{}")
-
-          # Check if policy has the case-sensitive typo (AWS:SourceArn instead of aws:SourceArn)
-          if echo "$CURRENT_POLICY" | grep -q '"AWS:SourceArn"'; then
-            echo "⚠️  Found case-sensitive typo in bucket policy (AWS:SourceArn should be aws:SourceArn)"
-            echo "Fixing bucket policy..."
-
-            # Create corrected policy with lowercase aws:SourceArn
-            cat > /tmp/s3-bucket-policy.json <<EOF
+          # Create the required bucket policy
+          cat > /tmp/s3-bucket-policy.json <<EOF
           {
             "Version": "2012-10-17",
             "Statement": [
@@ -159,14 +148,24 @@ jobs:
           }
           EOF
 
-            # Apply the corrected policy
-            aws s3api put-bucket-policy \
-              --bucket "$S3_BUCKET" \
-              --policy file:///tmp/s3-bucket-policy.json
+          # Apply the policy (will create or update)
+          aws s3api put-bucket-policy \
+            --bucket "$S3_BUCKET" \
+            --policy file:///tmp/s3-bucket-policy.json
 
-            echo "✓ Bucket policy fixed with correct case: aws:SourceArn"
+          echo "✓ S3 bucket policy configured for CloudFront OAC access"
+
+          # Verify policy was applied
+          APPLIED_POLICY=$(aws s3api get-bucket-policy \
+            --bucket "$S3_BUCKET" \
+            --query Policy \
+            --output text 2>/dev/null || echo "")
+
+          if echo "$APPLIED_POLICY" | grep -q "cloudfront.amazonaws.com"; then
+            echo "✓ Policy verification passed"
           else
-            echo "✓ Bucket policy is correct (no case-sensitivity issues found)"
+            echo "⚠️  WARNING: Policy may not have been applied correctly"
+            echo "$APPLIED_POLICY"
           fi
 
       - name: Sync to CDN
@@ -941,30 +940,33 @@ jobs:
 
             $DOCKER_CMD system prune -f || true
 
-      - name: Invalidate CloudFront cache for HTML pages
+      - name: Invalidate CloudFront cache for deployed assets
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
-          # Invalidate HTML pages to ensure browsers get fresh HTML with correct CSS/JS references
-          # This prevents 403 errors from outdated asset references after deployment
-          echo "Invalidating CloudFront cache for HTML pages..."
+          # Invalidate all assets to ensure CloudFront serves fresh content from S3
+          # This prevents 403 errors from stale cache entries pointing to deleted/moved files
+          echo "Invalidating CloudFront cache for all deployed assets..."
 
           if [ -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
             echo "WARNING: CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation"
             exit 0
           fi
 
+          # Invalidate everything under /media/* (includes _next/static/*)
+          # This is necessary because Next.js generates new hashed filenames on each build
+          # and CloudFront may cache references to old files that no longer exist
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --paths "/" "/index.html" "/*.html" \
+            --paths "/media/*" \
             --query 'Invalidation.{Status:Status,Id:Id}' \
             --output table
 
-          echo "✓ CloudFront cache invalidation initiated"
-          echo "Note: May take 1-5 minutes to complete. HTML pages will be refreshed from origin."
+          echo "✓ CloudFront cache invalidation initiated for all CDN assets"
+          echo "Note: Invalidation completes in 1-5 minutes. During this time, some cached assets may still be served."
 
       - name: Revoke runner IP from all Security Groups
         if: always()
