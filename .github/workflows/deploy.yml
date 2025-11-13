@@ -179,46 +179,6 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
         run: npm run sync:cdn:no-build
 
-      - name: Verify CDN assets are accessible
-        env:
-          CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
-        continue-on-error: true
-        run: |
-          echo "Verifying CDN assets are accessible..."
-
-          # Wait a moment for CloudFront to propagate
-          sleep 5
-
-          # Find a CSS file that was just uploaded
-          CSS_FILE=$(find .next/static -name "*.css" -type f | head -1)
-
-          if [ -n "$CSS_FILE" ]; then
-            # Extract the relative path (remove .next/ prefix)
-            RELATIVE_PATH=$(echo "$CSS_FILE" | sed 's|^\.next/||')
-            CDN_URL="https://${CDN_DOMAIN}/media/_next/${RELATIVE_PATH}"
-
-            echo "Testing CDN URL: $CDN_URL"
-
-            # Use || true to prevent curl from failing the script
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CDN_URL" || echo "000")
-
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✓ CDN assets are accessible (HTTP $HTTP_CODE)"
-            elif [ "$HTTP_CODE" = "403" ]; then
-              echo "⚠️  WARNING: CDN returned 403 Forbidden"
-              echo "This may indicate an S3 bucket policy issue or CloudFront cache"
-              echo "Continuing deployment, but check CDN access after deployment completes"
-            elif [ "$HTTP_CODE" = "000" ]; then
-              echo "⚠️  WARNING: Failed to connect to CDN"
-              echo "Continuing deployment, but verify CDN access manually"
-            else
-              echo "⚠️  WARNING: CDN returned HTTP $HTTP_CODE"
-              echo "Continuing deployment, but verify CDN access manually"
-            fi
-          else
-            echo "No CSS files found to test, skipping CDN verification"
-          fi
-
   build-images:
     name: Build & push Docker images
     runs-on: ubuntu-latest
