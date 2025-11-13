@@ -31,15 +31,29 @@ ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 
 # Build argument to bust cache when artifact changes (set to BUILD_ID or timestamp)
-ARG CACHE_BUST
-RUN echo "Cache bust: ${CACHE_BUST}"
+ARG CACHE_BUST=unknown
+RUN echo "=== Docker Build Cache Info ===" && \
+    echo "CACHE_BUST value: ${CACHE_BUST}" && \
+    echo "This should change with each new build" && \
+    echo "==============================="
 
 # Use prebuilt Next.js output from CI/CD when available to avoid rebuilding inside Docker
 # Priority: 1) next-build.tar.gz artifact 2) existing .next directory 3) build from scratch
 RUN if [ -f next-build.tar.gz ]; then \
-      echo "Using pre-built .next from CI/CD (next-build.tar.gz)"; \
+      echo "✓ Found next-build.tar.gz artifact"; \
+      ls -lh next-build.tar.gz; \
+      echo "Extracting pre-built .next from CI/CD..."; \
       tar -xzf next-build.tar.gz; \
-      echo "Extracted build ID: $(cat .next/BUILD_ID 2>/dev/null || echo 'unknown')"; \
+      if [ -f .next/BUILD_ID ]; then \
+        BUILD_ID=$(cat .next/BUILD_ID); \
+        echo "✓ Extracted build with BUILD_ID: $BUILD_ID"; \
+      else \
+        echo "⚠️  Warning: BUILD_ID file not found after extraction"; \
+      fi; \
+      if [ -f .next/static/chunks/webpack-*.js ]; then \
+        WEBPACK=$(ls .next/static/chunks/webpack-*.js | head -1 | xargs basename); \
+        echo "✓ Webpack chunk in image: $WEBPACK"; \
+      fi; \
     elif [ -d .next ]; then \
       echo "Using existing pre-built .next directory"; \
     else \
