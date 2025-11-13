@@ -21,22 +21,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test:ci
+        run: npm test -- --run --coverage --reporter=verbose
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./coverage/coverage-final.json
+          files: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   lint:
     name: Lint
@@ -48,7 +49,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
@@ -67,19 +68,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run TypeScript type check
-        run: npm run typecheck
+        run: npx tsc --noEmit
 
   build:
     name: Build Next.js app
     runs-on: ubuntu-latest
-    needs: [test, lint, typecheck]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,18 +87,43 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js application
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-cache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
+          restore-keys: |
+            ${{ runner.os }}-next-cache-
+
+      - name: Build Next.js
+        env:
+          SKIP_ENV_VALIDATION: "true"
+          DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+          NODE_ENV: "production"
+          AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
+          AUTH_URL: "http://localhost:3000"
         run: npm run build
 
-      - name: Package Next.js output
+      - name: Package Next.js output for deploy workflow (standalone + static only)
         run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory not found!"
+            exit 1
+          fi
+          if [ ! -d ".next/standalone" ] || [ ! -d ".next/static" ]; then
+            echo "Error: expected .next/standalone and .next/static to exist"
+            ls -la .next
+            exit 1
+          fi
           tar -czf next-build.tar.gz .next/standalone .next/static
+          ls -lh next-build.tar.gz
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -106,3 +131,4 @@ jobs:
           name: nextjs-build
           path: next-build.tar.gz
           retention-days: 1
+          if-no-files-found: error
