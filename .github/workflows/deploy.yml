@@ -159,9 +159,10 @@ jobs:
 
             ETAG=$(echo "$DIST_CONFIG" | jq -r '.ETag')
 
-            # Update the config to use OAC
+            # Update the config to use OAC and set Origin Path to /media
             UPDATED_CONFIG=$(echo "$DIST_CONFIG" | jq --arg oac_id "$OAC_ID" \
               '.DistributionConfig.Origins.Items[0].OriginAccessControlId = $oac_id |
+               .DistributionConfig.Origins.Items[0].OriginPath = "/media" |
                .DistributionConfig.Origins.Items[0].S3OriginConfig.OriginAccessIdentity = ""')
 
             # Save to temp file
@@ -173,10 +174,45 @@ jobs:
               --distribution-config file:///tmp/dist-config.json \
               --if-match "$ETAG"
 
-            echo "✓ CloudFront distribution updated with OAC"
+            echo "✓ CloudFront distribution updated with OAC and Origin Path set to /media"
             echo "⏳ Distribution is being deployed (this may take 5-15 minutes)"
           else
             echo "✓ CloudFront OAC is already configured: $OAC_ID"
+
+            # Check if Origin Path is correct
+            ORIGIN_PATH=$(aws cloudfront get-distribution \
+              --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+              --query 'Distribution.DistributionConfig.Origins.Items[0].OriginPath' \
+              --output text)
+
+            if [ "$ORIGIN_PATH" != "/media" ]; then
+              echo "⚠️  Origin Path is '$ORIGIN_PATH', should be '/media'. Fixing..."
+
+              # Get current distribution config
+              DIST_CONFIG=$(aws cloudfront get-distribution-config \
+                --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+                --output json)
+
+              ETAG=$(echo "$DIST_CONFIG" | jq -r '.ETag')
+
+              # Update Origin Path
+              UPDATED_CONFIG=$(echo "$DIST_CONFIG" | jq \
+                '.DistributionConfig.Origins.Items[0].OriginPath = "/media"')
+
+              # Save to temp file
+              echo "$UPDATED_CONFIG" | jq '.DistributionConfig' > /tmp/dist-config.json
+
+              # Update distribution
+              aws cloudfront update-distribution \
+                --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+                --distribution-config file:///tmp/dist-config.json \
+                --if-match "$ETAG"
+
+              echo "✓ Origin Path updated to /media"
+              echo "⏳ Distribution is being deployed (this may take 5-15 minutes)"
+            else
+              echo "✓ Origin Path is correctly set to /media"
+            fi
           fi
 
           # Create/update S3 bucket policy
