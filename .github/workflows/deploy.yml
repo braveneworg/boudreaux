@@ -652,6 +652,8 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
@@ -659,8 +661,6 @@ jobs:
           timeout: 60s
           command_timeout: 30m
           envs: WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT,LETSENCRYPT_EMAIL
-        env:
-          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
           script: |
             set -euo pipefail
 
