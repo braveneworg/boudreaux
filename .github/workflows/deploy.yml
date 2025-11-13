@@ -431,7 +431,8 @@ jobs:
       - name: Wait for registry sync
         run: |
           echo "Waiting for registry to sync both images..."
-          sleep 10
+          echo "This ensures both images are fully propagated before capture"
+          sleep 20
 
       - name: Capture both image digests
         run: |
@@ -460,6 +461,10 @@ jobs:
 
           echo "✓ Digests captured successfully:"
           cat image-digests.json
+          
+          echo ""
+          echo "These digests will be used for deployment to ensure"
+          echo "containers match the build artifacts synced to S3"
 
       - name: Upload image digest artifact
         uses: actions/upload-artifact@v4
@@ -499,6 +504,10 @@ jobs:
           NGINX_DIGEST=$(jq -r '.nginx' image-digests.json)
           echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
           echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
+          
+          echo "Will deploy with digests:"
+          echo "  Website: $WEBSITE_DIGEST"
+          echo "  Nginx: $NGINX_DIGEST"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -867,10 +876,18 @@ jobs:
             fi
             echo "✓ Both containers are running"
 
-            # Force restart to ensure latest HTML is served (fixes stale CSS references)
-            echo "Restarting containers to ensure fresh HTML with correct asset references..."
-            $DOCKER_CMD restart website nginx
-            sleep 3
+            # Verify containers are healthy before proceeding
+            echo "Verifying container health..."
+            CONTAINER_COUNT=$($DOCKER_CMD ps --filter "name=website" --filter "name=nginx" --format '{{.Names}}' | wc -l)
+            if [ "$CONTAINER_COUNT" -lt 2 ]; then
+              echo "❌ ERROR: Expected 2 containers but found $CONTAINER_COUNT"
+              $DOCKER_CMD ps -a
+              exit 1
+            fi
+            echo "✓ Both containers running"
+            
+            # Give containers time to fully start serving content
+            sleep 5
 
             # Basic health check (allow insecure only if using a temporary self-signed cert)
             echo "Running health check..."
