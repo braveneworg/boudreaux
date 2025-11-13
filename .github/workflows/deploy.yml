@@ -833,19 +833,34 @@ jobs:
             WEBSITE_IMAGE='${{ env.WEBSITE_IMAGE }}'
             NGINX_IMAGE='${{ env.NGINX_IMAGE }}'
 
-            # Capture previously deployed digests (if present)
+            # Capture previously deployed digests (for rollback if needed)
             PREV_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE" 2>/dev/null || true)
             PREV_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE" 2>/dev/null || true)
+
+            # CRITICAL: Remove old :latest tagged images to prevent Docker from using stale cache
+            echo "Removing old :latest images to force fresh pull..."
+            $DOCKER_CMD rmi "$WEBSITE_IMAGE:latest" 2>/dev/null || true
+            $DOCKER_CMD rmi "$NGINX_IMAGE:latest" 2>/dev/null || true
 
             # If digests are provided, pin to those; otherwise, use latest and capture digests
             if [ -n "${WEBSITE_DIGEST:-}" ] && [ -n "${NGINX_DIGEST:-}" ]; then
               echo "Using provided digests for deployment"
+              echo "  Website: $WEBSITE_DIGEST"
+              echo "  Nginx: $NGINX_DIGEST"
+              
               # Pull by fully qualified digest (image@sha256:...)
-              $DOCKER_CMD pull "$WEBSITE_IMAGE@$WEBSITE_DIGEST" || true
-              $DOCKER_CMD pull "$NGINX_IMAGE@$NGINX_DIGEST" || true
+              $DOCKER_CMD pull "$WEBSITE_IMAGE@$WEBSITE_DIGEST" || {
+                echo "❌ Failed to pull website image with digest"
+                exit 1
+              }
+              $DOCKER_CMD pull "$NGINX_IMAGE@$NGINX_DIGEST" || {
+                echo "❌ Failed to pull nginx image with digest"
+                exit 1
+              }
+              
               # Tag with :latest for compose to use
-              $DOCKER_CMD tag "$WEBSITE_IMAGE@$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
-              $DOCKER_CMD tag "$NGINX_IMAGE@$NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+              $DOCKER_CMD tag "$WEBSITE_IMAGE@$WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest"
+              $DOCKER_CMD tag "$NGINX_IMAGE@$NGINX_DIGEST" "$NGINX_IMAGE:latest"
               NEW_WEBSITE_DIGEST="$WEBSITE_IMAGE@$WEBSITE_DIGEST"
               NEW_NGINX_DIGEST="$NGINX_IMAGE@$NGINX_DIGEST"
             else
@@ -857,11 +872,21 @@ jobs:
             fi
 
             # Restart stack (force remove any conflicting containers)
+            echo "Stopping existing containers..."
             $DOCKER_CMD compose -f docker-compose.prod.yml down --remove-orphans || true
 
             # Remove any containers with conflicting names
+            echo "Removing old containers..."
             $DOCKER_CMD rm -f website nginx 2>/dev/null || true
 
+            # Verify images are fresh (should match digests we just pulled)
+            echo "Verifying fresh images..."
+            CURRENT_WEBSITE_ID=$($DOCKER_CMD images "$WEBSITE_IMAGE:latest" --format "{{.ID}}")
+            CURRENT_NGINX_ID=$($DOCKER_CMD images "$NGINX_IMAGE:latest" --format "{{.ID}}")
+            echo "  Website image ID: $CURRENT_WEBSITE_ID"
+            echo "  Nginx image ID: $CURRENT_NGINX_ID"
+
+            echo "Starting containers with fresh images..."
             $DOCKER_CMD compose -f docker-compose.prod.yml up -d --force-recreate
 
             # Verify containers are running
