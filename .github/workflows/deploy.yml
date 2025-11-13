@@ -342,6 +342,7 @@ jobs:
   build-nginx:
     name: Build nginx image (with retry)
     runs-on: ubuntu-latest
+    needs: download-build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -415,27 +416,62 @@ jobs:
             exit 1
           fi
 
-      - name: Capture multi-arch image digests
+  capture-digests:
+    name: Capture image digests after both builds complete
+    runs-on: ubuntu-latest
+    needs: [build-images, build-nginx]
+    steps:
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Wait for registry sync
+        run: |
+          echo "Waiting for registry to sync both images..."
+          sleep 10
+
+      - name: Capture both image digests
         run: |
           set -e
-          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
-          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest | awk '/Digest:/ {print $2; exit}')
-          echo "Resolved website manifest digest: $WEBSITE_DIGEST"
-          echo "Resolved nginx manifest digest: $NGINX_DIGEST"
-          echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
-          echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
+
+          echo "Fetching website image digest..."
+          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+
+          echo "Fetching nginx image digest..."
+          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+
+          echo "Website digest: $WEBSITE_DIGEST"
+          echo "Nginx digest: $NGINX_DIGEST"
+
+          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
+            echo "❌ ERROR: Failed to get website digest"
+            exit 1
+          fi
+
+          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
+            echo "❌ ERROR: Failed to get nginx digest"
+            exit 1
+          fi
+
           printf '{"website":"%s","nginx":"%s"}' "$WEBSITE_DIGEST" "$NGINX_DIGEST" > image-digests.json
+
+          echo "✓ Digests captured successfully:"
+          cat image-digests.json
 
       - name: Upload image digest artifact
         uses: actions/upload-artifact@v4
         with:
           name: image-digests
           path: image-digests.json
+          retention-days: 1
 
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [build-images, sync-cdn]
+    needs: [capture-digests, sync-cdn]
     permissions:
       contents: read
       id-token: write
