@@ -1,4 +1,4 @@
-ARG NODE=node:lts-alpine
+ARG NODE=node:22.12.0-alpine
 FROM ${NODE} AS dependencies
 RUN apk add --no-cache libc6-compat
 
