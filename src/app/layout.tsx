@@ -7,7 +7,6 @@ import { Separator } from '@radix-ui/react-separator';
 import { Toaster } from '@/components/ui/sonner';
 
 import AuthToolbar from './components/auth/auth-toolbar';
-import CDNStatusBanner from './components/cdn-status-banner';
 import Footer from './components/footer/footer';
 import Header from './components/header/header';
 import { Providers } from './components/providers';
@@ -77,7 +76,6 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <CDNStatusBanner />
           <Header isMobile={isMobile} />
           <main className="font-sans px-1.5 flex flex-col flex-1 w-full max-w-full overflow-x-hidden">
             <AuthToolbar />
