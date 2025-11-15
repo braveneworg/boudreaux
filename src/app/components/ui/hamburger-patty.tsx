@@ -47,7 +47,7 @@ export default function HamburgerPatty({
   rotateOpen = 45,
   rotateClosed = 0,
   yOffset = -8,
-  width = 'w-5.5',
+  width = 'w-5',
   height = 'h-0.5',
   bgColor = 'bg-white',
   duration = 0.5,
