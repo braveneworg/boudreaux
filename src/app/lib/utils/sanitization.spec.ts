@@ -34,8 +34,8 @@ describe('sanitizeHtml', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeHtml(null as any)).toBe('');
-    expect(sanitizeHtml(undefined as any)).toBe('');
+    expect(sanitizeHtml(null as unknown as string)).toBe('');
+    expect(sanitizeHtml(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -65,8 +65,8 @@ describe('sanitizeString', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeString(null as any)).toBe('');
-    expect(sanitizeString(undefined as any)).toBe('');
+    expect(sanitizeString(null as unknown as string)).toBe('');
+    expect(sanitizeString(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -95,8 +95,8 @@ describe('sanitizeEmail', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeEmail(null as any)).toBe('');
-    expect(sanitizeEmail(undefined as any)).toBe('');
+    expect(sanitizeEmail(null as unknown as string)).toBe('');
+    expect(sanitizeEmail(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -122,8 +122,8 @@ describe('sanitizePhone', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizePhone(null as any)).toBe('');
-    expect(sanitizePhone(undefined as any)).toBe('');
+    expect(sanitizePhone(null as unknown as string)).toBe('');
+    expect(sanitizePhone(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -160,14 +160,14 @@ describe('sanitizeUrl', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeUrl(null as any)).toBe('');
-    expect(sanitizeUrl(undefined as any)).toBe('');
+    expect(sanitizeUrl(null as unknown as string)).toBe('');
+    expect(sanitizeUrl(undefined as unknown as string)).toBe('');
   });
 
   it('should normalize URL format', () => {
     expect(sanitizeUrl('https://example.com')).toBe('https://example.com/');
     expect(sanitizeUrl('https://example.com/path?query=1')).toBe(
-      'https://example.com/path?query=1',
+      'https://example.com/path?query=1'
     );
   });
 });
@@ -199,8 +199,8 @@ describe('sanitizeUsername', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeUsername(null as any)).toBe('');
-    expect(sanitizeUsername(undefined as any)).toBe('');
+    expect(sanitizeUsername(null as unknown as string)).toBe('');
+    expect(sanitizeUsername(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -230,8 +230,8 @@ describe('normalizeWhitespace', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(normalizeWhitespace(null as any)).toBe('');
-    expect(normalizeWhitespace(undefined as any)).toBe('');
+    expect(normalizeWhitespace(null as unknown as string)).toBe('');
+    expect(normalizeWhitespace(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -254,7 +254,7 @@ describe('sanitizeTextField', () => {
   });
 
   it('should return empty string for null/undefined input', () => {
-    expect(sanitizeTextField(null as any)).toBe('');
-    expect(sanitizeTextField(undefined as any)).toBe('');
+    expect(sanitizeTextField(null as unknown as string)).toBe('');
+    expect(sanitizeTextField(undefined as unknown as string)).toBe('');
   });
 });

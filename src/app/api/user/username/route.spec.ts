@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { vi } from 'vitest';
 
-import { POST } from './route';
-
 import { prisma } from '@/app/lib/prisma';
+
+import { POST } from './route';
 
 // Mock dependencies
 vi.mock('@/app/lib/prisma', () => ({
@@ -17,7 +17,7 @@ vi.mock('@/app/lib/prisma', () => ({
 }));
 
 vi.mock('@/app/lib/decorators/with-auth', () => ({
-  withAuth: (handler: any) => handler,
+  withAuth: (handler: unknown) => handler,
 }));
 
 describe('POST /api/user/username', () => {
@@ -38,7 +38,14 @@ describe('POST /api/user/username', () => {
       mockUpdate.mockResolvedValue({
         id: 'user-123',
         username: 'newusername',
-      } as any);
+        email: null,
+        emailVerified: null,
+        image: null,
+        name: null,
+        hashedPassword: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       const request = new NextRequest('http://localhost/api/user/username', {
         method: 'POST',
@@ -66,7 +73,14 @@ describe('POST /api/user/username', () => {
       mockUpdate.mockResolvedValue({
         id: 'user-123',
         username: 'validname',
-      } as any);
+        email: null,
+        emailVerified: null,
+        image: null,
+        name: null,
+        hashedPassword: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       const request = new NextRequest('http://localhost/api/user/username', {
         method: 'POST',
