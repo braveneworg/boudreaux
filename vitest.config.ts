@@ -72,13 +72,26 @@ export default defineConfig({
         // Middleware (already has its own test)
         // Add more specific exclusions as needed
       ],
-      // TODO: Add this section back once we've established >= 90% coverage project-wide across metrics: lines,
-      // functions, statements, and branchers
+      // TODO: Coverage threshold strategy
+      // Current project-wide coverage: ~31% lines (as of 2025-11-15)
+      //
+      // Analysis:
+      // - Critical business logic (lib/actions/utils/validation): 85-100% ✅
+      // - Main gap: Pages (~20 files) and UI components (~50+ files) at 0-20%
+      // - Reaching 90% project-wide would require ~200+ additional tests
+      //
+      // Recommended approach:
+      // 1. Maintain high coverage (>90%) for business logic via code reviews
+      // 2. Add E2E tests for pages/user flows (not unit tests)
+      // 3. Re-evaluate project-wide thresholds after E2E test suite is established
+      //
+      // When business logic coverage is consistently >90% and E2E tests cover
+      // critical user flows, consider enabling these thresholds:
       // thresholds: {
-      //   lines: 95,
-      //   functions: 95,
-      //   branches: 95,
-      //   statements: 95,
+      //   lines: 85,
+      //   functions: 85,
+      //   branches: 80,
+      //   statements: 85,
       // },
     },
 
