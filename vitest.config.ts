@@ -73,7 +73,7 @@ export default defineConfig({
         // Add more specific exclusions as needed
       ],
       // TODO: Add this section back once we've established >= 90% coverage project-wide across metrics: lines,
-      // functions, statements, and branchers
+      // functions, statements, and branches
       // thresholds: {
       //   lines: 95,
       //   functions: 95,
