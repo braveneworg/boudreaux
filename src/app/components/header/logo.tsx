@@ -12,15 +12,15 @@ const Logo = ({ isMobile }: LogoProps) => {
     <Link href="/">
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="block ml-[8px] mt-2 size-[56px] md:size-[144px] rounded-full bg-white"
-        height={56}
+        className="block ml-[8px] mt-1.5 size-[48px] md:size-[144px] rounded-full bg-white"
+        height={44}
         priority
         src={
           isMobile
             ? '/media/fake-four-inc-black-hand-logo.svg'
             : '/media/fake-four-inc-black-stardust-hand-logo.svg'
         }
-        width={56}
+        width={44}
       />
     </Link>
   );

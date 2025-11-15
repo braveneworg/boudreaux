@@ -72,6 +72,12 @@ export default defineConfig({
         // Middleware (already has its own test)
         // Add more specific exclusions as needed
       ],
+      thresholds: {
+        lines: 95,
+        functions: 95,
+        branches: 95,
+        statements: 95,
+      },
     },
 
     exclude: [

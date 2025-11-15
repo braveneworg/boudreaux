@@ -139,7 +139,7 @@
 @keyframes bg-particle-pulse {
   0% {
     transform: scale(1);
-    opacity: 0.95;
+    opacity: 0.75;
   }
   25% {
     transform: scale(1.02);
@@ -147,7 +147,7 @@
   }
   50% {
     transform: scale(1.05);
-    opacity: 0.98;
+    opacity: 0.88;
   }
   75% {
     transform: scale(1.03);
@@ -155,7 +155,7 @@
   }
   100% {
     transform: scale(1);
-    opacity: 0.95;
+    opacity: 0.75;
   }
 }
 
@@ -164,7 +164,7 @@
     filter: brightness(1) contrast(1);
   }
   25% {
-    filter: brightness(1.1) contrast(1.05);
+    filter: brightness(0.75) contrast(1.05);
   }
   50% {
     filter: brightness(1.2) contrast(1.1);
@@ -173,7 +173,7 @@
     filter: brightness(1.1) contrast(1.05);
   }
   100% {
-    filter: brightness(1) contrast(1);
+    filter: brightness(0.8) contrast(1);
   }
 }
 
@@ -221,7 +221,7 @@
 }
 
 .particles-animate::before {
-  animation: bg-particle-shimmer 2s ease-in-out 0.3s 1;
+  animation: bg-particle-shimmer 3s ease-in-out 0.3s 1;
 }
 
 .particle-sparkle {

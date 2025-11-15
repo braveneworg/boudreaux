@@ -3,9 +3,6 @@
 import { motion } from 'framer-motion';
 
 export interface HamburgerPattyProps {
-  /**
-   * Whether the patty is in the open (X) state
-   */
   isOpen?: boolean;
   /**
    * The rotation angle when open (in degrees)
@@ -50,10 +47,10 @@ export default function HamburgerPatty({
   rotateOpen = 45,
   rotateClosed = 0,
   yOffset = -8,
-  width = 'w-6',
+  width = 'w-5.5',
   height = 'h-0.5',
   bgColor = 'bg-white',
-  duration = 0.3,
+  duration = 0.5,
   opacityOpen = 1,
   opacityClosed = 1,
 }: HamburgerPattyProps) {
