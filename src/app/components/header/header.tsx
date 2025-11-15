@@ -104,7 +104,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
                 priority
                 src="/media/fake-four-inc-words.png"
                 width={222}
-                height={0}
+                height={40}
               />
               <HamburgerMenu />
             </>
