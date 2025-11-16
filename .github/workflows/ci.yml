@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -80,6 +80,9 @@ jobs:
   build:
     name: Build Next.js app
     runs-on: ubuntu-latest
+    # Only build artifacts on main branch (for deployment)
+    # PRs and feature branches get tested but don't need build artifacts
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
