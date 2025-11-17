@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const config = {
   // Use full CDN URL for all static assets in production
   // This eliminates the need for NGINX redirects and avoids 301 caching issues
   assetPrefix: process.env.NODE_ENV === 'production' ? 'https://cdn.fakefourrecords.com/media' : '',
@@ -26,7 +27,6 @@ const nextConfig = {
     }
     return config;
   },
-
   // Output configuration
   output: 'standalone',
   // NOTE: trailingSlash set to false because Auth.js API routes don't work with trailing slashes
@@ -123,6 +123,6 @@ const nextConfig = {
       },
     ];
   },
-};
+} satisfies NextConfig;
 
-module.exports = nextConfig;
+export default config;

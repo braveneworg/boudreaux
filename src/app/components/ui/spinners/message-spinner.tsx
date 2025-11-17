@@ -34,10 +34,8 @@ export const MessageSpinner = ({
         spinnerContainerSize
       )}
     >
-      <div>
-        <SpinnerRingCircle size={size} variant={variant} />
-      </div>
-      <div className={cn(`flex justify-center items-center -mt-2 pl-8 ${containerSize}`)}>
+      <SpinnerRingCircle size={size} variant={variant} />
+      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
         <h2 className={cn('text-muted-foreground', textClass)}>{title}</h2>
       </div>
     </div>

@@ -33,9 +33,6 @@ export default function Home() {
             artist={tracks[0].artist}
           />
         </Card>
-        {/* <Card>
-          <DataStoreHealthStatus />
-        </Card> */}
       </ContentContainer>
     </PageContainer>
   );
