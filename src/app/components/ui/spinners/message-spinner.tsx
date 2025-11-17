@@ -35,7 +35,7 @@ export const MessageSpinner = ({
       )}
     >
       <SpinnerRingCircle size={size} variant={variant} />
-      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
+      <div className={cn('flex justify-center items-center pl-8', containerSize)}>
         <h2 className={cn('text-muted-foreground', textClass)}>{title}</h2>
       </div>
     </div>
