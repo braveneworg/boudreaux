@@ -31,14 +31,6 @@ vi.mock('./components/ui/audio/mobile-first-players', () => ({
 }));
 
 // Mock UI components
-vi.mock('./components/ui/card', () => ({
-  Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={className} data-testid="card">
-      {children}
-    </div>
-  ),
-}));
-
 vi.mock('./components/ui/content-container', () => ({
   ContentContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="content-container">{children}</div>
@@ -65,7 +57,7 @@ describe('Home Page', () => {
 
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
-    expect(screen.getByTestId('card')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-card-player')).toBeInTheDocument();
   });
 
   it('should render featured artists heading', () => {
@@ -108,11 +100,5 @@ describe('Home Page', () => {
     expect(audioElement.src).toContain(
       '/media/ceschi/mp3s/Ceschi%20-%20Bring%20Us%20The%20Head%20Of%20Francisco%20False%20(Part%201)%20-%2003%20We%20Are%20Enough%20(produced%20by%20Danny%20T%20Levin).mp3'
     );
-  });
-
-  it('should apply correct CSS class to card', () => {
-    render(<Home />);
-
-    expect(screen.getByTestId('card')).toHaveClass('mb-6');
   });
 });

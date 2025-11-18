@@ -22,23 +22,22 @@ export const MessageSpinner = ({
   const gapClass = size === 'sm' ? 'gap-2' : size === 'md' ? 'gap-4' : 'gap-6';
   const textClass = size === 'sm' ? 'text-sm' : size === 'md' ? 'text-lg' : 'text-2xl';
   const containerSize =
-    size === 'sm' ? 'h-[16px] w-[16px] leading-[16px]' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
-  const spinnerContainerSize = 'h-[16px] w-full relative -left-3 leading-[16px]';
+    size === 'sm' ? 'size-8 leading-8' : size === 'md' ? 'h-8 w-8' : 'h-10 w-10';
+  const spinnerContainerSize =
+    size === 'sm' ? 'h-8 w-full relative -left-4' : 'h-3 w-full relative -left-4';
 
   return (
     <div
       className={cn(
-        'flex items-center justify-center my-3',
+        'flex items-center justify-center leading-[16px]',
         gapClass,
         className,
         spinnerContainerSize
       )}
     >
-      <div>
-        <SpinnerRingCircle size={size} variant={variant} />
-      </div>
-      <div className={cn(`flex justify-center items-center -mt-2 pl-8 ${containerSize}`)}>
-        <h2 className={cn('text-muted-foreground', textClass)}>{title}</h2>
+      <SpinnerRingCircle size={size} variant={variant} />
+      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
+        <span className={cn('text-muted-foreground m-0 p-0', textClass)}>{title}</span>
       </div>
     </div>
   );

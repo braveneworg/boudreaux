@@ -21,7 +21,7 @@ export default function HamburgerMenu() {
   ];
 
   return (
-    <div className="flex justify-end pointer-events-none">
+    <div className="flex justify-end items-center pointer-events-none">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative" asChild>
           <Button className="relative bg-transparent pointer-events-auto top-0.5 -right-[10px]">

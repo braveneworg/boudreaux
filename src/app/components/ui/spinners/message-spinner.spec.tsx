@@ -60,9 +60,9 @@ describe('MessageSpinner', () => {
           <MessageSpinner title="Loading..." size="sm" variant="default" />
         );
 
-        // The wrapper has the spinner container size class
+        // The wrapper has the spinner container size class (h-8 w-full for small)
         const wrapper = container.firstChild as HTMLElement;
-        expect(wrapper).toHaveClass('h-[16px]');
+        expect(wrapper).toHaveClass('h-8', 'w-full');
       });
     });
 
@@ -212,11 +212,11 @@ describe('MessageSpinner', () => {
   });
 
   describe('accessibility', () => {
-    it('should render title as heading element', () => {
+    it('should render title text element', () => {
       render(<MessageSpinner title="Loading..." size="md" variant="default" />);
 
       const title = screen.getByText(/Loading/i);
-      expect(title.tagName).toBe('H2');
+      expect(title.tagName).toBe('SPAN');
     });
 
     it('should display the provided title text', () => {
