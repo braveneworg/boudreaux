@@ -22,7 +22,7 @@ export default function Home() {
   return (
     <PageContainer>
       <ContentContainer>
-        <h1 className="pt-4 px-4">Featured artists</h1>
+        <h1 className="pt-4 px-4 h-13 mb-0 leading-tight">Featured artists</h1>
         <MobileCardPlayer
           audioSrc={tracks[0].audioSrc}
           albumArt={tracks[0].albumArt}

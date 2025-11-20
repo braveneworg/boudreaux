@@ -1,0 +1,117 @@
+/* Audio player specific styling */
+.video-js.vjs-audio {
+  background-color: #1a1a1a;
+  height: auto;
+}
+
+/* Control bar for audio */
+.video-js.vjs-audio .vjs-control-bar {
+  display: flex;
+  align-items: center;
+  background-color: #000;
+  height: 4rem;
+  padding: 0 1rem;
+  gap: 0.5rem;
+}
+
+/* Hide big play button for audio */
+.video-js.vjs-audio .vjs-big-play-button {
+  display: none;
+}
+
+/* Audio control buttons */
+.vjs-audio-rewind-control,
+.vjs-audio-fast-forward-control,
+.vjs-skip-previous-control,
+.vjs-skip-next-control {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.vjs-audio-rewind-control:hover,
+.vjs-audio-fast-forward-control:hover,
+.vjs-skip-previous-control:hover,
+.vjs-skip-next-control:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+/* Play button larger for audio */
+.video-js.vjs-audio .vjs-play-control {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.video-js.vjs-audio .vjs-play-control:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Progress control takes full width */
+.video-js.vjs-audio .vjs-progress-control {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Time displays */
+.video-js.vjs-audio .vjs-current-time,
+.video-js.vjs-audio .vjs-duration {
+  display: block;
+  padding: 0 0.5rem;
+}
+
+.video-js.vjs-audio .vjs-time-divider {
+  padding: 0;
+  min-width: auto;
+}
+
+/* Volume control */
+.video-js.vjs-audio .vjs-volume-panel {
+  width: auto;
+}
+
+/* Disabled state */
+.vjs-skip-previous-control.vjs-disabled,
+.vjs-skip-next-control.vjs-disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .video-js.vjs-audio .vjs-control-bar {
+    height: 3.5rem;
+    padding: 0 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .vjs-audio-rewind-control,
+  .vjs-audio-fast-forward-control,
+  .vjs-skip-previous-control,
+  .vjs-skip-next-control {
+    & svg {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+  }
+
+  .video-js.vjs-audio .vjs-play-control {
+    & span::before {
+      width: auto;
+      height: auto;
+      position: relative;
+      top: 0rem;
+    }
+  }
+
+  /* Hide time divider on mobile */
+  .video-js.vjs-audio .vjs-time-divider {
+    display: none;
+  }
+}
