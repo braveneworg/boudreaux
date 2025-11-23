@@ -2,33 +2,9 @@
   --audio-control-button-size: 2.75rem;
 }
 
-/* Mobile-First Video.js Customizations */
-
-/* Force controls to always be visible */
-.video-js.vjs-audio .vjs-control-bar {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-/* Ensure vjs-has-started keeps controls visible */
-.video-js.vjs-has-started .vjs-control-bar {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-/* Remove user-state hiding of controls */
-.video-js.vjs-user-inactive .vjs-control-bar,
-.video-js.vjs-user-active .vjs-control-bar {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
 /* Larger progress bar for easier touching */
 .video-js .vjs-progress-control {
-  height: 30px;
+  height: 2.75rem;
 }
 
 .video-js .vjs-progress-holder {
@@ -49,18 +25,7 @@
 .video-js {
   min-width: calc(20rem - 4rem);
   width: 100%;
-  height: 3rem !important;
-
-  .vjs-button {
-    width: var(--audio-control-button-size);
-    height: var(--audio-control-button-size);
-  }
-
-  .vjs-current-time,
-  .vjs-duration,
-  .vjs-time-divider {
-    display: block;
-  }
+  height: 3.15rem !important;
 
   button:active {
     /* Better touch feedback */
@@ -144,27 +109,55 @@
     & .vjs-volume-panel {
       order: 4 !important;
       position: relative;
-      top: -3rem;
-      left: 1.75rem;
+      top: -2.75rem;
       line-height: 0.75rem;
       height: 0.75rem;
     }
 
     /* Bigger play button on mobile */
-    & .vjs-play-control {
-      width: calc(var(--audio-control-button-size) + 0.25rem);
-      height: var(--audio-control-button-size);
-      top: -2.666rem;
+    & .vjs-play-control .vjs-icon-placeholder {
+      position: relative;
+      font-size: 1rem;
+      top: -1.55rem;
     }
 
-    & .vjs-mute-control,
     & .vjs-volume-panel {
-      width: var(--audio-control-button-size) !important;
-      font-size: 0.555rem;
-      right: -0.75rem;
-      top: -1.7rem;
-      text-align: right;
+      display: flex;
+      position: absolute;
+      top: 1.1rem;
+      right: -0.25rem;
+      width: calc(var(--audio-control-button-size) - 0.25rem);
+      height: calc(var(--audio-control-button-size) - 0.25rem);
     }
+
+    & .vjs-mute-control {
+      font-size: 0.666rem;
+      width: calc(var(--audio-control-button-size) - 0.25rem);
+      height: calc(var(--audio-control-button-size) - 0.25rem);
+    }
+
+    @media (max-width: 40rem) {
+      & svg {
+        width: 1.5rem;
+        height: 1.5rem;
+        margin: 0 auto;
+      }
+    }
+  }
+
+  /* Ensure vjs-has-started keeps controls visible */
+  &.vjs-has-started .vjs-control-bar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Remove user-state hiding of controls */
+  &.vjs-user-inactive .vjs-control-bar,
+  &.vjs-user-active .vjs-control-bar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   @media (hover: none) {
@@ -182,31 +175,27 @@
       -webkit-tap-highlight-color: transparent;
     }
   }
-}
 
-.vjs-audio-rewind-control,
-.vjs-audio-fast-forward-control,
-.vjs-skip-previous-control,
-.vjs-skip-next-control {
-  width: 2.75rem !important;
-  height: 2.75rem !important;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    transform: scale(1.1);
-  }
-
-  &.vjs-disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-
-  @media (max-width: 640px) {
-    & svg {
-      width: 1rem;
-      height: 1rem;
-      margin: 0 auto;
+  .vjs-audio-rewind-control,
+  .vjs-audio-fast-forward-control,
+  .vjs-skip-previous-control,
+  .vjs-skip-next-control {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: scale(1.1);
     }
+
+    &.vjs-disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+  }
+
+  .vjs-skip-previous-control {
+    margin: auto 0 0 0;
   }
 }
