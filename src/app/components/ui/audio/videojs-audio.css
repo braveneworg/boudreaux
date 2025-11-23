@@ -26,11 +26,6 @@
   opacity: 1 !important;
 }
 
-/* Bigger play button on mobile */
-.video-js .vjs-play-control {
-  width: 48px;
-}
-
 /* Larger progress bar for easier touching */
 .video-js .vjs-progress-control {
   height: 30px;
@@ -49,105 +44,48 @@
 
 /* Optimize for small screens */
 @media (max-width: 640px) {
-  .video-js .vjs-time-control {
-    font-size: 12px;
-    padding: 0 0.5em;
-  }
-
-  .video-js .vjs-remaining-time {
-    display: block;
-  }
-
-  .video-js .vjs-current-time,
-  .video-js .vjs-duration,
-  .video-js .vjs-time-divider {
-    display: block;
-  }
-}
-
-/* Clean audio player styling */
-.video-js.vjs-audio {
-  /* height: 60px; */
-  /* background: transparent; */
-  font-size: 14px;
-}
-
-.video-js.vjs-audio .vjs-control-bar {
-  /* height: 60px; */
-  /* background: rgba(0, 0, 0, 0.05); */
-  border-radius: 12px;
-  position: relative;
-}
-
-.video-js.vjs-audio .vjs-progress-control {
-  position: absolute;
-  color: var(--color-zinc-50);
-  top: 12px;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: 4px;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-/* Smooth animations */
-.video-js .vjs-play-progress {
-  transition: width 0.2s ease;
-}
-
-/* Better touch feedback */
-.video-js button:active {
-  transform: scale(0.95);
-}
-
-/* Prevent controls from fading out */
-.video-js .vjs-control-bar {
-  transition: none !important;
-  padding-top: 0.75rem;
-}
-
-/* Ensure touch scrolling is smooth */
-.touch-pan-y {
-  touch-action: pan-y;
-}
-
-/* Prevent text selection on mobile */
-.select-none {
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .video-js {
   min-width: calc(20rem - 4rem);
   width: 100%;
-  height: 4.444rem !important;
+  height: 3rem !important;
 
   .vjs-button {
     width: var(--audio-control-button-size);
     height: var(--audio-control-button-size);
   }
 
-  &.vjs-has-started .vjs-control-bar {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative;
-    justify-content: center;
-    gap: 0.5rem;
+  .vjs-current-time,
+  .vjs-duration,
+  .vjs-time-divider {
+    display: block;
+  }
+
+  button:active {
+    /* Better touch feedback */
+    transform: scale(0.95);
   }
 
   &.vjs-audio {
     position: relative;
-
     border-radius: 0.5rem;
 
     & .vjs-control-bar {
       align-items: center;
-      background-color: transparent;
-      padding: 0;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 0.875rem;
+      display: flex !important;
+      gap: 0.5rem;
+      flex-wrap: wrap !important;
+      justify-content: center;
       margin: 0;
+      min-height: 3rem;
+      opacity: 1 !important;
+      position: relative;
+      padding: 0;
+      transition: none !important;
+      visibility: visible !important;
     }
 
     & .vjs-big-play-button {
@@ -155,14 +93,16 @@
     }
 
     & .vjs-progress-control {
+      align-items: center !important;
+      color: var(--color-zinc-50);
+      display: flex !important;
       flex: 1 1 auto !important;
+      height: auto !important;
+      max-width: calc(100% - 5.5rem) !important;
       order: 2 !important;
       position: relative !important;
-      top: -0.666rem;
-      height: auto !important;
-      display: flex !important;
-      align-items: center !important;
-      max-width: calc(100% - 5.5rem) !important;
+      top: -0.875rem;
+      width: 100%;
     }
 
     & .vjs-progress-holder {
@@ -174,7 +114,8 @@
 
     & .vjs-play-progress {
       background-color: currentColor;
-      border-radius: 3px;
+      border-radius: 0.188rem;
+      transition: width 0.2s ease;
     }
 
     & .vjs-current-time,
@@ -203,10 +144,17 @@
     & .vjs-volume-panel {
       order: 4 !important;
       position: relative;
-      top: -1.75rem;
-      left: 0.5rem;
+      top: -3rem;
+      left: 1.75rem;
       line-height: 0.75rem;
       height: 0.75rem;
+    }
+
+    /* Bigger play button on mobile */
+    & .vjs-play-control {
+      width: calc(var(--audio-control-button-size) + 0.25rem);
+      height: var(--audio-control-button-size);
+      top: -2.666rem;
     }
 
     & .vjs-mute-control,
@@ -215,12 +163,8 @@
       left: -0.25rem;
       top: -1.1rem;
       & .vjs-icon-placeholder::before {
-        font-size: 1rem;
+        font-size: 0.1rem;
       }
-    }
-
-    & .vjs-play-control {
-      top: -2.75rem;
     }
   }
 

@@ -283,3 +283,14 @@
 #devtools-indicator {
   display: none !important;
 }
+
+/* Prevent text selection on mobile */
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Ensure touch scrolling is smooth */
+.touch-pan-y {
+  touch-action: pan-y;
+}
