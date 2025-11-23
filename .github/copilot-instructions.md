@@ -43,6 +43,13 @@ Next.js v15.5.0 app with TypeScript, Tailwind v4, shadcn/ui, React Hook Form, Zo
 - Keep components small and focused
 - Prefer arrow functions for components
 - File name matches component name
+- Never create class components
+- Use props destructuring
+- Use React.FC only when necessary, prefer function declarations
+- Use React.memo for performance optimization of pure components
+- Use useCallback and useMemo for memoizing functions and values
+- Avoid inline functions and objects in JSX props
+- Use Fragment shorthand <> </> when no key or attribute is needed
 
 ### Forms
 
