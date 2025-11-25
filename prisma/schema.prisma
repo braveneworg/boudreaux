@@ -68,6 +68,8 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider])
 }
 
 model Session {
@@ -79,6 +81,9 @@ model Session {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expires])
 }
 
 model VerificationToken {
@@ -104,4 +109,241 @@ model Authenticator {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, credentialID])
+}
+
+model Image {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  caption   String?
+  artist    Artist   @relation(fields: [artistId], references: [id])
+  artistId  String   @db.ObjectId
+  release   Release? @relation(fields: [releaseId], references: [id])
+  releaseId String?  @db.ObjectId
+  group     Group?   @relation(fields: [groupId], references: [id])
+  groupId   String?  @db.ObjectId
+  track     Track?   @relation(fields: [trackId], references: [id])
+  trackId   String?  @db.ObjectId
+  url       Url?     @relation(fields: [urlId], references: [id])
+  urlId     String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([artistId])
+  @@index([releaseId])
+  @@index([groupId])
+  @@index([trackId])
+  @@index([urlId])
+}
+
+model Group {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  formedOn     DateTime?
+  endedOn      DateTime?
+  bio          String? // Markdown supported post-MVP, for now just plain text blurb
+  shortBio     String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  images       Image[]
+  artistGroups ArtistGroup[]
+
+  @@index([name])
+}
+
+enum Platform {
+  SPOTIFY
+  APPLE_MUSIC
+  BANDCAMP
+  YOUTUBE
+  SOUNDCLOUD
+  AMAZON_MUSIC
+  FACEBOOK
+  TWITTER
+  INSTAGRAM
+  BLUESKY
+  TIKTOK
+  WEBSITE
+}
+
+// Model to store various URLs associated with an artist on various platforms such as Bandcamp, Spotify, Apple Music, etc.
+// artistUrlPrefix will be derived from the platform type and combined with the url field to yield the full URL
+model Url {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist   Artist   @relation(fields: [artistId], references: [id])
+  artistId String   @db.ObjectId
+  platform Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
+  url      String // TODO: validate that this is a well-formed URL
+  images   Image[]
+
+  @@index([artistId])
+  @@index([platform])
+}
+
+model Genre {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Label {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  name         String        @unique
+  signedOn     DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  artistLabels ArtistLabel[]
+}
+
+model Artist {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  firstName      String
+  middleName     String? // Optional middle name; if stored with commas, split into array on retrieval
+  surname        String // aka last name; if stored with commas, split into array on retrieval
+  akaNames       String? // aka_name = also known as names; if stored with commas, split into array on retrieval
+  displayName    String? // The primary name to display for the artist; Will be derived from other name fields if not provided
+  title          String? // e.g., Dr., Prof., Sir, D.J., M.C.
+  suffix         String? // e.g., Jr., Sr., III, PhD
+  phone          String? // internal only; contact phone number; if stored with commas, split into array on retrieval
+  address1       String? // internal only; street address line 1
+  address2       String? // internal only; street address line 2, ie. apartment or suite number
+  city           String? // internal only; city
+  state          String? // internal only; state
+  postalCode     String? // internal only; postal code
+  country        String? // internal only; country
+  bio            String? // Markdown supported post-MVP, for now just plain text blurb
+  shortBio       String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
+  altBio         String? // Ditto md support; An alternative bio for special use cases
+  slug           String          @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
+  genres         String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
+  bornOn         DateTime? // Always feature artist on their birthday if known
+  diedOn         DateTime?
+  featuredOn     DateTime? // Date when artist was featured along with their latest release
+  publishedOn    DateTime? // Date when the artist was published
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime?       @updatedAt
+  archivedAt     DateTime? // Soft delete timestamp
+  deactivatedAt  DateTime? // Date when the artist was deactivated; ie. left the label
+  reactivatedAt  DateTime? // Date when the artist was reactivated; ie. re-signed with the label
+  notes          String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
+  images         Image[]
+  artistLabels   ArtistLabel[] // All labels the artist is/was associated with
+  artistGroups   ArtistGroup[] // Names of musical groups the artist is/was associated with
+  artistReleases ArtistRelease[] // Releases associated with the artist, including Tracks released
+  urls           Url[] // Various platform URLs associated with the artist
+  tags           String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
+  isPseudonymous Boolean         @default(false) // Don't display real name if true; use first of akaNames or displayName instead in that order
+  isActive       Boolean         @default(true) // Whether the artist is currently active; used for filtering in listings
+  instruments    String? // If stored with commas, split into array on retrieval; list of instruments the artist plays from primary to occasional
+  artistUrls     ArtistUrl[]
+
+  @@index([isActive])
+  @@index([featuredOn])
+  @@index([firstName, surname])
+  @@index([displayName])
+}
+
+model ArtistGroup {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  artist   Artist @relation(fields: [artistId], references: [id])
+  artistId String @db.ObjectId
+  group    Group  @relation(fields: [groupId], references: [id])
+  groupId  String @db.ObjectId
+
+  @@unique([artistId, groupId])
+  @@index([artistId])
+  @@index([groupId])
+}
+
+model ArtistLabel {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  artist   Artist @relation(fields: [artistId], references: [id])
+  artistId String @db.ObjectId
+  label    Label  @relation(fields: [labelId], references: [id])
+  labelId  String @db.ObjectId
+
+  @@unique([artistId, labelId])
+  @@index([artistId])
+  @@index([labelId])
+}
+
+model ArtistRelease {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  artist    Artist  @relation(fields: [artistId], references: [id])
+  artistId  String  @db.ObjectId
+  release   Release @relation(fields: [releaseId], references: [id])
+  releaseId String  @db.ObjectId
+
+  @@unique([artistId, releaseId])
+  @@index([artistId])
+  @@index([releaseId])
+}
+
+model ArtistUrl {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist   Artist   @relation(fields: [artistId], references: [id])
+  artistId String   @db.ObjectId
+  platform Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
+  url      String
+
+  @@unique([artistId, platform])
+  @@index([artistId])
+  @@index([platform])
+}
+
+// Add to Tag collection as new tags are created. Remove hash before storing
+model Tag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Release {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  coverArt       String
+  releasedOn     DateTime // Release date sans time component
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  publishedAt    DateTime? // Date when the release was published
+  images         Image[]
+  releaseTracks  ReleaseTrack[]
+  artistReleases ArtistRelease[]
+
+  @@index([releasedOn])
+  @@index([title])
+}
+
+model Track {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  duration      Int // Duration in seconds
+  audioFile     String // URL or file path to the audio file
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  images        Image[]
+  position      Int // Position of the track in the release; 0-based index
+  releaseTracks ReleaseTrack[]
+
+  @@index([title])
+  @@index([position])
+}
+
+model ReleaseTrack {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  release   Release @relation(fields: [releaseId], references: [id])
+  releaseId String  @db.ObjectId
+  track     Track   @relation(fields: [trackId], references: [id])
+  trackId   String  @db.ObjectId
+
+  @@unique([releaseId, trackId])
+  @@index([releaseId])
+  @@index([trackId])
+}
+
+model Instrument {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
