@@ -145,6 +145,7 @@ model Group {
   updatedAt    DateTime      @updatedAt
   images       Image[]
   artistGroups ArtistGroup[]
+  urls         Url[]
 
   @@index([name])
 }
@@ -162,17 +163,23 @@ enum Platform {
   BLUESKY
   TIKTOK
   WEBSITE
+  PATREON
+  DISCOGS
 }
 
 // Model to store various URLs associated with an artist on various platforms such as Bandcamp, Spotify, Apple Music, etc.
 // artistUrlPrefix will be derived from the platform type and combined with the url field to yield the full URL
 model Url {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  artist   Artist   @relation(fields: [artistId], references: [id])
-  artistId String   @db.ObjectId
-  platform Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
-  url      String // TODO: validate that this is a well-formed URL
-  images   Image[]
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist    Artist   @relation(fields: [artistId], references: [id])
+  artistId  String   @db.ObjectId
+  release   Release? @relation(fields: [releaseId], references: [id])
+  releaseId String?  @db.ObjectId
+  group     Group?   @relation(fields: [groupId], references: [id])
+  groupId   String?  @db.ObjectId
+  platform  Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
+  url       String // TODO: validate that this is a well-formed URL
+  images    Image[]
 
   @@index([artistId])
   @@index([platform])
@@ -309,6 +316,7 @@ model Release {
   images         Image[]
   releaseTracks  ReleaseTrack[]
   artistReleases ArtistRelease[]
+  urls           Url[]
 
   @@index([releasedOn])
   @@index([title])
