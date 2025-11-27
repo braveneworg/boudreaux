@@ -167,19 +167,55 @@ enum Platform {
   DISCOGS
 }
 
+enum Format {
+  DIGITAL
+  MP3_320KBPS
+  MP3_256KBPS
+  MP3_192KBPS
+  MP3_128KBPS
+  FLAC
+  ALAC
+  WAV
+  AIFF
+  AAC
+  OGG_VORBIS
+  WMA
+  CD
+  VINYL
+  VINYL_7_INCH
+  VINYL_10_INCH
+  VINYL_12_INCH
+  VINYL_180G
+  VINYL_COLORED
+  VINYL_PICTURE_DISC
+  VINYL_GATEFOLD
+  VINYL_SPLATTERED
+  VINYL_ETCHED
+  VINYL_45RPM
+  VINYL_33RPM
+  VINYL_TRANSPARENT
+  VINYL_DOUBLE_LP
+  VINYL_TRIPLE_LP
+  VINYL_QUAD_LP
+  CASSETTE
+  VIDEO
+  OTHER
+}
+
 // Model to store various URLs associated with an artist on various platforms such as Bandcamp, Spotify, Apple Music, etc.
 // artistUrlPrefix will be derived from the platform type and combined with the url field to yield the full URL
 model Url {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  artist    Artist   @relation(fields: [artistId], references: [id])
-  artistId  String   @db.ObjectId
-  release   Release? @relation(fields: [releaseId], references: [id])
-  releaseId String?  @db.ObjectId
-  group     Group?   @relation(fields: [groupId], references: [id])
-  groupId   String?  @db.ObjectId
-  platform  Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
-  url       String // TODO: validate that this is a well-formed URL
-  images    Image[]
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  artist      Artist       @relation(fields: [artistId], references: [id])
+  artistId    String       @db.ObjectId
+  release     Release?     @relation(fields: [releaseId], references: [id])
+  releaseId   String?      @db.ObjectId
+  group       Group?       @relation(fields: [groupId], references: [id])
+  groupId     String?      @db.ObjectId
+  platform    Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
+  url         String // TODO: validate that this is a well-formed URL
+  images      Image[]
+  releaseUrls ReleaseUrl[]
 
   @@index([artistId])
   @@index([platform])
@@ -305,18 +341,58 @@ model Tag {
   updatedAt DateTime @updatedAt
 }
 
+model Variants {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  description String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ReleaseUrl {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  release   Release @relation(fields: [releaseId], references: [id])
+  releaseId String  @db.ObjectId
+  url       Url     @relation(fields: [urlId], references: [id])
+  urlId     String  @db.ObjectId
+
+  @@index([releaseId])
+}
+
 model Release {
-  id             String          @id @default(auto()) @map("_id") @db.ObjectId
-  title          String
-  coverArt       String
-  releasedOn     DateTime // Release date sans time component
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  publishedAt    DateTime? // Date when the release was published
-  images         Image[]
-  releaseTracks  ReleaseTrack[]
-  artistReleases ArtistRelease[]
-  urls           Url[]
+  id                  String          @id @default(auto()) @map("_id") @db.ObjectId
+  title               String
+  labels              String[]
+  releasedOn          DateTime // Release date sans time component
+  catalogNumber       String?
+  coverArt            String
+  downloadUrls        String[]
+  formats             Format[] // enum
+  // Array of extended format data objects with structure:
+  // { format: Format, color?: string, isLimitedEdition: boolean, unitsPressed?: number, isSoldOut: boolean, hasLinerNotes: boolean, specialFeatures?: string[], bandcampUrl?: string, description?: string, notes?: string[] }
+  // See interface definitions in src/app/components/ui/audio/types.d.ts
+  // TODO: move types to a shared location for both frontend and backend use
+  extendedData        Json[]
+  images              Image[]
+  tags                String[]
+  notes               String[]
+  executiveProducedBy String[]
+  coProducedBy        String[]
+  masteredBy          String[]
+  mixedBy             String[]
+  recordedBy          String[]
+  artBy               String[]
+  designBy            String[]
+  photographyBy       String[]
+  linerNotesBy        String[]
+  imageTypes          String[]
+  variants            String[]
+  releaseTracks       ReleaseTrack[]
+  artistReleases      ArtistRelease[]
+  releaseUrls         ReleaseUrl[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  publishedAt         DateTime? // Date when the release was published
+  urls                Url[]
 
   @@index([releasedOn])
   @@index([title])
@@ -330,7 +406,7 @@ model Track {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   images        Image[]
-  position      Int // Position of the track in the release; 0-based index
+  position      Int // Position of the track in the release 0-based index
   releaseTracks ReleaseTrack[]
 
   @@index([title])
