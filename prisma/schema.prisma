@@ -299,6 +299,7 @@ model Artist {
   featuredArtistId      String?                @db.ObjectId
   track                 Track?                 @relation(fields: [trackId], references: [id])
   trackId               String?                @db.ObjectId
+  trackArtists          TrackArtist[]
 
   @@index([isActive])
   @@index([firstName, surname])
@@ -463,12 +464,25 @@ model Track {
   images          Image[]
   position        Int // Position of the track in the release 0-based index
   releaseTracks   ReleaseTrack[]
-  artists         Artist[]
+  artists         TrackArtist[]
   urls            Url[]
   featuredArtists FeaturedArtist[]
+  artists         Artist[]
 
   @@index([title])
   @@index([position])
+}
+
+model TrackArtist {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  track    Track  @relation(fields: [trackId], references: [id])
+  trackId  String @db.ObjectId
+  artist   Artist @relation(fields: [artistId], references: [id])
+  artistId String @db.ObjectId
+
+  @@unique([trackId, artistId])
+  @@index([trackId])
+  @@index([artistId])
 }
 
 model ReleaseTrack {

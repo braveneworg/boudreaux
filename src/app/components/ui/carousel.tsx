@@ -71,6 +71,7 @@ function Carousel({
     if (!api) return;
     setCanScrollPrev(api.canScrollPrev());
     setCanScrollNext(api.canScrollNext());
+    console.log(`74: carousel > api >>>`, api);
   }, []);
 
   const scrollPrev = useCallback(() => {
