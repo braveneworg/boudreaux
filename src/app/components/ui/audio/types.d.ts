@@ -8,6 +8,7 @@ interface Release {
   coverArt: string;
   bandcampUrl: string;
   releasedOn: string;
+  trackUrl?: string;
 }
 
 interface Artist {

@@ -94,6 +94,13 @@ export default defineConfig({
 
   resolve: {
     alias: {
+      // More specific aliases first (order matters for matching)
+      '@/components': path.resolve(process.cwd(), './src/app/components'),
+      '@/utils': path.resolve(process.cwd(), './src/app/lib/utils'),
+      '@/ui': path.resolve(process.cwd(), './src/app/components/ui'),
+      '@/lib': path.resolve(process.cwd(), './src/app/lib'),
+      '@/hooks': path.resolve(process.cwd(), './src/app/hooks'),
+      // General @ alias last
       '@': path.resolve(process.cwd(), './src'),
       // Keep only next/server alias - let vi.mock handle next/navigation
       'next/server': path.resolve(process.cwd(), './__mocks__/next/server.js'),
