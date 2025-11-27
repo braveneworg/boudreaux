@@ -197,17 +197,6 @@ export interface Variants {
 }
 
 /**
- * ReleaseUrl model - matches Prisma ReleaseUrl model
- */
-export interface ReleaseUrl {
-  id: string;
-  release: Release;
-  releaseId: string;
-  url: Url;
-  urlId: string;
-}
-
-/**
  * ReleaseTrack model - matches Prisma ReleaseTrack model
  */
 export interface ReleaseTrack {
@@ -279,50 +268,38 @@ export type User = Prisma.UserGetPayload<{
   };
 }>;
 
-export interface Release extends MediaEntity {
-  title: string;
-  labels?: string[]; // Defaults to "Fake Four Inc." if not specified; maybe there could be more than one label associated with a release, I'm
-  formats?: Format[]; // If this isn't specified, assume some basic set of formats available
-  releasedOn: Date;
-  catalogNumber?: string;
-  coverArt?: string;
-  downloadUrls?: string[]; // If not specified (yet?), assume streaming only for now;
-  extendedData?: Json;
-  images: Image[]; // First image is the cover art
-  tags?: string[];
-  notes?: string[];
-  executiveProducedBy?: string[];
-  coProducedBy?: string[];
-  masteredBy?: string[];
-  mixedBy?: string[];
-  recordedBy?: string[];
-  artBy: string[]; // e.g., Cover Art, Layout, etc.
-  designBy?: string[]; // e.g., Andy McAlpine
-  photographyBy?: string[]; // e.g., Jane Doe
-  linerNotesBy?: string[]; // e.g., John Smith, et al.
-  imageTypes?: string[]; // e.g., Cover Photo, Back Cover, Insert, etc.
-  releaseTracks: ReleaseTrack[]; // All the tracks on this release
-  artistReleases: ArtistRelease[]; // All the artists associated with this release
-  releaseUrls: ReleaseUrl[]; // artist, platform, url, etc.
-  variants: string[]; // e.g., Deluxe Edition, Remastered, etc.
-}
+export type Release = Prisma.ReleaseGetPayload<{
+  include: {
+    images: true;
+    artistReleases: {
+      include: {
+        artist: true;
+      };
+    };
+    releaseTracks: {
+      include: {
+        track: true;
+      };
+    };
+    releaseUrls: {
+      include: {
+        url: true;
+      };
+    };
+  };
+}>;
 
-export interface Url extends MediaEntity {
-  artist: Artist;
-  artistId: string;
-  release?: Release;
-  releaseId?: string;
-  group?: Group;
-  groupId?: string;
-  platform: Platform;
-  url: string;
-  track?: Track;
-  trackId?: string;
-}
+export type Url = Prisma.UrlGetPayload<{
+  include: {
+    artist: true;
+    release: true;
+    track: true;
+  };
+}>;
 
-export interface ReleaseUrl extends Identity {
-  release: Release;
-  releaseId: string;
-  url: Url;
-  urlId: string;
-}
+export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
+  include: {
+    release: true;
+    url: true;
+  };
+}>;
