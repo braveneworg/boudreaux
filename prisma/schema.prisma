@@ -114,6 +114,7 @@ model Authenticator {
 model Image {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   caption   String?
+  altText   String?
   artist    Artist   @relation(fields: [artistId], references: [id])
   artistId  String   @db.ObjectId
   release   Release? @relation(fields: [releaseId], references: [id])

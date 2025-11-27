@@ -7,7 +7,7 @@ interface Release {
   catalogNumber: string;
   coverArt: string;
   bandcampUrl: string;
-  releasedOn: number;
+  releasedOn: string;
 }
 
 interface Artist {

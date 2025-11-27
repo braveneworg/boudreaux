@@ -43,7 +43,7 @@ const artists: Artist[] = [
         catalogNumber: 'CAT001',
         coverArt: '/media/ceschi/thank-plath.jpg',
         bandcampUrl: 'https://artist1.bandcamp.com',
-        releasedOn: 1622505600,
+        releasedOn: new Date('2025-07-24'),
       },
     ],
     artists: [],
@@ -95,6 +95,52 @@ const artists: Artist[] = [
     artists: [],
     bandcampUrl: 'https://artist1.bandcamp.com',
   },
+  {
+    id: '3',
+    displayName: 'Artist 1',
+    first: 'First 1',
+    last: 'Last 1',
+    name: 'Artist One',
+    pics: ['pic1.jpg'],
+    releases: [
+      {
+        id: '3',
+        title: 'Release 1',
+        format: 'Digital',
+        year: 2021,
+        label: 'Label 1',
+        catalogNumber: 'CAT001',
+        coverArt: '/media/ceschi/broken-bone-ballads.jpeg',
+        bandcampUrl: 'https://artist1.bandcamp.com',
+        releasedOn: 1622505600,
+      },
+    ],
+    artists: [],
+    bandcampUrl: 'https://artist1.bandcamp.com',
+  },
+  {
+    id: '4  ',
+    displayName: 'Artist 1',
+    first: 'First 1',
+    last: 'Last 1',
+    name: 'Artist One',
+    pics: ['pic1.jpg'],
+    releases: [
+      {
+        id: '3',
+        title: 'Release 1',
+        format: 'Digital',
+        year: 2021,
+        label: 'Label 1',
+        catalogNumber: 'CAT001',
+        coverArt: '/media/factor-chandelier/as-dark-as-today.jpg',
+        bandcampUrl: 'https://artist1.bandcamp.com',
+        releasedOn: '2025-07-24',
+      },
+    ],
+    artists: [],
+    bandcampUrl: 'https://artist1.bandcamp.com',
+  },
 ];
 
 interface MobileCardPlayerProps {
@@ -118,6 +164,7 @@ export function MobileCardPlayer({
 }: MobileCardPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const albumArtRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -168,6 +215,11 @@ export function MobileCardPlayer({
     };
   }, [audioSrc, onPreviousTrack, onNextTrack]);
 
+  const handleSelect = (artist: Artist) => {
+    console.log('Selected artist:', artist);
+    // Implement logic to update the player with the selected artist's track
+  };
+
   // const Button = videojs.getComponent('Button');
 
   // Register components
@@ -178,19 +230,20 @@ export function MobileCardPlayer({
 
   return (
     <>
-      <div className="px-4 sm:px-6">
-        <FeaturedArtistsThumbCarousel artists={artists} />
+      <div>
+        <FeaturedArtistsThumbCarousel onSelect={handleSelect} artists={artists} />
         <Image
+          ref={albumArtRef}
           src={albumArt}
           alt={`${album} by ${artist}`}
-          width={380}
-          height={380}
-          className="w-full aspect-square object-cover rounded-lg"
+          width={360}
+          height={360}
+          className="w-full min-w-[322px] aspect-square object-cover rounded-lg border border-solid border-zinc-300 shadow-lg mx-0 p-0 my-3"
         />
       </div>
 
       {/* Audio Player - Full Width on Mobile, Controls Always Visible */}
-      <div className="p-4 sm:p-6 pt-4">
+      <div className="p-0 m-0">
         <div className="audio-player-wrapper">
           <audio
             ref={audioRef}

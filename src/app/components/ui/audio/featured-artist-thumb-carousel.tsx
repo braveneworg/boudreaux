@@ -8,18 +8,46 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 
-export function FeaturedArtistsThumbCarousel({ artists }: { artists: Artist[] }) {
+export function FeaturedArtistsThumbCarousel({
+  artists,
+  onSelect,
+}: {
+  artists: Artist[];
+  onSelect: (artist: Artist) => void;
+}) {
+  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    // Handle click event
+    console.log(`Clicked on artist: ${event.currentTarget}`);
+    const artist = artists.find((a) => a.id === event.currentTarget.dataset.id);
+    if (artist) {
+      onSelect(artist);
+    }
+  };
+
   return (
-    <Carousel aria-label="Featured Artists" orientation="horizontal">
-      <CarouselContent className="flex justify-center gap-2">
+    <Carousel
+      aria-label="Featured Artists"
+      orientation="horizontal"
+      opts={{
+        align: 'center',
+        slidesToScroll: 3,
+        loop: true,
+      }}
+    >
+      <CarouselContent className="gap-6">
         {artists.map((artist) => (
-          <CarouselItem key={artist.id}>
+          <CarouselItem key={artist.id} onClick={handleClick}>
             <Image
-              className="border-radius-[0.5rem]"
-              src={artist.releases.sort((a, b) => b.releasedOn - a.releasedOn)[0].coverArt}
+              data-id={artist.id}
+              className="relative aspect-square w-24 rounded-lg border border-solid border-zinc-300 shadow-lg"
+              src={
+                artist.releases.sort(
+                  (a, b) => new Date(b.releasedOn).getTime() - new Date(a.releasedOn).getTime()
+                )[0].coverArt
+              }
               alt={artist.name}
-              width={84}
-              height={84}
+              width={96}
+              height={96}
             />
           </CarouselItem>
         ))}
