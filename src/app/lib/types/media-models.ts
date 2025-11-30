@@ -179,6 +179,10 @@ export interface Artist {
   bornOn?: Date;
   diedOn?: Date;
   featuredOn?: Date;
+  featuredUntil?: Date;
+  featuredTrack?: Track;
+  featuredTrackId?: string;
+  featuredDescription?: string;
   publishedOn?: Date;
   createdAt: Date;
   updatedAt?: Date;
@@ -283,6 +287,7 @@ export interface Release {
   releasedOn: Date;
   catalogNumber?: string;
   coverArt: string;
+  description?: string;
   downloadUrls: string[];
   formats: Format[];
   extendedData: Json[];

@@ -238,46 +238,49 @@ model Label {
 }
 
 model Artist {
-  id             String          @id @default(auto()) @map("_id") @db.ObjectId
-  firstName      String
-  middleName     String? // Optional middle name; if stored with commas, split into array on retrieval
-  surname        String // aka last name; if stored with commas, split into array on retrieval
-  akaNames       String? // aka_name = also known as names; if stored with commas, split into array on retrieval
-  displayName    String? // The primary name to display for the artist; Will be derived from other name fields if not provided
-  title          String? // e.g., Dr., Prof., Sir, D.J., M.C.
-  suffix         String? // e.g., Jr., Sr., III, PhD
-  phone          String? // internal only; contact phone number; if stored with commas, split into array on retrieval
-  address1       String? // internal only; street address line 1
-  address2       String? // internal only; street address line 2, ie. apartment or suite number
-  city           String? // internal only; city
-  state          String? // internal only; state
-  postalCode     String? // internal only; postal code
-  country        String? // internal only; country
-  bio            String? // Markdown supported post-MVP, for now just plain text blurb
-  shortBio       String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
-  altBio         String? // Ditto md support; An alternative bio for special use cases
-  slug           String          @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
-  genres         String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
-  bornOn         DateTime? // Always feature artist on their birthday if known
-  diedOn         DateTime?
-  featuredOn     DateTime? // Date when artist was featured along with their latest release
-  publishedOn    DateTime? // Date when the artist was published
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime?       @updatedAt
-  archivedAt     DateTime? // Soft delete timestamp
-  deactivatedAt  DateTime? // Date when the artist was deactivated; ie. left the label
-  reactivatedAt  DateTime? // Date when the artist was reactivated; ie. re-signed with the label
-  notes          String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
-  images         Image[]
-  artistLabels   ArtistLabel[] // All labels the artist is/was associated with
-  artistGroups   ArtistGroup[] // Names of musical groups the artist is/was associated with
-  artistReleases ArtistRelease[] // Releases associated with the artist, including Tracks released
-  urls           Url[] // Various platform URLs associated with the artist
-  tags           String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
-  isPseudonymous Boolean         @default(false) // Don't display real name if true; use first of akaNames or displayName instead in that order
-  isActive       Boolean         @default(true) // Whether the artist is currently active; used for filtering in listings
-  instruments    String? // If stored with commas, split into array on retrieval; list of instruments the artist plays from primary to occasional
-  artistUrls     ArtistUrl[]
+  id                  String          @id @default(auto()) @map("_id") @db.ObjectId
+  firstName           String
+  middleName          String? // Optional middle name; if stored with commas, split into array on retrieval
+  surname             String // aka last name; if stored with commas, split into array on retrieval
+  akaNames            String? // aka_name = also known as names; if stored with commas, split into array on retrieval
+  displayName         String? // The primary name to display for the artist; Will be derived from other name fields if not provided
+  title               String? // e.g., Dr., Prof., Sir, D.J., M.C.
+  suffix              String? // e.g., Jr., Sr., III, PhD
+  phone               String? // internal only; contact phone number; if stored with commas, split into array on retrieval
+  address1            String? // internal only; street address line 1
+  address2            String? // internal only; street address line 2, ie. apartment or suite number
+  city                String? // internal only; city
+  state               String? // internal only; state
+  postalCode          String? // internal only; postal code
+  country             String? // internal only; country
+  bio                 String? // Markdown supported post-MVP, for now just plain text blurb
+  shortBio            String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
+  altBio              String? // Ditto md support; An alternative bio for special use cases
+  slug                String          @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
+  genres              String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
+  bornOn              DateTime? // Always feature artist on their birthday if known
+  diedOn              DateTime?
+  featuredOn          DateTime? // Date when artist was featured along with their latest release
+  featuredTrack       Track?          @relation(fields: [featuredTrackId], references: [id])
+  featuredTrackId     String?         @db.ObjectId
+  featuredDescription String? // Markdown supported post-MVP; A special description to use when the artist is featured; keep it brief
+  publishedOn         DateTime? // Date when the artist was published
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime?       @updatedAt
+  archivedAt          DateTime? // Soft delete timestamp
+  deactivatedAt       DateTime? // Date when the artist was deactivated; ie. left the label
+  reactivatedAt       DateTime? // Date when the artist was reactivated; ie. re-signed with the label
+  notes               String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
+  images              Image[]
+  artistLabels        ArtistLabel[] // All labels the artist is/was associated with
+  artistGroups        ArtistGroup[] // Names of musical groups the artist is/was associated with
+  artistReleases      ArtistRelease[] // Releases associated with the artist, including Tracks released
+  urls                Url[] // Various platform URLs associated with the artist
+  tags                String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
+  isPseudonymous      Boolean         @default(false) // Don't display real name if true; use first of akaNames or displayName instead in that order
+  isActive            Boolean         @default(true) // Whether the artist is currently active; used for filtering in listings
+  instruments         String? // If stored with commas, split into array on retrieval; list of instruments the artist plays from primary to occasional
+  artistUrls          ArtistUrl[]
 
   @@index([isActive])
   @@index([featuredOn])
@@ -365,12 +368,11 @@ model Release {
   releasedOn          DateTime // Release date sans time component
   catalogNumber       String?
   coverArt            String
+  description         String? // Markdown supported post-MVP; A general description of the release for use in various contexts; keep it brief
   downloadUrls        String[]
   formats             Format[] // enum
   // Array of extended format data objects with structure:
   // { format: Format, color?: string, isLimitedEdition: boolean, unitsPressed?: number, isSoldOut: boolean, hasLinerNotes: boolean, specialFeatures?: string[], bandcampUrl?: string, description?: string, notes?: string[] }
-  // See interface definitions in src/app/components/ui/audio/types.d.ts
-  // TODO: move types to a shared location for both frontend and backend use
   extendedData        Json[]
   images              Image[]
   tags                String[]
@@ -408,6 +410,7 @@ model Track {
   images        Image[]
   position      Int // Position of the track in the release 0-based index
   releaseTracks ReleaseTrack[]
+  artists       Artist[]
 
   @@index([title])
   @@index([position])
