@@ -261,6 +261,7 @@ model Artist {
   bornOn              DateTime? // Always feature artist on their birthday if known
   diedOn              DateTime?
   featuredOn          DateTime? // Date when artist was featured along with their latest release
+  featuredUntil       DateTime? // Date when the featured period ends; if not set, artist remains featured indefinitely
   featuredTrack       Track?          @relation(fields: [featuredTrackId], references: [id])
   featuredTrackId     String?         @db.ObjectId
   featuredDescription String? // Markdown supported post-MVP; A special description to use when the artist is featured; keep it brief
@@ -284,6 +285,7 @@ model Artist {
 
   @@index([isActive])
   @@index([featuredOn])
+  @@index([featuredUntil])
   @@index([firstName, surname])
   @@index([displayName])
 }
@@ -394,10 +396,15 @@ model Release {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   publishedAt         DateTime? // Date when the release was published
+  featuredOn          DateTime? // Date when the release was featured
+  featuredUntil       DateTime? // Date when the featured period ends; if not set, release remains featured indefinitely
+  featuredDescription String? // A special description to use when the release is featured; keep it brief
   urls                Url[]
 
   @@index([releasedOn])
   @@index([title])
+  @@index([featuredOn])
+  @@index([featuredUntil])
 }
 
 model Track {
