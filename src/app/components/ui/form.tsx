@@ -14,7 +14,7 @@ import {
 } from 'react-hook-form';
 
 import { Label } from '@/app/components/ui/label';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/lib/utils';
 
 import type * as LabelPrimitive from '@radix-ui/react-label';
 
@@ -51,13 +51,18 @@ const useFormField = () => {
     throw new Error('useFormField should be used within a FormProvider (Form)');
   }
 
-  const { getFieldState } = formContext;
-  const formState = useFormState({ name: fieldContext.name });
-  const fieldState = getFieldState(fieldContext.name, formState);
-
   if (!fieldContext) {
     throw new Error('useFormField should be used within <FormField>');
   }
+
+  const { getFieldState, control } = formContext;
+
+  if (!control) {
+    throw new Error('Form control is undefined. Ensure the form is properly initialized.');
+  }
+
+  const formState = useFormState({ control });
+  const fieldState = getFieldState(fieldContext.name, formState);
 
   const { id } = itemContext;
 

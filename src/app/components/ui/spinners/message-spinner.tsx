@@ -1,4 +1,4 @@
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/lib/utils';
 
 import { SpinnerRingCircle } from './spinner-ring-circle';
 

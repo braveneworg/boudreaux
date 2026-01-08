@@ -8,7 +8,6 @@ import Image from 'next/image';
 import { ChevronDown, ChevronUp, EllipsisVertical, Search as SearchIcon } from 'lucide-react';
 import videojs from 'video.js';
 
-import { getArtistDisplayName } from '@/app/lib/utils/get-artist-display-name';
 import TextField from '@/components/forms/fields/text-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +27,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import type { Artist, Release } from '@/lib/types/media-models';
+import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import {
   AudioFastForwardButton,
@@ -147,17 +147,24 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
   return (
     <Carousel aria-label="Featured Artists" orientation="horizontal">
       <CarouselContent className="flex justify-center gap-2">
-        {numberUpSliced.map((artist) => (
-          <CarouselItem key={artist.id}>
-            <Image
-              className="border-radius-[0.5rem]"
-              src={artist.releases.sort((a, b) => b.releasedOn - a.releasedOn)[0].coverArt}
-              alt={artist.name}
-              width={84}
-              height={84}
-            />
-          </CarouselItem>
-        ))}
+        {numberUpSliced.map((artist) => {
+          const latestRelease = artist.releases.sort(
+            (a, b) => b.release.releasedOn.getTime() - a.release.releasedOn.getTime()
+          )[0];
+          const latestCoverArt = latestRelease?.release.coverArt;
+
+          return (
+            <CarouselItem key={artist.id}>
+              <Image
+                className="border-radius-[0.5rem]"
+                src={latestCoverArt}
+                alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
+                width={84}
+                height={84}
+              />
+            </CarouselItem>
+          );
+        })}
       </CarouselContent>
       <CarouselPrevious />
       <CarouselNext />
@@ -189,7 +196,7 @@ const CoverArtView = ({
   return (
     <Image
       src={release.coverArt}
-      alt={`${release.title} by ${artist.name}`}
+      alt={`${release.title} by ${getArtistDisplayName(artist)}`}
       width={width}
       height={height}
       className="w-full aspect-square object-cover rounded-lg"
@@ -402,14 +409,13 @@ const TrackListDrawer = ({
   artistRelease,
   currentTrackId,
   onTrackSelect,
-  children,
 }: {
   artistRelease: { release: Release; artist: Artist };
   currentTrackId?: string;
   onTrackSelect?: (trackId: string) => void;
 }) => {
-  const { artist, release } = artistRelease;
-  const { releaseTracks } = artistRelease.release;
+  const { release } = artistRelease;
+  const { releaseTracks } = release;
 
   // TODO: verify if this function is actually needed?
   /**
@@ -494,9 +500,6 @@ const TrackListDrawer = ({
             Close
           </Button>
         </DrawerClose>
-        <MediaPlayer.Description
-          description={artist.featuredOn ? artist.featuredDescription : release.description}
-        />
       </DrawerContent>
     </Drawer>
   );
@@ -663,10 +666,12 @@ const SocialSharer = () => <div>SocialSharer</div>;
 type MediaPlayerComponent =
   | typeof Search
   | typeof CoverArtView
-  | typeof Controls
   | typeof CoverArtCarousel
+  | typeof Controls
   | typeof Description
   | typeof DotNavMenu
+  | typeof DotNavMenuItem
+  | typeof DotNavMenuTrigger
   | typeof TrackListDrawer
   | typeof InfoTickerTape
   | typeof SocialSharer;
@@ -741,9 +746,9 @@ MediaPlayer.CoverArtView = CoverArtView;
 MediaPlayer.InfoTickerTape = InfoTickerTape;
 MediaPlayer.Controls = Controls;
 MediaPlayer.CoverArtCarousel = CoverArtCarousel;
-// MediaPlayer.Description = Description;
-// MediaPlayer.DotNavMenu = DotNavMenu;
-// MediaPlayer.DotNavMenuItem = DotNavMenuItem;
-// MediaPlayer.DotNavMenuTrigger = DotNavMenuTrigger;
+MediaPlayer.Description = Description;
+MediaPlayer.DotNavMenu = DotNavMenu;
+MediaPlayer.DotNavMenuItem = DotNavMenuItem;
+MediaPlayer.DotNavMenuTrigger = DotNavMenuTrigger;
 MediaPlayer.TrackListDrawer = TrackListDrawer;
-// MediaPlayer.SocialSharer = SocialSharer;
+MediaPlayer.SocialSharer = SocialSharer;

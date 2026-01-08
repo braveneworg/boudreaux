@@ -64,14 +64,28 @@ describe('middleware', () => {
     } as unknown as NextRequest;
   };
 
-  const createMockToken = (overrides: Partial<JWT> = {}): JWT =>
-    ({
+  const createMockToken = (overrides: Partial<JWT> = {}): JWT => {
+    const defaultToken = {
       sub: '1',
       email: 'test@example.com',
       name: 'Test User',
-      role: 'user',
+      user: {
+        id: '1',
+        username: 'testuser',
+        email: 'test@example.com',
+        role: 'user',
+      },
+    };
+
+    return {
+      ...defaultToken,
       ...overrides,
-    }) as JWT;
+      user: {
+        ...defaultToken.user,
+        ...(overrides as any).user,
+      },
+    } as JWT;
+  };
 
   describe('public routes', () => {
     const publicRoutes = [
@@ -188,7 +202,7 @@ describe('middleware', () => {
     });
 
     it('should reject non-admin users trying to access admin routes with 403', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: 'user' } }));
 
       const request = createMockRequest('/admin/dashboard');
       const result = (await middleware(request)) as unknown as MockResponse;
@@ -203,7 +217,7 @@ describe('middleware', () => {
         createMockToken({
           email: 'admin@example.com',
           name: 'Admin User',
-          role: 'admin',
+          user: { role: 'admin' },
         })
       );
 
@@ -220,7 +234,7 @@ describe('middleware', () => {
         createMockToken({
           email: 'admin@example.com',
           name: 'Admin User',
-          role: 'admin',
+          user: { role: 'admin' },
         })
       );
 
@@ -237,7 +251,7 @@ describe('middleware', () => {
         createMockToken({
           email: 'admin@example.com',
           name: 'Admin User',
-          role: 'admin',
+          user: { role: 'admin' },
         })
       );
 
@@ -311,7 +325,9 @@ describe('middleware', () => {
     });
 
     it('should handle token with missing role property', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: undefined } as unknown as JWT));
+      mockGetToken.mockResolvedValue(
+        createMockToken({ user: { role: undefined } } as unknown as JWT)
+      );
 
       // Set callbackUrl to match pathname to reach admin check
       const request = createMockRequest('/admin/dashboard', {
@@ -326,7 +342,7 @@ describe('middleware', () => {
     });
 
     it('should handle token with null role property', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: null } as unknown as JWT));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: null } } as unknown as JWT));
 
       // Set callbackUrl to match pathname to reach admin check
       const request = createMockRequest('/admin/dashboard', {
@@ -367,7 +383,7 @@ describe('middleware', () => {
     });
 
     it('should log unauthorized admin access attempts with user details', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: 'user', sub: '123' }));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: 'user' }, sub: '123' }));
 
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
@@ -386,7 +402,7 @@ describe('middleware', () => {
     });
 
     it('should log IP address from x-forwarded-for header', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: 'user' } }));
 
       const mockRequest = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
@@ -406,7 +422,7 @@ describe('middleware', () => {
     });
 
     it('should log IP address from x-real-ip header when x-forwarded-for is not available', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: 'user' }));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: 'user' } }));
 
       const mockRequest = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
@@ -424,7 +440,9 @@ describe('middleware', () => {
     });
 
     it('should log "none" for userRole when role is undefined', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: undefined } as unknown as JWT));
+      mockGetToken.mockResolvedValue(
+        createMockToken({ user: { role: undefined } } as unknown as JWT)
+      );
 
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
@@ -595,7 +613,7 @@ describe('middleware', () => {
 
   describe('role-based access variations', () => {
     it('should reject admin access with empty string role', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: '' } as unknown as JWT));
+      mockGetToken.mockResolvedValue(createMockToken({ user: { role: '' } } as unknown as JWT));
 
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },
@@ -609,7 +627,9 @@ describe('middleware', () => {
     });
 
     it('should reject admin access with incorrect role casing', async () => {
-      mockGetToken.mockResolvedValue(createMockToken({ role: 'ADMIN' } as unknown as JWT));
+      mockGetToken.mockResolvedValue(
+        createMockToken({ user: { role: 'ADMIN' } } as unknown as JWT)
+      );
 
       const request = createMockRequest('/admin/dashboard', {
         searchParams: { callbackUrl: '/admin/dashboard' },

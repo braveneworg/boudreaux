@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
-import type { FormState } from '@/app/lib/types/form-state';
+import type { FormState } from '@/lib/types/form-state';
 
 import type { Control } from 'react-hook-form';
 

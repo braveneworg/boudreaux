@@ -5,9 +5,9 @@ import type { JSX } from 'react';
 
 import HealthStatusIcon from './health-status-icon';
 import HealthStatusMessage from './health-status-message';
-import { getApiBaseUrl } from '../lib/utils/database-utils';
+import { getApiBaseUrl } from '../../lib/utils/database-utils';
 
-import type { HealthStatus } from '../lib/types/health-status';
+import type { HealthStatus } from '../../lib/types/health-status';
 
 const MAX_RETRY_ATTEMPTS = 10;
 

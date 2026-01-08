@@ -1,4 +1,4 @@
-import { checkDatabaseHealth } from '@/app/lib/utils/database-utils';
+import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 
 import { GET } from './route';
 

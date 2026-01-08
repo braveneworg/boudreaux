@@ -1,4 +1,5 @@
 // types/next-auth.d.ts (or similar)
+import type { User } from '@prisma/client';
 import type { DefaultSession, DefaultUser } from 'next-auth';
 import type { DefaultJWT } from 'next-auth/jwt';
 
@@ -71,20 +72,6 @@ declare module 'next-auth/adapters' {
 
 declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
-    id: string;
-    username: string;
-    email: string;
-    role?: string;
-    // Add other custom properties if needed
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-    country?: string;
-    allowSmsNotifications?: boolean;
+    user: User & AdapterUser;
   }
 }

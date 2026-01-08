@@ -32,7 +32,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
   );
 
   return (
-    <div className="sticky top-0 left-0 right-0 z-[100] w-full">
+    <div className="sticky top-0 left-0 right-0 z-100 w-full">
       {/* Animated background layer */}
       <motion.div
         animate={{

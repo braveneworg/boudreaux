@@ -23,4 +23,4 @@ export type {
   Track,
   Url,
   Variants,
-} from '../../../lib/types/media-models';
+} from '../../../../lib/types/media-models';

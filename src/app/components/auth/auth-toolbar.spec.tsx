@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
-import { CONSTANTS } from '@/app/lib/constants';
+import { CONSTANTS } from '@/lib/constants';
 
 import AuthToolbar from './auth-toolbar';
 

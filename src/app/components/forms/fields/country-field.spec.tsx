@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import { type ProfileFormData } from '@/app/lib/validation/profile-schema';
+import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
 import CountryField from './country-field';
 

@@ -4,9 +4,9 @@ import { usePathname } from 'next/navigation';
 
 import { useSession } from 'next-auth/react';
 
-import { CONSTANTS } from '@/app/lib/constants';
-import { log } from '@/app/lib/utils/console-logger';
-import { cn } from '@/app/lib/utils/tailwind-utils';
+import { CONSTANTS } from '@/lib/constants';
+import { log } from '@/lib/utils/console-logger';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 import SignInLink from './signin-link';
 import SignedinToolbar from './signout-button';
