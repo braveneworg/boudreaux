@@ -6,16 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { Separator } from '@radix-ui/react-separator';
-import {
-  ArchiveRestoreIcon,
-  BookCheck,
-  Eye,
-  InfoIcon,
-  Pencil,
-  Send,
-  Trash2Icon,
-  X,
-} from 'lucide-react';
+import { ArchiveRestoreIcon, BookCheck, Eye, InfoIcon, Send, Trash2Icon, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { AdminEntity } from '@/app/admin/types';
@@ -34,7 +25,6 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { Switch } from '@/app/components/ui/switch';
-import VerticalSeparator from '@/app/components/ui/vertical-separator';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 import { toPascalCase } from '@/lib/utils/string-utils';
 
@@ -298,11 +288,6 @@ export function DataView<T extends Record<string, unknown>>({
                         return null;
                       })()}
                     <div className="flex flex-row justify-center gap-2 items-center mb-2">
-                      <Pencil className="h-4 w-4" />
-                      <Link href={`/admin/${entity}s/${id}?edit=true`}>
-                        Edit {getDisplayName(item)}
-                      </Link>
-                      <VerticalSeparator className="h-4! border-[0.5px] border-zinc-300" />
                       <InfoIcon className="h-4 w-4" />
                       <Link href={`/admin/${entity}s/${id}`}>View more info</Link>
                     </div>

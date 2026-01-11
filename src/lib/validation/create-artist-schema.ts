@@ -70,7 +70,11 @@ export const createArtistSchema = z.object({
   bornOn: z.string().optional().or(z.literal('')),
   diedOn: z.string().optional().or(z.literal('')),
   publishedOn: z.string().optional().or(z.literal('')),
-  createdBy: z.uuid().optional(),
+  // MongoDB ObjectId is a 24-character hex string, not a standard UUID
+  createdBy: z
+    .string()
+    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid MongoDB ObjectId format' })
+    .optional(),
 });
 
 type schemaType = typeof createArtistSchema & Partial<FormData>;
