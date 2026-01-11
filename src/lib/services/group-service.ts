@@ -271,7 +271,9 @@ export class GroupService {
 
       const s3Client = getS3Client();
       const bucket = process.env.AWS_S3_BUCKET_NAME;
-      const cdnDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
+      const cdnDomainRaw = process.env.AWS_CLOUDFRONT_DOMAIN;
+      // Strip any existing protocol from CDN domain to avoid double https://
+      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
 
       if (!bucket) {
         return { success: false, error: 'S3 bucket not configured' };
@@ -351,14 +353,17 @@ export class GroupService {
 
       // Extract S3 key from URL
       if (image.src) {
-        const cdnDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
+        const cdnDomainRaw = process.env.AWS_CLOUDFRONT_DOMAIN;
+        // Strip any existing protocol from CDN domain
+        const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
         const bucket = process.env.AWS_S3_BUCKET_NAME;
         let key: string | null = null;
 
         if (cdnDomain && image.src.includes(cdnDomain)) {
-          key = image.src.replace(`https://${cdnDomain}/`, '');
+          // Extract key from CDN URL (handles both correct and malformed URLs with double https://)
+          key = image.src.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
         } else if (bucket && image.src.includes(bucket)) {
-          key = image.src.replace(`https://${bucket}.s3.amazonaws.com/`, '');
+          key = image.src.replace(/^(https?:\/\/)+/, '').replace(`${bucket}.s3.amazonaws.com/`, '');
         }
 
         if (key) {

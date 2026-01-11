@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -427,6 +428,72 @@ export default function GroupForm({ groupId: initialGroupId }: GroupFormProps) {
           if (groupId) {
             const newFormState = await updateGroupAction(groupId, formState, formData);
             if (newFormState.success) {
+              // Upload any pending images for existing group
+              const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
+              if (imagesToUpload.length > 0) {
+                setIsUploadingImages(true);
+                setImages((prev) =>
+                  prev.map((img) =>
+                    img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
+                  )
+                );
+
+                try {
+                  const imageFormData = new FormData();
+                  for (const img of imagesToUpload) {
+                    if (img.file) {
+                      imageFormData.append('files', img.file);
+                      imageFormData.append('captions', img.caption || '');
+                      imageFormData.append('altTexts', img.altText || '');
+                    }
+                  }
+
+                  const uploadResult = await uploadGroupImagesAction(groupId, imageFormData);
+
+                  if (uploadResult.success && uploadResult.data) {
+                    setImages((prev) => {
+                      const uploadedData = uploadResult.data || [];
+                      let uploadIndex = 0;
+                      return prev.map((img) => {
+                        if (img.file && !img.uploadedUrl && uploadedData[uploadIndex]) {
+                          const uploaded = uploadedData[uploadIndex];
+                          uploadIndex++;
+                          return {
+                            ...img,
+                            id: uploaded.id,
+                            uploadedUrl: uploaded.src,
+                            isUploading: false,
+                            sortOrder: uploaded.sortOrder,
+                          };
+                        }
+                        return { ...img, isUploading: false };
+                      });
+                    });
+                  } else {
+                    setImages((prev) =>
+                      prev.map((img) =>
+                        img.file && !img.uploadedUrl
+                          ? { ...img, isUploading: false, error: uploadResult.error }
+                          : img
+                      )
+                    );
+                    toast.error(uploadResult.error || 'Failed to upload images');
+                  }
+                } catch (uploadError) {
+                  error('Image upload error:', uploadError);
+                  setImages((prev) =>
+                    prev.map((img) =>
+                      img.file && !img.uploadedUrl
+                        ? { ...img, isUploading: false, error: 'Upload failed' }
+                        : img
+                    )
+                  );
+                  toast.error('Failed to upload images');
+                } finally {
+                  setIsUploadingImages(false);
+                }
+              }
+
               if (data.publishedOn && !isPublished) {
                 setIsPublished(true);
                 toast.success(<PublishedToastContent name={name} />);
@@ -589,7 +656,9 @@ export default function GroupForm({ groupId: initialGroupId }: GroupFormProps) {
     })();
   }, [groupForm, onSubmitGroupForm, formatValidationErrors]);
 
-  const isDirty = groupForm.formState.isDirty || imagesReordered || membersChanged;
+  const hasPendingImages = images.some((img) => img.file && !img.uploadedUrl);
+  const isDirty =
+    groupForm.formState.isDirty || imagesReordered || membersChanged || hasPendingImages;
 
   if (!groupForm || !control || isLoadingGroup) {
     return (
@@ -803,6 +872,16 @@ export default function GroupForm({ groupId: initialGroupId }: GroupFormProps) {
                     No members added yet
                   </div>
                 )}
+
+                <p className="text-sm">
+                  <Link
+                    href="/admin/artists/new"
+                    className="inline-flex items-center gap-1 underline"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create artist
+                  </Link>
+                </p>
               </section>
 
               <Separator />

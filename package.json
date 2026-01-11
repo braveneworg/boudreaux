@@ -29,7 +29,7 @@
     "docker:publish:nginx": "npm run docker:build:nginx && npm run docker:push:nginx"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

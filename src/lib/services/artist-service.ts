@@ -297,7 +297,9 @@ export class ArtistService {
 
       const s3Client = getS3Client();
       const s3Bucket = process.env.S3_BUCKET;
-      const cdnDomain = process.env.CDN_DOMAIN;
+      const cdnDomainRaw = process.env.CDN_DOMAIN;
+      // Strip any existing protocol from CDN domain to avoid double https://
+      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
 
       if (!s3Bucket) {
         return { success: false, error: 'S3 bucket not configured' };
@@ -428,14 +430,16 @@ export class ArtistService {
 
       // Extract S3 key from URL
       const s3Bucket = process.env.S3_BUCKET;
-      const cdnDomain = process.env.CDN_DOMAIN;
+      const cdnDomainRaw = process.env.CDN_DOMAIN;
+      // Strip any existing protocol from CDN domain
+      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
 
       if (image.src && s3Bucket) {
         let s3Key: string | null = null;
 
         if (cdnDomain && image.src.includes(cdnDomain)) {
-          // Extract key from CDN URL
-          s3Key = image.src.replace(`https://${cdnDomain}/`, '');
+          // Extract key from CDN URL (handles both correct and malformed URLs with double https://)
+          s3Key = image.src.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
         } else if (image.src.includes('.s3.')) {
           // Extract key from S3 URL
           const urlParts = image.src.split('.s3.');

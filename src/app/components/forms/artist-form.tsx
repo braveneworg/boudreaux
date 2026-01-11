@@ -256,6 +256,72 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
           if (artistId) {
             const newFormState = await updateArtistAction(artistId, formState, formData);
             if (newFormState.success) {
+              // Upload any pending images for existing artist
+              const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
+              if (imagesToUpload.length > 0) {
+                setIsUploadingImages(true);
+                setImages((prev) =>
+                  prev.map((img) =>
+                    img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
+                  )
+                );
+
+                try {
+                  const imageFormData = new FormData();
+                  for (const img of imagesToUpload) {
+                    if (img.file) {
+                      imageFormData.append('files', img.file);
+                      imageFormData.append('captions', img.caption || '');
+                      imageFormData.append('altTexts', img.altText || '');
+                    }
+                  }
+
+                  const uploadResult = await uploadArtistImagesAction(artistId, imageFormData);
+
+                  if (uploadResult.success && uploadResult.data) {
+                    setImages((prev) => {
+                      const uploadedData = uploadResult.data || [];
+                      let uploadIndex = 0;
+                      return prev.map((img) => {
+                        if (img.file && !img.uploadedUrl && uploadedData[uploadIndex]) {
+                          const uploaded = uploadedData[uploadIndex];
+                          uploadIndex++;
+                          return {
+                            ...img,
+                            id: uploaded.id,
+                            uploadedUrl: uploaded.src,
+                            isUploading: false,
+                            sortOrder: uploaded.sortOrder,
+                          };
+                        }
+                        return { ...img, isUploading: false };
+                      });
+                    });
+                  } else {
+                    setImages((prev) =>
+                      prev.map((img) =>
+                        img.file && !img.uploadedUrl
+                          ? { ...img, isUploading: false, error: uploadResult.error }
+                          : img
+                      )
+                    );
+                    toast.error(uploadResult.error || 'Failed to upload images');
+                  }
+                } catch (uploadError) {
+                  error('Image upload error:', uploadError);
+                  setImages((prev) =>
+                    prev.map((img) =>
+                      img.file && !img.uploadedUrl
+                        ? { ...img, isUploading: false, error: 'Upload failed' }
+                        : img
+                    )
+                  );
+                  toast.error('Failed to upload images');
+                } finally {
+                  setIsUploadingImages(false);
+                }
+              }
+
               // Check if this was a publish action (publishedOn was set)
               if (data.publishedOn && !isPublished) {
                 setIsPublished(true);
@@ -453,7 +519,8 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
   }, [artistForm, onSubmitArtistForm, formatValidationErrors]);
 
   // Track form dirty state for Save button enablement (includes image reordering)
-  const isDirty = artistForm.formState.isDirty || imagesReordered;
+  const hasPendingImages = images.some((img) => img.file && !img.uploadedUrl);
+  const isDirty = artistForm.formState.isDirty || imagesReordered || hasPendingImages;
 
   // Ensure form is fully initialized before rendering
   if (!artistForm || !control || isLoadingArtist) {
