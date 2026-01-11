@@ -181,7 +181,7 @@ export default function ArtistForm() {
           },
           {
             anchorText: 'Create Artist',
-            url: '/admin/artist/new',
+            url: '/admin/artists',
             isActive: true,
           },
         ]}
@@ -202,7 +202,7 @@ export default function ArtistForm() {
               <Separator />
               {/* Name Section */}
               <section className="space-y-4 pt-0">
-                <h3 className="text-lg font-semibold">Name Information</h3>
+                <h2 className="font-semibold">Name Information</h2>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <TextField
                     control={artistForm.control}
@@ -263,7 +263,7 @@ export default function ArtistForm() {
 
               {/* Biography Section */}
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold">Biography</h3>
+                <h2 className="font-semibold">Biography</h2>
                 <FormField
                   control={artistForm.control}
                   name="bio"
@@ -317,7 +317,7 @@ export default function ArtistForm() {
 
               {/* Music Information */}
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold">Music Information</h3>
+                <h2 className="font-semibold">Music Information</h2>
                 <TextField
                   control={artistForm.control}
                   name="genres"
@@ -336,7 +336,7 @@ export default function ArtistForm() {
 
               {/* Dates Section */}
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold">Important Dates</h3>
+                <h2 className="font-semibold">Important Dates</h2>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <FormField
                     control={artistForm.control}

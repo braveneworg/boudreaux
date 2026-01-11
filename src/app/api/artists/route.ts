@@ -19,13 +19,11 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
-    const isActive = searchParams.get('isActive');
     const search = searchParams.get('search');
 
     const params = {
       ...(skip && { skip: parseInt(skip, 10) }),
       ...(take && { take: parseInt(take, 10) }),
-      ...(isActive !== null && { isActive: isActive === 'true' }),
       ...(search && { search }),
     };
 

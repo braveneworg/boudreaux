@@ -84,7 +84,7 @@ export default async function RootLayout({
           </main>
           <Footer />
         </Providers>
-        <Toaster />
+        <Toaster position="bottom-center" />
       </body>
     </html>
   );

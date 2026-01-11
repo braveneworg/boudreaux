@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { Separator } from '@radix-ui/react-separator';
-import { InfoIcon, Pencil, Send, Trash2Icon } from 'lucide-react';
+import { ArchiveRestoreIcon, BookCheck, InfoIcon, Pencil, Send, Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { AdminEntity } from '@/app/admin/types';
@@ -85,10 +85,10 @@ export function DataView<T extends Record<string, unknown>>({
       const publishedMatch = showPublished && isPublished;
       const unpublishedMatch = showUnpublished && !isPublished;
 
-      // If neither toggle is on, don't show anything
-      if (!showPublished && !showUnpublished) return false;
+      // If no toggle is on, don't show anything
+      if (!showPublished && !showUnpublished && !showDeleted) return false;
       // If at least one toggle is on, check if item matches
-      if (!publishedMatch && !unpublishedMatch) return false;
+      if (!publishedMatch && !unpublishedMatch && !isDeleted) return false;
 
       // Filter by search query
       if (searchQuery) {
@@ -101,36 +101,39 @@ export function DataView<T extends Record<string, unknown>>({
     });
   }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery]);
 
-  const handleButtonClick = () => {
-    router?.push(`/admin/${entity}/new`);
+  const fetchEntity = useCallback(
+    async (body: Record<string, unknown>) => {
+      return await fetch(`/api/${entity}s/`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+        .then((res) => res.json())
+        .catch((error) => {
+          console.error(`Failed to fetch ${entity}:`, error);
+          return { error: 'Failed to fetch entity' };
+        });
+    },
+    [entity]
+  );
+
+  const handleCreateEntityButtonClick = () => {
+    router?.push(`/admin/${entity}s`);
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  const handleShowDeletedChange = (checked: boolean) => {
-    setShowDeleted(checked);
-  };
-
-  const handleShowPublishedChange = (checked: boolean) => {
-    setShowPublished(checked);
-  };
-
-  const handleShowUnpublishedChange = (checked: boolean) => {
-    setShowUnpublished(checked);
-  };
-
   const handleClickPublishButton = useCallback(
-    async (_event: React.MouseEvent<HTMLButtonElement>) => {
-      const { id } = (_event.currentTarget as HTMLButtonElement).dataset;
+    async (event: React.MouseEvent<HTMLButtonElement>) => {
+      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
 
       if (id) {
-        const response = await fetch(`/api/${entity}s/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isActive: true, publishedOn: new Date().toISOString() }),
-        }).then((res) => res.json());
+        const response = await fetchEntity({
+          isActive: true,
+          publishedOn: new Date().toISOString(),
+        });
 
         if (response.id) {
           toast.success(
@@ -144,20 +147,60 @@ export function DataView<T extends Record<string, unknown>>({
         toast.error(`Failed to publish: Missing ${entity} ID - ${id}`);
       }
     },
-    [entity, refetch]
+    [entity, fetchEntity, refetch]
   );
 
-  const handleClickDeleteButton = (_event: React.MouseEvent<HTMLButtonElement>) => {
-    throw new Error('Function not implemented.');
-  };
+  const handleClickDeleteButton = useCallback(
+    async (event: React.MouseEvent<HTMLButtonElement>) => {
+      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
+      if (id) {
+        const response = await fetchEntity({
+          isActive: false,
+          deletedOn: new Date().toISOString(),
+        });
 
-  const handleClickRestoreButton = (_event: React.MouseEvent<HTMLButtonElement>) => {
-    throw new Error('Function not implemented.');
-  };
+        if (response.id) {
+          toast.success(
+            `Successfully deleted ${entity} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+          );
+          refetch();
+        } else {
+          toast.error(`Failed to delete ${entity} - ${id}: ${response.error}`);
+        }
+      } else {
+        toast.error(`Failed to delete: Missing ${entity} ID - ${id}`);
+      }
+    },
+    [entity, fetchEntity, refetch]
+  );
+
+  const handleClickRestoreButton = useCallback(
+    async (event: React.MouseEvent<HTMLButtonElement>) => {
+      const { id } = (event.currentTarget as HTMLButtonElement).dataset;
+      if (id) {
+        const response = await fetchEntity({ isActive: true, deletedOn: null });
+        if (response.id) {
+          // Add more properties to display in the abscense of displayName
+          toast.success(
+            `Successfully restored ${entity} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+          );
+          refetch();
+        } else {
+          toast.error(`Failed to restore ${entity} - ${id}: ${response.error}`);
+        }
+      } else {
+        toast.error(`Failed to restore: Missing ${entity} ID - ${id}`);
+      }
+    },
+    [entity, fetchEntity, refetch]
+  );
 
   return (
     <>
-      <Button className="w-full" onClick={handleButtonClick}>{`Create ${entity}`}</Button>
+      <Button
+        className="w-full"
+        onClick={handleCreateEntityButtonClick}
+      >{`Create ${entity}`}</Button>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       <Input
         className="w-full my-4"
@@ -166,17 +209,13 @@ export function DataView<T extends Record<string, unknown>>({
         placeholder={`Search ${entity}s...`}
       />
       <div className="flex items-center gap-2 mb-2">
-        <Switch id="show-deleted" checked={showDeleted} onCheckedChange={handleShowDeletedChange} />
+        <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
         <Label htmlFor="show-deleted" className="cursor-pointer">
           Show deleted
         </Label>
       </div>
       <div className="flex items-center gap-2 mb-2">
-        <Switch
-          id="show-published"
-          checked={showPublished}
-          onCheckedChange={handleShowPublishedChange}
-        />
+        <Switch id="show-published" checked={showPublished} onCheckedChange={setShowPublished} />
         <Label htmlFor="show-published" className="cursor-pointer">
           Show published
         </Label>
@@ -185,7 +224,7 @@ export function DataView<T extends Record<string, unknown>>({
         <Switch
           id="show-unpublished"
           checked={showUnpublished}
-          onCheckedChange={handleShowUnpublishedChange}
+          onCheckedChange={setShowUnpublished}
         />
         <Label htmlFor="show-unpublished" className="cursor-pointer">
           Show unpublished
@@ -256,7 +295,11 @@ export function DataView<T extends Record<string, unknown>>({
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button disabled={!!item.publishedOn}>
-                            <Send className="mr-0 size-4" />
+                            {item.publishedOn ? (
+                              <BookCheck className="mr-0 size-4" />
+                            ) : (
+                              <Send className="mr-0 size-4" />
+                            )}
                             {item.publishedOn ? 'Published' : 'Publish'}
                             {isPending && <Spinner className="mr-2 size-4" />}
                           </Button>
@@ -290,16 +333,50 @@ export function DataView<T extends Record<string, unknown>>({
                       </Dialog>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button
-                            onClick={
-                              item.deletedOn ? handleClickRestoreButton : handleClickDeleteButton
-                            }
-                            variant={item.deletedOn ? 'secondary' : 'destructive'}
-                          >
-                            <Trash2Icon className="mr-0 size-4" />
+                          <Button variant={item.deletedOn ? 'secondary' : 'destructive'}>
+                            {item.deletedOn ? (
+                              <ArchiveRestoreIcon className="mr-0 size-4" />
+                            ) : (
+                              <Trash2Icon className="mr-0 size-4" />
+                            )}
                             {item.deletedOn ? 'Restore' : 'Delete'}
                           </Button>
                         </DialogTrigger>
+                        <DialogContent>
+                          <section>
+                            <DialogHeader>
+                              <DialogTitle asChild>
+                                {item.deletedOn ? (
+                                  <h1 className="text-3xl!">Confirm Restore</h1>
+                                ) : (
+                                  <h1 className="text-3xl!">Confirm Delete</h1>
+                                )}
+                              </DialogTitle>
+                            </DialogHeader>
+                            <p className="mt-1 mb-4">
+                              Are you sure you want to {item.deletedOn ? 'restore' : 'delete'}{' '}
+                              <b>{getDisplayName(item)}</b>?
+                            </p>
+                            <DialogFooter>
+                              <DialogClose asChild>
+                                <Button variant="secondary">Cancel</Button>
+                              </DialogClose>
+                              <DialogClose asChild>
+                                <Button
+                                  variant={item.deletedOn ? 'default' : 'destructive'}
+                                  onClick={
+                                    item.deletedOn
+                                      ? handleClickRestoreButton
+                                      : handleClickDeleteButton
+                                  }
+                                  datasetId={id}
+                                >
+                                  Confirm
+                                </Button>
+                              </DialogClose>
+                            </DialogFooter>
+                          </section>
+                        </DialogContent>
                       </Dialog>
                     </div>
                   </Card>

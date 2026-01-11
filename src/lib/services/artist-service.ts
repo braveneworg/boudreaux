@@ -92,14 +92,12 @@ export class ArtistService {
   static async getArtists(params?: {
     skip?: number;
     take?: number;
-    isActive?: boolean;
     search?: string;
   }): Promise<ServiceResponse<Artist[]>> {
     try {
-      const { skip = 0, take = 50, isActive = true, search } = params || {};
+      const { skip = 0, take = 50, search } = params || {};
 
       const where: Prisma.ArtistWhereInput = {
-        ...(typeof isActive === 'boolean' && { isActive }),
         ...(search && {
           OR: [
             { firstName: { contains: search, mode: 'insensitive' } },

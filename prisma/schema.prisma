@@ -273,8 +273,8 @@ model Artist {
   createdBy             String? // User ID of the admin who created the artist entry
   updatedAt             DateTime?              @updatedAt
   updatedBy             String? // User ID of the admin who last updated the artist entry
-  archivedAt            DateTime? // Soft delete timestamp
-  archivedBy            String? // User ID of the admin who archived the artist entry
+  deletedOn             DateTime? // Soft delete timestamp
+  deletedBy             String? // User ID of the admin who deleted the artist entry
   deactivatedAt         DateTime? // Date when the artist was deactivated; ie. left the label
   deactivatedBy         String? // User ID of the admin who deactivated the artist entry
   reactivatedAt         DateTime? // Date when the artist was reactivated; ie. re-signed with the label
