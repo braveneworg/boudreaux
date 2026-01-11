@@ -22,13 +22,24 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ImagePlus, X, GripVertical } from 'lucide-react';
+import { ImagePlus, X, GripVertical, Eye } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 import { Button } from './button';
+import { Dialog, DialogContent, DialogTitle, DialogClose } from './dialog';
 import { Progress } from './progress';
 import { SpinnerRingCircle } from './spinners/spinner-ring-circle';
+
+/**
+ * Cleans up malformed URLs that may have duplicate protocols (e.g., https://https://)
+ */
+const cleanImageUrl = (url: string): string => {
+  if (!url) return url;
+  // Fix double https:// protocol
+  return url.replace(/^https?:\/\/https?:\/\//, 'https://');
+};
+
 /**
  * Represents an image item in the uploader
  */
@@ -54,6 +65,8 @@ export interface ImageUploaderProps {
   onUpload?: (images: ImageItem[]) => Promise<void>;
   /** Called when images are reordered (for persisting to database) */
   onReorder?: (imageIds: string[]) => Promise<void>;
+  /** Called when an uploaded image should be deleted from database/CDN */
+  onDelete?: (imageId: string) => Promise<{ success: boolean; error?: string }>;
   /** Maximum number of images allowed */
   maxImages?: number;
   /** Maximum file size in bytes (default 5MB) */
@@ -70,11 +83,17 @@ export interface ImageUploaderProps {
 
 interface SortableImageItemProps {
   item: ImageItem;
-  onRemove: (id: string) => void;
+  onDeleteRequest: (item: ImageItem) => void;
+  onPreview: (item: ImageItem) => void;
   disabled?: boolean;
 }
 
-const SortableImageItem = ({ item, onRemove, disabled }: SortableImageItemProps) => {
+const SortableImageItem = ({
+  item,
+  onDeleteRequest,
+  onPreview,
+  disabled,
+}: SortableImageItemProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: disabled || item.isUploading,
@@ -110,7 +129,7 @@ const SortableImageItem = ({ item, onRemove, disabled }: SortableImageItemProps)
 
       {/* Image preview - using next/image for blob URLs requires unoptimized */}
       <Image
-        src={item.preview}
+        src={cleanImageUrl(item.preview)}
         alt={item.altText || 'Uploaded image'}
         fill
         className="object-cover"
@@ -157,7 +176,7 @@ const SortableImageItem = ({ item, onRemove, disabled }: SortableImageItemProps)
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onRemove(item.id);
+            onDeleteRequest(item);
           }}
           className="absolute right-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow-sm transition-opacity hover:bg-destructive sm:opacity-0 sm:group-hover:opacity-100"
           aria-label="Remove image"
@@ -174,6 +193,21 @@ const SortableImageItem = ({ item, onRemove, disabled }: SortableImageItemProps)
           </svg>
         </div>
       )}
+
+      {/* View button - always visible on mobile, hover on desktop */}
+      {isInteractive && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(item);
+          }}
+          className="absolute bottom-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-opacity hover:bg-background sm:opacity-0 sm:group-hover:opacity-100"
+          aria-label="Preview image"
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 };
@@ -189,6 +223,7 @@ export const ImageUploader = ({
   onImagesChange,
   onUpload,
   onReorder,
+  onDelete,
   maxImages = 10,
   maxFileSize = 5 * 1024 * 1024, // 5MB
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
@@ -199,7 +234,56 @@ export const ImageUploader = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<ImageItem | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null);
   const inputId = useId();
+
+  const handlePreview = useCallback((item: ImageItem) => {
+    setPreviewImage(item);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewImage(null);
+  }, []);
+
+  const handleDeleteRequest = useCallback((item: ImageItem) => {
+    setImageToDelete(item);
+  }, []);
+
+  const handleCancelDelete = useCallback(() => {
+    setImageToDelete(null);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!imageToDelete) return;
+
+    // If this is an uploaded image and we have an onDelete callback, call it to delete from CDN/database
+    if (imageToDelete.uploadedUrl && onDelete) {
+      setIsDeleting(true);
+      try {
+        const result = await onDelete(imageToDelete.id);
+        if (!result.success) {
+          console.error('Failed to delete image from server:', result.error);
+          // Still proceed with local removal even if server delete fails
+        }
+      } catch (error) {
+        console.error('Error deleting image from server:', error);
+        // Still proceed with local removal even if server delete fails
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+
+    // Revoke object URL for local images
+    if (imageToDelete.preview && !imageToDelete.uploadedUrl) {
+      URL.revokeObjectURL(imageToDelete.preview);
+    }
+
+    // Remove from local state
+    onImagesChange(images.filter((item) => item.id !== imageToDelete.id));
+    setImageToDelete(null);
+  }, [imageToDelete, images, onImagesChange, onDelete]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -327,17 +411,6 @@ export const ImageUploader = ({
     setIsDragOver(false);
   }, []);
 
-  const handleRemove = useCallback(
-    (id: string) => {
-      const itemToRemove = images.find((item) => item.id === id);
-      if (itemToRemove?.preview && !itemToRemove.uploadedUrl) {
-        URL.revokeObjectURL(itemToRemove.preview);
-      }
-      onImagesChange(images.filter((item) => item.id !== id));
-    },
-    [images, onImagesChange]
-  );
-
   const handleUploadClick = useCallback(() => {
     if (onUpload && images.length > 0) {
       const imagesToUpload = images.filter((img) => !img.uploadedUrl && !img.error);
@@ -350,15 +423,15 @@ export const ImageUploader = ({
   const canAddMore = images.length < maxImages && !disabled;
   const hasUnuploadedImages = images.some((img) => !img.uploadedUrl && !img.error && img.file);
   const isUploading = images.some((img) => img.isUploading);
-  const isDisabled = disabled || isReordering;
+  const isDisabled = disabled || isReordering || isDeleting;
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Reordering indicator */}
-      {isReordering && (
+      {/* Reordering/Deleting indicator */}
+      {(isReordering || isDeleting) && (
         <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-muted-foreground">
           <SpinnerRingCircle size="sm" />
-          <span>Saving order...</span>
+          <span>{isDeleting ? 'Deleting...' : 'Saving order...'}</span>
         </div>
       )}
 
@@ -426,7 +499,8 @@ export const ImageUploader = ({
                 <SortableImageItem
                   key={item.id}
                   item={item}
-                  onRemove={handleRemove}
+                  onDeleteRequest={handleDeleteRequest}
+                  onPreview={handlePreview}
                   disabled={isDisabled}
                 />
               ))}
@@ -455,6 +529,60 @@ export const ImageUploader = ({
           </Button>
         </div>
       )}
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={handleClosePreview}>
+        <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
+          <DialogTitle className="sr-only">{previewImage?.altText || 'Image preview'}</DialogTitle>
+          {previewImage && (
+            <div className="relative aspect-auto max-h-[85vh] w-full">
+              <Image
+                src={cleanImageUrl(previewImage.preview)}
+                alt={previewImage.altText || 'Image preview'}
+                width={1200}
+                height={800}
+                className="h-auto max-h-[85vh] w-full object-contain"
+                unoptimized={previewImage.preview.startsWith('blob:')}
+              />
+            </div>
+          )}
+          <DialogClose className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!imageToDelete} onOpenChange={handleCancelDelete}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>Delete Image</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this image? This action cannot be undone.
+          </p>
+          {imageToDelete && (
+            <div className="my-4 flex justify-center">
+              <div className="relative h-32 w-32 overflow-hidden rounded-lg border">
+                <Image
+                  src={cleanImageUrl(imageToDelete.preview)}
+                  alt={imageToDelete.altText || 'Image to delete'}
+                  fill
+                  className="object-cover"
+                  unoptimized={imageToDelete.preview.startsWith('blob:')}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={handleCancelDelete}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

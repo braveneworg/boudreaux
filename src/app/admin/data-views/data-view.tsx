@@ -1,11 +1,21 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { Separator } from '@radix-ui/react-separator';
-import { ArchiveRestoreIcon, BookCheck, InfoIcon, Pencil, Send, Trash2Icon } from 'lucide-react';
+import {
+  ArchiveRestoreIcon,
+  BookCheck,
+  Eye,
+  InfoIcon,
+  Pencil,
+  Send,
+  Trash2Icon,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { AdminEntity } from '@/app/admin/types';
@@ -27,6 +37,15 @@ import { Switch } from '@/app/components/ui/switch';
 import VerticalSeparator from '@/app/components/ui/vertical-separator';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 import { toPascalCase } from '@/lib/utils/string-utils';
+
+/**
+ * Cleans up malformed URLs that may have duplicate protocols (e.g., https://https://)
+ */
+const cleanImageUrl = (url: string): string => {
+  if (!url) return url;
+  // Fix double https:// protocol
+  return url.replace(/^https?:\/\/https?:\/\//, 'https://');
+};
 
 /**
  * A generic data view component for displaying and managing admin entities.
@@ -52,6 +71,7 @@ export function DataView<T extends Record<string, unknown>>({
   entity,
   data,
   fieldsToShow,
+  imageField,
   refetch,
   isPending,
   error,
@@ -59,6 +79,8 @@ export function DataView<T extends Record<string, unknown>>({
   entity: AdminEntity;
   data: Record<string, T[]> | null;
   fieldsToShow: string[];
+  /** Field name containing an array of images with src property */
+  imageField?: string;
   refetch: () => void;
   isPending: boolean;
   error?: string | null;
@@ -67,6 +89,7 @@ export function DataView<T extends Record<string, unknown>>({
   const [showPublished, setShowPublished] = useState(true);
   const [showUnpublished, setShowUnpublished] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
   const router = useRouter();
 
   const searchData = useMemo(() => {
@@ -101,17 +124,17 @@ export function DataView<T extends Record<string, unknown>>({
     });
   }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery]);
 
-  const fetchEntity = useCallback(
-    async (body: Record<string, unknown>) => {
-      return await fetch(`/api/${entity}s/`, {
-        method: 'GET',
+  const updateEntity = useCallback(
+    async (id: string, body: Record<string, unknown>) => {
+      return await fetch(`/api/${entity}s/${id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
         .then((res) => res.json())
         .catch((error) => {
-          console.error(`Failed to fetch ${entity}:`, error);
-          return { error: 'Failed to fetch entity' };
+          console.error(`Failed to update ${entity}:`, error);
+          return { error: 'Failed to update entity' };
         });
     },
     [entity]
@@ -130,8 +153,7 @@ export function DataView<T extends Record<string, unknown>>({
       const { id } = (event.currentTarget as HTMLButtonElement).dataset;
 
       if (id) {
-        const response = await fetchEntity({
-          isActive: true,
+        const response = await updateEntity(id, {
           publishedOn: new Date().toISOString(),
         });
 
@@ -141,21 +163,20 @@ export function DataView<T extends Record<string, unknown>>({
           );
           refetch();
         } else {
-          toast.error(`Failed to publish ${entity} - ${id}: ${response.error}`);
+          toast.error(`Failed to publish ${entity}: ${response.error || 'Unknown error'}`);
         }
       } else {
-        toast.error(`Failed to publish: Missing ${entity} ID - ${id}`);
+        toast.error(`Failed to publish: Missing ${entity} ID`);
       }
     },
-    [entity, fetchEntity, refetch]
+    [entity, updateEntity, refetch]
   );
 
   const handleClickDeleteButton = useCallback(
     async (event: React.MouseEvent<HTMLButtonElement>) => {
       const { id } = (event.currentTarget as HTMLButtonElement).dataset;
       if (id) {
-        const response = await fetchEntity({
-          isActive: false,
+        const response = await updateEntity(id, {
           deletedOn: new Date().toISOString(),
         });
 
@@ -165,20 +186,20 @@ export function DataView<T extends Record<string, unknown>>({
           );
           refetch();
         } else {
-          toast.error(`Failed to delete ${entity} - ${id}: ${response.error}`);
+          toast.error(`Failed to delete ${entity}: ${response.error || 'Unknown error'}`);
         }
       } else {
-        toast.error(`Failed to delete: Missing ${entity} ID - ${id}`);
+        toast.error(`Failed to delete: Missing ${entity} ID`);
       }
     },
-    [entity, fetchEntity, refetch]
+    [entity, updateEntity, refetch]
   );
 
   const handleClickRestoreButton = useCallback(
     async (event: React.MouseEvent<HTMLButtonElement>) => {
       const { id } = (event.currentTarget as HTMLButtonElement).dataset;
       if (id) {
-        const response = await fetchEntity({ isActive: true, deletedOn: null });
+        const response = await updateEntity(id, { deletedOn: null });
         if (response.id) {
           // Add more properties to display in the abscense of displayName
           toast.success(
@@ -186,13 +207,13 @@ export function DataView<T extends Record<string, unknown>>({
           );
           refetch();
         } else {
-          toast.error(`Failed to restore ${entity} - ${id}: ${response.error}`);
+          toast.error(`Failed to restore ${entity}: ${response.error || 'Unknown error'}`);
         }
       } else {
-        toast.error(`Failed to restore: Missing ${entity} ID - ${id}`);
+        toast.error(`Failed to restore: Missing ${entity} ID`);
       }
     },
-    [entity, fetchEntity, refetch]
+    [entity, updateEntity, refetch]
   );
 
   return (
@@ -239,6 +260,43 @@ export function DataView<T extends Record<string, unknown>>({
               return (
                 <li key={id}>
                   <Card>
+                    {/* Image thumbnails */}
+                    {imageField &&
+                      (() => {
+                        const images = item[imageField] as
+                          | Array<{ src?: string; altText?: string }>
+                          | undefined;
+                        if (images && images.length > 0) {
+                          return (
+                            <div className="mb-3 flex justify-center gap-2">
+                              {images.slice(0, 3).map((image) =>
+                                image.src ? (
+                                  <button
+                                    key={image.src}
+                                    type="button"
+                                    onClick={() =>
+                                      setPreviewImage(image as { src: string; altText?: string })
+                                    }
+                                    className="group relative h-16 w-16 overflow-hidden rounded-md border bg-muted transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                  >
+                                    <Image
+                                      src={cleanImageUrl(image.src)}
+                                      alt={image.altText || `${entity} image`}
+                                      fill
+                                      className="object-cover"
+                                      sizes="64px"
+                                    />
+                                    <span className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+                                      <Eye className="h-3 w-3" />
+                                    </span>
+                                  </button>
+                                ) : null
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     <div className="flex flex-row justify-center gap-2 items-center mb-2">
                       <Pencil className="h-4 w-4" />
                       <Link href={`/admin/${entity}s/${id}?edit=true`}>
@@ -388,6 +446,28 @@ export function DataView<T extends Record<string, unknown>>({
       ) : (
         <p>No data available</p>
       )}
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
+          <DialogTitle className="sr-only">{previewImage?.altText || 'Image preview'}</DialogTitle>
+          {previewImage && (
+            <div className="relative aspect-auto max-h-[85vh] w-full">
+              <Image
+                src={cleanImageUrl(previewImage.src)}
+                alt={previewImage.altText || 'Image preview'}
+                width={1200}
+                height={800}
+                className="h-auto max-h-[85vh] w-full object-contain"
+              />
+            </div>
+          )}
+          <DialogClose className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

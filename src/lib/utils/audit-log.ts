@@ -5,6 +5,7 @@
 
 export type AuditEvent =
   | 'media.artist.created'
+  | 'media.artist.updated'
   | 'media.artist.images.uploaded'
   | 'media.artist.images.reordered'
   | 'media.artist.image.deleted'

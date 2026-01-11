@@ -95,6 +95,11 @@ export class ArtistService {
     try {
       const artist = (await prisma.artist.findUnique({
         where: { id },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
       })) as unknown as Artist | null;
 
       if (!artist) {
@@ -165,6 +170,12 @@ export class ArtistService {
         skip,
         take,
         orderBy: { createdAt: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 3,
+          },
+        },
       })) as unknown as Artist[];
 
       return { success: true, data: artists };

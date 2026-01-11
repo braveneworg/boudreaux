@@ -32,6 +32,7 @@ export const ArtistDataView = () => {
       entity={ENTITIES.artist}
       data={data}
       fieldsToShow={fieldsToShow}
+      imageField="images"
       refetch={refetch}
       isPending={isPending}
     />

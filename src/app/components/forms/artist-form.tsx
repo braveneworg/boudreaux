@@ -2,6 +2,8 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
+import { useRouter } from 'next/navigation';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -29,10 +31,12 @@ import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploade
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import {
+  deleteArtistImageAction,
   reorderArtistImagesAction,
   uploadArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
@@ -42,6 +46,10 @@ import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
 import { DatePicker } from '../ui/datepicker';
 
 type FormFieldName = keyof ArtistFormData;
+
+interface ArtistFormProps {
+  artistId?: string;
+}
 
 const initialFormState: FormState = {
   fields: {},
@@ -54,7 +62,19 @@ const ToastContent = ({ fullName }: { fullName: string }) => (
   </>
 );
 
-export default function ArtistForm() {
+const UpdatedToastContent = ({ fullName }: { fullName: string }) => (
+  <>
+    Artist <b>{`${fullName}`}</b> saved successfully.
+  </>
+);
+
+const PublishedToastContent = ({ fullName }: { fullName: string }) => (
+  <>
+    Artist <b>{`${fullName}`}</b> published successfully.
+  </>
+);
+
+export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProps) {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createArtistAction,
     initialFormState
@@ -62,8 +82,16 @@ export default function ArtistForm() {
   const [isTransitionPending, startTransition] = useTransition();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  // artistId will be set after artist creation for persisting image reordering
-  const [artistId, setArtistId] = useState<string | null>(null);
+  const [isLoadingArtist, setIsLoadingArtist] = useState(!!initialArtistId);
+  // artistId will be set after artist creation or from URL param for persisting image reordering
+  const [artistId, setArtistId] = useState<string | null>(initialArtistId || null);
+  // Track if artist is published (publishedOn date exists)
+  const [isPublished, setIsPublished] = useState(false);
+  // Track if images have been reordered (for enabling Save button)
+  const [imagesReordered, setImagesReordered] = useState(false);
+  // Track if we're in edit mode (after artist creation or when loading existing artist)
+  const isEditMode = artistId !== null;
+  const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
   const formRef = useRef<HTMLFormElement>(null);
@@ -91,12 +119,96 @@ export default function ArtistForm() {
   });
   const { control } = artistForm;
 
+  // Fetch artist data when initialArtistId is provided
+  useEffect(() => {
+    if (!initialArtistId) return;
+
+    const fetchArtist = async () => {
+      try {
+        setIsLoadingArtist(true);
+        const response = await fetch(`/api/artists/${initialArtistId}`);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(errorData.error || 'Failed to load artist');
+          return;
+        }
+
+        const artist = await response.json();
+
+        // Format dates for the form (YYYY-MM-DD format)
+        const formatDate = (dateValue: string | Date | null | undefined): string => {
+          if (!dateValue) return '';
+          const date = new Date(dateValue);
+          return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+        };
+
+        // Reset form with fetched data
+        artistForm.reset({
+          firstName: artist.firstName || '',
+          middleName: artist.middleName || '',
+          surname: artist.surname || '',
+          akaNames: artist.akaNames || '',
+          displayName: artist.displayName || '',
+          title: artist.title || '',
+          suffix: artist.suffix || '',
+          slug: artist.slug || '',
+          bio: artist.bio || '',
+          shortBio: artist.shortBio || '',
+          altBio: artist.altBio || '',
+          genres: artist.genres || '',
+          tags: artist.tags || '',
+          bornOn: formatDate(artist.bornOn),
+          diedOn: formatDate(artist.diedOn),
+          publishedOn: formatDate(artist.publishedOn),
+          createdBy: artist.createdBy || user?.id,
+        });
+
+        // Set published state
+        if (artist.publishedOn) {
+          setIsPublished(true);
+        }
+
+        // Load existing images if any
+        if (artist.images && artist.images.length > 0) {
+          const existingImages: ImageItem[] = artist.images.map(
+            (img: {
+              id: string;
+              src: string;
+              caption?: string;
+              altText?: string;
+              sortOrder?: number;
+            }) => ({
+              id: img.id,
+              preview: img.src,
+              uploadedUrl: img.src,
+              caption: img.caption || '',
+              altText: img.altText || '',
+              sortOrder: img.sortOrder ?? 0,
+            })
+          );
+          setImages(existingImages);
+        }
+      } catch (err) {
+        error('Failed to fetch artist:', err);
+        toast.error('Failed to load artist data');
+      } finally {
+        setIsLoadingArtist(false);
+      }
+    };
+
+    fetchArtist();
+  }, [initialArtistId, artistForm, user?.id]);
+
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);
   }, []);
 
   const handleReorder = useCallback(
     async (imageIds: string[]) => {
+      // Mark images as reordered for Save button enablement
+      setImagesReordered(true);
+
       // Only persist reorder if we have an artistId (after artist creation)
       // and there are uploaded images to reorder
       if (!artistId) {
@@ -114,6 +226,20 @@ export default function ArtistForm() {
     [artistId]
   );
 
+  const handleDeleteImage = useCallback(
+    async (imageId: string): Promise<{ success: boolean; error?: string }> => {
+      // Call the server action to delete from database and CDN
+      const result = await deleteArtistImageAction(imageId);
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to delete image');
+      }
+
+      return result;
+    },
+    []
+  );
+
   const onSubmitArtistForm = useCallback(
     async (data: ArtistFormData) => {
       const formData = new FormData();
@@ -124,93 +250,138 @@ export default function ArtistForm() {
       });
       startTransition(async () => {
         if (formRef.current) {
-          const newFormState = await createArtistAction(formState, formData);
-          if (newFormState.success) {
-            const fullName = data.displayName || `${data.firstName} ${data.surname}`.trim();
-            const createdArtistId = newFormState.data?.artistId as string | undefined;
+          const fullName = data.displayName || `${data.firstName} ${data.surname}`.trim();
 
-            // Set artistId for image reordering persistence
-            if (createdArtistId) {
-              setArtistId(createdArtistId);
+          // If we already have an artistId, this is an update
+          if (artistId) {
+            const newFormState = await updateArtistAction(artistId, formState, formData);
+            if (newFormState.success) {
+              // Check if this was a publish action (publishedOn was set)
+              if (data.publishedOn && !isPublished) {
+                setIsPublished(true);
+                toast.success(<PublishedToastContent fullName={fullName} />);
+              } else {
+                toast.success(<UpdatedToastContent fullName={fullName} />);
+              }
+              // Reset form dirty state after successful save
+              artistForm.reset(data);
+              setImagesReordered(false);
+            } else {
+              toast.error('Failed to update artist. Please check the form for errors.');
+            }
+          } else {
+            // This is a create action
+            const newFormState = await createArtistAction(formState, formData);
+            if (newFormState.success) {
+              const createdArtistId = newFormState.data?.artistId as string | undefined;
 
-              // Upload images if any were added
-              const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
-              if (imagesToUpload.length > 0) {
-                setIsUploadingImages(true);
+              // Set artistId for image reordering persistence
+              if (createdArtistId) {
+                setArtistId(createdArtistId);
 
-                // Update image states to show uploading
-                setImages((prev) =>
-                  prev.map((img) =>
-                    img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
-                  )
-                );
+                // Update URL to include the artist ID (shallow update, no navigation)
+                router.replace(`/admin/artists/${createdArtistId}`, { scroll: false });
 
-                try {
-                  // Create FormData for image upload
-                  const imageFormData = new FormData();
-                  for (const img of imagesToUpload) {
-                    if (img.file) {
-                      imageFormData.append('files', img.file);
-                      imageFormData.append('captions', img.caption || '');
-                      imageFormData.append('altTexts', img.altText || '');
-                    }
-                  }
+                // Check if this was a publish action
+                if (data.publishedOn) {
+                  setIsPublished(true);
+                }
 
-                  const uploadResult = await uploadArtistImagesAction(
-                    createdArtistId,
-                    imageFormData
+                // Upload images if any were added
+                const imagesToUpload = images.filter((img) => img.file && !img.uploadedUrl);
+                if (imagesToUpload.length > 0) {
+                  setIsUploadingImages(true);
+
+                  // Update image states to show uploading
+                  setImages((prev) =>
+                    prev.map((img) =>
+                      img.file && !img.uploadedUrl ? { ...img, isUploading: true } : img
+                    )
                   );
 
-                  if (uploadResult.success && uploadResult.data) {
-                    // Update images with uploaded URLs
-                    setImages((prev) => {
-                      const uploadedData = uploadResult.data || [];
-                      return prev.map((img, index) => {
-                        if (img.file && !img.uploadedUrl && uploadedData[index]) {
-                          return {
-                            ...img,
-                            id: uploadedData[index].id,
-                            uploadedUrl: uploadedData[index].src,
-                            isUploading: false,
-                            sortOrder: uploadedData[index].sortOrder,
-                          };
-                        }
-                        return { ...img, isUploading: false };
-                      });
-                    });
-                    toast.success(
-                      `${uploadResult.data.length} image${uploadResult.data.length !== 1 ? 's' : ''} uploaded successfully`
+                  try {
+                    // Create FormData for image upload
+                    const imageFormData = new FormData();
+                    for (const img of imagesToUpload) {
+                      if (img.file) {
+                        imageFormData.append('files', img.file);
+                        imageFormData.append('captions', img.caption || '');
+                        imageFormData.append('altTexts', img.altText || '');
+                      }
+                    }
+
+                    const uploadResult = await uploadArtistImagesAction(
+                      createdArtistId,
+                      imageFormData
                     );
-                  } else {
-                    // Mark images as failed
+
+                    if (uploadResult.success && uploadResult.data) {
+                      // Update images with uploaded URLs
+                      setImages((prev) => {
+                        const uploadedData = uploadResult.data || [];
+                        return prev.map((img, index) => {
+                          if (img.file && !img.uploadedUrl && uploadedData[index]) {
+                            return {
+                              ...img,
+                              id: uploadedData[index].id,
+                              uploadedUrl: uploadedData[index].src,
+                              isUploading: false,
+                              sortOrder: uploadedData[index].sortOrder,
+                            };
+                          }
+                          return { ...img, isUploading: false };
+                        });
+                      });
+                      // Show combined success message for artist + images
+                      toast.success(
+                        <>
+                          Artist <b>{fullName}</b> created with {uploadResult.data.length} image
+                          {uploadResult.data.length !== 1 ? 's' : ''}.
+                        </>
+                      );
+                    } else {
+                      // Mark images as failed
+                      setImages((prev) =>
+                        prev.map((img) =>
+                          img.file && !img.uploadedUrl
+                            ? { ...img, isUploading: false, error: uploadResult.error }
+                            : img
+                        )
+                      );
+                      toast.error(uploadResult.error || 'Failed to upload images');
+                      // Still show artist creation success
+                      toast.success(<ToastContent fullName={fullName} />);
+                    }
+                  } catch (uploadError) {
+                    error('Image upload error:', uploadError);
                     setImages((prev) =>
                       prev.map((img) =>
                         img.file && !img.uploadedUrl
-                          ? { ...img, isUploading: false, error: uploadResult.error }
+                          ? { ...img, isUploading: false, error: 'Upload failed' }
                           : img
                       )
                     );
-                    toast.error(uploadResult.error || 'Failed to upload images');
+                    toast.error('Failed to upload images');
+                    // Still show artist creation success
+                    toast.success(<ToastContent fullName={fullName} />);
+                  } finally {
+                    setIsUploadingImages(false);
                   }
-                } catch (uploadError) {
-                  error('Image upload error:', uploadError);
-                  setImages((prev) =>
-                    prev.map((img) =>
-                      img.file && !img.uploadedUrl
-                        ? { ...img, isUploading: false, error: 'Upload failed' }
-                        : img
-                    )
-                  );
-                  toast.error('Failed to upload images');
-                } finally {
-                  setIsUploadingImages(false);
+                } else {
+                  // No images to upload, just show artist creation success
+                  toast.success(<ToastContent fullName={fullName} />);
                 }
-              }
-            }
 
-            toast.success(<ToastContent fullName={fullName} />);
-          } else {
-            toast.error('Failed to create artist. Please check the form for errors.');
+                // Reset form dirty state
+                artistForm.reset(data);
+                setImagesReordered(false);
+              } else {
+                // No artistId returned but success - show generic success
+                toast.success(<ToastContent fullName={fullName} />);
+              }
+            } else {
+              toast.error('Failed to create artist. Please check the form for errors.');
+            }
           }
         } else {
           error('ArtistForm: Form reference is null on submit.');
@@ -218,7 +389,7 @@ export default function ArtistForm() {
         }
       });
     },
-    [formState, images]
+    [formState, images, artistId, isPublished, artistForm, router]
   );
 
   const isSubmitting = isPending || isTransitionPending || isUploadingImages;
@@ -228,6 +399,7 @@ export default function ArtistForm() {
   const firstName = useWatch({ control, name: 'firstName' });
   const middleName = useWatch({ control, name: 'middleName' });
   const surname = useWatch({ control, name: 'surname' });
+  const slug = useWatch({ control, name: 'slug' });
 
   // Auto-generate slug from name fields
   useEffect(() => {
@@ -252,25 +424,44 @@ export default function ArtistForm() {
     }
   }, [displayName, firstName, middleName, surname, artistForm]);
 
+  // Clear slug error when the value becomes valid (lowercase alphanumeric with dashes)
+  useEffect(() => {
+    if (slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      artistForm.clearErrors('slug');
+    }
+  }, [slug, artistForm]);
+
   const handleSelectDate = (dateString: string, fieldName: string): void => {
-    artistForm.setValue(fieldName as FormFieldName, dateString);
+    artistForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
   };
 
-  const handleClickCreateAndPublishButton = useCallback(() => {
-    startTransition(async () => {
-      onSubmitArtistForm(artistForm.getValues());
-      artistForm.setValue('publishedOn' as keyof ArtistFormData, new Date().toISOString());
-      artistForm.handleSubmit(onSubmitArtistForm)();
-    });
-  }, [artistForm, onSubmitArtistForm]);
+  // Helper to format validation errors for toast display
+  const formatValidationErrors = useCallback((errors: Record<string, { message?: string }>) => {
+    const errorMessages = Object.entries(errors)
+      .map(([field, error]) => `${field}: ${error.message || 'Invalid'}`)
+      .join(', ');
+    return errorMessages || 'Please check the form for errors.';
+  }, []);
+
+  // Handler for Create & Publish (create mode) or Publish (edit mode)
+  const handleClickPublishButton = useCallback(() => {
+    artistForm.setValue('publishedOn', new Date().toISOString(), { shouldDirty: true });
+    artistForm.handleSubmit(onSubmitArtistForm, (errors) => {
+      console.error('Form validation errors:', errors);
+      toast.error(formatValidationErrors(errors));
+    })();
+  }, [artistForm, onSubmitArtistForm, formatValidationErrors]);
+
+  // Track form dirty state for Save button enablement (includes image reordering)
+  const isDirty = artistForm.formState.isDirty || imagesReordered;
 
   // Ensure form is fully initialized before rendering
-  if (!artistForm || !control) {
+  if (!artistForm || !control || isLoadingArtist) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Create New Artist</CardTitle>
-          <CardDescription>Loading form...</CardDescription>
+          <CardTitle>{initialArtistId ? 'Edit Artist' : 'Create New Artist'}</CardTitle>
+          <CardDescription>Loading...</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -293,7 +484,7 @@ export default function ArtistForm() {
             isActive: false,
           },
           {
-            anchorText: 'Create Artist',
+            anchorText: isEditMode ? 'Edit Artist' : 'Create Artist',
             url: '/admin/artists',
             isActive: true,
           },
@@ -301,14 +492,21 @@ export default function ArtistForm() {
       />
       <Card>
         <CardHeader>
-          <CardTitle>Create New Artist</CardTitle>
-          <CardDescription>Required fields are marked with an asterisk *</CardDescription>
+          <CardTitle>{isEditMode ? 'Edit Artist' : 'Create New Artist'}</CardTitle>
+          <CardDescription>
+            {isEditMode
+              ? 'Update artist information. Changes are saved when you click Save.'
+              : 'Required fields are marked with an asterisk *'}
+          </CardDescription>
         </CardHeader>
         <Form {...artistForm}>
           <form
             action={formAction}
             ref={formRef}
-            onSubmit={artistForm.handleSubmit(onSubmitArtistForm)}
+            onSubmit={artistForm.handleSubmit(onSubmitArtistForm, (errors) => {
+              console.error('Form validation errors:', errors);
+              toast.error(formatValidationErrors(errors));
+            })}
             noValidate
           >
             <CardContent className="space-y-6">
@@ -499,6 +697,7 @@ export default function ArtistForm() {
                   images={images}
                   onImagesChange={handleImagesChange}
                   onReorder={handleReorder}
+                  onDelete={handleDeleteImage}
                   maxImages={10}
                   disabled={isSubmitting}
                   label="Upload artist images"
@@ -507,12 +706,32 @@ export default function ArtistForm() {
             </CardContent>
 
             <CardFooter className="flex justify-end gap-4">
-              <Button disabled={isSubmitting} onClick={handleClickCreateAndPublishButton}>
-                Create &amp; Publish
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create'}
-              </Button>
+              {isEditMode ? (
+                // Edit mode buttons
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSubmitting || isPublished}
+                    onClick={handleClickPublishButton}
+                  >
+                    {isPublished ? 'Published' : 'Publish'}
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting || !isDirty}>
+                    {isSubmitting ? 'Saving...' : 'Save'}
+                  </Button>
+                </>
+              ) : (
+                // Create mode buttons
+                <>
+                  <Button type="button" disabled={isSubmitting} onClick={handleClickPublishButton}>
+                    Create &amp; Publish
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Creating...' : 'Create'}
+                  </Button>
+                </>
+              )}
             </CardFooter>
           </form>
         </Form>
