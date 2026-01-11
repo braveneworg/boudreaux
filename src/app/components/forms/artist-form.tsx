@@ -572,6 +572,26 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
 
               <Separator />
 
+              {/* Images Section */}
+              <section className="space-y-4">
+                <h2 className="font-semibold">Images</h2>
+                <p className="text-sm text-muted-foreground">
+                  Add images for this artist. You can drag to reorder them. Images will be uploaded
+                  after the artist is created or updated.
+                </p>
+                <ImageUploader
+                  images={images}
+                  onImagesChange={handleImagesChange}
+                  onReorder={handleReorder}
+                  onDelete={handleDeleteImage}
+                  maxImages={10}
+                  disabled={isSubmitting}
+                  label="Upload artist images"
+                />
+              </section>
+
+              <Separator />
+
               {/* Biography Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Biography</h2>
@@ -684,24 +704,6 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     )}
                   />
                 </div>
-              </section>
-              <Separator />
-              {/* Images Section */}
-              <section className="space-y-4">
-                <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-muted-foreground">
-                  Add images for this artist. You can drag to reorder them. Images will be uploaded
-                  after the artist is created.
-                </p>
-                <ImageUploader
-                  images={images}
-                  onImagesChange={handleImagesChange}
-                  onReorder={handleReorder}
-                  onDelete={handleDeleteImage}
-                  maxImages={10}
-                  disabled={isSubmitting}
-                  label="Upload artist images"
-                />
               </section>
             </CardContent>
 

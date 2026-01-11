@@ -1,0 +1,109 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+
+import { requireRole } from '@/lib/utils/auth/require-role';
+
+import { auth } from '../../../auth';
+import { GroupService } from '../services/group-service';
+import { logSecurityEvent } from '../utils/audit-log';
+import { setUnknownError } from '../utils/auth/auth-utils';
+import getActionState from '../utils/auth/get-action-state';
+import { createGroupSchema } from '../validation/create-group-schema';
+
+import type { FormState } from '../types/form-state';
+
+export const updateGroupAction = async (
+  groupId: string,
+  _initialState: FormState,
+  payload: FormData
+): Promise<FormState> => {
+  await requireRole('admin');
+
+  const permittedFieldNames = [
+    'name',
+    'displayName',
+    'bio',
+    'shortBio',
+    'formedOn',
+    'endedOn',
+    'publishedOn',
+  ];
+  const { formState, parsed } = getActionState(payload, permittedFieldNames, createGroupSchema);
+
+  if (parsed.success) {
+    try {
+      // Get current user session
+      const session = await auth();
+
+      if (!session?.user?.id && session?.user?.role !== 'admin') {
+        formState.success = false;
+        if (!formState.errors) {
+          formState.errors = {};
+        }
+        formState.errors.general = ['You must be a logged in admin user to update a group'];
+        return formState;
+      }
+
+      const { name, displayName, bio, shortBio, formedOn, endedOn, publishedOn } = parsed.data;
+
+      // Update group in database
+      const response = await GroupService.updateGroup(groupId, {
+        name,
+        displayName,
+        bio,
+        shortBio,
+        formedOn: formedOn ? new Date(formedOn) : undefined,
+        endedOn: endedOn ? new Date(endedOn) : undefined,
+        publishedOn: publishedOn ? new Date(publishedOn) : undefined,
+      });
+
+      // Log group update for security audit
+      logSecurityEvent({
+        event: 'media.group.updated',
+        userId: session.user.id,
+        metadata: {
+          groupId,
+          updatedFields: Object.keys(parsed.data).filter(
+            (key) => parsed.data[key as keyof typeof parsed.data] !== undefined
+          ),
+          success: response.success,
+        },
+      });
+
+      if (response.success) {
+        formState.errors = undefined;
+        formState.data = { groupId: response.data?.id };
+      } else {
+        if (!formState.errors) {
+          formState.errors = {};
+        }
+
+        const errorMessage = response.error || 'Failed to update group';
+
+        // Check if error is related to name uniqueness
+        if (
+          errorMessage.toLowerCase().includes('name') &&
+          (errorMessage.toLowerCase().includes('unique') ||
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('duplicate'))
+        ) {
+          formState.errors.name = ['This name is already in use. Please choose a different one.'];
+        } else {
+          formState.errors = { general: [errorMessage] };
+        }
+      }
+
+      formState.success = response.success;
+
+      // Revalidate paths
+      revalidatePath(`/admin/groups/${groupId}`);
+      revalidatePath('/admin/groups');
+    } catch {
+      formState.success = false;
+      setUnknownError(formState);
+    }
+  }
+
+  return formState;
+};

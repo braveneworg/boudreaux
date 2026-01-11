@@ -146,6 +146,8 @@ model Group {
   endedOn         DateTime?
   bio             String? // Markdown supported post-MVP, for now just plain text blurb
   shortBio        String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
+  publishedOn     DateTime? // Date when the group was published
+  deletedOn       DateTime? // Soft delete date
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   images          Image[]
