@@ -126,6 +126,7 @@ model Image {
   updatedAt DateTime @updatedAt
   src       String?
   altText   String?
+  sortOrder Int      @default(0)
   url       Url?     @relation(fields: [urlId], references: [id])
   urlId     String?  @db.ObjectId
 
@@ -134,6 +135,7 @@ model Image {
   @@index([groupId])
   @@index([trackId])
   @@index([urlId])
+  @@index([sortOrder])
 }
 
 model Group {

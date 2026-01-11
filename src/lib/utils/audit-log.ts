@@ -5,6 +5,10 @@
 
 export type AuditEvent =
   | 'media.artist.created'
+  | 'media.artist.images.uploaded'
+  | 'media.artist.images.reordered'
+  | 'media.artist.image.deleted'
+  | 'media.artist.image.updated'
   | 'auth.signin.success'
   | 'auth.signin.failed'
   | 'auth.signout'

@@ -22,8 +22,6 @@ import signupSchema, {
   type FormSchemaType as SignupSchemaType,
 } from '@/lib/validation/signup-schema';
 
-import type { Control } from 'react-hook-form';
-
 const SignupPage = () => {
   type SigninOrSignupSchema<T> = T extends { termsAndConditions: true }
     ? SignupSchemaType

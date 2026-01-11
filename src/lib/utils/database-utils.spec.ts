@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { prisma } from '@/lib/prisma';
 import type { MockPrismaClient } from '@/lib/types/test-utils';
 
 import { checkDatabaseHealth, getApiBaseUrl, withRetry } from './database-utils';
-import { prisma } from '@/lib/prisma';
 
 // Mock the prisma client
 vi.mock('../prisma', () => ({

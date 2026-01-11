@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { NextRequest } from 'next/server';
-import { Prisma } from '@prisma/client';
 
 import { ArtistService } from '@/lib/services/artist-service';
 

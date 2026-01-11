@@ -3,8 +3,8 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
-import { withCache } from '@/lib/utils/simple-cache';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { withCache } from '@/lib/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
 

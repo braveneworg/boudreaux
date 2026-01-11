@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
+import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
@@ -12,7 +13,6 @@ import getActionState from '@/lib/utils/auth/get-action-state';
 import changeEmailSchema from '@/lib/validation/change-email-schema';
 
 import { auth, signOut } from '../../../auth';
-import { prisma } from '@/lib/prisma';
 
 import type { FormState } from '../types/form-state';
 import type { AdapterUser } from 'next-auth/adapters';

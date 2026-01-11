@@ -68,6 +68,8 @@ export const createArtistAction = async (
 
       if (response.success) {
         formState.errors = undefined;
+        // Include the created artist ID in the response for image uploads
+        formState.data = { artistId: response.data?.id };
       } else {
         if (!formState.errors) {
           formState.errors = {};
