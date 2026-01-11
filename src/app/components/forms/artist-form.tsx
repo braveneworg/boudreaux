@@ -33,12 +33,14 @@ import { Textarea } from '@/app/components/ui/textarea';
 import {
   deleteArtistImageAction,
   reorderArtistImagesAction,
-  uploadArtistImagesAction,
 } from '@/lib/actions/artist-image-actions';
 import { createArtistAction } from '@/lib/actions/create-artist-action';
+import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
+import { registerArtistImagesAction } from '@/lib/actions/register-image-actions';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
+import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
@@ -267,20 +269,46 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                 );
 
                 try {
-                  const imageFormData = new FormData();
-                  for (const img of imagesToUpload) {
-                    if (img.file) {
-                      imageFormData.append('files', img.file);
-                      imageFormData.append('captions', img.caption || '');
-                      imageFormData.append('altTexts', img.altText || '');
-                    }
+                  // Step 1: Get presigned URLs for direct S3 upload
+                  const fileInfos = imagesToUpload.map((img) => ({
+                    fileName: img.file!.name,
+                    contentType: img.file!.type,
+                    fileSize: img.file!.size,
+                  }));
+
+                  const presignedResult = await getPresignedUploadUrlsAction(
+                    'artists',
+                    artistId,
+                    fileInfos
+                  );
+
+                  if (!presignedResult.success || !presignedResult.data) {
+                    throw Error(presignedResult.error || 'Failed to get upload URLs');
                   }
 
-                  const uploadResult = await uploadArtistImagesAction(artistId, imageFormData);
+                  // Step 2: Upload files directly to S3
+                  const files = imagesToUpload.map((img) => img.file!);
+                  const uploadResults = await uploadFilesToS3(files, presignedResult.data);
 
-                  if (uploadResult.success && uploadResult.data) {
+                  // Check for upload failures
+                  const failedUploads = uploadResults.filter((r) => !r.success);
+                  if (failedUploads.length > 0) {
+                    throw Error(`Failed to upload ${failedUploads.length} image(s)`);
+                  }
+
+                  // Step 3: Register uploaded images in the database
+                  const imageInfos = presignedResult.data.map((presigned, index) => ({
+                    s3Key: presigned.s3Key,
+                    cdnUrl: presigned.cdnUrl,
+                    caption: imagesToUpload[index].caption || '',
+                    altText: imagesToUpload[index].altText || '',
+                  }));
+
+                  const registerResult = await registerArtistImagesAction(artistId, imageInfos);
+
+                  if (registerResult.success && registerResult.data) {
                     setImages((prev) => {
-                      const uploadedData = uploadResult.data || [];
+                      const uploadedData = registerResult.data || [];
                       let uploadIndex = 0;
                       return prev.map((img) => {
                         if (img.file && !img.uploadedUrl && uploadedData[uploadIndex]) {
@@ -298,25 +326,20 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                       });
                     });
                   } else {
-                    setImages((prev) =>
-                      prev.map((img) =>
-                        img.file && !img.uploadedUrl
-                          ? { ...img, isUploading: false, error: uploadResult.error }
-                          : img
-                      )
-                    );
-                    toast.error(uploadResult.error || 'Failed to upload images');
+                    throw Error(registerResult.error || 'Failed to register images');
                   }
                 } catch (uploadError) {
                   error('Image upload error:', uploadError);
+                  const errorMessage =
+                    uploadError instanceof Error ? uploadError.message : 'Upload failed';
                   setImages((prev) =>
                     prev.map((img) =>
                       img.file && !img.uploadedUrl
-                        ? { ...img, isUploading: false, error: 'Upload failed' }
+                        ? { ...img, isUploading: false, error: errorMessage }
                         : img
                     )
                   );
-                  toast.error('Failed to upload images');
+                  toast.error(errorMessage);
                 } finally {
                   setIsUploadingImages(false);
                 }
@@ -366,25 +389,50 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                   );
 
                   try {
-                    // Create FormData for image upload
-                    const imageFormData = new FormData();
-                    for (const img of imagesToUpload) {
-                      if (img.file) {
-                        imageFormData.append('files', img.file);
-                        imageFormData.append('captions', img.caption || '');
-                        imageFormData.append('altTexts', img.altText || '');
-                      }
-                    }
+                    // Step 1: Get presigned URLs for direct S3 upload
+                    const fileInfos = imagesToUpload.map((img) => ({
+                      fileName: img.file!.name,
+                      contentType: img.file!.type,
+                      fileSize: img.file!.size,
+                    }));
 
-                    const uploadResult = await uploadArtistImagesAction(
+                    const presignedResult = await getPresignedUploadUrlsAction(
+                      'artists',
                       createdArtistId,
-                      imageFormData
+                      fileInfos
                     );
 
-                    if (uploadResult.success && uploadResult.data) {
+                    if (!presignedResult.success || !presignedResult.data) {
+                      throw Error(presignedResult.error || 'Failed to get upload URLs');
+                    }
+
+                    // Step 2: Upload files directly to S3
+                    const files = imagesToUpload.map((img) => img.file!);
+                    const uploadResults = await uploadFilesToS3(files, presignedResult.data);
+
+                    // Check for upload failures
+                    const failedUploads = uploadResults.filter((r) => !r.success);
+                    if (failedUploads.length > 0) {
+                      throw Error(`Failed to upload ${failedUploads.length} image(s)`);
+                    }
+
+                    // Step 3: Register uploaded images in the database
+                    const imageInfos = presignedResult.data.map((presigned, index) => ({
+                      s3Key: presigned.s3Key,
+                      cdnUrl: presigned.cdnUrl,
+                      caption: imagesToUpload[index].caption || '',
+                      altText: imagesToUpload[index].altText || '',
+                    }));
+
+                    const registerResult = await registerArtistImagesAction(
+                      createdArtistId,
+                      imageInfos
+                    );
+
+                    if (registerResult.success && registerResult.data) {
                       // Update images with uploaded URLs
                       setImages((prev) => {
-                        const uploadedData = uploadResult.data || [];
+                        const uploadedData = registerResult.data || [];
                         return prev.map((img, index) => {
                           if (img.file && !img.uploadedUrl && uploadedData[index]) {
                             return {
@@ -401,33 +449,25 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                       // Show combined success message for artist + images
                       toast.success(
                         <>
-                          Artist <b>{fullName}</b> created with {uploadResult.data.length} image
-                          {uploadResult.data.length !== 1 ? 's' : ''}.
+                          Artist <b>{fullName}</b> created with {registerResult.data.length} image
+                          {registerResult.data.length !== 1 ? 's' : ''}.
                         </>
                       );
                     } else {
-                      // Mark images as failed
-                      setImages((prev) =>
-                        prev.map((img) =>
-                          img.file && !img.uploadedUrl
-                            ? { ...img, isUploading: false, error: uploadResult.error }
-                            : img
-                        )
-                      );
-                      toast.error(uploadResult.error || 'Failed to upload images');
-                      // Still show artist creation success
-                      toast.success(<ToastContent fullName={fullName} />);
+                      throw Error(registerResult.error || 'Failed to register images');
                     }
                   } catch (uploadError) {
                     error('Image upload error:', uploadError);
+                    const errorMessage =
+                      uploadError instanceof Error ? uploadError.message : 'Upload failed';
                     setImages((prev) =>
                       prev.map((img) =>
                         img.file && !img.uploadedUrl
-                          ? { ...img, isUploading: false, error: 'Upload failed' }
+                          ? { ...img, isUploading: false, error: errorMessage }
                           : img
                       )
                     );
-                    toast.error('Failed to upload images');
+                    toast.error(errorMessage);
                     // Still show artist creation success
                     toast.success(<ToastContent fullName={fullName} />);
                   } finally {
