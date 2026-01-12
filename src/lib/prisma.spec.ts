@@ -1,5 +1,3 @@
-import 'server-only';
-
 // Mock PrismaClient to avoid real database connections
 import { prisma } from '@/lib/prisma';
 

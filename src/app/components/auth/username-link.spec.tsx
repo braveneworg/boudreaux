@@ -1,5 +1,7 @@
 import React from 'react';
 
+vi.mock('server-only', () => ({}));
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -55,7 +57,7 @@ describe('UsernameLink', () => {
     render(<UsernameLink username="testuser" />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass('text-sm', 'hover:underline', 'underline-offset-4');
+    expect(link).toHaveClass('text-sm', 'text-muted-foreground', 'hover:text-foreground');
   });
 
   it('handles empty username gracefully', () => {

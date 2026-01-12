@@ -15,11 +15,11 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../../auth', () => ({
+vi.mock('../../../auth', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('@/app/lib/prisma-adapter', () => ({
+vi.mock('@/lib/prisma-adapter', () => ({
   CustomPrismaAdapter: vi.fn(() => ({
     updateUser: mockUpdateUser,
   })),
@@ -33,11 +33,11 @@ vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
-vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
+vi.mock('@/lib/utils/auth/get-action-state', () => ({
   default: mockGetActionState,
 }));
 
-vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
+vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -45,7 +45,7 @@ vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
   };
 });
 
-vi.mock('@/app/lib/validation/change-username-schema');
+vi.mock('@/lib/validation/change-username-schema');
 
 describe('changeUsernameAction', () => {
   const mockFormData = new FormData();

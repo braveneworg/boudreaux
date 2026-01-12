@@ -91,8 +91,9 @@ describe('SignedInAs', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
-      expect(screen.getByTestId('username-link')).toBeInTheDocument();
-      expect(screen.getByText('@testuser')).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: /@testuser/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute('href', '/profile');
     });
 
     it('applies consistent flex layout', () => {

@@ -49,7 +49,7 @@ vi.mock('./combobox-field', () => ({
 }));
 
 // Mock the countries utils
-vi.mock('@/app/lib/utils/countries', () => ({
+vi.mock('@/lib/utils/countries', () => ({
   COUNTRIES: [
     { code: 'US', name: 'United States' },
     { code: 'CA', name: 'Canada' },

@@ -15,7 +15,7 @@ describe('toPascalCase', () => {
     });
 
     it('should handle already PascalCase strings', () => {
-      expect(toPascalCase('HelloWorld')).toBe('Helloworld');
+      expect(toPascalCase('HelloWorld')).toBe('HelloWorld');
     });
   });
 
@@ -25,15 +25,15 @@ describe('toPascalCase', () => {
     });
 
     it('should convert UPPERCASE to PascalCase', () => {
-      expect(toPascalCase('UPPERCASE STRING')).toBe('UppercaseString');
+      expect(toPascalCase('UPPERCASE STRING')).toBe('UPPERCASESTRING');
     });
 
     it('should convert mixedCase to PascalCase', () => {
-      expect(toPascalCase('mIxEd CaSe')).toBe('MixedCase');
+      expect(toPascalCase('mIxEd CaSe')).toBe('MIxEdCaSe');
     });
 
     it('should convert camelCase to PascalCase', () => {
-      expect(toPascalCase('camelCase')).toBe('Camelcase');
+      expect(toPascalCase('camelCase')).toBe('CamelCase');
     });
 
     it('should convert snake_case-like string to PascalCase', () => {

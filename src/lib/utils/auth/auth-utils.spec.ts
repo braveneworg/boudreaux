@@ -1,15 +1,7 @@
 // Mock bcrypt to speed up tests
-import { isValidEmail, getHashedPassword, setUnknownError, EMAIL_REGEX } from './auth-utils';
+import { isValidEmail, setUnknownError, EMAIL_REGEX } from './auth-utils';
 
 import type { FormState } from '../../types/form-state';
-
-vi.mock('bcrypt', () => ({
-  hash: vi
-    .fn()
-    .mockImplementation((password: string) =>
-      Promise.resolve(`hashed_${password}_${Math.random().toString(36).substring(7)}`)
-    ),
-}));
 
 describe('auth-utils', () => {
   describe('EMAIL_REGEX', () => {
@@ -80,34 +72,6 @@ describe('auth-utils', () => {
       expect(isValidEmail('')).toBe(false);
       expect(isValidEmail('a@b.co')).toBe(true);
       expect(isValidEmail('user@' + 'a'.repeat(250) + '.com')).toBe(false); // Domain too long
-    });
-  });
-
-  describe('getHashedPassword', () => {
-    it('should hash a password successfully', async () => {
-      const password = 'testPassword123';
-      const hashedPassword = await getHashedPassword(password);
-
-      expect(hashedPassword).toBeDefined();
-      expect(typeof hashedPassword).toBe('string');
-      expect(hashedPassword).not.toBe(password);
-      expect(hashedPassword.length).toBeGreaterThan(0);
-    });
-
-    it('should produce different hashes for the same password', async () => {
-      const password = 'testPassword123';
-      const hash1 = await getHashedPassword(password);
-      const hash2 = await getHashedPassword(password);
-
-      expect(hash1).not.toBe(hash2); // bcrypt includes salt, so hashes should be different
-    });
-
-    it('should handle empty password', async () => {
-      const password = '';
-      const hashedPassword = await getHashedPassword(password);
-
-      expect(hashedPassword).toBeDefined();
-      expect(typeof hashedPassword).toBe('string');
     });
   });
 

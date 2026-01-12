@@ -15,7 +15,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../../auth', () => ({
+vi.mock('../../../auth', () => ({
   auth: mockAuth,
 }));
 
@@ -27,11 +27,11 @@ vi.mock('../prisma', () => ({
   },
 }));
 
-vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
+vi.mock('@/lib/utils/auth/get-action-state', () => ({
   default: mockGetActionState,
 }));
 
-vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
+vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -43,7 +43,7 @@ vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
-vi.mock('@/app/lib/validation/profile-schema');
+vi.mock('@/lib/validation/profile-schema');
 
 describe('updateProfileAction', () => {
   const mockFormData = new FormData();

@@ -8,7 +8,7 @@ import {
 } from './account-lockout';
 
 // Mock Prisma Client
-vi.mock('@/app/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: vi.fn(),

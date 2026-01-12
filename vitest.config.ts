@@ -93,11 +93,16 @@ export default defineConfig({
   },
 
   resolve: {
-    alias: {
-      '@': path.resolve(process.cwd(), './src'),
+    alias: [
+      { find: '@/components', replacement: path.resolve(process.cwd(), './src/app/components') },
+      { find: '@/lib', replacement: path.resolve(process.cwd(), './src/lib') },
+      { find: '@/ui', replacement: path.resolve(process.cwd(), './src/app/components/ui') },
+      { find: '@/hooks', replacement: path.resolve(process.cwd(), './src/app/hooks') },
+      { find: '@/utils', replacement: path.resolve(process.cwd(), './src/lib/utils') },
+      { find: '@', replacement: path.resolve(process.cwd(), './src') },
       // Keep only next/server alias - let vi.mock handle next/navigation
-      'next/server': path.resolve(process.cwd(), './__mocks__/next/server.js'),
-    },
+      { find: 'next/server', replacement: path.resolve(process.cwd(), './__mocks__/next/server.js') },
+    ],
     conditions: ['import', 'module', 'browser', 'default'],
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
   },

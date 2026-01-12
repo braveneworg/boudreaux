@@ -130,7 +130,14 @@ describe('ArtistService', () => {
       if (result.success) {
         expect(result.data).toEqual(mockArtist);
       }
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({ where: { id: 'artist-123' } });
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
+        where: { id: 'artist-123' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      });
     });
 
     it('should return error when artist not found', async () => {
@@ -243,6 +250,12 @@ describe('ArtistService', () => {
         skip: 0,
         take: 50,
         orderBy: { createdAt: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 3,
+          },
+        },
       });
     });
 
@@ -257,20 +270,12 @@ describe('ArtistService', () => {
         skip: 10,
         take: 5,
         orderBy: { createdAt: 'desc' },
-      });
-    });
-
-    it('should filter by isActive', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
-
-      const result = await ArtistService.getArtists({ isActive: true });
-
-      expect(result.success).toBe(true);
-      expect(prisma.artist.findMany).toHaveBeenCalledWith({
-        where: { isActive: true },
-        skip: 0,
-        take: 50,
-        orderBy: { createdAt: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 3,
+          },
+        },
       });
     });
 
@@ -292,23 +297,27 @@ describe('ArtistService', () => {
         skip: 0,
         take: 50,
         orderBy: { createdAt: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 3,
+          },
+        },
       });
     });
 
-    it('should combine filters and search', async () => {
+    it('should combine pagination and search', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist]);
 
       const result = await ArtistService.getArtists({
         skip: 5,
         take: 10,
-        isActive: true,
         search: 'doe',
       });
 
       expect(result.success).toBe(true);
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
         where: {
-          isActive: true,
           OR: [
             { firstName: { contains: 'doe', mode: 'insensitive' } },
             { surname: { contains: 'doe', mode: 'insensitive' } },
@@ -319,6 +328,12 @@ describe('ArtistService', () => {
         skip: 5,
         take: 10,
         orderBy: { createdAt: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 3,
+          },
+        },
       });
     });
 
@@ -486,7 +501,7 @@ describe('ArtistService', () => {
 
   describe('archiveArtist', () => {
     it('should archive an artist successfully', async () => {
-      const archivedArtist = { ...mockArtist, archivedAt: new Date('2024-12-13') };
+      const archivedArtist = { ...mockArtist, deletedOn: new Date('2024-12-13') };
       vi.mocked(prisma.artist.update).mockResolvedValue(archivedArtist);
 
       const result = await ArtistService.archiveArtist('artist-123');
@@ -497,7 +512,7 @@ describe('ArtistService', () => {
       }
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'artist-123' },
-        data: { archivedAt: expect.any(Date) },
+        data: { deletedOn: expect.any(Date) },
       });
     });
 

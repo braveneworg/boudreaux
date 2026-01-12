@@ -22,7 +22,7 @@ vi.mock('next/headers', () => ({
 }));
 
 // Mock rate limiter
-vi.mock('@/app/lib/utils/rate-limit', () => ({
+vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: vi.fn(() => ({
     check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
   })),
@@ -30,7 +30,7 @@ vi.mock('@/app/lib/utils/rate-limit', () => ({
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../../auth', () => ({
+vi.mock('../../../auth', () => ({
   signIn: mockSignIn,
 }));
 
@@ -38,11 +38,11 @@ vi.mock('next/navigation', () => ({
   redirect: mockRedirect,
 }));
 
-vi.mock('@/app/lib/utils/auth/get-action-state', () => ({
+vi.mock('@/lib/utils/auth/get-action-state', () => ({
   default: mockGetActionState,
 }));
 
-vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
+vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -50,7 +50,7 @@ vi.mock('@/app/lib/utils/auth/auth-utils', async (importOriginal) => {
   };
 });
 
-vi.mock('@/app/lib/validation/signin-schema');
+vi.mock('@/lib/validation/signin-schema');
 
 type FormState = {
   fields: Record<string, string>;

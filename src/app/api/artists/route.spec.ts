@@ -103,21 +103,6 @@ describe('Artist API Routes', () => {
       });
     });
 
-    it('should handle isActive filter', async () => {
-      vi.mocked(ArtistService.getArtists).mockResolvedValue({
-        success: true,
-        data: [mockArtist] as never,
-      });
-
-      const request = new NextRequest('http://localhost:3000/api/artist?isActive=true');
-      const response = await GET(request);
-
-      expect(response.status).toBe(200);
-      expect(ArtistService.getArtists).toHaveBeenCalledWith({
-        isActive: true,
-      });
-    });
-
     it('should handle search parameter', async () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,
@@ -139,16 +124,13 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest(
-        'http://localhost:3000/api/artist?skip=5&take=10&isActive=true&search=doe'
-      );
+      const request = new NextRequest('http://localhost:3000/api/artist?skip=5&take=10&search=doe');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
         skip: 5,
         take: 10,
-        isActive: true,
         search: 'doe',
       });
     });
@@ -207,21 +189,6 @@ describe('Artist API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal server error' });
-    });
-
-    it('should parse isActive=false correctly', async () => {
-      vi.mocked(ArtistService.getArtists).mockResolvedValue({
-        success: true,
-        data: [],
-      });
-
-      const request = new NextRequest('http://localhost:3000/api/artist?isActive=false');
-      const response = await GET(request);
-
-      expect(response.status).toBe(200);
-      expect(ArtistService.getArtists).toHaveBeenCalledWith({
-        isActive: false,
-      });
     });
 
     it('should handle invalid numeric parameters gracefully', async () => {
