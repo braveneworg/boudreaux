@@ -1,11 +1,11 @@
-import { checkDatabaseHealth } from '@/app/lib/utils/database-utils';
+import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 
 import { GET } from './route';
 
 // Import after mocking
 
 // Mock the database-utils module
-vi.mock('@/app/lib/utils/database-utils', () => ({
+vi.mock('@/lib/utils/database-utils', () => ({
   checkDatabaseHealth: vi.fn(),
 }));
 

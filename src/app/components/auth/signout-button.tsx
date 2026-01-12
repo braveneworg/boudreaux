@@ -4,8 +4,8 @@ import { LogOutIcon } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
-import { CONSTANTS } from '@/app/lib/constants';
-import { cn } from '@/app/lib/utils/tailwind-utils';
+import { CONSTANTS } from '@/lib/constants';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 import AdminLink from './admin-link';
 import EditProfileButton from './edit-profile-button';

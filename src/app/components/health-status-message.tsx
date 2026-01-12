@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import type { HealthStatus } from '../lib/types/health-status';
+import type { HealthStatus } from '../../lib/types/health-status';
 
 interface HealthStatusMessageProps {
   healthStatus: HealthStatus | null;

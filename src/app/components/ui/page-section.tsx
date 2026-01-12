@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { cn } from '@/app/lib/utils/tailwind-utils';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 type PageSectionProps = {
   children: React.ReactNode;

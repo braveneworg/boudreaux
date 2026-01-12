@@ -1,8 +1,8 @@
 import NextAuth from 'next-auth';
 import Nodemailer from 'next-auth/providers/nodemailer';
 
-import { prisma } from '@/app/lib/prisma';
-import { CustomPrismaAdapter } from '@/app/lib/prisma-adapter';
+import { prisma } from '@/lib/prisma';
+import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 
 import type { User } from 'next-auth';
 import type { AdapterUser } from 'next-auth/adapters';
@@ -58,7 +58,7 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomPrismaAdapter(prisma),
   // Trust host header from reverse proxy (NGINX)
   // Required when running behind a proxy
@@ -194,3 +194,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // Enable CSRF protection
   useSecureCookies: process.env.NODE_ENV === 'production',
 });
+
+export { handlers, auth, signIn, signOut };

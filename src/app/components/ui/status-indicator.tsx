@@ -2,7 +2,7 @@ import React from 'react';
 
 import { CheckIcon, XIcon, LoaderIcon } from 'lucide-react';
 
-import { cn } from '@/app/lib/utils/tailwind-utils';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 interface StatusIndicatorProps {
   isSuccess?: boolean;

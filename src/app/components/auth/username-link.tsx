@@ -2,7 +2,10 @@ import Link from 'next/link';
 
 const UsernameLink = ({ username }: { username: string }) => {
   return (
-    <Link className="text-sm hover:underline underline-offset-4" href={`/profile/${username}`}>
+    <Link
+      href={`/profile/${username}`}
+      className="text-sm text-muted-foreground hover:text-foreground"
+    >
       @{username}
     </Link>
   );

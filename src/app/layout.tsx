@@ -19,7 +19,7 @@ import 'video.js/dist/video-js.css';
 // Server-side environment validation on startup
 if (typeof window === 'undefined') {
   // Dynamic import to avoid bundling in client
-  import('@/app/lib/config/env-validation').then(({ validateEnvironment }) => {
+  import('@/lib/config/env-validation').then(({ validateEnvironment }) => {
     validateEnvironment();
   });
 }
@@ -70,7 +70,7 @@ export default async function RootLayout({
   const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${dawningOfANewDay.variable} antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full`}
         suppressHydrationWarning
@@ -84,7 +84,7 @@ export default async function RootLayout({
           </main>
           <Footer />
         </Providers>
-        <Toaster />
+        <Toaster position="bottom-center" />
       </body>
     </html>
   );

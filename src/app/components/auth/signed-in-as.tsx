@@ -1,10 +1,10 @@
+import Link from 'next/link';
+
 import { KeyIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
-import { cn } from '@/app/lib/utils';
-
-import UsernameLink from './username-link';
+import { cn } from '@/lib/utils';
 
 const SignedInAs = () => {
   const { data: session } = useSession();
@@ -32,7 +32,9 @@ const SignedInAs = () => {
           </div>
         )}
         <KeyIcon size={16} className="md:hidden" />
-        <UsernameLink username={username} />
+        <Link className="text-sm hover:underline underline-offset-4" href="/profile">
+          @{username}
+        </Link>
       </div>
     </>
   );

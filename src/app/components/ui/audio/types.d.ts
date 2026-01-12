@@ -1,23 +1,26 @@
-interface Release {
-  id: string;
-  title: string;
-  format: string;
-  year: number;
-  label: string;
-  catalogNumber: string;
-  coverArt: string;
-  bandcampUrl: string;
-  releasedOn: number;
-}
-
-interface Artist {
-  id: string;
-  displayName: string;
-  first: string;
-  last: string;
-  name: string;
-  pics: string[];
-  releases: Release[];
-  artists: Artist[];
-  bandcampUrl: string;
-}
+/**
+ * Re-export media model types from the shared location
+ * @deprecated Import directly from '@/lib/types/media-models' instead
+ */
+export type {
+  Artist,
+  ArtistGroup,
+  ArtistLabel,
+  ArtistRelease,
+  ArtistUrl,
+  Format,
+  Genre,
+  Group,
+  Image,
+  Instrument,
+  Json,
+  Label,
+  Platform,
+  Release,
+  ReleaseTrack,
+  ReleaseUrl,
+  Tag,
+  Track,
+  Url,
+  Variants,
+} from '../../../../lib/types/media-models';

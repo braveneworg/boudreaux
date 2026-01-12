@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import { type ProfileFormData } from '@/app/lib/validation/profile-schema';
+import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
 import CountryField from './country-field';
 
@@ -49,7 +49,7 @@ vi.mock('./combobox-field', () => ({
 }));
 
 // Mock the countries utils
-vi.mock('@/app/lib/utils/countries', () => ({
+vi.mock('@/lib/utils/countries', () => ({
   COUNTRIES: [
     { code: 'US', name: 'United States' },
     { code: 'CA', name: 'Canada' },

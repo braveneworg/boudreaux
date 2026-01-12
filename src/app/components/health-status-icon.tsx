@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import type { HealthStatusType } from '../lib/types/health-status';
+import type { HealthStatusType } from '../../lib/types/health-status';
 
 interface HealthStatusIconProps {
   status: HealthStatusType | null;

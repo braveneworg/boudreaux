@@ -2,8 +2,8 @@
 
 import React from 'react';
 
-import { COUNTRIES } from '@/app/lib/utils/countries';
-import type { ProfileFormData } from '@/app/lib/validation/profile-schema';
+import { COUNTRIES } from '@/lib/utils/countries';
+import type { ProfileFormData } from '@/lib/validation/profile-schema';
 
 import ComboboxField from './combobox-field';
 

@@ -203,3 +203,4 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't mock implementation details in tests (mock behavior instead)
 - Don't test implementation details (test behavior and output instead)
 - Don't rely solely on code coverage metrics (focus on meaningful tests)
+- Don't use relative imports that traverse up the directory tree (e.g., ../../../lib/utils). Use absolute imports from the project root instead (e.g., '@/lib/utils').
