@@ -101,7 +101,10 @@ export default defineConfig({
       { find: '@/utils', replacement: path.resolve(process.cwd(), './src/lib/utils') },
       { find: '@', replacement: path.resolve(process.cwd(), './src') },
       // Keep only next/server alias - let vi.mock handle next/navigation
-      { find: 'next/server', replacement: path.resolve(process.cwd(), './__mocks__/next/server.js') },
+      {
+        find: 'next/server',
+        replacement: path.resolve(process.cwd(), './__mocks__/next/server.js'),
+      },
     ],
     conditions: ['import', 'module', 'browser', 'default'],
     extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],

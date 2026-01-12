@@ -250,7 +250,9 @@ describe('createArtistAction', () => {
       const result = await createArtistAction(initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.slug).toEqual(['This slug is already in use. Please choose a different one.']);
+      expect(result.errors?.slug).toEqual([
+        'This slug is already in use. Please choose a different one.',
+      ]);
     });
 
     it('should handle service returning error without message', async () => {

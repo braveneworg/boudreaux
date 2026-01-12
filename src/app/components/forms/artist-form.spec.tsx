@@ -1,5 +1,3 @@
-vi.mock('server-only', () => ({}));
-
 import { useActionState, useTransition } from 'react';
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -11,6 +9,8 @@ import { toast } from 'sonner';
 import type { FormState } from '@/lib/types/form-state';
 
 import ArtistForm from './artist-form';
+
+vi.mock('server-only', () => ({}));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual('react');
