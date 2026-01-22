@@ -62,13 +62,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/signin', request.url));
     }
 
-    if (token.role !== 'admin') {
+    if (token.user.role !== 'admin') {
       // Log unauthorized access attempt (dynamic import for edge runtime compatibility)
       // Note: In production, integrate with your logging service
       console.warn('Unauthorized admin access attempt:', {
         userId: token.sub,
         attemptedPath: pathname,
-        userRole: token.role || 'none',
+        userRole: token.user.role || 'none',
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
         timestamp: new Date().toISOString(),
       });

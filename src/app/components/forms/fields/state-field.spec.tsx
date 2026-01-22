@@ -54,7 +54,7 @@ vi.mock('./combobox-field', () => ({
 }));
 
 // Mock the US_STATES data
-vi.mock('@/app/lib/utils/states', () => ({
+vi.mock('@/lib/utils/states', () => ({
   US_STATES: [
     { code: 'NY', name: 'New York' },
     { code: 'CA', name: 'California' },

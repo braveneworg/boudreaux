@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 
 import HealthStatusMessage from './health-status-message';
 
-import type { HealthStatus } from '../lib/types/health-status';
+import type { HealthStatus } from '../../lib/types/health-status';
 
 describe('HealthStatusMessage', () => {
   describe('Loading State', () => {

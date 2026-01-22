@@ -6,7 +6,7 @@ import { RefreshCwIcon } from 'lucide-react';
 import { generateUsername } from 'unique-username-generator';
 
 import { Button } from '@/app/components/ui/button';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/lib/utils';
 
 import type { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 

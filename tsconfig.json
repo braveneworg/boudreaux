@@ -20,12 +20,13 @@
       }
     ],
     "paths": {
-      "@/*": ["src/*"],
-      "@/components/*": ["src/app/components/*"],
-      "@/utils/*": ["src/app/lib/utils/*"],
-      "@/ui/*": ["src/app/components/ui/*"],
-      "@/lib/*": ["src/app/lib/*"],
-      "@/hooks/*": ["src/app/hooks/*"]
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/app/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/app/lib/*": ["./src/lib/*"],
+      "@/utils/*": ["./src/lib/utils/*"],
+      "@/ui/*": ["./src/app/components/ui/*"],
+      "@/hooks/*": ["./src/app/hooks/*"]
     },
     "types": ["vitest/globals", "node"]
   },

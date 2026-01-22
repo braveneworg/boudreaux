@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  useActionState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from 'react';
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Separator } from '@radix-ui/react-separator';
@@ -28,24 +20,23 @@ import {
 } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { changeEmailAction } from '@/app/lib/actions/change-email-action';
-import { changeUsernameAction } from '@/app/lib/actions/change-username-action';
-import { updateProfileAction } from '@/app/lib/actions/update-profile-action';
+import { changeEmailAction } from '@/lib/actions/change-email-action';
+import { changeUsernameAction } from '@/lib/actions/change-username-action';
+import { updateProfileAction } from '@/lib/actions/update-profile-action';
 import type {
   ProfileFormData,
   ChangeEmailFormData,
   ChangeUsernameFormData,
-} from '@/app/lib/types/form-data';
-import type { FormState } from '@/app/lib/types/form-state';
-import { splitFullName } from '@/app/lib/utils/split-full-name';
-import changeEmailSchema from '@/app/lib/validation/change-email-schema';
-import usernameSchema from '@/app/lib/validation/change-username-schema';
-import profileSchema from '@/app/lib/validation/profile-schema';
+} from '@/lib/types/form-data';
+import type { FormState } from '@/lib/types/form-state';
+import { splitFullName } from '@/lib/utils/split-full-name';
+import changeEmailSchema from '@/lib/validation/change-email-schema';
+import usernameSchema from '@/lib/validation/change-username-schema';
+import profileSchema from '@/lib/validation/profile-schema';
 
 import { Switch } from '../ui/switch';
 
 const initialFormState: FormState = {
-  errors: {},
   fields: {},
   success: false,
 };
@@ -64,16 +55,14 @@ export default function ProfileForm() {
     initialFormState
   );
   const [isTransitionPending, startTransition] = useTransition();
-  const { data: session, update } = useSession();
+  const { data: session, update, status } = useSession();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
 
-  // Memoize fallback names to prevent unnecessary recalculations
-  const fallbackNames = useMemo(() => splitFullName(user?.name ?? ''), [user?.name]);
-  const firstName = user?.firstName || fallbackNames.firstName || '';
-  const lastName = user?.lastName || fallbackNames.lastName || '';
+  const firstName = user?.firstName ?? '';
+  const lastName = user?.lastName ?? '';
 
   const personalProfileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -176,18 +165,23 @@ export default function ProfileForm() {
       const hasChanges = Object.keys(personalProfileForm.formState.dirtyFields).length > 0;
 
       if (!hasChanges) {
-        personalProfileForm.reset({
-          firstName: user.firstName || fallbackNames.firstName || '',
-          lastName: user.lastName || fallbackNames.lastName || '',
-          phone: user.phone ?? '',
-          addressLine1: user.addressLine1 ?? '',
-          addressLine2: user.addressLine2 ?? '',
-          city: user.city ?? '',
-          state: user.state ?? '',
-          zipCode: user.zipCode ?? '',
-          country: user.country ?? '',
-          allowSmsNotifications: user.allowSmsNotifications ?? false,
-        });
+        personalProfileForm.reset(
+          {
+            firstName: user.firstName || fallbackNames.firstName || '',
+            lastName: user.lastName || fallbackNames.lastName || '',
+            phone: user.phone ?? '',
+            addressLine1: user.addressLine1 ?? '',
+            addressLine2: user.addressLine2 ?? '',
+            city: user.city ?? '',
+            state: user.state ?? '',
+            zipCode: user.zipCode ?? '',
+            country: user.country ?? '',
+            allowSmsNotifications: user.allowSmsNotifications ?? false,
+          },
+          {
+            keepDefaultValues: false,
+          }
+        );
         setAreFormValuesSet(true);
       }
     }
@@ -369,7 +363,27 @@ export default function ProfileForm() {
     [isEditingUserEmail, isEditingUsername, changeEmailForm, changeUsernameForm]
   );
 
-  if (!user) {
+  // Wait for session to load before rendering forms
+  if (status === 'loading' || !user) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Guard against forms not being initialized
+  if (!personalProfileForm.control || !changeEmailForm.control || !changeUsernameForm.control) {
     return (
       <div className="space-y-6">
         <Card>

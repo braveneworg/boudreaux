@@ -52,7 +52,8 @@ const config = {
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
-      "connect-src 'self' https://challenges.cloudflare.com https://cdn.fakefourrecords.com",
+      // Allow S3 direct uploads - explicit bucket URL + wildcard for any *.amazonaws.com subdomain
+      "connect-src 'self' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://fakefourmedia.s3.us-east-1.amazonaws.com https://*.amazonaws.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "object-src 'none'",

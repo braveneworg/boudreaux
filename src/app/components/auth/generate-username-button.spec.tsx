@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { createMockedForm } from '@/app/lib/types/test-utils';
+import { createMockedForm } from '@/lib/types/test-utils';
 
 import { GenerateUsernameButton } from './generate-username-button';
 

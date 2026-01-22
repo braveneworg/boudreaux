@@ -12,7 +12,7 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Card } from '@/app/components/ui/card';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
-import { signinAction } from '@/app/lib/actions/signin-action';
+import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import type { FormState } from '@/lib/types/form-state';
 import signinSchema, {
@@ -21,8 +21,6 @@ import signinSchema, {
 import signupSchema, {
   type FormSchemaType as SignupSchemaType,
 } from '@/lib/validation/signup-schema';
-
-import type { Control } from 'react-hook-form';
 
 const SignupPage = () => {
   type SigninOrSignupSchema<T> = T extends { termsAndConditions: true }
@@ -113,13 +111,7 @@ const SignupPage = () => {
           <FormProvider {...form}>
             <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
               <SignupSigninForm
-                control={
-                  form.control as Control<{
-                    email: string;
-                    general?: string;
-                    termsAndConditions?: boolean;
-                  }>
-                }
+                control={form.control}
                 isPending={isSubmitting}
                 isVerified={isVerified}
                 setIsVerified={setIsVerified}

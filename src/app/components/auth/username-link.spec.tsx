@@ -5,6 +5,8 @@ import { describe, it, expect, vi } from 'vitest';
 
 import UsernameLink from './username-link';
 
+vi.mock('server-only', () => ({}));
+
 // Mock Next.js Link
 vi.mock('next/link', () => ({
   default: ({
@@ -55,7 +57,7 @@ describe('UsernameLink', () => {
     render(<UsernameLink username="testuser" />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass('text-sm', 'hover:underline', 'underline-offset-4');
+    expect(link).toHaveClass('text-sm', 'text-muted-foreground', 'hover:text-foreground');
   });
 
   it('handles empty username gracefully', () => {

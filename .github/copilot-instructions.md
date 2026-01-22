@@ -43,6 +43,13 @@ Next.js v15.5.0 app with TypeScript, Tailwind v4, shadcn/ui, React Hook Form, Zo
 - Keep components small and focused
 - Prefer arrow functions for components
 - File name matches component name
+- Never create class components
+- Use props destructuring
+- Use React.FC only when necessary, prefer function declarations
+- Use React.memo for performance optimization of pure components
+- Use useCallback and useMemo for memoizing functions and values
+- Avoid inline functions and objects in JSX props
+- Use Fragment shorthand <> </> when no key or attribute is needed
 
 ### Forms
 
@@ -196,3 +203,4 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't mock implementation details in tests (mock behavior instead)
 - Don't test implementation details (test behavior and output instead)
 - Don't rely solely on code coverage metrics (focus on meaningful tests)
+- Don't use relative imports that traverse up the directory tree (e.g., ../../../lib/utils). Use absolute imports from the project root instead (e.g., '@/lib/utils').

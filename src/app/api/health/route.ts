@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { checkDatabaseHealth } from '@/app/lib/utils/database-utils';
+import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

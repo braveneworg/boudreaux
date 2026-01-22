@@ -1,4 +1,4 @@
-import { cn } from '@/app/lib/utils/tailwind-utils';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 import { Separator } from './separator';
 

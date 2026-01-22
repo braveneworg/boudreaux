@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
-import { CONSTANTS } from '@/app/lib/constants';
+import { CONSTANTS } from '@/lib/constants';
 
 import AuthToolbar from './auth-toolbar';
 
@@ -41,13 +41,13 @@ vi.mock('../ui/spinners/message-spinner', () => ({
   ),
 }));
 
-vi.mock('@/app/lib/utils/tailwind-utils', () => ({
+vi.mock('@/lib/utils/tailwind-utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 // Mock console logger
 const mockLog = vi.fn();
-vi.mock('@/app/lib/utils/console-logger', () => ({
+vi.mock('@/lib/utils/console-logger', () => ({
   log: (...args: unknown[]) => mockLog(...args),
 }));
 
