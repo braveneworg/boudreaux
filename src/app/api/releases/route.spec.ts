@@ -201,9 +201,7 @@ describe('Release API Routes', () => {
         data: [mockRelease] as never,
       });
 
-      const request = new NextRequest(
-        'http://localhost:3000/api/releases?skip=invalid&take=abc'
-      );
+      const request = new NextRequest('http://localhost:3000/api/releases?skip=invalid&take=abc');
       const response = await GET(request);
 
       expect(response.status).toBe(200);

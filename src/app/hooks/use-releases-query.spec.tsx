@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
 
 import useReleasesQuery from './use-releases-query';
 
@@ -15,9 +16,10 @@ const createQueryClient = () =>
 
 const createWrapper = () => {
   const queryClient = createQueryClient();
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  const Wrapper = function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  };
+  return Wrapper;
 };
 
 describe('useReleasesQuery', () => {
