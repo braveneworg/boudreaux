@@ -81,3 +81,28 @@
 - Follow the toasts in create artists section for consistency.
 - Ensure proper type definitions for release data and API responses.
 - Audit and code review before merging changes.
+
+### Admin Create Release Section
+
+- Ability to create new releases through a dedicated admin interface.
+- Form fields for entering release details such as title, artist, release date, genre, and status.
+- Implement form validation to ensure all required fields are filled out correctly.
+- Provide options to save the release as a draft or publish it immediately.
+- Integrate with existing backend services to submit new release data.
+- Ensure responsive design for usability on various devices.
+- Use TypeScript interfaces to define the structure of the release creation form data.
+- Implement error handling for form submission to manage failures gracefully.
+- Write unit tests for the new admin create release section components and form interactions.
+- Document the new admin create release section functionality and usage instructions.
+- Optimize the performance of the form rendering and data submission.
+- Ensure compatibility with existing admin features and modules.
+- Use async/await for handling asynchronous form submissions.
+- Follow best practices for security and data privacy when handling release data.
+- Review and test the new admin create release section thoroughly before deployment.
+- Monitor the performance and user feedback post-release to address any issues promptly.
+- Refactor existing code if necessary to improve maintainability and integration with the new admin create release section.
+- Keep dependencies up to date and avoid introducing unnecessary ones.
+- Ensure the new admin create release section aligns with the overall project goals and user needs.
+- Show toasts or notifications to inform users of successful or failed actions.
+- Follow the toasts in create artists section for consistency.
+- Follow the create artist section form structure and styling for consistency.

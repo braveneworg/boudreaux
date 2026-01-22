@@ -168,6 +168,18 @@ export class GroupService {
             orderBy: { sortOrder: 'asc' },
             take: 3,
           },
+          artistGroups: {
+            include: {
+              artist: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  surname: true,
+                  displayName: true,
+                },
+              },
+            },
+          },
         },
       });
 

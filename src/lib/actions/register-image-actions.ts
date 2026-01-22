@@ -196,3 +196,82 @@ export const registerGroupImagesAction = async (
     return { success: false, error: 'Failed to register images' };
   }
 };
+
+/**
+ * Server action to register images after direct S3 upload for releases
+ */
+export const registerReleaseImagesAction = async (
+  releaseId: string,
+  images: RegisterImageInput[]
+): Promise<RegisterImageActionResult> => {
+  await requireRole('admin');
+
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id || session?.user?.role !== 'admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Verify release exists
+    const releaseExists = await prisma.release.findUnique({
+      where: { id: releaseId },
+      select: { id: true },
+    });
+
+    if (!releaseExists) {
+      return { success: false, error: 'Release not found' };
+    }
+
+    // Get the next sort order for this release
+    const existingImages = await prisma.image.findMany({
+      where: { releaseId },
+      select: { id: true },
+    });
+    let nextSortOrder = existingImages.length;
+
+    const results: RegisterImageResult[] = [];
+
+    for (const image of images) {
+      const dbImage = await prisma.image.create({
+        data: {
+          src: image.cdnUrl,
+          caption: image.caption,
+          altText: image.altText,
+          releaseId,
+          sortOrder: nextSortOrder,
+        },
+      });
+
+      results.push({
+        id: dbImage.id,
+        src: dbImage.src ?? '',
+        caption: dbImage.caption ?? undefined,
+        altText: dbImage.altText ?? undefined,
+        sortOrder: dbImage.sortOrder ?? nextSortOrder,
+      });
+
+      nextSortOrder++;
+    }
+
+    // Log image registration for security audit
+    logSecurityEvent({
+      event: 'media.release.images.uploaded',
+      userId: session.user.id,
+      metadata: {
+        releaseId,
+        fileCount: images.length,
+        success: true,
+      },
+    });
+
+    // Revalidate release page
+    revalidatePath(`/releases/[slug]`, 'page');
+    revalidatePath('/admin/releases');
+
+    return { success: true, data: results };
+  } catch (error) {
+    console.error('Register release images action error:', error);
+    return { success: false, error: 'Failed to register images' };
+  }
+};
