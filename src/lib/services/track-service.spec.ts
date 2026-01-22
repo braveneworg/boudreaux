@@ -1,0 +1,438 @@
+// Mock server-only and prisma first to prevent errors from imported modules
+import { Prisma } from '@prisma/client';
+
+import { TrackService } from './track-service';
+import { prisma } from '../prisma';
+
+import type { Track } from '../types/media-models';
+
+vi.mock('server-only', () => ({}));
+vi.mock('../prisma', () => ({
+  prisma: {
+    track: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    image: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  },
+}));
+
+// Mock @prisma/client after the first vi.mock calls
+vi.mock('@prisma/client', async () => {
+  const actual = await vi.importActual('@prisma/client');
+  return {
+    ...actual,
+    Prisma: {
+      PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+        code: string;
+        constructor(message: string, options: { code: string; clientVersion: string }) {
+          super(message);
+          this.code = options.code;
+        }
+      },
+      PrismaClientInitializationError: class PrismaClientInitializationError extends Error {
+        constructor(message: string, _clientVersion: string) {
+          super(message);
+        }
+      },
+    },
+  };
+});
+
+describe('TrackService', () => {
+  const mockTrack: Partial<Track> = {
+    id: 'track-123',
+    title: 'Test Track',
+    duration: 225,
+    audioUrl: 'https://example.com/audio.mp3',
+    coverArt: 'https://example.com/cover.jpg',
+    position: 1,
+    createdAt: new Date('2024-01-15T00:00:00.000Z'),
+    updatedAt: new Date('2024-01-15T00:00:00.000Z'),
+    images: [],
+    urls: [],
+    releaseTracks: [],
+    artists: [],
+  };
+
+  const mockCreateInput: Prisma.TrackCreateInput = {
+    title: 'Test Track',
+    duration: 225,
+    audioUrl: 'https://example.com/audio.mp3',
+    coverArt: 'https://example.com/cover.jpg',
+    position: 1,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('createTrack', () => {
+    it('should create a track successfully', async () => {
+      vi.mocked(prisma.track.create).mockResolvedValue(mockTrack as never);
+
+      const result = await TrackService.createTrack(mockCreateInput);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTrack);
+      expect(prisma.track.create).toHaveBeenCalledWith({
+        data: mockCreateInput,
+        include: {
+          urls: true,
+          images: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: true,
+        },
+      });
+    });
+
+    it('should return error for unique constraint violation', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.create).mockRejectedValue(prismaError);
+
+      const result = await TrackService.createTrack(mockCreateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Track with this title already exists');
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.create).mockRejectedValue(prismaError);
+
+      const result = await TrackService.createTrack(mockCreateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database unavailable');
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.create).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.createTrack(mockCreateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to create track');
+    });
+  });
+
+  describe('getTrackById', () => {
+    it('should retrieve a track by ID successfully', async () => {
+      vi.mocked(prisma.track.findUnique).mockResolvedValue(mockTrack as never);
+
+      const result = await TrackService.getTrackById('track-123');
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTrack);
+      expect(prisma.track.findUnique).toHaveBeenCalledWith({
+        where: { id: 'track-123' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: {
+            include: {
+              artist: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  surname: true,
+                  displayName: true,
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('should return error when track is not found', async () => {
+      vi.mocked(prisma.track.findUnique).mockResolvedValue(null);
+
+      const result = await TrackService.getTrackById('nonexistent-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Track not found');
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.findUnique).mockRejectedValue(prismaError);
+
+      const result = await TrackService.getTrackById('track-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database unavailable');
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.findUnique).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.getTrackById('track-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to retrieve track');
+    });
+  });
+
+  describe('getTracks', () => {
+    const mockTracks: Partial<Track>[] = [
+      { ...mockTrack, id: 'track-1', title: 'Track 1' },
+      { ...mockTrack, id: 'track-2', title: 'Track 2' },
+    ];
+
+    it('should retrieve all tracks with default params', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      const result = await TrackService.getTracks();
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTracks);
+      expect(prisma.track.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+        include: expect.any(Object),
+      });
+    });
+
+    it('should apply skip and take params', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({ skip: 10, take: 25 });
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 25,
+        })
+      );
+    });
+
+    it('should apply search filter', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({ search: 'test' });
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+          },
+        })
+      );
+    });
+
+    it('should return empty array when no tracks exist', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue([]);
+
+      const result = await TrackService.getTracks();
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual([]);
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.findMany).mockRejectedValue(prismaError);
+
+      const result = await TrackService.getTracks();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database unavailable');
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.findMany).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.getTracks();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to retrieve tracks');
+    });
+  });
+
+  describe('updateTrack', () => {
+    const mockUpdateInput: Prisma.TrackUpdateInput = {
+      title: 'Updated Track',
+      duration: 300,
+    };
+
+    it('should update a track successfully', async () => {
+      const updatedTrack = { ...mockTrack, title: 'Updated Track', duration: 300 };
+      vi.mocked(prisma.track.update).mockResolvedValue(updatedTrack as never);
+
+      const result = await TrackService.updateTrack('track-123', mockUpdateInput);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(updatedTrack);
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-123' },
+        data: mockUpdateInput,
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: {
+            include: {
+              artist: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return error when track is not found', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.updateTrack('nonexistent-id', mockUpdateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Track not found');
+    });
+
+    it('should return error for unique constraint violation', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.updateTrack('track-123', mockUpdateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Track with this title already exists');
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.updateTrack('track-123', mockUpdateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database unavailable');
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.updateTrack('track-123', mockUpdateInput);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to update track');
+    });
+  });
+
+  describe('deleteTrack', () => {
+    it('should delete a track successfully', async () => {
+      vi.mocked(prisma.track.delete).mockResolvedValue(mockTrack as never);
+
+      const result = await TrackService.deleteTrack('track-123');
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTrack);
+      expect(prisma.track.delete).toHaveBeenCalledWith({
+        where: { id: 'track-123' },
+        include: {
+          images: true,
+          urls: true,
+          releaseTracks: true,
+          artists: true,
+        },
+      });
+    });
+
+    it('should return error when track is not found', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.delete).mockRejectedValue(prismaError);
+
+      const result = await TrackService.deleteTrack('nonexistent-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Track not found');
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.delete).mockRejectedValue(prismaError);
+
+      const result = await TrackService.deleteTrack('track-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database unavailable');
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.delete).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.deleteTrack('track-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to delete track');
+    });
+  });
+});
