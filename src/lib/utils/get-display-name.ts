@@ -1,6 +1,10 @@
 export const getDisplayName = (item: Record<string, unknown>): string => {
   if (item.displayName && typeof item.displayName === 'string') {
     return item.displayName;
+  } else if (item.title && typeof item.title === 'string') {
+    return item.title;
+  } else if (item.name && typeof item.name === 'string') {
+    return item.name;
   } else if (
     item.firstName &&
     item.surname &&
