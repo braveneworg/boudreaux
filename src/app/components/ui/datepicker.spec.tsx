@@ -498,9 +498,16 @@ describe('DatePicker', () => {
       // Verify onSelect was called with a new date
       expect(onSelect).toHaveBeenCalled();
       
-      // Verify the value contains the same month and day
-      expect(input.value).toContain('06');
-      expect(input.value).toContain('25');
+      // Verify the date was updated by parsing the ISO string sent to onSelect
+      const callArgs = onSelect.mock.calls[0];
+      const isoString = callArgs[0];
+      const newDate = new Date(isoString);
+      
+      // Month should be June (5 in 0-indexed) and day should be 25
+      expect(newDate.getMonth()).toBe(5);
+      expect(newDate.getDate()).toBe(25);
+      // Year should have increased from 2000
+      expect(newDate.getFullYear()).toBeGreaterThan(2000);
     });
 
     it('should handle leap year dates correctly', async () => {
