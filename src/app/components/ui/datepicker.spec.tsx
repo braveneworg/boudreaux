@@ -6,6 +6,9 @@ import { DatePicker } from './datepicker';
 vi.mock('server-only', () => ({}));
 
 // Helper function to set date value on input
+// Note: We use the DOM API here instead of userEvent.type() because typing character-by-character
+// (e.g., "0", "1", "/", "1", "5", "/", "2", "0", "0", "0") triggers onChange for each character,
+// causing invalid intermediate date parsing. This approach simulates pasting a complete date value.
 const setInputDate = (input: HTMLInputElement, dateString: string) => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, dateString);
   input.dispatchEvent(new Event('change', { bubbles: true }));
