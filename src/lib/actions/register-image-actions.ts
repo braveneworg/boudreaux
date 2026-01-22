@@ -275,3 +275,82 @@ export const registerReleaseImagesAction = async (
     return { success: false, error: 'Failed to register images' };
   }
 };
+
+/**
+ * Server action to register images after direct S3 upload for tracks
+ */
+export const registerTrackImagesAction = async (
+  trackId: string,
+  images: RegisterImageInput[]
+): Promise<RegisterImageActionResult> => {
+  await requireRole('admin');
+
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id || session?.user?.role !== 'admin') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Verify track exists
+    const trackExists = await prisma.track.findUnique({
+      where: { id: trackId },
+      select: { id: true },
+    });
+
+    if (!trackExists) {
+      return { success: false, error: 'Track not found' };
+    }
+
+    // Get the next sort order for this track
+    const existingImages = await prisma.image.findMany({
+      where: { trackId },
+      select: { id: true },
+    });
+    let nextSortOrder = existingImages.length;
+
+    const results: RegisterImageResult[] = [];
+
+    for (const image of images) {
+      const dbImage = await prisma.image.create({
+        data: {
+          src: image.cdnUrl,
+          caption: image.caption,
+          altText: image.altText,
+          trackId,
+          sortOrder: nextSortOrder,
+        },
+      });
+
+      results.push({
+        id: dbImage.id,
+        src: dbImage.src ?? '',
+        caption: dbImage.caption ?? undefined,
+        altText: dbImage.altText ?? undefined,
+        sortOrder: dbImage.sortOrder ?? nextSortOrder,
+      });
+
+      nextSortOrder++;
+    }
+
+    // Log image registration for security audit
+    logSecurityEvent({
+      event: 'media.track.images.uploaded',
+      userId: session.user.id,
+      metadata: {
+        trackId,
+        fileCount: images.length,
+        success: true,
+      },
+    });
+
+    // Revalidate track page
+    revalidatePath(`/tracks/[id]`, 'page');
+    revalidatePath('/admin/tracks');
+
+    return { success: true, data: results };
+  } catch (error) {
+    console.error('Register track images action error:', error);
+    return { success: false, error: 'Failed to register images' };
+  }
+};
