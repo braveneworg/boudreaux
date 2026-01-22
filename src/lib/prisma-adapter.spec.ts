@@ -1,9 +1,9 @@
 // Mock server-only before any imports that use it
-vi.mock('server-only', () => ({}));
-
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 
 import type { AdapterUser, Adapter } from 'next-auth/adapters';
+
+vi.mock('server-only', () => ({}));
 
 // Mock @auth/prisma-adapter
 vi.mock('@auth/prisma-adapter', () => ({

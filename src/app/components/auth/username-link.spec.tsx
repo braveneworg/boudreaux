@@ -1,11 +1,11 @@
 import React from 'react';
 
-vi.mock('server-only', () => ({}));
-
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import UsernameLink from './username-link';
+
+vi.mock('server-only', () => ({}));
 
 // Mock Next.js Link
 vi.mock('next/link', () => ({

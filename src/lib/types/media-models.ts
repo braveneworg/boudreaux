@@ -99,17 +99,6 @@ export interface Image {
   updatedAt: Date;
 }
 
-interface Identity {
-  id: string;
-  createdAt: Date;
-  updatedAt?: Date;
-  publishedAt?: Date;
-}
-
-interface MediaEntity extends Identity {
-  images: Image[]; // Must have at least one image
-}
-
 /**
  * Genre model - matches Prisma Genre model
  */
