@@ -10,7 +10,10 @@ vi.mock('server-only', () => ({}));
 // (e.g., "0", "1", "/", "1", "5", "/", "2", "0", "0", "0") triggers onChange for each character,
 // causing invalid intermediate date parsing. This approach simulates pasting a complete date value.
 const setInputDate = (input: HTMLInputElement, dateString: string) => {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, dateString);
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+    input,
+    dateString
+  );
   input.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
@@ -38,7 +41,9 @@ describe('DatePicker', () => {
     it('should render with sr-only label', () => {
       render(<DatePicker fieldName="testDate" />);
 
-      const label = screen.getByText('Use up/down arrow keys to change year, left/right to change month');
+      const label = screen.getByText(
+        'Use up/down arrow keys to change year, left/right to change month'
+      );
       expect(label).toHaveClass('sr-only');
     });
 
@@ -87,9 +92,9 @@ describe('DatePicker', () => {
       });
 
       // Find a button within gridcells (the actual date buttons)
-      const dateButtons = screen.getAllByRole('button').filter(btn => 
-        btn.hasAttribute('data-day')
-      );
+      const dateButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.hasAttribute('data-day'));
       const selectableDate = dateButtons.find((btn) => !btn.hasAttribute('aria-disabled'));
 
       if (selectableDate) {
@@ -113,11 +118,13 @@ describe('DatePicker', () => {
       setInputDate(input, '01/15/2000');
 
       const expectedDate = new Date('1/15/2000');
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
     });
 
     it('should call onSelect when valid date is entered', async () => {
@@ -174,11 +181,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowUp}');
 
       const expectedDate = new Date(2001, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalledWith(expectedDate.toISOString(), 'testDate');
     });
 
@@ -195,11 +204,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowDown}');
 
       const expectedDate = new Date(1999, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalledWith(expectedDate.toISOString(), 'testDate');
     });
 
@@ -216,11 +227,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowRight}');
 
       const expectedDate = new Date(2000, 1, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalledWith(expectedDate.toISOString(), 'testDate');
     });
 
@@ -237,11 +250,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowLeft}');
 
       const expectedDate = new Date(2000, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalledWith(expectedDate.toISOString(), 'testDate');
     });
 
@@ -249,7 +264,11 @@ describe('DatePicker', () => {
       render(<DatePicker fieldName="testDate" />);
 
       const input = screen.getByRole('textbox');
-      const keydownEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+      const keydownEvent = new KeyboardEvent('keydown', {
+        key: 'ArrowUp',
+        bubbles: true,
+        cancelable: true,
+      });
       const preventDefaultSpy = vi.spyOn(keydownEvent, 'preventDefault');
 
       input.dispatchEvent(keydownEvent);
@@ -285,11 +304,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowDown}');
 
       const expectedDate = new Date(1900, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).not.toHaveBeenCalled();
     });
 
@@ -306,11 +327,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowUp}');
 
       const expectedDate = new Date(2099, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).not.toHaveBeenCalled();
     });
 
@@ -324,11 +347,13 @@ describe('DatePicker', () => {
       setInputDate(input, '01/15/1900');
 
       const expectedDate = new Date(1900, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
     });
 
     it('should allow year 2099 as valid date', async () => {
@@ -341,11 +366,13 @@ describe('DatePicker', () => {
       setInputDate(input, '01/15/2099');
 
       const expectedDate = new Date(2099, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
     });
 
     it('should allow ArrowUp from year 1901', async () => {
@@ -361,11 +388,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowUp}');
 
       const expectedDate = new Date(1902, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalled();
     });
 
@@ -382,11 +411,13 @@ describe('DatePicker', () => {
       await user.type(input, '{ArrowDown}');
 
       const expectedDate = new Date(2097, 0, 15);
-      expect(input).toHaveValue(expectedDate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }));
+      expect(input).toHaveValue(
+        expectedDate.toLocaleDateString(navigator.language, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+      );
       expect(onSelect).toHaveBeenCalled();
     });
   });
@@ -405,9 +436,9 @@ describe('DatePicker', () => {
       });
 
       // Find a button within the calendar (the actual date buttons)
-      const dateButtons = screen.getAllByRole('button').filter(btn => 
-        btn.hasAttribute('data-day') && !btn.hasAttribute('aria-disabled')
-      );
+      const dateButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.hasAttribute('data-day') && !btn.hasAttribute('aria-disabled'));
 
       if (dateButtons.length > 0) {
         onSelect.mockClear();
@@ -430,16 +461,19 @@ describe('DatePicker', () => {
       });
 
       // Find a button within the calendar (the actual date buttons)
-      const dateButtons = screen.getAllByRole('button').filter(btn => 
-        btn.hasAttribute('data-day') && !btn.hasAttribute('aria-disabled')
-      );
+      const dateButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.hasAttribute('data-day') && !btn.hasAttribute('aria-disabled'));
 
       if (dateButtons.length > 0) {
         onSelect.mockClear();
         await user.click(dateButtons[0]);
 
         await waitFor(() => {
-          expect(onSelect).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}/), 'testDate');
+          expect(onSelect).toHaveBeenCalledWith(
+            expect.stringMatching(/^\d{4}-\d{2}-\d{2}/),
+            'testDate'
+          );
         });
       }
     });
@@ -481,7 +515,10 @@ describe('DatePicker', () => {
       const input = screen.getByRole('textbox');
       await user.type(input, '{ArrowUp}');
 
-      expect(onSelect).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/), 'testDate');
+      expect(onSelect).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        'testDate'
+      );
     });
   });
 
@@ -500,12 +537,12 @@ describe('DatePicker', () => {
 
       // Verify onSelect was called with a new date
       expect(onSelect).toHaveBeenCalled();
-      
+
       // Verify the date was updated by parsing the ISO string sent to onSelect
       const callArgs = onSelect.mock.calls[0];
       const isoString = callArgs[0];
       const newDate = new Date(isoString);
-      
+
       // Month should be June (5 in 0-indexed) and day should be 25
       expect(newDate.getMonth()).toBe(5);
       expect(newDate.getDate()).toBe(25);
