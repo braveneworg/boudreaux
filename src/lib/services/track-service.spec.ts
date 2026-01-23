@@ -157,18 +157,14 @@ describe('TrackService', () => {
             },
           },
           artists: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                    take: 1,
-                  },
-                },
+            select: {
+              id: true,
+              firstName: true,
+              surname: true,
+              displayName: true,
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
               },
             },
           },
@@ -318,11 +314,7 @@ describe('TrackService', () => {
               release: true,
             },
           },
-          artists: {
-            include: {
-              artist: true,
-            },
-          },
+          artists: true,
         },
       });
     });

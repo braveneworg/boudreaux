@@ -63,18 +63,14 @@ export class TrackService {
             },
           },
           artists: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                  images: {
-                    orderBy: { sortOrder: 'asc' },
-                    take: 1,
-                  },
-                },
+            select: {
+              id: true,
+              firstName: true,
+              surname: true,
+              displayName: true,
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
               },
             },
           },
@@ -135,15 +131,11 @@ export class TrackService {
             },
           },
           artists: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  surname: true,
-                  displayName: true,
-                },
-              },
+            select: {
+              id: true,
+              firstName: true,
+              surname: true,
+              displayName: true,
             },
           },
         },
@@ -182,11 +174,7 @@ export class TrackService {
               release: true,
             },
           },
-          artists: {
-            include: {
-              artist: true,
-            },
-          },
+          artists: true,
         },
       });
 

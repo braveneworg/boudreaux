@@ -31,6 +31,7 @@ import {
 } from '@/app/components/ui/form';
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
 import { Input } from '@/app/components/ui/input';
+import { MediaUploader, type MediaItem } from '@/app/components/ui/media-uploader';
 import { Separator } from '@/app/components/ui/separator';
 import { createTrackAction } from '@/lib/actions/create-track-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
@@ -121,7 +122,9 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
   );
   const [isTransitionPending, startTransition] = useTransition();
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(!!initialTrackId);
   const [trackId, setTrackId] = useState<string | null>(initialTrackId || null);
   const [isPublished, setIsPublished] = useState(false);
@@ -228,6 +231,105 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);
   }, []);
+
+  const handleMediaChange = useCallback((newMediaItems: MediaItem[]) => {
+    setMediaItems(newMediaItems);
+  }, []);
+
+  const handleMediaUpload = useCallback(
+    async (items: MediaItem[]) => {
+      if (!items.length) return;
+
+      setIsUploadingMedia(true);
+      setMediaItems((prev) =>
+        prev.map((item) =>
+          items.find((i) => i.id === item.id)
+            ? { ...item, isUploading: true, uploadProgress: 0 }
+            : item
+        )
+      );
+
+      try {
+        // We need a track ID to upload media - if creating new track, it should be created first
+        const targetTrackId = trackId || 'temp';
+
+        const fileInfos = items.map((item) => ({
+          fileName: item.file!.name,
+          contentType: item.file!.type,
+          fileSize: item.file!.size,
+        }));
+
+        const presignedResult = await getPresignedUploadUrlsAction(
+          'tracks',
+          targetTrackId,
+          fileInfos
+        );
+
+        if (!presignedResult.success || !presignedResult.data) {
+          throw Error(presignedResult.error || 'Failed to get upload URLs');
+        }
+
+        const files = items.map((item) => item.file!);
+        const uploadResults = await uploadFilesToS3(files, presignedResult.data);
+
+        const failedUploads = uploadResults.filter((r) => !r.success);
+        if (failedUploads.length > 0) {
+          throw Error(`Failed to upload ${failedUploads.length} file(s)`);
+        }
+
+        // Update media items with uploaded URLs
+        setMediaItems((prev) =>
+          prev.map((item) => {
+            const itemIndex = items.findIndex((i) => i.id === item.id);
+            if (itemIndex !== -1 && presignedResult.data?.[itemIndex]) {
+              const uploadedUrl = presignedResult.data[itemIndex].cdnUrl;
+              // Also update the audioUrl field if this is an audio file
+              if (item.mediaType === 'audio') {
+                trackForm.setValue('audioUrl', uploadedUrl, { shouldDirty: true });
+                // Also set duration if we have it
+                if (item.duration) {
+                  trackForm.setValue('duration', item.duration, { shouldDirty: true });
+                  setDurationDisplay(formatDuration(item.duration));
+                }
+              }
+              return { ...item, uploadedUrl, isUploading: false, uploadProgress: 100 };
+            }
+            return item;
+          })
+        );
+
+        toast.success(`Successfully uploaded ${items.length} file(s)`);
+      } catch (uploadError) {
+        error('Media upload error:', uploadError);
+        const errorMessage = uploadError instanceof Error ? uploadError.message : 'Upload failed';
+        setMediaItems((prev) =>
+          prev.map((item) =>
+            items.find((i) => i.id === item.id)
+              ? { ...item, isUploading: false, error: errorMessage }
+              : item
+          )
+        );
+        toast.error(errorMessage);
+      } finally {
+        setIsUploadingMedia(false);
+      }
+    },
+    [trackId, trackForm]
+  );
+
+  const handleMediaDelete = useCallback(
+    async (itemId: string): Promise<{ success: boolean; error?: string }> => {
+      // For now, just remove from local state. The actual S3 deletion would need
+      // a separate server action if the file was already uploaded.
+      const item = mediaItems.find((i) => i.id === itemId);
+      if (item?.uploadedUrl && item.uploadedUrl === trackForm.getValues('audioUrl')) {
+        // Clear the audioUrl if we're deleting the uploaded audio file
+        trackForm.setValue('audioUrl', '', { shouldDirty: true });
+      }
+      return { success: true };
+    },
+    [mediaItems, trackForm]
+  );
 
   const handleReorder = useCallback(
     async (imageIds: string[]) => {
@@ -442,7 +544,7 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
     }
   };
 
-  const isSubmitting = isPending || isTransitionPending || isUploadingImages;
+  const isSubmitting = isPending || isTransitionPending || isUploadingImages || isUploadingMedia;
 
   const formatValidationErrors = useCallback((errors: Record<string, { message?: string }>) => {
     const errorMessages = Object.entries(errors)
@@ -460,7 +562,9 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
   }, [trackForm, onSubmitTrackForm, formatValidationErrors]);
 
   const hasPendingImages = images.some((img) => img.file && !img.uploadedUrl);
-  const isDirty = trackForm.formState.isDirty || imagesReordered || hasPendingImages;
+  const hasPendingMedia = mediaItems.some((item) => item.file && !item.uploadedUrl);
+  const isDirty =
+    trackForm.formState.isDirty || imagesReordered || hasPendingImages || hasPendingMedia;
 
   if (!trackForm || !control || isLoadingTrack) {
     return (
@@ -567,6 +671,40 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
                     )}
                   />
                 </div>
+
+                {/* Media Upload Section */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium">Upload Audio/Video File</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Upload an audio or video file for this track. Supported formats include MP3,
+                    WAV, FLAC, AAC, MP4, WebM, and more. The audio URL will be automatically set
+                    after upload.
+                  </p>
+                  <MediaUploader
+                    mediaItems={mediaItems}
+                    onMediaChange={handleMediaChange}
+                    onUpload={handleMediaUpload}
+                    onDelete={handleMediaDelete}
+                    mediaType="all"
+                    maxFiles={1}
+                    maxFileSize={1024 * 1024 * 1024} // 1GB
+                    multiple={false}
+                    disabled={isSubmitting}
+                    label="Upload audio or video file"
+                  />
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Or enter URL manually
+                    </span>
+                  </div>
+                </div>
+
                 <TextField
                   control={control}
                   name="audioUrl"

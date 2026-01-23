@@ -82,7 +82,7 @@ describe('middleware', () => {
       ...overrides,
       user: {
         ...defaultToken.user,
-        ...(overrides as any).user,
+        ...(overrides as Partial<JWT>).user,
       },
     } as JWT;
   };
