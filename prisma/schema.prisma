@@ -467,7 +467,7 @@ model Track {
   artists         TrackArtist[]
   urls            Url[]
   featuredArtists FeaturedArtist[]
-  artists         Artist[]
+  trackArtists    Artist[] // Reverse relation for Artist.track
 
   @@index([title])
   @@index([position])

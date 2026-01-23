@@ -26,7 +26,7 @@ import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { Switch } from '@/app/components/ui/switch';
 import { getDisplayName } from '@/lib/utils/get-display-name';
-import { toPascalCase } from '@/lib/utils/string-utils';
+import { toDisplayLabel, toEntityUrlPath, toPascalCase } from '@/lib/utils/string-utils';
 
 /**
  * Cleans up malformed URLs that may have duplicate protocols (e.g., https://https://)
@@ -114,24 +114,30 @@ export function DataView<T extends Record<string, unknown>>({
     });
   }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery]);
 
+  // Get the URL-friendly path for the entity (e.g., "featuredArtist" -> "featured-artists")
+  const entityUrlPath = toEntityUrlPath(entity);
+
+  // Get the display-friendly label for the entity (e.g., "featuredArtist" -> "featured artist")
+  const entityDisplayLabel = toDisplayLabel(entity);
+
   const updateEntity = useCallback(
     async (id: string, body: Record<string, unknown>) => {
-      return await fetch(`/api/${entity}s/${id}`, {
+      return await fetch(`/api/${entityUrlPath}/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
         .then((res) => res.json())
         .catch((error) => {
-          console.error(`Failed to update ${entity}:`, error);
+          console.error(`Failed to update ${entityDisplayLabel}:`, error);
           return { error: 'Failed to update entity' };
         });
     },
-    [entity]
+    [entityDisplayLabel, entityUrlPath]
   );
 
   const handleCreateEntityButtonClick = () => {
-    router?.push(`/admin/${entity}s`);
+    router?.push(`/admin/${entityUrlPath}`);
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -149,17 +155,19 @@ export function DataView<T extends Record<string, unknown>>({
 
         if (response.id) {
           toast.success(
-            `Successfully published ${entity} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+            `Successfully published ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
           );
           refetch();
         } else {
-          toast.error(`Failed to publish ${entity}: ${response.error || 'Unknown error'}`);
+          toast.error(
+            `Failed to publish ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+          );
         }
       } else {
-        toast.error(`Failed to publish: Missing ${entity} ID`);
+        toast.error(`Failed to publish: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entity, updateEntity, refetch]
+    [entityDisplayLabel, updateEntity, refetch]
   );
 
   const handleClickDeleteButton = useCallback(
@@ -172,17 +180,19 @@ export function DataView<T extends Record<string, unknown>>({
 
         if (response.id) {
           toast.success(
-            `Successfully deleted ${entity} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+            `Successfully deleted ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
           );
           refetch();
         } else {
-          toast.error(`Failed to delete ${entity}: ${response.error || 'Unknown error'}`);
+          toast.error(
+            `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+          );
         }
       } else {
-        toast.error(`Failed to delete: Missing ${entity} ID`);
+        toast.error(`Failed to delete: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entity, updateEntity, refetch]
+    [entityDisplayLabel, updateEntity, refetch]
   );
 
   const handleClickRestoreButton = useCallback(
@@ -193,17 +203,19 @@ export function DataView<T extends Record<string, unknown>>({
         if (response.id) {
           // Add more properties to display in the abscense of displayName
           toast.success(
-            `Successfully restored ${entity} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+            `Successfully restored ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
           );
           refetch();
         } else {
-          toast.error(`Failed to restore ${entity}: ${response.error || 'Unknown error'}`);
+          toast.error(
+            `Failed to restore ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+          );
         }
       } else {
-        toast.error(`Failed to restore: Missing ${entity} ID`);
+        toast.error(`Failed to restore: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entity, updateEntity, refetch]
+    [entityDisplayLabel, updateEntity, refetch]
   );
 
   return (
@@ -211,13 +223,13 @@ export function DataView<T extends Record<string, unknown>>({
       <Button
         className="w-full"
         onClick={handleCreateEntityButtonClick}
-      >{`Create ${entity}`}</Button>
+      >{`Create ${entityDisplayLabel}`}</Button>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       <Input
         className="w-full my-4"
         type="search"
         onChange={handleSearchChange}
-        placeholder={`Search ${entity}s...`}
+        placeholder={`Search ${entityDisplayLabel}s...`}
       />
       <div className="flex items-center gap-2 mb-2">
         <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
@@ -289,7 +301,7 @@ export function DataView<T extends Record<string, unknown>>({
                       })()}
                     <div className="flex flex-row justify-center gap-2 items-center mb-2">
                       <InfoIcon className="h-4 w-4" />
-                      <Link href={`/admin/${entity}s/${id}`}>View more info</Link>
+                      <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
                     </div>
                     <Separator className="border-[0.5px] mt-0 mb-2 border-zinc-300" />
                     {fieldsToShow.map((field: string, index: number) => {

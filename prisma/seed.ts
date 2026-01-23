@@ -45,83 +45,97 @@ const createArtists = async (count: number) => {
   });
 };
 
-// const _createGroups = async (count: number) => {
-//   const images = await prisma.image.createMany({
-//     data: [
-//       {
-//         src: faker.image.urlLoremFlickr({ category: 'people' }),
-//         altText: faker.lorem.sentence(),
-//       },
-//     ],
-//   });
+const createGroups = async (count: number) => {
+  const groupData = Array.from({ length: count }).map(() => ({
+    name: faker.music.genre() + ' ' + faker.word.noun(),
+    shortBio: faker.lorem.sentence(),
+    bio: faker.lorem.paragraph(),
+    formedOn: faker.date.past({ years: 10 }),
+  }));
 
-//   const groupData = Array.from({ length: count }).map(() => ({
-//     name: faker.music.artist(),
-//     shortBio: faker.lorem.sentence(),
-//     bio: faker.lorem.paragraph(),
-//     images,
-//     formedOn: faker.date.past({ years: 10 }),
-//     endedOn: faker.date.recent({ days: 1000 }),
-//   }));
+  await prisma.group.createMany({
+    data: groupData,
+  });
+};
 
-//   await prisma.group.createMany({
-//     data: groupData,
-//   });
-// };
+const createReleases = async (count: number) => {
+  const releaseData = Array.from({ length: count }).map(() => ({
+    title: faker.music.songName(),
+    description: faker.lorem.sentences(2),
+    releasedOn: faker.date.past({ years: 3 }),
+    coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
+  }));
 
-// const _createFeaturedArtists = async (count: number) => {
-//   console.warn(
-//     '⚠️ Creating featured artists requires existing artists, tracks, releases, and groups.'
-//   );
-//   const artists = await prisma.artist.findMany();
-//   const tracks = await prisma.track.findMany();
-//   const releases = await prisma.release.findMany();
-//   const groups = await prisma.group.findMany();
+  await prisma.release.createMany({
+    data: releaseData,
+  });
+};
 
-//   if (artists.length === 0) {
-//     console.warn('⚠️ No artists found. Skipping featured artists creation.');
-//     return;
-//   }
+const createTracks = async (count: number) => {
+  // Sample audio URLs that actually work for testing
+  const sampleAudioUrls = [
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+  ];
 
-//   const featuredArtistData = Array.from({ length: count }).map(() => ({
-//     featuredOn: faker.date.past({ years: 5 }),
-//     artistId: faker.helpers.arrayElement(artists).id,
-//     trackId: faker.helpers.arrayElement(tracks).id,
-//     releaseId: faker.helpers.arrayElement(releases).id,
-//     groupId: faker.helpers.arrayElement(groups).id,
-//   }));
+  const trackData = Array.from({ length: count }).map((_, index) => ({
+    title: faker.music.songName(),
+    coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
+    duration: faker.number.int({ min: 120, max: 420 }), // Duration in seconds
+    audioUrl: sampleAudioUrls[index % sampleAudioUrls.length],
+    position: index,
+  }));
 
-//   await prisma.featuredArtist.createMany({
-//     data: featuredArtistData,
-//   });
-// };
+  await prisma.track.createMany({
+    data: trackData,
+  });
+};
 
-// const _createReleases = async (count: number) => {
-//   const releaseData = Array.from({ length: count }).map(() => ({
-//     title: faker.music.album(),
-//     description: faker.lorem.sentences(2),
-//     releasedOn: faker.date.past({ years: 3 }),
-//     coverArt: faker.image.urlLoremFlickr({ category: 'music' }),
-//   }));
+const createFeaturedArtists = async (count: number) => {
+  const artists = await prisma.artist.findMany();
+  const tracks = await prisma.track.findMany();
+  const releases = await prisma.release.findMany();
+  const groups = await prisma.group.findMany();
 
-//   await prisma.release.createMany({
-//     data: releaseData,
-//   });
-// };
+  if (artists.length === 0) {
+    console.warn('⚠️ No artists found. Skipping featured artists creation.');
+    return;
+  }
 
-// const _createTracks = async (count: number) => {
-//   const trackData = Array.from({ length: count }).map(() => ({
-//     title: faker.music.songName(),
-//     coverArt: faker.image.urlLoremFlickr({ category: 'music' }),
-//     duration: faker.number.int({ min: 120, max: 420 }), // Duration in seconds
-//     audioUrl: faker.internet.url(),
-//     position: faker.number.int({ min: 0, max: 10 }),
-//   }));
+  // Create featured artists one at a time to handle the Artist[] relation
+  for (let i = 0; i < count; i++) {
+    const randomArtist = faker.helpers.arrayElement(artists);
+    const randomTrack = tracks.length > 0 ? faker.helpers.arrayElement(tracks) : null;
+    const randomRelease = releases.length > 0 ? faker.helpers.arrayElement(releases) : null;
+    const randomGroup = groups.length > 0 ? faker.helpers.arrayElement(groups) : null;
 
-//   await prisma.track.createMany({
-//     data: trackData,
-//   });
-// };
+    await prisma.featuredArtist.create({
+      data: {
+        displayName: faker.helpers.maybe(() => faker.person.fullName(), { probability: 0.3 }),
+        featuredOn: faker.date.recent({ days: 30 }),
+        position: i + 1,
+        description: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.7 }),
+        coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
+        ...(randomTrack && { track: { connect: { id: randomTrack.id } } }),
+        ...(randomRelease && { release: { connect: { id: randomRelease.id } } }),
+        ...(randomGroup && { group: { connect: { id: randomGroup.id } } }),
+        artists: {
+          connect: [{ id: randomArtist.id }],
+        },
+      },
+    });
+  }
+
+  console.info(`✅ Created ${count} featured artists.`);
+};
 
 async function main() {
   // Check for --drop-database flag
@@ -164,14 +178,11 @@ async function main() {
   } else {
     console.info('🌱 Seeding development database...');
 
-    await Promise.all([
-      // Create dummy data using faker data
-      createArtists(10),
-      // createGroups(10),
-      // createReleases(20),
-      // createTracks(50),
-      // createFeaturedArtists(5),
-    ]);
+    // Create base entities first (these can be created in parallel)
+    await Promise.all([createArtists(10), createGroups(5), createReleases(10), createTracks(20)]);
+
+    // Create featured artists after base entities exist
+    await createFeaturedArtists(7);
 
     console.info('✅ Development database seeded.');
   }

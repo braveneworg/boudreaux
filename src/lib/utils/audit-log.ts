@@ -10,6 +10,8 @@ export type AuditEvent =
   | 'media.artist.images.reordered'
   | 'media.artist.image.deleted'
   | 'media.artist.image.updated'
+  | 'media.featured_artist.created'
+  | 'media.featured_artist.updated'
   | 'media.group.created'
   | 'media.group.updated'
   | 'media.group.images.uploaded'
