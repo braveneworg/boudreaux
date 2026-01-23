@@ -1,8 +1,8 @@
 'use client';
 
-import type { Artist } from '@/app/components/ui/audio/types';
 import useArtistsQuery from '@/app/hooks/use-artists-query';
 import { ENTITIES } from '@/lib/constants';
+import type { Artist } from '@/lib/types/media-models';
 
 import { DataView } from './data-view';
 

@@ -83,7 +83,7 @@ describe('GenerateUsernameButton', () => {
         username: 'existing-username',
         confirmUsername: 'existing-username',
       })),
-      trigger: vi.fn<[], Promise<boolean>>().mockResolvedValue(true),
+      trigger: vi.fn().mockResolvedValue(true),
     });
 
     // Set default mock return value
