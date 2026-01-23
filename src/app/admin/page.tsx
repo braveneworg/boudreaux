@@ -6,6 +6,7 @@ import { Combobox } from '@/components/forms/fields/combobox';
 import { toPascalCase } from '@/lib/utils/string-utils';
 
 import { ArtistDataView } from './data-views/artist-data-view';
+import { FeaturedArtistDataView } from './data-views/featured-artist-data-view';
 import { GroupDataView } from './data-views/group-data-view';
 import { ReleaseDataView } from './data-views/release-data-view';
 import { TrackDataView } from './data-views/track-data-view';
@@ -48,6 +49,7 @@ export default function AdminPage() {
       {view === 'group' && <GroupDataView />}
       {view === 'release' && <ReleaseDataView />}
       {view === 'track' && <TrackDataView />}
+      {view === 'featured artist' && <FeaturedArtistDataView />}
     </>
   );
 }

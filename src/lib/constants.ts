@@ -24,4 +24,5 @@ export const ENTITIES = {
   release: 'release',
   track: 'track',
   group: 'group',
+  featuredArtist: 'featuredArtist',
 } as const;
