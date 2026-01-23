@@ -26,7 +26,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer';
-import type { Artist, Release } from '@/lib/types/media-models';
+import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import {
@@ -168,6 +168,124 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
       </CarouselContent>
       <CarouselPrevious />
       <CarouselNext />
+    </Carousel>
+  );
+};
+
+/**
+ * A carousel component that displays featured artists with their cover art.
+ *
+ * @param props - The component props
+ * @param props.featuredArtists - Array of FeaturedArtist objects to display in the carousel
+ * @param props.onSelect - Optional callback function when a featured artist is selected
+ *
+ * @returns A horizontal carousel component with featured artist cover art images
+ *
+ * @remarks
+ * - Displays the cover art for each featured artist (uses coverArt, release coverArt, or placeholder)
+ * - Includes previous/next navigation controls
+ * - Shows display name on hover
+ * - Sorted by position field
+ *
+ * @example
+ * ```tsx
+ * <MediaPlayer>
+ *   <MediaPlayer.FeaturedArtistCarousel
+ *     featuredArtists={featuredArtists}
+ *     onSelect={(artist) => console.log(artist)}
+ *   />
+ * </MediaPlayer>
+ * ```
+ */
+const FeaturedArtistCarousel = ({
+  featuredArtists,
+  onSelect,
+}: {
+  featuredArtists: FeaturedArtist[];
+  onSelect?: (featuredArtist: FeaturedArtist) => void;
+}) => {
+  // Sort by position (lower numbers first)
+  const sortedArtists = [...featuredArtists].sort((a, b) => a.position - b.position);
+
+  /**
+   * Get the display name for a featured artist
+   */
+  const getDisplayName = (featured: FeaturedArtist): string => {
+    // Use featured displayName if available
+    if (featured.displayName) {
+      return featured.displayName;
+    }
+    // Fall back to first artist's display name
+    if (featured.artists && featured.artists.length > 0) {
+      const artist = featured.artists[0];
+      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
+    }
+    // Fall back to group name
+    if (featured.group) {
+      return featured.group.name;
+    }
+    return 'Unknown Artist';
+  };
+
+  /**
+   * Get the cover art URL for a featured artist
+   */
+  const getCoverArt = (featured: FeaturedArtist): string | null => {
+    // Use featured coverArt if available
+    if (featured.coverArt) {
+      return featured.coverArt;
+    }
+    // Fall back to release coverArt
+    if (featured.release?.coverArt) {
+      return featured.release.coverArt;
+    }
+    // Fall back to track's release coverArt if available
+    // Note: This would require including track.release in the query
+    return null;
+  };
+
+  return (
+    <Carousel aria-label="Featured Artists" orientation="horizontal" className="w-full">
+      <CarouselContent className="-ml-2 md:-ml-4">
+        {sortedArtists.map((featured) => {
+          const coverArt = getCoverArt(featured);
+          const displayName = getDisplayName(featured);
+
+          return (
+            <CarouselItem
+              key={featured.id}
+              className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/7"
+            >
+              <button
+                type="button"
+                onClick={() => onSelect?.(featured)}
+                className="group relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              >
+                {coverArt ? (
+                  <Image
+                    src={coverArt}
+                    alt={displayName}
+                    fill
+                    className="object-cover transition-transform group-hover:scale-105"
+                    sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
+                    <span className="text-zinc-500 text-xs text-center px-1">{displayName}</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
+                  <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
+                    {displayName}
+                  </span>
+                </div>
+              </button>
+            </CarouselItem>
+          );
+        })}
+      </CarouselContent>
+      <CarouselPrevious className="hidden sm:flex" />
+      <CarouselNext className="hidden sm:flex" />
     </Carousel>
   );
 };
@@ -746,6 +864,7 @@ MediaPlayer.CoverArtView = CoverArtView;
 MediaPlayer.InfoTickerTape = InfoTickerTape;
 MediaPlayer.Controls = Controls;
 MediaPlayer.CoverArtCarousel = CoverArtCarousel;
+MediaPlayer.FeaturedArtistCarousel = FeaturedArtistCarousel;
 MediaPlayer.Description = Description;
 MediaPlayer.DotNavMenu = DotNavMenu;
 MediaPlayer.DotNavMenuItem = DotNavMenuItem;

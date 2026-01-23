@@ -63,14 +63,18 @@ export class TrackService {
             },
           },
           artists: {
-            select: {
-              id: true,
-              firstName: true,
-              surname: true,
-              displayName: true,
-              images: {
-                orderBy: { sortOrder: 'asc' },
-                take: 1,
+            include: {
+              artist: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  surname: true,
+                  displayName: true,
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                    take: 1,
+                  },
+                },
               },
             },
           },
@@ -131,11 +135,15 @@ export class TrackService {
             },
           },
           artists: {
-            select: {
-              id: true,
-              firstName: true,
-              surname: true,
-              displayName: true,
+            include: {
+              artist: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  surname: true,
+                  displayName: true,
+                },
+              },
             },
           },
         },

@@ -15,6 +15,12 @@ const config = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   webpack: (config: { module: { rules: unknown[] } }, { isServer }: { isServer: boolean }) => {
@@ -56,6 +62,8 @@ const config = {
       "connect-src 'self' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://fakefourmedia.s3.us-east-1.amazonaws.com https://*.amazonaws.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
+      // Allow media from CDN and S3, plus blob: for local playback
+      "media-src 'self' https: blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

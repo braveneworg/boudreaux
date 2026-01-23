@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 
 import { Combobox } from '@/components/forms/fields/combobox';
-import { toPascalCase } from '@/lib/utils/string-utils';
+import { toTitleCase } from '@/lib/utils/string-utils';
 
 import { ArtistDataView } from './data-views/artist-data-view';
 import { FeaturedArtistDataView } from './data-views/featured-artist-data-view';
@@ -23,7 +23,7 @@ export default function AdminPage() {
     const entities = ['artist', 'group', 'release', 'track', 'featured artist'];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
-      label: toPascalCase(entity),
+      label: toTitleCase(entity),
     }));
   }, []);
 
