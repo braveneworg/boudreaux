@@ -165,14 +165,7 @@ describe.skip('ArtistForm', () => {
       expect(screen.getByRole('button', { name: 'Create Artist' })).toBeInTheDocument();
     });
 
-    it('should render cancel button when onCancel provided', () => {
-      const onCancel = vi.fn();
-      render(<ArtistForm onCancel={onCancel} />);
-
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('should not render cancel button when onCancel not provided', () => {
+    it('should not render cancel button', () => {
       render(<ArtistForm />);
 
       expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
@@ -215,16 +208,6 @@ describe.skip('ArtistForm', () => {
       const submitButton = screen.getByRole('button', { name: 'Creating...' });
       expect(submitButton).toBeDisabled();
     });
-
-    it('should disable cancel button when submitting', () => {
-      const onCancel = vi.fn();
-      vi.mocked(useActionState).mockReturnValue([initialFormState, vi.fn(), true] as never);
-
-      render(<ArtistForm onCancel={onCancel} />);
-
-      const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-      expect(cancelButton).toBeDisabled();
-    });
   });
 
   describe('Success Handling', () => {
@@ -261,24 +244,6 @@ describe.skip('ArtistForm', () => {
 
       await waitFor(() => {
         expect(mockFormMethods.reset).toHaveBeenCalled();
-      });
-    });
-
-    it('should call onSuccess callback when provided', async () => {
-      const onSuccess = vi.fn();
-      const successState: FormState = {
-        fields: {},
-        success: true,
-      };
-
-      const { rerender } = render(<ArtistForm onSuccess={onSuccess} />);
-
-      vi.mocked(useActionState).mockReturnValue([successState, vi.fn(), false] as never);
-
-      rerender(<ArtistForm onSuccess={onSuccess} />);
-
-      await waitFor(() => {
-        expect(onSuccess).toHaveBeenCalled();
       });
     });
 
@@ -408,56 +373,6 @@ describe.skip('ArtistForm', () => {
       });
 
       expect(mockFormMethods.reset).not.toHaveBeenCalled();
-    });
-
-    it('should not call onSuccess on failure', async () => {
-      const onSuccess = vi.fn();
-      const errorState: FormState = {
-        fields: {},
-        success: false,
-        errors: { general: ['Artist creation failed'] },
-      };
-
-      const { rerender } = render(<ArtistForm onSuccess={onSuccess} />);
-
-      vi.mocked(useActionState).mockReturnValue([errorState, vi.fn(), false] as never);
-
-      rerender(<ArtistForm onSuccess={onSuccess} />);
-
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalled();
-      });
-
-      expect(onSuccess).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('User Interactions', () => {
-    it('should call onCancel when cancel button clicked', async () => {
-      const user = userEvent.setup();
-      const onCancel = vi.fn();
-
-      render(<ArtistForm onCancel={onCancel} />);
-
-      const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-      await user.click(cancelButton);
-
-      expect(onCancel).toHaveBeenCalled();
-    });
-
-    it('should not submit when cancel is clicked', async () => {
-      const user = userEvent.setup();
-      const onCancel = vi.fn();
-      const mockFormAction = vi.fn();
-
-      vi.mocked(useActionState).mockReturnValue([initialFormState, mockFormAction, false] as never);
-
-      render(<ArtistForm onCancel={onCancel} />);
-
-      const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-      await user.click(cancelButton);
-
-      expect(mockFormAction).not.toHaveBeenCalled();
     });
   });
 

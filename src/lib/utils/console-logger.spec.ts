@@ -1,11 +1,11 @@
 import { error, log, LogMethods, warn } from './console-logger';
 
-import type { SpyInstance } from 'vitest';
+import type { MockInstance } from 'vitest';
 
 describe('console-logger', () => {
-  let consoleInfoSpy: SpyInstance<Parameters<Console['info']>, ReturnType<Console['info']>>;
-  let consoleWarnSpy: SpyInstance<Parameters<Console['warn']>, ReturnType<Console['warn']>>;
-  let consoleErrorSpy: SpyInstance<Parameters<Console['error']>, ReturnType<Console['error']>>;
+  let consoleInfoSpy: MockInstance;
+  let consoleWarnSpy: MockInstance;
+  let consoleErrorSpy: MockInstance;
 
   beforeEach(() => {
     // Spy on console methods

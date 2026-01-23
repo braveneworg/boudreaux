@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { getToken } from 'next-auth/jwt';
-import { type MockedFunction, type SpyInstance } from 'vitest';
+import { type MockedFunction, type MockInstance } from 'vitest';
 
 import { middleware } from './middleware';
 
@@ -372,7 +372,7 @@ describe('middleware', () => {
   });
 
   describe('security logging', () => {
-    let consoleWarnSpy: SpyInstance<Parameters<Console['warn']>, ReturnType<Console['warn']>>;
+    let consoleWarnSpy: MockInstance;
 
     beforeEach(() => {
       consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

@@ -9,8 +9,11 @@ import { GET, POST as postHandler } from './route';
 vi.mock('server-only', () => ({}));
 
 // Mock withAdmin decorator to bypass auth in tests
+// The decorator wraps handlers to add (request, context, session) signature
+// We mock it to pass through the request only since inner handlers don't use context
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: <T>(handler: T) => handler,
+  withAdmin: (handler: (request: Request) => Promise<Response>) =>
+    Promise.resolve((request: Request) => handler(request)),
 }));
 
 vi.mock('@/lib/services/artist-service', () => ({
@@ -225,7 +228,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(201);
@@ -247,7 +250,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -264,7 +267,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -281,7 +284,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -304,7 +307,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(409);
@@ -326,7 +329,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -348,7 +351,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -367,7 +370,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -393,7 +396,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
 
       expect(response.status).toBe(201);
       expect(ArtistService.createArtist).toHaveBeenCalledWith({
@@ -413,7 +416,7 @@ describe('Artist API Routes', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -430,7 +433,7 @@ describe('Artist API Routes', () => {
         }),
       });
 
-      const response = await POST(request);
+      const response = await POST(request, { params: Promise.resolve({}) });
       const data = await response.json();
 
       expect(response.status).toBe(400);

@@ -20,7 +20,7 @@ export type MockedFormReturn<TFieldValues extends FieldValues = FieldValues> = {
 } & {
   setValue?: Mock;
   getValues?: Mock;
-  trigger?: Mock<Promise<boolean>>;
+  trigger?: Mock;
   watch?: Mock;
   reset?: Mock;
   handleSubmit?: Mock;
