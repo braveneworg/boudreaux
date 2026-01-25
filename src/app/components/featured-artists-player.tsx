@@ -19,6 +19,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const [selectedArtist, setSelectedArtist] = useState<FeaturedArtist | null>(
     featuredArtists.length > 0 ? featuredArtists[0] : null
   );
+  const [isPlaying, setIsPlaying] = useState(false);
 
   /**
    * Get the display name for a featured artist
@@ -63,8 +64,8 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   }
 
   return (
-    <MediaPlayer>
-      <div className="space-y-6">
+    <MediaPlayer className="mb-2">
+      <div className="space-y-2 mt-2">
         {/* Featured Artists Carousel */}
         <MediaPlayer.FeaturedArtistCarousel
           featuredArtists={featuredArtists}
@@ -73,41 +74,38 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
         {/* Selected Artist Details */}
         {selectedArtist && (
-          <div className="flex flex-col items-center space-y-4">
-            {/* Cover Art */}
-            {getCoverArt(selectedArtist) && (
-              <div className="relative w-full max-w-sm aspect-square">
-                <Image
-                  src={getCoverArt(selectedArtist)!}
-                  alt={getDisplayName(selectedArtist)}
-                  fill
-                  className="object-cover rounded-lg shadow-lg"
-                  sizes="(max-width: 640px) 100vw, 384px"
-                />
-              </div>
-            )}
+          <div className="flex flex-col items-center">
+            {/* Cover Art with Audio Controls beneath it */}
+            <div className="w-full max-w-sm">
+              {/* Cover Art - only show if we have a valid image */}
+              {getCoverArt(selectedArtist) ? (
+                <div className="relative w-full aspect-square">
+                  <Image
+                    src={getCoverArt(selectedArtist)!}
+                    alt={getDisplayName(selectedArtist)}
+                    fill
+                    className="object-cover rounded-t-lg shadow-lg"
+                    sizes="(max-width: 640px) 100vw, 384px"
+                  />
+                </div>
+              ) : null}
 
-            {/* Artist Name and Description */}
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold text-zinc-900">
-                {getDisplayName(selectedArtist)}
-              </h2>
-              {selectedArtist.description && (
-                <p className="text-sm text-zinc-600 max-w-md">{selectedArtist.description}</p>
+              {/* Audio Controls - sits directly beneath the image */}
+              {selectedArtist.track?.audioUrl && (
+                <div className="w-full bg-zinc-900 overflow-hidden">
+                  <MediaPlayer.Controls
+                    audioSrc={selectedArtist.track.audioUrl}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                  />
+                </div>
               )}
-              {selectedArtist.release && (
-                <p className="text-sm text-zinc-500">
-                  Latest Release: {selectedArtist.release.title}
-                </p>
+
+              {/* Info Ticker Tape - beneath the controls */}
+              {selectedArtist.track?.title && (
+                <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} isPlaying={isPlaying} />
               )}
             </div>
-
-            {/* Audio Controls - only show if there's a track with audio */}
-            {selectedArtist.track?.audioUrl && (
-              <div className="w-full max-w-md">
-                <MediaPlayer.Controls audioSrc={selectedArtist.track.audioUrl} />
-              </div>
-            )}
           </div>
         )}
       </div>

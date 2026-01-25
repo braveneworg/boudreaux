@@ -303,3 +303,17 @@ nextjs-portal {
 .touch-pan-y {
   touch-action: pan-y;
 }
+
+/* Marquee animation for ticker tape */
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 15s linear infinite;
+}

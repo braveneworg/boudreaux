@@ -7,7 +7,7 @@ export interface HeadingProps extends React.HTMLAttributes<HTMLHeadingElement> {
 }
 
 const levelStyles: Record<number, string> = {
-  1: 'pt-4 px-4 h-13 mb-0 leading-tight',
+  1: 'pt-2 px-4 h-13 mb-0 leading-tight',
   2: 'pt-3 px-4 h-11 mb-0 leading-tight',
   3: 'pt-2 px-4 h-9 mb-0 leading-tight',
   4: 'pt-2 px-4 h-8 mb-0 leading-snug',

@@ -21,10 +21,10 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div className={cn('h-[20px] my-2', className)}>
+    <div className={cn('h-3 my-2', className)}>
       <div
         className={cn(
-          'flex h-[20px] items-center relative justify-center gap-2',
+          'flex h-3 items-center relative justify-center gap-2',
           { 'gap-4': isMobile },
           className
         )}

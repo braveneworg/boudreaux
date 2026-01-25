@@ -101,6 +101,10 @@ function Carousel({
 
   useEffect(() => {
     if (!api) return;
+
+    // Initialize scroll state immediately
+    onSelect(api);
+
     api.on('reInit', onSelect);
     api.on('select', onSelect);
 
@@ -140,25 +144,11 @@ function CarouselContent({ className, ...props }: ComponentProps<'div'>) {
   const { carouselRef, orientation } = useCarousel();
 
   return (
-    <div
-      ref={carouselRef}
-      className="flex flex-col right-0 justify-space-center overflow-hidden relative"
-      data-slot="carousel-content"
-    >
+    <div ref={carouselRef} className="overflow-hidden" data-slot="carousel-content">
       <div
-        className={cn(
-          'flex',
-          orientation === 'horizontal' ? 'pl-10 pr-20' : '-mt-4 flex-col',
-          className
-        )}
+        className={cn('flex', orientation === 'horizontal' ? '' : '-mt-4 flex-col', className)}
         {...props}
       />
-      {orientation === 'horizontal' && (
-        <>
-          <div className="absolute left-0 top-0 bottom-0 w-12 bg-linear-to-r from-zinc-100 to-transparent pointer-events-none z-5" />
-          <div className="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-zinc-100 to-transparent pointer-events-none z-5" />
-        </>
-      )}
     </div>
   );
 }

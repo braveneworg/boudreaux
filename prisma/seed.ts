@@ -110,11 +110,23 @@ const createFeaturedArtists = async (count: number) => {
     return;
   }
 
+  if (tracks.length === 0) {
+    console.warn('⚠️ No tracks found. Skipping featured artists creation.');
+    return;
+  }
+
+  if (releases.length === 0) {
+    console.warn('⚠️ No releases found. Skipping featured artists creation.');
+    return;
+  }
+
   // Create featured artists one at a time to handle the Artist[] relation
   for (let i = 0; i < count; i++) {
     const randomArtist = faker.helpers.arrayElement(artists);
-    const randomTrack = tracks.length > 0 ? faker.helpers.arrayElement(tracks) : null;
-    const randomRelease = releases.length > 0 ? faker.helpers.arrayElement(releases) : null;
+    // Track and Release are required
+    const randomTrack = faker.helpers.arrayElement(tracks);
+    const randomRelease = faker.helpers.arrayElement(releases);
+    // Group is optional
     const randomGroup = groups.length > 0 ? faker.helpers.arrayElement(groups) : null;
 
     await prisma.featuredArtist.create({
@@ -124,8 +136,8 @@ const createFeaturedArtists = async (count: number) => {
         position: i + 1,
         description: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.7 }),
         coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
-        ...(randomTrack && { track: { connect: { id: randomTrack.id } } }),
-        ...(randomRelease && { release: { connect: { id: randomRelease.id } } }),
+        track: { connect: { id: randomTrack.id } },
+        release: { connect: { id: randomRelease.id } },
         ...(randomGroup && { group: { connect: { id: randomGroup.id } } }),
         artists: {
           connect: [{ id: randomArtist.id }],

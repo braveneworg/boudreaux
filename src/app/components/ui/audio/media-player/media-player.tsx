@@ -62,6 +62,8 @@ interface MediaControlsProps {
   audioSrc: string;
   onPreviousTrack?: () => void;
   onNextTrack?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
 }
 
 /**
@@ -245,8 +247,13 @@ const FeaturedArtistCarousel = ({
   };
 
   return (
-    <Carousel aria-label="Featured Artists" orientation="horizontal" className="w-full">
-      <CarouselContent className="-ml-2 md:-ml-4">
+    <Carousel
+      aria-label="Featured Artists"
+      orientation="horizontal"
+      className="w-full px-10"
+      opts={{ loop: true, align: 'start' }}
+    >
+      <CarouselContent className="-ml-2">
         {sortedArtists.map((featured) => {
           const coverArt = getCoverArt(featured);
           const displayName = getDisplayName(featured);
@@ -254,38 +261,40 @@ const FeaturedArtistCarousel = ({
           return (
             <CarouselItem
               key={featured.id}
-              className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/7"
+              className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
             >
               <button
                 type="button"
                 onClick={() => onSelect?.(featured)}
-                className="group relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
               >
-                {coverArt ? (
-                  <Image
-                    src={coverArt}
-                    alt={displayName}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105"
-                    sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                    <span className="text-zinc-500 text-xs text-center px-1">{displayName}</span>
+                <div className="absolute inset-0 overflow-hidden rounded-lg">
+                  {coverArt ? (
+                    <Image
+                      src={coverArt}
+                      alt={displayName}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105"
+                      sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
+                      <span className="text-zinc-500 text-xs text-center px-1">{displayName}</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
+                    <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
+                      {displayName}
+                    </span>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
-                  <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
-                    {displayName}
-                  </span>
                 </div>
               </button>
             </CarouselItem>
           );
         })}
       </CarouselContent>
-      <CarouselPrevious className="hidden sm:flex" />
-      <CarouselNext className="hidden sm:flex" />
+      <CarouselPrevious className="left-0" />
+      <CarouselNext className="right-0" />
     </Carousel>
   );
 };
@@ -323,11 +332,34 @@ const CoverArtView = ({
 };
 
 /**
+ * Props for InfoTickerTape when using artistRelease format
+ */
+interface InfoTickerTapeArtistReleaseProps {
+  artistRelease: { release: Release; artist: Artist };
+  trackName: string;
+  featuredArtist?: never;
+  isPlaying?: boolean;
+}
+
+/**
+ * Props for InfoTickerTape when using featuredArtist format
+ */
+interface InfoTickerTapeFeaturedArtistProps {
+  featuredArtist: FeaturedArtist;
+  artistRelease?: never;
+  trackName?: never;
+  isPlaying?: boolean;
+}
+
+type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps;
+
+/**
  * InfoTickerTape component displays scrolling information about the currently playing track.
  *
  * @param props - The component props
- * @param props.artistRelease - An object containing a release and its associated artist
- * @param props.trackName - The name of the currently playing track
+ * @param props.artistRelease - An object containing a release and its associated artist (option 1)
+ * @param props.trackName - The name of the currently playing track (required with artistRelease)
+ * @param props.featuredArtist - A FeaturedArtist object (option 2)
  *
  * @returns A ticker tape component with scrolling track information
  *
@@ -335,38 +367,74 @@ const CoverArtView = ({
  * - Displays artist/group name, release title, and track name
  * - Has a transparent background
  * - Uses CSS animation for the scrolling effect
+ * - Supports two usage patterns: artistRelease + trackName OR featuredArtist
  *
  * @example
  * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.InfoTickerTape
- *     artistRelease={{ release, artist }}
- *     trackName="Song Title"
- *   />
- * </MediaPlayer>
+ * // Using artistRelease format
+ * <MediaPlayer.InfoTickerTape
+ *   artistRelease={{ release, artist }}
+ *   trackName="Song Title"
+ * />
+ *
+ * // Using featuredArtist format
+ * <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} />
  * ```
  */
-const InfoTickerTape = ({
-  artistRelease,
-  trackName,
-}: {
-  artistRelease: { release: Release; artist: Artist };
-  trackName: string;
-}) => {
-  const { release, artist } = artistRelease;
-  const { releaseTracks } = artistRelease.release;
+const InfoTickerTape = (props: InfoTickerTapeProps) => {
+  const { isPlaying = false } = props;
+
+  // Helper to get display name from FeaturedArtist
+  const getFeaturedDisplayName = (featured: FeaturedArtist): string => {
+    if (featured.displayName) {
+      return featured.displayName;
+    }
+    if (featured.artists && featured.artists.length > 0) {
+      const artist = featured.artists[0];
+      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
+    }
+    if (featured.group) {
+      return featured.group.name;
+    }
+    return 'Unknown Artist';
+  };
+
+  // Determine display values based on prop type
+  let displayName: string;
+  let releaseTitle: string | null;
+  let trackTitle: string;
+  let showTrackListDrawer = false;
+  let artistReleaseForDrawer: { release: Release; artist: Artist } | null = null;
+
+  if ('featuredArtist' in props && props.featuredArtist) {
+    const { featuredArtist } = props;
+    displayName = getFeaturedDisplayName(featuredArtist);
+    releaseTitle = featuredArtist.release?.title ?? null;
+    trackTitle = featuredArtist.track?.title ?? '';
+  } else {
+    const { artistRelease, trackName } = props;
+    displayName = getArtistDisplayName(artistRelease.artist);
+    releaseTitle = artistRelease.release.title;
+    trackTitle = trackName;
+    showTrackListDrawer = artistRelease.release.releaseTracks.length > 1;
+    artistReleaseForDrawer = artistRelease;
+  }
 
   return (
     <>
-      <div className="w-full overflow-hidden bg-transparent py-2 border-t border-top-zinc-200 border-top-radius-[0.5rem]">
-        <div className="animate-marquee whitespace-nowrap inline-block">
-          <span className="text-sm font-medium text-zinc-900">
-            {getArtistDisplayName(artist)} • {release.title} • {trackName}
+      <div className="w-full overflow-hidden bg-zinc-800 py-2 rounded-b-lg">
+        <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
+          <span className="text-sm font-medium text-zinc-100">
+            {trackTitle} • by {displayName}
+            {releaseTitle && ` • ${releaseTitle}`}
           </span>
         </div>
       </div>
-      {releaseTracks.length > 1 && (
-        <MediaPlayer.TrackListDrawer artistRelease={artistRelease} currentTrackId={trackName} />
+      {showTrackListDrawer && artistReleaseForDrawer && (
+        <MediaPlayer.TrackListDrawer
+          artistRelease={artistReleaseForDrawer}
+          currentTrackId={trackTitle}
+        />
       )}
     </>
   );
@@ -399,7 +467,13 @@ const InfoTickerTape = ({
  * </MediaPlayer>
  * ```
  */
-const Controls = ({ audioSrc, onPreviousTrack, onNextTrack }: MediaControlsProps) => {
+const Controls = ({
+  audioSrc,
+  onPreviousTrack,
+  onNextTrack,
+  onPlay,
+  onPause,
+}: MediaControlsProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<Player | null>(null);
   const SKIP_TIME = 10; // seconds for rewind/fast-forward
@@ -446,12 +520,25 @@ const Controls = ({ audioSrc, onPreviousTrack, onNextTrack }: MediaControlsProps
       }
     });
 
+    // Add play/pause event listeners
+    playerRef.current.on('play', () => {
+      onPlay?.();
+    });
+
+    playerRef.current.on('pause', () => {
+      onPause?.();
+    });
+
+    playerRef.current.on('ended', () => {
+      onPause?.();
+    });
+
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
       }
     };
-  }, [audioSrc, onPreviousTrack, onNextTrack]);
+  }, [audioSrc, onPreviousTrack, onNextTrack, onPlay, onPause]);
 
   // Register components
   videojs.registerComponent('AudioRewindButton', AudioRewindButton);
@@ -462,13 +549,11 @@ const Controls = ({ audioSrc, onPreviousTrack, onNextTrack }: MediaControlsProps
   return (
     <>
       {/* Audio Player - Full Width on Mobile, Controls Always Visible */}
-      <div className="p-4 sm:p-6 pt-4">
-        <div className="audio-player-wrapper">
-          <audio
-            ref={audioRef}
-            className="video-js vjs-default-skin vjs-audio vjs-has-started w-full"
-          />
-        </div>
+      <div className="audio-player-wrapper">
+        <audio
+          ref={audioRef}
+          className="video-js vjs-default-skin vjs-audio vjs-has-started w-full"
+        />
       </div>
     </>
   );
@@ -807,10 +892,12 @@ type MediaPlayerChildren = React.ReactElement<Record<string, never>, MediaPlayer
  *
  * @property children - One or more MediaPlayer sub-components
  * @property artists - Optional array of artist objects (currently unused, reserved for future use)
+ * @property className - Optional CSS class names to apply to the container
  */
 interface MediaPlayerProps {
   children: MediaPlayerChildren | MediaPlayerChildren[];
   artists?: Artist[];
+  className?: string;
 }
 
 /**
@@ -857,7 +944,9 @@ interface MediaPlayerProps {
  * </MediaPlayer>
  * ```
  */
-export const MediaPlayer = ({ children }: MediaPlayerProps) => <div>{children}</div>;
+export const MediaPlayer = ({ children, className }: MediaPlayerProps) => (
+  <div className={className}>{children}</div>
+);
 
 MediaPlayer.Search = Search;
 MediaPlayer.CoverArtView = CoverArtView;
