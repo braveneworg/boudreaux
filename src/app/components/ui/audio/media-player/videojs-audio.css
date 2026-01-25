@@ -35,6 +35,7 @@
   &.vjs-audio {
     position: relative;
     border-radius: 0.5rem;
+    overflow: visible !important;
 
     & .vjs-control-bar {
       align-items: center;
@@ -158,6 +159,39 @@
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+  }
+
+  /* Ensure controls stay visible when playing */
+  &.vjs-playing .vjs-control-bar,
+  &.vjs-paused .vjs-control-bar,
+  &.vjs-ended .vjs-control-bar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Force control bar to never hide */
+  & .vjs-control-bar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: none !important;
+  }
+
+  /* Override any hidden classes */
+  & .vjs-control-bar.vjs-hidden,
+  & .vjs-hidden .vjs-control-bar,
+  &.vjs-controls-disabled .vjs-control-bar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Prevent fade transitions */
+  & .vjs-control-bar,
+  & .vjs-control-bar * {
+    transition: none !important;
   }
 
   @media (hover: none) {

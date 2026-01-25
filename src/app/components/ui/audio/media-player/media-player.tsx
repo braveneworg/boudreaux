@@ -42,6 +42,17 @@ import type Player from 'video.js/dist/types/player';
 import 'video.js/dist/video-js.css';
 import './videojs-audio.css';
 
+// Register VideoJS components once at module level
+let componentsRegistered = false;
+const registerVideoJSComponents = () => {
+  if (componentsRegistered) return;
+  videojs.registerComponent('AudioRewindButton', AudioRewindButton);
+  videojs.registerComponent('AudioFastForwardButton', AudioFastForwardButton);
+  videojs.registerComponent('SkipPreviousButton', SkipPreviousButton);
+  videojs.registerComponent('SkipNextButton', SkipNextButton);
+  componentsRegistered = true;
+};
+
 /**
  * Form values interface for the search component.
  *
@@ -57,6 +68,9 @@ export interface SearchFormValues {
  * @property audioSrc - The source URL for the audio file
  * @property onPreviousTrack - Optional callback function for previous track navigation
  * @property onNextTrack - Optional callback function for next track navigation
+ * @property onPlay - Optional callback function when playback starts
+ * @property onPause - Optional callback function when playback pauses
+ * @property autoPlay - Optional flag to auto-play when source changes
  */
 interface MediaControlsProps {
   audioSrc: string;
@@ -64,6 +78,7 @@ interface MediaControlsProps {
   onNextTrack?: () => void;
   onPlay?: () => void;
   onPause?: () => void;
+  autoPlay?: boolean;
 }
 
 /**
@@ -250,7 +265,7 @@ const FeaturedArtistCarousel = ({
     <Carousel
       aria-label="Featured Artists"
       orientation="horizontal"
-      className="w-full px-10"
+      className="w-full px-10 mb-5"
       opts={{ loop: true, align: 'start' }}
     >
       <CarouselContent className="-ml-2">
@@ -422,7 +437,9 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
 
   return (
     <>
-      <div className="w-full overflow-hidden bg-zinc-800 py-2 rounded-b-lg">
+      <div
+        className={`w-full overflow-hidden bg-zinc-800 py-2 rounded-b-lg ${isPlaying ? '' : 'text-center'}`}
+      >
         <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-sm font-medium text-zinc-100">
             {trackTitle} • by {displayName}
@@ -469,23 +486,51 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
  */
 const Controls = ({
   audioSrc,
-  onPreviousTrack,
-  onNextTrack,
+  onPreviousTrack: _onPreviousTrack,
+  onNextTrack: _onNextTrack,
   onPlay,
   onPause,
+  autoPlay = false,
 }: MediaControlsProps) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const isInitializedRef = useRef(false);
+  const initialSourceRef = useRef(audioSrc); // Track initial source to skip auto-play on mount
   const SKIP_TIME = 10; // seconds for rewind/fast-forward
 
-  useEffect(() => {
-    if (!audioRef.current) return;
+  // Use refs for callbacks to avoid re-running the effect when they change
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
 
-    playerRef.current = videojs(audioRef.current, {
+  // Keep refs up to date
+  useEffect(() => {
+    onPlayRef.current = onPlay;
+    onPauseRef.current = onPause;
+  }, [onPlay, onPause]);
+
+  // Initialize player once
+  useEffect(() => {
+    // Register components once
+    registerVideoJSComponents();
+
+    if (!containerRef.current || isInitializedRef.current) return;
+
+    // Create audio element dynamically
+    const audioEl = document.createElement('audio');
+    audioEl.className = 'video-js vjs-default-skin';
+    containerRef.current.appendChild(audioEl);
+    audioElRef.current = audioEl;
+
+    const player = videojs(audioEl, {
       controls: true,
       autoplay: false,
       preload: 'auto',
       responsive: true,
+      inactivityTimeout: 0,
+      userActions: {
+        hotkeys: true,
+      },
       sources: [{ src: audioSrc, type: 'audio/mp3' }],
       fluid: false,
       fill: false,
@@ -508,55 +553,71 @@ const Controls = ({
           'volumePanel',
         ],
         volumePanel: {
-          inline: false, // Show volume slider inline
-          vertical: false, // Horizontal orientation
+          inline: false,
+          vertical: false,
         },
       },
     });
 
-    playerRef.current.ready(() => {
-      if (playerRef.current) {
-        playerRef.current.addClass('vjs-audio');
-      }
+    playerRef.current = player;
+    isInitializedRef.current = true;
+
+    player.ready(() => {
+      player.addClass('vjs-audio');
+      player.addClass('vjs-has-started');
+      player.userActive(true);
     });
 
-    // Add play/pause event listeners
-    playerRef.current.on('play', () => {
-      onPlay?.();
+    player.on('play', () => {
+      player.userActive(true);
+      onPlayRef.current?.();
     });
 
-    playerRef.current.on('pause', () => {
-      onPause?.();
+    player.on('pause', () => {
+      onPauseRef.current?.();
     });
 
-    playerRef.current.on('ended', () => {
-      onPause?.();
+    player.on('ended', () => {
+      onPauseRef.current?.();
+    });
+
+    player.on('userinactive', () => {
+      player.userActive(true);
     });
 
     return () => {
       if (playerRef.current) {
         playerRef.current.dispose();
+        playerRef.current = null;
+        audioElRef.current = null;
+        isInitializedRef.current = false;
       }
     };
-  }, [audioSrc, onPreviousTrack, onNextTrack, onPlay, onPause]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Initialize only once
 
-  // Register components
-  videojs.registerComponent('AudioRewindButton', AudioRewindButton);
-  videojs.registerComponent('AudioFastForwardButton', AudioFastForwardButton);
-  videojs.registerComponent('SkipPreviousButton', SkipPreviousButton);
-  videojs.registerComponent('SkipNextButton', SkipNextButton);
+  // Update source when audioSrc changes (without recreating player)
+  useEffect(() => {
+    if (playerRef.current && isInitializedRef.current) {
+      const isInitialSource = audioSrc === initialSourceRef.current;
+      playerRef.current.src({ src: audioSrc, type: 'audio/mp3' });
+      playerRef.current.load();
+      // Ensure controls remain visible after source change
+      playerRef.current.addClass('vjs-has-started');
+      playerRef.current.userActive(true);
 
-  return (
-    <>
-      {/* Audio Player - Full Width on Mobile, Controls Always Visible */}
-      <div className="audio-player-wrapper">
-        <audio
-          ref={audioRef}
-          className="video-js vjs-default-skin vjs-audio vjs-has-started w-full"
-        />
-      </div>
-    </>
-  );
+      // Auto-play if enabled and this is not the initial source
+      if (autoPlay && !isInitialSource) {
+        playerRef.current.play();
+      }
+      // Update initial source ref after first change
+      if (isInitialSource) {
+        initialSourceRef.current = '';
+      }
+    }
+  }, [audioSrc, autoPlay]);
+
+  return <div ref={containerRef} className="audio-player-wrapper min-h-14" data-vjs-player />;
 };
 
 /**

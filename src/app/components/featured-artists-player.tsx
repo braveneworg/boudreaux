@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -20,6 +20,14 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     featuredArtists.length > 0 ? featuredArtists[0] : null
   );
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
 
   /**
    * Get the display name for a featured artist
@@ -52,6 +60,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   };
 
   const handleSelectArtist = (artist: FeaturedArtist) => {
+    setIsPlaying(false); // Reset playing state when selecting a new artist
     setSelectedArtist(artist);
   };
 
@@ -92,11 +101,12 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
               {/* Audio Controls - sits directly beneath the image */}
               {selectedArtist.track?.audioUrl && (
-                <div className="w-full bg-zinc-900 overflow-hidden">
+                <div className="w-full bg-zinc-900">
                   <MediaPlayer.Controls
                     audioSrc={selectedArtist.track.audioUrl}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    autoPlay
                   />
                 </div>
               )}
