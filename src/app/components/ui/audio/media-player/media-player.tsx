@@ -426,6 +426,32 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
     displayName = getFeaturedDisplayName(featuredArtist);
     releaseTitle = featuredArtist.release?.title ?? null;
     trackTitle = featuredArtist.track?.title ?? '';
+    // Show TrackListDrawer if the release has more than 1 track
+    if (featuredArtist.release && featuredArtist.release.releaseTracks.length > 1) {
+      showTrackListDrawer = true;
+      // Convert FeaturedArtist to the artistRelease format expected by TrackListDrawer
+      const artist = featuredArtist.artists?.[0] ?? {
+        id: '',
+        firstName: displayName,
+        surname: '',
+        displayName,
+        slug: '',
+        email: null,
+        phone: null,
+        bio: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        images: [],
+        labels: [],
+        groups: [],
+        releases: [],
+        urls: [],
+      };
+      artistReleaseForDrawer = {
+        release: featuredArtist.release as Release,
+        artist: artist as Artist,
+      };
+    }
   } else {
     const { artistRelease, trackName } = props;
     displayName = getArtistDisplayName(artistRelease.artist);
@@ -735,7 +761,7 @@ const TrackListDrawer = ({
                       className={`text-sm font-medium ${
                         isCurrentTrack
                           ? 'text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-500 dark:text-zinc-400'
+                          : 'text-zinc-600 dark:text-zinc-500'
                       } w-6 shrink-0 text-right`}
                     >
                       {index + 1}.
@@ -744,19 +770,27 @@ const TrackListDrawer = ({
                       className={`text-sm ${
                         isCurrentTrack
                           ? 'font-semibold text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-700 dark:text-zinc-300'
+                          : 'text-zinc-800 dark:text-zinc-400'
                       } truncate`}
                     >
                       {track.title}
                     </span>
                   </div>
-                  <span className="text-sm text-zinc-500 dark:text-zinc-400 shrink-0 font-mono">
+                  <span className="text-sm text-zinc-600 dark:text-zinc-500 shrink-0 font-mono">
                     {formatDuration(track.duration)}
                   </span>
                 </li>
               );
             })}
           </ol>
+        </div>
+        <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
+          <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
+            <span>Total time</span>
+            <span className="font-mono">
+              {formatDuration(releaseTracks.reduce((total, rt) => total + rt.track.duration, 0))}
+            </span>
+          </div>
         </div>
         <DrawerClose asChild>
           <Button variant="outline" className="mx-4 mb-4">

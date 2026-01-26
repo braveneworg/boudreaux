@@ -85,7 +85,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
         {selectedArtist && (
           <div className="flex flex-col items-center">
             {/* Cover Art with Audio Controls beneath it */}
-            <div className="w-full max-w-sm">
+            <div className="w-full max-w-[333px]">
               {/* Cover Art - only show if we have a valid image */}
               {getCoverArt(selectedArtist) ? (
                 <div className="relative w-full aspect-square">
@@ -94,7 +94,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     alt={getDisplayName(selectedArtist)}
                     fill
                     className="object-cover rounded-t-lg shadow-lg"
-                    sizes="(max-width: 640px) 100vw, 384px"
+                    sizes="(max-width: 640px) 100vw, 333px"
                   />
                 </div>
               ) : null}
@@ -106,7 +106,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     audioSrc={selectedArtist.track.audioUrl}
                     onPlay={handlePlay}
                     onPause={handlePause}
-                    autoPlay
                   />
                 </div>
               )}
