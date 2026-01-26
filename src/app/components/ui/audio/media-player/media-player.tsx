@@ -70,6 +70,7 @@ export interface SearchFormValues {
  * @property onNextTrack - Optional callback function for next track navigation
  * @property onPlay - Optional callback function when playback starts
  * @property onPause - Optional callback function when playback pauses
+ * @property onEnded - Optional callback function when playback ends
  * @property autoPlay - Optional flag to auto-play when source changes
  */
 interface MediaControlsProps {
@@ -78,6 +79,7 @@ interface MediaControlsProps {
   onNextTrack?: () => void;
   onPlay?: () => void;
   onPause?: () => void;
+  onEnded?: () => void;
   autoPlay?: boolean;
 }
 
@@ -354,6 +356,7 @@ interface InfoTickerTapeArtistReleaseProps {
   trackName: string;
   featuredArtist?: never;
   isPlaying?: boolean;
+  onTrackSelect?: (trackId: string) => void;
 }
 
 /**
@@ -364,6 +367,7 @@ interface InfoTickerTapeFeaturedArtistProps {
   artistRelease?: never;
   trackName?: never;
   isPlaying?: boolean;
+  onTrackSelect?: (trackId: string) => void;
 }
 
 type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps;
@@ -477,6 +481,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
         <MediaPlayer.TrackListDrawer
           artistRelease={artistReleaseForDrawer}
           currentTrackId={trackTitle}
+          onTrackSelect={'featuredArtist' in props ? props.onTrackSelect : undefined}
         />
       )}
     </>
@@ -516,6 +521,7 @@ const Controls = ({
   onNextTrack: _onNextTrack,
   onPlay,
   onPause,
+  onEnded,
   autoPlay = false,
 }: MediaControlsProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -528,12 +534,14 @@ const Controls = ({
   // Use refs for callbacks to avoid re-running the effect when they change
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
+  const onEndedRef = useRef(onEnded);
 
   // Keep refs up to date
   useEffect(() => {
     onPlayRef.current = onPlay;
     onPauseRef.current = onPause;
-  }, [onPlay, onPause]);
+    onEndedRef.current = onEnded;
+  }, [onPlay, onPause, onEnded]);
 
   // Initialize player once
   useEffect(() => {
@@ -605,6 +613,7 @@ const Controls = ({
 
     player.on('ended', () => {
       onPauseRef.current?.();
+      onEndedRef.current?.();
     });
 
     player.on('userinactive', () => {
@@ -727,7 +736,7 @@ const TrackListDrawer = ({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900"
         >
           <span>View all {releaseTracks.length} tracks</span>
           <ChevronDown className="h-4 w-4" />
@@ -746,7 +755,7 @@ const TrackListDrawer = ({
               const { track } = releaseTrack;
               const isCurrentTrack = currentTrackId === track.id;
 
-              return (
+              const trackItem = (
                 <li
                   key={track.id}
                   className={`flex items-center justify-between gap-4 p-3 rounded-lg transition-colors ${
@@ -759,18 +768,14 @@ const TrackListDrawer = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
                       className={`text-sm font-medium ${
-                        isCurrentTrack
-                          ? 'text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-600 dark:text-zinc-500'
+                        isCurrentTrack ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-700'
                       } w-6 shrink-0 text-right`}
                     >
                       {index + 1}.
                     </span>
                     <span
                       className={`text-sm ${
-                        isCurrentTrack
-                          ? 'font-semibold text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-800 dark:text-zinc-400'
+                        isCurrentTrack ? 'font-semibold text-zinc-900' : 'text-zinc-700'
                       } truncate`}
                     >
                       {track.title}
@@ -781,11 +786,20 @@ const TrackListDrawer = ({
                   </span>
                 </li>
               );
+
+              // Wrap with DrawerClose if onTrackSelect is provided to close drawer on selection
+              return onTrackSelect ? (
+                <DrawerClose key={track.id} asChild>
+                  {trackItem}
+                </DrawerClose>
+              ) : (
+                trackItem
+              );
             })}
           </ol>
         </div>
         <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
-          <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="flex justify-between text-sm text-zinc-600">
             <span>Total time</span>
             <span className="font-mono">
               {formatDuration(releaseTracks.reduce((total, rt) => total + rt.track.duration, 0))}

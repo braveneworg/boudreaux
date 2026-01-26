@@ -64,6 +64,57 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     setSelectedArtist(artist);
   };
 
+  /**
+   * Handle track selection from the track list drawer
+   * Updates the selected artist's track to the newly selected track
+   */
+  const handleTrackSelect = useCallback(
+    (trackId: string) => {
+      if (!selectedArtist?.release?.releaseTracks) return;
+
+      // Find the track in the release
+      const releaseTrack = selectedArtist.release.releaseTracks.find(
+        (rt) => rt.track.id === trackId
+      );
+
+      if (releaseTrack) {
+        // Create a new selected artist with the new track
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: releaseTrack.track,
+        };
+        setSelectedArtist(updatedArtist);
+        setIsPlaying(true); // Auto-play the selected track
+      }
+    },
+    [selectedArtist]
+  );
+
+  /**
+   * Handle track ended - auto-advance to next track if available
+   */
+  const handleTrackEnded = useCallback(() => {
+    if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+    const releaseTracks = selectedArtist.release.releaseTracks;
+    // Sort tracks by position
+    const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+    // Find the current track index
+    const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+    // If there's a next track, play it
+    if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
+      const nextTrack = sortedTracks[currentIndex + 1].track;
+      const updatedArtist: FeaturedArtist = {
+        ...selectedArtist,
+        track: nextTrack,
+      };
+      setSelectedArtist(updatedArtist);
+      // isPlaying will be set by autoPlay triggering the onPlay callback
+    }
+  }, [selectedArtist]);
+
   if (featuredArtists.length === 0) {
     return (
       <div className="text-center py-8 text-zinc-500">
@@ -106,13 +157,19 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     audioSrc={selectedArtist.track.audioUrl}
                     onPlay={handlePlay}
                     onPause={handlePause}
+                    onEnded={handleTrackEnded}
+                    autoPlay
                   />
                 </div>
               )}
 
               {/* Info Ticker Tape - beneath the controls */}
               {selectedArtist.track?.title && (
-                <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} isPlaying={isPlaying} />
+                <MediaPlayer.InfoTickerTape
+                  featuredArtist={selectedArtist}
+                  isPlaying={isPlaying}
+                  onTrackSelect={handleTrackSelect}
+                />
               )}
             </div>
           </div>
