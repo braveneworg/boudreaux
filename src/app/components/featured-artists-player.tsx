@@ -20,6 +20,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     featuredArtists.length > 0 ? featuredArtists[0] : null
   );
   const [isPlaying, setIsPlaying] = useState(false);
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -61,6 +62,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
   const handleSelectArtist = (artist: FeaturedArtist) => {
     setIsPlaying(false); // Reset playing state when selecting a new artist
+    setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
   };
 
@@ -84,7 +86,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           track: releaseTrack.track,
         };
         setSelectedArtist(updatedArtist);
-        setIsPlaying(true); // Auto-play the selected track
+        setShouldAutoPlay(true); // Auto-play the selected track
       }
     },
     [selectedArtist]
@@ -111,9 +113,65 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
         track: nextTrack,
       };
       setSelectedArtist(updatedArtist);
-      // isPlaying will be set by autoPlay triggering the onPlay callback
+      setShouldAutoPlay(true); // Auto-play next track
     }
   }, [selectedArtist]);
+
+  /**
+   * Handle previous track button - go to previous track in release if available
+   */
+  const handlePreviousTrack = useCallback(
+    (wasPlaying: boolean) => {
+      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+      const releaseTracks = selectedArtist.release.releaseTracks;
+      // Sort tracks by position
+      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+      // Find the current track index
+      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+      // If there's a previous track, go to it
+      if (currentIndex > 0) {
+        const prevTrack = sortedTracks[currentIndex - 1].track;
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: prevTrack,
+        };
+        setSelectedArtist(updatedArtist);
+        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+      }
+    },
+    [selectedArtist]
+  );
+
+  /**
+   * Handle next track button - go to next track in release if available
+   */
+  const handleNextTrack = useCallback(
+    (wasPlaying: boolean) => {
+      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+      const releaseTracks = selectedArtist.release.releaseTracks;
+      // Sort tracks by position
+      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+      // Find the current track index
+      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+      // If there's a next track, go to it
+      if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
+        const nextTrack = sortedTracks[currentIndex + 1].track;
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: nextTrack,
+        };
+        setSelectedArtist(updatedArtist);
+        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+      }
+    },
+    [selectedArtist]
+  );
 
   if (featuredArtists.length === 0) {
     return (
@@ -158,7 +216,9 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     onPlay={handlePlay}
                     onPause={handlePause}
                     onEnded={handleTrackEnded}
-                    autoPlay
+                    onPreviousTrack={handlePreviousTrack}
+                    onNextTrack={handleNextTrack}
+                    autoPlay={shouldAutoPlay}
                   />
                 </div>
               )}

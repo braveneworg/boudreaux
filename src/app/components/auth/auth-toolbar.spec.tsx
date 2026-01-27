@@ -100,7 +100,7 @@ describe('AuthToolbar', () => {
       const innerDiv = outerDiv?.querySelector('div');
       expect(innerDiv).toHaveClass(
         'flex',
-        'h-[20px]',
+        'h-3',
         'items-center',
         'relative',
         'justify-center',

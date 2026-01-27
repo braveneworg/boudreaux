@@ -66,8 +66,8 @@ export interface SearchFormValues {
  * Props interface for the MediaControls component.
  *
  * @property audioSrc - The source URL for the audio file
- * @property onPreviousTrack - Optional callback function for previous track navigation
- * @property onNextTrack - Optional callback function for next track navigation
+ * @property onPreviousTrack - Optional callback function for previous track navigation (wasPlaying indicates if should auto-play)
+ * @property onNextTrack - Optional callback function for next track navigation (wasPlaying indicates if should auto-play)
  * @property onPlay - Optional callback function when playback starts
  * @property onPause - Optional callback function when playback pauses
  * @property onEnded - Optional callback function when playback ends
@@ -75,8 +75,8 @@ export interface SearchFormValues {
  */
 interface MediaControlsProps {
   audioSrc: string;
-  onPreviousTrack?: () => void;
-  onNextTrack?: () => void;
+  onPreviousTrack?: (wasPlaying: boolean) => void;
+  onNextTrack?: (wasPlaying: boolean) => void;
   onPlay?: () => void;
   onPause?: () => void;
   onEnded?: () => void;
@@ -471,7 +471,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
         className={`w-full overflow-hidden bg-zinc-800 py-2 rounded-b-lg ${isPlaying ? '' : 'text-center'}`}
       >
         <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
-          <span className="text-sm font-medium text-zinc-100">
+          <span className="text-xs font-medium text-zinc-100">
             {trackTitle} • by {displayName}
             {releaseTitle && ` • ${releaseTitle}`}
           </span>
@@ -517,8 +517,8 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
  */
 const Controls = ({
   audioSrc,
-  onPreviousTrack: _onPreviousTrack,
-  onNextTrack: _onNextTrack,
+  onPreviousTrack,
+  onNextTrack,
   onPlay,
   onPause,
   onEnded,
@@ -529,19 +529,26 @@ const Controls = ({
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const isInitializedRef = useRef(false);
   const initialSourceRef = useRef(audioSrc); // Track initial source to skip auto-play on mount
+  const lastPreviousClickRef = useRef<number>(0); // Track time of last previous click for double-click detection
   const SKIP_TIME = 10; // seconds for rewind/fast-forward
+  const DOUBLE_CLICK_THRESHOLD = 1000; // ms - time window for considering a "double click" for previous track
+  const REWIND_THRESHOLD = 3; // seconds - if within this time from start, go to previous track on first click
 
   // Use refs for callbacks to avoid re-running the effect when they change
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
   const onEndedRef = useRef(onEnded);
+  const onPreviousTrackRef = useRef(onPreviousTrack);
+  const onNextTrackRef = useRef(onNextTrack);
 
   // Keep refs up to date
   useEffect(() => {
     onPlayRef.current = onPlay;
     onPauseRef.current = onPause;
     onEndedRef.current = onEnded;
-  }, [onPlay, onPause, onEnded]);
+    onPreviousTrackRef.current = onPreviousTrack;
+    onNextTrackRef.current = onNextTrack;
+  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack]);
 
   // Initialize player once
   useEffect(() => {
@@ -618,6 +625,37 @@ const Controls = ({
 
     player.on('userinactive', () => {
       player.userActive(true);
+    });
+
+    // Handle skip previous button click
+    player.on('skipprevious', () => {
+      const currentTime = player.currentTime() || 0;
+      const wasPlaying = !player.paused();
+      const now = Date.now();
+      const timeSinceLastClick = now - lastPreviousClickRef.current;
+      lastPreviousClickRef.current = now;
+
+      // If within threshold from start OR clicked twice quickly, go to previous track
+      if (currentTime < REWIND_THRESHOLD || timeSinceLastClick < DOUBLE_CLICK_THRESHOLD) {
+        if (onPreviousTrackRef.current) {
+          onPreviousTrackRef.current(wasPlaying);
+        }
+      } else {
+        // Rewind to beginning
+        player.currentTime(0);
+        // If was playing, continue playing
+        if (wasPlaying) {
+          player.play();
+        }
+      }
+    });
+
+    // Handle skip next button click
+    player.on('skipnext', () => {
+      const wasPlaying = !player.paused();
+      if (onNextTrackRef.current) {
+        onNextTrackRef.current(wasPlaying);
+      }
     });
 
     return () => {
