@@ -12,8 +12,7 @@ vi.mock('server-only', () => ({}));
 // The decorator wraps handlers to add (request, context, session) signature
 // We mock it to pass through the request only since inner handlers don't use context
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: (request: Request) => Promise<Response>) =>
-    Promise.resolve((request: Request) => handler(request)),
+  withAdmin: (handler: () => unknown) => handler,
 }));
 
 vi.mock('@/lib/services/artist-service', () => ({

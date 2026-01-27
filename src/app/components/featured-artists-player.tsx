@@ -1,10 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import Image from 'next/image';
-
-import { MediaPlayer } from '@/app/components/ui/audio/media-player';
+import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
 interface FeaturedArtistsPlayerProps {
@@ -19,6 +17,24 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const [selectedArtist, setSelectedArtist] = useState<FeaturedArtist | null>(
     featuredArtists.length > 0 ? featuredArtists[0] : null
   );
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
+  const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  /**
+   * Handle toggle play/pause from cover art click
+   */
+  const handleTogglePlay = useCallback(() => {
+    playerControls?.toggle();
+  }, [playerControls]);
 
   /**
    * Get the display name for a featured artist
@@ -51,8 +67,117 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   };
 
   const handleSelectArtist = (artist: FeaturedArtist) => {
+    setIsPlaying(false); // Reset playing state when selecting a new artist
+    setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
   };
+
+  /**
+   * Handle track selection from the track list drawer
+   * Updates the selected artist's track to the newly selected track
+   */
+  const handleTrackSelect = useCallback(
+    (trackId: string) => {
+      if (!selectedArtist?.release?.releaseTracks) return;
+
+      // Find the track in the release
+      const releaseTrack = selectedArtist.release.releaseTracks.find(
+        (rt) => rt.track.id === trackId
+      );
+
+      if (releaseTrack) {
+        // Create a new selected artist with the new track
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: releaseTrack.track,
+        };
+        setSelectedArtist(updatedArtist);
+        setShouldAutoPlay(true); // Auto-play the selected track
+      }
+    },
+    [selectedArtist]
+  );
+
+  /**
+   * Handle track ended - auto-advance to next track if available
+   */
+  const handleTrackEnded = useCallback(() => {
+    if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+    const releaseTracks = selectedArtist.release.releaseTracks;
+    // Sort tracks by position
+    const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+    // Find the current track index
+    const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+    // If there's a next track, play it
+    if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
+      const nextTrack = sortedTracks[currentIndex + 1].track;
+      const updatedArtist: FeaturedArtist = {
+        ...selectedArtist,
+        track: nextTrack,
+      };
+      setSelectedArtist(updatedArtist);
+      setShouldAutoPlay(true); // Auto-play next track
+    }
+  }, [selectedArtist]);
+
+  /**
+   * Handle previous track button - go to previous track in release if available
+   */
+  const handlePreviousTrack = useCallback(
+    (wasPlaying: boolean) => {
+      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+      const releaseTracks = selectedArtist.release.releaseTracks;
+      // Sort tracks by position
+      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+      // Find the current track index
+      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+      // If there's a previous track, go to it
+      if (currentIndex > 0) {
+        const prevTrack = sortedTracks[currentIndex - 1].track;
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: prevTrack,
+        };
+        setSelectedArtist(updatedArtist);
+        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+      }
+    },
+    [selectedArtist]
+  );
+
+  /**
+   * Handle next track button - go to next track in release if available
+   */
+  const handleNextTrack = useCallback(
+    (wasPlaying: boolean) => {
+      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+
+      const releaseTracks = selectedArtist.release.releaseTracks;
+      // Sort tracks by position
+      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+
+      // Find the current track index
+      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
+
+      // If there's a next track, go to it
+      if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
+        const nextTrack = sortedTracks[currentIndex + 1].track;
+        const updatedArtist: FeaturedArtist = {
+          ...selectedArtist,
+          track: nextTrack,
+        };
+        setSelectedArtist(updatedArtist);
+        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+      }
+    },
+    [selectedArtist]
+  );
 
   if (featuredArtists.length === 0) {
     return (
@@ -63,8 +188,8 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   }
 
   return (
-    <MediaPlayer>
-      <div className="space-y-6">
+    <MediaPlayer className="mb-2">
+      <div className="space-y-2 mt-2">
         {/* Featured Artists Carousel */}
         <MediaPlayer.FeaturedArtistCarousel
           featuredArtists={featuredArtists}
@@ -73,41 +198,45 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
         {/* Selected Artist Details */}
         {selectedArtist && (
-          <div className="flex flex-col items-center space-y-4">
-            {/* Cover Art */}
-            {getCoverArt(selectedArtist) && (
-              <div className="relative w-full max-w-sm aspect-square">
-                <Image
+          <div className="flex flex-col items-center">
+            {/* Cover Art with Audio Controls beneath it */}
+            <div className="w-full max-w-[333px]">
+              {/* Interactive Cover Art - clickable with play/pause overlay */}
+              {getCoverArt(selectedArtist) && (
+                <MediaPlayer.InteractiveCoverArt
                   src={getCoverArt(selectedArtist)!}
                   alt={getDisplayName(selectedArtist)}
-                  fill
-                  className="object-cover rounded-lg shadow-lg"
-                  sizes="(max-width: 640px) 100vw, 384px"
+                  isPlaying={isPlaying}
+                  onTogglePlay={handleTogglePlay}
+                  className="shadow-lg"
                 />
-              </div>
-            )}
-
-            {/* Artist Name and Description */}
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-semibold text-zinc-900">
-                {getDisplayName(selectedArtist)}
-              </h2>
-              {selectedArtist.description && (
-                <p className="text-sm text-zinc-600 max-w-md">{selectedArtist.description}</p>
               )}
-              {selectedArtist.release && (
-                <p className="text-sm text-zinc-500">
-                  Latest Release: {selectedArtist.release.title}
-                </p>
+
+              {/* Audio Controls - sits directly beneath the image */}
+              {selectedArtist.track?.audioUrl && (
+                <div className="w-full bg-zinc-900">
+                  <MediaPlayer.Controls
+                    audioSrc={selectedArtist.track.audioUrl}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    onEnded={handleTrackEnded}
+                    onPreviousTrack={handlePreviousTrack}
+                    onNextTrack={handleNextTrack}
+                    autoPlay={shouldAutoPlay}
+                    controlsRef={setPlayerControls}
+                  />
+                </div>
+              )}
+
+              {/* Info Ticker Tape - beneath the controls */}
+              {selectedArtist.track?.title && (
+                <MediaPlayer.InfoTickerTape
+                  featuredArtist={selectedArtist}
+                  isPlaying={isPlaying}
+                  onTrackSelect={handleTrackSelect}
+                />
               )}
             </div>
-
-            {/* Audio Controls - only show if there's a track with audio */}
-            {selectedArtist.track?.audioUrl && (
-              <div className="w-full max-w-md">
-                <MediaPlayer.Controls audioSrc={selectedArtist.track.audioUrl} />
-              </div>
-            )}
           </div>
         )}
       </div>

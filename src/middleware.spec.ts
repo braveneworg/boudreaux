@@ -77,12 +77,14 @@ describe('middleware', () => {
       },
     };
 
+    const userOverrides = overrides.user ?? {};
+
     return {
       ...defaultToken,
       ...overrides,
       user: {
         ...defaultToken.user,
-        ...(overrides as Partial<JWT>).user,
+        ...userOverrides,
       },
     } as JWT;
   };

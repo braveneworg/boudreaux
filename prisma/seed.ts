@@ -71,21 +71,21 @@ const createReleases = async (count: number) => {
   });
 };
 
-const createTracks = async (count: number) => {
-  // Sample audio URLs that actually work for testing
-  const sampleAudioUrls = [
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
-  ];
+// Sample audio URLs that actually work for testing
+const sampleAudioUrls = [
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+];
 
+const createTracks = async (count: number) => {
   const trackData = Array.from({ length: count }).map((_, index) => ({
     title: faker.music.songName(),
     coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
@@ -99,22 +99,84 @@ const createTracks = async (count: number) => {
   });
 };
 
+/**
+ * Create releases with multiple tracks linked via ReleaseTrack
+ * This creates albums with 4-8 tracks each
+ */
+const createReleasesWithTracks = async () => {
+  const releases = await prisma.release.findMany();
+  const tracks = await prisma.track.findMany();
+
+  if (releases.length === 0 || tracks.length === 0) {
+    console.warn('⚠️ No releases or tracks found. Skipping release-track linking.');
+    return;
+  }
+
+  // Assign tracks to releases (each release gets 4-8 tracks)
+  let trackIndex = 0;
+  for (const release of releases) {
+    const trackCount = faker.number.int({ min: 4, max: 8 });
+    const releaseTracks = [];
+
+    for (let i = 0; i < trackCount && trackIndex < tracks.length; i++) {
+      releaseTracks.push({
+        releaseId: release.id,
+        trackId: tracks[trackIndex].id,
+      });
+      trackIndex++;
+    }
+
+    // Create ReleaseTrack entries for this release
+    if (releaseTracks.length > 0) {
+      await prisma.releaseTrack.createMany({
+        data: releaseTracks,
+      });
+    }
+
+    // Wrap around if we run out of tracks
+    if (trackIndex >= tracks.length) {
+      trackIndex = 0;
+    }
+  }
+
+  console.info('✅ Linked tracks to releases via ReleaseTrack.');
+};
+
 const createFeaturedArtists = async (count: number) => {
   const artists = await prisma.artist.findMany();
-  const tracks = await prisma.track.findMany();
-  const releases = await prisma.release.findMany();
   const groups = await prisma.group.findMany();
+
+  // Get releases with their tracks
+  const releases = await prisma.release.findMany({
+    include: {
+      releaseTracks: {
+        include: {
+          track: true,
+        },
+      },
+    },
+  });
+
+  // Filter to only releases that have tracks
+  const releasesWithTracks = releases.filter((r) => r.releaseTracks.length > 0);
 
   if (artists.length === 0) {
     console.warn('⚠️ No artists found. Skipping featured artists creation.');
     return;
   }
 
+  if (releasesWithTracks.length === 0) {
+    console.warn('⚠️ No releases with tracks found. Skipping featured artists creation.');
+    return;
+  }
+
   // Create featured artists one at a time to handle the Artist[] relation
   for (let i = 0; i < count; i++) {
     const randomArtist = faker.helpers.arrayElement(artists);
-    const randomTrack = tracks.length > 0 ? faker.helpers.arrayElement(tracks) : null;
-    const randomRelease = releases.length > 0 ? faker.helpers.arrayElement(releases) : null;
+    // Pick a release that has tracks, then pick one of its tracks as the featured track
+    const randomRelease = faker.helpers.arrayElement(releasesWithTracks);
+    const randomReleaseTrack = faker.helpers.arrayElement(randomRelease.releaseTracks);
+    // Group is optional
     const randomGroup = groups.length > 0 ? faker.helpers.arrayElement(groups) : null;
 
     await prisma.featuredArtist.create({
@@ -124,8 +186,8 @@ const createFeaturedArtists = async (count: number) => {
         position: i + 1,
         description: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.7 }),
         coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
-        ...(randomTrack && { track: { connect: { id: randomTrack.id } } }),
-        ...(randomRelease && { release: { connect: { id: randomRelease.id } } }),
+        track: { connect: { id: randomReleaseTrack.track.id } },
+        release: { connect: { id: randomRelease.id } },
         ...(randomGroup && { group: { connect: { id: randomGroup.id } } }),
         artists: {
           connect: [{ id: randomArtist.id }],
@@ -179,7 +241,10 @@ async function main() {
     console.info('🌱 Seeding development database...');
 
     // Create base entities first (these can be created in parallel)
-    await Promise.all([createArtists(10), createGroups(5), createReleases(10), createTracks(20)]);
+    await Promise.all([createArtists(10), createGroups(5), createReleases(10), createTracks(50)]);
+
+    // Link tracks to releases
+    await createReleasesWithTracks();
 
     // Create featured artists after base entities exist
     await createFeaturedArtists(7);

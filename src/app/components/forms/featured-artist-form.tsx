@@ -294,14 +294,15 @@ export default function FeaturedArtistForm({
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Media Associations</h3>
                 <p className="text-sm text-muted-foreground">
-                  Optionally associate this featured artist with a track, release, or group.
+                  Associate this featured artist with a track and release. Optionally associate with
+                  a group.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <TrackSelect
                     control={control}
                     name="trackId"
-                    label="Track (Optional)"
+                    label="Track"
                     placeholder="Select a track..."
                     setValue={setValue}
                   />
@@ -309,7 +310,7 @@ export default function FeaturedArtistForm({
                   <ReleaseSelect
                     control={control}
                     name="releaseId"
-                    label="Release (Optional)"
+                    label="Release"
                     placeholder="Select a release..."
                     setValue={setValue}
                   />

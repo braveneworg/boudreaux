@@ -6,17 +6,18 @@ import type { Artist } from '@/lib/types/media-models';
 
 import type { Prisma } from '@prisma/client';
 
-type ArtistCreateData = Prisma.ArtistCreateInput & {
-  images?: Array<{ id: string; [key: string]: unknown }>;
-  urls?: Array<{ id: string; [key: string]: unknown }>;
-};
-
-export async function createArtistAction(
-  artist: ArtistCreateData
-): Promise<ServiceResponse<Artist>> {
+export async function createArtistAction(artist: Artist): Promise<ServiceResponse<Artist>> {
   try {
-    const { images, urls, ...artistData } = artist;
-    const result = await ArtistService.createArtist({
+    const {
+      images,
+      urls,
+      labels: _labels,
+      groups: _groups,
+      releases: _releases,
+      ...artistData
+    } = artist;
+
+    const createInput: Prisma.ArtistCreateInput = {
       ...artistData,
       images: images
         ? {
@@ -34,13 +35,11 @@ export async function createArtistAction(
             })),
           }
         : undefined,
-    } as Prisma.ArtistCreateInput);
+    };
 
-    if (!result.success) {
-      return result;
-    }
+    const result = await ArtistService.createArtist(createInput);
 
-    return { success: true, data: result.data };
+    return result;
   } catch (error) {
     console.error('Error creating artist:', error);
     return { success: false, error: 'Failed to create artist' };

@@ -5,11 +5,10 @@ This document reviews the existing workflows (`deploy.yml` and `deploy-2.yml`) a
 ## Summary
 
 - Current `deploy.yml` combines build + CDN sync + Docker publish + SSH deploy. Build is good; deploy has been failing due to SSH connectivity/timeouts.
-<<<<<<< HEAD
-- `deploy-2.yml` focuses on SSH-only deploy with temporary IP whitelisting. It compiles and uses appleboy actions, but assumes a non-container PM2/node process and `git pull` build on the server, which conflicts with our containerized architecture and GHCR images.
-=======
+  <<<<<<< HEAD
+- # `deploy-2.yml` focuses on SSH-only deploy with temporary IP whitelisting. It compiles and uses appleboy actions, but assumes a non-container PM2/node process and `git pull` build on the server, which conflicts with our containerized architecture and GHCR images.
 - `deploy-2.yml` focuses on SSH-only deploy with temporary IP whitelisting. It uses appleboy actions, but assumes a non-container PM2/node process and `git pull` build on the server, which conflicts with our containerized architecture and GHCR images.
->>>>>>> main
+  > > > > > > > main
 - Proposal: keep the strong build job, push images to GHCR, and deploy via SSH with temporary IP allowlist, but run Docker Compose on EC2 to pull new images. Include a quick health check and proper cleanup. This is captured in the new `deploy-clean.yml`.
 
 ## Detailed Review

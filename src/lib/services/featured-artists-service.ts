@@ -18,7 +18,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });
@@ -56,7 +64,15 @@ export class FeaturedArtistsService {
             include: {
               artists: true,
               track: true,
-              release: true,
+              release: {
+                include: {
+                  releaseTracks: {
+                    include: {
+                      track: true,
+                    },
+                  },
+                },
+              },
               group: true,
             },
             orderBy: {
@@ -110,7 +126,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });
@@ -137,7 +161,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });
@@ -172,7 +204,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });
@@ -206,7 +246,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });
@@ -237,7 +285,15 @@ export class FeaturedArtistsService {
         include: {
           artists: true,
           track: true,
-          release: true,
+          release: {
+            include: {
+              releaseTracks: {
+                include: {
+                  track: true,
+                },
+              },
+            },
+          },
           group: true,
         },
       });

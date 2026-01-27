@@ -10,7 +10,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock withAdmin decorator to bypass auth in tests
 vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: <T>(handler: T) => handler,
+  withAdmin: (handler: () => unknown) => handler,
 }));
 
 vi.mock('@/lib/services/release-service', () => ({
