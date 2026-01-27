@@ -102,13 +102,16 @@ function Carousel({
   useEffect(() => {
     if (!api) return;
 
-    // Initialize scroll state immediately
-    onSelect(api);
-
     api.on('reInit', onSelect);
     api.on('select', onSelect);
 
+    // Use requestAnimationFrame to defer initial state update
+    const frameId = requestAnimationFrame(() => {
+      onSelect(api);
+    });
+
     return () => {
+      cancelAnimationFrame(frameId);
       api?.off('select', onSelect);
     };
   }, [api, onSelect]);
