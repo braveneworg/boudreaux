@@ -17,6 +17,7 @@ const TurnstileWidget = ({
       ? process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!
       : process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY!;
 
+  // eslint-disable-next-line no-console
   console.log(
     `23: turnstile-widget > public turnstile key >>>`,
     process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!
