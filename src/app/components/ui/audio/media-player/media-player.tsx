@@ -5,7 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import { ChevronDown, ChevronUp, EllipsisVertical, Search as SearchIcon } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  EllipsisVertical,
+  Pause,
+  Play,
+  Search as SearchIcon,
+} from 'lucide-react';
 import videojs from 'video.js';
 
 import TextField from '@/components/forms/fields/text-field';
@@ -28,6 +35,7 @@ import {
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
 import {
   AudioFastForwardButton,
@@ -63,6 +71,19 @@ export interface SearchFormValues {
 }
 
 /**
+ * Interface for accessing player controls from parent components.
+ *
+ * @property play - Function to start playback
+ * @property pause - Function to pause playback
+ * @property toggle - Function to toggle between play and pause
+ */
+export interface MediaPlayerControls {
+  play: () => void;
+  pause: () => void;
+  toggle: () => void;
+}
+
+/**
  * Props interface for the MediaControls component.
  *
  * @property audioSrc - The source URL for the audio file
@@ -72,6 +93,7 @@ export interface SearchFormValues {
  * @property onPause - Optional callback function when playback pauses
  * @property onEnded - Optional callback function when playback ends
  * @property autoPlay - Optional flag to auto-play when source changes
+ * @property controlsRef - Optional callback to receive player control methods
  */
 interface MediaControlsProps {
   audioSrc: string;
@@ -81,6 +103,7 @@ interface MediaControlsProps {
   onPause?: () => void;
   onEnded?: () => void;
   autoPlay?: boolean;
+  controlsRef?: (controls: MediaPlayerControls | null) => void;
 }
 
 /**
@@ -227,26 +250,6 @@ const FeaturedArtistCarousel = ({
   const sortedArtists = [...featuredArtists].sort((a, b) => a.position - b.position);
 
   /**
-   * Get the display name for a featured artist
-   */
-  const getDisplayName = (featured: FeaturedArtist): string => {
-    // Use featured displayName if available
-    if (featured.displayName) {
-      return featured.displayName;
-    }
-    // Fall back to first artist's display name
-    if (featured.artists && featured.artists.length > 0) {
-      const artist = featured.artists[0];
-      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-    }
-    // Fall back to group name
-    if (featured.group) {
-      return featured.group.name;
-    }
-    return 'Unknown Artist';
-  };
-
-  /**
    * Get the cover art URL for a featured artist
    */
   const getCoverArt = (featured: FeaturedArtist): string | null => {
@@ -273,7 +276,7 @@ const FeaturedArtistCarousel = ({
       <CarouselContent className="-ml-2">
         {sortedArtists.map((featured) => {
           const coverArt = getCoverArt(featured);
-          const displayName = getDisplayName(featured);
+          const displayName = getFeaturedArtistDisplayName(featured);
 
           return (
             <CarouselItem
@@ -349,6 +352,109 @@ const CoverArtView = ({
 };
 
 /**
+ * Props interface for the InteractiveCoverArt component.
+ *
+ * @property src - The source URL for the cover art image
+ * @property alt - Alt text for the image
+ * @property isPlaying - Whether the audio is currently playing
+ * @property onTogglePlay - Callback function to toggle play/pause state
+ * @property className - Optional CSS class names to apply to the container
+ */
+interface InteractiveCoverArtProps {
+  src: string;
+  alt: string;
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  className?: string;
+}
+
+/**
+ * InteractiveCoverArt component displays cover art with a play/pause overlay.
+ *
+ * @param props - The component props
+ * @param props.src - The source URL for the cover art image
+ * @param props.alt - Alt text for the image
+ * @param props.isPlaying - Whether the audio is currently playing
+ * @param props.onTogglePlay - Callback function to toggle play/pause state
+ * @param props.className - Optional CSS class names to apply to the container
+ *
+ * @returns A cover art image with an interactive overlay for play/pause control
+ *
+ * @remarks
+ * - Shows a play icon overlay when audio is not playing
+ * - Shows a pause icon overlay briefly when user clicks to pause (for visual feedback)
+ * - Never shows any overlay while audio is actively playing
+ * - The entire cover art area is clickable to toggle playback
+ *
+ * @example
+ * ```tsx
+ * <MediaPlayer.InteractiveCoverArt
+ *   src="/path/to/cover.jpg"
+ *   alt="Album Name by Artist"
+ *   isPlaying={isPlaying}
+ *   onTogglePlay={handleTogglePlay}
+ * />
+ * ```
+ */
+const InteractiveCoverArt = ({
+  src,
+  alt,
+  isPlaying,
+  onTogglePlay,
+  className,
+}: InteractiveCoverArtProps) => {
+  const [showPauseOverlay, setShowPauseOverlay] = useState(false);
+
+  const handleClick = () => {
+    if (isPlaying) {
+      // Show pause overlay briefly when pausing
+      setShowPauseOverlay(true);
+      setTimeout(() => {
+        setShowPauseOverlay(false);
+      }, 800);
+    }
+    onTogglePlay();
+  };
+
+  // Determine which overlay to show:
+  // - Show pause icon briefly after clicking to pause
+  // - Show play icon when not playing (and not showing pause overlay)
+  // - Show nothing when playing
+  const showOverlay = !isPlaying || showPauseOverlay;
+  const OverlayIcon = showPauseOverlay ? Pause : Play;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`relative w-full aspect-square group cursor-pointer focus:outline-none rounded-t-lg overflow-hidden ${className ?? ''}`}
+      aria-label={isPlaying ? 'Pause' : 'Play'}
+    >
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className="object-cover"
+        sizes="(max-width: 640px) 100vw, 333px"
+      />
+      {/* Overlay - visible when not playing or briefly when pausing */}
+      <div
+        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+          showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        {/* Nearly transparent background */}
+        <div className="absolute inset-0 bg-black/10" />
+        {/* Icon container */}
+        <div className="relative z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm">
+          <OverlayIcon className="w-8 h-8 text-white/30 drop-shadow-md" />
+        </div>
+      </div>
+    </button>
+  );
+};
+
+/**
  * Props for InfoTickerTape when using artistRelease format
  */
 interface InfoTickerTapeArtistReleaseProps {
@@ -403,57 +509,32 @@ type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeat
 const InfoTickerTape = (props: InfoTickerTapeProps) => {
   const { isPlaying = false } = props;
 
-  // Helper to get display name from FeaturedArtist
-  const getFeaturedDisplayName = (featured: FeaturedArtist): string => {
-    if (featured.displayName) {
-      return featured.displayName;
-    }
-    if (featured.artists && featured.artists.length > 0) {
-      const artist = featured.artists[0];
-      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-    }
-    if (featured.group) {
-      return featured.group.name;
-    }
-    return 'Unknown Artist';
-  };
-
   // Determine display values based on prop type
   let displayName: string;
   let releaseTitle: string | null;
   let trackTitle: string;
   let showTrackListDrawer = false;
   let artistReleaseForDrawer: { release: Release; artist: Artist } | null = null;
+  let currentTrackId: string | undefined;
 
   if ('featuredArtist' in props && props.featuredArtist) {
     const { featuredArtist } = props;
-    displayName = getFeaturedDisplayName(featuredArtist);
+    displayName = getFeaturedArtistDisplayName(featuredArtist);
     releaseTitle = featuredArtist.release?.title ?? null;
     trackTitle = featuredArtist.track?.title ?? '';
-    // Show TrackListDrawer if the release has more than 1 track
-    if (featuredArtist.release && featuredArtist.release.releaseTracks.length > 1) {
+    currentTrackId = featuredArtist.track?.id;
+    // Show TrackListDrawer if the release has more than 1 track and a primary artist is available
+    const primaryArtist = featuredArtist.artists?.[0];
+    if (
+      featuredArtist.release &&
+      featuredArtist.release.releaseTracks.length > 1 &&
+      primaryArtist
+    ) {
       showTrackListDrawer = true;
       // Convert FeaturedArtist to the artistRelease format expected by TrackListDrawer
-      const artist = featuredArtist.artists?.[0] ?? {
-        id: '',
-        firstName: displayName,
-        surname: '',
-        displayName,
-        slug: '',
-        email: null,
-        phone: null,
-        bio: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        images: [],
-        labels: [],
-        groups: [],
-        releases: [],
-        urls: [],
-      };
       artistReleaseForDrawer = {
         release: featuredArtist.release as Release,
-        artist: artist as Artist,
+        artist: primaryArtist as Artist,
       };
     }
   } else {
@@ -461,6 +542,11 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
     displayName = getArtistDisplayName(artistRelease.artist);
     releaseTitle = artistRelease.release.title;
     trackTitle = trackName;
+    // For artistRelease format, find the track ID by matching title
+    const matchingTrack = artistRelease.release.releaseTracks.find(
+      (rt) => rt.track.title === trackName
+    );
+    currentTrackId = matchingTrack?.track.id;
     showTrackListDrawer = artistRelease.release.releaseTracks.length > 1;
     artistReleaseForDrawer = artistRelease;
   }
@@ -480,7 +566,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
       {showTrackListDrawer && artistReleaseForDrawer && (
         <MediaPlayer.TrackListDrawer
           artistRelease={artistReleaseForDrawer}
-          currentTrackId={trackTitle}
+          currentTrackId={currentTrackId}
           onTrackSelect={'featuredArtist' in props ? props.onTrackSelect : undefined}
         />
       )}
@@ -523,6 +609,7 @@ const Controls = ({
   onPause,
   onEnded,
   autoPlay = false,
+  controlsRef,
 }: MediaControlsProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Player | null>(null);
@@ -540,6 +627,7 @@ const Controls = ({
   const onEndedRef = useRef(onEnded);
   const onPreviousTrackRef = useRef(onPreviousTrack);
   const onNextTrackRef = useRef(onNextTrack);
+  const controlsRefCallback = useRef(controlsRef);
 
   // Keep refs up to date
   useEffect(() => {
@@ -548,7 +636,8 @@ const Controls = ({
     onEndedRef.current = onEnded;
     onPreviousTrackRef.current = onPreviousTrack;
     onNextTrackRef.current = onNextTrack;
-  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack]);
+    controlsRefCallback.current = controlsRef;
+  }, [onPlay, onPause, onEnded, onPreviousTrack, onNextTrack, controlsRef]);
 
   // Initialize player once
   useEffect(() => {
@@ -607,6 +696,22 @@ const Controls = ({
       player.addClass('vjs-audio');
       player.addClass('vjs-has-started');
       player.userActive(true);
+
+      // Expose player controls via controlsRef after player is ready
+      if (controlsRefCallback.current) {
+        const controls: MediaPlayerControls = {
+          play: () => player.play(),
+          pause: () => player.pause(),
+          toggle: () => {
+            if (player.paused()) {
+              player.play();
+            } else {
+              player.pause();
+            }
+          },
+        };
+        controlsRefCallback.current(controls);
+      }
     });
 
     player.on('play', () => {
@@ -666,8 +771,12 @@ const Controls = ({
         isInitializedRef.current = false;
       }
     };
+    // We intentionally initialize the Video.js player only once on mount.
+    // The event handlers registered here read from mutable refs (e.g. onNextTrackRef)
+    // that are updated by other hooks, so they always see the latest callbacks
+    // without needing to recreate the player when those refs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Initialize only once
+  }, []);
 
   // Update source when audioSrc changes (without recreating player)
   useEffect(() => {
@@ -1016,6 +1125,7 @@ const SocialSharer = () => <div>SocialSharer</div>;
 type MediaPlayerComponent =
   | typeof Search
   | typeof CoverArtView
+  | typeof InteractiveCoverArt
   | typeof CoverArtCarousel
   | typeof Controls
   | typeof Description
@@ -1060,6 +1170,7 @@ interface MediaPlayerProps {
  * a custom media player interface:
  * - MediaPlayer.Search - Search input for filtering content
  * - MediaPlayer.CoverArtView - Display album/release cover art
+ * - MediaPlayer.InteractiveCoverArt - Cover art with play/pause overlay
  * - MediaPlayer.ThumbCarousel - Carousel of artist thumbnails
  * - MediaPlayer.InfoTickerTape - Scrolling track information display
  * - MediaPlayer.Controls - Audio playback controls with video.js
@@ -1097,6 +1208,7 @@ export const MediaPlayer = ({ children, className }: MediaPlayerProps) => (
 
 MediaPlayer.Search = Search;
 MediaPlayer.CoverArtView = CoverArtView;
+MediaPlayer.InteractiveCoverArt = InteractiveCoverArt;
 MediaPlayer.InfoTickerTape = InfoTickerTape;
 MediaPlayer.Controls = Controls;
 MediaPlayer.CoverArtCarousel = CoverArtCarousel;

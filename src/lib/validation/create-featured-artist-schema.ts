@@ -27,12 +27,12 @@ export const createFeaturedArtistSchema = z.object({
     .min(1, { message: 'At least one artist is required' }),
   trackId: z
     .string()
-    .min(1, { message: 'Track is required' })
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid track ID format' }),
+    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid track ID format' })
+    .min(1, { message: 'Track is required' }),
   releaseId: z
     .string()
-    .min(1, { message: 'Release is required' })
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid release ID format' }),
+    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid release ID format' })
+    .min(1, { message: 'Release is required' }),
   groupId: z
     .string()
     .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid group ID format' })

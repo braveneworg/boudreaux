@@ -2,9 +2,7 @@
 
 import { useCallback, useState } from 'react';
 
-import Image from 'next/image';
-
-import { MediaPlayer } from '@/app/components/ui/audio/media-player';
+import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 
 interface FeaturedArtistsPlayerProps {
@@ -21,6 +19,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
+  const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -29,6 +28,13 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const handlePause = useCallback(() => {
     setIsPlaying(false);
   }, []);
+
+  /**
+   * Handle toggle play/pause from cover art click
+   */
+  const handleTogglePlay = useCallback(() => {
+    playerControls?.toggle();
+  }, [playerControls]);
 
   /**
    * Get the display name for a featured artist
@@ -195,18 +201,16 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           <div className="flex flex-col items-center">
             {/* Cover Art with Audio Controls beneath it */}
             <div className="w-full max-w-[333px]">
-              {/* Cover Art - only show if we have a valid image */}
-              {getCoverArt(selectedArtist) ? (
-                <div className="relative w-full aspect-square">
-                  <Image
-                    src={getCoverArt(selectedArtist)!}
-                    alt={getDisplayName(selectedArtist)}
-                    fill
-                    className="object-cover rounded-t-lg shadow-lg"
-                    sizes="(max-width: 640px) 100vw, 333px"
-                  />
-                </div>
-              ) : null}
+              {/* Interactive Cover Art - clickable with play/pause overlay */}
+              {getCoverArt(selectedArtist) && (
+                <MediaPlayer.InteractiveCoverArt
+                  src={getCoverArt(selectedArtist)!}
+                  alt={getDisplayName(selectedArtist)}
+                  isPlaying={isPlaying}
+                  onTogglePlay={handleTogglePlay}
+                  className="shadow-lg"
+                />
+              )}
 
               {/* Audio Controls - sits directly beneath the image */}
               {selectedArtist.track?.audioUrl && (
@@ -219,6 +223,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     onPreviousTrack={handlePreviousTrack}
                     onNextTrack={handleNextTrack}
                     autoPlay={shouldAutoPlay}
+                    controlsRef={setPlayerControls}
                   />
                 </div>
               )}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -36,6 +37,32 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   FeaturedArtistCarousel.displayName = 'FeaturedArtistCarousel';
   MockMediaPlayer.FeaturedArtistCarousel = FeaturedArtistCarousel;
 
+  const InteractiveCoverArt = ({
+    src,
+    alt,
+    isPlaying,
+    onTogglePlay,
+  }: {
+    src: string;
+    alt: string;
+    isPlaying: boolean;
+    onTogglePlay: () => void;
+    className?: string;
+  }) => (
+    <button
+      data-testid="interactive-cover-art"
+      data-src={src}
+      data-alt={alt}
+      data-is-playing={isPlaying?.toString()}
+      onClick={onTogglePlay}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} data-testid="cover-art-image" />
+    </button>
+  );
+  InteractiveCoverArt.displayName = 'InteractiveCoverArt';
+  MockMediaPlayer.InteractiveCoverArt = InteractiveCoverArt;
+
   const Controls = ({
     audioSrc,
     onPlay,
@@ -44,6 +71,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     onPreviousTrack,
     onNextTrack,
     autoPlay,
+    controlsRef,
   }: {
     audioSrc: string;
     onPlay?: () => void;
@@ -52,35 +80,54 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     onPreviousTrack?: (wasPlaying: boolean) => void;
     onNextTrack?: (wasPlaying: boolean) => void;
     autoPlay?: boolean;
-  }) => (
-    <div
-      data-testid="media-controls"
-      data-audio-src={audioSrc}
-      data-auto-play={autoPlay?.toString()}
-    >
-      <button data-testid="play-button" onClick={onPlay}>
-        Play
-      </button>
-      <button data-testid="pause-button" onClick={onPause}>
-        Pause
-      </button>
-      <button data-testid="ended-trigger" onClick={onEnded}>
-        Ended
-      </button>
-      <button data-testid="previous-track-button" onClick={() => onPreviousTrack?.(true)}>
-        Previous (playing)
-      </button>
-      <button data-testid="previous-track-paused-button" onClick={() => onPreviousTrack?.(false)}>
-        Previous (paused)
-      </button>
-      <button data-testid="next-track-button" onClick={() => onNextTrack?.(true)}>
-        Next (playing)
-      </button>
-      <button data-testid="next-track-paused-button" onClick={() => onNextTrack?.(false)}>
-        Next (paused)
-      </button>
-    </div>
-  );
+    controlsRef?: (
+      controls: { play: () => void; pause: () => void; toggle: () => void } | null
+    ) => void;
+  }) => {
+    // Call controlsRef on mount with mock controls using useEffect to prevent infinite loops
+    useEffect(() => {
+      if (controlsRef) {
+        controlsRef({
+          play: () => onPlay?.(),
+          pause: () => onPause?.(),
+          toggle: () => {},
+        });
+      }
+      return () => {
+        controlsRef?.(null);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return (
+      <div
+        data-testid="media-controls"
+        data-audio-src={audioSrc}
+        data-auto-play={autoPlay?.toString()}
+      >
+        <button data-testid="play-button" onClick={onPlay}>
+          Play
+        </button>
+        <button data-testid="pause-button" onClick={onPause}>
+          Pause
+        </button>
+        <button data-testid="ended-trigger" onClick={onEnded}>
+          Ended
+        </button>
+        <button data-testid="previous-track-button" onClick={() => onPreviousTrack?.(true)}>
+          Previous (playing)
+        </button>
+        <button data-testid="previous-track-paused-button" onClick={() => onPreviousTrack?.(false)}>
+          Previous (paused)
+        </button>
+        <button data-testid="next-track-button" onClick={() => onNextTrack?.(true)}>
+          Next (playing)
+        </button>
+        <button data-testid="next-track-paused-button" onClick={() => onNextTrack?.(false)}>
+          Next (paused)
+        </button>
+      </div>
+    );
+  };
   Controls.displayName = 'Controls';
   MockMediaPlayer.Controls = Controls;
 
