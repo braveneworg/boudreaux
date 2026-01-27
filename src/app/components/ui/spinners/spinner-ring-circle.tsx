@@ -30,8 +30,7 @@ const spinnerRingCircleVariants = cva(
 );
 
 export interface SpinnerRingCircleProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof spinnerRingCircleVariants> {}
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof spinnerRingCircleVariants> {}
 
 const SpinnerRingCircle = ({
   className,

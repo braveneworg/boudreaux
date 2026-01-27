@@ -12,13 +12,10 @@ const TurnstileWidget = ({
   setIsVerified: (isVerified: boolean) => void;
 }) => {
   const turnstile = useTurnstile();
-
-  const getSiteKey = () => {
-    if (process.env.NODE_ENV === 'production') {
-      return process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!;
-    }
-    return process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY!;
-  };
+  const siteKey =
+    process.env.NODE_ENV === 'production'
+      ? process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!
+      : process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY!;
 
   const handleReset = () => {
     turnstile.reset();
@@ -34,7 +31,7 @@ const TurnstileWidget = ({
         onVerify={() => {
           setIsVerified(true);
         }}
-        sitekey={getSiteKey()}
+        sitekey={siteKey}
         theme="light"
         size="flexible"
         className="max-w-full mt-3 mb-0"
