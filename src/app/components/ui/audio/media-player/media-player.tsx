@@ -915,7 +915,7 @@ const TrackListDrawer = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
                       className={`text-sm font-medium w-6 shrink-0 text-right ${
-                        isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                        isCurrentTrack ? '!text-zinc-50' : 'text-zinc-500 dark:text-zinc-500'
                       }`}
                     >
                       {index + 1}.
@@ -923,7 +923,7 @@ const TrackListDrawer = ({
                     <span
                       className={`text-sm truncate ${
                         isCurrentTrack
-                          ? 'font-semibold text-zinc-50!'
+                          ? 'font-semibold !text-zinc-50'
                           : 'text-zinc-500 dark:text-zinc-500'
                       }`}
                     >
@@ -932,7 +932,7 @@ const TrackListDrawer = ({
                   </div>
                   <span
                     className={`text-sm shrink-0 font-mono ${
-                      isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                      isCurrentTrack ? '!text-zinc-50' : 'text-zinc-500 dark:text-zinc-600'
                     }`}
                   >
                     {formatDuration(track.duration)}
