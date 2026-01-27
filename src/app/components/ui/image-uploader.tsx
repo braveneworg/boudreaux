@@ -491,7 +491,7 @@ export const ImageUploader = ({
           <SortableContext items={images.map((i) => i.id)} strategy={rectSortingStrategy}>
             <div
               className={cn(
-                'grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6',
+                'grid grid-cols-3 gap-2 p-1 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6',
                 isReordering && 'pointer-events-none opacity-50'
               )}
             >

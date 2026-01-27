@@ -297,9 +297,9 @@ model Artist {
   artistFeaturedArtists ArtistFeaturedArtist[]
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
+  trackArtists          TrackArtist[]
   track                 Track?                 @relation(fields: [trackId], references: [id])
   trackId               String?                @db.ObjectId
-  trackArtists          TrackArtist[]
 
   @@index([isActive])
   @@index([firstName, surname])
