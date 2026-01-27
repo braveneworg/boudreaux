@@ -651,7 +651,7 @@ describe('MediaPlayer', () => {
       );
 
       // The current track should have the highlight class
-      const highlightedItem = container.querySelector('.bg-zinc-100');
+      const highlightedItem = container.querySelector('.bg-zinc-800');
       expect(highlightedItem).toBeInTheDocument();
     });
   });

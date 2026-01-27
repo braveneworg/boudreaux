@@ -907,28 +907,34 @@ const TrackListDrawer = ({
                   key={track.id}
                   className={`flex items-center justify-between gap-4 p-3 rounded-lg transition-colors ${
                     isCurrentTrack
-                      ? 'bg-zinc-100 dark:bg-zinc-800'
+                      ? 'bg-zinc-800 text-zinc-50'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
                   } ${onTrackSelect ? 'cursor-pointer' : ''}`}
                   onClick={() => onTrackSelect?.(track.id)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
-                      className={`text-sm font-medium ${
-                        isCurrentTrack ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-700'
-                      } w-6 shrink-0 text-right`}
+                      className={`text-sm font-medium w-6 shrink-0 text-right ${
+                        isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
                     >
                       {index + 1}.
                     </span>
                     <span
-                      className={`text-sm ${
-                        isCurrentTrack ? 'font-semibold text-zinc-900' : 'text-zinc-700'
-                      } truncate`}
+                      className={`text-sm truncate ${
+                        isCurrentTrack
+                          ? 'font-semibold text-zinc-50!'
+                          : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
                     >
                       {track.title}
                     </span>
                   </div>
-                  <span className="text-sm text-zinc-600 dark:text-zinc-500 shrink-0 font-mono">
+                  <span
+                    className={`text-sm shrink-0 font-mono ${
+                      isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                    }`}
+                  >
                     {formatDuration(track.duration)}
                   </span>
                 </li>
