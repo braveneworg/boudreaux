@@ -464,6 +464,8 @@ describe('MediaPlayer', () => {
       const featuredArtist = createMockFeaturedArtist({
         track: track1,
         release: mockRelease,
+        // Include an artist so TrackListDrawer is shown (requires primaryArtist)
+        artists: [{ id: 'artist-1', firstName: 'Test', surname: 'Artist', displayName: null }],
       });
 
       render(
