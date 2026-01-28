@@ -30,7 +30,7 @@ export const changeUsernameAction = async (
       const session = await auth();
 
       if (!session?.user?.id) {
-        throw new Error('You must be logged in to change your username');
+        throw Error('You must be logged in to change your username');
       }
 
       const adapter = CustomPrismaAdapter(prisma);

@@ -95,7 +95,7 @@ describe('console-logger', () => {
     });
 
     it('should handle Error objects', () => {
-      const testError = new Error('Test error');
+      const testError = Error('Test error');
 
       log(LogMethods.Error, testError);
 
@@ -182,7 +182,7 @@ describe('console-logger', () => {
     });
 
     it('should handle Error objects', () => {
-      const err = new Error('Test error');
+      const err = Error('Test error');
       error(err);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(err);
@@ -257,7 +257,7 @@ describe('console-logger', () => {
 
     it('should work in try-catch blocks', () => {
       try {
-        throw new Error('Test error');
+        throw Error('Test error');
       } catch (err) {
         error('Caught error:', err);
       }

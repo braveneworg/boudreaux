@@ -105,7 +105,7 @@ export async function withRetry<T>(
     try {
       return await operation();
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      lastError = error instanceof Error ? error : Error(String(error));
 
       // Don't retry on last attempt
       if (attempt === maxRetries) {
@@ -123,7 +123,7 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError || new Error('Operation failed after retries');
+  throw lastError || Error('Operation failed after retries');
 }
 
 /**

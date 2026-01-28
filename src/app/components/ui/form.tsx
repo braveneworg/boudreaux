@@ -48,17 +48,17 @@ const useFormField = () => {
   const formContext = useFormContext();
 
   if (!formContext) {
-    throw new Error('useFormField should be used within a FormProvider (Form)');
+    throw Error('useFormField should be used within a FormProvider (Form)');
   }
 
   if (!fieldContext) {
-    throw new Error('useFormField should be used within <FormField>');
+    throw Error('useFormField should be used within <FormField>');
   }
 
   const { getFieldState, control } = formContext;
 
   if (!control) {
-    throw new Error('Form control is undefined. Ensure the form is properly initialized.');
+    throw Error('Form control is undefined. Ensure the form is properly initialized.');
   }
 
   const formState = useFormState({ control });

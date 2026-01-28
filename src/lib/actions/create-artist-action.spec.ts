@@ -52,7 +52,7 @@ describe('createArtistAction', () => {
 
   describe('Authorization', () => {
     it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
 
       await expect(createArtistAction(initialFormState, mockFormData)).rejects.toThrow(
         'Unauthorized'
@@ -437,9 +437,7 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      vi.mocked(ArtistService.createArtist).mockRejectedValue(
-        new Error('Unexpected database error')
-      );
+      vi.mocked(ArtistService.createArtist).mockRejectedValue(Error('Unexpected database error'));
 
       const result = await createArtistAction(initialFormState, mockFormData);
 
@@ -466,7 +464,7 @@ describe('createArtistAction', () => {
       } as never);
 
       vi.mocked(logSecurityEvent).mockImplementation(() => {
-        throw new Error('Logging failed');
+        throw Error('Logging failed');
       });
 
       const result = await createArtistAction(initialFormState, mockFormData);

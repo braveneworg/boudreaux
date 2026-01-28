@@ -283,7 +283,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle timeout errors with ETIMEOUT in message', async () => {
-      const timeoutError = new Error('Connection ETIMEOUT');
+      const timeoutError = Error('Connection ETIMEOUT');
       vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
@@ -294,7 +294,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle timeout errors with "timeout" in message', async () => {
-      const timeoutError = new Error('Connection timeout exceeded');
+      const timeoutError = Error('Connection timeout exceeded');
       vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
@@ -305,7 +305,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle timeout errors with "timed out" in message', async () => {
-      const timeoutError = new Error('Operation timed out');
+      const timeoutError = Error('Operation timed out');
       vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
@@ -316,7 +316,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle timeout errors with ETIMEOUT error code', async () => {
-      const timeoutError = Object.assign(new Error('Network timeout'), { code: 'ETIMEOUT' });
+      const timeoutError = Object.assign(Error('Network timeout'), { code: 'ETIMEOUT' });
       vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
@@ -356,7 +356,7 @@ describe('changeUsernameAction', () => {
     });
 
     it('should handle general errors', async () => {
-      const generalError = new Error('Something went wrong');
+      const generalError = Error('Something went wrong');
       vi.mocked(mockUpdateUser).mockRejectedValue(generalError);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);

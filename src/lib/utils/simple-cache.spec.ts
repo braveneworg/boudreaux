@@ -150,7 +150,7 @@ describe('SimpleCache', () => {
 
     it('should handle async errors', async () => {
       const fn = async () => {
-        throw new Error('Test error');
+        throw Error('Test error');
       };
 
       await expect(withCache('error-key', fn, 60)).rejects.toThrow('Test error');

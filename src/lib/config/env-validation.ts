@@ -25,7 +25,7 @@ export function validateEnvironment() {
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    throw new Error(
+    throw Error(
       `Missing required environment variables: ${missing.join(', ')}\n` +
         'Please check your environment configuration and ensure all required variables are set.'
     );
@@ -33,7 +33,7 @@ export function validateEnvironment() {
 
   // Validate AUTH_SECRET length
   if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
-    throw new Error('AUTH_SECRET must be at least 32 characters for security');
+    throw Error('AUTH_SECRET must be at least 32 characters for security');
   }
 
   // Validate DATABASE_URL format (basic check)
@@ -45,7 +45,7 @@ export function validateEnvironment() {
   if (process.env.EMAIL_SERVER_PORT) {
     const port = Number(process.env.EMAIL_SERVER_PORT);
     if (isNaN(port) || port < 1 || port > 65535) {
-      throw new Error('EMAIL_SERVER_PORT must be a valid port number (1-65535)');
+      throw Error('EMAIL_SERVER_PORT must be a valid port number (1-65535)');
     }
   }
 

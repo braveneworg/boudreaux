@@ -285,7 +285,7 @@ describe('middleware', () => {
 
   describe('error handling', () => {
     it('should handle getToken errors gracefully', async () => {
-      mockGetToken.mockRejectedValue(new Error('Token error'));
+      mockGetToken.mockRejectedValue(Error('Token error'));
       const request = createMockRequest('/profile');
 
       // Middleware should handle the error and redirect to signin

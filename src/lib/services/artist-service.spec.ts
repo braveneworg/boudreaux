@@ -121,7 +121,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.create).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.create).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.createArtist(createInput);
 
@@ -176,7 +176,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtistById('artist-123');
 
@@ -224,7 +224,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
@@ -373,7 +373,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.findMany).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtists();
 
@@ -448,7 +448,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.update).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
@@ -500,7 +500,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.delete).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.delete).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.deleteArtist('artist-123');
 
@@ -556,7 +556,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.update).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.archiveArtist('artist-123');
 

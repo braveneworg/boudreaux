@@ -36,7 +36,7 @@ export function rateLimit(options: RateLimitOptions) {
         const currentUsage = tokenCount[0];
         const isRateLimited = currentUsage > limit;
 
-        return isRateLimited ? reject(new Error('Rate limit exceeded')) : resolve();
+        return isRateLimited ? reject(Error('Rate limit exceeded')) : resolve();
       }),
   };
 }

@@ -634,7 +634,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(new Error('Database connection failed'));
+      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(Error('Database connection failed'));
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
@@ -674,7 +674,7 @@ describe('updateProfileAction', () => {
         user: { id: 'user-123' },
       });
 
-      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(new Error('Update failed'));
+      vi.mocked(mockPrismaUserUpdate).mockRejectedValue(Error('Update failed'));
 
       await updateProfileAction(mockInitialState, mockFormData);
 
