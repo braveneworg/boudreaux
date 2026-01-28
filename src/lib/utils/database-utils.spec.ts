@@ -51,7 +51,7 @@ describe('Database Utils', () => {
 
     it('should return unhealthy status when database connection fails', async () => {
       const errorMessage = 'Connection timeout';
-      mockedPrisma.$runCommandRaw.mockRejectedValue(new Error(errorMessage));
+      mockedPrisma.$runCommandRaw.mockRejectedValue(Error(errorMessage));
 
       const result = await checkDatabaseHealth();
 
@@ -92,7 +92,7 @@ describe('Database Utils', () => {
     it('should retry on retryable errors', async () => {
       const operation = vi
         .fn()
-        .mockRejectedValueOnce(new Error('ETIMEOUT'))
+        .mockRejectedValueOnce(Error('ETIMEOUT'))
         .mockResolvedValue('success');
 
       const result = await withRetry(operation, {
@@ -105,7 +105,7 @@ describe('Database Utils', () => {
     });
 
     it('should retry up to maxRetries times', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('timeout'));
+      const operation = vi.fn().mockRejectedValue(Error('timeout'));
 
       await expect(withRetry(operation, { maxRetries: 3, initialDelay: 0 })).rejects.toThrow(
         'timeout'
@@ -115,7 +115,7 @@ describe('Database Utils', () => {
     });
 
     it('should use exponential backoff', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
+      const operation = vi.fn().mockRejectedValue(Error('ECONNRESET'));
       const delays: number[] = [];
       const originalSetTimeout = global.setTimeout;
 
@@ -141,7 +141,7 @@ describe('Database Utils', () => {
     });
 
     it('should respect maxDelay', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('timeout'));
+      const operation = vi.fn().mockRejectedValue(Error('timeout'));
       const delays: number[] = [];
       const originalSetTimeout = global.setTimeout;
 
@@ -167,7 +167,7 @@ describe('Database Utils', () => {
     });
 
     it('should not retry non-retryable errors', async () => {
-      const operation = vi.fn().mockRejectedValue(new Error('Invalid data'));
+      const operation = vi.fn().mockRejectedValue(Error('Invalid data'));
 
       await expect(withRetry(operation, { maxRetries: 3, initialDelay: 0 })).rejects.toThrow(
         'Invalid data'
@@ -189,7 +189,7 @@ describe('Database Utils', () => {
       for (const errorMsg of retryableErrors) {
         const operation = vi
           .fn()
-          .mockRejectedValueOnce(new Error(errorMsg))
+          .mockRejectedValueOnce(Error(errorMsg))
           .mockResolvedValue('success');
 
         const result = await withRetry(operation, { maxRetries: 2, initialDelay: 0 });
@@ -218,7 +218,7 @@ describe('Database Utils', () => {
     it('should use default options when not provided', async () => {
       const operation = vi
         .fn()
-        .mockRejectedValueOnce(new Error('timeout'))
+        .mockRejectedValueOnce(Error('timeout'))
         .mockResolvedValue('success');
 
       const result = await withRetry(operation);
@@ -229,8 +229,8 @@ describe('Database Utils', () => {
     it('should handle case-insensitive error messages', async () => {
       const operation = vi
         .fn()
-        .mockRejectedValueOnce(new Error('TIMEOUT ERROR'))
-        .mockRejectedValueOnce(new Error('Connection Failed'))
+        .mockRejectedValueOnce(Error('TIMEOUT ERROR'))
+        .mockRejectedValueOnce(Error('Connection Failed'))
         .mockResolvedValue('success');
 
       const result = await withRetry(operation, {
@@ -243,11 +243,11 @@ describe('Database Utils', () => {
     });
 
     it('should throw last error when all retries exhausted', async () => {
-      const lastError = new Error('Final timeout error');
+      const lastError = Error('Final timeout error');
       const operation = vi
         .fn()
-        .mockRejectedValueOnce(new Error('First timeout'))
-        .mockRejectedValueOnce(new Error('Second timeout'))
+        .mockRejectedValueOnce(Error('First timeout'))
+        .mockRejectedValueOnce(Error('Second timeout'))
         .mockRejectedValue(lastError);
 
       await expect(withRetry(operation, { maxRetries: 2, initialDelay: 0 })).rejects.toThrow(

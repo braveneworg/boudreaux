@@ -165,7 +165,7 @@ describe('CustomPrismaAdapter', () => {
         username: 'testuser',
       };
 
-      const dbError = new Error('Database connection failed');
+      const dbError = Error('Database connection failed');
       mockPrisma.user.create.mockRejectedValue(dbError);
 
       await expect(adapter.createUser(userData)).rejects.toThrow('Database connection failed');
@@ -358,7 +358,7 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should handle database errors during user fetch', async () => {
-      const dbError = new Error('Database timeout');
+      const dbError = Error('Database timeout');
       mockPrisma.user.findUnique.mockRejectedValue(dbError);
 
       await expect(adapter.getUser('1')).rejects.toThrow('Database timeout');
@@ -657,7 +657,7 @@ describe('CustomPrismaAdapter', () => {
         name: 'Updated Name',
       };
 
-      const dbError = new Error('User not found');
+      const dbError = Error('User not found');
       mockPrisma.user.update.mockRejectedValue(dbError);
 
       await expect(adapter.updateUser(updateData)).rejects.toThrow('User not found');

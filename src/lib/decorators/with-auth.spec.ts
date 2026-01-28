@@ -96,7 +96,7 @@ describe('withAuth decorator', () => {
     });
 
     it('should return 401 when auth throws an error', async () => {
-      mockAuth.mockRejectedValue(new Error('Auth error'));
+      mockAuth.mockRejectedValue(Error('Auth error'));
 
       const mockHandler = createMockHandler();
       const wrappedHandler = withAuth(mockHandler);
@@ -379,7 +379,7 @@ describe('withAdmin decorator', () => {
 
   describe('auth error handling', () => {
     it('should return 403 when auth throws an error', async () => {
-      mockAuth.mockRejectedValue(new Error('Auth error'));
+      mockAuth.mockRejectedValue(Error('Auth error'));
 
       const mockHandler = createMockHandler();
       const wrappedHandler = await withAdmin(mockHandler);

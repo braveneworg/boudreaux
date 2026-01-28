@@ -183,7 +183,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(ArtistService.getArtists).mockRejectedValue(new Error('Unexpected error'));
+      vi.mocked(ArtistService.getArtists).mockRejectedValue(Error('Unexpected error'));
 
       const request = new NextRequest('http://localhost:3000/api/artist');
       const response = await GET(request);
@@ -358,7 +358,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(ArtistService.createArtist).mockRejectedValue(new Error('Unexpected error'));
+      vi.mocked(ArtistService.createArtist).mockRejectedValue(Error('Unexpected error'));
 
       const request = new NextRequest('http://localhost:3000/api/artist', {
         method: 'POST',

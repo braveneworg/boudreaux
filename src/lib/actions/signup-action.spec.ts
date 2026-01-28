@@ -134,7 +134,7 @@ describe('signupAction', () => {
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
@@ -240,7 +240,7 @@ describe('signupAction', () => {
       mockAdapter.createUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
@@ -428,7 +428,7 @@ describe('signupAction', () => {
     });
 
     it('should handle timeout errors', async () => {
-      const timeoutError = new Error('Connection ETIMEOUT');
+      const timeoutError = Error('Connection ETIMEOUT');
       mockAdapter.createUser.mockRejectedValue(timeoutError);
 
       const result = await signupAction(mockInitialState, mockFormData);
@@ -439,7 +439,7 @@ describe('signupAction', () => {
     });
 
     it('should handle timeout errors when formState.errors is undefined', async () => {
-      const timeoutError = new Error('timeout exceeded');
+      const timeoutError = Error('timeout exceeded');
 
       const mockFormState: FormState = {
         fields: { email: 'test@example.com', termsAndConditions: true },
@@ -470,9 +470,9 @@ describe('signupAction', () => {
 
     it('should handle various timeout error formats', async () => {
       const timeoutErrors = [
-        new Error('timeout exceeded'),
-        new Error('operation timed out'),
-        Object.assign(new Error('Network timeout'), { code: 'ETIMEOUT' }),
+        Error('timeout exceeded'),
+        Error('operation timed out'),
+        Object.assign(Error('Network timeout'), { code: 'ETIMEOUT' }),
       ];
 
       for (const error of timeoutErrors) {
@@ -516,7 +516,7 @@ describe('signupAction', () => {
     });
 
     it('should handle general errors', async () => {
-      const generalError = new Error('Something went wrong');
+      const generalError = Error('Something went wrong');
       mockAdapter.createUser.mockRejectedValue(generalError);
 
       const result = await signupAction(mockInitialState, mockFormData);
@@ -546,7 +546,7 @@ describe('signupAction', () => {
       });
 
       mockAdapter.createUser.mockResolvedValue({ id: '1' });
-      vi.mocked(mockSignIn).mockRejectedValue(new Error('SignIn failed'));
+      vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {

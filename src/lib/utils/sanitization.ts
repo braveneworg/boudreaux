@@ -68,7 +68,7 @@ export function sanitizeUrl(url: string): string {
     const parsed = new URL(url);
     // Only allow http and https protocols
     if (!['http:', 'https:'].includes(parsed.protocol)) {
-      throw new Error('Invalid protocol');
+      throw Error('Invalid protocol');
     }
     return parsed.toString();
   } catch {

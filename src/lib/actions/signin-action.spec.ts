@@ -102,7 +102,7 @@ describe('signinAction', () => {
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
@@ -221,7 +221,7 @@ describe('signinAction', () => {
 
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
@@ -300,7 +300,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue(new Error('SignIn failed'));
+      vi.mocked(mockSignIn).mockRejectedValue(Error('SignIn failed'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {
@@ -334,7 +334,7 @@ describe('signinAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockSignIn).mockRejectedValue(new Error('Network failure'));
+      vi.mocked(mockSignIn).mockRejectedValue(Error('Network failure'));
 
       // Set up redirect mock to NOT throw for error test
       mockRedirect.mockImplementation(() => {
@@ -368,7 +368,7 @@ describe('signinAction', () => {
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       // This will throw due to redirect, but we expect it
@@ -481,7 +481,7 @@ describe('signinAction', () => {
 
       // Set up redirect mock to throw NEXT_REDIRECT error
       mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT');
+        throw Error('NEXT_REDIRECT');
       });
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
