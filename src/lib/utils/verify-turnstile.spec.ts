@@ -173,7 +173,7 @@ describe('verifyTurnstile', () => {
     it('should return error when JSON parsing fails', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.reject(Error('Invalid JSON')),
+        json: () => Promise.reject(new Error('Invalid JSON')),
       });
 
       const result = await verifyTurnstile('valid-token', '127.0.0.1');
