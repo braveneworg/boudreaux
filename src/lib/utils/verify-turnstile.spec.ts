@@ -150,7 +150,7 @@ describe('verifyTurnstile', () => {
 
   describe('network errors', () => {
     it('should return error when fetch fails', async () => {
-      mockFetch.mockRejectedValue(Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       const result = await verifyTurnstile('valid-token', '127.0.0.1');
 
