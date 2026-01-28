@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo "🔍 Running TypeScript type-check before push..."
+
+# Run TypeScript type-check on the entire project
+npx tsc --noEmit
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ TypeScript type-check failed. Please fix type errors before pushing."
+  echo "   Run 'npx tsc --noEmit' to see all errors."
+  exit 1
+fi
+
+echo "✅ TypeScript type-check passed"
+echo "🚀 Pushing changes..."
