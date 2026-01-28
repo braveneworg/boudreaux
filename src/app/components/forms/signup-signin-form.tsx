@@ -30,6 +30,7 @@ interface SignupSigninFormProps {
   isPending: boolean;
   isVerified: boolean;
   setIsVerified: (isVerified: boolean) => void;
+  onTurnstileToken?: (token: string) => void;
   state: FormState;
 }
 
@@ -39,6 +40,7 @@ const SignupSigninForm = ({
   isPending,
   isVerified,
   setIsVerified,
+  onTurnstileToken,
   state,
 }: SignupSigninFormProps) => {
   const pathName = usePathname();
@@ -108,7 +110,11 @@ const SignupSigninForm = ({
           )}
         </>
       )}
-      <TurnstileWidget isVerified={isVerified} setIsVerified={setIsVerified} />
+      <TurnstileWidget
+        isVerified={isVerified}
+        setIsVerified={setIsVerified}
+        onToken={onTurnstileToken}
+      />
       <div className="flex items-center gap-3 mt-4">
         {!isVerified && <Skeleton className="h-10 w-24" />}
         {isVerified && (

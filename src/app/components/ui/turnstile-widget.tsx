@@ -7,9 +7,11 @@ import Turnstile, { useTurnstile } from 'react-turnstile';
 const TurnstileWidget = ({
   isVerified: _isVerified,
   setIsVerified,
+  onToken,
 }: {
   isVerified: boolean;
   setIsVerified: (isVerified: boolean) => void;
+  onToken?: (token: string) => void;
 }) => {
   const turnstile = useTurnstile();
   const siteKey =
@@ -28,8 +30,9 @@ const TurnstileWidget = ({
         onError={handleReset}
         onExpire={handleReset}
         onTimeout={handleReset}
-        onVerify={() => {
+        onVerify={(token) => {
           setIsVerified(true);
+          onToken?.(token);
         }}
         sitekey={siteKey}
         theme="light"

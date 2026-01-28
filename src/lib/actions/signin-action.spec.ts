@@ -12,6 +12,7 @@ const mockHeaders = vi.hoisted(() =>
     get: vi.fn(() => '127.0.0.1'),
   }))
 );
+const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -26,6 +27,11 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: vi.fn(() => ({
     check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
   })),
+}));
+
+// Mock Turnstile verification
+vi.mock('@/lib/utils/verify-turnstile', () => ({
+  verifyTurnstile: mockVerifyTurnstile,
 }));
 
 // Mock dependencies
@@ -69,6 +75,9 @@ describe('signinAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFormData.set('email', 'test@example.com');
+    mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
+    // Default to passing Turnstile verification
+    mockVerifyTurnstile.mockResolvedValue({ success: true });
   });
 
   describe('successful signin flow', () => {
@@ -161,6 +170,63 @@ describe('signinAction', () => {
         redirect: false,
         redirectTo: '/',
       });
+    });
+  });
+
+  describe('Turnstile verification', () => {
+    it('should return error when Turnstile token is missing', async () => {
+      const formDataWithoutToken = new FormData();
+      formDataWithoutToken.set('email', 'test@example.com');
+
+      const result = await signinAction(mockInitialState, formDataWithoutToken);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain(
+        'CAPTCHA verification required. Please complete the verification.'
+      );
+      expect(mockSignIn).not.toHaveBeenCalled();
+    });
+
+    it('should return error when Turnstile verification fails', async () => {
+      mockVerifyTurnstile.mockResolvedValue({
+        success: false,
+        error: 'Invalid token',
+      });
+
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('Invalid token');
+      expect(mockSignIn).not.toHaveBeenCalled();
+    });
+
+    it('should proceed when Turnstile verification succeeds', async () => {
+      mockVerifyTurnstile.mockResolvedValue({ success: true });
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', '127.0.0.1');
+      expect(mockSignIn).toHaveBeenCalled();
     });
   });
 
@@ -338,6 +404,9 @@ describe('signinAction', () => {
 
     it('should handle empty form data gracefully', async () => {
       const emptyFormData = new FormData();
+      // Add turnstile token to pass CAPTCHA check
+      emptyFormData.set('cf-turnstile-response', 'test-turnstile-token');
+
       const mockFormState: FormState = {
         fields: {},
         success: false,

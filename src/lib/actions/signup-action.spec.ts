@@ -15,6 +15,7 @@ const mockHeaders = vi.hoisted(() =>
     get: vi.fn(() => '127.0.0.1'),
   }))
 );
+const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -29,6 +30,11 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: vi.fn(() => ({
     check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
   })),
+}));
+
+// Mock Turnstile verification
+vi.mock('@/lib/utils/verify-turnstile', () => ({
+  verifyTurnstile: mockVerifyTurnstile,
 }));
 
 // Mock email security
@@ -93,9 +99,12 @@ describe('signupAction', () => {
     vi.clearAllMocks();
     mockFormData.set('email', 'test@example.com');
     mockFormData.set('termsAndConditions', 'true');
+    mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
 
     vi.mocked(CustomPrismaAdapter).mockReturnValue(mockAdapter);
     vi.mocked(mockGenerateUsername).mockReturnValue('test-user-1234');
+    // Default to passing Turnstile verification
+    mockVerifyTurnstile.mockResolvedValue({ success: true });
   });
 
   describe('successful signup flow', () => {
@@ -177,6 +186,66 @@ describe('signupAction', () => {
           username: 'test-user-1234',
         })
       );
+    });
+  });
+
+  describe('Turnstile verification', () => {
+    it('should return error when Turnstile token is missing', async () => {
+      const formDataWithoutToken = new FormData();
+      formDataWithoutToken.set('email', 'test@example.com');
+      formDataWithoutToken.set('termsAndConditions', 'true');
+
+      const result = await signupAction(mockInitialState, formDataWithoutToken);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain(
+        'CAPTCHA verification required. Please complete the verification.'
+      );
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it('should return error when Turnstile verification fails', async () => {
+      mockVerifyTurnstile.mockResolvedValue({
+        success: false,
+        error: 'Invalid token',
+      });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('Invalid token');
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it('should proceed when Turnstile verification succeeds', async () => {
+      mockVerifyTurnstile.mockResolvedValue({ success: true });
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com', termsAndConditions: true },
+        success: false,
+        hasTimeout: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com', termsAndConditions: true },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      mockAdapter.createUser.mockResolvedValue({ id: '1', username: 'test-user-1234' });
+      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
+      });
+
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', '127.0.0.1');
+      expect(mockAdapter.createUser).toHaveBeenCalled();
     });
   });
 
