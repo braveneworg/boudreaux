@@ -6,6 +6,14 @@ import { useTurnstile } from 'react-turnstile';
 
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 
+// Store callbacks for testing
+let mockCallbacks: {
+  onVerify?: (token: string) => void;
+  onError?: () => void;
+  onExpire?: () => void;
+  onTimeout?: () => void;
+} = {};
+
 // Mock react-turnstile
 vi.mock('react-turnstile', () => ({
   default: ({
@@ -20,15 +28,16 @@ vi.mock('react-turnstile', () => ({
     onExpire?: () => void;
     onTimeout?: () => void;
     sitekey?: string;
-  }) =>
-    React.createElement('div', {
+  }) => {
+    // Store callbacks so tests can trigger them
+    mockCallbacks = { onVerify, onError, onExpire, onTimeout };
+
+    return React.createElement('div', {
       'data-testid': 'turnstile-widget',
       'data-sitekey': sitekey,
       onClick: () => onVerify?.('mock-token'),
-      'data-on-error': () => onError?.(),
-      'data-on-expire': () => onExpire?.(),
-      'data-on-timeout': () => onTimeout?.(),
-    }),
+    });
+  },
   useTurnstile: vi.fn(() => ({
     reset: vi.fn(),
   })),
@@ -203,6 +212,77 @@ describe('TurnstileWidget', () => {
       expect(mockSetIsVerified).toHaveBeenCalledTimes(2);
       expect(mockSetIsVerified).toHaveBeenNthCalledWith(1, true);
       expect(mockSetIsVerified).toHaveBeenNthCalledWith(2, true);
+    });
+
+    it('should call onToken callback with token when verification succeeds', async () => {
+      const mockOnToken = vi.fn();
+
+      render(<TurnstileWidget {...defaultProps} onToken={mockOnToken} />);
+
+      const widget = screen.getByTestId('turnstile-widget');
+      await userEvent.click(widget);
+
+      expect(mockOnToken).toHaveBeenCalledWith('mock-token');
+      expect(mockOnToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onToken with empty string when verification is reset on error', () => {
+      const mockOnToken = vi.fn();
+      const mockReset = vi.fn();
+      vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
+
+      render(<TurnstileWidget {...defaultProps} onToken={mockOnToken} />);
+
+      // Trigger error callback
+      mockCallbacks.onError?.();
+
+      expect(mockOnToken).toHaveBeenCalledWith('');
+      expect(mockSetIsVerified).toHaveBeenCalledWith(false);
+      expect(mockReset).toHaveBeenCalled();
+    });
+
+    it('should call onToken with empty string when verification expires', () => {
+      const mockOnToken = vi.fn();
+      const mockReset = vi.fn();
+      vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
+
+      render(<TurnstileWidget {...defaultProps} onToken={mockOnToken} />);
+
+      // Trigger expire callback
+      mockCallbacks.onExpire?.();
+
+      expect(mockOnToken).toHaveBeenCalledWith('');
+      expect(mockSetIsVerified).toHaveBeenCalledWith(false);
+      expect(mockReset).toHaveBeenCalled();
+    });
+
+    it('should call onToken with empty string when verification times out', () => {
+      const mockOnToken = vi.fn();
+      const mockReset = vi.fn();
+      vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
+
+      render(<TurnstileWidget {...defaultProps} onToken={mockOnToken} />);
+
+      // Trigger timeout callback
+      mockCallbacks.onTimeout?.();
+
+      expect(mockOnToken).toHaveBeenCalledWith('');
+      expect(mockSetIsVerified).toHaveBeenCalledWith(false);
+      expect(mockReset).toHaveBeenCalled();
+    });
+
+    it('should not throw when onToken is not provided and reset occurs', () => {
+      const mockReset = vi.fn();
+      vi.mocked(useTurnstile).mockReturnValue({ reset: mockReset });
+
+      render(<TurnstileWidget {...defaultProps} />);
+
+      expect(() => {
+        mockCallbacks.onError?.();
+      }).not.toThrow();
+
+      expect(mockSetIsVerified).toHaveBeenCalledWith(false);
+      expect(mockReset).toHaveBeenCalled();
     });
   });
 
