@@ -56,6 +56,7 @@ describe('TurnstileWidget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
+    mockCallbacks = {};
   });
 
   afterEach(() => {
