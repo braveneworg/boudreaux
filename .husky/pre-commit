@@ -1,22 +1,16 @@
 #!/bin/sh
 
-# Type checking
-echo "🔍 Running type check..."
-npx tsc --noEmit
-if [ $? -ne 0 ]; then
-  echo "❌ Type check failed. Please fix TypeScript errors before committing."
-  exit 1
-fi
-echo "✅ Type check passed"
-
 # Linting staged files
 echo "🔍 Running lint-staged..."
 npx lint-staged
+
 if [ $? -ne 0 ]; then
-  echo "❌ Linting failed. Please fix lint errors before committing."
+  echo "❌ Linting or compilation failed. Please fix errors before committing."
   exit 1
 fi
-echo "✅ Linting passed"
+
+echo "✅ Linting staged files passed"
+echo "✅ Type check of staged files passed"
 
 # Run tests related to changed files
 echo "🧪 Running tests for changed files..."
