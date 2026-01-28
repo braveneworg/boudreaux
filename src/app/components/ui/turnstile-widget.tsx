@@ -22,6 +22,7 @@ const TurnstileWidget = ({
   const handleReset = () => {
     turnstile.reset();
     setIsVerified(false);
+    onToken?.('');
   };
 
   return (
