@@ -17,7 +17,7 @@ Created `/src/lib/utils/verify-turnstile.ts`:
 ```typescript
 export async function verifyTurnstile(
   token: string,
-  remoteIp?: string
+  ip?: string
 ): Promise<TurnstileVerifyResult>;
 ```
 
