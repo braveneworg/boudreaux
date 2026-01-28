@@ -189,7 +189,6 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't skip Zod validation in Server Actions
 - Don't create new UI primitives (use shadcn/ui)
 - Never do the following code in tests: `import { describe, it, expect, vi } from 'vitest';` (assume they are globally available)
-- Never use new in before Error in typescript code (use Error('message') instead of new Error('message'))
 - Never create documentation from files that are not located in this repository
 - Never expose secrets or sensitive information in the codebase
 - Don't commit generated files or build artifacts
