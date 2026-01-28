@@ -32,6 +32,7 @@ const SignupPage = () => {
   // Cloudflare Turnstile verification
   const [isVerified, setIsVerified] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   const [state, setState] = useState<FormState>({
     errors: {},
@@ -68,6 +69,11 @@ const SignupPage = () => {
           }
         });
 
+        // Add Turnstile token for server-side verification
+        if (turnstileToken) {
+          formData.append('cf-turnstile-response', turnstileToken);
+        }
+
         const result = await (isSignupPath ? signupAction : signinAction)(state, formData);
 
         setState(result);
@@ -96,7 +102,7 @@ const SignupPage = () => {
         });
       }
     },
-    [isVerified, isSignupPath, state, form]
+    [isVerified, isSignupPath, state, form, turnstileToken]
   );
 
   return (
@@ -115,6 +121,7 @@ const SignupPage = () => {
                 isPending={isSubmitting}
                 isVerified={isVerified}
                 setIsVerified={setIsVerified}
+                onTurnstileToken={setTurnstileToken}
                 state={state}
                 hasTermsAndConditions={isSignupPath}
               />

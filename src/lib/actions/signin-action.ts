@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import getActionState from '@/lib/utils/auth/get-action-state';
 import { rateLimit } from '@/lib/utils/rate-limit';
+import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import signinSchema from '@/lib/validation/signin-schema';
 
 import { signIn } from '../../../auth';
@@ -31,6 +32,27 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
     return {
       success: false,
       errors: { general: ['Too many signin attempts. Please try again later.'] },
+      fields: {},
+    };
+  }
+
+  // Verify Turnstile token
+  const turnstileToken = payload.get('cf-turnstile-response') as string | null;
+  if (!turnstileToken) {
+    return {
+      success: false,
+      errors: { general: ['CAPTCHA verification required. Please complete the verification.'] },
+      fields: {},
+    };
+  }
+
+  const turnstileResult = await verifyTurnstile(turnstileToken, ip);
+  if (!turnstileResult.success) {
+    return {
+      success: false,
+      errors: {
+        general: [turnstileResult.error || 'CAPTCHA verification failed. Please try again.'],
+      },
       fields: {},
     };
   }

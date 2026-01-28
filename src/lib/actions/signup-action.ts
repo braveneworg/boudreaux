@@ -13,6 +13,7 @@ import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import getActionState from '@/lib/utils/auth/get-action-state';
 import { validateEmailSecurity } from '@/lib/utils/email-security';
 import { rateLimit } from '@/lib/utils/rate-limit';
+import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import signupSchema from '@/lib/validation/signup-schema';
 
 import { signIn } from '../../../auth';
@@ -40,6 +41,27 @@ export const signupAction = async (
     return {
       success: false,
       errors: { general: ['Too many signup attempts. Please try again later.'] },
+      fields: {},
+    };
+  }
+
+  // Verify Turnstile token
+  const turnstileToken = payload.get('cf-turnstile-response') as string | null;
+  if (!turnstileToken) {
+    return {
+      success: false,
+      errors: { general: ['CAPTCHA verification required. Please complete the verification.'] },
+      fields: {},
+    };
+  }
+
+  const turnstileResult = await verifyTurnstile(turnstileToken, ip);
+  if (!turnstileResult.success) {
+    return {
+      success: false,
+      errors: {
+        general: [turnstileResult.error || 'CAPTCHA verification failed. Please try again.'],
+      },
       fields: {},
     };
   }

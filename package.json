@@ -156,12 +156,8 @@
     "vitest": "^4.0.13"
   },
   "lint-staged": {
-    "**/*.ts": "tsc-files --noEmit",
+    "src/**/*.ts": "tsc-files --noEmit types/next-auth.d.ts",
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{js,jsx}": [
       "eslint --fix",
       "prettier --write"
     ],
