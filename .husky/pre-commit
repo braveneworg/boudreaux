@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# Linting staged files
+echo "🔍 Running lint-staged..."
+npx lint-staged
+
+if [ $? -ne 0 ]; then
+  echo "❌ Linting or compilation failed. Please fix errors before committing."
+  exit 1
+fi
+
+echo "✅ Linting staged files passed"
+echo "✅ Type check of staged files passed"
+
+# Run tests related to changed files
+echo "🧪 Running tests for changed files..."
+CHANGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' | grep -v '\.spec\.' | grep -v '\.test\.' | tr '\n' ' ')
+if [ -n "$CHANGED_FILES" ]; then
+  npx vitest run --related $CHANGED_FILES
+  if [ $? -ne 0 ]; then
+    echo "❌ Tests failed. Please fix failing tests before committing."
+    exit 1
+  fi
+  echo "✅ Related tests passed"
+else
+  echo "ℹ️  No source files changed, skipping tests"
+fi
+
+echo "🎉 Pre-commit checks complete!"
