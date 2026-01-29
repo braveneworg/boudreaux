@@ -98,6 +98,22 @@ export function NotificationBanner({ notifications, className }: NotificationBan
       onBlur={() => setIsPaused(false)}
       tabIndex={0}
     >
+      {/* Preload all images to prevent broken image icons when cycling */}
+      <div className="hidden" aria-hidden="true">
+        {notifications.map((notification, index) =>
+          notification.imageUrl ? (
+            <Image
+              key={notification.id}
+              src={notification.imageUrl}
+              alt=""
+              fill
+              sizes="100vw"
+              priority={index === 0}
+            />
+          ) : null
+        )}
+      </div>
+
       {/* Banner container with golden ratio height */}
       <div
         className="relative w-full"
@@ -120,7 +136,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
             aria-roledescription="slide"
             aria-label={`${currentIndex + 1} of ${totalNotifications}`}
           >
-            <BannerSlide notification={currentNotification} />
+            <BannerSlide notification={currentNotification} isFirst={currentIndex === 0} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -135,6 +151,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
 
 interface BannerSlideProps {
   notification: NotificationBannerType | undefined;
+  isFirst?: boolean;
 }
 
 /**
@@ -160,7 +177,7 @@ const hexToRgba = (hex: string, opacity: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
-function BannerSlide({ notification }: BannerSlideProps) {
+function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
   if (!notification) return null;
 
   const {
@@ -200,7 +217,14 @@ function BannerSlide({ notification }: BannerSlideProps) {
     >
       {/* Background image */}
       {hasImage && (
-        <Image src={imageUrl} alt={message} fill className="object-cover" priority sizes="100vw" />
+        <Image
+          src={imageUrl}
+          alt={message}
+          fill
+          className="object-cover"
+          priority={isFirst}
+          sizes="100vw"
+        />
       )}
 
       {/* Text overlay - matching the form preview styling */}

@@ -271,9 +271,11 @@ describe('NotificationBanner', () => {
     });
     render(<NotificationBanner notifications={[notification]} />);
 
-    const image = screen.getByTestId('banner-image');
-    expect(image).toHaveAttribute('src', 'https://example.com/banner.jpg');
-    expect(image).toHaveAttribute('alt', 'Banner with image');
+    // Find the visible image (not the preload image which has empty alt)
+    const images = screen.getAllByTestId('banner-image');
+    const visibleImage = images.find((img) => img.getAttribute('alt') === 'Banner with image');
+    expect(visibleImage).toHaveAttribute('src', 'https://example.com/banner.jpg');
+    expect(visibleImage).toHaveAttribute('alt', 'Banner with image');
   });
 
   it('renders link when linkUrl is provided', () => {
