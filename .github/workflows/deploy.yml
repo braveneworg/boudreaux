@@ -629,8 +629,7 @@ jobs:
           NEXT_APP_NGINX_IMAGE=${{ env.NGINX_IMAGE }}
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-          # Align secret names: ensure NEXTAUTH_URL exists; if older name used, set alias in repo settings
-          NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+          AUTH_URL=${{ secrets.AUTH_URL }}
           EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
           EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}
           EMAIL_SERVER_USER=${{ secrets.EMAIL_SERVER_USER }}

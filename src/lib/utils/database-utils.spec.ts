@@ -354,9 +354,9 @@ describe('Database Utils', () => {
       expect(result).toBe('http://localhost:3000');
     });
 
-    it('should use NEXTAUTH_URL on server-side in production', () => {
+    it('should use AUTH_URL on server-side in production', () => {
       vi.stubEnv('NODE_ENV', 'production');
-      vi.stubEnv('NEXTAUTH_URL', 'https://prod.example.com');
+      vi.stubEnv('AUTH_URL', 'https://prod.example.com');
       // Simulate server-side environment by setting window to undefined
       (global as { window?: Window & typeof globalThis }).window = undefined;
 
