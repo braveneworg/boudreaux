@@ -148,7 +148,7 @@ describe('ImageCropper', () => {
     it('displays tip about dragging corners and edges', () => {
       render(<ImageCropper {...defaultProps} />);
 
-      expect(screen.getByText(/drag the corners or edges/i)).toBeInTheDocument();
+      expect(screen.getByText(/Drag the top or bottom edges/i)).toBeInTheDocument();
     });
   });
 
@@ -319,7 +319,7 @@ describe('ImageCropper', () => {
 
       // Crop tip should be visible
       await waitFor(() => {
-        expect(screen.getByText(/drag the corners or edges/i)).toBeInTheDocument();
+        expect(screen.getByText(/Drag the top or bottom edges/i)).toBeInTheDocument();
       });
     });
 
