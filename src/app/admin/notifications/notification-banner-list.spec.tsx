@@ -13,6 +13,7 @@ import { NotificationBannerList } from './notification-banner-list';
 
 // Mock next/navigation
 const mockPush = vi.fn();
+
 const mockRefresh = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
