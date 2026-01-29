@@ -205,6 +205,7 @@ const createFeaturedArtists = async (count: number) => {
 /**
  * Create notification banners with various configurations
  * Dates are set dynamically relative to current time so they display when seeded
+ * Mix of solid color backgrounds and image backgrounds
  */
 const createNotifications = async (adminUserId: string) => {
   // Delete existing notifications first (so we get fresh dates on re-seed)
@@ -213,39 +214,47 @@ const createNotifications = async (adminUserId: string) => {
   const now = new Date();
 
   // Sample notification data with different configurations
+  // Mix of solid backgrounds and image backgrounds using picsum.photos
   const notifications = [
     {
+      // Banner with background IMAGE
       message: 'Welcome to Brave New Org',
       secondaryMessage: 'Discover new music from independent artists',
-      notes: 'Main welcome banner',
-      backgroundColor: '#1a1a2e',
+      notes: 'Main welcome banner with concert image',
+      imageUrl: 'https://picsum.photos/seed/concert/1920/1080',
+      originalImageUrl: 'https://picsum.photos/seed/concert/1920/1080',
+      backgroundColor: null,
       isOverlayed: true,
       messageFont: 'system-ui',
       messageFontSize: 3.0,
       messageContrast: 100,
       messageTextColor: '#ffffff',
       messageTextShadow: true,
-      messageTextShadowDarkness: 60,
+      messageTextShadowDarkness: 70,
       messagePositionX: 50,
-      messagePositionY: 40,
+      messagePositionY: 30,
       secondaryMessageFont: 'system-ui',
       secondaryMessageFontSize: 1.5,
       secondaryMessageContrast: 90,
       secondaryMessageTextColor: '#e0e0e0',
       secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 40,
+      secondaryMessageTextShadowDarkness: 60,
       secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 60,
+      secondaryMessagePositionY: 70,
       sortOrder: 1,
       isActive: true,
+      publishedAt: now,
       displayFrom: now,
       displayUntil: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       linkUrl: 'https://braveneworg.bandcamp.com',
     },
     {
+      // Banner with SOLID background
       message: 'New Release Available',
       secondaryMessage: 'Check out our latest album',
-      notes: 'Promotional banner for new releases',
+      notes: 'Promotional banner with solid color',
+      imageUrl: null,
+      originalImageUrl: null,
       backgroundColor: '#16213e',
       isOverlayed: true,
       messageFont: 'Georgia',
@@ -266,15 +275,19 @@ const createNotifications = async (adminUserId: string) => {
       secondaryMessagePositionY: 65,
       sortOrder: 2,
       isActive: true,
+      publishedAt: now,
       displayFrom: now,
       displayUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
       linkUrl: null,
     },
     {
+      // Banner with background IMAGE
       message: 'Live Show This Weekend',
       secondaryMessage: 'Join us for an unforgettable night',
-      notes: 'Event promotion banner',
-      backgroundColor: '#0f3460',
+      notes: 'Event promotion with stage image',
+      imageUrl: 'https://picsum.photos/seed/stage/1920/1080',
+      originalImageUrl: 'https://picsum.photos/seed/stage/1920/1080',
+      backgroundColor: null,
       isOverlayed: true,
       messageFont: 'Impact',
       messageFontSize: 3.5,
@@ -294,14 +307,18 @@ const createNotifications = async (adminUserId: string) => {
       secondaryMessagePositionY: 70,
       sortOrder: 3,
       isActive: true,
+      publishedAt: now,
       displayFrom: now,
       displayUntil: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       linkUrl: null,
     },
     {
+      // Banner with SOLID background (gradient-like dark purple)
       message: 'Subscribe to Our Newsletter',
-      secondaryMessage: null,
-      notes: 'Newsletter signup prompt',
+      secondaryMessage: 'Stay updated with the latest releases',
+      notes: 'Newsletter signup prompt with solid color',
+      imageUrl: null,
+      originalImageUrl: null,
       backgroundColor: '#533483',
       isOverlayed: true,
       messageFont: 'Helvetica',
@@ -311,26 +328,30 @@ const createNotifications = async (adminUserId: string) => {
       messageTextShadow: false,
       messageTextShadowDarkness: 50,
       messagePositionX: 50,
-      messagePositionY: 50,
+      messagePositionY: 40,
       secondaryMessageFont: 'system-ui',
-      secondaryMessageFontSize: 2.0,
+      secondaryMessageFontSize: 1.8,
       secondaryMessageContrast: 95,
-      secondaryMessageTextColor: '#ffffff',
-      secondaryMessageTextShadow: true,
+      secondaryMessageTextColor: '#e0e0e0',
+      secondaryMessageTextShadow: false,
       secondaryMessageTextShadowDarkness: 50,
       secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 90,
+      secondaryMessagePositionY: 60,
       sortOrder: 4,
       isActive: true,
+      publishedAt: now,
       displayFrom: now,
       displayUntil: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
       linkUrl: null,
     },
     {
-      message: 'Limited Edition Merch',
+      // Banner with background IMAGE
+      message: 'Limited Edition Vinyl',
       secondaryMessage: 'Get yours before they are gone!',
-      notes: 'Merchandise promotion - inactive',
-      backgroundColor: '#e94560',
+      notes: 'Vinyl merchandise promotion with music image',
+      imageUrl: 'https://picsum.photos/seed/vinyl/1920/1080',
+      originalImageUrl: 'https://picsum.photos/seed/vinyl/1920/1080',
+      backgroundColor: null,
       isOverlayed: true,
       messageFont: 'Arial Black',
       messageFontSize: 3.0,
@@ -349,7 +370,40 @@ const createNotifications = async (adminUserId: string) => {
       secondaryMessagePositionX: 50,
       secondaryMessagePositionY: 75,
       sortOrder: 5,
+      isActive: true,
+      publishedAt: now,
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
+      linkUrl: null,
+    },
+    {
+      // Banner with SOLID background (inactive for testing)
+      message: 'Coming Soon',
+      secondaryMessage: 'Something big is on the horizon',
+      notes: 'Teaser banner - inactive',
+      imageUrl: null,
+      originalImageUrl: null,
+      backgroundColor: '#e94560',
+      isOverlayed: true,
+      messageFont: 'Georgia',
+      messageFontSize: 3.2,
+      messageContrast: 100,
+      messageTextColor: '#ffffff',
+      messageTextShadow: true,
+      messageTextShadowDarkness: 60,
+      messagePositionX: 50,
+      messagePositionY: 40,
+      secondaryMessageFont: 'Georgia',
+      secondaryMessageFontSize: 1.5,
+      secondaryMessageContrast: 85,
+      secondaryMessageTextColor: '#ffffff',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 40,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 60,
+      sortOrder: 6,
       isActive: false, // Inactive notification for testing
+      publishedAt: null,
       displayFrom: now,
       displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
       linkUrl: null,
