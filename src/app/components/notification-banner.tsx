@@ -100,7 +100,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
     >
       {/* Preload all images to prevent broken image icons when cycling */}
       <div className="hidden" aria-hidden="true">
-        {notifications.map((notification, index) =>
+        {notifications.map((notification) =>
           notification.imageUrl ? (
             <Image
               key={notification.id}
@@ -108,7 +108,8 @@ export function NotificationBanner({ notifications, className }: NotificationBan
               alt=""
               fill
               sizes="100vw"
-              priority={index === 0}
+              priority
+              unoptimized
             />
           ) : null
         )}
@@ -224,6 +225,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
           className="object-cover"
           priority={isFirst}
           sizes="100vw"
+          unoptimized
         />
       )}
 
