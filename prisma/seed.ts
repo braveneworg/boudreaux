@@ -104,6 +104,9 @@ const createTracks = async (count: number) => {
  * This creates albums with 4-8 tracks each
  */
 const createReleasesWithTracks = async () => {
+  // Clear existing release-track links first to avoid unique constraint errors on re-seed
+  await prisma.releaseTrack.deleteMany({});
+
   const releases = await prisma.release.findMany();
   const tracks = await prisma.track.findMany();
 
@@ -199,6 +202,172 @@ const createFeaturedArtists = async (count: number) => {
   console.info(`✅ Created ${count} featured artists.`);
 };
 
+/**
+ * Create notification banners with various configurations
+ * Dates are set dynamically relative to current time so they display when seeded
+ */
+const createNotifications = async (adminUserId: string) => {
+  // Delete existing notifications first (so we get fresh dates on re-seed)
+  await prisma.notification.deleteMany({});
+
+  const now = new Date();
+
+  // Sample notification data with different configurations
+  const notifications = [
+    {
+      message: 'Welcome to Brave New Org',
+      secondaryMessage: 'Discover new music from independent artists',
+      notes: 'Main welcome banner',
+      backgroundColor: '#1a1a2e',
+      isOverlayed: true,
+      messageFont: 'system-ui',
+      messageFontSize: 3.0,
+      messageContrast: 100,
+      messageTextColor: '#ffffff',
+      messageTextShadow: true,
+      messageTextShadowDarkness: 60,
+      messagePositionX: 50,
+      messagePositionY: 40,
+      secondaryMessageFont: 'system-ui',
+      secondaryMessageFontSize: 1.5,
+      secondaryMessageContrast: 90,
+      secondaryMessageTextColor: '#e0e0e0',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 40,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 60,
+      sortOrder: 1,
+      isActive: true,
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      linkUrl: 'https://braveneworg.bandcamp.com',
+    },
+    {
+      message: 'New Release Available',
+      secondaryMessage: 'Check out our latest album',
+      notes: 'Promotional banner for new releases',
+      backgroundColor: '#16213e',
+      isOverlayed: true,
+      messageFont: 'Georgia',
+      messageFontSize: 2.8,
+      messageContrast: 100,
+      messageTextColor: '#ffd700',
+      messageTextShadow: true,
+      messageTextShadowDarkness: 70,
+      messagePositionX: 50,
+      messagePositionY: 35,
+      secondaryMessageFont: 'Georgia',
+      secondaryMessageFontSize: 1.8,
+      secondaryMessageContrast: 95,
+      secondaryMessageTextColor: '#ffffff',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 50,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 65,
+      sortOrder: 2,
+      isActive: true,
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      linkUrl: null,
+    },
+    {
+      message: 'Live Show This Weekend',
+      secondaryMessage: 'Join us for an unforgettable night',
+      notes: 'Event promotion banner',
+      backgroundColor: '#0f3460',
+      isOverlayed: true,
+      messageFont: 'Impact',
+      messageFontSize: 3.5,
+      messageContrast: 100,
+      messageTextColor: '#ff6b6b',
+      messageTextShadow: true,
+      messageTextShadowDarkness: 80,
+      messagePositionX: 50,
+      messagePositionY: 30,
+      secondaryMessageFont: 'Arial',
+      secondaryMessageFontSize: 2.0,
+      secondaryMessageContrast: 90,
+      secondaryMessageTextColor: '#ffffff',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 50,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 70,
+      sortOrder: 3,
+      isActive: true,
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      linkUrl: null,
+    },
+    {
+      message: 'Subscribe to Our Newsletter',
+      secondaryMessage: null,
+      notes: 'Newsletter signup prompt',
+      backgroundColor: '#533483',
+      isOverlayed: true,
+      messageFont: 'Helvetica',
+      messageFontSize: 2.5,
+      messageContrast: 100,
+      messageTextColor: '#ffffff',
+      messageTextShadow: false,
+      messageTextShadowDarkness: 50,
+      messagePositionX: 50,
+      messagePositionY: 50,
+      secondaryMessageFont: 'system-ui',
+      secondaryMessageFontSize: 2.0,
+      secondaryMessageContrast: 95,
+      secondaryMessageTextColor: '#ffffff',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 50,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 90,
+      sortOrder: 4,
+      isActive: true,
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
+      linkUrl: null,
+    },
+    {
+      message: 'Limited Edition Merch',
+      secondaryMessage: 'Get yours before they are gone!',
+      notes: 'Merchandise promotion - inactive',
+      backgroundColor: '#e94560',
+      isOverlayed: true,
+      messageFont: 'Arial Black',
+      messageFontSize: 3.0,
+      messageContrast: 100,
+      messageTextColor: '#ffffff',
+      messageTextShadow: true,
+      messageTextShadowDarkness: 90,
+      messagePositionX: 50,
+      messagePositionY: 25,
+      secondaryMessageFont: 'Arial',
+      secondaryMessageFontSize: 1.6,
+      secondaryMessageContrast: 100,
+      secondaryMessageTextColor: '#ffeb3b',
+      secondaryMessageTextShadow: true,
+      secondaryMessageTextShadowDarkness: 70,
+      secondaryMessagePositionX: 50,
+      secondaryMessagePositionY: 75,
+      sortOrder: 5,
+      isActive: false, // Inactive notification for testing
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
+      linkUrl: null,
+    },
+  ];
+
+  for (const notification of notifications) {
+    await prisma.notification.create({
+      data: {
+        ...notification,
+        addedBy: { connect: { id: adminUserId } },
+      },
+    });
+  }
+
+  console.info(`✅ Created ${notifications.length} notification banners.`);
+};
+
 async function main() {
   // Check for --drop-database flag
   const shouldDropDatabase = process.argv.includes('--drop-database');
@@ -233,6 +402,11 @@ async function main() {
 
   await createPrimaryAdminUser();
 
+  // Get the admin user for notifications
+  const adminUser = await prisma.user.findFirst({
+    where: { role: 'admin' },
+  });
+
   if (isProduction) {
     console.info('ℹ️ Production environment detected. Seeding as necessary.');
 
@@ -248,6 +422,13 @@ async function main() {
 
     // Create featured artists after base entities exist
     await createFeaturedArtists(7);
+
+    // Create notification banners (requires admin user)
+    if (adminUser) {
+      await createNotifications(adminUser.id);
+    } else {
+      console.warn('⚠️ No admin user found. Skipping notification creation.');
+    }
 
     console.info('✅ Development database seeded.');
   }
