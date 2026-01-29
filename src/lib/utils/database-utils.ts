@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma';
  *
  * Rules:
  *  - Development: force http (avoids TLS overhead and self-signed hassles).
- *  - Production (server): prefer NEXTAUTH_URL if set; otherwise force https + host derived from env or request context.
+ *  - Production (server): prefer AUTH_URL if set; otherwise force https + host derived from env or request context.
  *  - Production (client): always use window.location.origin but ensure protocol is https (rewrite if user loaded over http accidentally).
  *
  * We never return http for production to avoid mixed content warnings.
@@ -22,8 +22,8 @@ export function getApiBaseUrl(): string {
     if (isDev) {
       return 'http://localhost:3000';
     }
-    // Production server: use configured NEXTAUTH_URL if provided; otherwise synthesize https://fakefourrecords.com
-    const envUrl = process.env.NEXTAUTH_URL?.trim();
+    // Production server: use configured AUTH_URL if provided; otherwise synthesize https://fakefourrecords.com
+    const envUrl = process.env.AUTH_URL?.trim();
     if (envUrl) {
       // Normalize any accidental http to https
       return envUrl.startsWith('http://') ? envUrl.replace('http://', 'https://') : envUrl;
