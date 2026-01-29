@@ -2,8 +2,6 @@
 
 import { useCallback, useState } from 'react';
 
-import { useRouter } from 'next/navigation';
-
 import { Combobox } from '@/components/forms/fields/combobox';
 import { toTitleCase } from '@/lib/utils/string-utils';
 
@@ -16,19 +14,13 @@ import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 
 export default function AdminPage() {
   const [view, setView] = useState('artist');
-  const router = useRouter();
 
-  const switchView = (selectedView: string) => {
-    // Notifications has its own dedicated page
-    if (selectedView === 'notifications') {
-      router.push('/admin/notifications');
-      return;
-    }
-    setView(selectedView);
+  const switchView = (view: string) => {
+    setView(view);
   };
 
   const getEntityOptions = useCallback(() => {
-    const entities = ['artist', 'group', 'release', 'track', 'featured artist', 'notifications'];
+    const entities = ['artist', 'group', 'release', 'track', 'featured artist'];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
       label: toTitleCase(entity),
@@ -49,8 +41,8 @@ export default function AdminPage() {
       <Combobox
         className="mt-1.5 mb-4 w-full"
         options={getEntityOptions()}
-        onSelectAction={(selectedView) => {
-          switchView(selectedView);
+        onSelectAction={(view) => {
+          switchView(view);
         }}
       />
       {view === 'artist' && <ArtistDataView />}

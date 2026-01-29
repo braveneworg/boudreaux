@@ -40,9 +40,8 @@ model User {
   // Optional for WebAuthn support
   Authenticator Authenticator[]
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  notifications Notification[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Indexes for performance
   @@index([failedLoginAttempts])
@@ -503,53 +502,4 @@ model Instrument {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Notification {
-  id                                 String    @id @default(auto()) @map("_id") @db.ObjectId
-  message                            String // Primary message; also used as alt text for image
-  secondaryMessage                   String? // Optional secondary message for additional context
-  notes                              String? // Internal notes not meant for public display
-  originalImageUrl                   String? // Original cropped image without text overlay
-  imageUrl                           String? // Processed image URL with text overlay burned in
-  linkUrl                            String? // Fallback to bandcamp url if not provided
-  backgroundColor                    String? // Solid color background (hex value like #ffffff)
-  isOverlayed                        Boolean   @default(true) // Whether text is overlayed on image
-  // Font styling for message
-  messageFont                        String?   @default("system-ui") // Font family for main message
-  messageFontSize                    Float?    @default(2.5) // Font size in rem for main message (min 2.5)
-  messageContrast                    Float?    @default(100) // Contrast/opacity percentage for main message (0-100)
-  // Font styling for secondary message
-  secondaryMessageFont               String?   @default("system-ui") // Font family for secondary message
-  secondaryMessageFontSize           Float?    @default(2.0) // Font size in rem for secondary message (min 2.0)
-  secondaryMessageContrast           Float?    @default(95) // Contrast/opacity percentage for secondary message (0-100)
-  // Text color settings
-  messageTextColor                   String?   @default("#ffffff") // Hex color for main message text
-  secondaryMessageTextColor          String?   @default("#ffffff") // Hex color for secondary message text
-  // Text shadow settings
-  messageTextShadow                  Boolean?  @default(true) // Whether to show text shadow on main message
-  messageTextShadowDarkness          Float?    @default(50) // Darkness of text shadow (0=light, 100=dark)
-  secondaryMessageTextShadow         Boolean?  @default(true) // Whether to show text shadow on secondary message
-  secondaryMessageTextShadowDarkness Float?    @default(50) // Darkness of text shadow (0=light, 100=dark)
-  // Text position settings (percentage 0-100)
-  messagePositionX                   Float?    @default(50) // Horizontal position of main message (0=left, 100=right)
-  messagePositionY                   Float?    @default(10) // Vertical position of main message (0=top, 100=bottom)
-  secondaryMessagePositionX          Float?    @default(50) // Horizontal position of secondary message
-  secondaryMessagePositionY          Float?    @default(90) // Vertical position of secondary message
-  sortOrder                          Int       @default(0) // Order of notification in carousel; lower numbers appear first
-  isActive                           Boolean   @default(true) // Whether the notification is currently active
-  createdAt                          DateTime  @default(now())
-  updatedAt                          DateTime  @updatedAt // Auto-update on modification
-  displayFrom                        DateTime?
-  displayUntil                       DateTime?
-  addedBy                            User      @relation(fields: [addedById], references: [id], onDelete: Cascade)
-  addedById                          String    @db.ObjectId
-  publishedAt                        DateTime? // Date when the notification was published
-  publishedBy                        String? // User ID of the admin who published the notification
-
-  @@index([addedById])
-  @@index([isActive])
-  @@index([sortOrder])
-  @@index([displayFrom])
-  @@index([displayUntil])
 }
