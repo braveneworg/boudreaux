@@ -21,19 +21,22 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-// Mock next/image
+// Mock next/image - use img element for testing (eslint warning disabled for test mock)
 vi.mock('next/image', () => ({
   default: ({
     src,
     alt,
-    ...props
+    fill: _fill,
+    className,
+    sizes: _sizes,
   }: {
     src: string;
     alt: string;
     fill?: boolean;
     className?: string;
     sizes?: string;
-  }) => <img src={src} alt={alt} {...props} data-testid="notification-image" />,
+    // eslint-disable-next-line @next/next/no-img-element
+  }) => <img src={src} alt={alt} className={className} data-testid="notification-image" />,
 }));
 
 // Mock notification banner actions
