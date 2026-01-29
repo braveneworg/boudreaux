@@ -69,12 +69,16 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
       await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
 
       formState.success = true;
-    } catch {
+    } catch (error) {
       formState.success = false;
-    } finally {
-      if (!formState.success && formState.errors && Object.keys(formState.errors).length > 0) {
-        setUnknownError(formState);
+      // Log the error for debugging (only in development to avoid exposing details)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Sign-in error:', error);
+      } else {
+        console.error('Sign-in error:', error instanceof Error ? error.message : 'Unknown error');
       }
+      // Set a generic error message for the user
+      setUnknownError(formState);
     }
   }
 
