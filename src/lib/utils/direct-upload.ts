@@ -19,19 +19,35 @@ export const uploadFileToS3 = async (
   file: File,
   presignedUrl: PresignedUrlResult
 ): Promise<DirectUploadResult> => {
+  console.info('[S3 Upload] Starting upload:', {
+    fileName: file.name,
+    fileSize: file.size,
+    contentType: file.type,
+    s3Key: presignedUrl.s3Key,
+    uploadUrlPrefix: presignedUrl.uploadUrl.substring(0, 100) + '...',
+  });
+
   try {
     const response = await fetch(presignedUrl.uploadUrl, {
       method: 'PUT',
       body: file,
       headers: {
         'Content-Type': file.type,
-        'Content-Length': file.size.toString(),
       },
+      // Don't set Content-Length - browser handles it automatically
+      // Setting it manually can cause issues with some browsers
+    });
+
+    console.info('[S3 Upload] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      s3Key: presignedUrl.s3Key,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('S3 upload error:', {
+      console.error('[S3 Upload] Upload failed:', {
         status: response.status,
         statusText: response.statusText,
         errorText,
@@ -45,13 +61,21 @@ export const uploadFileToS3 = async (
       };
     }
 
+    // Verify the upload by checking the ETag header (S3 returns this on successful upload)
+    const etag = response.headers.get('ETag');
+    console.info('[S3 Upload] Upload successful:', {
+      s3Key: presignedUrl.s3Key,
+      cdnUrl: presignedUrl.cdnUrl,
+      etag,
+    });
+
     return {
       success: true,
       s3Key: presignedUrl.s3Key,
       cdnUrl: presignedUrl.cdnUrl,
     };
   } catch (error) {
-    console.error('Direct S3 upload error:', error);
+    console.error('[S3 Upload] Network/fetch error:', error);
     return {
       success: false,
       s3Key: presignedUrl.s3Key,
