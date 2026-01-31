@@ -241,6 +241,10 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
     secondaryMessageRotation,
     imageOffsetX,
     imageOffsetY,
+    messageWidth,
+    messageHeight,
+    secondaryMessageWidth,
+    secondaryMessageHeight,
   } = notification;
 
   // When isOverlayed is enabled, use the originalImageUrl (non-overlayed) because
@@ -278,64 +282,78 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
       {isOverlayed && (
         <>
           {/* Main message */}
-          <span
-            className="absolute px-2 text-center"
+          <div
+            className="absolute flex items-center justify-center text-center"
             style={{
               left: `${messagePositionX ?? 50}%`,
               top: `${messagePositionY ?? 10}%`,
+              width: `${messageWidth ?? 80}%`,
+              height: `${messageHeight ?? 30}%`,
               transform: `translate(-50%, -50%) rotate(${messageRotation ?? 0}deg)`,
-              maxWidth: '90%',
-              fontFamily:
-                messageFont === 'system-ui'
-                  ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                  : `'${messageFont}', system-ui, sans-serif`,
-              fontSize: `${messageFontSize ?? 2.5}rem`,
-              color: hexToRgba(messageTextColor || '#ffffff', (messageContrast ?? 100) / 100),
-              textShadow:
-                messageTextShadow && hasImage
-                  ? `0 2px 4px rgba(0,0,0,${0.3 + ((messageTextShadowDarkness ?? 50) / 100) * 0.6}), 0 4px 8px rgba(0,0,0,${0.2 + ((messageTextShadowDarkness ?? 50) / 100) * 0.4})`
-                  : messageTextShadow
-                    ? `0 1px 3px rgba(0,0,0,0.3)`
-                    : 'none',
-              fontWeight: 'normal',
-              textTransform: 'none',
-              letterSpacing: 'normal',
             }}
           >
-            {message}
-          </span>
-
-          {/* Secondary message */}
-          {secondaryMessage && (
             <span
-              className="absolute px-2 text-center"
+              className="px-2 text-center"
               style={{
-                left: `${secondaryMessagePositionX ?? 50}%`,
-                top: `${secondaryMessagePositionY ?? 90}%`,
-                transform: `translate(-50%, -50%) rotate(${secondaryMessageRotation ?? 0}deg)`,
-                maxWidth: '90%',
                 fontFamily:
-                  secondaryMessageFont === 'system-ui'
+                  messageFont === 'system-ui'
                     ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                    : `'${secondaryMessageFont}', system-ui, sans-serif`,
-                fontSize: `${secondaryMessageFontSize ?? 2}rem`,
-                color: hexToRgba(
-                  secondaryMessageTextColor || '#ffffff',
-                  (secondaryMessageContrast ?? 95) / 100
-                ),
+                    : `'${messageFont}', system-ui, sans-serif`,
+                fontSize: `${messageFontSize ?? 2.5}rem`,
+                color: hexToRgba(messageTextColor || '#ffffff', (messageContrast ?? 100) / 100),
                 textShadow:
-                  secondaryMessageTextShadow && hasImage
-                    ? `0 1px 3px rgba(0,0,0,${0.3 + ((secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.5}), 0 2px 6px rgba(0,0,0,${0.2 + ((secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.3})`
-                    : secondaryMessageTextShadow
-                      ? `0 1px 2px rgba(0,0,0,0.3)`
+                  messageTextShadow && hasImage
+                    ? `0 2px 4px rgba(0,0,0,${0.3 + ((messageTextShadowDarkness ?? 50) / 100) * 0.6}), 0 4px 8px rgba(0,0,0,${0.2 + ((messageTextShadowDarkness ?? 50) / 100) * 0.4})`
+                    : messageTextShadow
+                      ? `0 1px 3px rgba(0,0,0,0.3)`
                       : 'none',
                 fontWeight: 'normal',
                 textTransform: 'none',
                 letterSpacing: 'normal',
               }}
             >
-              {secondaryMessage}
+              {message}
             </span>
+          </div>
+
+          {/* Secondary message */}
+          {secondaryMessage && (
+            <div
+              className="absolute flex items-center justify-center text-center"
+              style={{
+                left: `${secondaryMessagePositionX ?? 50}%`,
+                top: `${secondaryMessagePositionY ?? 90}%`,
+                width: `${secondaryMessageWidth ?? 80}%`,
+                height: `${secondaryMessageHeight ?? 30}%`,
+                transform: `translate(-50%, -50%) rotate(${secondaryMessageRotation ?? 0}deg)`,
+              }}
+            >
+              <span
+                className="px-2 text-center"
+                style={{
+                  fontFamily:
+                    secondaryMessageFont === 'system-ui'
+                      ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                      : `'${secondaryMessageFont}', system-ui, sans-serif`,
+                  fontSize: `${secondaryMessageFontSize ?? 2}rem`,
+                  color: hexToRgba(
+                    secondaryMessageTextColor || '#ffffff',
+                    (secondaryMessageContrast ?? 95) / 100
+                  ),
+                  textShadow:
+                    secondaryMessageTextShadow && hasImage
+                      ? `0 1px 3px rgba(0,0,0,${0.3 + ((secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.5}), 0 2px 6px rgba(0,0,0,${0.2 + ((secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.3})`
+                      : secondaryMessageTextShadow
+                        ? `0 1px 2px rgba(0,0,0,0.3)`
+                        : 'none',
+                  fontWeight: 'normal',
+                  textTransform: 'none',
+                  letterSpacing: 'normal',
+                }}
+              >
+                {secondaryMessage}
+              </span>
+            </div>
           )}
         </>
       )}

@@ -162,65 +162,79 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
             {notification.isOverlayed && (
               <>
                 {/* Main message */}
-                <span
-                  className="absolute px-1 text-center leading-tight"
+                <div
+                  className="absolute flex items-center justify-center text-center"
                   style={{
                     left: `${notification.messagePositionX ?? 50}%`,
                     top: `${notification.messagePositionY ?? 10}%`,
+                    width: `${notification.messageWidth ?? 80}%`,
+                    height: `${notification.messageHeight ?? 30}%`,
                     transform: `translate(-50%, -50%) rotate(${notification.messageRotation ?? 0}deg)`,
-                    maxWidth: '90%',
-                    fontFamily:
-                      notification.messageFont === 'system-ui'
-                        ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                        : `'${notification.messageFont}', system-ui, sans-serif`,
-                    fontSize: `${notification.messageFontSize ?? 2.5}rem`,
-                    color: hexToRgba(
-                      notification.messageTextColor || '#ffffff',
-                      (notification.messageContrast ?? 100) / 100
-                    ),
-                    textShadow:
-                      notification.messageTextShadow &&
-                      (notification.imageUrl || notification.originalImageUrl)
-                        ? `0 1px 3px rgba(0,0,0,${0.4 + ((notification.messageTextShadowDarkness ?? 50) / 100) * 0.5})`
-                        : notification.messageTextShadow
-                          ? `0 1px 2px rgba(0,0,0,0.3)`
-                          : 'none',
-                    fontWeight: 'normal',
                   }}
                 >
-                  {notification.message}
-                </span>
-
-                {/* Secondary message */}
-                {notification.secondaryMessage && (
                   <span
-                    className="absolute px-1 text-center leading-tight"
+                    className="px-1 text-center leading-tight"
                     style={{
-                      left: `${notification.secondaryMessagePositionX ?? 50}%`,
-                      top: `${notification.secondaryMessagePositionY ?? 90}%`,
-                      transform: `translate(-50%, -50%) rotate(${notification.secondaryMessageRotation ?? 0}deg)`,
-                      maxWidth: '90%',
                       fontFamily:
-                        notification.secondaryMessageFont === 'system-ui'
+                        notification.messageFont === 'system-ui'
                           ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                          : `'${notification.secondaryMessageFont}', system-ui, sans-serif`,
-                      fontSize: `${notification.secondaryMessageFontSize ?? 2}rem`,
+                          : `'${notification.messageFont}', system-ui, sans-serif`,
+                      fontSize: `${notification.messageFontSize ?? 2.5}rem`,
                       color: hexToRgba(
-                        notification.secondaryMessageTextColor || '#ffffff',
-                        (notification.secondaryMessageContrast ?? 95) / 100
+                        notification.messageTextColor || '#ffffff',
+                        (notification.messageContrast ?? 100) / 100
                       ),
                       textShadow:
-                        notification.secondaryMessageTextShadow &&
+                        notification.messageTextShadow &&
                         (notification.imageUrl || notification.originalImageUrl)
-                          ? `0 1px 2px rgba(0,0,0,${0.3 + ((notification.secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.5})`
-                          : notification.secondaryMessageTextShadow
+                          ? `0 1px 3px rgba(0,0,0,${0.4 + ((notification.messageTextShadowDarkness ?? 50) / 100) * 0.5})`
+                          : notification.messageTextShadow
                             ? `0 1px 2px rgba(0,0,0,0.3)`
                             : 'none',
                       fontWeight: 'normal',
                     }}
                   >
-                    {notification.secondaryMessage}
+                    {notification.message}
                   </span>
+                </div>
+
+                {/* Secondary message */}
+                {notification.secondaryMessage && (
+                  <div
+                    className="absolute flex items-center justify-center text-center"
+                    style={{
+                      left: `${notification.secondaryMessagePositionX ?? 50}%`,
+                      top: `${notification.secondaryMessagePositionY ?? 90}%`,
+                      width: `${notification.secondaryMessageWidth ?? 80}%`,
+                      height: `${notification.secondaryMessageHeight ?? 30}%`,
+                      transform: `translate(-50%, -50%) rotate(${notification.secondaryMessageRotation ?? 0}deg)`,
+                    }}
+                  >
+                    <span
+                      className="px-1 text-center leading-tight"
+                      style={{
+                        fontFamily:
+                          notification.secondaryMessageFont === 'system-ui'
+                            ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                            : `'${notification.secondaryMessageFont}', system-ui, sans-serif`,
+                        fontSize: `${notification.secondaryMessageFontSize ?? 2}rem`,
+                        color: hexToRgba(
+                          notification.secondaryMessageTextColor || '#ffffff',
+                          (notification.secondaryMessageContrast ?? 95) / 100
+                        ),
+                        textShadow:
+                          notification.secondaryMessageTextShadow &&
+                          (notification.imageUrl || notification.originalImageUrl)
+                            ? `0 1px 2px rgba(0,0,0,${0.3 + ((notification.secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.5})`
+                            : notification.secondaryMessageTextShadow
+                              ? `0 1px 2px rgba(0,0,0,0.3)`
+                              : 'none',
+                        fontWeight: 'normal',
+                      }}
+                    >
+                      {notification.secondaryMessage}
+                    </span>
+                  </div>
                 )}
               </>
             )}
