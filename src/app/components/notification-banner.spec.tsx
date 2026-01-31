@@ -778,4 +778,82 @@ describe('NotificationBanner', () => {
       });
     });
   });
+
+  describe('image URL fallback behavior', () => {
+    it('uses originalImageUrl when isOverlayed is true and originalImageUrl exists', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        originalImageUrl: 'https://example.com/original.jpg',
+        imageUrl: 'https://example.com/processed.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('src', 'https://example.com/original.jpg');
+    });
+
+    it('falls back to imageUrl when isOverlayed is true but originalImageUrl is null', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        originalImageUrl: null,
+        imageUrl: 'https://example.com/processed.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('src', 'https://example.com/processed.jpg');
+    });
+
+    it('uses imageUrl when isOverlayed is false', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        originalImageUrl: 'https://example.com/original.jpg',
+        imageUrl: 'https://example.com/processed.jpg',
+        isOverlayed: false,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      // When isOverlayed is false, the image should be the processed one with burned-in text
+      expect(
+        images.some((img) => img.getAttribute('src') === 'https://example.com/processed.jpg')
+      ).toBe(true);
+    });
+
+    it('falls back to originalImageUrl when isOverlayed is false but imageUrl is null', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        originalImageUrl: 'https://example.com/original.jpg',
+        imageUrl: null,
+        isOverlayed: false,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      // Should fall back to originalImageUrl when imageUrl is null
+      expect(
+        images.some((img) => img.getAttribute('src') === 'https://example.com/original.jpg')
+      ).toBe(true);
+    });
+
+    it('renders no image when both imageUrl and originalImageUrl are null', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        originalImageUrl: null,
+        imageUrl: null,
+        backgroundColor: '#123456',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      // Preload section will not have an image, and the banner should use backgroundColor
+      const images = screen.queryAllByTestId('banner-image');
+      // Only preload section might have images, but with null URLs it should be empty
+      expect(images.length).toBe(0);
+    });
+  });
 });
