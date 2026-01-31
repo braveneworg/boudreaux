@@ -53,6 +53,12 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       // Exclude id from data to let MongoDB auto-generate ObjectId
       const { id: _id, ...userData } = data;
 
+      // Ensure emailVerified is a Date object, not a string
+      // Auth.js may pass it as a string after JWT/session deserialization
+      if (userData.emailVerified && typeof userData.emailVerified === 'string') {
+        userData.emailVerified = new Date(userData.emailVerified);
+      }
+
       // Check if user already exists by email
       // This prevents duplicate user creation when signing in with email
       if (userData.email) {
@@ -165,6 +171,13 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
     // Override updateUser to allow updating extra fields
     updateUser: async (data) => {
       const { id, ...updateData } = data;
+
+      // Ensure emailVerified is a Date object, not a string
+      // Auth.js may pass it as a string after JWT/session deserialization
+      if (updateData.emailVerified && typeof updateData.emailVerified === 'string') {
+        updateData.emailVerified = new Date(updateData.emailVerified);
+      }
+
       const user = await p.user.update({
         where: { id },
         data: updateData,
