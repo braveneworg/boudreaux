@@ -552,6 +552,8 @@ export default function NotificationBannerForm({
         setIsUploadingImage(true);
         setUploadProgress('Processing image...');
 
+        console.info('[NotificationBanner] Starting image upload flow');
+
         // Convert original cropped image to base64
         const base64 = await blobToBase64(result.blob);
         setOriginalImageBase64(base64);
@@ -566,10 +568,17 @@ export default function NotificationBannerForm({
           type: 'image/jpeg',
         });
 
+        console.info('[NotificationBanner] Created original file:', {
+          name: originalFile.name,
+          size: originalFile.size,
+          type: originalFile.type,
+        });
+
         setUploadProgress('Uploading original image...');
 
         // Generate a temporary ID for new notifications
         const uploadId = notificationId || `temp-${Date.now()}`;
+        console.info('[NotificationBanner] Using upload ID:', uploadId);
 
         // Get presigned URL for original image
         const originalPresignedResult = await getPresignedUploadUrlsAction(
@@ -584,15 +593,28 @@ export default function NotificationBannerForm({
           ]
         );
 
+        console.info('[NotificationBanner] Presigned URL result:', {
+          success: originalPresignedResult.success,
+          error: originalPresignedResult.error,
+          hasData: !!originalPresignedResult.data?.[0],
+        });
+
         if (!originalPresignedResult.success || !originalPresignedResult.data?.[0]) {
           throw new Error(originalPresignedResult.error || 'Failed to get upload URL');
         }
 
         // Upload original to S3
+        console.info('[NotificationBanner] Starting S3 upload for original image');
         const originalUploadResult = await uploadFileToS3(
           originalFile,
           originalPresignedResult.data[0]
         );
+
+        console.info('[NotificationBanner] Original upload result:', {
+          success: originalUploadResult.success,
+          error: originalUploadResult.error,
+          cdnUrl: originalUploadResult.cdnUrl,
+        });
 
         if (!originalUploadResult.success) {
           throw new Error(originalUploadResult.error || 'Original upload failed');
@@ -601,6 +623,7 @@ export default function NotificationBannerForm({
         // Set the original CDN URL in the form
         setValue('originalImageUrl', originalUploadResult.cdnUrl);
         setOriginalPreviewUrl(originalUploadResult.cdnUrl);
+        console.info('[NotificationBanner] Original image URL set:', originalUploadResult.cdnUrl);
 
         // Process with text overlay on backend
         const processedResult = await processImageWithOverlay(base64);
@@ -609,6 +632,12 @@ export default function NotificationBannerForm({
           // Upload processed image
           const processedFile = new File([processedResult.blob], `${baseFileName}-banner.jpg`, {
             type: 'image/jpeg',
+          });
+
+          console.info('[NotificationBanner] Created processed file:', {
+            name: processedFile.name,
+            size: processedFile.size,
+            type: processedFile.type,
           });
 
           setUploadProgress('Uploading processed image...');
@@ -629,10 +658,17 @@ export default function NotificationBannerForm({
             throw new Error(processedPresignedResult.error || 'Failed to get upload URL');
           }
 
+          console.info('[NotificationBanner] Starting S3 upload for processed image');
           const processedUploadResult = await uploadFileToS3(
             processedFile,
             processedPresignedResult.data[0]
           );
+
+          console.info('[NotificationBanner] Processed upload result:', {
+            success: processedUploadResult.success,
+            error: processedUploadResult.error,
+            cdnUrl: processedUploadResult.cdnUrl,
+          });
 
           if (!processedUploadResult.success) {
             throw new Error(processedUploadResult.error || 'Processed upload failed');
@@ -641,15 +677,22 @@ export default function NotificationBannerForm({
           // Set the processed CDN URL in the form
           setValue('imageUrl', processedUploadResult.cdnUrl);
           setProcessedPreviewUrl(processedUploadResult.cdnUrl);
+          console.info(
+            '[NotificationBanner] Processed image URL set:',
+            processedUploadResult.cdnUrl
+          );
         } else {
           // No overlay needed, use original for both
           setValue('imageUrl', originalUploadResult.cdnUrl);
           setProcessedPreviewUrl(originalUploadResult.cdnUrl);
+          console.info('[NotificationBanner] Using original for both URLs (no overlay)');
         }
 
         setUploadProgress('Upload complete!');
+        console.info('[NotificationBanner] Image upload flow completed successfully');
         toast.success(`Image cropped to ${BANNER_WIDTH}×${BANNER_HEIGHT} and uploaded!`);
       } catch (err) {
+        console.error('[NotificationBanner] Image upload failed:', err);
         error('Image upload failed:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to upload image');
         setUploadProgress('');

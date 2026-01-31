@@ -268,7 +268,7 @@ export function ImageCropper({
         <div className="space-y-4">
           {/* Cropper area */}
           <div
-            className="relative flex h-[400px] w-full items-center justify-center overflow-hidden rounded-lg"
+            className="relative flex h-[400px] w-full items-center justify-center rounded-lg"
             style={{ backgroundColor: useBackgroundColor ? backgroundColor : '#0a0a0a' }}
           >
             <ReactCrop
@@ -277,7 +277,7 @@ export function ImageCropper({
               onComplete={(c) => setCompletedCrop(c)}
               aspect={lockAspectRatio ? aspectRatio : undefined}
               ruleOfThirds
-              className="max-h-full max-w-full"
+              className="max-h-full max-w-full [&_.ReactCrop__crop-selection]:touch-none [&_.ReactCrop__drag-handle]:h-3 [&_.ReactCrop__drag-handle]:w-3 [&_.ReactCrop__drag-handle.ord-n]:-top-1.5! [&_.ReactCrop__drag-handle.ord-s]:-bottom-1.5! [&_.ReactCrop__drag-handle.ord-e]:-right-1.5! [&_.ReactCrop__drag-handle.ord-w]:-left-1.5! [&_.ReactCrop__drag-bar.ord-n]:h-2! [&_.ReactCrop__drag-bar.ord-s]:h-2! [&_.ReactCrop__drag-bar.ord-n]:-top-1! [&_.ReactCrop__drag-bar.ord-s]:-bottom-1! [&_.ReactCrop__drag-bar.ord-e]:w-2! [&_.ReactCrop__drag-bar.ord-w]:w-2! [&_.ReactCrop__drag-bar.ord-e]:-right-1! [&_.ReactCrop__drag-bar.ord-w]:-left-1!"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
