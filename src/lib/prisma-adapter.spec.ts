@@ -739,5 +739,65 @@ describe('CustomPrismaAdapter', () => {
 
       expect(result.emailVerified).toEqual(verifiedDate);
     });
+
+    it('should convert string emailVerified to Date in createUser', async () => {
+      const dateString = '2023-01-01T00:00:00.000Z';
+      const userData = {
+        id: '1',
+        email: 'test@example.com',
+        emailVerified: dateString as unknown as Date, // Simulating Auth.js passing a string
+        username: 'testuser',
+      };
+
+      const createdUser = {
+        id: '1',
+        name: null,
+        email: 'test@example.com',
+        emailVerified: new Date(dateString),
+        image: null,
+      };
+
+      mockPrisma.user.create.mockResolvedValue(createdUser);
+
+      await adapter.createUser(userData as AdapterUser);
+
+      // Verify that the string was converted to a Date before being passed to Prisma
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            emailVerified: expect.any(Date),
+          }),
+        })
+      );
+    });
+
+    it('should convert string emailVerified to Date in updateUser', async () => {
+      const dateString = '2023-01-01T00:00:00.000Z';
+      const updateData = {
+        id: '1',
+        emailVerified: dateString as unknown as Date, // Simulating Auth.js passing a string
+      };
+
+      const updatedUser = {
+        id: '1',
+        name: 'Test User',
+        email: 'test@example.com',
+        emailVerified: new Date(dateString),
+        image: null,
+        username: null,
+      };
+
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+
+      await adapter.updateUser(updateData);
+
+      // Verify that the string was converted to a Date before being passed to Prisma
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          emailVerified: expect.any(Date),
+        },
+      });
+    });
   });
 });
