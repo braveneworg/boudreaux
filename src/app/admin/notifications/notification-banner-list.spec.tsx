@@ -100,6 +100,10 @@ const createMockNotification = (
   secondaryMessageRotation: 0,
   imageOffsetX: 0,
   imageOffsetY: 0,
+  messageWidth: 80,
+  messageHeight: 30,
+  secondaryMessageWidth: 80,
+  secondaryMessageHeight: 30,
   ...overrides,
 });
 

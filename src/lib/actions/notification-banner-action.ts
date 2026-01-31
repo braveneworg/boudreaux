@@ -44,6 +44,10 @@ const permittedFieldNames = [
   'secondaryMessageRotation',
   'imageOffsetX',
   'imageOffsetY',
+  'messageWidth',
+  'messageHeight',
+  'secondaryMessageWidth',
+  'secondaryMessageHeight',
 ];
 
 export const createNotificationBannerAction = async (
@@ -51,6 +55,12 @@ export const createNotificationBannerAction = async (
   payload: FormData
 ): Promise<FormState> => {
   await requireRole('admin');
+
+  // Debug: Log received payload
+  console.info('[NotificationBannerAction] CREATE - Received FormData entries:');
+  for (const [key, value] of payload.entries()) {
+    console.info(`  ${key}: ${value}`);
+  }
 
   // Convert numeric and boolean fields
   const sortOrderValue = payload.get('sortOrder');
@@ -95,7 +105,11 @@ export const createNotificationBannerAction = async (
       key === 'messageRotation' ||
       key === 'secondaryMessageRotation' ||
       key === 'imageOffsetX' ||
-      key === 'imageOffsetY'
+      key === 'imageOffsetY' ||
+      key === 'messageWidth' ||
+      key === 'messageHeight' ||
+      key === 'secondaryMessageWidth' ||
+      key === 'secondaryMessageHeight'
     ) {
       formDataObj[key] = parseFloat(value.toString()) || 0;
     } else {
@@ -122,6 +136,16 @@ export const createNotificationBannerAction = async (
     formDataObj.sortOrder = 0;
   }
 
+  // Debug: Log dimension values before validation
+  console.info('[NotificationBannerAction] CREATE - Dimension values:', {
+    messageWidth: formDataObj.messageWidth,
+    messageHeight: formDataObj.messageHeight,
+    secondaryMessageWidth: formDataObj.secondaryMessageWidth,
+    secondaryMessageHeight: formDataObj.secondaryMessageHeight,
+    messagePositionX: formDataObj.messagePositionX,
+    messagePositionY: formDataObj.messagePositionY,
+  });
+
   // Validate with Zod
   const parsed = notificationBannerSchema.safeParse(formDataObj);
 
@@ -139,6 +163,7 @@ export const createNotificationBannerAction = async (
   }
 
   if (!parsed.success) {
+    console.error('[NotificationBannerAction] CREATE - Validation failed:', parsed.error.issues);
     formState.errors = {};
     for (const issue of parsed.error.issues) {
       const path = issue.path[0]?.toString() || 'general';
@@ -192,6 +217,10 @@ export const createNotificationBannerAction = async (
       secondaryMessageRotation,
       imageOffsetX,
       imageOffsetY,
+      messageWidth,
+      messageHeight,
+      secondaryMessageWidth,
+      secondaryMessageHeight,
     } = parsed.data;
 
     // Debug: Log image URLs being saved
@@ -233,6 +262,10 @@ export const createNotificationBannerAction = async (
       secondaryMessageRotation: secondaryMessageRotation ?? 0,
       imageOffsetX: imageOffsetX ?? 0,
       imageOffsetY: imageOffsetY ?? 0,
+      messageWidth: messageWidth ?? 80,
+      messageHeight: messageHeight ?? 30,
+      secondaryMessageWidth: secondaryMessageWidth ?? 80,
+      secondaryMessageHeight: secondaryMessageHeight ?? 30,
       addedBy: { connect: { id: session.user.id } },
     };
 
@@ -271,6 +304,12 @@ export const updateNotificationBannerAction = async (
   payload: FormData
 ): Promise<FormState> => {
   await requireRole('admin');
+
+  // Debug: Log received payload
+  console.info('[NotificationBannerAction] UPDATE - Received FormData entries:');
+  for (const [key, value] of payload.entries()) {
+    console.info(`  ${key}: ${value}`);
+  }
 
   const notificationId = payload.get('notificationId')?.toString();
 
@@ -311,7 +350,11 @@ export const updateNotificationBannerAction = async (
       key === 'messageRotation' ||
       key === 'secondaryMessageRotation' ||
       key === 'imageOffsetX' ||
-      key === 'imageOffsetY'
+      key === 'imageOffsetY' ||
+      key === 'messageWidth' ||
+      key === 'messageHeight' ||
+      key === 'secondaryMessageWidth' ||
+      key === 'secondaryMessageHeight'
     ) {
       formDataObj[key] = parseFloat(value.toString()) || 0;
     } else {
@@ -336,6 +379,16 @@ export const updateNotificationBannerAction = async (
     formDataObj.sortOrder = 0;
   }
 
+  // Debug: Log dimension values before validation
+  console.info('[NotificationBannerAction] UPDATE - Dimension values:', {
+    messageWidth: formDataObj.messageWidth,
+    messageHeight: formDataObj.messageHeight,
+    secondaryMessageWidth: formDataObj.secondaryMessageWidth,
+    secondaryMessageHeight: formDataObj.secondaryMessageHeight,
+    messagePositionX: formDataObj.messagePositionX,
+    messagePositionY: formDataObj.messagePositionY,
+  });
+
   const parsed = notificationBannerSchema.safeParse(formDataObj);
 
   const formState: FormState = {
@@ -351,6 +404,7 @@ export const updateNotificationBannerAction = async (
   }
 
   if (!parsed.success) {
+    console.error('[NotificationBannerAction] UPDATE - Validation failed:', parsed.error.issues);
     formState.errors = {};
     for (const issue of parsed.error.issues) {
       const path = issue.path[0]?.toString() || 'general';
@@ -404,6 +458,10 @@ export const updateNotificationBannerAction = async (
       secondaryMessageRotation,
       imageOffsetX,
       imageOffsetY,
+      messageWidth,
+      messageHeight,
+      secondaryMessageWidth,
+      secondaryMessageHeight,
     } = parsed.data;
 
     // Debug: Log image URLs being saved
@@ -446,12 +504,23 @@ export const updateNotificationBannerAction = async (
       secondaryMessageRotation: secondaryMessageRotation ?? 0,
       imageOffsetX: imageOffsetX ?? 0,
       imageOffsetY: imageOffsetY ?? 0,
+      messageWidth: messageWidth ?? 80,
+      messageHeight: messageHeight ?? 30,
+      secondaryMessageWidth: secondaryMessageWidth ?? 80,
+      secondaryMessageHeight: secondaryMessageHeight ?? 30,
     };
+
+    console.info(
+      '[NotificationBannerAction] UPDATE - Calling service with data:',
+      JSON.stringify(updateData, null, 2)
+    );
 
     const result = await NotificationBannerService.updateNotificationBanner(
       notificationId,
       updateData
     );
+
+    console.info('[NotificationBannerAction] UPDATE - Service result:', result);
 
     if (!result.success) {
       formState.errors = { general: [result.error] };

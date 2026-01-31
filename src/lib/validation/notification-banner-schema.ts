@@ -170,6 +170,27 @@ export const notificationBannerSchema = z
       .min(-100, { message: 'Offset Y must be at least -100%' })
       .max(100, { message: 'Offset Y must be at most 100%' })
       .default(0),
+    // Text box dimensions (percentage of container)
+    messageWidth: z
+      .number()
+      .min(10, { message: 'Width must be at least 10%' })
+      .max(100, { message: 'Width must be at most 100%' })
+      .default(80),
+    messageHeight: z
+      .number()
+      .min(5, { message: 'Height must be at least 5%' })
+      .max(100, { message: 'Height must be at most 100%' })
+      .default(30),
+    secondaryMessageWidth: z
+      .number()
+      .min(10, { message: 'Width must be at least 10%' })
+      .max(100, { message: 'Width must be at most 100%' })
+      .default(80),
+    secondaryMessageHeight: z
+      .number()
+      .min(5, { message: 'Height must be at least 5%' })
+      .max(100, { message: 'Height must be at most 100%' })
+      .default(30),
   })
   .refine(
     (data) => {

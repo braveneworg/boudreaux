@@ -317,3 +317,21 @@ nextjs-portal {
 .animate-marquee {
   animation: marquee 15s linear infinite;
 }
+
+/* Marching ants animation for selection borders */
+@keyframes marching-ants {
+  0% {
+    background-position:
+      0 0,
+      0 100%,
+      0 0,
+      100% 0;
+  }
+  100% {
+    background-position:
+      8px 0,
+      -8px 100%,
+      0 -8px,
+      100% 8px;
+  }
+}
