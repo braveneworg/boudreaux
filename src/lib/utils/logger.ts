@@ -62,7 +62,27 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
 
     if (isSensitive) {
       result[key] = '[REDACTED]';
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    } else if (Array.isArray(value)) {
+      // Recursively process array elements
+      result[key] = value.map((item) => {
+        if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+          return safeSerialize(item as Record<string, unknown>);
+        } else if (Array.isArray(item)) {
+          // Handle nested arrays recursively
+          return item.map((nestedItem) => {
+            if (
+              typeof nestedItem === 'object' &&
+              nestedItem !== null &&
+              !Array.isArray(nestedItem)
+            ) {
+              return safeSerialize(nestedItem as Record<string, unknown>);
+            }
+            return nestedItem;
+          });
+        }
+        return item;
+      });
+    } else if (typeof value === 'object' && value !== null) {
       result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
       result[key] = value;

@@ -147,6 +147,82 @@ describe('Logger', () => {
         })
       );
     });
+
+    it('redacts sensitive fields in arrays of objects', () => {
+      const logger = createLogger('TEST');
+      logger.info('array with sensitive data', {
+        users: [
+          { name: 'john', password: 'secret123' },
+          { name: 'jane', apiKey: 'key456' },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          users: [
+            expect.objectContaining({
+              name: 'john',
+              password: '[REDACTED]',
+            }),
+            expect.objectContaining({
+              name: 'jane',
+              apiKey: '[REDACTED]',
+            }),
+          ],
+        })
+      );
+    });
+
+    it('redacts sensitive fields in nested arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('nested array with sensitive data', {
+        groups: [
+          [
+            { name: 'user1', token: 'token123' },
+            { name: 'user2', secret: 'secret456' },
+          ],
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          groups: [
+            [
+              expect.objectContaining({
+                name: 'user1',
+                token: '[REDACTED]',
+              }),
+              expect.objectContaining({
+                name: 'user2',
+                secret: '[REDACTED]',
+              }),
+            ],
+          ],
+        })
+      );
+    });
+
+    it('preserves non-sensitive data in arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('array with non-sensitive data', {
+        items: [
+          { id: '1', name: 'item1', value: 100 },
+          { id: '2', name: 'item2', value: 200 },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({ id: '1', name: 'item1', value: 100 }),
+            expect.objectContaining({ id: '2', name: 'item2', value: 200 }),
+          ],
+        })
+      );
+    });
   });
 
   describe('operation logging', () => {
