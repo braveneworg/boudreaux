@@ -1297,7 +1297,11 @@ export default function NotificationBannerForm({
                   control={control}
                   name="imageUrl"
                   render={({ field }) => (
-                    <input type="hidden" name="imageUrl" value={field.value || ''} />
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
                   )}
                 />
 
@@ -1306,7 +1310,11 @@ export default function NotificationBannerForm({
                   control={control}
                   name="originalImageUrl"
                   render={({ field }) => (
-                    <input type="hidden" name="originalImageUrl" value={field.value || ''} />
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
                   )}
                 />
 
