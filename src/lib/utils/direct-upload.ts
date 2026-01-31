@@ -24,18 +24,19 @@ export const uploadFileToS3 = async (
     fileSize: file.size,
     contentType: file.type,
     s3Key: presignedUrl.s3Key,
-    uploadUrlPrefix: presignedUrl.uploadUrl.substring(0, 100) + '...',
+    cdnUrl: presignedUrl.cdnUrl,
+    uploadUrlHost: new URL(presignedUrl.uploadUrl).hostname,
+    uploadUrlPath: new URL(presignedUrl.uploadUrl).pathname,
   });
 
   try {
     const response = await fetch(presignedUrl.uploadUrl, {
       method: 'PUT',
       body: file,
+      mode: 'cors',
       headers: {
         'Content-Type': file.type,
       },
-      // Don't set Content-Length - browser handles it automatically
-      // Setting it manually can cause issues with some browsers
     });
 
     console.info('[S3 Upload] Response received:', {
@@ -68,6 +69,29 @@ export const uploadFileToS3 = async (
       cdnUrl: presignedUrl.cdnUrl,
       etag,
     });
+
+    // Verify the file is accessible via CDN with a small delay to allow for propagation
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Brief delay for S3 consistency
+      const verifyResponse = await fetch(presignedUrl.cdnUrl, {
+        method: 'HEAD',
+        cache: 'no-store',
+      });
+      if (!verifyResponse.ok) {
+        console.warn('[S3 Upload] CDN verification failed:', {
+          status: verifyResponse.status,
+          cdnUrl: presignedUrl.cdnUrl,
+        });
+      } else {
+        console.info('[S3 Upload] CDN verification successful:', {
+          cdnUrl: presignedUrl.cdnUrl,
+          contentType: verifyResponse.headers.get('Content-Type'),
+          contentLength: verifyResponse.headers.get('Content-Length'),
+        });
+      }
+    } catch (verifyError) {
+      console.warn('[S3 Upload] CDN verification error:', verifyError);
+    }
 
     return {
       success: true,

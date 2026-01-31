@@ -8,6 +8,8 @@ import type { ProcessNotificationImageInput } from './process-notification-image
 // Mock sharp before importing the action
 vi.mock('sharp', () => {
   const mockPipeline = {
+    metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
+    extract: vi.fn().mockReturnThis(),
     resize: vi.fn().mockReturnThis(),
     jpeg: vi.fn().mockReturnThis(),
     composite: vi.fn().mockReturnThis(),
@@ -42,6 +44,8 @@ const createValidInput = (
 describe('processNotificationImageAction', () => {
   const resetSharpMock = () => {
     const mockPipeline = {
+      metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
+      extract: vi.fn().mockReturnThis(),
       resize: vi.fn().mockReturnThis(),
       jpeg: vi.fn().mockReturnThis(),
       composite: vi.fn().mockReturnThis(),
@@ -115,9 +119,9 @@ describe('processNotificationImageAction', () => {
 
       expect(mockSharp).toHaveBeenCalled();
       const mockPipeline = mockSharp.mock.results[0]?.value;
+      // With overlay, the final resize uses 'fill' because we pre-crop to correct aspect ratio
       expect(mockPipeline.resize).toHaveBeenCalledWith(880, 544, {
-        fit: 'cover',
-        position: 'center',
+        fit: 'fill',
       });
     });
 
@@ -127,9 +131,9 @@ describe('processNotificationImageAction', () => {
 
       expect(mockSharp).toHaveBeenCalled();
       const mockPipeline = mockSharp.mock.results[0]?.value;
+      // With overlay, the final resize uses 'fill' because we pre-crop to correct aspect ratio
       expect(mockPipeline.resize).toHaveBeenCalledWith(1200, 600, {
-        fit: 'cover',
-        position: 'center',
+        fit: 'fill',
       });
     });
 
@@ -266,6 +270,8 @@ describe('processNotificationImageAction', () => {
   describe('error handling', () => {
     it('should return error when sharp fails', async () => {
       const mockPipeline = {
+        metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
+        extract: vi.fn().mockReturnThis(),
         resize: vi.fn().mockReturnThis(),
         jpeg: vi.fn().mockReturnThis(),
         composite: vi.fn().mockReturnThis(),
@@ -282,6 +288,8 @@ describe('processNotificationImageAction', () => {
 
     it('should handle non-Error exceptions', async () => {
       const mockPipeline = {
+        metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
+        extract: vi.fn().mockReturnThis(),
         resize: vi.fn().mockReturnThis(),
         jpeg: vi.fn().mockReturnThis(),
         composite: vi.fn().mockReturnThis(),
@@ -298,6 +306,8 @@ describe('processNotificationImageAction', () => {
 
     it('should handle invalid base64 input gracefully', async () => {
       const mockPipeline = {
+        metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
+        extract: vi.fn().mockReturnThis(),
         resize: vi.fn().mockReturnThis(),
         jpeg: vi.fn().mockReturnThis(),
         composite: vi.fn().mockReturnThis(),

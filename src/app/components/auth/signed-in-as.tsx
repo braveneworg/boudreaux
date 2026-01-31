@@ -10,15 +10,16 @@ const SignedInAs = () => {
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const username = session?.user?.username;
+  const displayName = username || session?.user?.name || session?.user?.email;
 
   if (process.env.NODE_ENV === 'development') {
     console.info('[SignedInAs] Session:', session);
     console.info('[SignedInAs] User:', session?.user);
-    console.info('[SignedInAs] Username:', username);
+    console.info('[SignedInAs] Display name:', displayName);
   }
 
-  if (!username) {
-    console.warn('[SignedInAs] No username found, returning null');
+  if (!displayName) {
+    console.warn('[SignedInAs] No display name found, returning null');
     return null;
   }
 
@@ -33,7 +34,7 @@ const SignedInAs = () => {
         )}
         <KeyIcon size={16} className="md:hidden" />
         <Link className="text-sm hover:underline underline-offset-4" href="/profile">
-          @{username}
+          {username ? `@${username}` : displayName}
         </Link>
       </div>
     </>

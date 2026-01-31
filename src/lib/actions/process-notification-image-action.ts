@@ -113,15 +113,20 @@ export async function processNotificationImageAction(
     // Decode base64 image
     const imageBuffer = Buffer.from(imageBase64, 'base64');
 
-    // Start with the image
-    let pipeline = sharp(imageBuffer).resize(width, height, {
-      fit: 'cover',
-      position: 'center',
-    });
+    // Get original image dimensions
+    const originalMetadata = await sharp(imageBuffer).metadata();
+    const originalWidth = originalMetadata.width || BANNER_WIDTH;
+    const originalHeight = originalMetadata.height || BANNER_HEIGHT;
 
-    // If overlay is not enabled or no message, just return the resized image
+    // If overlay is not enabled or no message, just resize and return
     if (!isOverlayed || !message) {
-      const outputBuffer = await pipeline.jpeg({ quality: 92 }).toBuffer();
+      const outputBuffer = await sharp(imageBuffer)
+        .resize(width, height, {
+          fit: 'cover',
+          position: 'center',
+        })
+        .jpeg({ quality: 92 })
+        .toBuffer();
       return {
         success: true,
         processedImageBase64: outputBuffer.toString('base64'),
@@ -129,24 +134,52 @@ export async function processNotificationImageAction(
       };
     }
 
+    // Calculate the crop dimensions at original size that maintain aspect ratio
+    // This ensures we burn text onto the same area that will be visible after resize
+    const targetAspect = width / height;
+    const originalAspect = originalWidth / originalHeight;
+
+    let cropWidth = originalWidth;
+    let cropHeight = originalHeight;
+    let cropLeft = 0;
+    let cropTop = 0;
+
+    if (originalAspect > targetAspect) {
+      // Original is wider - crop the sides
+      cropWidth = Math.round(originalHeight * targetAspect);
+      cropLeft = Math.round((originalWidth - cropWidth) / 2);
+    } else {
+      // Original is taller - crop top/bottom
+      cropHeight = Math.round(originalWidth / targetAspect);
+      cropTop = Math.round((originalHeight - cropHeight) / 2);
+    }
+
     // Log overlay settings for debugging
     console.info('[PROCESS_IMAGE] Creating text overlay with settings:', {
       message: message.substring(0, 50),
       messageFont,
       messageFontSize,
-      messageFontSizePx: Math.round(messageFontSize * BASE_FONT_SIZE * (width / 880)),
+      originalDimensions: `${originalWidth}x${originalHeight}`,
+      cropDimensions: `${cropWidth}x${cropHeight}`,
+      targetDimensions: `${width}x${height}`,
       messagePositionX,
       messagePositionY,
       messageRotation,
       isOverlayed,
     });
 
-    // Create text overlay SVG
+    // First, crop the image to the target aspect ratio (at original resolution)
+    const croppedBuffer = await sharp(imageBuffer)
+      .extract({ left: cropLeft, top: cropTop, width: cropWidth, height: cropHeight })
+      .toBuffer();
+
+    // Create text overlay SVG at the cropped original size
+    // This ensures text is burned at full resolution before resizing
     const svgOverlay = createTextOverlaySvg({
       message,
       secondaryMessage,
-      width,
-      height,
+      width: cropWidth,
+      height: cropHeight,
       messageFont,
       messageFontSize,
       messageContrast,
@@ -167,16 +200,20 @@ export async function processNotificationImageAction(
       secondaryMessageRotation,
     });
 
-    // Composite the text overlay onto the image
-    pipeline = pipeline.composite([
-      {
-        input: Buffer.from(svgOverlay),
-        top: 0,
-        left: 0,
-      },
-    ]);
-
-    const outputBuffer = await pipeline.jpeg({ quality: 92 }).toBuffer();
+    // Composite text onto cropped image at original resolution, then resize
+    const outputBuffer = await sharp(croppedBuffer)
+      .composite([
+        {
+          input: Buffer.from(svgOverlay),
+          top: 0,
+          left: 0,
+        },
+      ])
+      .resize(width, height, {
+        fit: 'fill', // Already cropped to correct aspect ratio
+      })
+      .jpeg({ quality: 92 })
+      .toBuffer();
 
     return {
       success: true,

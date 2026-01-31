@@ -71,31 +71,24 @@ ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install fonts for Sharp SVG text rendering
-# fontconfig is needed for font discovery
-# Download Google Fonts TTF files directly from jsDelivr CDN (fontsource)
-RUN apk add --no-cache fontconfig ttf-dejavu \
+# fontconfig is needed for font discovery, curl for downloading Google Fonts
+RUN apk add --no-cache fontconfig ttf-dejavu curl \
     && mkdir -p /usr/share/fonts/google \
     && cd /usr/share/fonts/google \
-    # Roboto
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-400-normal.ttf" -O Roboto-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-700-normal.ttf" -O Roboto-Bold.ttf \
-    # Open Sans
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/open-sans@latest/latin-400-normal.ttf" -O OpenSans-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/open-sans@latest/latin-700-normal.ttf" -O OpenSans-Bold.ttf \
-    # Lato
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/lato@latest/latin-400-normal.ttf" -O Lato-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/lato@latest/latin-700-normal.ttf" -O Lato-Bold.ttf \
-    # Oswald
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/oswald@latest/latin-400-normal.ttf" -O Oswald-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/oswald@latest/latin-700-normal.ttf" -O Oswald-Bold.ttf \
-    # Montserrat
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-400-normal.ttf" -O Montserrat-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-700-normal.ttf" -O Montserrat-Bold.ttf \
-    # Playfair Display
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/playfair-display@latest/latin-400-normal.ttf" -O PlayfairDisplay-Regular.ttf \
-    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/playfair-display@latest/latin-700-normal.ttf" -O PlayfairDisplay-Bold.ttf \
-    # Refresh font cache
-    && fc-cache -fv
+    # Download Google Fonts used in banner overlays
+    && curl -sL "https://fonts.google.com/download?family=Roboto" -o roboto.zip \
+    && curl -sL "https://fonts.google.com/download?family=Open%20Sans" -o opensans.zip \
+    && curl -sL "https://fonts.google.com/download?family=Lato" -o lato.zip \
+    && curl -sL "https://fonts.google.com/download?family=Oswald" -o oswald.zip \
+    && curl -sL "https://fonts.google.com/download?family=Playfair%20Display" -o playfair.zip \
+    && unzip -o roboto.zip -d roboto 2>/dev/null || true \
+    && unzip -o opensans.zip -d opensans 2>/dev/null || true \
+    && unzip -o lato.zip -d lato 2>/dev/null || true \
+    && unzip -o oswald.zip -d oswald 2>/dev/null || true \
+    && unzip -o playfair.zip -d playfair 2>/dev/null || true \
+    && rm -f *.zip \
+    && fc-cache -fv \
+    && apk del curl
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup

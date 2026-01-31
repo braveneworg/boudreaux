@@ -780,7 +780,7 @@ describe('NotificationBanner', () => {
   });
 
   describe('image URL fallback behavior', () => {
-    it('uses originalImageUrl when isOverlayed is true and originalImageUrl exists', () => {
+    it('uses originalImageUrl when isOverlayed is true and both URLs exist', () => {
       const notification = createMockNotification({
         message: 'Test message',
         originalImageUrl: 'https://example.com/original.jpg',

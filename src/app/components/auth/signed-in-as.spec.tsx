@@ -118,7 +118,7 @@ describe('SignedInAs', () => {
   });
 
   describe('when user has no username', () => {
-    it('returns null when username is undefined', () => {
+    it('displays email when username is undefined but email is available', () => {
       mockUseSession.mockReturnValue({
         data: {
           user: {
@@ -129,11 +129,11 @@ describe('SignedInAs', () => {
       });
       mockUseIsMobile.mockReturnValue(false);
 
-      const { container } = render(<SignedInAs />);
-      expect(container.firstChild).toBeNull();
+      render(<SignedInAs />);
+      expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
 
-    it('returns null when username is null', () => {
+    it('displays email when username is null but email is available', () => {
       mockUseSession.mockReturnValue({
         data: {
           user: {
@@ -145,8 +145,8 @@ describe('SignedInAs', () => {
       });
       mockUseIsMobile.mockReturnValue(false);
 
-      const { container } = render(<SignedInAs />);
-      expect(container.firstChild).toBeNull();
+      render(<SignedInAs />);
+      expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
 
     it('returns null when user session is null', () => {

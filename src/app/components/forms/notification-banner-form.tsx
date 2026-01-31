@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -53,7 +54,6 @@ import {
   updateNotificationBannerAction,
 } from '@/lib/actions/notification-banner-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
-import { processNotificationImageAction } from '@/lib/actions/process-notification-image-action';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 import { error } from '@/lib/utils/console-logger';
@@ -101,6 +101,34 @@ const hexToRgba = (hex: string, opacity: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
+/**
+ * Check if a URL is a remote URL (http/https) that can use Next.js Image
+ * Returns false for blob: URLs which need regular img tags
+ */
+const isRemoteUrl = (url: string): boolean => {
+  return url.startsWith('http://') || url.startsWith('https://');
+};
+
+/**
+ * LocalBlobImage component for rendering local blob URLs
+ * Uses Next.js Image with unoptimized flag and identity loader
+ * because blob: URLs cannot be optimized by Next.js image optimization
+ */
+interface LocalBlobImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+}
+
+// Identity loader returns the src as-is - required for blob URLs
+const blobImageLoader = ({ src }: { src: string }) => src;
+
+function LocalBlobImage({ src, alt, className }: LocalBlobImageProps) {
+  return (
+    <Image loader={blobImageLoader} src={src} alt={alt} fill className={className} unoptimized />
+  );
+}
+
 const initialFormState: FormState = {
   fields: {},
   success: false,
@@ -127,13 +155,15 @@ export default function NotificationBannerForm({
     initialNotificationId || null
   );
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isProcessingImage, _setIsProcessingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [_selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string>('');
   const [processedPreviewUrl, setProcessedPreviewUrl] = useState<string>('');
-  const [originalImageBase64, setOriginalImageBase64] = useState<string>('');
+  const [_originalImageBase64, setOriginalImageBase64] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingAutoSave, setPendingAutoSave] = useState(false);
+  const [skipRedirectOnSave, setSkipRedirectOnSave] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cropper state
@@ -233,6 +263,32 @@ export default function NotificationBannerForm({
   const [isRotatingSecondary, setIsRotatingSecondary] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
+  // Load Google Fonts for preview rendering
+  useEffect(() => {
+    // Google Fonts that need to be loaded for the font selector preview
+    const googleFonts = [
+      'Roboto',
+      'Open+Sans',
+      'Lato',
+      'Montserrat',
+      'Oswald',
+      'Playfair+Display',
+      'Bebas+Neue',
+      'Anton',
+      'Fjalla+One',
+      'Archivo+Black',
+    ];
+
+    const fontLink = document.getElementById('notification-banner-fonts');
+    if (!fontLink) {
+      const link = document.createElement('link');
+      link.id = 'notification-banner-fonts';
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?${googleFonts.map((f) => `family=${f}:wght@400;700`).join('&')}&display=swap`;
+      document.head.appendChild(link);
+    }
+  }, []);
+
   // Fetch notification data when initialNotificationId is provided
   useEffect(() => {
     if (!initialNotificationId) return;
@@ -317,18 +373,25 @@ export default function NotificationBannerForm({
   // Handle form submission success/failure
   useEffect(() => {
     if (formState.success && formState.data?.notificationId) {
-      const message = form.getValues('message');
-      toast.success(<ToastContent message={message || ''} />);
       const newId =
         typeof formState.data.notificationId === 'string' ? formState.data.notificationId : null;
       setNotificationId(newId);
-      router.push('/admin/notifications');
+
+      // Only show toast and redirect if not auto-saving image
+      if (skipRedirectOnSave) {
+        // Reset flag but don't redirect - stay on page after image auto-save
+        setSkipRedirectOnSave(false);
+      } else {
+        const message = form.getValues('message');
+        toast.success(<ToastContent message={message || ''} />);
+        router.push('/admin/notifications');
+      }
     }
 
     if (formState.errors?.general) {
       toast.error(formState.errors.general[0]);
     }
-  }, [formState, form, router]);
+  }, [formState, form, router, skipRedirectOnSave]);
 
   // Sync form errors with server-side validation
   useEffect(() => {
@@ -438,102 +501,8 @@ export default function NotificationBannerForm({
   };
 
   /**
-   * Processes the original image with text overlay on the backend
-   */
-  const processImageWithOverlay = useCallback(
-    async (imageBase64: string) => {
-      const message = form.getValues('message');
-      const secondaryMessage = form.getValues('secondaryMessage');
-      const isOverlayed = form.getValues('isOverlayed');
-      const messageFont = form.getValues('messageFont');
-      const messageFontSize = form.getValues('messageFontSize');
-      const messageContrast = form.getValues('messageContrast');
-      const secondaryMessageFont = form.getValues('secondaryMessageFont');
-      const secondaryMessageFontSize = form.getValues('secondaryMessageFontSize');
-      const secondaryMessageContrast = form.getValues('secondaryMessageContrast');
-      const messageTextColor = form.getValues('messageTextColor');
-      const secondaryMessageTextColor = form.getValues('secondaryMessageTextColor');
-      const messageTextShadow = form.getValues('messageTextShadow');
-      const messageTextShadowDarkness = form.getValues('messageTextShadowDarkness');
-      const secondaryMessageTextShadow = form.getValues('secondaryMessageTextShadow');
-      const secondaryMessageTextShadowDarkness = form.getValues(
-        'secondaryMessageTextShadowDarkness'
-      );
-      const messagePositionX = form.getValues('messagePositionX');
-      const messagePositionY = form.getValues('messagePositionY');
-      const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
-      const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
-      const messageRotation = form.getValues('messageRotation');
-      const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
-
-      if (!isOverlayed || !message) {
-        // No processing needed, use original image directly
-        return null;
-      }
-
-      setIsProcessingImage(true);
-      setUploadProgress('Processing image with text overlay...');
-
-      try {
-        const result = await processNotificationImageAction({
-          imageBase64,
-          mimeType: 'image/jpeg',
-          message,
-          secondaryMessage: secondaryMessage || undefined,
-          isOverlayed,
-          width: BANNER_WIDTH,
-          height: BANNER_HEIGHT,
-          messageFont,
-          messageFontSize,
-          messageContrast,
-          secondaryMessageFont,
-          secondaryMessageFontSize,
-          secondaryMessageContrast,
-          messageTextColor,
-          secondaryMessageTextColor,
-          messageTextShadow,
-          messageTextShadowDarkness,
-          secondaryMessageTextShadow,
-          secondaryMessageTextShadowDarkness,
-          messagePositionX,
-          messagePositionY,
-          secondaryMessagePositionX,
-          secondaryMessagePositionY,
-          messageRotation,
-          secondaryMessageRotation,
-        });
-
-        if (!result.success || !result.processedImageBase64) {
-          throw new Error(result.error || 'Failed to process image');
-        }
-
-        // Convert base64 back to blob for upload (without using fetch to avoid CSP issues)
-        const byteCharacters = atob(result.processedImageBase64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const processedBlob = new Blob([byteArray], { type: result.mimeType || 'image/jpeg' });
-
-        // Create local preview of processed image
-        const processedPreview = URL.createObjectURL(processedBlob);
-        setProcessedPreviewUrl(processedPreview);
-
-        return { blob: processedBlob, base64: result.processedImageBase64 };
-      } catch (err) {
-        error('Image processing failed:', err);
-        throw err;
-      } finally {
-        setIsProcessingImage(false);
-      }
-    },
-    [form]
-  );
-
-  /**
    * Handles the crop completion from the ImageCropper
-   * Uploads original image and processes with text overlay on backend
+   * Uploads the cropped image - text overlay is rendered dynamically, not burned in
    */
   const handleCropComplete = useCallback(
     async (result: CropResult) => {
@@ -625,72 +594,21 @@ export default function NotificationBannerForm({
         setOriginalPreviewUrl(originalUploadResult.cdnUrl);
         console.info('[NotificationBanner] Original image URL set:', originalUploadResult.cdnUrl);
 
-        // Process with text overlay on backend
-        const processedResult = await processImageWithOverlay(base64);
+        // Always use the original image for imageUrl - text overlay is rendered dynamically
+        // No need to burn text into the image since it's rendered via CSS/HTML like the preview
+        setValue('imageUrl', originalUploadResult.cdnUrl);
+        setProcessedPreviewUrl(originalUploadResult.cdnUrl);
+        console.info(
+          '[NotificationBanner] Using original for imageUrl (text overlay rendered dynamically)'
+        );
 
-        if (processedResult) {
-          // Upload processed image
-          const processedFile = new File([processedResult.blob], `${baseFileName}-banner.jpg`, {
-            type: 'image/jpeg',
-          });
+        setUploadProgress('Upload complete! Saving...');
+        console.info(
+          '[NotificationBanner] Image upload flow completed successfully, triggering auto-save'
+        );
 
-          console.info('[NotificationBanner] Created processed file:', {
-            name: processedFile.name,
-            size: processedFile.size,
-            type: processedFile.type,
-          });
-
-          setUploadProgress('Uploading processed image...');
-
-          const processedPresignedResult = await getPresignedUploadUrlsAction(
-            'notifications',
-            uploadId,
-            [
-              {
-                fileName: processedFile.name,
-                contentType: processedFile.type,
-                fileSize: processedFile.size,
-              },
-            ]
-          );
-
-          if (!processedPresignedResult.success || !processedPresignedResult.data?.[0]) {
-            throw new Error(processedPresignedResult.error || 'Failed to get upload URL');
-          }
-
-          console.info('[NotificationBanner] Starting S3 upload for processed image');
-          const processedUploadResult = await uploadFileToS3(
-            processedFile,
-            processedPresignedResult.data[0]
-          );
-
-          console.info('[NotificationBanner] Processed upload result:', {
-            success: processedUploadResult.success,
-            error: processedUploadResult.error,
-            cdnUrl: processedUploadResult.cdnUrl,
-          });
-
-          if (!processedUploadResult.success) {
-            throw new Error(processedUploadResult.error || 'Processed upload failed');
-          }
-
-          // Set the processed CDN URL in the form
-          setValue('imageUrl', processedUploadResult.cdnUrl);
-          setProcessedPreviewUrl(processedUploadResult.cdnUrl);
-          console.info(
-            '[NotificationBanner] Processed image URL set:',
-            processedUploadResult.cdnUrl
-          );
-        } else {
-          // No overlay needed, use original for both
-          setValue('imageUrl', originalUploadResult.cdnUrl);
-          setProcessedPreviewUrl(originalUploadResult.cdnUrl);
-          console.info('[NotificationBanner] Using original for both URLs (no overlay)');
-        }
-
-        setUploadProgress('Upload complete!');
-        console.info('[NotificationBanner] Image upload flow completed successfully');
-        toast.success(`Image cropped to ${BANNER_WIDTH}×${BANNER_HEIGHT} and uploaded!`);
+        // Trigger auto-save after image upload
+        setPendingAutoSave(true);
       } catch (err) {
         console.error('[NotificationBanner] Image upload failed:', err);
         error('Image upload failed:', err);
@@ -711,80 +629,8 @@ export default function NotificationBannerForm({
         }
       }
     },
-    [notificationId, originalFileName, setValue, processImageWithOverlay]
+    [notificationId, originalFileName, setValue]
   );
-
-  /**
-   * Re-processes the image when message or overlay settings change
-   */
-  const reprocessImage = useCallback(async () => {
-    if (!originalImageBase64) return;
-
-    try {
-      const processedResult = await processImageWithOverlay(originalImageBase64);
-
-      if (processedResult) {
-        // Upload processed image
-        const baseFileName = originalFileName.replace(/\.[^/.]+$/, '') || 'banner';
-        const processedFile = new File([processedResult.blob], `${baseFileName}-banner.jpg`, {
-          type: 'image/jpeg',
-        });
-
-        setUploadProgress('Uploading updated image...');
-        setIsUploadingImage(true);
-
-        const uploadId = notificationId || `temp-${Date.now()}`;
-
-        const processedPresignedResult = await getPresignedUploadUrlsAction(
-          'notifications',
-          uploadId,
-          [
-            {
-              fileName: processedFile.name,
-              contentType: processedFile.type,
-              fileSize: processedFile.size,
-            },
-          ]
-        );
-
-        if (!processedPresignedResult.success || !processedPresignedResult.data?.[0]) {
-          throw new Error(processedPresignedResult.error || 'Failed to get upload URL');
-        }
-
-        const processedUploadResult = await uploadFileToS3(
-          processedFile,
-          processedPresignedResult.data[0]
-        );
-
-        if (!processedUploadResult.success) {
-          throw new Error(processedUploadResult.error || 'Processed upload failed');
-        }
-
-        setValue('imageUrl', processedUploadResult.cdnUrl);
-        setProcessedPreviewUrl(processedUploadResult.cdnUrl);
-        setUploadProgress('');
-        toast.success('Image updated with new text overlay!');
-      } else {
-        // No overlay, use original
-        const originalUrl = form.getValues('originalImageUrl');
-        setValue('imageUrl', originalUrl);
-        setProcessedPreviewUrl(originalUrl || '');
-      }
-    } catch (err) {
-      error('Image reprocessing failed:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update image');
-      setUploadProgress('');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  }, [
-    originalImageBase64,
-    originalFileName,
-    notificationId,
-    setValue,
-    form,
-    processImageWithOverlay,
-  ]);
 
   // Clear uploaded image
   const handleClearImage = useCallback(() => {
@@ -817,95 +663,138 @@ export default function NotificationBannerForm({
     }
   }, [setValue, form]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
+  /**
+   * Build FormData from current form values and submit
+   * This is extracted so it can be called programmatically after image upload
+   */
+  const submitForm = useCallback(async () => {
     const isValid = await form.trigger();
     if (!isValid) {
-      return;
+      console.warn('[NotificationBanner] Form validation failed, skipping auto-save');
+      return false;
     }
 
-    if (formRef.current) {
-      const formData = new FormData(formRef.current);
-
-      // Add notification ID for update
-      if (notificationId) {
-        formData.append('notificationId', notificationId);
-      }
-
-      // Ensure boolean fields are included
-      const isOverlayed = form.getValues('isOverlayed');
-      const isActive = form.getValues('isActive');
-      formData.set('isOverlayed', isOverlayed ? 'true' : 'false');
-      formData.set('isActive', isActive ? 'true' : 'false');
-
-      // Ensure numeric font fields are included
-      const messageFontSize = form.getValues('messageFontSize');
-      const messageContrast = form.getValues('messageContrast');
-      const secondaryMessageFontSize = form.getValues('secondaryMessageFontSize');
-      const secondaryMessageContrast = form.getValues('secondaryMessageContrast');
-      formData.set('messageFontSize', String(messageFontSize));
-      formData.set('messageContrast', String(messageContrast));
-      formData.set('secondaryMessageFontSize', String(secondaryMessageFontSize));
-      formData.set('secondaryMessageContrast', String(secondaryMessageContrast));
-
-      // Ensure text color fields are included
-      const messageTextColor = form.getValues('messageTextColor');
-      const secondaryMessageTextColor = form.getValues('secondaryMessageTextColor');
-      formData.set('messageTextColor', messageTextColor || '#ffffff');
-      formData.set('secondaryMessageTextColor', secondaryMessageTextColor || '#ffffff');
-
-      // Ensure text shadow fields are included
-      const messageTextShadow = form.getValues('messageTextShadow');
-      const messageTextShadowDarkness = form.getValues('messageTextShadowDarkness');
-      const secondaryMessageTextShadow = form.getValues('secondaryMessageTextShadow');
-      const secondaryMessageTextShadowDarkness = form.getValues(
-        'secondaryMessageTextShadowDarkness'
-      );
-      formData.set('messageTextShadow', messageTextShadow ? 'true' : 'false');
-      formData.set('messageTextShadowDarkness', String(messageTextShadowDarkness));
-      formData.set('secondaryMessageTextShadow', secondaryMessageTextShadow ? 'true' : 'false');
-      formData.set(
-        'secondaryMessageTextShadowDarkness',
-        String(secondaryMessageTextShadowDarkness)
-      );
-
-      // Ensure backgroundColor is included
-      const backgroundColor = form.getValues('backgroundColor');
-      if (backgroundColor) {
-        formData.set('backgroundColor', backgroundColor);
-      }
-
-      // Ensure font family fields are included
-      const messageFont = form.getValues('messageFont');
-      const secondaryMessageFont = form.getValues('secondaryMessageFont');
-      formData.set('messageFont', messageFont || 'system-ui');
-      formData.set('secondaryMessageFont', secondaryMessageFont || 'system-ui');
-
-      // Ensure position fields are included
-      const messagePositionX = form.getValues('messagePositionX');
-      const messagePositionY = form.getValues('messagePositionY');
-      const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
-      const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
-      formData.set('messagePositionX', String(messagePositionX ?? 50));
-      formData.set('messagePositionY', String(messagePositionY ?? 10));
-      formData.set('secondaryMessagePositionX', String(secondaryMessagePositionX ?? 50));
-      formData.set('secondaryMessagePositionY', String(secondaryMessagePositionY ?? 90));
-
-      // Ensure rotation fields are included
-      const messageRotation = form.getValues('messageRotation');
-      const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
-      formData.set('messageRotation', String(messageRotation ?? 0));
-      formData.set('secondaryMessageRotation', String(secondaryMessageRotation ?? 0));
-
-      // Ensure image offset fields are included
-      const imageOffsetX = form.getValues('imageOffsetX');
-      const imageOffsetY = form.getValues('imageOffsetY');
-      formData.set('imageOffsetX', String(imageOffsetX ?? 0));
-      formData.set('imageOffsetY', String(imageOffsetY ?? 0));
-
-      formAction(formData);
+    if (!formRef.current) {
+      console.warn('[NotificationBanner] Form ref not available');
+      return false;
     }
+
+    const formData = new FormData(formRef.current);
+
+    // Add notification ID for update
+    if (notificationId) {
+      formData.append('notificationId', notificationId);
+    }
+
+    // Ensure image URLs are included (critical for saving uploaded images)
+    const imageUrl = form.getValues('imageUrl');
+    const originalImageUrl = form.getValues('originalImageUrl');
+
+    console.info('[NotificationBanner] Auto-save - image values:', {
+      imageUrl,
+      originalImageUrl,
+    });
+
+    if (imageUrl) {
+      formData.set('imageUrl', imageUrl);
+    }
+    if (originalImageUrl) {
+      formData.set('originalImageUrl', originalImageUrl);
+    }
+
+    // Ensure boolean fields are included
+    const isOverlayed = form.getValues('isOverlayed');
+    const isActive = form.getValues('isActive');
+    formData.set('isOverlayed', isOverlayed ? 'true' : 'false');
+    formData.set('isActive', isActive ? 'true' : 'false');
+
+    // Ensure numeric font fields are included
+    const messageFontSize = form.getValues('messageFontSize');
+    const messageContrast = form.getValues('messageContrast');
+    const secondaryMessageFontSize = form.getValues('secondaryMessageFontSize');
+    const secondaryMessageContrast = form.getValues('secondaryMessageContrast');
+    formData.set('messageFontSize', String(messageFontSize));
+    formData.set('messageContrast', String(messageContrast));
+    formData.set('secondaryMessageFontSize', String(secondaryMessageFontSize));
+    formData.set('secondaryMessageContrast', String(secondaryMessageContrast));
+
+    // Ensure text color fields are included
+    const messageTextColor = form.getValues('messageTextColor');
+    const secondaryMessageTextColor = form.getValues('secondaryMessageTextColor');
+    formData.set('messageTextColor', messageTextColor || '#ffffff');
+    formData.set('secondaryMessageTextColor', secondaryMessageTextColor || '#ffffff');
+
+    // Ensure text shadow fields are included
+    const messageTextShadow = form.getValues('messageTextShadow');
+    const messageTextShadowDarkness = form.getValues('messageTextShadowDarkness');
+    const secondaryMessageTextShadow = form.getValues('secondaryMessageTextShadow');
+    const secondaryMessageTextShadowDarkness = form.getValues('secondaryMessageTextShadowDarkness');
+    formData.set('messageTextShadow', messageTextShadow ? 'true' : 'false');
+    formData.set('messageTextShadowDarkness', String(messageTextShadowDarkness));
+    formData.set('secondaryMessageTextShadow', secondaryMessageTextShadow ? 'true' : 'false');
+    formData.set('secondaryMessageTextShadowDarkness', String(secondaryMessageTextShadowDarkness));
+
+    // Ensure backgroundColor is included
+    const backgroundColor = form.getValues('backgroundColor');
+    if (backgroundColor) {
+      formData.set('backgroundColor', backgroundColor);
+    }
+
+    // Ensure font family fields are included
+    const messageFont = form.getValues('messageFont');
+    const secondaryMessageFont = form.getValues('secondaryMessageFont');
+    formData.set('messageFont', messageFont || 'system-ui');
+    formData.set('secondaryMessageFont', secondaryMessageFont || 'system-ui');
+
+    // Ensure position fields are included
+    const messagePositionX = form.getValues('messagePositionX');
+    const messagePositionY = form.getValues('messagePositionY');
+    const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
+    const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
+    formData.set('messagePositionX', String(messagePositionX ?? 50));
+    formData.set('messagePositionY', String(messagePositionY ?? 10));
+    formData.set('secondaryMessagePositionX', String(secondaryMessagePositionX ?? 50));
+    formData.set('secondaryMessagePositionY', String(secondaryMessagePositionY ?? 90));
+
+    // Ensure rotation fields are included
+    const messageRotation = form.getValues('messageRotation');
+    const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
+    formData.set('messageRotation', String(messageRotation ?? 0));
+    formData.set('secondaryMessageRotation', String(secondaryMessageRotation ?? 0));
+
+    // Ensure image offset fields are included
+    const imageOffsetX = form.getValues('imageOffsetX');
+    const imageOffsetY = form.getValues('imageOffsetY');
+    formData.set('imageOffsetX', String(imageOffsetX ?? 0));
+    formData.set('imageOffsetY', String(imageOffsetY ?? 0));
+
+    formAction(formData);
+    return true;
+  }, [form, formAction, notificationId]);
+
+  // Auto-save after image upload completes
+  useEffect(() => {
+    if (pendingAutoSave && !isUploadingImage) {
+      setPendingAutoSave(false);
+      setSkipRedirectOnSave(true); // Don't redirect after auto-save
+      console.info('[NotificationBanner] Executing auto-save after image upload');
+      submitForm().then((success) => {
+        if (success) {
+          toast.success(`Image cropped to ${BANNER_WIDTH}×${BANNER_HEIGHT} and saved!`);
+          setUploadProgress('');
+        } else {
+          toast.error(
+            'Image uploaded but form has validation errors. Please fix them and save manually.'
+          );
+          setUploadProgress('');
+        }
+      });
+    }
+  }, [pendingAutoSave, isUploadingImage, submitForm]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await submitForm();
   };
 
   const handleCancel = () => {
@@ -1238,7 +1127,11 @@ export default function NotificationBannerForm({
                         </div>
 
                         {/* Original and Processed image preview */}
-                        {(originalPreviewUrl || processedPreviewUrl || field.value) && (
+                        {(originalPreviewUrl ||
+                          processedPreviewUrl ||
+                          watchedImageUrl ||
+                          watchedOriginalImageUrl ||
+                          field.value) && (
                           <div className="space-y-4">
                             {/* Action buttons */}
                             <div className="flex flex-wrap gap-2">
@@ -1252,28 +1145,6 @@ export default function NotificationBannerForm({
                                 >
                                   <Crop className="mr-2 h-4 w-4" />
                                   Re-crop
-                                </Button>
-                              )}
-                              {/* Reprocess button - only show if we have original and overlay is enabled */}
-                              {originalImageBase64 && watchedIsOverlayed && watchedMessage && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={reprocessImage}
-                                  disabled={isProcessingImage || isUploadingImage}
-                                >
-                                  {isProcessingImage ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Processing...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <ImagePlus className="mr-2 h-4 w-4" />
-                                      Update Text
-                                    </>
-                                  )}
                                 </Button>
                               )}
                               {/* Reset to original button - show when processed differs from original */}
@@ -1319,45 +1190,22 @@ export default function NotificationBannerForm({
                                       className="relative w-full overflow-hidden"
                                       style={{ paddingBottom: `${100 / 1.618}%` }}
                                     >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={originalPreviewUrl}
-                                        alt="Original banner"
-                                        className="absolute inset-0 h-full w-full object-cover"
-                                        onError={(e) => {
-                                          error(
-                                            'Failed to load original preview:',
-                                            originalPreviewUrl
-                                          );
-                                          e.currentTarget.src =
-                                            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                  {/* Processed image - full viewport width */}
-                                  <div className="space-y-1">
-                                    <p className="px-4 text-sm font-medium text-muted-foreground sm:px-6 md:px-8">
-                                      With Text Overlay
-                                    </p>
-                                    <div
-                                      className="relative w-full overflow-hidden"
-                                      style={{ paddingBottom: `${100 / 1.618}%` }}
-                                    >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={processedPreviewUrl}
-                                        alt="Processed banner"
-                                        className="absolute inset-0 h-full w-full object-cover"
-                                        onError={(e) => {
-                                          error(
-                                            'Failed to load processed preview:',
-                                            processedPreviewUrl
-                                          );
-                                          e.currentTarget.src =
-                                            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
-                                        }}
-                                      />
+                                      {isRemoteUrl(originalPreviewUrl) ? (
+                                        <Image
+                                          src={originalPreviewUrl}
+                                          alt="Original banner"
+                                          fill
+                                          className="object-cover"
+                                          sizes="100vw"
+                                          unoptimized
+                                        />
+                                      ) : (
+                                        <LocalBlobImage
+                                          src={originalPreviewUrl}
+                                          alt="Original banner"
+                                          className="absolute inset-0 h-full w-full object-cover"
+                                        />
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -1375,19 +1223,49 @@ export default function NotificationBannerForm({
                                   className="relative w-full overflow-hidden"
                                   style={{ paddingBottom: `${100 / 1.618}%` }}
                                 >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={processedPreviewUrl || originalPreviewUrl || field.value}
-                                    alt="Banner preview"
-                                    className="absolute inset-0 h-full w-full object-cover"
-                                    onError={(e) => {
-                                      const src =
-                                        processedPreviewUrl || originalPreviewUrl || field.value;
-                                      error('Failed to load single preview:', src);
-                                      e.currentTarget.src =
-                                        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
-                                    }}
-                                  />
+                                  {/* Compute single preview URL */}
+                                  {(processedPreviewUrl ||
+                                    originalPreviewUrl ||
+                                    watchedImageUrl ||
+                                    watchedOriginalImageUrl ||
+                                    field.value) &&
+                                    (isRemoteUrl(
+                                      processedPreviewUrl ||
+                                        originalPreviewUrl ||
+                                        watchedImageUrl ||
+                                        watchedOriginalImageUrl ||
+                                        field.value ||
+                                        ''
+                                    ) ? (
+                                      <Image
+                                        src={
+                                          processedPreviewUrl ||
+                                          originalPreviewUrl ||
+                                          watchedImageUrl ||
+                                          watchedOriginalImageUrl ||
+                                          field.value ||
+                                          ''
+                                        }
+                                        alt="Banner preview"
+                                        fill
+                                        className="object-cover"
+                                        sizes="100vw"
+                                        unoptimized
+                                      />
+                                    ) : (
+                                      <LocalBlobImage
+                                        src={
+                                          processedPreviewUrl ||
+                                          originalPreviewUrl ||
+                                          watchedImageUrl ||
+                                          watchedOriginalImageUrl ||
+                                          field.value ||
+                                          ''
+                                        }
+                                        alt="Banner preview"
+                                        className="absolute inset-0 h-full w-full object-cover"
+                                      />
+                                    ))}
                                 </div>
                                 <p className="mt-1 px-4 text-xs text-muted-foreground sm:px-6 md:px-8">
                                   {(originalPreviewUrl || processedPreviewUrl)?.startsWith('blob:')
@@ -1414,16 +1292,21 @@ export default function NotificationBannerForm({
                   )}
                 />
 
+                {/* Hidden field for imageUrl (processed/display image) */}
+                <FormField
+                  control={control}
+                  name="imageUrl"
+                  render={({ field }) => (
+                    <input type="hidden" name="imageUrl" value={field.value || ''} />
+                  )}
+                />
+
                 {/* Hidden field for originalImageUrl */}
                 <FormField
                   control={control}
                   name="originalImageUrl"
                   render={({ field }) => (
-                    <FormItem className="hidden">
-                      <FormControl>
-                        <Input type="hidden" {...field} />
-                      </FormControl>
-                    </FormItem>
+                    <input type="hidden" name="originalImageUrl" value={field.value || ''} />
                   )}
                 />
 

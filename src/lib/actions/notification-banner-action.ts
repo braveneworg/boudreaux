@@ -194,6 +194,12 @@ export const createNotificationBannerAction = async (
       imageOffsetY,
     } = parsed.data;
 
+    // Debug: Log image URLs being saved
+    console.info('[NotificationBannerAction] CREATE - Image URLs:', {
+      originalImageUrl,
+      imageUrl,
+    });
+
     const createData = {
       message,
       secondaryMessage: secondaryMessage || null,
@@ -399,6 +405,13 @@ export const updateNotificationBannerAction = async (
       imageOffsetX,
       imageOffsetY,
     } = parsed.data;
+
+    // Debug: Log image URLs being saved
+    console.info('[NotificationBannerAction] UPDATE - Image URLs:', {
+      notificationId,
+      originalImageUrl,
+      imageUrl,
+    });
 
     const updateData = {
       message,

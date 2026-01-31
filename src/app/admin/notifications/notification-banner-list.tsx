@@ -154,10 +154,11 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                   objectPosition: `calc(50% + ${notification.imageOffsetX ?? 0}%) calc(50% + ${notification.imageOffsetY ?? 0}%)`,
                 }}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                unoptimized
               />
             )}
 
-            {/* Text overlay - shown when isOverlayed is true */}
+            {/* Text overlay - show when isOverlayed is enabled (text is rendered dynamically, not burned in) */}
             {notification.isOverlayed && (
               <>
                 {/* Main message */}
