@@ -118,12 +118,10 @@ describe('SignedInAs', () => {
   });
 
   describe('when user has no username', () => {
-    it('returns null when username is undefined', () => {
+    it('returns null when username is undefined and no fallback available', () => {
       mockUseSession.mockReturnValue({
         data: {
-          user: {
-            email: 'test@example.com',
-          },
+          user: {},
         },
         status: 'authenticated',
       });
@@ -133,12 +131,11 @@ describe('SignedInAs', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('returns null when username is null', () => {
+    it('returns null when username is null and no fallback available', () => {
       mockUseSession.mockReturnValue({
         data: {
           user: {
             username: null,
-            email: 'test@example.com',
           },
         },
         status: 'authenticated',

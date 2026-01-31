@@ -46,8 +46,8 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
           ease: 'easeInOut',
         }}
       />
-      {/* Sparkle overlay */}
-      <div className="absolute inset-0 pointer-events-none z-10">
+      {/* Sparkle overlay - suppressHydrationWarning due to random positions */}
+      <div className="absolute inset-0 pointer-events-none z-10" suppressHydrationWarning>
         {/* Main sparkles */}
         {sparkles.map((sparkle) => (
           <motion.div
@@ -62,6 +62,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
               left: `${sparkle.left}%`,
               top: `${sparkle.top}%`,
             }}
+            suppressHydrationWarning
             transition={{
               delay: sparkle.delay,
               duration: sparkle.duration,
@@ -84,6 +85,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
               left: `${particle.left}%`,
               top: `${particle.top}%`,
             }}
+            suppressHydrationWarning
             transition={{
               delay: 2.5 + particle.delay,
               duration: particle.duration,

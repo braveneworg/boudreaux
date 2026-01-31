@@ -27,6 +27,10 @@ export const SYSTEM_FONTS = [
   { value: 'Montserrat', label: 'Montserrat' },
   { value: 'Oswald', label: 'Oswald' },
   { value: 'Playfair Display', label: 'Playfair Display' },
+  { value: 'Bebas Neue', label: 'Bebas Neue' },
+  { value: 'Anton', label: 'Anton' },
+  { value: 'Fjalla One', label: 'Fjalla One' },
+  { value: 'Archivo Black', label: 'Archivo Black' },
 ] as const;
 
 export type SystemFont = (typeof SYSTEM_FONTS)[number]['value'];

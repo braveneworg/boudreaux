@@ -126,11 +126,8 @@ export function NotificationBanner({ notifications, className }: NotificationBan
       {/* Preload all images to prevent broken image icons when cycling */}
       <div className="hidden" aria-hidden="true">
         {notifications.map((notification) => {
-          // Preload the appropriate image based on overlay setting
-          // Always fall back to whichever image URL exists
-          const preloadUrl = notification.isOverlayed
-            ? notification.originalImageUrl || notification.imageUrl
-            : notification.imageUrl || notification.originalImageUrl;
+          // Preload the image - text overlay is rendered dynamically, not burned in
+          const preloadUrl = notification.imageUrl || notification.originalImageUrl;
           return preloadUrl ? (
             <Image
               key={notification.id}
@@ -246,10 +243,11 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
     imageOffsetY,
   } = notification;
 
-  // When overlay is enabled, use originalImageUrl (without baked text) so CSS text overlay shows correctly.
-  // When overlay is disabled, use imageUrl (which may have baked text for non-overlay display).
-  // Always fall back to whichever image URL exists to prevent broken images.
-  const displayImageUrl = isOverlayed ? originalImageUrl || imageUrl : imageUrl || originalImageUrl;
+  // When isOverlayed is enabled, use the originalImageUrl (non-overlayed) because
+  // the text overlay is rendered dynamically via CSS, not burned into the image.
+  // Otherwise, use the processed imageUrl or fall back to originalImageUrl.
+  const displayImageUrl =
+    isOverlayed && originalImageUrl ? originalImageUrl : imageUrl || originalImageUrl;
   const hasImage = !!displayImageUrl;
   const hasLink = !!linkUrl;
 

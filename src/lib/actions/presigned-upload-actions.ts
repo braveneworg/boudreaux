@@ -213,7 +213,8 @@ export const getPresignedUploadUrlsAction = async (
         Bucket: s3Bucket,
         Key: s3Key,
         ContentType: file.contentType,
-        ContentLength: file.fileSize,
+        // Note: Not including ContentLength in presigned URL to avoid size mismatch issues
+        // S3 will still accept the upload and determine the size from the actual content
         CacheControl: 'public, max-age=31536000, immutable',
         Metadata: {
           entityType,
@@ -229,6 +230,16 @@ export const getPresignedUploadUrlsAction = async (
       // Construct the CDN URL
       const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
       const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
+
+      // Debug: Log the generated URLs
+      console.info('[PRESIGNED_URLS] Generated URL details:', {
+        s3Key,
+        cdnUrl,
+        s3DirectUrl,
+        uploadUrlHost: new URL(uploadUrl).hostname,
+        bucket: s3Bucket,
+        region: awsRegion,
+      });
 
       results.push({
         uploadUrl,
