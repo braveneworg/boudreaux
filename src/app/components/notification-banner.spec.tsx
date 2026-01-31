@@ -602,7 +602,8 @@ describe('NotificationBanner', () => {
 
       const messageElement = screen.getByText('Rotated banner text');
       expect(messageElement).toBeInTheDocument();
-      expect(messageElement.style.transform).toContain('rotate(15deg)');
+      // Rotation is now on the parent container div
+      expect(messageElement.parentElement?.style.transform).toContain('rotate(15deg)');
     });
 
     it('should render secondary message with rotation transform when secondaryMessageRotation is set', () => {
@@ -618,7 +619,8 @@ describe('NotificationBanner', () => {
 
       const secondaryElement = screen.getByText('Rotated secondary text');
       expect(secondaryElement).toBeInTheDocument();
-      expect(secondaryElement.style.transform).toContain('rotate(-20deg)');
+      // Rotation is now on the parent container div
+      expect(secondaryElement.parentElement?.style.transform).toContain('rotate(-20deg)');
     });
 
     it('should apply zero rotation when messageRotation is 0', () => {
@@ -632,7 +634,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const messageElement = screen.getByText('No rotation text');
-      expect(messageElement.style.transform).toContain('rotate(0deg)');
+      // Rotation is now on the parent container div
+      expect(messageElement.parentElement?.style.transform).toContain('rotate(0deg)');
     });
 
     it('should handle null rotation values with default 0 rotation', () => {
@@ -646,7 +649,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const messageElement = screen.getByText('Default rotation');
-      expect(messageElement.style.transform).toContain('rotate(0deg)');
+      // Rotation is now on the parent container div
+      expect(messageElement.parentElement?.style.transform).toContain('rotate(0deg)');
     });
 
     it('should render with maximum positive rotation', () => {
@@ -660,7 +664,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const messageElement = screen.getByText('Max rotation');
-      expect(messageElement.style.transform).toContain('rotate(360deg)');
+      // Rotation is now on the parent container div
+      expect(messageElement.parentElement?.style.transform).toContain('rotate(360deg)');
     });
 
     it('should render with maximum negative rotation', () => {
@@ -674,7 +679,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const messageElement = screen.getByText('Negative rotation');
-      expect(messageElement.style.transform).toContain('rotate(-360deg)');
+      // Rotation is now on the parent container div
+      expect(messageElement.parentElement?.style.transform).toContain('rotate(-360deg)');
     });
   });
 

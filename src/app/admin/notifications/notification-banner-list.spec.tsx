@@ -630,14 +630,13 @@ describe('NotificationBannerList', () => {
 
       render(<NotificationBannerList notifications={[notification]} />);
 
-      // Find the main message span element
+      // Find the main message span element - rotation is now on the parent div
       const messageElements = screen.getAllByText('Rotated message');
-      const overlayMessage = messageElements.find(
-        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
-      );
+      const overlayMessage = messageElements.find((el) => el.tagName.toLowerCase() === 'span');
 
       expect(overlayMessage).toBeDefined();
-      expect(overlayMessage?.style.transform).toContain('rotate(45deg)');
+      // Check parent div for rotation transform
+      expect(overlayMessage?.parentElement?.style.transform).toContain('rotate(45deg)');
     });
 
     it('should apply rotation transform to secondary message when secondaryMessageRotation is set', () => {
@@ -651,14 +650,13 @@ describe('NotificationBannerList', () => {
 
       render(<NotificationBannerList notifications={[notification]} />);
 
-      // Find the secondary message span element
+      // Find the secondary message span element - rotation is now on the parent div
       const secondaryElements = screen.getAllByText('Rotated secondary');
-      const overlaySecondary = secondaryElements.find(
-        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
-      );
+      const overlaySecondary = secondaryElements.find((el) => el.tagName.toLowerCase() === 'span');
 
       expect(overlaySecondary).toBeDefined();
-      expect(overlaySecondary?.style.transform).toContain('rotate(-30deg)');
+      // Check parent div for rotation transform
+      expect(overlaySecondary?.parentElement?.style.transform).toContain('rotate(-30deg)');
     });
 
     it('should apply zero rotation by default', () => {
@@ -672,12 +670,11 @@ describe('NotificationBannerList', () => {
       render(<NotificationBannerList notifications={[notification]} />);
 
       const messageElements = screen.getAllByText('Default rotation message');
-      const overlayMessage = messageElements.find(
-        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
-      );
+      const overlayMessage = messageElements.find((el) => el.tagName.toLowerCase() === 'span');
 
       expect(overlayMessage).toBeDefined();
-      expect(overlayMessage?.style.transform).toContain('rotate(0deg)');
+      // Check parent div for rotation transform
+      expect(overlayMessage?.parentElement?.style.transform).toContain('rotate(0deg)');
     });
 
     it('should handle null rotation values with default of 0', () => {
@@ -691,12 +688,11 @@ describe('NotificationBannerList', () => {
       render(<NotificationBannerList notifications={[notification]} />);
 
       const messageElements = screen.getAllByText('Null rotation message');
-      const overlayMessage = messageElements.find(
-        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
-      );
+      const overlayMessage = messageElements.find((el) => el.tagName.toLowerCase() === 'span');
 
       expect(overlayMessage).toBeDefined();
-      expect(overlayMessage?.style.transform).toContain('rotate(0deg)');
+      // Check parent div for rotation transform
+      expect(overlayMessage?.parentElement?.style.transform).toContain('rotate(0deg)');
     });
   });
 
