@@ -4,14 +4,16 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 
 import { auth } from '../../../auth';
 
-// Debug: Log at module load time
-console.info(
-  '[PRESIGNED_URLS] Module loaded. S3_BUCKET:',
-  process.env.S3_BUCKET ? 'SET' : 'NOT SET'
-);
+const logger = loggers.presignedUrls;
+
+// Log at module load time for debugging
+logger.info('Module loaded', {
+  s3BucketConfigured: !!process.env.S3_BUCKET,
+});
 
 /**
  * S3 client configuration
@@ -159,8 +161,10 @@ export const getPresignedUploadUrlsAction = async (
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {
-  // Debug: Log environment variables availability (not values for security)
-  console.info('[PRESIGNED_URLS] Environment check:', {
+  const operation = 'getPresignedUploadUrls';
+
+  // Log environment variables availability (not values for security)
+  logger.debug('Environment check', {
     hasS3Bucket: !!process.env.S3_BUCKET,
     hasAwsRegion: !!process.env.AWS_REGION,
     hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
@@ -174,10 +178,16 @@ export const getPresignedUploadUrlsAction = async (
     const session = await auth();
 
     if (!session?.user?.id || session?.user?.role !== 'admin') {
+      logger.warn('Unauthorized access attempt', {
+        hasSession: !!session,
+        hasUserId: !!session?.user?.id,
+        role: session?.user?.role,
+      });
       return { success: false, error: 'Unauthorized' };
     }
 
     if (files.length === 0) {
+      logger.warn('No files provided for upload', { entityType, entityId });
       return { success: false, error: 'No files provided' };
     }
 
@@ -185,6 +195,12 @@ export const getPresignedUploadUrlsAction = async (
     for (const file of files) {
       const validation = validateFile(file.contentType, file.fileSize);
       if (!validation.valid) {
+        logger.warn('File validation failed', {
+          fileName: file.fileName,
+          contentType: file.contentType,
+          fileSize: file.fileSize,
+          error: validation.error,
+        });
         return { success: false, error: validation.error };
       }
     }
@@ -197,12 +213,19 @@ export const getPresignedUploadUrlsAction = async (
     const awsRegion = process.env.AWS_REGION || 'us-east-1';
 
     if (!s3Bucket) {
-      console.error('[PRESIGNED_URLS] S3_BUCKET environment variable is not set');
+      logger.error('S3_BUCKET environment variable is not set');
       return {
         success: false,
         error: 'S3 storage is not configured. Please contact an administrator.',
       };
     }
+
+    logger.operationStart(operation, {
+      entityType,
+      entityId,
+      fileCount: files.length,
+      userId: session.user.id,
+    });
 
     const results: PresignedUrlResult[] = [];
 
@@ -231,8 +254,7 @@ export const getPresignedUploadUrlsAction = async (
       const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
       const cdnUrl = cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
 
-      // Debug: Log the generated URLs
-      console.info('[PRESIGNED_URLS] Generated URL details:', {
+      logger.debug('Generated presigned URL', {
         s3Key,
         cdnUrl,
         s3DirectUrl,
@@ -248,14 +270,16 @@ export const getPresignedUploadUrlsAction = async (
       });
     }
 
-    // Log presigned URL generation (console only, not security audit)
-    console.info(
-      `[PRESIGNED_URLS] Generated ${files.length} presigned URLs for ${entityType}/${entityId} by user ${session.user.id}`
-    );
+    logger.operationComplete(operation, {
+      entityType,
+      entityId,
+      fileCount: files.length,
+      userId: session.user.id,
+    });
 
     return { success: true, data: results };
   } catch (error) {
-    console.error('Get presigned URLs action error:', error);
+    logger.operationFailed(operation, error, { entityType, entityId, fileCount: files.length });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: `Failed to generate upload URLs: ${errorMessage}` };
   }

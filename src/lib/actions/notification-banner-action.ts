@@ -7,9 +7,12 @@ import { NotificationBannerService } from '../services/notification-banner-servi
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
 import { requireRole } from '../utils/auth/require-role';
+import { loggers } from '../utils/logger';
 import { notificationBannerSchema } from '../validation/notification-banner-schema';
 
 import type { FormState } from '../types/form-state';
+
+const logger = loggers.notifications;
 
 const permittedFieldNames = [
   'message',
@@ -57,9 +60,9 @@ export const createNotificationBannerAction = async (
   await requireRole('admin');
 
   // Debug: Log received payload
-  console.info('[NotificationBannerAction] CREATE - Received FormData entries:');
+  logger.debug('CREATE - Received FormData entries');
   for (const [key, value] of payload.entries()) {
-    console.info(`  ${key}: ${value}`);
+    logger.debug(`  ${key}: ${value}`);
   }
 
   // Convert numeric and boolean fields
@@ -137,7 +140,7 @@ export const createNotificationBannerAction = async (
   }
 
   // Debug: Log dimension values before validation
-  console.info('[NotificationBannerAction] CREATE - Dimension values:', {
+  logger.debug('CREATE - Dimension values', {
     messageWidth: formDataObj.messageWidth,
     messageHeight: formDataObj.messageHeight,
     secondaryMessageWidth: formDataObj.secondaryMessageWidth,
@@ -163,7 +166,7 @@ export const createNotificationBannerAction = async (
   }
 
   if (!parsed.success) {
-    console.error('[NotificationBannerAction] CREATE - Validation failed:', parsed.error.issues);
+    logger.warn('CREATE - Validation failed', { issues: parsed.error.issues });
     formState.errors = {};
     for (const issue of parsed.error.issues) {
       const path = issue.path[0]?.toString() || 'general';
@@ -224,7 +227,7 @@ export const createNotificationBannerAction = async (
     } = parsed.data;
 
     // Debug: Log image URLs being saved
-    console.info('[NotificationBannerAction] CREATE - Image URLs:', {
+    logger.debug('CREATE - Image URLs', {
       originalImageUrl,
       imageUrl,
     });
@@ -293,7 +296,7 @@ export const createNotificationBannerAction = async (
 
     return formState;
   } catch (error) {
-    console.error('Error creating notification banner:', error);
+    logger.error('Error creating notification banner', error);
     setUnknownError(formState);
     return formState;
   }
@@ -306,9 +309,9 @@ export const updateNotificationBannerAction = async (
   await requireRole('admin');
 
   // Debug: Log received payload
-  console.info('[NotificationBannerAction] UPDATE - Received FormData entries:');
+  logger.debug('UPDATE - Received FormData entries');
   for (const [key, value] of payload.entries()) {
-    console.info(`  ${key}: ${value}`);
+    logger.debug(`  ${key}: ${value}`);
   }
 
   const notificationId = payload.get('notificationId')?.toString();
@@ -380,7 +383,7 @@ export const updateNotificationBannerAction = async (
   }
 
   // Debug: Log dimension values before validation
-  console.info('[NotificationBannerAction] UPDATE - Dimension values:', {
+  logger.debug('UPDATE - Dimension values', {
     messageWidth: formDataObj.messageWidth,
     messageHeight: formDataObj.messageHeight,
     secondaryMessageWidth: formDataObj.secondaryMessageWidth,
@@ -404,7 +407,7 @@ export const updateNotificationBannerAction = async (
   }
 
   if (!parsed.success) {
-    console.error('[NotificationBannerAction] UPDATE - Validation failed:', parsed.error.issues);
+    logger.warn('UPDATE - Validation failed', { issues: parsed.error.issues });
     formState.errors = {};
     for (const issue of parsed.error.issues) {
       const path = issue.path[0]?.toString() || 'general';
@@ -465,7 +468,7 @@ export const updateNotificationBannerAction = async (
     } = parsed.data;
 
     // Debug: Log image URLs being saved
-    console.info('[NotificationBannerAction] UPDATE - Image URLs:', {
+    logger.debug('UPDATE - Image URLs', {
       notificationId,
       originalImageUrl,
       imageUrl,
@@ -510,17 +513,14 @@ export const updateNotificationBannerAction = async (
       secondaryMessageHeight: secondaryMessageHeight ?? 30,
     };
 
-    console.info(
-      '[NotificationBannerAction] UPDATE - Calling service with data:',
-      JSON.stringify(updateData, null, 2)
-    );
+    logger.debug('UPDATE - Calling service', { notificationId });
 
     const result = await NotificationBannerService.updateNotificationBanner(
       notificationId,
       updateData
     );
 
-    console.info('[NotificationBannerAction] UPDATE - Service result:', result);
+    logger.debug('UPDATE - Service result', { success: result.success });
 
     if (!result.success) {
       formState.errors = { general: [result.error] };
@@ -544,7 +544,7 @@ export const updateNotificationBannerAction = async (
 
     return formState;
   } catch (error) {
-    console.error('Error updating notification banner:', error);
+    logger.error('Error updating notification banner', error, { notificationId });
     setUnknownError(formState);
     return formState;
   }
@@ -579,7 +579,7 @@ export const deleteNotificationBannerAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting notification banner:', error);
+    logger.error('Error deleting notification banner', error, { notificationId });
     return { success: false, error: 'Failed to delete notification banner' };
   }
 };
@@ -616,7 +616,7 @@ export const publishNotificationBannerAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error publishing notification banner:', error);
+    logger.error('Error publishing notification banner', error, { notificationId });
     return { success: false, error: 'Failed to publish notification banner' };
   }
 };
@@ -650,7 +650,7 @@ export const unpublishNotificationBannerAction = async (
 
     return { success: true };
   } catch (error) {
-    console.error('Error unpublishing notification banner:', error);
+    logger.error('Error unpublishing notification banner', error, { notificationId });
     return { success: false, error: 'Failed to unpublish notification banner' };
   }
 };
