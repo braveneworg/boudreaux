@@ -31,12 +31,17 @@ export const uploadFileToS3 = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('S3 upload error:', errorText);
+      console.error('S3 upload error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        s3Key: presignedUrl.s3Key,
+      });
       return {
         success: false,
         s3Key: presignedUrl.s3Key,
         cdnUrl: presignedUrl.cdnUrl,
-        error: `Upload failed: ${response.status} ${response.statusText}`,
+        error: `Upload failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`,
       };
     }
 

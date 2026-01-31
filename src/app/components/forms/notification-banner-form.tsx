@@ -1280,6 +1280,14 @@ export default function NotificationBannerForm({
                                         src={originalPreviewUrl}
                                         alt="Original banner"
                                         className="absolute inset-0 h-full w-full object-cover"
+                                        onError={(e) => {
+                                          error(
+                                            'Failed to load original preview:',
+                                            originalPreviewUrl
+                                          );
+                                          e.currentTarget.src =
+                                            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
+                                        }}
                                       />
                                     </div>
                                   </div>
@@ -1297,6 +1305,14 @@ export default function NotificationBannerForm({
                                         src={processedPreviewUrl}
                                         alt="Processed banner"
                                         className="absolute inset-0 h-full w-full object-cover"
+                                        onError={(e) => {
+                                          error(
+                                            'Failed to load processed preview:',
+                                            processedPreviewUrl
+                                          );
+                                          e.currentTarget.src =
+                                            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
+                                        }}
                                       />
                                     </div>
                                   </div>
@@ -1320,6 +1336,13 @@ export default function NotificationBannerForm({
                                     src={processedPreviewUrl || originalPreviewUrl || field.value}
                                     alt="Banner preview"
                                     className="absolute inset-0 h-full w-full object-cover"
+                                    onError={(e) => {
+                                      const src =
+                                        processedPreviewUrl || originalPreviewUrl || field.value;
+                                      error('Failed to load single preview:', src);
+                                      e.currentTarget.src =
+                                        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="880" height="544" fill="%23f3f4f6"%3E%3Crect width="100%25" height="100%25"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="24"%3EImage failed to load%3C/text%3E%3C/svg%3E';
+                                    }}
                                   />
                                 </div>
                                 <p className="mt-1 px-4 text-xs text-muted-foreground sm:px-6 md:px-8">

@@ -245,6 +245,7 @@ export const getPresignedUploadUrlsAction = async (
     return { success: true, data: results };
   } catch (error) {
     console.error('Get presigned URLs action error:', error);
-    return { success: false, error: 'Failed to generate upload URLs' };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: `Failed to generate upload URLs: ${errorMessage}` };
   }
 };
