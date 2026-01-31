@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 /**
  * Simple structured logger for server-side operations

@@ -1,3 +1,7 @@
+/* eslint-disable import/first */
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
+
 import {
   createNotificationBannerAction,
   updateNotificationBannerAction,
