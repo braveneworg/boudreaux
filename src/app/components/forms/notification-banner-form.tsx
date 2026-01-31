@@ -181,6 +181,12 @@ export default function NotificationBannerForm({
       messagePositionY: 10,
       secondaryMessagePositionX: 50,
       secondaryMessagePositionY: 90,
+      // Rotation defaults (degrees)
+      messageRotation: 0,
+      secondaryMessageRotation: 0,
+      // Image offset defaults (percentage -100 to 100)
+      imageOffsetX: 0,
+      imageOffsetY: 0,
     },
   });
   const { control, setValue, watch } = form;
@@ -211,10 +217,19 @@ export default function NotificationBannerForm({
   const watchedMessagePositionY = watch('messagePositionY');
   const watchedSecondaryMessagePositionX = watch('secondaryMessagePositionX');
   const watchedSecondaryMessagePositionY = watch('secondaryMessagePositionY');
+  // Rotation watched values for live preview
+  const watchedMessageRotation = watch('messageRotation');
+  const watchedSecondaryMessageRotation = watch('secondaryMessageRotation');
+  // Image offset watched values for live preview
+  const watchedImageOffsetX = watch('imageOffsetX');
+  const watchedImageOffsetY = watch('imageOffsetY');
 
   // Drag state for positioning text
   const [isDraggingMessage, setIsDraggingMessage] = useState(false);
   const [isDraggingSecondary, setIsDraggingSecondary] = useState(false);
+  // Rotation drag state
+  const [isRotatingMessage, setIsRotatingMessage] = useState(false);
+  const [isRotatingSecondary, setIsRotatingSecondary] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch notification data when initialNotificationId is provided
@@ -272,6 +287,12 @@ export default function NotificationBannerForm({
           messagePositionY: notification.messagePositionY ?? 10,
           secondaryMessagePositionX: notification.secondaryMessagePositionX ?? 50,
           secondaryMessagePositionY: notification.secondaryMessagePositionY ?? 90,
+          // Rotation fields
+          messageRotation: notification.messageRotation ?? 0,
+          secondaryMessageRotation: notification.secondaryMessageRotation ?? 0,
+          // Image offset fields
+          imageOffsetX: notification.imageOffsetX ?? 0,
+          imageOffsetY: notification.imageOffsetY ?? 0,
         });
 
         // Set preview URLs from existing notification
@@ -807,6 +828,34 @@ export default function NotificationBannerForm({
         formData.set('backgroundColor', backgroundColor);
       }
 
+      // Ensure font family fields are included
+      const messageFont = form.getValues('messageFont');
+      const secondaryMessageFont = form.getValues('secondaryMessageFont');
+      formData.set('messageFont', messageFont || 'system-ui');
+      formData.set('secondaryMessageFont', secondaryMessageFont || 'system-ui');
+
+      // Ensure position fields are included
+      const messagePositionX = form.getValues('messagePositionX');
+      const messagePositionY = form.getValues('messagePositionY');
+      const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
+      const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
+      formData.set('messagePositionX', String(messagePositionX ?? 50));
+      formData.set('messagePositionY', String(messagePositionY ?? 10));
+      formData.set('secondaryMessagePositionX', String(secondaryMessagePositionX ?? 50));
+      formData.set('secondaryMessagePositionY', String(secondaryMessagePositionY ?? 90));
+
+      // Ensure rotation fields are included
+      const messageRotation = form.getValues('messageRotation');
+      const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
+      formData.set('messageRotation', String(messageRotation ?? 0));
+      formData.set('secondaryMessageRotation', String(secondaryMessageRotation ?? 0));
+
+      // Ensure image offset fields are included
+      const imageOffsetX = form.getValues('imageOffsetX');
+      const imageOffsetY = form.getValues('imageOffsetY');
+      formData.set('imageOffsetX', String(imageOffsetX ?? 0));
+      formData.set('imageOffsetY', String(imageOffsetY ?? 0));
+
       formAction(formData);
     }
   };
@@ -838,6 +887,9 @@ export default function NotificationBannerForm({
     (e: MouseEvent | TouchEvent) => {
       if (!isDraggingMessage && !isDraggingSecondary) return;
       if (!previewContainerRef.current) return;
+
+      // Prevent page scrolling while dragging
+      e.preventDefault();
 
       const container = previewContainerRef.current;
       const rect = container.getBoundingClientRect();
@@ -881,7 +933,7 @@ export default function NotificationBannerForm({
     if (isDraggingMessage || isDraggingSecondary) {
       document.addEventListener('mousemove', handleDragMove);
       document.addEventListener('mouseup', handleDragEnd);
-      document.addEventListener('touchmove', handleDragMove);
+      document.addEventListener('touchmove', handleDragMove, { passive: false });
       document.addEventListener('touchend', handleDragEnd);
       return () => {
         document.removeEventListener('mousemove', handleDragMove);
@@ -891,6 +943,137 @@ export default function NotificationBannerForm({
       };
     }
   }, [isDraggingMessage, isDraggingSecondary, handleDragMove, handleDragEnd]);
+
+  /**
+   * Handle rotation start for message
+   */
+  const handleMessageRotateStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsRotatingMessage(true);
+  }, []);
+
+  /**
+   * Handle rotation start for secondary message
+   */
+  const handleSecondaryRotateStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsRotatingSecondary(true);
+  }, []);
+
+  /**
+   * Handle rotation move for both messages
+   */
+  const handleRotationMove = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      if (!isRotatingMessage && !isRotatingSecondary) return;
+      if (!previewContainerRef.current) return;
+
+      // Prevent page scrolling while rotating
+      e.preventDefault();
+
+      const container = previewContainerRef.current;
+      const rect = container.getBoundingClientRect();
+
+      // Get position from mouse or touch event
+      let clientX: number;
+      let clientY: number;
+      if ('touches' in e) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      // Get the center point of the text element
+      const posX = isRotatingMessage
+        ? (watchedMessagePositionX ?? 50)
+        : (watchedSecondaryMessagePositionX ?? 50);
+      const posY = isRotatingMessage
+        ? (watchedMessagePositionY ?? 10)
+        : (watchedSecondaryMessagePositionY ?? 90);
+
+      const centerX = rect.left + (rect.width * posX) / 100;
+      const centerY = rect.top + (rect.height * posY) / 100;
+
+      // Calculate angle from center to cursor
+      const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+      // Adjust so 0° is at the top (add 90°)
+      const adjustedAngle = Math.round(angle + 90);
+      // Normalize to -180 to 180 range
+      const normalizedAngle = adjustedAngle > 180 ? adjustedAngle - 360 : adjustedAngle;
+
+      if (isRotatingMessage) {
+        setValue('messageRotation', normalizedAngle);
+      } else if (isRotatingSecondary) {
+        setValue('secondaryMessageRotation', normalizedAngle);
+      }
+    },
+    [
+      isRotatingMessage,
+      isRotatingSecondary,
+      watchedMessagePositionX,
+      watchedMessagePositionY,
+      watchedSecondaryMessagePositionX,
+      watchedSecondaryMessagePositionY,
+      setValue,
+    ]
+  );
+
+  /**
+   * Handle rotation end for both messages
+   */
+  const handleRotationEnd = useCallback(() => {
+    setIsRotatingMessage(false);
+    setIsRotatingSecondary(false);
+  }, []);
+
+  // Add document-level event listeners for rotation
+  useEffect(() => {
+    if (isRotatingMessage || isRotatingSecondary) {
+      document.addEventListener('mousemove', handleRotationMove);
+      document.addEventListener('mouseup', handleRotationEnd);
+      document.addEventListener('touchmove', handleRotationMove, { passive: false });
+      document.addEventListener('touchend', handleRotationEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleRotationMove);
+        document.removeEventListener('mouseup', handleRotationEnd);
+        document.removeEventListener('touchmove', handleRotationMove);
+        document.removeEventListener('touchend', handleRotationEnd);
+      };
+    }
+  }, [isRotatingMessage, isRotatingSecondary, handleRotationMove, handleRotationEnd]);
+
+  /**
+   * Handle keyboard events for image nudging
+   */
+  const handlePreviewKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const nudgeAmount = e.shiftKey ? 5 : 1; // Hold Shift for larger nudges
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          setValue('imageOffsetX', Math.max(-100, (watchedImageOffsetX ?? 0) - nudgeAmount));
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setValue('imageOffsetX', Math.min(100, (watchedImageOffsetX ?? 0) + nudgeAmount));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setValue('imageOffsetY', Math.max(-100, (watchedImageOffsetY ?? 0) - nudgeAmount));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setValue('imageOffsetY', Math.min(100, (watchedImageOffsetY ?? 0) + nudgeAmount));
+          break;
+      }
+    },
+    [watchedImageOffsetX, watchedImageOffsetY, setValue]
+  );
 
   if (isLoadingNotification) {
     return (
@@ -1219,6 +1402,54 @@ export default function NotificationBannerForm({
                   )}
                 />
 
+                {/* Hidden fields for text rotation */}
+                <FormField
+                  control={control}
+                  name="messageRotation"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value ?? 0} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="secondaryMessageRotation"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value ?? 0} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Hidden fields for image offset */}
+                <FormField
+                  control={control}
+                  name="imageOffsetX"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value ?? 0} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="imageOffsetY"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <Input type="hidden" {...field} value={field.value ?? 0} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={control}
                   name="backgroundColor"
@@ -1427,14 +1658,14 @@ export default function NotificationBannerForm({
                             </div>
                             <FormControl>
                               <Slider
-                                min={2.5}
-                                max={6}
+                                min={0.5}
+                                max={10}
                                 step={0.1}
                                 value={[field.value ?? 2.5]}
                                 onValueChange={(values) => setValue('messageFontSize', values[0])}
                               />
                             </FormControl>
-                            <FormDescription>Minimum 2.5rem for readability</FormDescription>
+                            <FormDescription>Font size from 0.5rem to 10rem</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1647,8 +1878,8 @@ export default function NotificationBannerForm({
                             </div>
                             <FormControl>
                               <Slider
-                                min={2}
-                                max={5}
+                                min={0.5}
+                                max={10}
                                 step={0.1}
                                 value={[field.value ?? 2]}
                                 onValueChange={(values) =>
@@ -1656,7 +1887,7 @@ export default function NotificationBannerForm({
                                 }
                               />
                             </FormControl>
-                            <FormDescription>Minimum 2rem for readability</FormDescription>
+                            <FormDescription>Font size from 0.5rem to 10rem</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1889,15 +2120,25 @@ export default function NotificationBannerForm({
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Preview</h3>
                     <p className="text-sm text-muted-foreground">
-                      Drag the text to position it on the image.
+                      Drag the text to position it. Use the rotation handle (↻) to rotate. Click the
+                      preview and use arrow keys to nudge the image (hold Shift for larger
+                      increments).
                     </p>
                     <div
                       ref={previewContainerRef}
-                      className="relative w-full overflow-hidden rounded-lg border"
+                      className="relative w-full overflow-hidden rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary"
                       style={{
                         paddingBottom: `${100 / 1.618}%`,
-                        cursor: isDraggingMessage || isDraggingSecondary ? 'grabbing' : 'default',
+                        cursor:
+                          isDraggingMessage ||
+                          isDraggingSecondary ||
+                          isRotatingMessage ||
+                          isRotatingSecondary
+                            ? 'grabbing'
+                            : 'default',
                       }}
+                      tabIndex={0}
+                      onKeyDown={handlePreviewKeyDown}
                     >
                       <div
                         className="absolute inset-0"
@@ -1905,113 +2146,158 @@ export default function NotificationBannerForm({
                           backgroundColor: !watchedImageUrl ? watchedBackgroundColor : undefined,
                           backgroundImage: watchedImageUrl ? `url(${watchedImageUrl})` : undefined,
                           backgroundSize: 'cover',
-                          backgroundPosition: 'center',
+                          backgroundPosition: `calc(50% + ${watchedImageOffsetX ?? 0}%) calc(50% + ${watchedImageOffsetY ?? 0}%)`,
                         }}
                       >
                         {watchedIsOverlayed && (
                           <>
-                            {/* Message - draggable and positioned */}
-                            <span
-                              className={cn(
-                                'absolute cursor-grab select-none px-2 transition-shadow',
-                                isDraggingMessage && 'cursor-grabbing',
-                                'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent'
-                              )}
+                            {/* Message - draggable, rotatable, and positioned */}
+                            <div
+                              className="absolute"
                               style={{
                                 left: `${watchedMessagePositionX ?? 50}%`,
                                 top: `${watchedMessagePositionY ?? 10}%`,
-                                transform: `translate(-50%, -50%)`,
-                                maxWidth: '90%',
-                                textAlign: 'center',
-                                fontFamily:
-                                  watchedMessageFont === 'system-ui'
-                                    ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                                    : `'${watchedMessageFont}', system-ui, sans-serif`,
-                                fontSize: `${watchedMessageFontSize}rem`,
-                                color: hexToRgba(
-                                  watchedMessageTextColor || '#ffffff',
-                                  (watchedMessageContrast ?? 100) / 100
-                                ),
-                                textShadow:
-                                  watchedMessageTextShadow && watchedImageUrl
-                                    ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
-                                    : 'none',
-                                textTransform: 'none',
-                                letterSpacing: 'normal',
-                                fontWeight: 'normal',
+                                transform: `translate(-50%, -50%) rotate(${watchedMessageRotation ?? 0}deg)`,
                               }}
-                              onMouseDown={handleMessageDragStart}
-                              onTouchStart={handleMessageDragStart}
-                              onDoubleClick={() => {
-                                messageTextareaRef.current?.focus();
-                                messageTextareaRef.current?.scrollIntoView({
-                                  behavior: 'smooth',
-                                  block: 'center',
-                                });
-                              }}
-                              title="Drag to position, double-click to edit"
                             >
-                              {watchedMessage || 'Your message here'}
-                            </span>
-                            {/* Secondary message - draggable and positioned */}
-                            {watchedSecondaryMessage && (
                               <span
                                 className={cn(
-                                  'absolute cursor-grab select-none px-2 transition-shadow',
-                                  isDraggingSecondary && 'cursor-grabbing',
+                                  'block cursor-grab select-none px-2 transition-shadow',
+                                  isDraggingMessage && 'cursor-grabbing',
                                   'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent'
                                 )}
                                 style={{
-                                  left: `${watchedSecondaryMessagePositionX ?? 50}%`,
-                                  top: `${watchedSecondaryMessagePositionY ?? 90}%`,
-                                  transform: `translate(-50%, -50%)`,
                                   maxWidth: '90%',
                                   textAlign: 'center',
                                   fontFamily:
-                                    watchedSecondaryMessageFont === 'system-ui'
+                                    watchedMessageFont === 'system-ui'
                                       ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                                      : `'${watchedSecondaryMessageFont}', system-ui, sans-serif`,
-                                  fontSize: `${watchedSecondaryMessageFontSize}rem`,
+                                      : `'${watchedMessageFont}', system-ui, sans-serif`,
+                                  fontSize: `${watchedMessageFontSize}rem`,
                                   color: hexToRgba(
-                                    watchedSecondaryMessageTextColor || '#ffffff',
-                                    (watchedSecondaryMessageContrast ?? 95) / 100
+                                    watchedMessageTextColor || '#ffffff',
+                                    (watchedMessageContrast ?? 100) / 100
                                   ),
                                   textShadow:
-                                    watchedSecondaryMessageTextShadow && watchedImageUrl
-                                      ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedSecondaryMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
+                                    watchedMessageTextShadow && watchedImageUrl
+                                      ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
                                       : 'none',
                                   textTransform: 'none',
                                   letterSpacing: 'normal',
                                   fontWeight: 'normal',
                                 }}
-                                onMouseDown={handleSecondaryDragStart}
-                                onTouchStart={handleSecondaryDragStart}
+                                onMouseDown={handleMessageDragStart}
+                                onTouchStart={handleMessageDragStart}
                                 onDoubleClick={() => {
-                                  secondaryMessageTextareaRef.current?.focus();
-                                  secondaryMessageTextareaRef.current?.scrollIntoView({
+                                  messageTextareaRef.current?.focus();
+                                  messageTextareaRef.current?.scrollIntoView({
                                     behavior: 'smooth',
                                     block: 'center',
                                   });
                                 }}
                                 title="Drag to position, double-click to edit"
                               >
-                                {watchedSecondaryMessage}
+                                {watchedMessage || 'Your message here'}
                               </span>
+                              {/* Rotation handle for message */}
+                              <button
+                                type="button"
+                                className={cn(
+                                  'absolute -right-6 top-1/2 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white',
+                                  isRotatingMessage && 'cursor-grabbing bg-white'
+                                )}
+                                onMouseDown={handleMessageRotateStart}
+                                onTouchStart={handleMessageRotateStart}
+                                title={`Rotate text (${watchedMessageRotation ?? 0}°)`}
+                              >
+                                ↻
+                              </button>
+                            </div>
+                            {/* Secondary message - draggable, rotatable, and positioned */}
+                            {watchedSecondaryMessage && (
+                              <div
+                                className="absolute"
+                                style={{
+                                  left: `${watchedSecondaryMessagePositionX ?? 50}%`,
+                                  top: `${watchedSecondaryMessagePositionY ?? 90}%`,
+                                  transform: `translate(-50%, -50%) rotate(${watchedSecondaryMessageRotation ?? 0}deg)`,
+                                }}
+                              >
+                                <span
+                                  className={cn(
+                                    'block cursor-grab select-none px-2 transition-shadow',
+                                    isDraggingSecondary && 'cursor-grabbing',
+                                    'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent'
+                                  )}
+                                  style={{
+                                    maxWidth: '90%',
+                                    textAlign: 'center',
+                                    fontFamily:
+                                      watchedSecondaryMessageFont === 'system-ui'
+                                        ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                                        : `'${watchedSecondaryMessageFont}', system-ui, sans-serif`,
+                                    fontSize: `${watchedSecondaryMessageFontSize}rem`,
+                                    color: hexToRgba(
+                                      watchedSecondaryMessageTextColor || '#ffffff',
+                                      (watchedSecondaryMessageContrast ?? 95) / 100
+                                    ),
+                                    textShadow:
+                                      watchedSecondaryMessageTextShadow && watchedImageUrl
+                                        ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedSecondaryMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
+                                        : 'none',
+                                    textTransform: 'none',
+                                    letterSpacing: 'normal',
+                                    fontWeight: 'normal',
+                                  }}
+                                  onMouseDown={handleSecondaryDragStart}
+                                  onTouchStart={handleSecondaryDragStart}
+                                  onDoubleClick={() => {
+                                    secondaryMessageTextareaRef.current?.focus();
+                                    secondaryMessageTextareaRef.current?.scrollIntoView({
+                                      behavior: 'smooth',
+                                      block: 'center',
+                                    });
+                                  }}
+                                  title="Drag to position, double-click to edit"
+                                >
+                                  {watchedSecondaryMessage}
+                                </span>
+                                {/* Rotation handle for secondary message */}
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    'absolute -right-6 top-1/2 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white',
+                                    isRotatingSecondary && 'cursor-grabbing bg-white'
+                                  )}
+                                  onMouseDown={handleSecondaryRotateStart}
+                                  onTouchStart={handleSecondaryRotateStart}
+                                  title={`Rotate text (${watchedSecondaryMessageRotation ?? 0}°)`}
+                                >
+                                  ↻
+                                </button>
+                              </div>
                             )}
                           </>
                         )}
                       </div>
                     </div>
-                    {/* Position display */}
-                    <div className="flex gap-4 text-xs text-muted-foreground">
+                    {/* Position and rotation display */}
+                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                       <span>
                         Message: X={watchedMessagePositionX ?? 50}%, Y=
-                        {watchedMessagePositionY ?? 10}%
+                        {watchedMessagePositionY ?? 10}%, Rotation=
+                        {watchedMessageRotation ?? 0}°
                       </span>
                       {watchedSecondaryMessage && (
                         <span>
                           Secondary: X={watchedSecondaryMessagePositionX ?? 50}%, Y=
-                          {watchedSecondaryMessagePositionY ?? 90}%
+                          {watchedSecondaryMessagePositionY ?? 90}%, Rotation=
+                          {watchedSecondaryMessageRotation ?? 0}°
+                        </span>
+                      )}
+                      {watchedImageUrl && (
+                        <span>
+                          Image offset: X={watchedImageOffsetX ?? 0}%, Y={watchedImageOffsetY ?? 0}%
                         </span>
                       )}
                     </div>

@@ -38,6 +38,12 @@ export type NotificationBanner = {
   messagePositionY: number | null;
   secondaryMessagePositionX: number | null;
   secondaryMessagePositionY: number | null;
+  // Text rotation settings
+  messageRotation: number | null;
+  secondaryMessageRotation: number | null;
+  // Image offset settings
+  imageOffsetX: number | null;
+  imageOffsetY: number | null;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;

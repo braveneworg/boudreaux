@@ -122,6 +122,10 @@ const createMockNotification = (
   messagePositionY: null,
   secondaryMessagePositionX: null,
   secondaryMessagePositionY: null,
+  messageRotation: null,
+  secondaryMessageRotation: null,
+  imageOffsetX: null,
+  imageOffsetY: null,
   ...overrides,
 });
 
@@ -578,6 +582,200 @@ describe('NotificationBanner', () => {
       const slide = screen.getByRole('group');
       expect(slide).toHaveClass('cursor-grab');
       expect(slide).toHaveClass('active:cursor-grabbing');
+    });
+  });
+
+  describe('text rotation', () => {
+    it('should render message with rotation transform when messageRotation is set', () => {
+      const notification = createMockNotification({
+        message: 'Rotated banner text',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageRotation: 15,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('Rotated banner text');
+      expect(messageElement).toBeInTheDocument();
+      expect(messageElement.style.transform).toContain('rotate(15deg)');
+    });
+
+    it('should render secondary message with rotation transform when secondaryMessageRotation is set', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Rotated secondary text',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        secondaryMessageRotation: -20,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const secondaryElement = screen.getByText('Rotated secondary text');
+      expect(secondaryElement).toBeInTheDocument();
+      expect(secondaryElement.style.transform).toContain('rotate(-20deg)');
+    });
+
+    it('should apply zero rotation when messageRotation is 0', () => {
+      const notification = createMockNotification({
+        message: 'No rotation text',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageRotation: 0,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('No rotation text');
+      expect(messageElement.style.transform).toContain('rotate(0deg)');
+    });
+
+    it('should handle null rotation values with default 0 rotation', () => {
+      const notification = createMockNotification({
+        message: 'Default rotation',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageRotation: null,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('Default rotation');
+      expect(messageElement.style.transform).toContain('rotate(0deg)');
+    });
+
+    it('should render with maximum positive rotation', () => {
+      const notification = createMockNotification({
+        message: 'Max rotation',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageRotation: 360,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('Max rotation');
+      expect(messageElement.style.transform).toContain('rotate(360deg)');
+    });
+
+    it('should render with maximum negative rotation', () => {
+      const notification = createMockNotification({
+        message: 'Negative rotation',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageRotation: -360,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('Negative rotation');
+      expect(messageElement.style.transform).toContain('rotate(-360deg)');
+    });
+  });
+
+  describe('image offset', () => {
+    it('should render image with objectPosition when imageOffsetX and imageOffsetY are set', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/offset-image.jpg',
+        imageOffsetX: 30,
+        imageOffsetY: -15,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      // Component renders two images: one for preloading (hidden) and one for display
+      const images = screen.getAllByTestId('banner-image');
+      // The displayed image (not hidden) has the object-position style
+      const displayedImage = images.find((img) =>
+        img.style.objectPosition?.includes('calc(50% + 30%)')
+      );
+      expect(displayedImage).toBeInTheDocument();
+      expect(displayedImage).toHaveAttribute('src', 'https://example.com/offset-image.jpg');
+      expect(displayedImage).toHaveStyle({
+        objectPosition: 'calc(50% + 30%) calc(50% + -15%)',
+      });
+    });
+
+    it('should render image with zero offset values', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: 0,
+        imageOffsetY: 0,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const displayedImage = images.find((img) =>
+        img.style.objectPosition?.includes('calc(50% + 0%)')
+      );
+      expect(displayedImage).toBeInTheDocument();
+      expect(displayedImage).toHaveStyle({
+        objectPosition: 'calc(50% + 0%) calc(50% + 0%)',
+      });
+    });
+
+    it('should handle null offset values with default 0', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: null,
+        imageOffsetY: null,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const displayedImage = images.find((img) =>
+        img.style.objectPosition?.includes('calc(50% + 0%)')
+      );
+      expect(displayedImage).toBeInTheDocument();
+      expect(displayedImage).toHaveStyle({
+        objectPosition: 'calc(50% + 0%) calc(50% + 0%)',
+      });
+    });
+
+    it('should render image with positive offset values', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: 100,
+        imageOffsetY: 100,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const displayedImage = images.find((img) =>
+        img.style.objectPosition?.includes('calc(50% + 100%)')
+      );
+      expect(displayedImage).toBeInTheDocument();
+      expect(displayedImage).toHaveStyle({
+        objectPosition: 'calc(50% + 100%) calc(50% + 100%)',
+      });
+    });
+
+    it('should render image with negative offset values', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: -100,
+        imageOffsetY: -100,
+      });
+
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      const displayedImage = images.find((img) =>
+        img.style.objectPosition?.includes('calc(50% + -100%)')
+      );
+      expect(displayedImage).toBeInTheDocument();
+      expect(displayedImage).toHaveStyle({
+        objectPosition: 'calc(50% + -100%) calc(50% + -100%)',
+      });
     });
   });
 });

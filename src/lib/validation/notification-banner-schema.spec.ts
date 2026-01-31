@@ -309,4 +309,326 @@ describe('notificationBannerSchema', () => {
       }
     });
   });
+
+  describe('messageRotation field', () => {
+    it('should accept valid rotation value of 0', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept positive rotation up to 360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: 360,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept negative rotation down to -360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: -360,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept intermediate rotation values', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: 45,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject rotation greater than 360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: 361,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Rotation must be at most 360°');
+      }
+    });
+
+    it('should reject rotation less than -360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageRotation: -361,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Rotation must be at least -360°');
+      }
+    });
+
+    it('should default to 0 when not provided', () => {
+      const result = notificationBannerSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.messageRotation).toBe(0);
+      }
+    });
+  });
+
+  describe('secondaryMessageRotation field', () => {
+    it('should accept valid rotation value of 0', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageRotation: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept positive rotation up to 360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageRotation: 360,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept negative rotation down to -360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageRotation: -360,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject rotation greater than 360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageRotation: 361,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Rotation must be at most 360°');
+      }
+    });
+
+    it('should reject rotation less than -360', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageRotation: -361,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Rotation must be at least -360°');
+      }
+    });
+
+    it('should default to 0 when not provided', () => {
+      const result = notificationBannerSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.secondaryMessageRotation).toBe(0);
+      }
+    });
+  });
+
+  describe('imageOffsetX field', () => {
+    it('should accept valid offset value of 0', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept positive offset up to 100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: 100,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept negative offset down to -100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: -100,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept intermediate offset values', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: 25,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject offset greater than 100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: 101,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Offset X must be at most 100%');
+      }
+    });
+
+    it('should reject offset less than -100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetX: -101,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Offset X must be at least -100%');
+      }
+    });
+
+    it('should default to 0 when not provided', () => {
+      const result = notificationBannerSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.imageOffsetX).toBe(0);
+      }
+    });
+  });
+
+  describe('imageOffsetY field', () => {
+    it('should accept valid offset value of 0', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetY: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept positive offset up to 100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetY: 100,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept negative offset down to -100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetY: -100,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject offset greater than 100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetY: 101,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Offset Y must be at most 100%');
+      }
+    });
+
+    it('should reject offset less than -100', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        imageOffsetY: -101,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Offset Y must be at least -100%');
+      }
+    });
+
+    it('should default to 0 when not provided', () => {
+      const result = notificationBannerSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.imageOffsetY).toBe(0);
+      }
+    });
+  });
+
+  describe('font size fields with updated limits', () => {
+    it('should accept messageFontSize at minimum 0.5', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageFontSize: 0.5,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept messageFontSize at maximum 10', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageFontSize: 10,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject messageFontSize below 0.5', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageFontSize: 0.4,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Message font size must be at least 0.5rem');
+      }
+    });
+
+    it('should reject messageFontSize above 10', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        messageFontSize: 10.1,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Message font size must be at most 10rem');
+      }
+    });
+
+    it('should accept secondaryMessageFontSize at minimum 0.5', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageFontSize: 0.5,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept secondaryMessageFontSize at maximum 10', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageFontSize: 10,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject secondaryMessageFontSize below 0.5', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageFontSize: 0.4,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe(
+          'Secondary message font size must be at least 0.5rem'
+        );
+      }
+    });
+
+    it('should reject secondaryMessageFontSize above 10', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        secondaryMessageFontSize: 10.1,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe(
+          'Secondary message font size must be at most 10rem'
+        );
+      }
+    });
+  });
 });

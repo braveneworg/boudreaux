@@ -150,6 +150,9 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                 alt={notification.message}
                 fill
                 className="object-cover"
+                style={{
+                  objectPosition: `calc(50% + ${notification.imageOffsetX ?? 0}%) calc(50% + ${notification.imageOffsetY ?? 0}%)`,
+                }}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
             )}
@@ -163,7 +166,7 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                   style={{
                     left: `${notification.messagePositionX ?? 50}%`,
                     top: `${notification.messagePositionY ?? 10}%`,
-                    transform: 'translate(-50%, -50%)',
+                    transform: `translate(-50%, -50%) rotate(${notification.messageRotation ?? 0}deg)`,
                     maxWidth: '90%',
                     fontFamily:
                       notification.messageFont === 'system-ui'
@@ -193,7 +196,7 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                     style={{
                       left: `${notification.secondaryMessagePositionX ?? 50}%`,
                       top: `${notification.secondaryMessagePositionY ?? 90}%`,
-                      transform: 'translate(-50%, -50%)',
+                      transform: `translate(-50%, -50%) rotate(${notification.secondaryMessageRotation ?? 0}deg)`,
                       maxWidth: '90%',
                       fontFamily:
                         notification.secondaryMessageFont === 'system-ui'

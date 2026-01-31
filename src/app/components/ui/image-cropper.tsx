@@ -256,7 +256,7 @@ export function ImageCropper({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>Crop Image</DialogTitle>
           <DialogDescription>

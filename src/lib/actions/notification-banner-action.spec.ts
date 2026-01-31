@@ -139,6 +139,10 @@ const mockNotificationBanner: NotificationBanner = {
   messagePositionY: 10,
   secondaryMessagePositionX: 50,
   secondaryMessagePositionY: 90,
+  messageRotation: 0,
+  secondaryMessageRotation: 0,
+  imageOffsetX: 0,
+  imageOffsetY: 0,
 };
 
 const initialFormState: FormState = {

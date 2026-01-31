@@ -64,6 +64,12 @@ describe('NotificationBannerService', () => {
     messagePositionY: null,
     secondaryMessagePositionX: null,
     secondaryMessagePositionY: null,
+    // Text rotation settings
+    messageRotation: null,
+    secondaryMessageRotation: null,
+    // Image offset settings
+    imageOffsetX: null,
+    imageOffsetY: null,
   };
 
   beforeEach(() => {
