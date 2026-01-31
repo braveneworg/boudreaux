@@ -5,15 +5,47 @@ import type { NotificationBanner as NotificationBannerType } from '@/lib/service
 import { NotificationBanner } from './notification-banner';
 
 // Mock framer-motion
+let mockOnDragEnd:
+  | ((event: unknown, info: { offset: { x: number }; velocity: { x: number } }) => void)
+  | undefined;
+
 vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   motion: {
     div: ({
       children,
+      onDragEnd,
+      drag,
+      dragConstraints,
+      dragElastic,
+      style,
       ...props
-    }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
-      <div {...props}>{children}</div>
-    ),
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      children: React.ReactNode;
+      onDragEnd?: (
+        event: unknown,
+        info: { offset: { x: number }; velocity: { x: number } }
+      ) => void;
+      drag?: 'x' | 'y' | boolean;
+      dragConstraints?: { left?: number; right?: number };
+      dragElastic?: number;
+      style?: React.CSSProperties;
+    }) => {
+      // Store the onDragEnd callback for testing
+      mockOnDragEnd = onDragEnd;
+      return (
+        <div
+          {...props}
+          style={style}
+          data-drag={drag ? String(drag) : undefined}
+          data-drag-constraints={dragConstraints ? JSON.stringify(dragConstraints) : undefined}
+          data-drag-elastic={dragElastic !== undefined ? String(dragElastic) : undefined}
+          data-touch-action={style?.touchAction}
+        >
+          {children}
+        </div>
+      );
+    },
   },
 }));
 
@@ -96,6 +128,7 @@ const createMockNotification = (
 describe('NotificationBanner', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockOnDragEnd = undefined;
   });
 
   afterEach(() => {
@@ -364,5 +397,187 @@ describe('NotificationBanner', () => {
 
     expect(screen.queryByText('Hidden message')).not.toBeInTheDocument();
     expect(screen.queryByText('Hidden secondary')).not.toBeInTheDocument();
+  });
+
+  describe('swipe navigation', () => {
+    it('enables drag on x-axis when multiple notifications exist', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const slide = screen.getByRole('group');
+      expect(slide).toHaveAttribute('data-drag', 'x');
+      expect(slide).toHaveAttribute('data-drag-constraints', JSON.stringify({ left: 0, right: 0 }));
+      expect(slide).toHaveAttribute('data-drag-elastic', '0.2');
+    });
+
+    it('disables drag when only one notification exists', () => {
+      const notification = createMockNotification({ id: '1', message: 'Only one' });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const slide = screen.getByRole('group');
+      expect(slide).not.toHaveAttribute('data-drag');
+    });
+
+    it('navigates to next notification on swipe left (negative offset)', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+        createMockNotification({ id: '3', message: 'Third' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+
+      // Simulate swipe left with offset beyond threshold
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: -60 }, velocity: { x: 0 } });
+      });
+
+      expect(screen.getByText('Second')).toBeInTheDocument();
+    });
+
+    it('navigates to previous notification on swipe right (positive offset)', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+        createMockNotification({ id: '3', message: 'Third' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      // First navigate to second notification
+      const secondDot = screen.getAllByRole('tab')[1];
+      fireEvent.click(secondDot);
+      expect(screen.getByText('Second')).toBeInTheDocument();
+
+      // Simulate swipe right with offset beyond threshold
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: 60 }, velocity: { x: 0 } });
+      });
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+    });
+
+    it('navigates to next notification on fast swipe left (high negative velocity)', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+
+      // Simulate fast swipe with velocity but small offset
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: -20 }, velocity: { x: -600 } });
+      });
+
+      expect(screen.getByText('Second')).toBeInTheDocument();
+    });
+
+    it('navigates to previous notification on fast swipe right (high positive velocity)', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      // First navigate to second notification
+      const secondDot = screen.getAllByRole('tab')[1];
+      fireEvent.click(secondDot);
+      expect(screen.getByText('Second')).toBeInTheDocument();
+
+      // Simulate fast swipe with velocity but small offset
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: 20 }, velocity: { x: 600 } });
+      });
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+    });
+
+    it('does not navigate when swipe is below threshold', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+
+      // Simulate small swipe below threshold
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: -30 }, velocity: { x: -200 } });
+      });
+
+      // Should stay on first notification
+      expect(screen.getByText('First')).toBeInTheDocument();
+    });
+
+    it('wraps to last notification when swiping right from first', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+        createMockNotification({ id: '3', message: 'Third' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      expect(screen.getByText('First')).toBeInTheDocument();
+
+      // Simulate swipe right from first notification
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: 60 }, velocity: { x: 0 } });
+      });
+
+      // Should wrap to last notification
+      expect(screen.getByText('Third')).toBeInTheDocument();
+    });
+
+    it('wraps to first notification when swiping left from last', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+        createMockNotification({ id: '3', message: 'Third' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      // Navigate to last notification
+      const lastDot = screen.getAllByRole('tab')[2];
+      fireEvent.click(lastDot);
+      expect(screen.getByText('Third')).toBeInTheDocument();
+
+      // Simulate swipe left from last notification
+      act(() => {
+        mockOnDragEnd?.(new MouseEvent('mouseup'), { offset: { x: -60 }, velocity: { x: 0 } });
+      });
+
+      // Should wrap to first notification
+      expect(screen.getByText('First')).toBeInTheDocument();
+    });
+
+    it('has proper touch-action style for vertical scrolling', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const slide = screen.getByRole('group');
+      // Check that the touch-action style is set to pan-y via data attribute
+      expect(slide).toHaveAttribute('data-touch-action', 'pan-y');
+    });
+
+    it('has grab cursor classes for drag feedback', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const slide = screen.getByRole('group');
+      expect(slide).toHaveClass('cursor-grab');
+      expect(slide).toHaveClass('active:cursor-grabbing');
+    });
   });
 });

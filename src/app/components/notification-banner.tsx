@@ -50,10 +50,35 @@ export function NotificationBanner({ notifications, className }: NotificationBan
     setCurrentIndex((prev) => (prev + 1) % totalNotifications);
   }, [totalNotifications]);
 
+  // Navigate to previous notification
+  const goToPrevious = useCallback(() => {
+    if (totalNotifications <= 1) return;
+    setCurrentIndex((prev) => (prev - 1 + totalNotifications) % totalNotifications);
+  }, [totalNotifications]);
+
   // Navigate to specific notification
   const goToIndex = useCallback((index: number) => {
     setCurrentIndex(index);
   }, []);
+
+  // Handle swipe/drag end
+  const handleDragEnd = useCallback(
+    (
+      _event: MouseEvent | TouchEvent | PointerEvent,
+      info: { offset: { x: number }; velocity: { x: number } }
+    ) => {
+      const swipeThreshold = 50;
+      const velocityThreshold = 500;
+
+      // Determine swipe direction based on offset and velocity
+      if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+        goToNext();
+      } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+        goToPrevious();
+      }
+    },
+    [goToNext, goToPrevious]
+  );
 
   // Auto-cycle effect
   useEffect(() => {
@@ -67,12 +92,12 @@ export function NotificationBanner({ notifications, className }: NotificationBan
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (event.key === 'ArrowLeft') {
-        setCurrentIndex((prev) => (prev - 1 + totalNotifications) % totalNotifications);
+        goToPrevious();
       } else if (event.key === 'ArrowRight') {
         goToNext();
       }
     },
-    [goToNext, totalNotifications]
+    [goToNext, goToPrevious]
   );
 
   if (notifications.length === 0) {
@@ -132,7 +157,12 @@ export function NotificationBanner({ notifications, className }: NotificationBan
               duration: 0.5,
               ease: [0.4, 0, 0.2, 1], // Cubic bezier easing
             }}
-            className="absolute inset-0"
+            drag={totalNotifications > 1 ? 'x' : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={handleDragEnd}
+            className="absolute inset-0 cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'pan-y' }}
             role="group"
             aria-roledescription="slide"
             aria-label={`${currentIndex + 1} of ${totalNotifications}`}
