@@ -234,6 +234,10 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
     messagePositionY,
     secondaryMessagePositionX,
     secondaryMessagePositionY,
+    messageRotation,
+    secondaryMessageRotation,
+    imageOffsetX,
+    imageOffsetY,
   } = notification;
 
   const hasImage = !!imageUrl;
@@ -253,6 +257,9 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
           alt={message}
           fill
           className="object-cover"
+          style={{
+            objectPosition: `calc(50% + ${imageOffsetX ?? 0}%) calc(50% + ${imageOffsetY ?? 0}%)`,
+          }}
           priority={isFirst}
           sizes="100vw"
           unoptimized
@@ -268,7 +275,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
             style={{
               left: `${messagePositionX ?? 50}%`,
               top: `${messagePositionY ?? 10}%`,
-              transform: 'translate(-50%, -50%)',
+              transform: `translate(-50%, -50%) rotate(${messageRotation ?? 0}deg)`,
               maxWidth: '90%',
               fontFamily:
                 messageFont === 'system-ui'
@@ -297,7 +304,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
               style={{
                 left: `${secondaryMessagePositionX ?? 50}%`,
                 top: `${secondaryMessagePositionY ?? 90}%`,
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(-50%, -50%) rotate(${secondaryMessageRotation ?? 0}deg)`,
                 maxWidth: '90%',
                 fontFamily:
                   secondaryMessageFont === 'system-ui'

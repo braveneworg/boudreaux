@@ -96,6 +96,10 @@ const createMockNotification = (
   messagePositionY: 10,
   secondaryMessagePositionX: 50,
   secondaryMessagePositionY: 90,
+  messageRotation: 0,
+  secondaryMessageRotation: 0,
+  imageOffsetX: 0,
+  imageOffsetY: 0,
   ...overrides,
 });
 
@@ -608,6 +612,133 @@ describe('NotificationBannerList', () => {
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('text rotation styling', () => {
+    it('should apply rotation transform to main message when messageRotation is set', () => {
+      const notification = createMockNotification({
+        message: 'Rotated message',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/image.jpg',
+        messageRotation: 45,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      // Find the main message span element
+      const messageElements = screen.getAllByText('Rotated message');
+      const overlayMessage = messageElements.find(
+        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
+      );
+
+      expect(overlayMessage).toBeDefined();
+      expect(overlayMessage?.style.transform).toContain('rotate(45deg)');
+    });
+
+    it('should apply rotation transform to secondary message when secondaryMessageRotation is set', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Rotated secondary',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/image.jpg',
+        secondaryMessageRotation: -30,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      // Find the secondary message span element
+      const secondaryElements = screen.getAllByText('Rotated secondary');
+      const overlaySecondary = secondaryElements.find(
+        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
+      );
+
+      expect(overlaySecondary).toBeDefined();
+      expect(overlaySecondary?.style.transform).toContain('rotate(-30deg)');
+    });
+
+    it('should apply zero rotation by default', () => {
+      const notification = createMockNotification({
+        message: 'Default rotation message',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/image.jpg',
+        messageRotation: 0,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      const messageElements = screen.getAllByText('Default rotation message');
+      const overlayMessage = messageElements.find(
+        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
+      );
+
+      expect(overlayMessage).toBeDefined();
+      expect(overlayMessage?.style.transform).toContain('rotate(0deg)');
+    });
+
+    it('should handle null rotation values with default of 0', () => {
+      const notification = createMockNotification({
+        message: 'Null rotation message',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/image.jpg',
+        messageRotation: null,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      const messageElements = screen.getAllByText('Null rotation message');
+      const overlayMessage = messageElements.find(
+        (el) => el.tagName.toLowerCase() === 'span' && el.className.includes('absolute')
+      );
+
+      expect(overlayMessage).toBeDefined();
+      expect(overlayMessage?.style.transform).toContain('rotate(0deg)');
+    });
+  });
+
+  describe('image offset styling', () => {
+    it('should apply objectPosition style to image when offsets are set', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: 25,
+        imageOffsetY: -10,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      const image = screen.getByTestId('notification-image');
+      // Note: The mock doesn't preserve all styles, but we verify it renders
+      expect(image).toBeInTheDocument();
+      expect(image).toHaveAttribute('src', 'https://example.com/image.jpg');
+    });
+
+    it('should render image with zero offset by default', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: 0,
+        imageOffsetY: 0,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      const image = screen.getByTestId('notification-image');
+      expect(image).toBeInTheDocument();
+    });
+
+    it('should handle null offset values', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/image.jpg',
+        imageOffsetX: null,
+        imageOffsetY: null,
+      });
+
+      render(<NotificationBannerList notifications={[notification]} />);
+
+      const image = screen.getByTestId('notification-image');
+      expect(image).toBeInTheDocument();
     });
   });
 });

@@ -7,6 +7,12 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
 
+// Debug: Log at module load time
+console.info(
+  '[PRESIGNED_URLS] Module loaded. S3_BUCKET:',
+  process.env.S3_BUCKET ? 'SET' : 'NOT SET'
+);
+
 /**
  * S3 client configuration
  */
@@ -153,6 +159,15 @@ export const getPresignedUploadUrlsAction = async (
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {
+  // Debug: Log environment variables availability (not values for security)
+  console.info('[PRESIGNED_URLS] Environment check:', {
+    hasS3Bucket: !!process.env.S3_BUCKET,
+    hasAwsRegion: !!process.env.AWS_REGION,
+    hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+    hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+    hasCdnDomain: !!process.env.CDN_DOMAIN,
+  });
+
   await requireRole('admin');
 
   try {

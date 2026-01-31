@@ -77,8 +77,8 @@ export const notificationBannerSchema = z
     messageFont: z.string().default('system-ui'),
     messageFontSize: z
       .number()
-      .min(2.5, { message: 'Message font size must be at least 2.5rem' })
-      .max(6, { message: 'Message font size must be at most 6rem' })
+      .min(0.5, { message: 'Message font size must be at least 0.5rem' })
+      .max(10, { message: 'Message font size must be at most 10rem' })
       .default(2.5),
     messageContrast: z
       .number()
@@ -89,8 +89,8 @@ export const notificationBannerSchema = z
     secondaryMessageFont: z.string().default('system-ui'),
     secondaryMessageFontSize: z
       .number()
-      .min(2, { message: 'Secondary message font size must be at least 2rem' })
-      .max(5, { message: 'Secondary message font size must be at most 5rem' })
+      .min(0.5, { message: 'Secondary message font size must be at least 0.5rem' })
+      .max(10, { message: 'Secondary message font size must be at most 10rem' })
       .default(2),
     secondaryMessageContrast: z
       .number()
@@ -144,6 +144,28 @@ export const notificationBannerSchema = z
       .min(0, { message: 'Position Y must be at least 0%' })
       .max(100, { message: 'Position Y must be at most 100%' })
       .default(90),
+    // Text rotation settings (degrees)
+    messageRotation: z
+      .number()
+      .min(-360, { message: 'Rotation must be at least -360°' })
+      .max(360, { message: 'Rotation must be at most 360°' })
+      .default(0),
+    secondaryMessageRotation: z
+      .number()
+      .min(-360, { message: 'Rotation must be at least -360°' })
+      .max(360, { message: 'Rotation must be at most 360°' })
+      .default(0),
+    // Image offset settings (percentage -100 to 100)
+    imageOffsetX: z
+      .number()
+      .min(-100, { message: 'Offset X must be at least -100%' })
+      .max(100, { message: 'Offset X must be at most 100%' })
+      .default(0),
+    imageOffsetY: z
+      .number()
+      .min(-100, { message: 'Offset Y must be at least -100%' })
+      .max(100, { message: 'Offset Y must be at most 100%' })
+      .default(0),
   })
   .refine(
     (data) => {

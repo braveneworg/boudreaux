@@ -536,6 +536,12 @@ model Notification {
   messagePositionY                   Float?    @default(10) // Vertical position of main message (0=top, 100=bottom)
   secondaryMessagePositionX          Float?    @default(50) // Horizontal position of secondary message
   secondaryMessagePositionY          Float?    @default(90) // Vertical position of secondary message
+  // Text rotation settings (degrees -360 to 360)
+  messageRotation                    Float?    @default(0) // Rotation angle for main message in degrees
+  secondaryMessageRotation           Float?    @default(0) // Rotation angle for secondary message in degrees
+  // Image position offset settings (percentage -100 to 100)
+  imageOffsetX                       Float?    @default(0) // Horizontal offset of image (negative=left, positive=right)
+  imageOffsetY                       Float?    @default(0) // Vertical offset of image (negative=up, positive=down)
   sortOrder                          Int       @default(0) // Order of notification in carousel; lower numbers appear first
   isActive                           Boolean   @default(true) // Whether the notification is currently active
   createdAt                          DateTime  @default(now())

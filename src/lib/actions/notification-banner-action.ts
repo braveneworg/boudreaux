@@ -40,6 +40,10 @@ const permittedFieldNames = [
   'messagePositionY',
   'secondaryMessagePositionX',
   'secondaryMessagePositionY',
+  'messageRotation',
+  'secondaryMessageRotation',
+  'imageOffsetX',
+  'imageOffsetY',
 ];
 
 export const createNotificationBannerAction = async (
@@ -87,9 +91,13 @@ export const createNotificationBannerAction = async (
       key === 'messagePositionX' ||
       key === 'messagePositionY' ||
       key === 'secondaryMessagePositionX' ||
-      key === 'secondaryMessagePositionY'
+      key === 'secondaryMessagePositionY' ||
+      key === 'messageRotation' ||
+      key === 'secondaryMessageRotation' ||
+      key === 'imageOffsetX' ||
+      key === 'imageOffsetY'
     ) {
-      formDataObj[key] = parseFloat(value.toString()) || undefined;
+      formDataObj[key] = parseFloat(value.toString()) || 0;
     } else {
       formDataObj[key] = value.toString();
     }
@@ -180,6 +188,10 @@ export const createNotificationBannerAction = async (
       messagePositionY,
       secondaryMessagePositionX,
       secondaryMessagePositionY,
+      messageRotation,
+      secondaryMessageRotation,
+      imageOffsetX,
+      imageOffsetY,
     } = parsed.data;
 
     const createData = {
@@ -211,6 +223,10 @@ export const createNotificationBannerAction = async (
       messagePositionY: messagePositionY ?? 10,
       secondaryMessagePositionX: secondaryMessagePositionX ?? 50,
       secondaryMessagePositionY: secondaryMessagePositionY ?? 90,
+      messageRotation: messageRotation ?? 0,
+      secondaryMessageRotation: secondaryMessageRotation ?? 0,
+      imageOffsetX: imageOffsetX ?? 0,
+      imageOffsetY: imageOffsetY ?? 0,
       addedBy: { connect: { id: session.user.id } },
     };
 
@@ -285,9 +301,13 @@ export const updateNotificationBannerAction = async (
       key === 'messagePositionX' ||
       key === 'messagePositionY' ||
       key === 'secondaryMessagePositionX' ||
-      key === 'secondaryMessagePositionY'
+      key === 'secondaryMessagePositionY' ||
+      key === 'messageRotation' ||
+      key === 'secondaryMessageRotation' ||
+      key === 'imageOffsetX' ||
+      key === 'imageOffsetY'
     ) {
-      formDataObj[key] = parseFloat(value.toString()) || undefined;
+      formDataObj[key] = parseFloat(value.toString()) || 0;
     } else {
       formDataObj[key] = value.toString();
     }
@@ -374,6 +394,10 @@ export const updateNotificationBannerAction = async (
       messagePositionY,
       secondaryMessagePositionX,
       secondaryMessagePositionY,
+      messageRotation,
+      secondaryMessageRotation,
+      imageOffsetX,
+      imageOffsetY,
     } = parsed.data;
 
     const updateData = {
@@ -405,6 +429,10 @@ export const updateNotificationBannerAction = async (
       messagePositionY: messagePositionY ?? 10,
       secondaryMessagePositionX: secondaryMessagePositionX ?? 50,
       secondaryMessagePositionY: secondaryMessagePositionY ?? 90,
+      messageRotation: messageRotation ?? 0,
+      secondaryMessageRotation: secondaryMessageRotation ?? 0,
+      imageOffsetX: imageOffsetX ?? 0,
+      imageOffsetY: imageOffsetY ?? 0,
     };
 
     const result = await NotificationBannerService.updateNotificationBanner(
