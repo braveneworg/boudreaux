@@ -143,10 +143,10 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
             className="relative aspect-video w-full"
             style={{ backgroundColor: notification.backgroundColor || '#1a1a2e' }}
           >
-            {/* Background image if exists */}
-            {notification.imageUrl && (
+            {/* Background image if exists - fallback to originalImageUrl if imageUrl is not available */}
+            {(notification.imageUrl || notification.originalImageUrl) && (
               <Image
-                src={notification.imageUrl}
+                src={notification.imageUrl || notification.originalImageUrl || ''}
                 alt={notification.message}
                 fill
                 className="object-cover"
@@ -178,7 +178,8 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                       (notification.messageContrast ?? 100) / 100
                     ),
                     textShadow:
-                      notification.messageTextShadow && notification.imageUrl
+                      notification.messageTextShadow &&
+                      (notification.imageUrl || notification.originalImageUrl)
                         ? `0 1px 3px rgba(0,0,0,${0.4 + ((notification.messageTextShadowDarkness ?? 50) / 100) * 0.5})`
                         : notification.messageTextShadow
                           ? `0 1px 2px rgba(0,0,0,0.3)`
@@ -208,7 +209,8 @@ export function NotificationBannerList({ notifications }: NotificationBannerList
                         (notification.secondaryMessageContrast ?? 95) / 100
                       ),
                       textShadow:
-                        notification.secondaryMessageTextShadow && notification.imageUrl
+                        notification.secondaryMessageTextShadow &&
+                        (notification.imageUrl || notification.originalImageUrl)
                           ? `0 1px 2px rgba(0,0,0,${0.3 + ((notification.secondaryMessageTextShadowDarkness ?? 50) / 100) * 0.5})`
                           : notification.secondaryMessageTextShadow
                             ? `0 1px 2px rgba(0,0,0,0.3)`

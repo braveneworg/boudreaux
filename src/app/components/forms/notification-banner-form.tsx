@@ -192,6 +192,7 @@ export default function NotificationBannerForm({
   const { control, setValue, watch } = form;
 
   // Watch fields for preview
+  const watchedOriginalImageUrl = watch('originalImageUrl');
   const watchedImageUrl = watch('imageUrl');
   const watchedBackgroundColor = watch('backgroundColor');
   const watchedMessage = watch('message');
@@ -2170,12 +2171,16 @@ export default function NotificationBannerForm({
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundColor: !(originalPreviewUrl || watchedImageUrl)
+                          backgroundColor: !(
+                            originalPreviewUrl ||
+                            watchedOriginalImageUrl ||
+                            watchedImageUrl
+                          )
                             ? watchedBackgroundColor
                             : undefined,
                           backgroundImage:
-                            originalPreviewUrl || watchedImageUrl
-                              ? `url(${originalPreviewUrl || watchedImageUrl})`
+                            originalPreviewUrl || watchedOriginalImageUrl || watchedImageUrl
+                              ? `url(${originalPreviewUrl || watchedOriginalImageUrl || watchedImageUrl})`
                               : undefined,
                           backgroundSize: 'cover',
                           backgroundPosition: `calc(50% + ${watchedImageOffsetX ?? 0}%) calc(50% + ${watchedImageOffsetY ?? 0}%)`,
@@ -2211,7 +2216,10 @@ export default function NotificationBannerForm({
                                     (watchedMessageContrast ?? 100) / 100
                                   ),
                                   textShadow:
-                                    watchedMessageTextShadow && watchedImageUrl
+                                    watchedMessageTextShadow &&
+                                    (originalPreviewUrl ||
+                                      watchedOriginalImageUrl ||
+                                      watchedImageUrl)
                                       ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
                                       : 'none',
                                   textTransform: 'none',
@@ -2274,7 +2282,10 @@ export default function NotificationBannerForm({
                                       (watchedSecondaryMessageContrast ?? 95) / 100
                                     ),
                                     textShadow:
-                                      watchedSecondaryMessageTextShadow && watchedImageUrl
+                                      watchedSecondaryMessageTextShadow &&
+                                      (originalPreviewUrl ||
+                                        watchedOriginalImageUrl ||
+                                        watchedImageUrl)
                                         ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedSecondaryMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
                                         : 'none',
                                     textTransform: 'none',
@@ -2327,7 +2338,7 @@ export default function NotificationBannerForm({
                           {watchedSecondaryMessageRotation ?? 0}°
                         </span>
                       )}
-                      {watchedImageUrl && (
+                      {(originalPreviewUrl || watchedOriginalImageUrl || watchedImageUrl) && (
                         <span>
                           Image offset: X={watchedImageOffsetX ?? 0}%, Y={watchedImageOffsetY ?? 0}%
                         </span>
