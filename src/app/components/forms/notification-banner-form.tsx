@@ -462,6 +462,8 @@ export default function NotificationBannerForm({
       const messagePositionY = form.getValues('messagePositionY');
       const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
       const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
+      const messageRotation = form.getValues('messageRotation');
+      const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
 
       if (!isOverlayed || !message) {
         // No processing needed, use original image directly
@@ -496,6 +498,8 @@ export default function NotificationBannerForm({
           messagePositionY,
           secondaryMessagePositionX,
           secondaryMessagePositionY,
+          messageRotation,
+          secondaryMessageRotation,
         });
 
         if (!result.success || !result.processedImageBase64) {

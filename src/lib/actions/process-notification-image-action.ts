@@ -51,6 +51,10 @@ export interface ProcessNotificationImageInput {
   secondaryMessagePositionX?: number;
   /** Vertical position of secondary message (0-100, 0=top, 100=bottom) */
   secondaryMessagePositionY?: number;
+  /** Rotation angle for main message in degrees (-360 to 360) */
+  messageRotation?: number;
+  /** Rotation angle for secondary message in degrees (-360 to 360) */
+  secondaryMessageRotation?: number;
 }
 
 export interface ProcessNotificationImageResult {
@@ -102,6 +106,8 @@ export async function processNotificationImageAction(
       messagePositionY = 10,
       secondaryMessagePositionX = 50,
       secondaryMessagePositionY = 90,
+      messageRotation = 0,
+      secondaryMessageRotation = 0,
     } = input;
 
     // Decode base64 image
@@ -145,6 +151,8 @@ export async function processNotificationImageAction(
       messagePositionY,
       secondaryMessagePositionX,
       secondaryMessagePositionY,
+      messageRotation,
+      secondaryMessageRotation,
     });
 
     // Composite the text overlay onto the image
@@ -193,6 +201,8 @@ interface TextOverlaySvgOptions {
   messagePositionY: number;
   secondaryMessagePositionX: number;
   secondaryMessagePositionY: number;
+  messageRotation: number;
+  secondaryMessageRotation: number;
 }
 
 /**
@@ -233,6 +243,8 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
     messagePositionY,
     secondaryMessagePositionX,
     secondaryMessagePositionY,
+    messageRotation,
+    secondaryMessageRotation,
   } = options;
 
   // Strip any HTML/markup from messages - render as plain text only
@@ -326,11 +338,13 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
       const offsetFromCenter = (index - (messageLines.length - 1) / 2) * lineHeight;
       const y = messageBaseY + offsetFromCenter;
       const filterAttr = messageTextShadow ? ' filter="url(#message-shadow)"' : '';
+      const transformAttr =
+        messageRotation !== 0 ? ` transform="rotate(${messageRotation}, ${messageX}, ${y})"` : '';
       return `
     <text x="${messageX}" y="${y}" text-anchor="${messageTextAnchor}" dominant-baseline="middle"
       font-family="${messageFontStack}"
       font-size="${messageFontSizePx}"
-      fill="rgba(${messageRgb.r},${messageRgb.g},${messageRgb.b},${messageOpacity})"${filterAttr}>${escapeXml(line)}</text>`;
+      fill="rgba(${messageRgb.r},${messageRgb.g},${messageRgb.b},${messageOpacity})"${filterAttr}${transformAttr}>${escapeXml(line)}</text>`;
     })
     .join('\n  ')}
 
@@ -343,11 +357,15 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
       const offsetFromCenter = (index - (secondaryLines.length - 1) / 2) * secondaryLineHeight;
       const y = secondaryBaseY + offsetFromCenter;
       const filterAttr = secondaryMessageTextShadow ? ' filter="url(#secondary-shadow)"' : '';
+      const transformAttr =
+        secondaryMessageRotation !== 0
+          ? ` transform="rotate(${secondaryMessageRotation}, ${secondaryX}, ${y})"`
+          : '';
       return `
     <text x="${secondaryX}" y="${y}" text-anchor="${secondaryTextAnchor}" dominant-baseline="middle"
       font-family="${secondaryFontStack}"
       font-size="${secondaryFontSizePx}"
-      fill="rgba(${secondaryRgb.r},${secondaryRgb.g},${secondaryRgb.b},${secondaryOpacity})"${filterAttr}>${escapeXml(line)}</text>`;
+      fill="rgba(${secondaryRgb.r},${secondaryRgb.g},${secondaryRgb.b},${secondaryOpacity})"${filterAttr}${transformAttr}>${escapeXml(line)}</text>`;
     })
     .join('\n  ')}`
       : ''
