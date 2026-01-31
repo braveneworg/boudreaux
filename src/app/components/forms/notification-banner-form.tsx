@@ -2170,8 +2170,13 @@ export default function NotificationBannerForm({
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundColor: !watchedImageUrl ? watchedBackgroundColor : undefined,
-                          backgroundImage: watchedImageUrl ? `url(${watchedImageUrl})` : undefined,
+                          backgroundColor: !(originalPreviewUrl || watchedImageUrl)
+                            ? watchedBackgroundColor
+                            : undefined,
+                          backgroundImage:
+                            originalPreviewUrl || watchedImageUrl
+                              ? `url(${originalPreviewUrl || watchedImageUrl})`
+                              : undefined,
                           backgroundSize: 'cover',
                           backgroundPosition: `calc(50% + ${watchedImageOffsetX ?? 0}%) calc(50% + ${watchedImageOffsetY ?? 0}%)`,
                         }}

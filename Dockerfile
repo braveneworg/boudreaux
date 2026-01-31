@@ -70,6 +70,26 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install fonts for Sharp SVG text rendering
+# fontconfig is needed for font discovery, curl for downloading Google Fonts
+RUN apk add --no-cache fontconfig ttf-dejavu curl \
+    && mkdir -p /usr/share/fonts/google \
+    && cd /usr/share/fonts/google \
+    # Download Google Fonts used in banner overlays
+    && curl -sL "https://fonts.google.com/download?family=Roboto" -o roboto.zip \
+    && curl -sL "https://fonts.google.com/download?family=Open%20Sans" -o opensans.zip \
+    && curl -sL "https://fonts.google.com/download?family=Lato" -o lato.zip \
+    && curl -sL "https://fonts.google.com/download?family=Oswald" -o oswald.zip \
+    && curl -sL "https://fonts.google.com/download?family=Playfair%20Display" -o playfair.zip \
+    && unzip -o roboto.zip -d roboto 2>/dev/null || true \
+    && unzip -o opensans.zip -d opensans 2>/dev/null || true \
+    && unzip -o lato.zip -d lato 2>/dev/null || true \
+    && unzip -o oswald.zip -d oswald 2>/dev/null || true \
+    && unzip -o playfair.zip -d playfair 2>/dev/null || true \
+    && rm -f *.zip \
+    && fc-cache -fv \
+    && apk del curl
+
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
 RUN adduser --system --uid 1001 appuser

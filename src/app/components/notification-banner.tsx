@@ -125,19 +125,23 @@ export function NotificationBanner({ notifications, className }: NotificationBan
     >
       {/* Preload all images to prevent broken image icons when cycling */}
       <div className="hidden" aria-hidden="true">
-        {notifications.map((notification) =>
-          notification.imageUrl ? (
+        {notifications.map((notification) => {
+          // Preload the appropriate image based on overlay setting
+          const preloadUrl = notification.isOverlayed
+            ? notification.originalImageUrl || notification.imageUrl
+            : notification.imageUrl;
+          return preloadUrl ? (
             <Image
               key={notification.id}
-              src={notification.imageUrl}
+              src={preloadUrl}
               alt=""
               fill
               sizes="100vw"
               priority
               unoptimized
             />
-          ) : null
-        )}
+          ) : null;
+        })}
       </div>
 
       {/* Banner container with golden ratio height */}
@@ -214,6 +218,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
   const {
     message,
     secondaryMessage,
+    originalImageUrl,
     imageUrl,
     linkUrl,
     backgroundColor,
@@ -240,7 +245,10 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
     imageOffsetY,
   } = notification;
 
-  const hasImage = !!imageUrl;
+  // When overlay is enabled, use originalImageUrl (without baked text) so CSS text overlay shows correctly.
+  // When overlay is disabled, use imageUrl (which may have baked text for non-overlay display).
+  const displayImageUrl = isOverlayed ? originalImageUrl || imageUrl : imageUrl;
+  const hasImage = !!displayImageUrl;
   const hasLink = !!linkUrl;
 
   const content = (
@@ -253,7 +261,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
       {/* Background image */}
       {hasImage && (
         <Image
-          src={imageUrl}
+          src={displayImageUrl}
           alt={message}
           fill
           className="object-cover"
