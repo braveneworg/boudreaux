@@ -638,6 +638,11 @@ jobs:
           EMAIL_FROM=${{ secrets.EMAIL_FROM }}
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
           CLOUDFLARE_SECRET=${{ secrets.CLOUDFLARE_SECRET }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET=${{ secrets.S3_BUCKET }}
+          CDN_DOMAIN=${{ secrets.CDN_DOMAIN }}
           EOF
 
       - name: Upload compose + env
