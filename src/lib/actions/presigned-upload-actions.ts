@@ -182,7 +182,11 @@ export const getPresignedUploadUrlsAction = async (
     const awsRegion = process.env.AWS_REGION || 'us-east-1';
 
     if (!s3Bucket) {
-      return { success: false, error: 'S3 bucket not configured' };
+      console.error('[PRESIGNED_URLS] S3_BUCKET environment variable is not set');
+      return {
+        success: false,
+        error: 'S3 storage is not configured. Please contact an administrator.',
+      };
     }
 
     const results: PresignedUrlResult[] = [];
