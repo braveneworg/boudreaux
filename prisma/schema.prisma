@@ -542,6 +542,11 @@ model Notification {
   // Image position offset settings (percentage -100 to 100)
   imageOffsetX                       Float?    @default(0) // Horizontal offset of image (negative=left, positive=right)
   imageOffsetY                       Float?    @default(0) // Vertical offset of image (negative=up, positive=down)
+  // Text box dimension settings (percentage 10-100)
+  messageWidth                       Float?    @default(80) // Width of main message text box (percentage of container)
+  messageHeight                      Float?    @default(30) // Height of main message text box (percentage of container)
+  secondaryMessageWidth              Float?    @default(80) // Width of secondary message text box (percentage of container)
+  secondaryMessageHeight             Float?    @default(30) // Height of secondary message text box (percentage of container)
   sortOrder                          Int       @default(0) // Order of notification in carousel; lower numbers appear first
   isActive                           Boolean   @default(true) // Whether the notification is currently active
   createdAt                          DateTime  @default(now())

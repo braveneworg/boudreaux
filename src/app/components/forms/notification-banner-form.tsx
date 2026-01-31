@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -66,6 +66,7 @@ import {
 
 import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
 import { DatePicker } from '../ui/datepicker';
+import { ResizableTextBox } from '../ui/resizable-text-box';
 
 type FormFieldName = keyof NotificationBannerFormData;
 
@@ -163,7 +164,8 @@ export default function NotificationBannerForm({
   const [_originalImageBase64, setOriginalImageBase64] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [pendingAutoSave, setPendingAutoSave] = useState(false);
-  const [skipRedirectOnSave, setSkipRedirectOnSave] = useState(false);
+  // Use ref for skipRedirectOnSave to avoid race conditions with async form submission
+  const skipRedirectOnSaveRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cropper state
@@ -217,6 +219,11 @@ export default function NotificationBannerForm({
       // Image offset defaults (percentage -100 to 100)
       imageOffsetX: 0,
       imageOffsetY: 0,
+      // Text box dimensions defaults (percentage)
+      messageWidth: 80,
+      messageHeight: 30,
+      secondaryMessageWidth: 80,
+      secondaryMessageHeight: 30,
     },
   });
   const { control, setValue, watch } = form;
@@ -254,6 +261,11 @@ export default function NotificationBannerForm({
   // Image offset watched values for live preview
   const watchedImageOffsetX = watch('imageOffsetX');
   const watchedImageOffsetY = watch('imageOffsetY');
+  // Text box dimension watched values for live preview
+  const watchedMessageWidth = watch('messageWidth');
+  const watchedMessageHeight = watch('messageHeight');
+  const watchedSecondaryMessageWidth = watch('secondaryMessageWidth');
+  const watchedSecondaryMessageHeight = watch('secondaryMessageHeight');
 
   // Drag state for positioning text
   const [isDraggingMessage, setIsDraggingMessage] = useState(false);
@@ -261,6 +273,8 @@ export default function NotificationBannerForm({
   // Rotation drag state
   const [isRotatingMessage, setIsRotatingMessage] = useState(false);
   const [isRotatingSecondary, setIsRotatingSecondary] = useState(false);
+  // Selection state for text boxes
+  const [selectedTextBox, setSelectedTextBox] = useState<'message' | 'secondary' | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Load Google Fonts for preview rendering
@@ -350,6 +364,11 @@ export default function NotificationBannerForm({
           // Image offset fields
           imageOffsetX: notification.imageOffsetX ?? 0,
           imageOffsetY: notification.imageOffsetY ?? 0,
+          // Text box dimension fields
+          messageWidth: notification.messageWidth ?? 80,
+          messageHeight: notification.messageHeight ?? 30,
+          secondaryMessageWidth: notification.secondaryMessageWidth ?? 80,
+          secondaryMessageHeight: notification.secondaryMessageHeight ?? 30,
         });
 
         // Set preview URLs from existing notification
@@ -378,9 +397,9 @@ export default function NotificationBannerForm({
       setNotificationId(newId);
 
       // Only show toast and redirect if not auto-saving image
-      if (skipRedirectOnSave) {
+      if (skipRedirectOnSaveRef.current) {
         // Reset flag but don't redirect - stay on page after image auto-save
-        setSkipRedirectOnSave(false);
+        skipRedirectOnSaveRef.current = false;
       } else {
         const message = form.getValues('message');
         toast.success(<ToastContent message={message || ''} />);
@@ -390,8 +409,20 @@ export default function NotificationBannerForm({
 
     if (formState.errors?.general) {
       toast.error(formState.errors.general[0]);
+    } else if (formState.errors && Object.keys(formState.errors).length > 0) {
+      // Show first field error if no general error
+      const firstField = Object.keys(formState.errors)[0];
+      const firstError = formState.errors[firstField]?.[0];
+      if (firstError) {
+        toast.error(`${firstField}: ${firstError}`);
+      }
     }
-  }, [formState, form, router, skipRedirectOnSave]);
+
+    // Log any field-specific errors for debugging
+    if (formState.errors && Object.keys(formState.errors).length > 0) {
+      console.error('[NotificationBanner] Form errors:', formState.errors);
+    }
+  }, [formState, form, router]);
 
   // Sync form errors with server-side validation
   useEffect(() => {
@@ -663,6 +694,49 @@ export default function NotificationBannerForm({
     }
   }, [setValue, form]);
 
+  // Re-crop existing image with current background color settings
+  const handleRecropImage = useCallback(async () => {
+    // First try to use the local blob URL if we have it (from current session upload)
+    if (imageToCrop) {
+      setCropperOpen(true);
+      return;
+    }
+
+    // Otherwise, fetch the uploaded original image and convert to blob URL
+    const originalUrl = form.getValues('originalImageUrl');
+    const imageUrl = form.getValues('imageUrl');
+    const urlToRecrop = originalUrl || imageUrl;
+
+    if (urlToRecrop) {
+      try {
+        // Show loading state
+        setUploadProgress('Loading image for cropping...');
+
+        // Use proxy endpoint to fetch the image to avoid CORS issues
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(urlToRecrop)}`;
+        const response = await fetch(proxyUrl);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to fetch image');
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        setImageToCrop(blobUrl);
+        setCropperOpen(true);
+        setUploadProgress('');
+      } catch (err) {
+        console.error('[NotificationBanner] Failed to load image for re-crop:', err);
+        toast.error('Failed to load image for cropping. Please try uploading a new image.');
+        setUploadProgress('');
+      }
+    } else {
+      toast.error('No image available to re-crop');
+    }
+  }, [imageToCrop, form]);
+
   /**
    * Build FormData from current form values and submit
    * This is extracted so it can be called programmatically after image upload
@@ -684,6 +758,14 @@ export default function NotificationBannerForm({
     // Add notification ID for update
     if (notificationId) {
       formData.append('notificationId', notificationId);
+    }
+
+    // Ensure message fields are included from form state (not just DOM)
+    const message = form.getValues('message');
+    const secondaryMessage = form.getValues('secondaryMessage');
+    formData.set('message', message || '');
+    if (secondaryMessage) {
+      formData.set('secondaryMessage', secondaryMessage);
     }
 
     // Ensure image URLs are included (critical for saving uploaded images)
@@ -768,7 +850,20 @@ export default function NotificationBannerForm({
     formData.set('imageOffsetX', String(imageOffsetX ?? 0));
     formData.set('imageOffsetY', String(imageOffsetY ?? 0));
 
-    formAction(formData);
+    // Ensure text box dimension fields are included
+    const messageWidth = form.getValues('messageWidth');
+    const messageHeight = form.getValues('messageHeight');
+    const secondaryMessageWidth = form.getValues('secondaryMessageWidth');
+    const secondaryMessageHeight = form.getValues('secondaryMessageHeight');
+    formData.set('messageWidth', String(messageWidth ?? 80));
+    formData.set('messageHeight', String(messageHeight ?? 30));
+    formData.set('secondaryMessageWidth', String(secondaryMessageWidth ?? 80));
+    formData.set('secondaryMessageHeight', String(secondaryMessageHeight ?? 30));
+
+    // Wrap formAction in startTransition for proper React 19 useActionState behavior
+    startTransition(() => {
+      formAction(formData);
+    });
     return true;
   }, [form, formAction, notificationId]);
 
@@ -776,7 +871,7 @@ export default function NotificationBannerForm({
   useEffect(() => {
     if (pendingAutoSave && !isUploadingImage) {
       setPendingAutoSave(false);
-      setSkipRedirectOnSave(true); // Don't redirect after auto-save
+      skipRedirectOnSaveRef.current = true; // Don't redirect after auto-save
       console.info('[NotificationBanner] Executing auto-save after image upload');
       submitForm().then((success) => {
         if (success) {
@@ -1135,16 +1230,20 @@ export default function NotificationBannerForm({
                           <div className="space-y-4">
                             {/* Action buttons */}
                             <div className="flex flex-wrap gap-2">
-                              {/* Re-crop button - only show if we have the original image */}
-                              {imageToCrop && (
+                              {/* Re-crop button - show when we have an image to re-crop */}
+                              {(imageToCrop ||
+                                watchedOriginalImageUrl ||
+                                watchedImageUrl ||
+                                field.value) && (
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setCropperOpen(true)}
+                                  onClick={handleRecropImage}
+                                  disabled={isUploadingImage || isProcessingImage}
                                 >
                                   <Crop className="mr-2 h-4 w-4" />
-                                  Re-crop
+                                  Re-crop / Change Background
                                 </Button>
                               )}
                               {/* Reset to original button - show when processed differs from original */}
@@ -2119,156 +2218,119 @@ export default function NotificationBannerForm({
                           backgroundSize: 'cover',
                           backgroundPosition: `calc(50% + ${watchedImageOffsetX ?? 0}%) calc(50% + ${watchedImageOffsetY ?? 0}%)`,
                         }}
+                        onClick={() => setSelectedTextBox(null)}
                       >
                         {watchedIsOverlayed && (
                           <>
-                            {/* Message - draggable, rotatable, and positioned */}
-                            <div
-                              className="absolute"
-                              style={{
-                                left: `${watchedMessagePositionX ?? 50}%`,
-                                top: `${watchedMessagePositionY ?? 10}%`,
-                                transform: `translate(-50%, -50%) rotate(${watchedMessageRotation ?? 0}deg)`,
+                            {/* Message - draggable, rotatable, resizable, and positioned */}
+                            <ResizableTextBox
+                              width={watchedMessageWidth ?? 80}
+                              height={watchedMessageHeight ?? 30}
+                              onWidthChange={(w) => setValue('messageWidth', w)}
+                              onHeightChange={(h) => setValue('messageHeight', h)}
+                              positionX={watchedMessagePositionX ?? 50}
+                              positionY={watchedMessagePositionY ?? 10}
+                              rotation={watchedMessageRotation ?? 0}
+                              isDragging={isDraggingMessage}
+                              onDragStart={handleMessageDragStart}
+                              onRotateStart={handleMessageRotateStart}
+                              isSelected={selectedTextBox === 'message'}
+                              onSelect={() => setSelectedTextBox('message')}
+                              onDoubleClick={() => {
+                                messageTextareaRef.current?.focus();
+                                messageTextareaRef.current?.scrollIntoView({
+                                  behavior: 'smooth',
+                                  block: 'center',
+                                });
+                              }}
+                              title="Drag to position, double-click to edit, drag handles to resize"
+                              textStyle={{
+                                fontFamily:
+                                  watchedMessageFont === 'system-ui'
+                                    ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                                    : `'${watchedMessageFont}', system-ui, sans-serif`,
+                                fontSize: `${watchedMessageFontSize}rem`,
+                                color: hexToRgba(
+                                  watchedMessageTextColor || '#ffffff',
+                                  (watchedMessageContrast ?? 100) / 100
+                                ),
+                                textShadow:
+                                  watchedMessageTextShadow &&
+                                  (originalPreviewUrl || watchedOriginalImageUrl || watchedImageUrl)
+                                    ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
+                                    : 'none',
+                                textTransform: 'none',
+                                letterSpacing: 'normal',
+                                fontWeight: 'normal',
                               }}
                             >
-                              <span
-                                className={cn(
-                                  'block cursor-grab select-none px-2 transition-shadow',
-                                  isDraggingMessage && 'cursor-grabbing',
-                                  'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent'
-                                )}
-                                style={{
-                                  maxWidth: '90%',
-                                  textAlign: 'center',
+                              {watchedMessage || 'Your message here'}
+                            </ResizableTextBox>
+                            {/* Secondary message - draggable, rotatable, resizable, and positioned */}
+                            {watchedSecondaryMessage && (
+                              <ResizableTextBox
+                                width={watchedSecondaryMessageWidth ?? 80}
+                                height={watchedSecondaryMessageHeight ?? 30}
+                                onWidthChange={(w) => setValue('secondaryMessageWidth', w)}
+                                onHeightChange={(h) => setValue('secondaryMessageHeight', h)}
+                                positionX={watchedSecondaryMessagePositionX ?? 50}
+                                positionY={watchedSecondaryMessagePositionY ?? 90}
+                                rotation={watchedSecondaryMessageRotation ?? 0}
+                                isDragging={isDraggingSecondary}
+                                onDragStart={handleSecondaryDragStart}
+                                onRotateStart={handleSecondaryRotateStart}
+                                isSelected={selectedTextBox === 'secondary'}
+                                onSelect={() => setSelectedTextBox('secondary')}
+                                onDoubleClick={() => {
+                                  secondaryMessageTextareaRef.current?.focus();
+                                  secondaryMessageTextareaRef.current?.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'center',
+                                  });
+                                }}
+                                title="Drag to position, double-click to edit, drag handles to resize"
+                                textStyle={{
                                   fontFamily:
-                                    watchedMessageFont === 'system-ui'
+                                    watchedSecondaryMessageFont === 'system-ui'
                                       ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                                      : `'${watchedMessageFont}', system-ui, sans-serif`,
-                                  fontSize: `${watchedMessageFontSize}rem`,
+                                      : `'${watchedSecondaryMessageFont}', system-ui, sans-serif`,
+                                  fontSize: `${watchedSecondaryMessageFontSize}rem`,
                                   color: hexToRgba(
-                                    watchedMessageTextColor || '#ffffff',
-                                    (watchedMessageContrast ?? 100) / 100
+                                    watchedSecondaryMessageTextColor || '#ffffff',
+                                    (watchedSecondaryMessageContrast ?? 95) / 100
                                   ),
                                   textShadow:
-                                    watchedMessageTextShadow &&
+                                    watchedSecondaryMessageTextShadow &&
                                     (originalPreviewUrl ||
                                       watchedOriginalImageUrl ||
                                       watchedImageUrl)
-                                      ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
+                                      ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedSecondaryMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
                                       : 'none',
                                   textTransform: 'none',
                                   letterSpacing: 'normal',
                                   fontWeight: 'normal',
                                 }}
-                                onMouseDown={handleMessageDragStart}
-                                onTouchStart={handleMessageDragStart}
-                                onDoubleClick={() => {
-                                  messageTextareaRef.current?.focus();
-                                  messageTextareaRef.current?.scrollIntoView({
-                                    behavior: 'smooth',
-                                    block: 'center',
-                                  });
-                                }}
-                                title="Drag to position, double-click to edit"
                               >
-                                {watchedMessage || 'Your message here'}
-                              </span>
-                              {/* Rotation handle for message */}
-                              <button
-                                type="button"
-                                className={cn(
-                                  'absolute -right-6 top-1/2 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white',
-                                  isRotatingMessage && 'cursor-grabbing bg-white'
-                                )}
-                                onMouseDown={handleMessageRotateStart}
-                                onTouchStart={handleMessageRotateStart}
-                                title={`Rotate text (${watchedMessageRotation ?? 0}°)`}
-                              >
-                                ↻
-                              </button>
-                            </div>
-                            {/* Secondary message - draggable, rotatable, and positioned */}
-                            {watchedSecondaryMessage && (
-                              <div
-                                className="absolute"
-                                style={{
-                                  left: `${watchedSecondaryMessagePositionX ?? 50}%`,
-                                  top: `${watchedSecondaryMessagePositionY ?? 90}%`,
-                                  transform: `translate(-50%, -50%) rotate(${watchedSecondaryMessageRotation ?? 0}deg)`,
-                                }}
-                              >
-                                <span
-                                  className={cn(
-                                    'block cursor-grab select-none px-2 transition-shadow',
-                                    isDraggingSecondary && 'cursor-grabbing',
-                                    'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent'
-                                  )}
-                                  style={{
-                                    maxWidth: '90%',
-                                    textAlign: 'center',
-                                    fontFamily:
-                                      watchedSecondaryMessageFont === 'system-ui'
-                                        ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-                                        : `'${watchedSecondaryMessageFont}', system-ui, sans-serif`,
-                                    fontSize: `${watchedSecondaryMessageFontSize}rem`,
-                                    color: hexToRgba(
-                                      watchedSecondaryMessageTextColor || '#ffffff',
-                                      (watchedSecondaryMessageContrast ?? 95) / 100
-                                    ),
-                                    textShadow:
-                                      watchedSecondaryMessageTextShadow &&
-                                      (originalPreviewUrl ||
-                                        watchedOriginalImageUrl ||
-                                        watchedImageUrl)
-                                        ? `0 1px 2px rgba(0,0,0,${0.3 + ((watchedSecondaryMessageTextShadowDarkness ?? 50) / 100) * 0.6})`
-                                        : 'none',
-                                    textTransform: 'none',
-                                    letterSpacing: 'normal',
-                                    fontWeight: 'normal',
-                                  }}
-                                  onMouseDown={handleSecondaryDragStart}
-                                  onTouchStart={handleSecondaryDragStart}
-                                  onDoubleClick={() => {
-                                    secondaryMessageTextareaRef.current?.focus();
-                                    secondaryMessageTextareaRef.current?.scrollIntoView({
-                                      behavior: 'smooth',
-                                      block: 'center',
-                                    });
-                                  }}
-                                  title="Drag to position, double-click to edit"
-                                >
-                                  {watchedSecondaryMessage}
-                                </span>
-                                {/* Rotation handle for secondary message */}
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    'absolute -right-6 top-1/2 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white',
-                                    isRotatingSecondary && 'cursor-grabbing bg-white'
-                                  )}
-                                  onMouseDown={handleSecondaryRotateStart}
-                                  onTouchStart={handleSecondaryRotateStart}
-                                  title={`Rotate text (${watchedSecondaryMessageRotation ?? 0}°)`}
-                                >
-                                  ↻
-                                </button>
-                              </div>
+                                {watchedSecondaryMessage}
+                              </ResizableTextBox>
                             )}
                           </>
                         )}
                       </div>
                     </div>
-                    {/* Position and rotation display */}
+                    {/* Position, rotation, and dimensions display */}
                     <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                       <span>
                         Message: X={watchedMessagePositionX ?? 50}%, Y=
-                        {watchedMessagePositionY ?? 10}%, Rotation=
-                        {watchedMessageRotation ?? 0}°
+                        {watchedMessagePositionY ?? 10}%, W={watchedMessageWidth ?? 80}%, H=
+                        {watchedMessageHeight ?? 30}%, Rotation={watchedMessageRotation ?? 0}°
                       </span>
                       {watchedSecondaryMessage && (
                         <span>
                           Secondary: X={watchedSecondaryMessagePositionX ?? 50}%, Y=
-                          {watchedSecondaryMessagePositionY ?? 90}%, Rotation=
+                          {watchedSecondaryMessagePositionY ?? 90}%, W=
+                          {watchedSecondaryMessageWidth ?? 80}%, H=
+                          {watchedSecondaryMessageHeight ?? 30}%, Rotation=
                           {watchedSecondaryMessageRotation ?? 0}°
                         </span>
                       )}
@@ -2278,6 +2340,10 @@ export default function NotificationBannerForm({
                         </span>
                       )}
                     </div>
+                    {/* Selection hint */}
+                    <p className="text-xs text-muted-foreground">
+                      Click a text box to select it and see resize handles. Drag handles to resize.
+                    </p>
                   </div>
                 </>
               )}

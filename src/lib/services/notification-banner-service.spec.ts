@@ -70,6 +70,11 @@ describe('NotificationBannerService', () => {
     // Image offset settings
     imageOffsetX: null,
     imageOffsetY: null,
+    // Text box dimension settings
+    messageWidth: null,
+    messageHeight: null,
+    secondaryMessageWidth: null,
+    secondaryMessageHeight: null,
   };
 
   beforeEach(() => {

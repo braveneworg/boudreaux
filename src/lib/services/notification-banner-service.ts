@@ -44,6 +44,11 @@ export type NotificationBanner = {
   // Image offset settings
   imageOffsetX: number | null;
   imageOffsetY: number | null;
+  // Text box dimension settings
+  messageWidth: number | null;
+  messageHeight: number | null;
+  secondaryMessageWidth: number | null;
+  secondaryMessageHeight: number | null;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;
@@ -194,6 +199,9 @@ export class NotificationBannerService {
     data: Prisma.NotificationUpdateInput
   ): Promise<ServiceResponse<NotificationBanner>> {
     try {
+      console.info('[NotificationBannerService] Updating notification:', id);
+      console.info('[NotificationBannerService] Update data:', JSON.stringify(data, null, 2));
+
       const notification = await prisma.notification.update({
         where: { id },
         data,
@@ -201,7 +209,10 @@ export class NotificationBannerService {
 
       return { success: true, data: notification };
     } catch (error) {
+      console.error('[NotificationBannerService] Update error:', error);
+
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        console.error('[NotificationBannerService] Prisma error code:', error.code);
         if (error.code === 'P2025') {
           return { success: false, error: 'Notification banner not found' };
         }
