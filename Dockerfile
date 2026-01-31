@@ -70,6 +70,33 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install fonts for Sharp SVG text rendering
+# fontconfig is needed for font discovery
+# Download Google Fonts TTF files directly from jsDelivr CDN (fontsource)
+RUN apk add --no-cache fontconfig ttf-dejavu \
+    && mkdir -p /usr/share/fonts/google \
+    && cd /usr/share/fonts/google \
+    # Roboto
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-400-normal.ttf" -O Roboto-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-700-normal.ttf" -O Roboto-Bold.ttf \
+    # Open Sans
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/open-sans@latest/latin-400-normal.ttf" -O OpenSans-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/open-sans@latest/latin-700-normal.ttf" -O OpenSans-Bold.ttf \
+    # Lato
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/lato@latest/latin-400-normal.ttf" -O Lato-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/lato@latest/latin-700-normal.ttf" -O Lato-Bold.ttf \
+    # Oswald
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/oswald@latest/latin-400-normal.ttf" -O Oswald-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/oswald@latest/latin-700-normal.ttf" -O Oswald-Bold.ttf \
+    # Montserrat
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-400-normal.ttf" -O Montserrat-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-700-normal.ttf" -O Montserrat-Bold.ttf \
+    # Playfair Display
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/playfair-display@latest/latin-400-normal.ttf" -O PlayfairDisplay-Regular.ttf \
+    && wget -q "https://cdn.jsdelivr.net/fontsource/fonts/playfair-display@latest/latin-700-normal.ttf" -O PlayfairDisplay-Bold.ttf \
+    # Refresh font cache
+    && fc-cache -fv
+
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
 RUN adduser --system --uid 1001 appuser

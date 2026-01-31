@@ -129,6 +129,18 @@ export async function processNotificationImageAction(
       };
     }
 
+    // Log overlay settings for debugging
+    console.info('[PROCESS_IMAGE] Creating text overlay with settings:', {
+      message: message.substring(0, 50),
+      messageFont,
+      messageFontSize,
+      messageFontSizePx: Math.round(messageFontSize * BASE_FONT_SIZE * (width / 880)),
+      messagePositionX,
+      messagePositionY,
+      messageRotation,
+      isOverlayed,
+    });
+
     // Create text overlay SVG
     const svgOverlay = createTextOverlaySvg({
       message,
