@@ -16,6 +16,12 @@ services:
       NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY}
       CLOUDFLARE_SECRET: ${CLOUDFLARE_SECRET}
       NEXT_TELEMETRY_DISABLED: 1
+      # AWS S3 configuration for file uploads
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      CDN_DOMAIN: ${CDN_DOMAIN}
     expose:
       - "3000"
     networks:
