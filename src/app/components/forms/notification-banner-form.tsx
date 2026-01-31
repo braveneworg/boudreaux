@@ -1208,33 +1208,6 @@ export default function NotificationBannerForm({
                                       )}
                                     </div>
                                   </div>
-                                  {/* Processed image - full viewport width */}
-                                  <div className="space-y-1">
-                                    <p className="px-4 text-sm font-medium text-muted-foreground sm:px-6 md:px-8">
-                                      With Text Overlay
-                                    </p>
-                                    <div
-                                      className="relative w-full overflow-hidden"
-                                      style={{ paddingBottom: `${100 / 1.618}%` }}
-                                    >
-                                      {isRemoteUrl(processedPreviewUrl) ? (
-                                        <Image
-                                          src={processedPreviewUrl}
-                                          alt="Processed banner"
-                                          fill
-                                          className="object-cover"
-                                          sizes="100vw"
-                                          unoptimized
-                                        />
-                                      ) : (
-                                        <LocalBlobImage
-                                          src={processedPreviewUrl}
-                                          alt="Processed banner"
-                                          className="absolute inset-0 h-full w-full object-cover"
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
                                 </div>
                               )}
 

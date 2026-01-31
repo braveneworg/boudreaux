@@ -118,32 +118,35 @@ describe('SignedInAs', () => {
   });
 
   describe('when user has no username', () => {
-    it('returns null when username is undefined and no fallback available', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {},
-        },
-        status: 'authenticated',
-      });
-      mockUseIsMobile.mockReturnValue(false);
-
-      const { container } = render(<SignedInAs />);
-      expect(container.firstChild).toBeNull();
-    });
-
-    it('returns null when username is null and no fallback available', () => {
+    it('displays email when username is undefined but email is available', () => {
       mockUseSession.mockReturnValue({
         data: {
           user: {
-            username: null,
+            email: 'test@example.com',
           },
         },
         status: 'authenticated',
       });
       mockUseIsMobile.mockReturnValue(false);
 
-      const { container } = render(<SignedInAs />);
-      expect(container.firstChild).toBeNull();
+      render(<SignedInAs />);
+      expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    });
+
+    it('displays email when username is null but email is available', () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            username: null,
+            email: 'test@example.com',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+
+      render(<SignedInAs />);
+      expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
 
     it('returns null when user session is null', () => {
