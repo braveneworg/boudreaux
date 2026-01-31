@@ -160,6 +160,7 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+          SKIP_CLEANUP: "true"
         run: npm run sync:cdn:no-build
 
       - name: Verify files uploaded to S3
