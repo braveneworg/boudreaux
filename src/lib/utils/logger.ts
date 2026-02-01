@@ -70,7 +70,7 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
         }
         return item;
       });
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
       result[key] = value;
