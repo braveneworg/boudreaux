@@ -34,6 +34,21 @@ const formatLogMessage = (level: LogLevel, context: LogContext, message: string)
 };
 
 /**
+ * Processes a value recursively for safe serialization
+ */
+const processValue = (
+  value: unknown,
+  safeSerialize: (data: Record<string, unknown>) => Record<string, unknown>
+): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => processValue(item, safeSerialize));
+  } else if (typeof value === 'object' && value !== null) {
+    return safeSerialize(value as Record<string, unknown>);
+  }
+  return value;
+};
+
+/**
  * Safely serializes data for logging, filtering sensitive fields
  */
 const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> => {
@@ -52,15 +67,6 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     'private',
   ];
 
-  const processValue = (value: unknown): unknown => {
-    if (Array.isArray(value)) {
-      return value.map((item) => processValue(item));
-    } else if (typeof value === 'object' && value !== null) {
-      return safeSerialize(value as Record<string, unknown>);
-    }
-    return value;
-  };
-
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
@@ -72,7 +78,7 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     if (isSensitive) {
       result[key] = '[REDACTED]';
     } else {
-      result[key] = processValue(value);
+      result[key] = processValue(value, safeSerialize);
     }
   }
 
