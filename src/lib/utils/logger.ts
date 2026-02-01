@@ -81,6 +81,14 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     if (isSensitive) {
       result[key] = '[REDACTED]';
     } else if (Array.isArray(value)) {
+      // Recursively sanitize arrays containing objects
+      result[key] = value.map((item) => {
+        if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+          return safeSerialize(item as Record<string, unknown>);
+        }
+        return item;
+      });
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       result[key] = safeSerializeArray(value);
     } else if (typeof value === 'object' && value !== null) {
       result[key] = safeSerialize(value as Record<string, unknown>);
