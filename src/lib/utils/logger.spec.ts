@@ -242,6 +242,34 @@ describe('Logger', () => {
         expect.any(String),
         expect.objectContaining({
           items: [],
+          tags: ['tag1', 'tag2', 'tag3'],
+          numbers: [1, 2, 3],
+        })
+      );
+    });
+
+    it('redacts sensitive fields in deeply nested arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('deeply nested array data', {
+        matrix: [
+          [
+            { id: 1, password: 'secret1' },
+            { id: 2, token: 'token2' },
+          ],
+          [{ id: 3, apiKey: 'key3' }],
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          matrix: [
+            [
+              expect.objectContaining({ id: 1, password: '[REDACTED]' }),
+              expect.objectContaining({ id: 2, token: '[REDACTED]' }),
+            ],
+            [expect.objectContaining({ id: 3, apiKey: '[REDACTED]' })],
+          ],
         })
       );
     });
