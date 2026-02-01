@@ -147,6 +147,104 @@ describe('Logger', () => {
         })
       );
     });
+
+    it('handles arrays containing objects with sensitive fields', () => {
+      const logger = createLogger('TEST');
+      logger.info('array of users', {
+        users: [
+          { name: 'alice', password: 'secret1' },
+          { name: 'bob', token: 'token123' },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          users: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'alice',
+              password: '[REDACTED]',
+            }),
+            expect.objectContaining({
+              name: 'bob',
+              token: '[REDACTED]',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('handles arrays with mixed content including sensitive data', () => {
+      const logger = createLogger('TEST');
+      logger.info('mixed array', {
+        items: ['plain string', 42, { id: '123', apiKey: 'key123', value: 'visible' }],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            'plain string',
+            42,
+            expect.objectContaining({
+              id: '123',
+              apiKey: '[REDACTED]',
+              value: 'visible',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('handles nested arrays with sensitive data', () => {
+      const logger = createLogger('TEST');
+      logger.info('nested arrays', {
+        groups: [
+          {
+            name: 'admins',
+            members: [
+              { username: 'admin1', password: 'pass1' },
+              { username: 'admin2', secretKey: 'key2' },
+            ],
+          },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          groups: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'admins',
+              members: expect.arrayContaining([
+                expect.objectContaining({
+                  username: 'admin1',
+                  password: '[REDACTED]',
+                }),
+                expect.objectContaining({
+                  username: 'admin2',
+                  secretKey: '[REDACTED]',
+                }),
+              ]),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('handles empty arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('empty array', {
+        items: [],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          items: [],
+        })
+      );
+    });
   });
 
   describe('operation logging', () => {
