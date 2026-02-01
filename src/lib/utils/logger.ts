@@ -52,6 +52,15 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     'private',
   ];
 
+  const processValue = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map((item) => processValue(item));
+    } else if (typeof value === 'object' && value !== null) {
+      return safeSerialize(value as Record<string, unknown>);
+    }
+    return value;
+  };
+
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
@@ -62,17 +71,8 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
 
     if (isSensitive) {
       result[key] = '[REDACTED]';
-    } else if (Array.isArray(value)) {
-      result[key] = value.map((item) => {
-        if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-          return safeSerialize(item as Record<string, unknown>);
-        }
-        return item;
-      });
-    } else if (typeof value === 'object' && value !== null) {
-      result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
-      result[key] = value;
+      result[key] = processValue(value);
     }
   }
 
