@@ -223,6 +223,40 @@ describe('Logger', () => {
         })
       );
     });
+
+    it('redacts sensitive fields in deeply nested arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('deeply nested array with sensitive data', {
+        level1: [
+          [
+            [
+              { name: 'user1', password: 'secret1' },
+              { name: 'user2', apiKey: 'key2' },
+            ],
+          ],
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          level1: [
+            [
+              [
+                expect.objectContaining({
+                  name: 'user1',
+                  password: '[REDACTED]',
+                }),
+                expect.objectContaining({
+                  name: 'user2',
+                  apiKey: '[REDACTED]',
+                }),
+              ],
+            ],
+          ],
+        })
+      );
+    });
   });
 
   describe('operation logging', () => {
