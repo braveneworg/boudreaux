@@ -147,6 +147,104 @@ describe('Logger', () => {
         })
       );
     });
+
+    it('redacts sensitive fields in arrays of objects', () => {
+      const logger = createLogger('TEST');
+      logger.info('array data', {
+        users: [
+          { username: 'john', password: 'secret123' },
+          { username: 'jane', token: 'token456' },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          users: [
+            { username: 'john', password: '[REDACTED]' },
+            { username: 'jane', token: '[REDACTED]' },
+          ],
+        })
+      );
+    });
+
+    it('logs arrays of primitive values without modification', () => {
+      const logger = createLogger('TEST');
+      logger.info('array of primitives', {
+        ids: [1, 2, 3],
+        names: ['alice', 'bob'],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          ids: [1, 2, 3],
+          names: ['alice', 'bob'],
+        })
+      );
+    });
+
+    it('redacts sensitive fields in mixed arrays with objects', () => {
+      const logger = createLogger('TEST');
+      logger.info('mixed array data', {
+        items: [
+          { id: 1, name: 'item1', apiKey: 'key123' },
+          { id: 2, name: 'item2', secret: 'secret456' },
+          'plain string',
+          123,
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          items: [
+            { id: 1, name: 'item1', apiKey: '[REDACTED]' },
+            { id: 2, name: 'item2', secret: '[REDACTED]' },
+            'plain string',
+            123,
+          ],
+        })
+      );
+    });
+
+    it('redacts sensitive fields in deeply nested arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('deeply nested array data', {
+        departments: [
+          {
+            name: 'Engineering',
+            users: [
+              { username: 'alice', password: 'pass123' },
+              { username: 'bob', apiKey: 'key456' },
+            ],
+          },
+          {
+            name: 'Sales',
+            users: [{ username: 'charlie', token: 'token789' }],
+          },
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          departments: [
+            {
+              name: 'Engineering',
+              users: [
+                { username: 'alice', password: '[REDACTED]' },
+                { username: 'bob', apiKey: '[REDACTED]' },
+              ],
+            },
+            {
+              name: 'Sales',
+              users: [{ username: 'charlie', token: '[REDACTED]' }],
+            },
+          ],
+        })
+      );
+    });
   });
 
   describe('operation logging', () => {
