@@ -1,3 +1,5 @@
+'use server';
+
 import 'server-only';
 
 /**
@@ -67,6 +69,18 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
     'private',
   ];
 
+  /**
+   * Helper function to recursively process arrays at any nesting depth
+   */
+  const processArrayItem = (item: unknown): unknown => {
+    if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+      return safeSerialize(item as Record<string, unknown>);
+    } else if (Array.isArray(item)) {
+      return item.map(processArrayItem);
+    }
+    return item;
+  };
+
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
@@ -77,6 +91,10 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
 
     if (isSensitive) {
       result[key] = '[REDACTED]';
+    } else if (Array.isArray(value)) {
+      result[key] = value.map(processArrayItem);
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
       result[key] = processValue(value, safeSerialize);
     }
