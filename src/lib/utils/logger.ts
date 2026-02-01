@@ -52,20 +52,6 @@ const SENSITIVE_KEYS = [
 ];
 
 /**
- * Recursively processes arrays to sanitize any sensitive data
- */
-const safeSerializeArray = (arr: unknown[]): unknown[] => {
-  return arr.map((item) => {
-    if (Array.isArray(item)) {
-      return safeSerializeArray(item);
-    } else if (typeof item === 'object' && item !== null) {
-      return safeSerialize(item as Record<string, unknown>);
-    }
-    return item;
-  });
-};
-
-/**
  * Safely serializes data for logging, filtering sensitive fields
  */
 const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> => {
@@ -89,6 +75,20 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
   }
 
   return result;
+};
+
+/**
+ * Recursively processes arrays to sanitize any sensitive data
+ */
+const safeSerializeArray = (arr: unknown[]): unknown[] => {
+  return arr.map((item) => {
+    if (Array.isArray(item)) {
+      return safeSerializeArray(item);
+    } else if (typeof item === 'object' && item !== null) {
+      return safeSerialize(item as Record<string, unknown>);
+    }
+    return item;
+  });
 };
 
 /**
