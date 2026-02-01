@@ -1,3 +1,5 @@
+'use server';
+
 import 'server-only';
 
 /**
@@ -34,29 +36,45 @@ const formatLogMessage = (level: LogLevel, context: LogContext, message: string)
 };
 
 /**
+ * List of sensitive field names to redact from logs
+ */
+const SENSITIVE_KEYS = [
+  'password',
+  'secret',
+  'token',
+  'key',
+  'credential',
+  'authorization',
+  'cookie',
+  'session',
+  'accesskey',
+  'secretkey',
+  'apikey',
+  'private',
+];
+ * Processes a value recursively for safe serialization
+ */
+const processValue = (
+  value: unknown,
+  safeSerialize: (data: Record<string, unknown>) => Record<string, unknown>
+): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => processValue(item, safeSerialize));
+  } else if (typeof value === 'object' && value !== null) {
+    return safeSerialize(value as Record<string, unknown>);
+  }
+  return value;
+};
+
+/**
  * Safely serializes data for logging, filtering sensitive fields
  */
 const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> => {
-  const sensitiveKeys = [
-    'password',
-    'secret',
-    'token',
-    'key',
-    'credential',
-    'authorization',
-    'cookie',
-    'session',
-    'accesskey',
-    'secretkey',
-    'apikey',
-    'private',
-  ];
-
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
     const lowerKey = key.toLowerCase();
-    const isSensitive = sensitiveKeys.some(
+    const isSensitive = SENSITIVE_KEYS.some(
       (sensitive) => lowerKey.includes(sensitive) || lowerKey === sensitive
     );
 
@@ -71,13 +89,29 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
         return item;
       });
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      result[key] = safeSerializeArray(value);
+    } else if (typeof value === 'object' && value !== null) {
       result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
-      result[key] = value;
+      result[key] = processValue(value, safeSerialize);
     }
   }
 
   return result;
+};
+
+/**
+ * Recursively processes arrays to sanitize any sensitive data
+ */
+const safeSerializeArray = (arr: unknown[]): unknown[] => {
+  return arr.map((item) => {
+    if (Array.isArray(item)) {
+      return safeSerializeArray(item);
+    } else if (typeof item === 'object' && item !== null) {
+      return safeSerialize(item as Record<string, unknown>);
+    }
+    return item;
+  });
 };
 
 /**

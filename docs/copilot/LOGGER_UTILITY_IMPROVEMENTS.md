@@ -8,7 +8,7 @@ This document summarizes the code quality improvements made based on the copilot
 
 ### 1. Created Structured Logger Utility
 
-**File:** [src/lib/utils/logger.ts](src/lib/utils/logger.ts)
+**File:** [src/lib/utils/logger.ts](../../src/lib/utils/logger.ts)
 
 A reusable logging utility that provides:
 
@@ -43,7 +43,7 @@ logger.operationFailed('createNotification', error, { id: '123' });
 
 ### 2. Updated presigned-upload-actions.ts
 
-**File:** [src/lib/actions/presigned-upload-actions.ts](src/lib/actions/presigned-upload-actions.ts)
+**File:** [src/lib/actions/presigned-upload-actions.ts](../../src/lib/actions/presigned-upload-actions.ts)
 
 - Replaced raw `console.info` and `console.error` calls with structured logger
 - Added operation lifecycle logging (`operationStart`, `operationComplete`, `operationFailed`)
@@ -52,7 +52,7 @@ logger.operationFailed('createNotification', error, { id: '123' });
 
 ### 3. Updated notification-banner-action.ts
 
-**File:** [src/lib/actions/notification-banner-action.ts](src/lib/actions/notification-banner-action.ts)
+**File:** [src/lib/actions/notification-banner-action.ts](../../src/lib/actions/notification-banner-action.ts)
 
 - Replaced all `console.info` and `console.error` calls with structured logger
 - Moved debug logs to use `logger.debug` (only visible in development)
@@ -61,7 +61,7 @@ logger.operationFailed('createNotification', error, { id: '123' });
 
 ### 4. Test Coverage
 
-**File:** [src/lib/utils/logger.spec.ts](src/lib/utils/logger.spec.ts)
+**File:** [src/lib/utils/logger.spec.ts](../../src/lib/utils/logger.spec.ts)
 
 24 comprehensive tests covering:
 
