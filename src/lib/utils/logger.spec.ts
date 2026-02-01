@@ -153,7 +153,7 @@ describe('Logger', () => {
       logger.info('array with sensitive data', {
         users: [
           { name: 'john', password: 'secret123' },
-          { name: 'jane', apiKey: 'key456' },
+          { name: 'jane', password: 'secret456' },
         ],
       });
 
@@ -161,55 +161,20 @@ describe('Logger', () => {
         expect.any(String),
         expect.objectContaining({
           users: [
-            expect.objectContaining({
-              name: 'john',
-              password: '[REDACTED]',
-            }),
-            expect.objectContaining({
-              name: 'jane',
-              apiKey: '[REDACTED]',
-            }),
+            expect.objectContaining({ name: 'john', password: '[REDACTED]' }),
+            expect.objectContaining({ name: 'jane', password: '[REDACTED]' }),
           ],
         })
       );
     });
 
-    it('redacts sensitive fields in nested arrays', () => {
+    it('redacts sensitive fields in arrays containing mixed objects', () => {
       const logger = createLogger('TEST');
-      logger.info('nested array with sensitive data', {
-        groups: [
-          [
-            { name: 'user1', token: 'token123' },
-            { name: 'user2', secret: 'secret456' },
-          ],
-        ],
-      });
-
-      expect(consoleSpy.info).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          groups: [
-            [
-              expect.objectContaining({
-                name: 'user1',
-                token: '[REDACTED]',
-              }),
-              expect.objectContaining({
-                name: 'user2',
-                secret: '[REDACTED]',
-              }),
-            ],
-          ],
-        })
-      );
-    });
-
-    it('preserves non-sensitive data in arrays', () => {
-      const logger = createLogger('TEST');
-      logger.info('array with non-sensitive data', {
+      logger.info('mixed array data', {
         items: [
-          { id: '1', name: 'item1', value: 100 },
-          { id: '2', name: 'item2', value: 200 },
+          { id: 1, apiKey: 'key123', value: 'data1' },
+          { id: 2, token: 'token456', value: 'data2' },
+          { id: 3, value: 'data3' },
         ],
       });
 
@@ -217,42 +182,81 @@ describe('Logger', () => {
         expect.any(String),
         expect.objectContaining({
           items: [
-            expect.objectContaining({ id: '1', name: 'item1', value: 100 }),
-            expect.objectContaining({ id: '2', name: 'item2', value: 200 }),
+            expect.objectContaining({ id: 1, apiKey: '[REDACTED]', value: 'data1' }),
+            expect.objectContaining({ id: 2, token: '[REDACTED]', value: 'data2' }),
+            expect.objectContaining({ id: 3, value: 'data3' }),
           ],
         })
       );
     });
 
-    it('redacts sensitive fields in deeply nested arrays', () => {
+    it('redacts sensitive fields in nested arrays', () => {
       const logger = createLogger('TEST');
-      logger.info('deeply nested array with sensitive data', {
-        level1: [
-          [
-            [
-              { name: 'user1', password: 'secret1' },
-              { name: 'user2', apiKey: 'key2' },
+      logger.info('nested arrays with sensitive data', {
+        groups: [
+          {
+            name: 'admins',
+            users: [
+              { username: 'admin1', password: 'pass1' },
+              { username: 'admin2', password: 'pass2' },
             ],
-          ],
+          },
         ],
       });
 
       expect(consoleSpy.info).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          level1: [
-            [
-              [
-                expect.objectContaining({
-                  name: 'user1',
-                  password: '[REDACTED]',
-                }),
-                expect.objectContaining({
-                  name: 'user2',
-                  apiKey: '[REDACTED]',
-                }),
+          groups: [
+            expect.objectContaining({
+              name: 'admins',
+              users: [
+                expect.objectContaining({ username: 'admin1', password: '[REDACTED]' }),
+                expect.objectContaining({ username: 'admin2', password: '[REDACTED]' }),
               ],
+            }),
+          ],
+        })
+      );
+    });
+
+    it('handles arrays with non-object values', () => {
+      const logger = createLogger('TEST');
+      logger.info('array with primitives', {
+        tags: ['tag1', 'tag2', 'tag3'],
+        numbers: [1, 2, 3],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          tags: ['tag1', 'tag2', 'tag3'],
+          numbers: [1, 2, 3],
+        })
+      );
+    });
+
+    it('redacts sensitive fields in deeply nested arrays', () => {
+      const logger = createLogger('TEST');
+      logger.info('deeply nested array data', {
+        matrix: [
+          [
+            { id: 1, password: 'secret1' },
+            { id: 2, token: 'token2' },
+          ],
+          [{ id: 3, apiKey: 'key3' }],
+        ],
+      });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          matrix: [
+            [
+              expect.objectContaining({ id: 1, password: '[REDACTED]' }),
+              expect.objectContaining({ id: 2, token: '[REDACTED]' }),
             ],
+            [expect.objectContaining({ id: 3, apiKey: '[REDACTED]' })],
           ],
         })
       );
