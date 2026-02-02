@@ -43,7 +43,13 @@ export default defineConfig({
     // Use fixed seed for reproducibility, override with VITEST_SEED env var
     sequence: {
       shuffle: true,
-      seed: process.env.VITEST_SEED ? parseInt(process.env.VITEST_SEED, 10) : 42,
+      seed: (() => {
+        if (process.env.VITEST_SEED) {
+          const parsed = parseInt(process.env.VITEST_SEED, 10);
+          return Number.isNaN(parsed) ? 42 : parsed;
+        }
+        return 42;
+      })(),
     },
 
     // Disable typecheck by default for faster runs
