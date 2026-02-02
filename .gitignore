@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+test-results.xml
+tsconfig.*.json
 
 # next.js
 /.next/
