@@ -41,10 +41,16 @@ export default defineConfig({
     testTimeout: 5000,
 
     // Randomize test order to catch hidden dependencies
-    // Use a fixed seed for reproducible test order across local and CI environments
+    // Use fixed seed for reproducibility, override with VITEST_SEED env var
     sequence: {
       shuffle: true,
-      seed: 12345, // Fixed seed for reproducible random order
+      seed: (() => {
+        if (process.env.VITEST_SEED) {
+          const parsed = parseInt(process.env.VITEST_SEED, 10);
+          return Number.isNaN(parsed) || parsed <= 0 ? 42 : parsed;
+        }
+        return 42;
+      })(),
     },
 
     // Disable typecheck by default for faster runs
