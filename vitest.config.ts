@@ -41,10 +41,6 @@ export default defineConfig({
     fileParallelism: true, // Run test files in parallel for speed
     testTimeout: 5000,
 
-    // Vitest 4: forks pool options are now top-level (used in CI)
-    singleFork: false, // Allow multiple forks
-    minWorkers: process.env.CI ? 1 : 2, // Reduce fork spawn overhead locally
-
     // Randomize test order to catch hidden dependencies
     // Use a fixed seed for reproducible test order across local and CI environments
     sequence: {
