@@ -822,6 +822,8 @@ describe('CustomPrismaAdapter', () => {
       };
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
@@ -856,6 +858,8 @@ describe('CustomPrismaAdapter', () => {
       };
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
@@ -892,6 +896,8 @@ describe('CustomPrismaAdapter', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockRejectedValue(new Error('Database error'));
 
       const result = await adapter.useVerificationToken?.({
@@ -911,6 +917,8 @@ describe('CustomPrismaAdapter', () => {
 
     it('should rethrow error if base adapter useVerificationToken fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // The @auth/prisma-adapter internally calls verificationToken.delete which then throws
+      mockPrisma.verificationToken.delete.mockRejectedValue(new Error('Token error'));
       mockUseVerificationToken.mockRejectedValue(new Error('Token error'));
 
       await expect(
