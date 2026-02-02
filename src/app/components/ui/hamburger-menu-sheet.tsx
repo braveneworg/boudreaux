@@ -35,16 +35,16 @@ export default function HamburgerMenuSheet({
 }: HamburgerMenuSheetProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <div className="relative size-[48px]">{children}</div>
+      <div className="relative size-12">{children}</div>
       <SheetContent
         side="right"
-        className="w-[100vw] h-[calc(100vh-65px)] md:h-[calc(100vh-144px)] top-[65px] md:top-[144px] border-0 z-[200] pt-0 px-8 fixed bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-6.svg)] bg-zinc-950 bg-cover bg-center opacity-90 bg-no-repeat pointer-events-auto"
+        className="w-screen h-[calc(100vh-65px)] md:h-[calc(100vh-144px)] top-[65px] md:top-36 border-0 z-200 pt-0 px-8 fixed bg-transparent backdrop-blur before:inset-0 bg-[url(/media/particles-6.svg)] bg-zinc-950 bg-cover bg-center opacity-90 bg-no-repeat pointer-events-auto"
         aria-label="Navigation menu"
         isOpen={isOpen}
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav className="flex flex-col" aria-label="Main navigation">
-          <SocialMediaIconLinks className="justify-center border-b-1 border-b-accent" />
+          <SocialMediaIconLinks className="justify-center border-b border-b-accent" />
           <ul className="pt-4 space-y-4" role="list">
             {menuItems.map((item, index) => (
               <motion.li

@@ -6,6 +6,22 @@ import { prisma } from '../prisma';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
+// Mock S3 with proper class syntax
+const mockS3Send = vi.fn().mockResolvedValue({});
+vi.mock('@aws-sdk/client-s3', () => {
+  return {
+    S3Client: class MockS3Client {
+      send = mockS3Send;
+    },
+    PutObjectCommand: class MockPutObjectCommand {
+      constructor(public params: Record<string, unknown>) {}
+    },
+    DeleteObjectCommand: class MockDeleteObjectCommand {
+      constructor(public params: Record<string, unknown>) {}
+    },
+  };
+});
+
 vi.mock('../prisma', () => ({
   prisma: {
     artist: {
@@ -15,6 +31,14 @@ vi.mock('../prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    image: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -563,6 +587,414 @@ describe('ArtistService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBe('Failed to archive artist');
+      }
+    });
+  });
+
+  describe('uploadArtistImage', () => {
+    const mockImageData = {
+      file: Buffer.from('test image data'),
+      fileName: 'test-image.jpg',
+      contentType: 'image/jpeg',
+      caption: 'Test caption',
+      altText: 'Test alt text',
+    };
+
+    beforeEach(() => {
+      process.env.S3_BUCKET = 'test-bucket';
+      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+      process.env.AWS_REGION = 'us-east-1';
+    });
+
+    it('should upload image successfully', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.image.create).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/test-image.jpg',
+        caption: 'Test caption',
+        altText: 'Test alt text',
+        sortOrder: 0,
+      } as never);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.id).toBe('image-123');
+        expect(mockS3Send).toHaveBeenCalled();
+      }
+    });
+
+    it('should return error when artist not found', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Artist not found');
+      }
+    });
+
+    it('should return error when S3 bucket not configured', async () => {
+      delete process.env.S3_BUCKET;
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('S3 bucket not configured');
+      }
+    });
+
+    it('should handle database unavailable error', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to upload image');
+      }
+    });
+
+    it('should use direct S3 URL when CDN not configured', async () => {
+      delete process.env.CDN_DOMAIN;
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.image.create).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://test-bucket.s3.us-east-1.amazonaws.com/media/artists/artist-123/test-image.jpg',
+        caption: 'Test caption',
+        altText: 'Test alt text',
+        sortOrder: 0,
+      } as never);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('uploadArtistImages', () => {
+    const mockImageDataArray = [
+      {
+        file: Buffer.from('test image 1'),
+        fileName: 'image1.jpg',
+        contentType: 'image/jpeg',
+      },
+      {
+        file: Buffer.from('test image 2'),
+        fileName: 'image2.jpg',
+        contentType: 'image/jpeg',
+      },
+    ];
+
+    beforeEach(() => {
+      process.env.S3_BUCKET = 'test-bucket';
+      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+      process.env.AWS_REGION = 'us-east-1';
+    });
+
+    it('should upload multiple images successfully', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.image.create)
+        .mockResolvedValueOnce({
+          id: 'image-1',
+          src: 'https://cdn.example.com/image1.jpg',
+          sortOrder: 0,
+        } as never)
+        .mockResolvedValueOnce({
+          id: 'image-2',
+          src: 'https://cdn.example.com/image2.jpg',
+          sortOrder: 1,
+        } as never);
+
+      const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toHaveLength(2);
+      }
+    });
+
+    it('should return error when artist not found', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+
+      const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Artist not found');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to upload images');
+      }
+    });
+  });
+
+  describe('deleteArtistImage', () => {
+    beforeEach(() => {
+      process.env.S3_BUCKET = 'test-bucket';
+      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+    });
+
+    it('should delete image successfully', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.id).toBe('image-123');
+      }
+    });
+
+    it('should return error when image not found', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(null);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Image not found');
+      }
+    });
+
+    it('should delete from S3 with S3 URL format', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://test-bucket.s3.us-east-1.amazonaws.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(true);
+      expect(mockS3Send).toHaveBeenCalled();
+    });
+
+    it('should continue with DB delete even if S3 delete fails', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+      mockS3Send.mockRejectedValueOnce(new Error('S3 error'));
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle database unavailable error', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.image.findUnique).mockRejectedValue(initError);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+  });
+
+  describe('getArtistImages', () => {
+    it('should get artist images successfully', async () => {
+      const mockImages = [
+        { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 0 },
+        { id: 'image-2', src: 'https://cdn.example.com/image2.jpg', sortOrder: 1 },
+      ];
+      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+
+      const result = await ArtistService.getArtistImages('artist-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toHaveLength(2);
+      }
+    });
+
+    it('should return empty array when no images found', async () => {
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+
+      const result = await ArtistService.getArtistImages('artist-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toHaveLength(0);
+      }
+    });
+
+    it('should handle database unavailable error', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.image.findMany).mockRejectedValue(initError);
+
+      const result = await ArtistService.getArtistImages('artist-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.getArtistImages('artist-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to retrieve artist images');
+      }
+    });
+  });
+
+  describe('updateArtistImage', () => {
+    it('should update image successfully', async () => {
+      vi.mocked(prisma.image.update).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/image.jpg',
+        caption: 'Updated caption',
+        altText: 'Updated alt text',
+        sortOrder: 0,
+      } as never);
+
+      const result = await ArtistService.updateArtistImage('image-123', {
+        caption: 'Updated caption',
+        altText: 'Updated alt text',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.caption).toBe('Updated caption');
+      }
+    });
+
+    it('should return error when image not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.image.update).mockRejectedValue(notFoundError);
+
+      const result = await ArtistService.updateArtistImage('image-123', {
+        caption: 'Updated caption',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Image not found');
+      }
+    });
+
+    it('should handle database unavailable error', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.image.update).mockRejectedValue(initError);
+
+      const result = await ArtistService.updateArtistImage('image-123', {
+        caption: 'Updated caption',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.image.update).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.updateArtistImage('image-123', {
+        caption: 'Updated caption',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to update image');
+      }
+    });
+  });
+
+  describe('reorderArtistImages', () => {
+    it('should reorder images successfully', async () => {
+      vi.mocked(prisma.image.findMany)
+        .mockResolvedValueOnce([{ id: 'image-1' }, { id: 'image-2' }] as never)
+        .mockResolvedValueOnce([
+          { id: 'image-2', src: 'https://cdn.example.com/image2.jpg', sortOrder: 0 },
+          { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 1 },
+        ] as never);
+      vi.mocked(prisma.image.update).mockResolvedValue({} as never);
+
+      const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
+
+      expect(result.success).toBe(true);
+      expect(prisma.image.update).toHaveBeenCalled();
+    });
+
+    it('should return error when images not found', async () => {
+      vi.mocked(prisma.image.findMany).mockResolvedValue([{ id: 'image-1' }] as never);
+
+      const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Some images not found or do not belong to this artist');
+      }
+    });
+
+    it('should handle database unavailable error', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.image.findMany).mockRejectedValue(initError);
+
+      const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.image.findMany).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to reorder images');
       }
     });
   });

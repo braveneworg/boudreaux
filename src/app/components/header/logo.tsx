@@ -12,7 +12,7 @@ const Logo = ({ isMobile }: LogoProps) => {
     <Link href="/">
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="block ml-[8px] mt-1.5 size-[48px] md:size-[144px] rounded-full bg-white"
+        className="block ml-2 mt-1.5 size-12 md:size-36 rounded-full bg-white"
         height={48}
         priority
         src={

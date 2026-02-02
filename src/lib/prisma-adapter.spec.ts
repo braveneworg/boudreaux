@@ -5,7 +5,8 @@ import type { AdapterUser, Adapter } from 'next-auth/adapters';
 
 vi.mock('server-only', () => ({}));
 
-// Mock @auth/prisma-adapter
+// Mock @auth/prisma-adapter - create a function to return different mocks
+const mockUseVerificationToken = vi.fn();
 vi.mock('@auth/prisma-adapter', () => ({
   PrismaAdapter: vi.fn(() => ({
     createSession: vi.fn(),
@@ -13,7 +14,7 @@ vi.mock('@auth/prisma-adapter', () => ({
     updateSession: vi.fn(),
     deleteSession: vi.fn(),
     createVerificationToken: vi.fn(),
-    useVerificationToken: vi.fn(),
+    useVerificationToken: mockUseVerificationToken,
     createAccount: vi.fn(),
     deleteAccount: vi.fn(),
     linkAccount: vi.fn(),
@@ -798,6 +799,117 @@ describe('CustomPrismaAdapter', () => {
           emailVerified: expect.any(Date),
         },
       });
+    });
+  });
+
+  describe('useVerificationToken', () => {
+    it('should call base adapter useVerificationToken and update emailVerified', async () => {
+      const mockToken = {
+        identifier: 'test@example.com',
+        token: 'abc123',
+        expires: new Date(),
+      };
+
+      mockUseVerificationToken.mockResolvedValue(mockToken);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: new Date(),
+      });
+
+      const result = await adapter.useVerificationToken?.({
+        identifier: 'test@example.com',
+        token: 'abc123',
+      });
+
+      expect(result).toEqual(mockToken);
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+      });
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { emailVerified: expect.any(Date) },
+      });
+    });
+
+    it('should not update emailVerified if user already verified', async () => {
+      const mockToken = {
+        identifier: 'test@example.com',
+        token: 'abc123',
+        expires: new Date(),
+      };
+
+      mockUseVerificationToken.mockResolvedValue(mockToken);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: new Date(),
+      });
+
+      await adapter.useVerificationToken?.({
+        identifier: 'test@example.com',
+        token: 'abc123',
+      });
+
+      expect(mockPrisma.user.findUnique).toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should return null if verification token not found', async () => {
+      mockUseVerificationToken.mockResolvedValue(null);
+
+      const result = await adapter.useVerificationToken?.({
+        identifier: 'test@example.com',
+        token: 'invalid',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors when updating emailVerified', async () => {
+      const mockToken = {
+        identifier: 'test@example.com',
+        token: 'abc123',
+        expires: new Date(),
+      };
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockUseVerificationToken.mockResolvedValue(mockToken);
+      mockPrisma.user.findUnique.mockRejectedValue(new Error('Database error'));
+
+      const result = await adapter.useVerificationToken?.({
+        identifier: 'test@example.com',
+        token: 'abc123',
+      });
+
+      // Should return the token even if updating emailVerified fails
+      expect(result).toEqual(mockToken);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[CustomPrismaAdapter] Error updating emailVerified:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should rethrow error if base adapter useVerificationToken fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockUseVerificationToken.mockRejectedValue(new Error('Token error'));
+
+      await expect(
+        adapter.useVerificationToken?.({
+          identifier: 'test@example.com',
+          token: 'abc123',
+        })
+      ).rejects.toThrow('Token error');
+
+      consoleSpy.mockRestore();
     });
   });
 });

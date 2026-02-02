@@ -135,7 +135,7 @@
       @apply underline;
     }
     &:visited {
-      @apply text-[var(--color-rebecca-purple)];
+      @apply text-rebecca-purple;
     }
   }
 }

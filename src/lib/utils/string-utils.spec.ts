@@ -1,4 +1,10 @@
-import { toPascalCase } from './string-utils';
+import {
+  toPascalCase,
+  toTitleCase,
+  toDisplayLabel,
+  toKebabCase,
+  toEntityUrlPath,
+} from './string-utils';
 
 describe('toPascalCase', () => {
   describe('basic conversions', () => {
@@ -132,6 +138,150 @@ describe('toPascalCase', () => {
       const input = 'test string';
       const result: string = toPascalCase(input);
       expect(typeof result).toBe('string');
+    });
+  });
+});
+
+describe('toTitleCase', () => {
+  describe('basic conversions', () => {
+    it('should convert lowercase string to Title Case', () => {
+      expect(toTitleCase('hello world')).toBe('Hello World');
+    });
+
+    it('should convert UPPERCASE string to Title Case', () => {
+      expect(toTitleCase('HELLO WORLD')).toBe('Hello World');
+    });
+
+    it('should convert mixedCase string to Title Case', () => {
+      expect(toTitleCase('hElLo WoRlD')).toBe('Hello World');
+    });
+
+    it('should handle single word', () => {
+      expect(toTitleCase('hello')).toBe('Hello');
+    });
+
+    it('should handle multiple words', () => {
+      expect(toTitleCase('featured artist page')).toBe('Featured Artist Page');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty string', () => {
+      expect(toTitleCase('')).toBe('');
+    });
+
+    it('should handle string with only spaces', () => {
+      expect(toTitleCase('   ')).toBe('');
+    });
+
+    it('should handle multiple spaces between words', () => {
+      expect(toTitleCase('hello    world')).toBe('Hello World');
+    });
+
+    it('should handle single character', () => {
+      expect(toTitleCase('a')).toBe('A');
+    });
+  });
+});
+
+describe('toDisplayLabel', () => {
+  describe('basic conversions', () => {
+    it('should convert camelCase to display label', () => {
+      expect(toDisplayLabel('featuredArtist')).toBe('featured artist');
+    });
+
+    it('should convert PascalCase to display label', () => {
+      expect(toDisplayLabel('FeaturedArtist')).toBe('featured artist');
+    });
+
+    it('should handle multiple capital letters', () => {
+      expect(toDisplayLabel('HTTPRequestHandler')).toBe('httprequest handler');
+    });
+
+    it('should handle single word', () => {
+      expect(toDisplayLabel('hello')).toBe('hello');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty string', () => {
+      expect(toDisplayLabel('')).toBe('');
+    });
+
+    it('should handle already lowercase string', () => {
+      expect(toDisplayLabel('lowercase')).toBe('lowercase');
+    });
+  });
+});
+
+describe('toKebabCase', () => {
+  describe('basic conversions', () => {
+    it('should convert camelCase to kebab-case', () => {
+      expect(toKebabCase('featuredArtist')).toBe('featured-artist');
+    });
+
+    it('should convert PascalCase to kebab-case', () => {
+      expect(toKebabCase('FeaturedArtist')).toBe('featured-artist');
+    });
+
+    it('should convert spaces to hyphens', () => {
+      expect(toKebabCase('featured artist')).toBe('featured-artist');
+    });
+
+    it('should convert underscores to hyphens', () => {
+      expect(toKebabCase('featured_artist')).toBe('featured-artist');
+    });
+
+    it('should handle multiple capital letters', () => {
+      expect(toKebabCase('HTTPRequest')).toBe('httprequest');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty string', () => {
+      expect(toKebabCase('')).toBe('');
+    });
+
+    it('should handle already kebab-case', () => {
+      expect(toKebabCase('featured-artist')).toBe('featured-artist');
+    });
+
+    it('should handle single word', () => {
+      expect(toKebabCase('hello')).toBe('hello');
+    });
+  });
+});
+
+describe('toEntityUrlPath', () => {
+  describe('basic conversions', () => {
+    it('should convert entity name to URL path with plural', () => {
+      expect(toEntityUrlPath('featuredArtist')).toBe('featured-artists');
+    });
+
+    it('should convert PascalCase entity to URL path', () => {
+      expect(toEntityUrlPath('FeaturedArtist')).toBe('featured-artists');
+    });
+
+    it('should handle single word entity', () => {
+      expect(toEntityUrlPath('artist')).toBe('artists');
+    });
+
+    it('should handle already lowercase entity', () => {
+      expect(toEntityUrlPath('user')).toBe('users');
+    });
+  });
+
+  describe('real-world examples', () => {
+    it('should convert notificationBanner to notification-banners', () => {
+      expect(toEntityUrlPath('notificationBanner')).toBe('notification-banners');
+    });
+
+    it('should convert track to tracks', () => {
+      expect(toEntityUrlPath('track')).toBe('tracks');
+    });
+
+    it('should convert release to releases', () => {
+      expect(toEntityUrlPath('release')).toBe('releases');
     });
   });
 });

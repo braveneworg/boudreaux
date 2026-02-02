@@ -45,11 +45,17 @@ const mockDrawImage = vi.fn();
 const mockToBlob = vi.fn((callback: (blob: Blob | null) => void, type: string) => {
   callback(new Blob(['test'], { type }));
 });
-const mockGetContext = vi.fn(() => ({
+
+// Cast to the proper mock return type to allow mockReturnValueOnce(null)
+type MockContextFn = ReturnType<typeof vi.fn> & {
+  mockReturnValueOnce(value: CanvasRenderingContext2D | null): void;
+};
+
+const mockGetContext: MockContextFn = vi.fn(() => ({
   imageSmoothingEnabled: true,
   imageSmoothingQuality: 'high',
   drawImage: mockDrawImage,
-}));
+})) as MockContextFn;
 
 const createMockCanvas = () => ({
   width: 0,
@@ -202,6 +208,30 @@ describe('image-resize', () => {
       await resizeImage(file, { maxWidth: 880 });
 
       expect(URL.revokeObjectURL).toHaveBeenCalled();
+    });
+
+    it('should throw error when canvas context is null', async () => {
+      // Mock getContext to return null
+      mockGetContext.mockReturnValueOnce(null);
+
+      const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+
+      await expect(resizeImage(file, { maxWidth: 880 })).rejects.toThrow(
+        'Failed to get canvas context'
+      );
+    });
+
+    it('should throw error when toBlob fails', async () => {
+      // Mock toBlob to call callback with null
+      mockToBlob.mockImplementationOnce((callback: (blob: Blob | null) => void) => {
+        callback(null);
+      });
+
+      const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+
+      await expect(resizeImage(file, { maxWidth: 880 })).rejects.toThrow(
+        'Failed to create image blob'
+      );
     });
   });
 

@@ -1,8 +1,6 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { S3Client } from '@aws-sdk/client-s3';
-
 import {
   deleteReleaseImageAction,
   getReleaseImagesAction,
@@ -32,12 +30,19 @@ vi.mock('../prisma', () => ({
 }));
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
-vi.mock('@aws-sdk/client-s3', () => ({
-  S3Client: vi.fn().mockImplementation(() => ({
-    send: vi.fn().mockResolvedValue({}),
-  })),
-  DeleteObjectCommand: vi.fn().mockImplementation((args) => args),
-}));
+
+// Mock S3 with proper class syntax
+const mockS3Send = vi.fn().mockResolvedValue({});
+vi.mock('@aws-sdk/client-s3', () => {
+  return {
+    S3Client: class MockS3Client {
+      send = mockS3Send;
+    },
+    DeleteObjectCommand: class MockDeleteObjectCommand {
+      constructor(public params: Record<string, unknown>) {}
+    },
+  };
+});
 
 describe('release-image-actions', () => {
   const mockSession = {
@@ -91,6 +96,66 @@ describe('release-image-actions', () => {
       expect(result.error).toBe('Unauthorized');
     });
 
+    it('should return error when user session has no id', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { role: 'admin' },
+      } as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should skip S3 delete when no S3 bucket configured', async () => {
+      delete process.env.S3_BUCKET;
+      const mockImage = {
+        id: 'image-123',
+        src: 'https://cdn.example.com/images/release-cover.jpg',
+        releaseId: 'release-123',
+      };
+
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      expect(result.success).toBe(true);
+      expect(prisma.image.delete).toHaveBeenCalled();
+    });
+
+    it('should skip S3 delete when image src is empty', async () => {
+      const mockImage = {
+        id: 'image-123',
+        src: '',
+        releaseId: 'release-123',
+      };
+
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      expect(result.success).toBe(true);
+      expect(prisma.image.delete).toHaveBeenCalled();
+    });
+
+    it('should skip S3 delete when URL does not match any known pattern', async () => {
+      const mockImage = {
+        id: 'image-123',
+        src: 'https://other-domain.com/image.jpg',
+        releaseId: 'release-123',
+      };
+
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      expect(result.success).toBe(true);
+      expect(prisma.image.delete).toHaveBeenCalled();
+    });
+
     it('should return error when image not found', async () => {
       vi.mocked(prisma.image.findUnique).mockResolvedValue(null);
 
@@ -116,8 +181,8 @@ describe('release-image-actions', () => {
       expect(prisma.image.delete).toHaveBeenCalledWith({
         where: { id: 'image-123' },
       });
-      // Verify S3Client was instantiated (S3 operations are attempted)
-      expect(S3Client).toHaveBeenCalled();
+      // Verify S3 delete was attempted
+      expect(mockS3Send).toHaveBeenCalled();
     });
 
     it('should delete from S3 with S3 URL format', async () => {
@@ -133,7 +198,7 @@ describe('release-image-actions', () => {
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(S3Client).toHaveBeenCalled();
+      expect(mockS3Send).toHaveBeenCalled();
     });
 
     it('should continue with DB delete even if S3 delete fails', async () => {
@@ -145,12 +210,7 @@ describe('release-image-actions', () => {
 
       vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
       vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
-      vi.mocked(S3Client).mockImplementation(
-        () =>
-          ({
-            send: vi.fn().mockRejectedValue(Error('S3 error')),
-          }) as never
-      );
+      mockS3Send.mockRejectedValueOnce(new Error('S3 error'));
 
       const result = await deleteReleaseImageAction('image-123');
 
@@ -318,6 +378,28 @@ describe('release-image-actions', () => {
       expect(result.error).toBe('Unauthorized');
     });
 
+    it('should return error when user is not admin', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { id: 'user-123', role: 'user' },
+      } as never);
+
+      const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error when user session has no id', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { role: 'admin' },
+      } as never);
+
+      const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
+
     it('should update image caption', async () => {
       vi.mocked(prisma.image.update).mockResolvedValue({ id: 'image-123' } as never);
 
@@ -400,6 +482,28 @@ describe('release-image-actions', () => {
 
     it('should return error when user is not logged in', async () => {
       vi.mocked(auth).mockResolvedValue(null as never);
+
+      const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error when user is not admin', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { id: 'user-123', role: 'user' },
+      } as never);
+
+      const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error when user session has no id', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { role: 'admin' },
+      } as never);
 
       const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
 

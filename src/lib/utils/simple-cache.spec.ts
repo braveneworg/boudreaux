@@ -199,6 +199,40 @@ describe('SimpleCache', () => {
     });
   });
 
+  describe('cleanup functionality', () => {
+    it('should remove expired entries during cleanup via get', async () => {
+      // Set entries with very short TTL
+      cache.set('expire-soon-1', 'value1', 1); // 1 second TTL
+      cache.set('expire-soon-2', 'value2', 1); // 1 second TTL
+      cache.set('keep', 'value3', 3600); // Long TTL
+
+      // Verify all entries exist initially
+      expect(cache.getStats().size).toBe(3);
+
+      // Wait for expiration
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      // Access expired entries to trigger deletion
+      expect(cache.get('expire-soon-1')).toBeNull();
+      expect(cache.get('expire-soon-2')).toBeNull();
+
+      // Non-expired entry should still exist
+      expect(cache.get('keep')).toBe('value3');
+
+      // Stats should reflect cleanup
+      const stats = cache.getStats();
+      expect(stats.size).toBe(1);
+      expect(stats.keys).toEqual(['keep']);
+    });
+
+    it('should handle cleanup when cache is empty', () => {
+      cache.clear();
+      const stats = cache.getStats();
+      expect(stats.size).toBe(0);
+      expect(stats.keys).toEqual([]);
+    });
+  });
+
   describe('concurrent operations', () => {
     it('should handle multiple simultaneous sets', () => {
       const promises = Array.from({ length: 100 }, (_, i) =>

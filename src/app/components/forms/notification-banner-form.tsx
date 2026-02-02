@@ -2226,8 +2226,8 @@ export default function NotificationBannerForm({
                             <ResizableTextBox
                               width={watchedMessageWidth ?? 80}
                               height={watchedMessageHeight ?? 30}
-                              onWidthChange={(w) => setValue('messageWidth', w)}
-                              onHeightChange={(h) => setValue('messageHeight', h)}
+                              onWidthChange={(w: number) => setValue('messageWidth', w)}
+                              onHeightChange={(h: number) => setValue('messageHeight', h)}
                               positionX={watchedMessagePositionX ?? 50}
                               positionY={watchedMessagePositionY ?? 10}
                               rotation={watchedMessageRotation ?? 0}
@@ -2271,8 +2271,10 @@ export default function NotificationBannerForm({
                               <ResizableTextBox
                                 width={watchedSecondaryMessageWidth ?? 80}
                                 height={watchedSecondaryMessageHeight ?? 30}
-                                onWidthChange={(w) => setValue('secondaryMessageWidth', w)}
-                                onHeightChange={(h) => setValue('secondaryMessageHeight', h)}
+                                onWidthChange={(w: number) => setValue('secondaryMessageWidth', w)}
+                                onHeightChange={(h: number) =>
+                                  setValue('secondaryMessageHeight', h)
+                                }
                                 positionX={watchedSecondaryMessagePositionX ?? 50}
                                 positionY={watchedSecondaryMessagePositionY ?? 90}
                                 rotation={watchedSecondaryMessageRotation ?? 0}

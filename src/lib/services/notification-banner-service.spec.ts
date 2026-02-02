@@ -386,5 +386,206 @@ describe('NotificationBannerService', () => {
         expect(result.error).toBe('Notification banner not found');
       }
     });
+
+    it('should return error on database connection failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+      vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+      const result =
+        await NotificationBannerService.unpublishNotificationBanner('notification-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should return generic error on unexpected failure', async () => {
+      vi.mocked(prisma.notification.update).mockRejectedValue(new Error('Unexpected'));
+
+      const result =
+        await NotificationBannerService.unpublishNotificationBanner('notification-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to unpublish notification banner');
+      }
+    });
+  });
+
+  describe('error handling', () => {
+    describe('getActiveNotificationBanners errors', () => {
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.findMany).mockRejectedValue(new Error('Unexpected'));
+
+        const result = await NotificationBannerService.getActiveNotificationBanners(new Date());
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to fetch notification banners');
+        }
+      });
+    });
+
+    describe('getAllNotificationBanners errors', () => {
+      it('should return error on database connection failure', async () => {
+        const prismaError = new Prisma.PrismaClientInitializationError(
+          'Database connection failed',
+          '5.0.0'
+        );
+        vi.mocked(prisma.notification.findMany).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.getAllNotificationBanners();
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Database unavailable');
+        }
+      });
+
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.findMany).mockRejectedValue(new Error('Unexpected'));
+
+        const result = await NotificationBannerService.getAllNotificationBanners();
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to retrieve notification banners');
+        }
+      });
+    });
+
+    describe('getNotificationBannerById errors', () => {
+      it('should return error on database connection failure', async () => {
+        const prismaError = new Prisma.PrismaClientInitializationError(
+          'Database connection failed',
+          '5.0.0'
+        );
+        vi.mocked(prisma.notification.findUnique).mockRejectedValue(prismaError);
+
+        const result =
+          await NotificationBannerService.getNotificationBannerById('notification-123');
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Database unavailable');
+        }
+      });
+
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.findUnique).mockRejectedValue(new Error('Unexpected'));
+
+        const result =
+          await NotificationBannerService.getNotificationBannerById('notification-123');
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to fetch notification banner');
+        }
+      });
+    });
+
+    describe('updateNotificationBanner errors', () => {
+      it('should return error on database connection failure', async () => {
+        const prismaError = new Prisma.PrismaClientInitializationError(
+          'Database connection failed',
+          '5.0.0'
+        );
+        vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.updateNotificationBanner(
+          'notification-123',
+          {
+            message: 'Updated',
+          }
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Database unavailable');
+        }
+      });
+
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.update).mockRejectedValue(new Error('Unexpected'));
+
+        const result = await NotificationBannerService.updateNotificationBanner(
+          'notification-123',
+          {
+            message: 'Updated',
+          }
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to update notification banner');
+        }
+      });
+    });
+
+    describe('deleteNotificationBanner errors', () => {
+      it('should return error on database connection failure', async () => {
+        const prismaError = new Prisma.PrismaClientInitializationError(
+          'Database connection failed',
+          '5.0.0'
+        );
+        vi.mocked(prisma.notification.delete).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.deleteNotificationBanner('notification-123');
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Database unavailable');
+        }
+      });
+
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.delete).mockRejectedValue(new Error('Unexpected'));
+
+        const result = await NotificationBannerService.deleteNotificationBanner('notification-123');
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to delete notification banner');
+        }
+      });
+    });
+
+    describe('publishNotificationBanner errors', () => {
+      it('should return error on database connection failure', async () => {
+        const prismaError = new Prisma.PrismaClientInitializationError(
+          'Database connection failed',
+          '5.0.0'
+        );
+        vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.publishNotificationBanner(
+          'notification-123',
+          'user-123'
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Database unavailable');
+        }
+      });
+
+      it('should return generic error on unexpected failure', async () => {
+        vi.mocked(prisma.notification.update).mockRejectedValue(new Error('Unexpected'));
+
+        const result = await NotificationBannerService.publishNotificationBanner(
+          'notification-123',
+          'user-123'
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Failed to publish notification banner');
+        }
+      });
+    });
   });
 });
