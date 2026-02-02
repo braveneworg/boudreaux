@@ -33,9 +33,14 @@ interface MockPrismaAccount {
   findUnique: ReturnType<typeof vi.fn>;
 }
 
+interface MockPrismaVerificationToken {
+  delete: ReturnType<typeof vi.fn>;
+}
+
 interface MockPrismaClient {
   user: MockPrismaUser;
   account: MockPrismaAccount;
+  verificationToken: MockPrismaVerificationToken;
 }
 
 // Mock PrismaClient
@@ -48,6 +53,9 @@ vi.mock('@prisma/client', () => ({
     },
     account: {
       findUnique: vi.fn(),
+    },
+    verificationToken: {
+      delete: vi.fn(),
     },
   })),
 }));
@@ -76,6 +84,9 @@ describe('CustomPrismaAdapter', () => {
       },
       account: {
         findUnique: vi.fn(),
+      },
+      verificationToken: {
+        delete: vi.fn(),
       },
     };
 
