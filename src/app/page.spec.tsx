@@ -9,30 +9,18 @@ import Home from './page';
 vi.mock('server-only', () => ({}));
 
 // Mock the FeaturedArtistsService
+const mockGetFeaturedArtists = vi.fn();
 vi.mock('@/lib/services/featured-artists-service', () => ({
   FeaturedArtistsService: {
-    getFeaturedArtists: vi.fn().mockResolvedValue({
-      success: true,
-      data: [
-        {
-          id: '1',
-          displayName: 'Test Artist',
-          coverArt: 'https://example.com/cover.jpg',
-          artists: [{ id: 'a1', displayName: 'Artist One' }],
-          track: { id: 't1', title: 'Test Track', audioUrl: 'https://example.com/audio.mp3' },
-        },
-      ],
-    }),
+    getFeaturedArtists: (...args: unknown[]) => mockGetFeaturedArtists(...args),
   },
 }));
 
 // Mock the NotificationBannerService
+const mockGetActiveNotificationBanners = vi.fn();
 vi.mock('@/lib/services/notification-banner-service', () => ({
   NotificationBannerService: {
-    getActiveNotificationBanners: vi.fn().mockResolvedValue({
-      success: true,
-      data: [],
-    }),
+    getActiveNotificationBanners: (...args: unknown[]) => mockGetActiveNotificationBanners(...args),
   },
 }));
 
@@ -86,6 +74,27 @@ vi.mock('./components/notification-banner', () => ({
 }));
 
 describe('Home Page', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // Default successful mocks
+    mockGetFeaturedArtists.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: '1',
+          displayName: 'Test Artist',
+          coverArt: 'https://example.com/cover.jpg',
+          artists: [{ id: 'a1', displayName: 'Artist One' }],
+          track: { id: 't1', title: 'Test Track', audioUrl: 'https://example.com/audio.mp3' },
+        },
+      ],
+    });
+    mockGetActiveNotificationBanners.mockResolvedValue({
+      success: true,
+      data: [],
+    });
+  });
+
   it('should render page structure', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -116,5 +125,64 @@ describe('Home Page', () => {
 
     const heading = screen.getByRole('heading', { name: 'Featured artists' });
     expect(heading.tagName).toBe('H1');
+  });
+
+  it('should render empty array when featuredArtists fetch fails', async () => {
+    mockGetFeaturedArtists.mockResolvedValue({
+      success: false,
+      error: 'Failed to fetch',
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    // Should still render without crashing
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+    expect(screen.getByTestId('featured-artists-player')).toBeInTheDocument();
+  });
+
+  it('should render empty array when notifications fetch fails', async () => {
+    mockGetActiveNotificationBanners.mockResolvedValue({
+      success: false,
+      error: 'Failed to fetch',
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    // Should still render without crashing
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+    // Notification banner should not be rendered
+    expect(screen.queryByTestId('notification-banner')).not.toBeInTheDocument();
+  });
+
+  it('should render notification banner when notifications exist', async () => {
+    mockGetActiveNotificationBanners.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'n1',
+          message: 'Test notification',
+          type: 'info',
+        },
+      ],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(screen.getByTestId('notification-banner')).toBeInTheDocument();
+  });
+
+  it('should not render notification banner when notifications array is empty', async () => {
+    mockGetActiveNotificationBanners.mockResolvedValue({
+      success: true,
+      data: [],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(screen.queryByTestId('notification-banner')).not.toBeInTheDocument();
   });
 });

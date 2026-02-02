@@ -96,6 +96,13 @@ vi.mock('@/app/components/ui/popover', () => ({
               )
             : child
         )}
+        <button
+          data-testid="popover-close-trigger"
+          onClick={() => onOpenChange?.(false)}
+          style={{ display: 'none' }}
+        >
+          Close
+        </button>
       </div>
     );
   },
@@ -613,6 +620,243 @@ describe('ArtistMultiSelect', () => {
       // Deselect
       await user.click(screen.getByTestId('command-item-artist-1'));
       expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Select artists...');
+    });
+  });
+
+  describe('badge removal', () => {
+    it('removes artist when clicking badge remove button', async () => {
+      const user = userEvent.setup();
+      const mockSetValue = vi.fn();
+
+      render(
+        <TestWrapper>
+          {({ control }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={mockSetValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // Open and select an artist
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-artist-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-artist-1'));
+
+      // Should show badge
+      await waitFor(() => {
+        expect(screen.getByTestId('badge')).toBeInTheDocument();
+      });
+
+      // Click remove button on badge
+      const removeButton = screen.getByRole('button', { name: /remove/i });
+      await user.click(removeButton);
+
+      // Artist should be removed
+      await waitFor(() => {
+        expect(screen.queryByTestId('badge')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('disabled state', () => {
+    it('disables trigger button when disabled prop is true', () => {
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              disabled
+            />
+          )}
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('combobox-trigger')).toBeDisabled();
+    });
+  });
+
+  describe('popover state management', () => {
+    it('clears search value when popover closes', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // Open popover
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toBeInTheDocument();
+      });
+
+      // Type in search
+      const input = screen.getByTestId('command-input');
+      await user.type(input, 'test');
+
+      // Close popover by clicking trigger again
+      await user.click(screen.getByTestId('popover-close-trigger'));
+
+      // Re-open popover - search should be cleared
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toHaveValue('');
+      });
+    });
+  });
+
+  describe('fetch error handling', () => {
+    it('handles non-ok response from fetch', async () => {
+      const user = userEvent.setup();
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({}),
+      });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+    });
+
+    it('handles network error during fetch', async () => {
+      const user = userEvent.setup();
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+    });
+
+    it('handles non-Error exception during fetch', async () => {
+      const user = userEvent.setup();
+      mockFetch.mockRejectedValueOnce('String error');
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('search with parameter', () => {
+    it('fetches with search parameter when searching', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toBeInTheDocument();
+      });
+
+      // Type in search
+      const input = screen.getByTestId('command-input');
+      await user.type(input, 'test');
+
+      // Advance timers to trigger debounced search
+      await vi.advanceTimersByTimeAsync(350);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('search=test'));
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('does not skip initial fetch when artists are empty', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/artists'));
+      });
     });
   });
 });

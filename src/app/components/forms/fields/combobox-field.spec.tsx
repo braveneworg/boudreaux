@@ -54,6 +54,7 @@ vi.mock('@/app/components/ui/popover', () => ({
   Popover: ({
     children,
     open,
+    onOpenChange,
   }: {
     children?: React.ReactNode;
     open?: boolean;
@@ -61,6 +62,14 @@ vi.mock('@/app/components/ui/popover', () => ({
   }) => (
     <div data-testid="popover" data-open={open?.toString()}>
       {children}
+      {/* Expose onOpenChange for testing */}
+      <button
+        data-testid="close-popover-trigger"
+        onClick={() => onOpenChange?.(false)}
+        style={{ display: 'none' }}
+      >
+        Close
+      </button>
     </div>
   ),
   PopoverContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -76,14 +85,19 @@ vi.mock('@/app/components/ui/popover', () => ({
 vi.mock('@/app/components/ui/command', () => {
   const CommandInputMock = React.forwardRef<
     HTMLInputElement,
-    { placeholder?: string; value?: string } & Record<string, unknown>
-  >(function CommandInput({ placeholder, value, ...props }, ref) {
+    {
+      placeholder?: string;
+      value?: string;
+      onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    } & React.InputHTMLAttributes<HTMLInputElement>
+  >(function CommandInput({ placeholder, value, onChange, ...props }, ref) {
     return (
       <input
         ref={ref}
         data-testid="command-input"
-        placeholder={placeholder as string}
-        value={(value as string) || ''}
+        placeholder={placeholder}
+        value={value || ''}
+        onChange={onChange}
         {...props}
       />
     );
@@ -93,22 +107,40 @@ vi.mock('@/app/components/ui/command', () => {
     Command: ({
       children,
       value,
+      onValueChange,
     }: {
       children: React.ReactNode;
       shouldFilter?: boolean;
       value?: string;
       onValueChange?: (value: string) => void;
     }) => {
-      // Pass value context to children by cloning CommandInput elements
+      // Pass value context and onValueChange to children by cloning CommandInput elements
       const enhancedChildren = React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === CommandInputMock) {
-          return React.cloneElement(child as React.ReactElement<{ value?: string }>, { value });
+          return React.cloneElement(
+            child as React.ReactElement<{
+              value?: string;
+              onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+            }>,
+            {
+              value,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.(e.target.value),
+            }
+          );
         }
         return child;
       });
       return (
         <div data-testid="command" data-value={value}>
           {enhancedChildren}
+          {/* Expose onValueChange for testing empty value */}
+          <button
+            data-testid="clear-search-trigger"
+            onClick={() => onValueChange?.('')}
+            style={{ display: 'none' }}
+          >
+            Clear
+          </button>
         </div>
       );
     },
@@ -655,6 +687,60 @@ describe('ComboboxField', () => {
 
       // Command component receives shouldFilter prop for custom filtering
       expect(command).toBeInTheDocument();
+    });
+
+    it('clears search value when popover closes', async () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const commandInput = screen.getByTestId('command-input');
+
+      // Type to open and populate search
+      fireEvent.keyDown(trigger, { key: 'o' });
+
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('o');
+      });
+
+      // Close the popover using the hidden trigger
+      const closeButton = screen.getByTestId('close-popover-trigger');
+      fireEvent.click(closeButton);
+
+      // Search should be cleared after popover closes
+      await waitFor(() => {
+        expect(commandInput).toHaveValue('');
+      });
+    });
+
+    it('closes popover when search input is cleared while open', async () => {
+      render(
+        <TestWrapper>
+          <ComboboxField {...defaultProps} />
+        </TestWrapper>
+      );
+
+      const trigger = screen.getByTestId('combobox-trigger');
+      const popover = screen.getByTestId('popover');
+
+      // Open popover by typing
+      fireEvent.keyDown(trigger, { key: 'x' });
+
+      await waitFor(() => {
+        expect(popover).toHaveAttribute('data-open', 'true');
+      });
+
+      // Clear search using the hidden trigger
+      const clearButton = screen.getByTestId('clear-search-trigger');
+      fireEvent.click(clearButton);
+
+      // Popover should close when search is cleared
+      await waitFor(() => {
+        expect(popover).toHaveAttribute('data-open', 'false');
+      });
     });
   });
 });

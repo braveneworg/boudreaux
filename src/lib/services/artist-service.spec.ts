@@ -755,6 +755,45 @@ describe('ArtistService', () => {
         expect(result.error).toBe('Failed to upload images');
       }
     });
+
+    it('should aggregate errors when all uploads fail', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      // Mock S3 upload to fail for all images
+      mockS3Send.mockRejectedValue(new Error('S3 upload failed'));
+
+      const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('image1.jpg');
+        expect(result.error).toContain('image2.jpg');
+      }
+      // Restore mock for other tests
+      mockS3Send.mockResolvedValue({});
+    });
+
+    it('should return partial success when some uploads fail', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      // First upload succeeds, second fails
+      mockS3Send.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('S3 upload failed'));
+      vi.mocked(prisma.image.create).mockResolvedValueOnce({
+        id: 'image-1',
+        src: 'https://cdn.example.com/image1.jpg',
+        sortOrder: 0,
+      } as never);
+
+      const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
+
+      // Should still succeed because at least one image uploaded
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toHaveLength(1);
+      }
+      // Restore mock for other tests
+      mockS3Send.mockResolvedValue({});
+    });
   });
 
   describe('deleteArtistImage', () => {
@@ -821,6 +860,44 @@ describe('ArtistService', () => {
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
       vi.mocked(prisma.image.findUnique).mockRejectedValue(initError);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle P2025 error when image is deleted during operation', async () => {
+      // Simulate findUnique succeeding but delete failing due to record being deleted
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      const p2025Error = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.image.delete).mockRejectedValue(p2025Error);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Image not found');
+      }
+    });
+
+    it('should handle database init error during delete', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.image.delete).mockRejectedValue(initError);
 
       const result = await ArtistService.deleteArtistImage('image-123');
 

@@ -317,4 +317,136 @@ describe('DataStoreHealthStatus', () => {
       // No errors should be thrown (React would warn about updating unmounted component)
     });
   });
+
+  describe('SSL and network errors', () => {
+    it('shows SSL-specific error message for SSL errors', async () => {
+      // Simulate exhausting all retries with SSL error
+      const sslError = new Error('SSL error: ERR_SSL_PROTOCOL_ERROR');
+      for (let i = 0; i < 11; i++) {
+        mockFetch.mockRejectedValueOnce(sslError);
+      }
+
+      render(<DataStoreHealthStatus />);
+
+      // Wait for initial call
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
+
+      // Advance through all retry attempts
+      // First 3 retries: 500ms each
+      for (let i = 0; i < 3; i++) {
+        vi.advanceTimersByTime(500);
+        await waitFor(() => {
+          expect(mockFetch).toHaveBeenCalledTimes(i + 2);
+        });
+      }
+
+      // Later retries: exponential backoff 1s, 2s, 4s, 8s, 16s, 32s, 64s
+      const delays = [1000, 2000, 4000, 8000, 16000, 32000, 64000];
+      for (let i = 0; i < delays.length; i++) {
+        vi.advanceTimersByTime(delays[i]);
+        await waitFor(() => {
+          expect(mockFetch).toHaveBeenCalledTimes(i + 5);
+        });
+      }
+
+      // After all retries, error message should appear
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'error');
+      });
+    });
+  });
+
+  describe('failsafe timeout', () => {
+    it('shows timeout error after 60 seconds of loading', async () => {
+      // Mock fetch that never resolves and never rejects
+      mockFetch.mockImplementation(() => new Promise(() => {}));
+
+      render(<DataStoreHealthStatus />);
+
+      // Verify initial loading state
+      const icon = screen.getByTestId('health-status-icon');
+      expect(icon).toHaveAttribute('data-is-loading', 'true');
+
+      // Advance time to trigger failsafe (60 seconds)
+      vi.advanceTimersByTime(60000);
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).toHaveAttribute('data-status', 'error');
+      });
+    });
+
+    it('does not trigger failsafe if fetch succeeds before timeout', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: 'healthy',
+            database: 'Connected',
+          }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'healthy');
+      });
+
+      // Advance past failsafe time
+      vi.advanceTimersByTime(60000);
+
+      // Should still show healthy status
+      const icon = screen.getByTestId('health-status-icon');
+      expect(icon).toHaveAttribute('data-status', 'healthy');
+    });
+  });
+
+  describe('non-Error exceptions', () => {
+    it('handles non-Error exceptions gracefully', async () => {
+      // Reject with a non-Error object
+      mockFetch.mockRejectedValue('String error');
+
+      render(<DataStoreHealthStatus />);
+
+      // Advance through retries
+      for (let i = 0; i < 10; i++) {
+        vi.advanceTimersByTime(i < 3 ? 500 : Math.pow(2, i - 3) * 1000);
+      }
+
+      await waitFor(
+        () => {
+          const icon = screen.getByTestId('health-status-icon');
+          expect(icon).toHaveAttribute('data-status', 'error');
+        },
+        { timeout: 5000 }
+      );
+    });
+  });
+
+  describe('error response without database field', () => {
+    it('uses fallback message when errorData.database is undefined', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({
+            status: 'error',
+            error: 'Some error',
+            // database field intentionally omitted
+          }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'error');
+      });
+    });
+  });
 });

@@ -325,6 +325,59 @@ describe('notification-banner-action', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.imageUrl).toBeDefined();
     });
+
+    it('should use fallback values when boolean fields are omitted from form data', async () => {
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      // Create minimal form data without boolean fields
+      const formData = new FormData();
+      formData.append('message', 'Test message');
+      formData.append('imageUrl', 'https://example.com/image.jpg');
+      formData.append('messageFont', 'system-ui');
+      formData.append('messageFontSize', '2.5');
+      formData.append('messageContrast', '100');
+      formData.append('secondaryMessageFont', 'system-ui');
+      formData.append('secondaryMessageFontSize', '2');
+      formData.append('secondaryMessageContrast', '95');
+      formData.append('messageTextColor', '#ffffff');
+      formData.append('secondaryMessageTextColor', '#ffffff');
+      formData.append('messageTextShadowDarkness', '50');
+      formData.append('secondaryMessageTextShadowDarkness', '50');
+      formData.append('messagePositionX', '50');
+      formData.append('messagePositionY', '10');
+      formData.append('secondaryMessagePositionX', '50');
+      formData.append('secondaryMessagePositionY', '90');
+      // Note: isOverlayed, isActive, messageTextShadow, secondaryMessageTextShadow, sortOrder are omitted
+
+      await createNotificationBannerAction(initialFormState, formData);
+
+      // The fallback values should be applied: all booleans false, sortOrder 0
+      expect(NotificationBannerService.createNotificationBanner).toHaveBeenCalled();
+    });
+
+    it('should handle checkbox "on" values for boolean fields', async () => {
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      // Use 'on' value which is what browsers send for checked checkboxes
+      const formData = createValidFormData({
+        isOverlayed: 'on',
+        isActive: 'on',
+        messageTextShadow: 'on',
+        secondaryMessageTextShadow: 'on',
+      });
+
+      const result = await createNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(true);
+    });
   });
 
   describe('updateNotificationBannerAction', () => {
@@ -443,6 +496,23 @@ describe('notification-banner-action', () => {
       formData.append('secondaryMessagePositionX', '50');
       formData.append('secondaryMessagePositionY', '90');
       // Intentionally not including isOverlayed, isActive, etc.
+
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should default sortOrder to 0 when invalid value provided', async () => {
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
+      vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData({
+        sortOrder: 'invalid',
+      });
+      formData.append('notificationId', 'notification-123');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
