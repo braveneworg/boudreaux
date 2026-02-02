@@ -110,6 +110,54 @@ describe('Health Check API', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('should include error message in development mode when catch block triggered with Error', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.mocked(checkDatabaseHealth).mockRejectedValue(new Error('Database connection failed'));
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Database connection failed');
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('should include generic error message in development mode for non-Error exceptions', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.mocked(checkDatabaseHealth).mockRejectedValue('String thrown error');
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Unspecified error occurred');
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('should not include error in production mode when catch block triggered', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.mocked(checkDatabaseHealth).mockRejectedValue(new Error('Sensitive error details'));
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBeUndefined();
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
     it('should include timestamp in ISO format', async () => {
       vi.mocked(checkDatabaseHealth).mockResolvedValue({
         healthy: true,

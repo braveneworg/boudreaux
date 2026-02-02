@@ -44,10 +44,33 @@ describe('createArtistAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Reset all mocks to clear implementations from previous tests (not just call history)
+    vi.resetAllMocks();
+
     vi.mocked(requireRole).mockResolvedValue(undefined);
     vi.mocked(auth).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
+
+    // Default mock for getActionState - required for tests that depend on parsing
+    vi.mocked(getActionState).mockReturnValue({
+      formState: { fields: {}, success: false },
+      parsed: {
+        success: true,
+        data: {
+          firstName: 'John',
+          surname: 'Doe',
+          slug: 'john-doe',
+          middleName: 'M',
+          displayName: 'Johnny Doe',
+        },
+      },
+    } as never);
+
+    // Default mock for ArtistService.createArtist - required for successful flow tests
+    vi.mocked(ArtistService.createArtist).mockResolvedValue({
+      success: true,
+      data: { id: 'artist-123' },
+    } as never);
   });
 
   describe('Authorization', () => {

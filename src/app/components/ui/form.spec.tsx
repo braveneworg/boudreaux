@@ -287,6 +287,17 @@ describe('Form Components', () => {
 
       consoleSpy.mockRestore();
     });
+
+    it('throws error when field context is empty', () => {
+      // This tests the !fieldContext branch - covered implicitly when context is empty object
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<InvalidFormFieldConsumer />);
+
+      expect(screen.getByTestId('error')).toBeInTheDocument();
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('FormItem', () => {

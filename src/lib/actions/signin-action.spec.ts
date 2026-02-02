@@ -135,6 +135,11 @@ describe('signinAction', () => {
 
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
 
+      // Set up redirect mock to throw NEXT_REDIRECT error
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
@@ -162,6 +167,11 @@ describe('signinAction', () => {
       });
 
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
+
+      // Set up redirect mock to throw NEXT_REDIRECT error
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
 
       await expect(signinAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
@@ -315,6 +325,106 @@ describe('signinAction', () => {
         redirect: false,
         redirectTo: '/',
       });
+    });
+
+    it('should log full error object in development mode', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      const testError = Error('Development error');
+      vi.mocked(mockSignIn).mockRejectedValue(testError);
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockRedirect.mockImplementation(() => {});
+
+      await signinAction(mockInitialState, mockFormData);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', testError);
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('should log error message only in production mode', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockSignIn).mockRejectedValue(Error('Production error'));
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockRedirect.mockImplementation(() => {});
+
+      await signinAction(mockInitialState, mockFormData);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', 'Production error');
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
+    });
+
+    it('should log Unknown error in production mode for non-Error exceptions', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'test@example.com' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockSignIn).mockRejectedValue('String thrown error');
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockRedirect.mockImplementation(() => {});
+
+      await signinAction(mockInitialState, mockFormData);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Sign-in error:', 'Unknown error');
+
+      consoleErrorSpy.mockRestore();
+      vi.unstubAllEnvs();
     });
 
     it('should call setUnknownError in finally block when there are errors', async () => {

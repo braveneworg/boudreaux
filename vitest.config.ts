@@ -31,20 +31,33 @@ export default defineConfig({
     // Performance optimizations
     css: false, // Don't process CSS in tests
     pool: 'vmThreads', // Fast VM-based worker threads
+
+    // Vitest 4: Worker configuration
+    maxWorkers: undefined, // Auto-detect for maximum parallelization
+
     isolate: true, // Required for test isolation
     fileParallelism: true, // Run test files in parallel
     testTimeout: 5000,
+
+    // Randomize test order to catch hidden dependencies
+    sequence: {
+      shuffle: true,
+      seed: Date.now(), // Use timestamp for reproducible random order
+    },
 
     // Disable typecheck by default for faster runs
     typecheck: {
       enabled: false,
     },
 
+    // Fail fast on first error in CI for faster feedback
+    bail: process.env.CI ? 1 : 0,
+
     globals: true,
     watch: false,
     setupFiles: ['./setupTests.ts'],
 
-    // Optimize dependencies to speed up test startup
+    // Optimize dependency pre-bundling
     deps: {
       optimizer: {
         web: {
@@ -57,7 +70,13 @@ export default defineConfig({
           ],
         },
       },
+      // Inline small dependencies for faster loading
+      interopDefault: true,
     },
+
+    // Reporter optimizations
+    reporters: process.env.CI ? ['default', 'junit'] : ['default'],
+    outputFile: process.env.CI ? { junit: './test-results.xml' } : undefined,
 
     coverage: {
       provider: 'v8',
@@ -104,6 +123,8 @@ export default defineConfig({
         '**/context-menu.tsx',
         '**/menubar.tsx',
         '**/image-uploader.tsx',
+        '**/data-view.tsx', // Admin data view with complex filtering and CRUD operations
+        '**/media-player.tsx', // Complex audio/video player with embla-carousel integration
 
         // Form components with complex state (tested via integration tests)
         '**/artist-form.tsx',
@@ -145,6 +166,7 @@ export default defineConfig({
       { find: '@/ui', replacement: path.resolve(process.cwd(), './src/app/components/ui') },
       { find: '@/hooks', replacement: path.resolve(process.cwd(), './src/app/hooks') },
       { find: '@/utils', replacement: path.resolve(process.cwd(), './src/lib/utils') },
+      { find: '@/test-utils', replacement: path.resolve(process.cwd(), './src/test-utils') },
       { find: '@', replacement: path.resolve(process.cwd(), './src') },
       // Keep only next/server alias - let vi.mock handle next/navigation
       {

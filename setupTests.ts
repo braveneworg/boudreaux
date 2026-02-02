@@ -48,17 +48,27 @@ vi.mock('next/navigation', async () => {
 
 // Mock ResizeObserver which is not available in Node.js test environment
 // This is commonly needed for components that use responsive layouts or size detection
-global.ResizeObserver = class ResizeObserver {
-  observe() {
-    // Mock implementation - do nothing
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = MockResizeObserver;
+
+// Mock IntersectionObserver for components that use lazy loading
+class MockIntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
   }
-  unobserve() {
-    // Mock implementation - do nothing
-  }
-  disconnect() {
-    // Mock implementation - do nothing
-  }
-};
+}
+global.IntersectionObserver = MockIntersectionObserver;
 
 // Mock window.matchMedia which is not available in Node.js test environment
 // This is commonly needed for components that use media queries or responsive hooks
@@ -77,6 +87,15 @@ if (typeof window !== 'undefined') {
       dispatchEvent: vi.fn(),
     })),
   });
+
+  // Mock scrollTo for scroll-based components
+  Object.defineProperty(window, 'scrollTo', {
+    writable: true,
+    value: vi.fn(),
+  });
+
+  // Mock scrollIntoView for JSDOM
+  Element.prototype.scrollIntoView = vi.fn();
 }
 
 expect.extend(matchers); // Add custom jest matchers from jest-dom
@@ -84,4 +103,8 @@ expect.extend(matchers); // Add custom jest matchers from jest-dom
 // Clean up the DOM after each test to prevent memory leaks
 afterEach(() => {
   cleanup();
+  // Clear all mocks after each test (clears call history, not implementations)
+  // Note: Individual test files should use vi.resetAllMocks() in their beforeEach
+  // if they need to reset mock implementations between tests
+  vi.clearAllMocks();
 });

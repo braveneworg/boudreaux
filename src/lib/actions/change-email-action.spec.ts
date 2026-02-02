@@ -63,7 +63,8 @@ describe('changeEmailAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Reset all mocks to clear implementations from previous tests
+    vi.resetAllMocks();
     mockFormData.set('email', 'newemail@example.com');
     mockFormData.set('confirmEmail', 'newemail@example.com');
     mockFormData.set('previousEmail', 'oldemail@example.com');
