@@ -6,7 +6,7 @@ import { AudioMetadataService } from '@/lib/services/audio-metadata-service';
 
 export const dynamic = 'force-dynamic';
 
-// Increase body size limit for audio files (up to 500MB)
+// Configure request timeout for metadata extraction (body size limit is set in nginx.conf, currently 500MB)
 export const maxDuration = 60; // 60 seconds timeout for large file processing
 
 /**
