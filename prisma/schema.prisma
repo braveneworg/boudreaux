@@ -489,7 +489,7 @@ model TrackArtist {
 
 model ReleaseTrack {
   id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  release   Release @relation(fields: [releaseId], references: [id])
+  release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
   releaseId String  @db.ObjectId
   track     Track   @relation(fields: [trackId], references: [id])
   trackId   String  @db.ObjectId
