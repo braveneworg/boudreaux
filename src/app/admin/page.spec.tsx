@@ -92,6 +92,7 @@ describe('AdminPage', () => {
 
     expect(screen.getByTestId('combobox')).toBeInTheDocument();
     expect(screen.getByTestId('option-artist')).toBeInTheDocument();
+    expect(screen.getByTestId('option-upload bulk tracks')).toBeInTheDocument();
     expect(screen.getByTestId('option-group')).toBeInTheDocument();
     expect(screen.getByTestId('option-release')).toBeInTheDocument();
     expect(screen.getByTestId('option-track')).toBeInTheDocument();
@@ -103,6 +104,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
 
     expect(screen.getByText('Artist')).toBeInTheDocument();
+    expect(screen.getByText('Upload Bulk Tracks')).toBeInTheDocument();
     expect(screen.getByText('Group')).toBeInTheDocument();
     expect(screen.getByText('Release')).toBeInTheDocument();
     expect(screen.getByText('Track')).toBeInTheDocument();
@@ -162,6 +164,16 @@ describe('AdminPage', () => {
     await user.click(screen.getByTestId('option-notifications'));
 
     expect(mockPush).toHaveBeenCalledWith('/admin/notifications');
+    // Should still show artist view since we navigated away
+    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
+  });
+
+  it('navigates to bulk upload page when upload bulk tracks is selected', async () => {
+    render(<AdminPage />);
+
+    await user.click(screen.getByTestId('option-upload bulk tracks'));
+
+    expect(mockPush).toHaveBeenCalledWith('/admin/tracks/bulk');
     // Should still show artist view since we navigated away
     expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
   });

@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -232,9 +233,103 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
     setImages(newImages);
   }, []);
 
-  const handleMediaChange = useCallback((newMediaItems: MediaItem[]) => {
-    setMediaItems(newMediaItems);
+  /**
+   * Extract metadata from an audio file using the API
+   */
+  const extractAudioMetadata = useCallback(async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/tracks/metadata', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.warn('Metadata extraction failed:', errorData.error);
+        return null;
+      }
+
+      const result = await response.json();
+      return result.metadata;
+    } catch (err) {
+      console.warn('Error extracting metadata:', err);
+      return null;
+    }
   }, []);
+
+  const handleMediaChange = useCallback(
+    async (newMediaItems: MediaItem[]) => {
+      setMediaItems(newMediaItems);
+
+      // If a new audio file was added (has file but no uploadedUrl), extract metadata
+      const newAudioFile = newMediaItems.find(
+        (item) => item.file && !item.uploadedUrl && item.mediaType === 'audio'
+      );
+
+      if (newAudioFile?.file && !isEditMode) {
+        // Only auto-populate in create mode
+        toast.info('Extracting audio metadata...');
+
+        const metadata = await extractAudioMetadata(newAudioFile.file);
+
+        if (metadata) {
+          // Auto-populate form fields from metadata
+          if (metadata.title && !trackForm.getValues('title')) {
+            trackForm.setValue('title', metadata.title, { shouldDirty: true });
+          }
+
+          if (metadata.duration) {
+            trackForm.setValue('duration', metadata.duration, { shouldDirty: true });
+            setDurationDisplay(formatDuration(metadata.duration));
+          }
+
+          if (metadata.trackNumber && !trackForm.getValues('position')) {
+            trackForm.setValue('position', metadata.trackNumber, { shouldDirty: true });
+          }
+
+          // If album metadata is present and no releases selected, find or create one
+          const currentReleaseIds = trackForm.getValues('releaseIds') || [];
+          if (metadata.album && currentReleaseIds.length === 0) {
+            try {
+              const { findOrCreateReleaseAction } =
+                await import('@/lib/actions/find-or-create-release-action');
+
+              const result = await findOrCreateReleaseAction({
+                album: metadata.album,
+                label: metadata.label,
+                catalogNumber: metadata.catalogNumber,
+                year: metadata.year,
+                date: metadata.date,
+                albumArtist: metadata.albumArtist,
+                lossless: metadata.lossless,
+                coverArt: metadata.coverArt,
+              });
+
+              if (result.success && result.releaseId) {
+                trackForm.setValue('releaseIds', [result.releaseId], { shouldDirty: true });
+
+                if (result.created) {
+                  toast.success(`Created release "${result.releaseTitle}" from metadata`);
+                } else {
+                  toast.info(`Found existing release "${result.releaseTitle}"`);
+                }
+              } else if (result.error) {
+                console.warn('Failed to find/create release:', result.error);
+              }
+            } catch (err) {
+              console.warn('Error with release auto-creation:', err);
+            }
+          }
+
+          toast.success('Audio metadata extracted successfully');
+        }
+      }
+    },
+    [extractAudioMetadata, isEditMode, trackForm]
+  );
 
   const handleMediaUpload = useCallback(
     async (items: MediaItem[]) => {
@@ -604,9 +699,19 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
         <CardHeader>
           <CardTitle>{isEditMode ? 'Edit Track' : 'Create New Track'}</CardTitle>
           <CardDescription>
-            {isEditMode
-              ? 'Update track information. Changes are saved when you click Save.'
-              : 'Required fields are marked with an asterisk *'}
+            {isEditMode ? (
+              'Update track information. Changes are saved when you click Save.'
+            ) : (
+              <>
+                Required fields are marked with an asterisk *.{' '}
+                <Link
+                  href="/admin/tracks/bulk"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Upload multiple tracks at once
+                </Link>
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <Form {...trackForm}>
@@ -620,6 +725,52 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
             noValidate
           >
             <CardContent className="space-y-6">
+              {/* Media Upload Section - At the top for easy access */}
+              <section className="space-y-4">
+                <h2 className="font-semibold">Upload Audio/Video File</h2>
+                <p className="text-sm text-muted-foreground">
+                  Upload an audio or video file for this track. Supported formats include MP3, WAV,
+                  FLAC, AAC, MP4, WebM, and more.
+                  {!isEditMode && (
+                    <>
+                      {' '}
+                      <strong>
+                        Audio metadata (title, duration, track number) will be automatically
+                        extracted and used to populate the form.
+                      </strong>
+                    </>
+                  )}
+                </p>
+                <MediaUploader
+                  mediaItems={mediaItems}
+                  onMediaChange={handleMediaChange}
+                  onUpload={handleMediaUpload}
+                  onDelete={handleMediaDelete}
+                  mediaType="all"
+                  maxFiles={1}
+                  maxFileSize={1024 * 1024 * 1024} // 1GB
+                  multiple={false}
+                  disabled={isSubmitting}
+                  label="Upload audio or video file"
+                />
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      Or enter URL manually
+                    </span>
+                  </div>
+                </div>
+                <TextField
+                  control={control}
+                  name="audioUrl"
+                  label="Audio URL *"
+                  placeholder="https://example.com/track.mp3"
+                />
+              </section>
+
               <Separator />
 
               {/* Basic Information Section */}
@@ -671,46 +822,6 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
                     )}
                   />
                 </div>
-
-                {/* Media Upload Section */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium">Upload Audio/Video File</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Upload an audio or video file for this track. Supported formats include MP3,
-                    WAV, FLAC, AAC, MP4, WebM, and more. The audio URL will be automatically set
-                    after upload.
-                  </p>
-                  <MediaUploader
-                    mediaItems={mediaItems}
-                    onMediaChange={handleMediaChange}
-                    onUpload={handleMediaUpload}
-                    onDelete={handleMediaDelete}
-                    mediaType="all"
-                    maxFiles={1}
-                    maxFileSize={1024 * 1024 * 1024} // 1GB
-                    multiple={false}
-                    disabled={isSubmitting}
-                    label="Upload audio or video file"
-                  />
-                </div>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                      Or enter URL manually
-                    </span>
-                  </div>
-                </div>
-
-                <TextField
-                  control={control}
-                  name="audioUrl"
-                  label="Audio URL *"
-                  placeholder="https://example.com/track.mp3"
-                />
                 <TextField
                   control={control}
                   name="coverArt"

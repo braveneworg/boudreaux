@@ -874,6 +874,22 @@ const TrackListDrawer = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  /**
+   * Get cover art for a release track, falling back to track coverArt or release coverArt
+   */
+  const getCoverArt = (releaseTrack: (typeof releaseTracks)[number]): string | null => {
+    // First, check ReleaseTrack's coverArt (derived from uploaded file metadata)
+    if ('coverArt' in releaseTrack && releaseTrack.coverArt) {
+      return releaseTrack.coverArt as string;
+    }
+    // Fall back to the track's own coverArt
+    if (releaseTrack.track.coverArt) {
+      return releaseTrack.track.coverArt;
+    }
+    // Fall back to release coverArt
+    return release.coverArt || null;
+  };
+
   // Sort tracks by position
   const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
 
@@ -901,6 +917,7 @@ const TrackListDrawer = ({
             {sortedTracks.map((releaseTrack, index) => {
               const { track } = releaseTrack;
               const isCurrentTrack = currentTrackId === track.id;
+              const coverArt = getCoverArt(releaseTrack);
 
               const trackItem = (
                 <li
@@ -920,6 +937,17 @@ const TrackListDrawer = ({
                     >
                       {index + 1}.
                     </span>
+                    {coverArt && (
+                      <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
+                        <Image
+                          src={coverArt}
+                          alt={track.title}
+                          fill
+                          className="object-cover"
+                          sizes="40px"
+                        />
+                      </div>
+                    )}
                     <span
                       className={`text-sm truncate ${
                         isCurrentTrack
