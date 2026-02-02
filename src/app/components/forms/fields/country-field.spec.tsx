@@ -7,17 +7,9 @@ import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
 import CountryField from './country-field';
 
-// Mock the ComboboxField component
+// Mock the ComboboxField component - use named function to ensure mock is properly hoisted
 vi.mock('./combobox-field', () => ({
-  default: ({
-    label,
-    placeholder,
-    searchPlaceholder,
-    emptyMessage,
-    options,
-    popoverWidth,
-    onUserInteraction,
-  }: {
+  default: function MockComboboxField(props: {
     label?: string;
     placeholder?: string;
     searchPlaceholder?: string;
@@ -25,27 +17,29 @@ vi.mock('./combobox-field', () => ({
     options: { value: string; label: string }[];
     popoverWidth?: string;
     onUserInteraction?: () => void;
-  }) => (
-    <div data-testid="combobox-field">
-      <label data-testid="combobox-label">{label}</label>
-      <button data-testid="combobox-trigger">{placeholder}</button>
-      <input data-testid="combobox-search" placeholder={searchPlaceholder} />
-      <div data-testid="combobox-empty">{emptyMessage}</div>
-      <div data-testid="combobox-width" className={popoverWidth} />
-      <div data-testid="combobox-options">
-        {options.map((option: { value: string; label: string }) => (
-          <button
-            key={option.value}
-            data-testid="country-option"
-            data-value={option.value}
-            onClick={() => onUserInteraction?.()}
-          >
-            {option.label}
-          </button>
-        ))}
+  }) {
+    return (
+      <div data-testid="combobox-field">
+        <label data-testid="combobox-label">{props.label}</label>
+        <button data-testid="combobox-trigger">{props.placeholder}</button>
+        <input data-testid="combobox-search" placeholder={props.searchPlaceholder} />
+        <div data-testid="combobox-empty">{props.emptyMessage}</div>
+        <div data-testid="combobox-width" className={props.popoverWidth} />
+        <div data-testid="combobox-options">
+          {props.options.map((option: { value: string; label: string }) => (
+            <button
+              key={option.value}
+              data-testid="country-option"
+              data-value={option.value}
+              onClick={() => props.onUserInteraction?.()}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-  ),
+    );
+  },
 }));
 
 // Mock the countries utils

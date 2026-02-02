@@ -30,13 +30,14 @@ export default defineConfig({
 
     // Performance optimizations
     css: false, // Don't process CSS in tests
-    pool: 'vmThreads', // Fast VM-based worker threads
+    pool: 'forks', // Use forks for better test isolation (matches CI behavior)
 
     // Vitest 4: Worker configuration
-    maxWorkers: undefined, // Auto-detect for maximum parallelization
+    // Auto-detect workers but use forks pool for proper isolation
+    maxWorkers: undefined,
 
     isolate: true, // Required for test isolation
-    fileParallelism: true, // Run test files in parallel
+    fileParallelism: true, // Run test files in parallel for speed
     testTimeout: 5000,
 
     // Randomize test order to catch hidden dependencies
