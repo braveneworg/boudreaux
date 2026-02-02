@@ -178,6 +178,11 @@ describe('signupAction', () => {
       mockAdapter.createUser.mockResolvedValue({ id: '1' });
       vi.mocked(mockSignIn).mockResolvedValue(undefined);
 
+      // Set up redirect mock to throw NEXT_REDIRECT error
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
       await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockGenerateUsername).toHaveBeenCalledWith('', 4);

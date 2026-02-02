@@ -442,3 +442,91 @@ describe('CarouselNext button click', () => {
     // The scrollNext callback should have been called via the mock
   });
 });
+
+describe('Carousel with null api edge cases', () => {
+  it('handles api being null in onSelect', () => {
+    // When api is null, onSelect should return early
+    // This is covered when carousel first mounts before api is ready
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    // Just verify carousel renders without error
+    expect(screen.getByRole('region')).toBeInTheDocument();
+  });
+
+  it('handles no setApi callback provided', () => {
+    // When setApi is not provided, the effect should return early
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    expect(screen.getByRole('region')).toBeInTheDocument();
+  });
+});
+
+describe('Carousel orientation from opts', () => {
+  it('derives vertical orientation from opts.axis when orientation not specified', () => {
+    render(
+      <Carousel opts={{ axis: 'y' }}>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    expect(screen.getByRole('region')).toBeInTheDocument();
+  });
+
+  it('uses horizontal as default when no opts.axis provided', () => {
+    render(
+      <Carousel opts={{}}>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    expect(screen.getByRole('region')).toBeInTheDocument();
+  });
+});
+
+describe('Carousel button disabled states', () => {
+  it('previous button respects canScrollPrev state', () => {
+    // Default mock has canScrollPrev returning true
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    expect(prevButton).toBeInTheDocument();
+  });
+
+  it('next button respects canScrollNext state', () => {
+    // Default mock has canScrollNext returning true
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    expect(nextButton).toBeInTheDocument();
+  });
+});

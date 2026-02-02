@@ -1,7 +1,6 @@
 import React from 'react';
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
 
 import EditProfileButton from './edit-profile-button';
 
@@ -31,7 +30,18 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+// Mock the useIsMobile hook
+const mockUseIsMobile = vi.fn();
+vi.mock('@/app/hooks/use-mobile', () => ({
+  useIsMobile: () => mockUseIsMobile(),
+}));
+
 describe('EditProfileButton', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockUseIsMobile.mockReturnValue(false); // Default to desktop
+  });
+
   it('renders the edit profile link', () => {
     render(<EditProfileButton />);
 
@@ -59,5 +69,21 @@ describe('EditProfileButton', () => {
 
     const link = screen.getByRole('link');
     expect(link).toHaveClass('flex', 'items-center', 'gap-2', 'text-sm', 'underline-offset-4');
+  });
+
+  it('renders null on mobile devices', () => {
+    mockUseIsMobile.mockReturnValue(true);
+
+    const { container } = render(<EditProfileButton />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders link on desktop devices', () => {
+    mockUseIsMobile.mockReturnValue(false);
+
+    render(<EditProfileButton />);
+
+    expect(screen.getByRole('link')).toBeInTheDocument();
   });
 });

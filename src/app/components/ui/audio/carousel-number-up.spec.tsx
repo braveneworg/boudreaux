@@ -260,4 +260,30 @@ describe('CarouselNumberUp', () => {
     const image = screen.getByRole('img');
     expect(image).toHaveAttribute('src', '/new-cover.jpg');
   });
+
+  it('uses displayName when available', () => {
+    const artistWithDisplayName: Artist = {
+      ...mockArtists[0],
+      displayName: 'DJ Superstar',
+    };
+
+    render(<CarouselNumberUp artists={[artistWithDisplayName]} numberUp={1} />);
+
+    const image = screen.getByRole('img');
+    expect(image).toHaveAttribute('alt', 'DJ Superstar');
+  });
+
+  it('uses firstName and surname fallback when displayName is null', () => {
+    const artistWithoutDisplayName: Artist = {
+      ...mockArtists[0],
+      displayName: null,
+      firstName: 'John',
+      surname: 'Doe',
+    };
+
+    render(<CarouselNumberUp artists={[artistWithoutDisplayName]} numberUp={1} />);
+
+    const image = screen.getByRole('img');
+    expect(image).toHaveAttribute('alt', 'John Doe');
+  });
 });

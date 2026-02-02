@@ -1,8 +1,6 @@
 // Mock PrismaClient to avoid real database connections
-import { prisma } from '@/lib/prisma';
-
 vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn(function PrismaClient() {
+  PrismaClient: vi.fn(function PrismaClient(config: { log?: string[] }) {
     return {
       $connect: vi.fn(),
       $disconnect: vi.fn(),
@@ -10,51 +8,53 @@ vi.mock('@prisma/client', () => ({
       session: {},
       verificationToken: {},
       account: {},
+      _config: config,
     };
   }),
 }));
 
 describe('prisma', () => {
-  it('should export a prisma client object', () => {
+  it('should export a prisma client object', async () => {
+    const { prisma } = await import('@/lib/prisma');
     expect(prisma).toBeDefined();
     expect(typeof prisma).toBe('object');
     expect(prisma).not.toBeNull();
   });
 
-  it('should be a singleton across imports', () => {
-    // Multiple references to prisma should be the same instance
-    const prismaRef1 = prisma;
-    const prismaRef2 = prisma;
+  it('should be a singleton across imports', async () => {
+    const { prisma: prisma1 } = await import('@/lib/prisma');
+    const { prisma: prisma2 } = await import('@/lib/prisma');
 
-    expect(prismaRef1).toBe(prismaRef2);
+    // Multiple references to prisma should be the same instance
+    expect(prisma1).toBe(prisma2);
   });
 
-  it('should be usable in test environment', () => {
+  it('should be usable in test environment', async () => {
+    const { prisma } = await import('@/lib/prisma');
     // Verify prisma works in test context
     expect(prisma).toBeDefined();
     expect(prisma).not.toBeUndefined();
     expect(prisma).not.toBeNull();
   });
 
-  it('should handle multiple property accesses', () => {
+  it('should handle multiple property accesses', async () => {
+    const { prisma } = await import('@/lib/prisma');
     // Verify we can access prisma multiple times without errors
     expect(prisma).toBeTruthy();
     expect(prisma).toBeTruthy();
     expect(prisma).toBeTruthy();
   });
 
-  it('should maintain consistent reference', () => {
-    // Store reference
-    const ref1 = prisma;
-
-    // Access again
-    const ref2 = prisma;
+  it('should maintain consistent reference', async () => {
+    const { prisma: ref1 } = await import('@/lib/prisma');
+    const { prisma: ref2 } = await import('@/lib/prisma');
 
     // Should be identical
     expect(ref1).toStrictEqual(ref2);
   });
 
-  it('should export valid prisma instance', () => {
+  it('should export valid prisma instance', async () => {
+    const { prisma } = await import('@/lib/prisma');
     // Comprehensive check that prisma is properly exported
     expect(prisma).not.toBeUndefined();
     expect(prisma).not.toBeNull();

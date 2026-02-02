@@ -866,4 +866,40 @@ describe('NotificationBanner', () => {
       expect(images.length).toBe(0);
     });
   });
+
+  describe('hexToRgba color conversion', () => {
+    it('renders with short hex color (#RGB format)', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        messageTextColor: '#FFF',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Test message')).toBeInTheDocument();
+    });
+
+    it('handles invalid hex color gracefully', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        messageTextColor: 'invalid',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Test message')).toBeInTheDocument();
+    });
+
+    it('renders secondary message with short hex color', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary',
+        secondaryMessageTextColor: '#ABC',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Secondary')).toBeInTheDocument();
+    });
+  });
 });

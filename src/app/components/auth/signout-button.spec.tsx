@@ -213,4 +213,25 @@ describe('SignedinToolbar', () => {
       expect(signOutButton).toHaveAttribute('data-variant', 'link:narrow');
     });
   });
+
+  describe('mobile responsiveness', () => {
+    it('hides vertical separator on mobile', () => {
+      mockUseIsMobile.mockReturnValue(true);
+      render(<SignedinToolbar />);
+
+      // On mobile, vertical separator after the button should not be rendered
+      const separators = screen.queryAllByTestId('vertical-separator');
+      // Only one separator should remain (before AdminLink if admin)
+      expect(separators.length).toBeLessThan(2);
+    });
+
+    it('shows vertical separator on desktop', () => {
+      mockUseIsMobile.mockReturnValue(false);
+      render(<SignedinToolbar />);
+
+      const separators = screen.getAllByTestId('vertical-separator');
+      // At least one separator should be visible
+      expect(separators.length).toBeGreaterThan(0);
+    });
+  });
 });
