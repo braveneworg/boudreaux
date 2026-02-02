@@ -46,7 +46,7 @@ export default defineConfig({
       seed: (() => {
         if (process.env.VITEST_SEED) {
           const parsed = parseInt(process.env.VITEST_SEED, 10);
-          return Number.isNaN(parsed) ? 42 : parsed;
+          return Number.isNaN(parsed) || parsed <= 0 ? 42 : parsed;
         }
         return 42;
       })(),
