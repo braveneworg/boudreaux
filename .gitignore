@@ -13,6 +13,8 @@
 # testing
 /coverage
 test-results.xml
+# Temporary TypeScript config files generated during testing (e.g., tsconfig.abc123xyz.json)
+tsconfig.??????????.json
 
 # next.js
 /.next/

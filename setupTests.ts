@@ -96,15 +96,61 @@ if (typeof window !== 'undefined') {
 
   // Mock scrollIntoView for JSDOM
   Element.prototype.scrollIntoView = vi.fn();
+
+  // Mock HTMLCanvasElement.getContext for components that use canvas
+  // (e.g., chart libraries, image processing, etc.)
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((contextType: string) => {
+    if (contextType === '2d') {
+      return {
+        fillRect: vi.fn(),
+        clearRect: vi.fn(),
+        getImageData: vi.fn(() => ({
+          data: new Uint8ClampedArray(4),
+        })),
+        putImageData: vi.fn(),
+        createImageData: vi.fn(() => ({
+          data: new Uint8ClampedArray(4),
+        })),
+        setTransform: vi.fn(),
+        drawImage: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        scale: vi.fn(),
+        rotate: vi.fn(),
+        translate: vi.fn(),
+        transform: vi.fn(),
+        beginPath: vi.fn(),
+        closePath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        clip: vi.fn(),
+        arc: vi.fn(),
+        arcTo: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        rect: vi.fn(),
+        fillText: vi.fn(),
+        strokeText: vi.fn(),
+        measureText: vi.fn(() => ({ width: 0 })),
+        canvas: {
+          width: 300,
+          height: 150,
+        },
+      };
+    }
+    return null;
+  });
 }
 
 expect.extend(matchers); // Add custom jest matchers from jest-dom
 
-// Clean up the DOM after each test to prevent memory leaks
+// Clean up the DOM and clear mock call history after each test to ensure isolation
 afterEach(() => {
   cleanup();
-  // Clear all mocks after each test (clears call history, not implementations)
-  // Note: Individual test files should use vi.resetAllMocks() in their beforeEach
-  // if they need to reset mock implementations between tests
+  // Clear all mock call history after each test (but keep implementations intact)
+  // This provides a consistent, clean mock state across the entire test suite
+  // while preserving mock implementations set up in setupTests or test files.
+  // Use vi.clearAllMocks() instead of vi.resetAllMocks() to avoid breaking
+  // global mocks like matchMedia, ResizeObserver, IntersectionObserver, etc.
   vi.clearAllMocks();
 });

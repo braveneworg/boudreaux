@@ -33,9 +33,14 @@ interface MockPrismaAccount {
   findUnique: ReturnType<typeof vi.fn>;
 }
 
+interface MockPrismaVerificationToken {
+  delete: ReturnType<typeof vi.fn>;
+}
+
 interface MockPrismaClient {
   user: MockPrismaUser;
   account: MockPrismaAccount;
+  verificationToken: MockPrismaVerificationToken;
 }
 
 // Mock PrismaClient
@@ -48,6 +53,9 @@ vi.mock('@prisma/client', () => ({
     },
     account: {
       findUnique: vi.fn(),
+    },
+    verificationToken: {
+      delete: vi.fn(),
     },
   })),
 }));
@@ -76,6 +84,9 @@ describe('CustomPrismaAdapter', () => {
       },
       account: {
         findUnique: vi.fn(),
+      },
+      verificationToken: {
+        delete: vi.fn(),
       },
     };
 
@@ -811,6 +822,8 @@ describe('CustomPrismaAdapter', () => {
       };
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
@@ -845,6 +858,8 @@ describe('CustomPrismaAdapter', () => {
       };
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-123',
         email: 'test@example.com',
@@ -861,6 +876,11 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null if verification token not found', async () => {
+      // The @auth/prisma-adapter calls verificationToken.delete which throws when record not found
+      // Prisma throws a P2025 error when record to delete is not found
+      const notFoundError = new Error('Record to delete does not exist.');
+      (notFoundError as Error & { code: string }).code = 'P2025';
+      mockPrisma.verificationToken.delete.mockRejectedValue(notFoundError);
       mockUseVerificationToken.mockResolvedValue(null);
 
       const result = await adapter.useVerificationToken?.({
@@ -881,6 +901,8 @@ describe('CustomPrismaAdapter', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       mockUseVerificationToken.mockResolvedValue(mockToken);
+      // The @auth/prisma-adapter internally calls verificationToken.delete
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
       mockPrisma.user.findUnique.mockRejectedValue(new Error('Database error'));
 
       const result = await adapter.useVerificationToken?.({
@@ -900,6 +922,8 @@ describe('CustomPrismaAdapter', () => {
 
     it('should rethrow error if base adapter useVerificationToken fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // The @auth/prisma-adapter internally calls verificationToken.delete which then throws
+      mockPrisma.verificationToken.delete.mockRejectedValue(new Error('Token error'));
       mockUseVerificationToken.mockRejectedValue(new Error('Token error'));
 
       await expect(
