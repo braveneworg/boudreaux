@@ -462,6 +462,8 @@ model Track {
   audioUrl        String // URL or file path to the audio file
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  deletedOn       DateTime? // Date when the track was soft-deleted; null if not deleted
+  publishedOn     DateTime? // Date when the track was published
   coverArt        String?
   images          Image[]
   position        Int // Position of the track in the release 0-based index
@@ -473,6 +475,7 @@ model Track {
 
   @@index([title])
   @@index([position])
+  @@index([deletedOn])
 }
 
 model TrackArtist {
