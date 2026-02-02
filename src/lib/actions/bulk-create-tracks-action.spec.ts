@@ -190,6 +190,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -223,6 +225,8 @@ describe('bulkCreateTracksAction', () => {
           coverArt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          deletedOn: null,
+          publishedOn: null,
         })
         .mockResolvedValueOnce({
           id: 'track-2',
@@ -233,6 +237,8 @@ describe('bulkCreateTracksAction', () => {
           coverArt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          deletedOn: null,
+          publishedOn: null,
         });
 
       const tracks: BulkTrackData[] = [
@@ -268,6 +274,8 @@ describe('bulkCreateTracksAction', () => {
           coverArt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          deletedOn: null,
+          publishedOn: null,
         })
         .mockRejectedValueOnce(new Error('Database error'));
 
@@ -317,6 +325,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -363,6 +373,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: 'data:image/jpeg;base64,/9j/4AAQ...',
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -406,6 +418,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -440,6 +454,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -486,6 +502,8 @@ describe('bulkCreateTracksAction', () => {
         coverArt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
       });
 
       const tracks: BulkTrackData[] = [

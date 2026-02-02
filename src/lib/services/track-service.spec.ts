@@ -57,6 +57,8 @@ describe('TrackService', () => {
     position: 1,
     createdAt: new Date('2024-01-15T00:00:00.000Z'),
     updatedAt: new Date('2024-01-15T00:00:00.000Z'),
+    deletedOn: null,
+    publishedOn: null,
     images: [],
     releaseTracks: [],
     urls: [],
@@ -470,6 +472,152 @@ describe('TrackService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBe('Failed to delete track');
+      }
+    });
+  });
+
+  describe('softDeleteTrack', () => {
+    it('should soft delete a track successfully', async () => {
+      const softDeletedTrack = { ...mockTrack, deletedOn: new Date() };
+      vi.mocked(prisma.track.update).mockResolvedValue(softDeletedTrack as never);
+
+      const result = await TrackService.softDeleteTrack('track-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.deletedOn).not.toBeNull();
+      }
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-123' },
+        data: { deletedOn: expect.any(Date) },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: true,
+        },
+      });
+    });
+
+    it('should return error when track is not found', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.softDeleteTrack('nonexistent-id');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Track not found');
+      }
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.softDeleteTrack('track-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.softDeleteTrack('track-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to soft delete track');
+      }
+    });
+  });
+
+  describe('restoreTrack', () => {
+    it('should restore a soft-deleted track successfully', async () => {
+      const restoredTrack = { ...mockTrack, deletedOn: null };
+      vi.mocked(prisma.track.update).mockResolvedValue(restoredTrack as never);
+
+      const result = await TrackService.restoreTrack('track-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.deletedOn).toBeNull();
+      }
+      expect(prisma.track.update).toHaveBeenCalledWith({
+        where: { id: 'track-123' },
+        data: { deletedOn: null },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: true,
+        },
+      });
+    });
+
+    it('should return error when track is not found', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.restoreTrack('nonexistent-id');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Track not found');
+      }
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.update).mockRejectedValue(prismaError);
+
+      const result = await TrackService.restoreTrack('track-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.restoreTrack('track-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to restore track');
       }
     });
   });

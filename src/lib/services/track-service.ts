@@ -239,4 +239,82 @@ export class TrackService {
       return { success: false, error: 'Failed to delete track' };
     }
   }
+
+  /**
+   * Soft delete a track by ID (set deletedOn timestamp)
+   */
+  static async softDeleteTrack(id: string): Promise<ServiceResponse<Track>> {
+    try {
+      const track = await prisma.track.update({
+        where: { id },
+        data: { deletedOn: new Date() },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: true,
+        },
+      });
+
+      return { success: true, data: track as unknown as Track };
+    } catch (error) {
+      // Record not found
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Track not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to soft delete track' };
+    }
+  }
+
+  /**
+   * Restore a soft-deleted track by ID (clear deletedOn timestamp)
+   */
+  static async restoreTrack(id: string): Promise<ServiceResponse<Track>> {
+    try {
+      const track = await prisma.track.update({
+        where: { id },
+        data: { deletedOn: null },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          urls: true,
+          releaseTracks: {
+            include: {
+              release: true,
+            },
+          },
+          artists: true,
+        },
+      });
+
+      return { success: true, data: track as unknown as Track };
+    } catch (error) {
+      // Record not found
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Track not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to restore track' };
+    }
+  }
 }
