@@ -2,6 +2,12 @@ import { render, screen } from '@testing-library/react';
 
 import AdminLink from './admin-link';
 
+vi.mock('lucide-react', () => ({
+  ShieldUser: ({ className }: { className?: string }) => (
+    <svg data-testid="shield-user-icon" className={className} />
+  ),
+}));
+
 describe('AdminLink', () => {
   describe('rendering', () => {
     it('should render admin link with correct text', () => {
