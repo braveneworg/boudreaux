@@ -876,6 +876,11 @@ describe('CustomPrismaAdapter', () => {
     });
 
     it('should return null if verification token not found', async () => {
+      // The @auth/prisma-adapter calls verificationToken.delete which throws when record not found
+      // Prisma throws a P2025 error when record to delete is not found
+      const notFoundError = new Error('Record to delete does not exist.');
+      (notFoundError as Error & { code: string }).code = 'P2025';
+      mockPrisma.verificationToken.delete.mockRejectedValue(notFoundError);
       mockUseVerificationToken.mockResolvedValue(null);
 
       const result = await adapter.useVerificationToken?.({
