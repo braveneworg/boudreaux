@@ -136,6 +136,28 @@ export function DataView<T extends Record<string, unknown>>({
     [entityDisplayLabel, entityUrlPath]
   );
 
+  const deleteEntity = useCallback(
+    async (id: string) => {
+      return await fetch(`/api/${entityUrlPath}/${id}`, {
+        method: 'DELETE',
+      })
+        .then((res) => res.json())
+        .catch((error) => {
+          console.error(`Failed to delete ${entityDisplayLabel}:`, error);
+          return { error: 'Failed to delete entity' };
+        });
+    },
+    [entityDisplayLabel, entityUrlPath]
+  );
+
+  // Check if entity supports soft delete by checking if first item has deletedOn property
+  const supportsSoftDelete = useMemo(() => {
+    const baseData = data?.[`${String(entity)}s`] as T[];
+    if (!baseData || baseData.length === 0) return true; // Default to soft delete for empty data
+    // Check if 'deletedOn' exists in the first item (including if it's null)
+    return 'deletedOn' in baseData[0];
+  }, [data, entity]);
+
   const handleCreateEntityButtonClick = () => {
     router?.push(`/admin/${entityUrlPath}`);
   };
@@ -174,25 +196,40 @@ export function DataView<T extends Record<string, unknown>>({
     async (event: React.MouseEvent<HTMLButtonElement>) => {
       const { id } = (event.currentTarget as HTMLButtonElement).dataset;
       if (id) {
-        const response = await updateEntity(id, {
-          deletedOn: new Date().toISOString(),
-        });
+        // Use hard delete for entities that don't support soft delete (like Release)
+        if (!supportsSoftDelete) {
+          const response = await deleteEntity(id);
 
-        if (response.id) {
-          toast.success(
-            `Successfully deleted ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
-          );
-          refetch();
+          if (response.message || !response.error) {
+            toast.success(`Successfully deleted ${entityDisplayLabel}`);
+            refetch();
+          } else {
+            toast.error(
+              `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+            );
+          }
         } else {
-          toast.error(
-            `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
-          );
+          // Use soft delete for entities that support it
+          const response = await updateEntity(id, {
+            deletedOn: new Date().toISOString(),
+          });
+
+          if (response.id) {
+            toast.success(
+              `Successfully deleted ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+            );
+            refetch();
+          } else {
+            toast.error(
+              `Failed to delete ${entityDisplayLabel}: ${response.error || 'Unknown error'}`
+            );
+          }
         }
       } else {
         toast.error(`Failed to delete: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entityDisplayLabel, updateEntity, refetch]
+    [entityDisplayLabel, updateEntity, deleteEntity, refetch, supportsSoftDelete]
   );
 
   const handleClickRestoreButton = useCallback(
@@ -231,12 +268,14 @@ export function DataView<T extends Record<string, unknown>>({
         onChange={handleSearchChange}
         placeholder={`Search ${entityDisplayLabel}s...`}
       />
-      <div className="flex items-center gap-2 mb-2">
-        <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
-        <Label htmlFor="show-deleted" className="cursor-pointer">
-          Show deleted
-        </Label>
-      </div>
+      {supportsSoftDelete && (
+        <div className="flex items-center gap-2 mb-2">
+          <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
+          <Label htmlFor="show-deleted" className="cursor-pointer">
+            Show deleted
+          </Label>
+        </div>
+      )}
       <div className="flex items-center gap-2 mb-2">
         <Switch id="show-published" checked={showPublished} onCheckedChange={setShowPublished} />
         <Label htmlFor="show-published" className="cursor-pointer">
@@ -388,20 +427,24 @@ export function DataView<T extends Record<string, unknown>>({
                       </Dialog>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant={item.deletedOn ? 'secondary' : 'destructive'}>
-                            {item.deletedOn ? (
+                          <Button
+                            variant={
+                              supportsSoftDelete && item.deletedOn ? 'secondary' : 'destructive'
+                            }
+                          >
+                            {supportsSoftDelete && item.deletedOn ? (
                               <ArchiveRestoreIcon className="mr-0 size-4" />
                             ) : (
                               <Trash2Icon className="mr-0 size-4" />
                             )}
-                            {item.deletedOn ? 'Restore' : 'Delete'}
+                            {supportsSoftDelete && item.deletedOn ? 'Restore' : 'Delete'}
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <section>
                             <DialogHeader>
                               <DialogTitle asChild>
-                                {item.deletedOn ? (
+                                {supportsSoftDelete && item.deletedOn ? (
                                   <h1 className="text-3xl!">Confirm Restore</h1>
                                 ) : (
                                   <h1 className="text-3xl!">Confirm Delete</h1>
@@ -409,7 +452,8 @@ export function DataView<T extends Record<string, unknown>>({
                               </DialogTitle>
                             </DialogHeader>
                             <p className="mt-1 mb-4">
-                              Are you sure you want to {item.deletedOn ? 'restore' : 'delete'}{' '}
+                              Are you sure you want to{' '}
+                              {supportsSoftDelete && item.deletedOn ? 'restore' : 'delete'}{' '}
                               <b>{getDisplayName(item)}</b>?
                             </p>
                             <DialogFooter>
@@ -418,9 +462,11 @@ export function DataView<T extends Record<string, unknown>>({
                               </DialogClose>
                               <DialogClose asChild>
                                 <Button
-                                  variant={item.deletedOn ? 'default' : 'destructive'}
+                                  variant={
+                                    supportsSoftDelete && item.deletedOn ? 'default' : 'destructive'
+                                  }
                                   onClick={
-                                    item.deletedOn
+                                    supportsSoftDelete && item.deletedOn
                                       ? handleClickRestoreButton
                                       : handleClickDeleteButton
                                   }

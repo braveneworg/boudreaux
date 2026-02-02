@@ -50,6 +50,7 @@ describe('ReleaseService', () => {
     releaseUrls: [],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
+    deletedOn: null,
     publishedAt: null,
     featuredOn: null,
     featuredUntil: null,
@@ -555,6 +556,154 @@ describe('ReleaseService', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBe('Failed to delete release');
+      }
+    });
+  });
+
+  describe('softDeleteRelease', () => {
+    it('should soft delete a release successfully', async () => {
+      const softDeletedRelease = { ...mockRelease, deletedOn: new Date() };
+      vi.mocked(prisma.release.update).mockResolvedValue(softDeletedRelease);
+
+      const result = await ReleaseService.softDeleteRelease('release-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.deletedOn).not.toBeNull();
+      }
+      expect(prisma.release.update).toHaveBeenCalledWith({
+        where: { id: 'release-123' },
+        data: { deletedOn: expect.any(Date) },
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
+            },
+          },
+          releaseTracks: {
+            include: {
+              track: true,
+            },
+          },
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return error when release not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
+
+      const result = await ReleaseService.softDeleteRelease('non-existent');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Release not found');
+      }
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.release.update).mockRejectedValue(initError);
+
+      const result = await ReleaseService.softDeleteRelease('release-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await ReleaseService.softDeleteRelease('release-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to soft delete release');
+      }
+    });
+  });
+
+  describe('restoreRelease', () => {
+    it('should restore a soft-deleted release successfully', async () => {
+      const restoredRelease = { ...mockRelease, deletedOn: null };
+      vi.mocked(prisma.release.update).mockResolvedValue(restoredRelease);
+
+      const result = await ReleaseService.restoreRelease('release-123');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.deletedOn).toBeNull();
+      }
+      expect(prisma.release.update).toHaveBeenCalledWith({
+        where: { id: 'release-123' },
+        data: { deletedOn: null },
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
+            },
+          },
+          releaseTracks: {
+            include: {
+              track: true,
+            },
+          },
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return error when release not found', async () => {
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
+
+      const result = await ReleaseService.restoreRelease('non-existent');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Release not found');
+      }
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.release.update).mockRejectedValue(initError);
+
+      const result = await ReleaseService.restoreRelease('release-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Database unavailable');
+      }
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
+
+      const result = await ReleaseService.restoreRelease('release-123');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Failed to restore release');
       }
     });
   });

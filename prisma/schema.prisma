@@ -412,7 +412,7 @@ model ReleaseUrl {
 
 model Release {
   id                  String           @id @default(auto()) @map("_id") @db.ObjectId
-  title               String
+  title               String           @unique
   labels              String[]
   releasedOn          DateTime // Release date sans time component
   catalogNumber       String?
@@ -439,6 +439,7 @@ model Release {
   releaseUrls         ReleaseUrl[]
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+  deletedOn           DateTime? // Date when the release was soft-deleted; null if not deleted
   publishedAt         DateTime? // Date when the release was published
   featuredOn          DateTime? // Date when the release was featured
   featuredUntil       DateTime? // Date when the featured period ends; if not set, release remains featured indefinitely
@@ -449,9 +450,9 @@ model Release {
   tagId               String?          @db.ObjectId
 
   @@index([releasedOn])
-  @@index([title])
   @@index([featuredOn])
   @@index([featuredUntil])
+  @@index([deletedOn])
 }
 
 model Track {
