@@ -70,28 +70,9 @@ export const uploadFileToS3 = async (
       etag,
     });
 
-    // Verify the file is accessible via CDN with a small delay to allow for propagation
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Brief delay for S3 consistency
-      const verifyResponse = await fetch(presignedUrl.cdnUrl, {
-        method: 'HEAD',
-        cache: 'no-store',
-      });
-      if (!verifyResponse.ok) {
-        console.warn('[S3 Upload] CDN verification failed:', {
-          status: verifyResponse.status,
-          cdnUrl: presignedUrl.cdnUrl,
-        });
-      } else {
-        console.info('[S3 Upload] CDN verification successful:', {
-          cdnUrl: presignedUrl.cdnUrl,
-          contentType: verifyResponse.headers.get('Content-Type'),
-          contentLength: verifyResponse.headers.get('Content-Length'),
-        });
-      }
-    } catch (verifyError) {
-      console.warn('[S3 Upload] CDN verification error:', verifyError);
-    }
+    // Note: CDN verification via HEAD request is skipped because CloudFront
+    // doesn't include CORS headers for HEAD requests from browser origins.
+    // The S3 upload success (with ETag) is sufficient confirmation.
 
     return {
       success: true,
