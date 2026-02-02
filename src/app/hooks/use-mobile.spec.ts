@@ -51,7 +51,7 @@ describe('useIsMobile', () => {
     expect(result.current).toBe(false);
   });
 
-  it('should return true initially when window width is < 768px', () => {
+  it('should return true initially when window width is less than 768px', () => {
     Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
@@ -97,7 +97,10 @@ describe('useIsMobile', () => {
 
       // Trigger the change event
       listeners.forEach((listener) => {
-        listener({} as MediaQueryListEvent);
+        listener({
+          matches: true,
+          media: '(max-width: 767px)',
+        } as MediaQueryListEvent);
       });
     });
 
@@ -125,7 +128,10 @@ describe('useIsMobile', () => {
 
       // Trigger the change event
       listeners.forEach((listener) => {
-        listener({} as MediaQueryListEvent);
+        listener({
+          matches: false,
+          media: '(max-width: 767px)',
+        } as MediaQueryListEvent);
       });
     });
 
