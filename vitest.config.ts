@@ -30,11 +30,12 @@ export default defineConfig({
 
     // Performance optimizations
     css: false, // Don't process CSS in tests
-    pool: 'forks', // Use forks for better test isolation (matches CI behavior)
+    // Use vmThreads locally for ~3x faster tests, forks in CI for better isolation
+    pool: process.env.CI ? 'forks' : 'vmThreads',
 
     // Vitest 4: Worker configuration
-    // Auto-detect workers but use forks pool for proper isolation
-    maxWorkers: undefined,
+    // Use 75% of cores locally for speed, auto-detect in CI
+    maxWorkers: process.env.CI ? undefined : '75%',
 
     isolate: true, // Required for test isolation
     fileParallelism: true, // Run test files in parallel for speed
