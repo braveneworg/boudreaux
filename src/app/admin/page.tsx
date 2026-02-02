@@ -24,11 +24,24 @@ export default function AdminPage() {
       router.push('/admin/notifications');
       return;
     }
+    // Bulk upload has its own dedicated page
+    if (selectedView === 'upload bulk tracks') {
+      router.push('/admin/tracks/bulk');
+      return;
+    }
     setView(selectedView);
   };
 
   const getEntityOptions = useCallback(() => {
-    const entities = ['artist', 'group', 'release', 'track', 'featured artist', 'notifications'];
+    const entities = [
+      'artist',
+      'upload bulk tracks',
+      'group',
+      'release',
+      'track',
+      'featured artist',
+      'notifications',
+    ];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
       label: toTitleCase(entity),

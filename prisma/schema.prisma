@@ -492,6 +492,8 @@ model ReleaseTrack {
   releaseId String  @db.ObjectId
   track     Track   @relation(fields: [trackId], references: [id])
   trackId   String  @db.ObjectId
+  position  Int     @default(0)
+  coverArt  String? // Cover art derived from the uploaded audio file's metadata
 
   @@unique([releaseId, trackId])
   @@index([releaseId])

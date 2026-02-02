@@ -141,6 +141,7 @@ const createMockTrack = (
     duration: number;
     position: number;
     audioUrl: string;
+    coverArt: string | null;
   }> = {}
 ): Track =>
   ({
@@ -149,20 +150,25 @@ const createMockTrack = (
     duration: overrides.duration ?? 180,
     position: overrides.position ?? 1,
     audioUrl: overrides.audioUrl ?? 'https://example.com/audio.mp3',
-    coverArt: null,
+    coverArt: overrides.coverArt ?? null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     images: [],
     releaseTracks: [],
   }) as unknown as Track;
 
-const createMockReleaseTrack = (track: Track): ReleaseTrack =>
+const createMockReleaseTrack = (
+  track: Track,
+  overrides: Partial<{ coverArt: string | null }> = {}
+): ReleaseTrack =>
   ({
     id: `release-track-${track.id}`,
     releaseId: 'release-1',
     trackId: track.id,
     track,
     release: null,
+    position: track.position,
+    coverArt: overrides.coverArt ?? null,
   }) as unknown as ReleaseTrack;
 
 const createMockRelease = (
@@ -653,6 +659,95 @@ describe('MediaPlayer', () => {
       // The current track should have the highlight class
       const highlightedItem = container.querySelector('.bg-zinc-800');
       expect(highlightedItem).toBeInTheDocument();
+    });
+
+    it('should display cover art thumbnails when available', () => {
+      const trackWithCoverArt = createMockTrack({
+        id: 'track-cover',
+        title: 'Track With Cover',
+        position: 1,
+        duration: 180,
+        coverArt: 'https://example.com/track-cover.jpg',
+      });
+      const releaseTrackWithCoverArt = createMockReleaseTrack(trackWithCoverArt, {
+        coverArt: 'https://example.com/release-track-cover.jpg',
+      });
+      const releaseWithCoverArt = createMockRelease([releaseTrackWithCoverArt], {
+        title: 'Album With Covers',
+        coverArt: 'https://example.com/album-cover.jpg',
+      });
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.TrackListDrawer
+            artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
+          />
+        </MediaPlayer>
+      );
+
+      // Should render the cover art image - prioritizes releaseTrack.coverArt
+      const coverArtImages = screen.getAllByTestId('next-image');
+      expect(coverArtImages.length).toBeGreaterThan(0);
+      expect(coverArtImages[0]).toHaveAttribute(
+        'src',
+        'https://example.com/release-track-cover.jpg'
+      );
+    });
+
+    it('should fall back to track coverArt when releaseTrack coverArt is not available', () => {
+      const trackWithCoverArt = createMockTrack({
+        id: 'track-cover',
+        title: 'Track With Cover',
+        position: 1,
+        duration: 180,
+        coverArt: 'https://example.com/track-cover.jpg',
+      });
+      const releaseTrackWithoutCoverArt = createMockReleaseTrack(trackWithCoverArt); // No coverArt override
+      const releaseWithCoverArt = createMockRelease([releaseTrackWithoutCoverArt], {
+        title: 'Album With Covers',
+        coverArt: 'https://example.com/album-cover.jpg',
+      });
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.TrackListDrawer
+            artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
+          />
+        </MediaPlayer>
+      );
+
+      // Should render the track's cover art image as fallback
+      const coverArtImages = screen.getAllByTestId('next-image');
+      expect(coverArtImages.length).toBeGreaterThan(0);
+      expect(coverArtImages[0]).toHaveAttribute('src', 'https://example.com/track-cover.jpg');
+    });
+
+    it('should fall back to release coverArt when no track coverArt is available', () => {
+      const trackWithoutCoverArt = createMockTrack({
+        id: 'track-no-cover',
+        title: 'Track Without Cover',
+        position: 1,
+        duration: 180,
+        coverArt: null,
+      });
+      const releaseTrackWithoutCoverArt = createMockReleaseTrack(trackWithoutCoverArt);
+      const releaseWithCoverArt = createMockRelease([releaseTrackWithoutCoverArt], {
+        title: 'Album With Cover',
+        coverArt: 'https://example.com/album-cover.jpg',
+      });
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.TrackListDrawer
+            artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
+          />
+        </MediaPlayer>
+      );
+
+      // Should render the release's cover art as fallback
+      const coverArtImages = screen.getAllByTestId('next-image');
+      expect(coverArtImages.length).toBeGreaterThan(0);
+      expect(coverArtImages[0]).toHaveAttribute('src', 'https://example.com/album-cover.jpg');
     });
   });
 

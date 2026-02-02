@@ -194,6 +194,8 @@ export interface ReleaseTrack {
   releaseId: string;
   track: Track;
   trackId: string;
+  position: number;
+  coverArt?: string;
 }
 
 /**
