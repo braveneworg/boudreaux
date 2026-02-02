@@ -72,6 +72,19 @@ describe('POST /api/tracks/metadata', () => {
     vi.clearAllMocks();
   });
 
+  it('should return 400 if content type header is missing', async () => {
+    const request = {
+      headers: new Headers(), // No content-type header
+      formData: vi.fn().mockResolvedValue(new FormData()),
+    } as unknown as NextRequest;
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Content-Type must be multipart/form-data');
+  });
+
   it('should return 400 if content type is not multipart/form-data', async () => {
     const request = createMockRequest('application/json');
 
