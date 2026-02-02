@@ -557,6 +557,7 @@ describe('ArtistService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
+      vi.mocked(prisma.artist.update).mockReset();
       vi.mocked(prisma.artist.update).mockRejectedValue(notFoundError);
 
       const result = await ArtistService.archiveArtist('non-existent');
@@ -569,6 +570,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.artist.update).mockReset();
       vi.mocked(prisma.artist.update).mockRejectedValue(initError);
 
       const result = await ArtistService.archiveArtist('artist-123');
@@ -580,6 +582,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
+      vi.mocked(prisma.artist.update).mockReset();
       vi.mocked(prisma.artist.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.archiveArtist('artist-123');
