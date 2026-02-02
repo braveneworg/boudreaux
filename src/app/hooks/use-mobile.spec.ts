@@ -51,7 +51,7 @@ describe('useIsMobile', () => {
     expect(result.current).toBe(false);
   });
 
-  it('should return true initially when window width is less than 768px', () => {
+  it('should return true initially when window width is < 768px', () => {
     Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
@@ -76,7 +76,7 @@ describe('useIsMobile', () => {
     expect(mql.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
   });
 
-  it('should update when matchMedia change event fires', () => {
+  it('should update from desktop to mobile when matchMedia change event fires', () => {
     Object.defineProperty(window, 'innerWidth', {
       writable: true,
       configurable: true,
