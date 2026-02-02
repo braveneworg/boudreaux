@@ -135,6 +135,26 @@ const generateId = (): string => {
   return `track-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 };
 
+/**
+ * Process items in batches with concurrency limit
+ * This allows parallel processing while avoiding overwhelming the server
+ */
+const processInBatches = async <T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R>,
+  concurrency = 3
+): Promise<R[]> => {
+  const results: R[] = [];
+
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+
+  return results;
+};
+
 export default function BulkTrackUploader() {
   const [tracks, setTracks] = useState<BulkTrackItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -206,28 +226,40 @@ export default function BulkTrackUploader() {
 
       setTracks((prev) => [...prev, ...newTracks]);
 
-      // Extract metadata for each file
-      for (const track of newTracks) {
-        setTracks((prev) =>
-          prev.map((t) => (t.id === track.id ? { ...t, status: 'extracting' as const } : t))
-        );
+      // Mark all tracks as extracting
+      setTracks((prev) =>
+        prev.map((t) =>
+          newTracks.some((nt) => nt.id === t.id) ? { ...t, status: 'extracting' as const } : t
+        )
+      );
 
-        const metadata = await extractMetadata(track.file);
+      // Extract metadata in parallel batches (3 concurrent extractions)
+      // This significantly speeds up bulk uploads while not overwhelming the server
+      const CONCURRENCY_LIMIT = 3;
 
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.id === track.id
-              ? {
-                  ...t,
-                  status: 'extracted' as const,
-                  metadata: metadata ?? undefined,
-                  title: metadata?.title || t.title,
-                  position: metadata?.trackNumber || t.position,
-                }
-              : t
-          )
-        );
-      }
+      await processInBatches(
+        newTracks,
+        async (track) => {
+          const metadata = await extractMetadata(track.file);
+
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === track.id
+                ? {
+                    ...t,
+                    status: 'extracted' as const,
+                    metadata: metadata ?? undefined,
+                    title: metadata?.title || t.title,
+                    position: metadata?.trackNumber || t.position,
+                  }
+                : t
+            )
+          );
+
+          return metadata;
+        },
+        CONCURRENCY_LIMIT
+      );
 
       // Clear the input
       if (fileInputRef.current) {
