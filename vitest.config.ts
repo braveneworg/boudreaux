@@ -40,9 +40,10 @@ export default defineConfig({
     testTimeout: 5000,
 
     // Randomize test order to catch hidden dependencies
+    // Use fixed seed for reproducibility, override with VITEST_SEED env var
     sequence: {
       shuffle: true,
-      seed: Date.now(), // Use timestamp for reproducible random order
+      seed: process.env.VITEST_SEED ? parseInt(process.env.VITEST_SEED, 10) : 42,
     },
 
     // Disable typecheck by default for faster runs
