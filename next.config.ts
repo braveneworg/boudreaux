@@ -42,7 +42,10 @@ const config = {
   // Optimize for production
   compress: true,
 
-  // Security: Limit body size to prevent DoS
+  // Body size limits
+  // Note: For API routes like /api/tracks/metadata that need larger uploads,
+  // the nginx config has location-specific client_max_body_size settings.
+  // For local development, Next.js uses Node.js defaults which should handle larger files.
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
