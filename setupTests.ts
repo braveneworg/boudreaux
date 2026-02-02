@@ -100,11 +100,12 @@ if (typeof window !== 'undefined') {
 
 expect.extend(matchers); // Add custom jest matchers from jest-dom
 
-// Clean up the DOM after each test to prevent memory leaks
+// Clean up the DOM and reset all mocks after each test to ensure isolation
 afterEach(() => {
   cleanup();
-  // Clear all mocks after each test (clears call history, not implementations)
-  // Note: Individual test files should use vi.resetAllMocks() in their beforeEach
-  // if they need to reset mock implementations between tests
-  vi.clearAllMocks();
+  // Reset all mocks after each test (clears call history and implementations)
+  // This provides a consistent, clean mock state across the entire test suite.
+  // Individual test files generally should not need to call vi.resetAllMocks()
+  // themselves unless they intentionally override the global behavior.
+  vi.resetAllMocks();
 });
