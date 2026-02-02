@@ -240,4 +240,94 @@ export class ReleaseService {
       return { success: false, error: 'Failed to delete release' };
     }
   }
+
+  /**
+   * Soft delete a release by ID (set deletedOn timestamp)
+   */
+  static async softDeleteRelease(id: string): Promise<ServiceResponse<Release>> {
+    try {
+      const release = await prisma.release.update({
+        where: { id },
+        data: { deletedOn: new Date() },
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
+            },
+          },
+          releaseTracks: {
+            include: {
+              track: true,
+            },
+          },
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
+      });
+
+      return { success: true, data: release as unknown as Release };
+    } catch (error) {
+      // Record not found
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Release not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to soft delete release' };
+    }
+  }
+
+  /**
+   * Restore a soft-deleted release by ID (clear deletedOn timestamp)
+   */
+  static async restoreRelease(id: string): Promise<ServiceResponse<Release>> {
+    try {
+      const release = await prisma.release.update({
+        where: { id },
+        data: { deletedOn: null },
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
+            },
+          },
+          releaseTracks: {
+            include: {
+              track: true,
+            },
+          },
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
+      });
+
+      return { success: true, data: release as unknown as Release };
+    } catch (error) {
+      // Record not found
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return { success: false, error: 'Release not found' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to restore release' };
+    }
+  }
 }
