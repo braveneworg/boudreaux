@@ -237,5 +237,25 @@ describe('Environment Validation', () => {
 
       expect(consoleInfoSpy).toHaveBeenCalledWith('✅ Environment validation passed');
     });
+
+    it('should skip validation when SKIP_ENV_VALIDATION is true', () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      process.env = {
+        ...process.env,
+        SKIP_ENV_VALIDATION: 'true',
+        DATABASE_URL: undefined, // This would normally cause an error
+      };
+
+      // Should not throw even with missing required vars
+      expect(() => validateEnvironment()).not.toThrow();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '⚠️  Environment validation skipped (SKIP_ENV_VALIDATION=true)'
+      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '   Variables will be validated at runtime when container starts'
+      );
+    });
   });
 });

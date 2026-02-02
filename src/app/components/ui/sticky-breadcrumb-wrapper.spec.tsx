@@ -237,4 +237,15 @@ describe('StickyBreadcrumbWrapper', () => {
     wrapper = container.firstChild as HTMLElement;
     expect(wrapper).toHaveClass('fixed');
   });
+
+  it('returns null when isVisible is false', () => {
+    const { container } = render(
+      <StickyBreadcrumbWrapper isVisible={false}>
+        <div>Test Content</div>
+      </StickyBreadcrumbWrapper>
+    );
+
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByText('Test Content')).not.toBeInTheDocument();
+  });
 });

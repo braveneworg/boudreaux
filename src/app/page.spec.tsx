@@ -26,6 +26,16 @@ vi.mock('@/lib/services/featured-artists-service', () => ({
   },
 }));
 
+// Mock the NotificationBannerService
+vi.mock('@/lib/services/notification-banner-service', () => ({
+  NotificationBannerService: {
+    getActiveNotificationBanners: vi.fn().mockResolvedValue({
+      success: true,
+      data: [],
+    }),
+  },
+}));
+
 // Mock UI components
 vi.mock('./components/ui/content-container', () => ({
   ContentContainer: ({ children }: { children: React.ReactNode }) => (
@@ -69,6 +79,10 @@ vi.mock('./components/featured-artists-player', () => ({
   FeaturedArtistsPlayer: () => (
     <div data-testid="featured-artists-player">Featured Artists Player</div>
   ),
+}));
+
+vi.mock('./components/notification-banner', () => ({
+  NotificationBanner: () => <div data-testid="notification-banner">Notification Banner</div>,
 }));
 
 describe('Home Page', () => {

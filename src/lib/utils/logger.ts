@@ -52,19 +52,6 @@ const SENSITIVE_KEYS = [
   'apikey',
   'private',
 ];
- * Processes a value recursively for safe serialization
- */
-const processValue = (
-  value: unknown,
-  safeSerialize: (data: Record<string, unknown>) => Record<string, unknown>
-): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => processValue(item, safeSerialize));
-  } else if (typeof value === 'object' && value !== null) {
-    return safeSerialize(value as Record<string, unknown>);
-  }
-  return value;
-};
 
 /**
  * Safely serializes data for logging, filtering sensitive fields
@@ -88,30 +75,14 @@ const safeSerialize = (data: Record<string, unknown>): Record<string, unknown> =
         }
         return item;
       });
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      result[key] = safeSerializeArray(value);
     } else if (typeof value === 'object' && value !== null) {
       result[key] = safeSerialize(value as Record<string, unknown>);
     } else {
-      result[key] = processValue(value, safeSerialize);
+      result[key] = value;
     }
   }
 
   return result;
-};
-
-/**
- * Recursively processes arrays to sanitize any sensitive data
- */
-const safeSerializeArray = (arr: unknown[]): unknown[] => {
-  return arr.map((item) => {
-    if (Array.isArray(item)) {
-      return safeSerializeArray(item);
-    } else if (typeof item === 'object' && item !== null) {
-      return safeSerialize(item as Record<string, unknown>);
-    }
-    return item;
-  });
 };
 
 /**

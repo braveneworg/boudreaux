@@ -209,5 +209,37 @@ describe('Featured Artists API Routes', () => {
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Failed to create artist' });
     });
+
+    it('should handle unexpected errors in GET and return 500', async () => {
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockRejectedValue(
+        new Error('Unexpected error')
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Internal server error' });
+    });
+
+    it('should handle unexpected errors in POST and return 500', async () => {
+      vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockRejectedValue(
+        new Error('Unexpected error')
+      );
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
+        method: 'POST',
+        body: JSON.stringify({
+          displayName: 'Featured Artist Name',
+        }),
+      });
+
+      const response = await POST(request, { params: Promise.resolve({}) });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Internal server error' });
+    });
   });
 });
