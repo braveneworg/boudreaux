@@ -40,9 +40,10 @@ export default defineConfig({
     testTimeout: 5000,
 
     // Randomize test order to catch hidden dependencies
+    // Use a fixed seed for reproducible test order across local and CI environments
     sequence: {
       shuffle: true,
-      seed: Date.now(), // Use timestamp for reproducible random order
+      seed: 12345, // Fixed seed for reproducible random order
     },
 
     // Disable typecheck by default for faster runs

@@ -7,46 +7,53 @@ import CheckboxField from './checkbox-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 
-// Mock the UI components
-vi.mock('@/app/components/ui/form', () => ({
-  FormField: ({
-    name,
-    render,
-  }: {
-    name: string;
-    render: (context: Record<string, unknown>) => React.ReactNode;
-  }) => {
-    const field = {
-      value: false,
-      onChange: vi.fn(),
-      onBlur: vi.fn(),
+// Mock the UI components - use inline JSX to avoid issues with React hoisting in mocks
+vi.mock('@/app/components/ui/form', () => {
+  // Create stable mock functions outside the component definitions
+  const mockOnChange = vi.fn();
+  const mockOnBlur = vi.fn();
+  const mockRef = vi.fn();
+
+  return {
+    FormField: ({
       name,
-      ref: vi.fn(),
-    };
-    return render({ field });
-  },
-  FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="form-item" className={className}>
-      {children}
-    </div>
-  ),
-  FormLabel: ({
-    children,
-    htmlFor,
-    className,
-  }: {
-    children: React.ReactNode;
-    htmlFor?: string;
-    className?: string;
-  }) => (
-    <label data-testid="form-label" htmlFor={htmlFor} className={className}>
-      {children}
-    </label>
-  ),
-  FormControl: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="form-control">{children}</div>
-  ),
-}));
+      render,
+    }: {
+      name: string;
+      render: (context: { field: Record<string, unknown> }) => React.ReactNode;
+    }) => {
+      const field = {
+        value: false,
+        onChange: mockOnChange,
+        onBlur: mockOnBlur,
+        name,
+        ref: mockRef,
+      };
+      return render({ field });
+    },
+    FormItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+      <div data-testid="form-item" className={className}>
+        {children}
+      </div>
+    ),
+    FormLabel: ({
+      children,
+      htmlFor,
+      className,
+    }: {
+      children: React.ReactNode;
+      htmlFor?: string;
+      className?: string;
+    }) => (
+      <label data-testid="form-label" htmlFor={htmlFor} className={className}>
+        {children}
+      </label>
+    ),
+    FormControl: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="form-control">{children}</div>
+    ),
+  };
+});
 
 vi.mock('@/app/components/ui/checkbox', () => ({
   Checkbox: ({
