@@ -13,4 +13,19 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ TypeScript type-check passed"
+
+echo ""
+echo "🧪 Running tests before push..."
+
+# Run all tests
+npm run test
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Tests failed. Please fix failing tests before pushing."
+  echo "   Run 'npm run test' to see all failures."
+  exit 1
+fi
+
+echo "✅ All tests passed"
 echo "🚀 Pushing changes..."
