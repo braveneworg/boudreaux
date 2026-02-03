@@ -274,14 +274,9 @@ export async function bulkCreateTracksAction(
         // Get artist name (priority: track artist > album artist)
         const artistName = track.artist?.trim() || track.albumArtist?.trim();
 
-        // Determine if albumArtist represents a group (when it differs from artist)
-        // Common pattern: artist is the band member, albumArtist is the band name
-        const groupName =
-          track.albumArtist?.trim() &&
-          track.artist?.trim() &&
-          track.albumArtist.trim().toLowerCase() !== track.artist.trim().toLowerCase()
-            ? track.albumArtist.trim()
-            : undefined;
+        // Always create a Group from albumArtist when present
+        // Groups typically represent bands/ensembles while Artists are individual members
+        const groupName = track.albumArtist?.trim() || undefined;
 
         // Create track and all associations in a single transaction
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -334,36 +329,38 @@ export async function bulkCreateTracksAction(
             }
           }
 
-          // Handle group creation/association if albumArtist differs from artist
+          // Handle group creation from albumArtist metadata
           let groupId: string | undefined;
 
-          if (groupName && artistId) {
+          if (groupName) {
             const groupKey = groupName.toLowerCase();
             const cachedGroup = groupCache.get(groupKey);
 
             if (cachedGroup) {
               groupId = cachedGroup.groupId;
 
-              // Still need to create ArtistGroup association for cached groups
-              const existingArtistGroup = await tx.artistGroup.findUnique({
-                where: {
-                  artistId_groupId: {
-                    artistId,
-                    groupId,
-                  },
-                },
-              });
-
-              if (!existingArtistGroup) {
-                await tx.artistGroup.create({
-                  data: {
-                    artistId,
-                    groupId,
+              // Create ArtistGroup association for cached groups if we have an artist
+              if (artistId) {
+                const existingArtistGroup = await tx.artistGroup.findUnique({
+                  where: {
+                    artistId_groupId: {
+                      artistId,
+                      groupId,
+                    },
                   },
                 });
+
+                if (!existingArtistGroup) {
+                  await tx.artistGroup.create({
+                    data: {
+                      artistId,
+                      groupId,
+                    },
+                  });
+                }
               }
             } else {
-              // Find or create group with artist association in transaction
+              // Find or create group, optionally with artist association
               const groupResult = await findOrCreateGroupAction(groupName, {
                 artistId,
                 tx,

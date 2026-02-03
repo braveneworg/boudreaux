@@ -160,10 +160,10 @@ const { handlers, auth, signIn, signOut } = NextAuth({
       return baseUrl;
     },
     async session({ session, token }) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      session &&
-        (session.user = token.user as User &
-          AdapterUser & { id: string; username: string; email: string; role: string });
+      if (session) {
+        session.user = token.user as User &
+          AdapterUser & { id: string; username: string; email: string; role: string };
+      }
 
       return session;
     },

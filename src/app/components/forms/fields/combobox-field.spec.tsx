@@ -641,7 +641,7 @@ describe('ComboboxField', () => {
       });
     });
 
-    it('populates search input when typing on closed popover', async () => {
+    it('populates search input when typing letter on closed popover and opens popover', async () => {
       render(
         <TestWrapper>
           <ComboboxField {...defaultProps} />

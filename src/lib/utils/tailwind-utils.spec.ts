@@ -8,7 +8,13 @@ describe('tailwind-utils', () => {
     });
 
     it('should handle conditional classes', () => {
-      const result = cn('base-class', true && 'conditional-class', false && 'should-not-appear');
+      const isTrue = true;
+      const isFalse = false;
+      const result = cn(
+        'base-class',
+        isTrue && 'conditional-class',
+        isFalse && 'should-not-appear'
+      );
       expect(result).toBe('base-class conditional-class');
     });
 

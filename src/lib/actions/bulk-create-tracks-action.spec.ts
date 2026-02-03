@@ -891,7 +891,7 @@ describe('bulkCreateTracksAction', () => {
     });
   });
 
-  describe('group creation when albumArtist differs from artist', () => {
+  describe('group creation from albumArtist metadata', () => {
     beforeEach(() => {
       mockFindOrCreateArtist.mockResolvedValue({
         success: true,
@@ -955,7 +955,7 @@ describe('bulkCreateTracksAction', () => {
       );
     });
 
-    it('should not create group when albumArtist matches artist', async () => {
+    it('should create group when albumArtist matches artist', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -990,10 +990,17 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
-      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+      // Now always creates a Group from albumArtist
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
+        'The Beatles',
+        expect.objectContaining({
+          artistId: 'artist-123',
+          tx: expect.anything(),
+        })
+      );
     });
 
-    it('should not create group when albumArtist matches artist (case-insensitive)', async () => {
+    it('should create group when albumArtist matches artist (case-insensitive)', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -1028,7 +1035,14 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
-      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+      // Now always creates a Group from albumArtist (uses the albumArtist casing)
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
+        'THE BEATLES',
+        expect.objectContaining({
+          artistId: 'artist-123',
+          tx: expect.anything(),
+        })
+      );
     });
 
     it('should cache group lookups for same group name', async () => {

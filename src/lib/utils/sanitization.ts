@@ -30,10 +30,13 @@ export function sanitizeString(input: string): string {
   if (!input) return '';
 
   // Remove null bytes, control characters, and special Unicode
-  return input
-    .replace(/\0/g, '') // Null bytes
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Control characters
-    .trim();
+  return (
+    input
+      .replace(/\0/g, '') // Null bytes
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Control characters
+      .trim()
+  );
 }
 
 /**

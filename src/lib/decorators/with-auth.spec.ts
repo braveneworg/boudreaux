@@ -105,9 +105,7 @@ describe('withAuth decorator', () => {
       const context = createMockContext();
 
       // The decorator should catch the error and return 401
-      await expect(async () => {
-        await wrappedHandler(request, context);
-      }).rejects.toThrow('Auth error');
+      await expect(wrappedHandler(request, context)).rejects.toThrow('Auth error');
     });
 
     it('should pass through the original handler response', async () => {
@@ -388,9 +386,7 @@ describe('withAdmin decorator', () => {
       const context = createMockContext();
 
       // The decorator should propagate the error
-      await expect(async () => {
-        await wrappedHandler(request, context);
-      }).rejects.toThrow('Auth error');
+      await expect(wrappedHandler(request, context)).rejects.toThrow('Auth error');
     });
   });
 
