@@ -47,13 +47,18 @@ export function withAuth(handler: AuthenticatedHandler) {
 // Admin role decorator
 // Usage: Wrap API route handlers that require admin role
 // Example: export const GET = withAdmin(async (req, res, session) => { ... });
-export async function withAdmin(handler: AuthenticatedHandler) {
+export function withAdmin(handler: AuthenticatedHandler) {
   return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
     const role = 'admin';
 
+    // Check authentication first
+    if (!session) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // Check role authorization
-    if (session?.user?.role !== role) {
+    if (session.user?.role !== role) {
       return NextResponse.json(
         { error: 'Insufficient permissions', required: role },
         { status: 403 }

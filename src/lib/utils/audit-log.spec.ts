@@ -241,5 +241,169 @@ describe('Audit Log', () => {
 
       expect(consoleSpy).toHaveBeenCalledTimes(eventTypes.length);
     });
+
+    it('should support all media audit event types', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+      const mediaEventTypes: AuditEvent[] = [
+        'media.artist.created',
+        'media.artist.found',
+        'media.artist.updated',
+        'media.artist.images.uploaded',
+        'media.artist.images.reordered',
+        'media.artist.image.deleted',
+        'media.artist.image.updated',
+        'media.featured_artist.created',
+        'media.featured_artist.updated',
+        'media.group.created',
+        'media.group.found',
+        'media.group.updated',
+        'media.group.images.uploaded',
+        'media.group.images.reordered',
+        'media.group.image.deleted',
+        'media.group.member.added',
+        'media.group.member.removed',
+        'media.release.created',
+        'media.release.updated',
+        'media.release.found',
+        'media.release.create_failed',
+        'media.release.images.uploaded',
+        'media.release.images.reordered',
+        'media.release.image.deleted',
+        'media.track.created',
+        'media.track.updated',
+        'media.tracks.bulk_created',
+        'media.track.images.uploaded',
+        'media.track.images.reordered',
+        'media.track.image.deleted',
+      ];
+
+      mediaEventTypes.forEach((eventType) => {
+        logSecurityEvent({
+          event: eventType,
+          userId: 'test-user',
+        });
+      });
+
+      expect(consoleSpy).toHaveBeenCalledTimes(mediaEventTypes.length);
+    });
+
+    it('should support notification banner audit event types', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+      const notificationEventTypes: AuditEvent[] = [
+        'notification.banner.created',
+        'notification.banner.updated',
+        'notification.banner.deleted',
+        'notification.banner.published',
+        'notification.banner.unpublished',
+      ];
+
+      notificationEventTypes.forEach((eventType) => {
+        logSecurityEvent({
+          event: eventType,
+          userId: 'test-user',
+        });
+      });
+
+      expect(consoleSpy).toHaveBeenCalledTimes(notificationEventTypes.length);
+    });
+
+    it('should support UI audit event types', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+      const uiEventTypes: AuditEvent[] = ['ui.artist.form.submitted'];
+
+      uiEventTypes.forEach((eventType) => {
+        logSecurityEvent({
+          event: eventType,
+          userId: 'test-user',
+        });
+      });
+
+      expect(consoleSpy).toHaveBeenCalledTimes(uiEventTypes.length);
+    });
+
+    it('should log media.artist.found with proper metadata', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+
+      logSecurityEvent({
+        event: 'media.artist.found',
+        userId: 'admin-123',
+        metadata: {
+          artistId: 'artist-456',
+          artistName: 'Test Artist',
+          searchedName: 'test artist',
+          artistReleaseCreated: true,
+        },
+      });
+
+      expect(consoleSpy).toHaveBeenCalled();
+      const logCall = consoleSpy.mock.calls[0];
+      expect(logCall[1]).toHaveProperty('event', 'media.artist.found');
+      expect(logCall[1]).toHaveProperty('metadata');
+      expect(logCall[1].metadata).toEqual({
+        artistId: 'artist-456',
+        artistName: 'Test Artist',
+        searchedName: 'test artist',
+        artistReleaseCreated: true,
+      });
+    });
+
+    it('should log media.group.found with proper metadata', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+
+      logSecurityEvent({
+        event: 'media.group.found',
+        userId: 'admin-123',
+        metadata: {
+          groupId: 'group-456',
+          groupName: 'The Beatles',
+          searchedName: 'the beatles',
+          artistGroupCreated: false,
+        },
+      });
+
+      expect(consoleSpy).toHaveBeenCalled();
+      const logCall = consoleSpy.mock.calls[0];
+      expect(logCall[1]).toHaveProperty('event', 'media.group.found');
+      expect(logCall[1]).toHaveProperty('metadata');
+      expect(logCall[1].metadata).toEqual({
+        groupId: 'group-456',
+        groupName: 'The Beatles',
+        searchedName: 'the beatles',
+        artistGroupCreated: false,
+      });
+    });
+
+    it('should log media.tracks.bulk_created with proper metadata', () => {
+      const consoleSpy = vi.spyOn(console, 'info');
+
+      logSecurityEvent({
+        event: 'media.tracks.bulk_created',
+        userId: 'admin-123',
+        metadata: {
+          totalTracks: 10,
+          successCount: 8,
+          failedCount: 2,
+          autoCreateRelease: true,
+          releasesCreated: 1,
+          artistsCreated: 2,
+          groupsCreated: 1,
+          artistReleasesCreated: true,
+          artistGroupsCreated: true,
+        },
+      });
+
+      expect(consoleSpy).toHaveBeenCalled();
+      const logCall = consoleSpy.mock.calls[0];
+      expect(logCall[1]).toHaveProperty('event', 'media.tracks.bulk_created');
+      expect(logCall[1]).toHaveProperty('metadata');
+      expect(logCall[1].metadata).toMatchObject({
+        totalTracks: 10,
+        successCount: 8,
+        failedCount: 2,
+        autoCreateRelease: true,
+        artistsCreated: 2,
+        groupsCreated: 1,
+      });
+    });
   });
 });
