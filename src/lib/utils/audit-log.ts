@@ -5,6 +5,7 @@
 
 export type AuditEvent =
   | 'media.artist.created'
+  | 'media.artist.found'
   | 'media.artist.updated'
   | 'media.artist.images.uploaded'
   | 'media.artist.images.reordered'
@@ -13,6 +14,7 @@ export type AuditEvent =
   | 'media.featured_artist.created'
   | 'media.featured_artist.updated'
   | 'media.group.created'
+  | 'media.group.found'
   | 'media.group.updated'
   | 'media.group.images.uploaded'
   | 'media.group.images.reordered'

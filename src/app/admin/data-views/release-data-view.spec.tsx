@@ -165,4 +165,240 @@ describe('ReleaseDataView', () => {
     expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
     expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
   });
+
+  describe('albumArtist computation', () => {
+    it('should display album artist from artistReleases', async () => {
+      const releasesWithArtist = {
+        releases: [
+          {
+            id: 'release-123',
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            catalogNumber: 'TEST-001',
+            coverArt: null,
+            formats: ['DIGITAL'],
+            images: [],
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-01',
+            publishedAt: null,
+            deletedOn: null,
+            artistReleases: [
+              {
+                id: 'ar-1',
+                artist: {
+                  id: 'artist-1',
+                  name: 'john-smith',
+                  displayName: 'John Smith',
+                },
+              },
+            ],
+          },
+        ],
+        count: 1,
+      };
+
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: releasesWithArtist,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('John Smith')).toBeInTheDocument();
+      });
+    });
+
+    it('should display multiple album artists joined by comma', async () => {
+      const releasesWithMultipleArtists = {
+        releases: [
+          {
+            id: 'release-123',
+            title: 'Collab Album',
+            releasedOn: '2024-01-15',
+            catalogNumber: 'COLLAB-001',
+            coverArt: null,
+            formats: ['DIGITAL'],
+            images: [],
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-01',
+            publishedAt: null,
+            deletedOn: null,
+            artistReleases: [
+              {
+                id: 'ar-1',
+                artist: {
+                  id: 'artist-1',
+                  name: 'john-lennon',
+                  displayName: 'John Lennon',
+                },
+              },
+              {
+                id: 'ar-2',
+                artist: {
+                  id: 'artist-2',
+                  name: 'paul-mccartney',
+                  displayName: 'Paul McCartney',
+                },
+              },
+            ],
+          },
+        ],
+        count: 1,
+      };
+
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: releasesWithMultipleArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('John Lennon, Paul McCartney')).toBeInTheDocument();
+      });
+    });
+
+    it('should display dash when no artistReleases exist', async () => {
+      const releasesWithoutArtist = {
+        releases: [
+          {
+            id: 'release-123',
+            title: 'No Artist Album',
+            releasedOn: '2024-01-15',
+            catalogNumber: 'NONE-001',
+            coverArt: null,
+            formats: ['DIGITAL'],
+            images: [],
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-01',
+            publishedAt: null,
+            deletedOn: null,
+            artistReleases: [],
+          },
+        ],
+        count: 1,
+      };
+
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: releasesWithoutArtist,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        // Title should render
+        expect(screen.getByText('No Artist Album')).toBeInTheDocument();
+        // The dash should appear somewhere in the rendered output (multiple dashes for different fields)
+        const dashes = screen.getAllByText('-');
+        expect(dashes.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should use artist name when displayName is null', async () => {
+      const releasesWithNameOnly = {
+        releases: [
+          {
+            id: 'release-123',
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            catalogNumber: 'TEST-001',
+            coverArt: null,
+            formats: ['DIGITAL'],
+            images: [],
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-01',
+            publishedAt: null,
+            deletedOn: null,
+            artistReleases: [
+              {
+                id: 'ar-1',
+                artist: {
+                  id: 'artist-1',
+                  name: 'the-band',
+                  displayName: null,
+                },
+              },
+            ],
+          },
+        ],
+        count: 1,
+      };
+
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: releasesWithNameOnly,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('the-band')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle undefined artistReleases', async () => {
+      const releasesWithUndefinedArtists = {
+        releases: [
+          {
+            id: 'release-123',
+            title: 'Test Album Undefined',
+            releasedOn: '2024-01-15',
+            catalogNumber: 'TEST-001',
+            coverArt: null,
+            formats: ['DIGITAL'],
+            images: [],
+            createdAt: '2024-01-01',
+            updatedAt: '2024-01-01',
+            publishedAt: null,
+            deletedOn: null,
+            // artistReleases is undefined
+          },
+        ],
+        count: 1,
+      };
+
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: releasesWithUndefinedArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        // Title should render
+        expect(screen.getByText('Test Album Undefined')).toBeInTheDocument();
+        // The dash should appear somewhere for undefined artistReleases (multiple dashes for different fields)
+        const dashes = screen.getAllByText('-');
+        expect(dashes.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should include albumArtist in fieldsToShow', async () => {
+      vi.mocked(useReleasesQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: mockReleases,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        // The DataView should render the albumArtist column header
+        expect(screen.getByText('Album Artist')).toBeInTheDocument();
+      });
+    });
+  });
 });

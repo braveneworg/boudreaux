@@ -32,6 +32,7 @@ import { Label } from '@/app/components/ui/label';
 import { Progress } from '@/app/components/ui/progress';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Separator } from '@/app/components/ui/separator';
+import { Switch } from '@/app/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -159,6 +160,7 @@ export default function BulkTrackUploader() {
   const [tracks, setTracks] = useState<BulkTrackItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [autoCreateRelease, setAutoCreateRelease] = useState(true);
+  const [publishTracks, setPublishTracks] = useState(false);
   const [_results, setResults] = useState<BulkTrackResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -398,10 +400,15 @@ export default function BulkTrackUploader() {
         label: track.metadata?.label,
         catalogNumber: track.metadata?.catalogNumber,
         albumArtist: track.metadata?.albumArtist,
+        artist: track.metadata?.artist,
         lossless: track.metadata?.lossless,
       }));
 
-      const createResult = await bulkCreateTracksAction(trackData, autoCreateRelease);
+      const createResult = await bulkCreateTracksAction(
+        trackData,
+        autoCreateRelease,
+        publishTracks
+      );
 
       // Update tracks with create results
       for (const result of createResult.results) {
@@ -438,21 +445,26 @@ export default function BulkTrackUploader() {
         toast.error(`Failed to create tracks: ${createResult.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Bulk upload error:', error);
-      toast.error(error instanceof Error ? error.message : 'Bulk upload failed');
+      const errorMessage = error instanceof Error ? error.message : 'Bulk upload failed';
+      console.error('Bulk upload error:', {
+        message: errorMessage,
+        error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      toast.error(errorMessage);
 
-      // Mark remaining tracks as error
+      // Mark remaining tracks as error with the actual error message
       setTracks((prev) =>
         prev.map((t) =>
           t.status === 'uploading' || t.status === 'creating'
-            ? { ...t, status: 'error' as const, error: 'Processing interrupted' }
+            ? { ...t, status: 'error' as const, error: errorMessage }
             : t
         )
       );
     } finally {
       setIsProcessing(false);
     }
-  }, [tracks, autoCreateRelease]);
+  }, [tracks, autoCreateRelease, publishTracks]);
 
   const pendingCount = tracks.filter(
     (t) => t.status === 'pending' || t.status === 'extracting' || t.status === 'extracted'
@@ -578,6 +590,21 @@ export default function BulkTrackUploader() {
                   className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Automatically create or match releases from album metadata
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="publish-tracks"
+                  checked={publishTracks}
+                  onCheckedChange={setPublishTracks}
+                  disabled={isProcessing}
+                />
+                <Label
+                  htmlFor="publish-tracks"
+                  className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Published
                 </Label>
               </div>
             </>

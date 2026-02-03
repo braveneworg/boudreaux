@@ -1,5 +1,7 @@
 // Mock server-only first to prevent errors from imported modules
 import { bulkCreateTracksAction, type BulkTrackData } from './bulk-create-tracks-action';
+import { findOrCreateArtistAction } from './find-or-create-artist-action';
+import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction } from './find-or-create-release-action';
 import { auth } from '../../../auth';
 import { prisma } from '../prisma';
@@ -16,9 +18,20 @@ vi.mock('../prisma', () => ({
     track: {
       create: vi.fn(),
     },
+    artistRelease: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
+    artistGroup: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
+    $transaction: vi.fn(),
   },
 }));
 vi.mock('./find-or-create-release-action');
+vi.mock('./find-or-create-artist-action');
+vi.mock('./find-or-create-group-action');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
@@ -26,7 +39,12 @@ vi.mock('next/cache');
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>;
 const mockRequireRole = vi.mocked(requireRole);
 const mockPrismaTrackCreate = vi.mocked(prisma.track.create);
+const mockPrismaTransaction = vi.mocked(prisma.$transaction);
+const mockPrismaArtistReleaseFindUnique = vi.mocked(prisma.artistRelease.findUnique);
+const mockPrismaArtistReleaseCreate = vi.mocked(prisma.artistRelease.create);
 const mockFindOrCreateRelease = vi.mocked(findOrCreateReleaseAction);
+const mockFindOrCreateArtist = vi.mocked(findOrCreateArtistAction);
+const mockFindOrCreateGroup = vi.mocked(findOrCreateGroupAction);
 
 describe('bulkCreateTracksAction', () => {
   beforeEach(() => {
@@ -41,9 +59,27 @@ describe('bulkCreateTracksAction', () => {
         email: 'admin@test.com',
       },
       expires: new Date(Date.now() + 86400000).toISOString(),
-    });
+    } as Session);
 
     mockRequireRole.mockResolvedValue();
+
+    // Default transaction mock
+    mockPrismaTransaction.mockImplementation(async (callback) => {
+      const mockTx = {
+        track: {
+          create: mockPrismaTrackCreate,
+        },
+        artistRelease: {
+          findUnique: mockPrismaArtistReleaseFindUnique,
+          create: mockPrismaArtistReleaseCreate,
+        },
+        artistGroup: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn(),
+        },
+      };
+      return callback(mockTx as never);
+    });
   });
 
   describe('validation', () => {
@@ -116,7 +152,7 @@ describe('bulkCreateTracksAction', () => {
           email: 'user@test.com',
         },
         expires: new Date(Date.now() + 86400000).toISOString(),
-      });
+      } as Session);
 
       const tracks: BulkTrackData[] = [
         { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
@@ -530,7 +566,21 @@ describe('bulkCreateTracksAction', () => {
 
   describe('error handling', () => {
     it('should handle database errors gracefully', async () => {
-      mockPrismaTrackCreate.mockRejectedValue(new Error('Connection failed'));
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        return callback({
+          track: {
+            create: vi.fn().mockRejectedValue(new Error('Connection failed')),
+          },
+          artistRelease: {
+            findUnique: vi.fn(),
+            create: vi.fn(),
+          },
+          artistGroup: {
+            findUnique: vi.fn(),
+            create: vi.fn(),
+          },
+        } as never);
+      });
 
       const tracks: BulkTrackData[] = [
         { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
@@ -541,6 +591,779 @@ describe('bulkCreateTracksAction', () => {
       expect(result.success).toBe(false);
       expect(result.results[0].success).toBe(false);
       expect(result.results[0].error).toBe('Connection failed');
+    });
+  });
+
+  describe('publishTracks parameter', () => {
+    beforeEach(() => {
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: {
+            create: vi.fn().mockResolvedValue({
+              id: 'track-123',
+              title: 'Test Track',
+              duration: 180,
+              audioUrl: 'https://example.com/track.mp3',
+              position: 1,
+              coverArt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              deletedOn: null,
+              publishedOn: null,
+            }),
+          },
+          artistRelease: {
+            findUnique: vi.fn().mockResolvedValue(null),
+            create: vi.fn(),
+          },
+          artistGroup: {
+            findUnique: vi.fn().mockResolvedValue(null),
+            create: vi.fn(),
+          },
+        };
+        return callback(mockTx as never);
+      });
+    });
+
+    it('should not set publishedOn when publishTracks is false', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn(), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn(), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
+      ];
+
+      await bulkCreateTracksAction(tracks, false, false);
+
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            publishedOn: undefined,
+          }),
+        })
+      );
+    });
+
+    it('should set publishedOn to current date when publishTracks is true', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: new Date(),
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn(), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn(), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
+      ];
+
+      await bulkCreateTracksAction(tracks, false, true);
+
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            publishedOn: expect.any(Date),
+          }),
+        })
+      );
+    });
+  });
+
+  describe('artist creation and association', () => {
+    beforeEach(() => {
+      mockFindOrCreateArtist.mockResolvedValue({
+        success: true,
+        artistId: 'artist-123',
+        artistName: 'Test Artist',
+        created: true,
+        artistReleaseCreated: false,
+        trackArtistCreated: false,
+      });
+    });
+
+    it('should call findOrCreateArtistAction when artist metadata is present', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          artist: 'Test Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Test Artist',
+        expect.objectContaining({
+          releaseId: undefined,
+          tx: expect.anything(),
+        })
+      );
+    });
+
+    it('should use albumArtist when artist is not provided', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          albumArtist: 'Album Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Album Artist',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
+    });
+
+    it('should cache artist lookups for same artist name', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Track 1',
+          duration: 180,
+          audioUrl: 'https://example.com/track1.mp3',
+          artist: 'Same Artist',
+        },
+        {
+          title: 'Track 2',
+          duration: 180,
+          audioUrl: 'https://example.com/track2.mp3',
+          artist: 'Same Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      // Should only call findOrCreateArtistAction once due to caching
+      expect(mockFindOrCreateArtist).toHaveBeenCalledTimes(1);
+    });
+
+    it('should connect track to artist when artist is found/created', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          artist: 'Test Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            artists: {
+              create: {
+                artistId: 'artist-123',
+              },
+            },
+          }),
+        })
+      );
+    });
+  });
+
+  describe('group creation when albumArtist differs from artist', () => {
+    beforeEach(() => {
+      mockFindOrCreateArtist.mockResolvedValue({
+        success: true,
+        artistId: 'artist-123',
+        artistName: 'John Lennon',
+        created: true,
+        artistReleaseCreated: false,
+        trackArtistCreated: false,
+      });
+
+      mockFindOrCreateGroup.mockResolvedValue({
+        success: true,
+        groupId: 'group-123',
+        groupName: 'The Beatles',
+        created: true,
+        artistGroupCreated: true,
+      });
+    });
+
+    it('should create group when albumArtist differs from artist', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Imagine',
+          duration: 180,
+          audioUrl: 'https://example.com/imagine.mp3',
+          artist: 'John Lennon',
+          albumArtist: 'The Beatles',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
+        'The Beatles',
+        expect.objectContaining({
+          artistId: 'artist-123',
+          tx: expect.anything(),
+        })
+      );
+    });
+
+    it('should not create group when albumArtist matches artist', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          artist: 'The Beatles',
+          albumArtist: 'The Beatles',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+    });
+
+    it('should not create group when albumArtist matches artist (case-insensitive)', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          artist: 'the beatles',
+          albumArtist: 'THE BEATLES',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+    });
+
+    it('should cache group lookups for same group name', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      const artistGroupFindUnique = vi.fn().mockResolvedValue(null);
+      const artistGroupCreate = vi.fn();
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: artistGroupFindUnique, create: artistGroupCreate },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Track 1',
+          duration: 180,
+          audioUrl: 'https://example.com/track1.mp3',
+          artist: 'John Lennon',
+          albumArtist: 'The Beatles',
+        },
+        {
+          title: 'Track 2',
+          duration: 180,
+          audioUrl: 'https://example.com/track2.mp3',
+          artist: 'Paul McCartney',
+          albumArtist: 'The Beatles',
+        },
+      ];
+
+      // Reset the mock to return different artist IDs
+      mockFindOrCreateArtist
+        .mockResolvedValueOnce({
+          success: true,
+          artistId: 'artist-john',
+          artistName: 'John Lennon',
+          created: true,
+          artistReleaseCreated: false,
+          trackArtistCreated: false,
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          artistId: 'artist-paul',
+          artistName: 'Paul McCartney',
+          created: true,
+          artistReleaseCreated: false,
+          trackArtistCreated: false,
+        });
+
+      await bulkCreateTracksAction(tracks, false);
+
+      // Should only call findOrCreateGroupAction once due to caching
+      expect(mockFindOrCreateGroup).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('albumArtist and release association', () => {
+    it('should link albumArtist to release when both are present', async () => {
+      mockFindOrCreateRelease.mockResolvedValue({
+        success: true,
+        releaseId: 'release-123',
+        releaseTitle: 'Test Album',
+        created: true,
+      });
+
+      mockFindOrCreateArtist.mockResolvedValue({
+        success: true,
+        artistId: 'artist-123',
+        artistName: 'Album Artist',
+        created: true,
+        artistReleaseCreated: true,
+        trackArtistCreated: false,
+      });
+
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+          albumArtist: 'Album Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, true);
+
+      // Should call findOrCreateArtistAction with releaseId for albumArtist
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith('Album Artist', {
+        releaseId: 'release-123',
+      });
+    });
+  });
+
+  describe('transaction support', () => {
+    it('should wrap track creation in a transaction', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn(), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn(), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockPrismaTransaction).toHaveBeenCalled();
+    });
+
+    it('should pass transaction client to findOrCreateArtistAction', async () => {
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Test Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          artist: 'Test Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, false);
+
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Test Artist',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
+    });
+  });
+
+  describe('albumArtist caching across multiple tracks', () => {
+    it('should create ArtistRelease for cached albumArtist on new release', async () => {
+      const artistReleaseCreateMock = vi.fn();
+
+      // First release setup
+      mockFindOrCreateRelease
+        .mockResolvedValueOnce({
+          success: true,
+          releaseId: 'release-1',
+          releaseTitle: 'Album 1',
+          created: true,
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          releaseId: 'release-2',
+          releaseTitle: 'Album 2',
+          created: true,
+        });
+
+      mockFindOrCreateArtist.mockResolvedValue({
+        success: true,
+        artistId: 'artist-123',
+        artistName: 'Same Artist',
+        created: false,
+        artistReleaseCreated: true,
+        trackArtistCreated: false,
+      });
+
+      // Mock prisma.artistRelease for the first pass check
+      mockPrismaArtistReleaseFindUnique.mockResolvedValue(null);
+      mockPrismaArtistReleaseCreate.mockImplementation(artistReleaseCreateMock);
+
+      const createMock = vi.fn().mockResolvedValue({
+        id: 'track-123',
+        title: 'Track',
+        duration: 180,
+        audioUrl: 'https://example.com/track.mp3',
+        position: 1,
+        coverArt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedOn: null,
+        publishedOn: null,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: { create: createMock },
+          artistRelease: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Track 1',
+          duration: 180,
+          audioUrl: 'https://example.com/track1.mp3',
+          album: 'Album 1',
+          albumArtist: 'Same Artist',
+        },
+        {
+          title: 'Track 2',
+          duration: 180,
+          audioUrl: 'https://example.com/track2.mp3',
+          album: 'Album 2',
+          albumArtist: 'Same Artist',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, true);
+
+      // findOrCreateArtistAction should be called once for the first track
+      // For subsequent tracks with same albumArtist but different album,
+      // it should create ArtistRelease directly from the cache
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith('Same Artist', {
+        releaseId: 'release-1',
+      });
+    });
+  });
+
+  describe('global error handling', () => {
+    it('should handle errors thrown outside transaction loop', async () => {
+      // Cause an error in the initial release finding phase
+      mockFindOrCreateRelease.mockRejectedValue(new Error('Unexpected error'));
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+        },
+      ];
+
+      const result = await bulkCreateTracksAction(tracks, true);
+
+      expect(result).toEqual({
+        success: false,
+        successCount: 0,
+        failedCount: 1,
+        results: [],
+        error: 'Unexpected error',
+      });
+    });
+
+    it('should handle non-Error objects thrown', async () => {
+      // Cause an error with non-Error type
+      mockFindOrCreateRelease.mockRejectedValue('string error');
+
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+        },
+      ];
+
+      const result = await bulkCreateTracksAction(tracks, true);
+
+      expect(result).toEqual({
+        success: false,
+        successCount: 0,
+        failedCount: 1,
+        results: [],
+        error: 'An unexpected error occurred',
+      });
     });
   });
 });
