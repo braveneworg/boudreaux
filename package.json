@@ -165,7 +165,7 @@
   "lint-staged": {
     "src/**/*.ts": "tsc-files --noEmit types/next-auth.d.ts",
     "*.{ts,tsx}": [
-      "eslint --fix",
+      "eslint --config eslint.config.mjs --fix",
       "prettier --write"
     ],
     "*.{json,css,md}": [
