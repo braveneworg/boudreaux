@@ -15,6 +15,21 @@ fi
 echo "✅ TypeScript type-check passed"
 
 echo ""
+echo "🔎 Running ESLint before push..."
+
+# Run ESLint with max-warnings 0 to fail on any warnings
+npm run lint -- --max-warnings 0
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ ESLint found errors or warnings. Please fix them before pushing."
+  echo "   Run 'npm run lint' to see all issues."
+  exit 1
+fi
+
+echo "✅ ESLint passed"
+
+echo ""
 echo "🧪 Running tests before push..."
 
 # Run all tests
