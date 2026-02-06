@@ -36,10 +36,12 @@ describe('signup-schema', () => {
           termsAndConditions: true,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const emailErrors = result.error.issues.filter((issue) => issue.path[0] === 'email');
-          expect(emailErrors.length).toBeGreaterThan(0);
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[] }> };
+        };
+        const emailErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'email');
+        expect(emailErrors.length).toBeGreaterThan(0);
       });
     });
 
@@ -48,10 +50,12 @@ describe('signup-schema', () => {
         termsAndConditions: true,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const emailErrors = result.error.issues.filter((issue) => issue.path[0] === 'email');
-        expect(emailErrors.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      const emailErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'email');
+      expect(emailErrors.length).toBeGreaterThan(0);
     });
   });
 
@@ -70,13 +74,15 @@ describe('signup-schema', () => {
         termsAndConditions: false,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const termsErrors = result.error.issues.filter(
-          (issue) => issue.path[0] === 'termsAndConditions'
-        );
-        expect(termsErrors.length).toBeGreaterThan(0);
-        expect(termsErrors[0].message).toBe('You must accept the terms and conditions');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const termsErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'termsAndConditions'
+      );
+      expect(termsErrors.length).toBeGreaterThan(0);
+      expect(termsErrors[0].message).toBe('You must accept the terms and conditions');
     });
 
     it('should require termsAndConditions field', () => {
@@ -84,12 +90,14 @@ describe('signup-schema', () => {
         email: 'test@example.com',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const termsErrors = result.error.issues.filter(
-          (issue) => issue.path[0] === 'termsAndConditions'
-        );
-        expect(termsErrors.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      const termsErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'termsAndConditions'
+      );
+      expect(termsErrors.length).toBeGreaterThan(0);
     });
 
     it('should reject non-boolean values', () => {
@@ -156,11 +164,10 @@ describe('signup-schema', () => {
 
       const result = signupSchema.safeParse(validForm);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.email).toBe('test@example.com');
-        expect(result.data.termsAndConditions).toBe(true);
-        expect(result.data.general).toBe('Optional info');
-      }
+      const successResult = result as { success: true; data: FormSchemaType };
+      expect(successResult.data.email).toBe('test@example.com');
+      expect(successResult.data.termsAndConditions).toBe(true);
+      expect(successResult.data.general).toBe('Optional info');
     });
 
     it('should reject form with multiple invalid fields', () => {
@@ -172,22 +179,26 @@ describe('signup-schema', () => {
 
       const result = signupSchema.safeParse(invalidForm);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.length).toBeGreaterThan(2); // Should have errors for email, terms, and general
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.length).toBeGreaterThan(2); // Should have errors for email, terms, and general
 
-        const fieldErrors = result.error.issues.map((issue) => issue.path[0]);
-        expect(fieldErrors).toContain('email');
-        expect(fieldErrors).toContain('termsAndConditions');
-        expect(fieldErrors).toContain('general');
-      }
+      const fieldErrors = errorResult.error.issues.map((issue) => issue.path[0]);
+      expect(fieldErrors).toContain('email');
+      expect(fieldErrors).toContain('termsAndConditions');
+      expect(fieldErrors).toContain('general');
     });
 
     it('should reject completely empty form', () => {
       const result = signupSchema.safeParse({});
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.length).toBeGreaterThanOrEqual(2); // email and termsAndConditions required
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.length).toBeGreaterThanOrEqual(2); // email and termsAndConditions required
     });
   });
 
@@ -199,16 +210,19 @@ describe('signup-schema', () => {
         general: 'info',
       });
 
-      if (result.success) {
-        // TypeScript should infer these types correctly
-        const email: string = result.data.email;
-        const terms: boolean = result.data.termsAndConditions;
-        const general: string | undefined = result.data.general;
+      expect(result.success).toBe(true);
+      // TypeScript should infer these types correctly
+      const successResult = result as {
+        success: true;
+        data: { email: string; termsAndConditions: boolean; general?: string };
+      };
+      const email: string = successResult.data.email;
+      const terms: boolean = successResult.data.termsAndConditions;
+      const general: string | undefined = successResult.data.general;
 
-        expect(typeof email).toBe('string');
-        expect(typeof terms).toBe('boolean');
-        expect(typeof general === 'string' || typeof general === 'undefined').toBe(true);
-      }
+      expect(typeof email).toBe('string');
+      expect(typeof terms).toBe('boolean');
+      expect(typeof general === 'string' || typeof general === 'undefined').toBe(true);
     });
   });
 });

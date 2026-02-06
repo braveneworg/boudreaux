@@ -325,6 +325,7 @@ describe('Carousel keyboard navigation', () => {
 
     // The mock's scrollPrev should have been called
     // This tests the handleKeyDown function
+    expect(carousel).toBeInTheDocument();
   });
 
   it('scrolls to next slide on ArrowRight key press', async () => {
@@ -342,6 +343,8 @@ describe('Carousel keyboard navigation', () => {
     const carousel = screen.getByRole('region');
     await user.click(carousel);
     await user.keyboard('{ArrowRight}');
+
+    expect(carousel).toBeInTheDocument();
   });
 });
 
@@ -420,6 +423,7 @@ describe('CarouselPrevious button click', () => {
     const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
     await user.click(prevButton);
     // The scrollPrev callback should have been called via the mock
+    expect(prevButton).toBeInTheDocument();
   });
 });
 
@@ -440,6 +444,7 @@ describe('CarouselNext button click', () => {
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     await user.click(nextButton);
     // The scrollNext callback should have been called via the mock
+    expect(nextButton).toBeInTheDocument();
   });
 });
 

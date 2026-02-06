@@ -92,10 +92,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.createNotificationBanner(createInput);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockNotification);
-      }
+      expect(result).toMatchObject({ success: true, data: mockNotification });
       expect(prisma.notification.create).toHaveBeenCalledWith({ data: createInput });
     });
 
@@ -108,10 +105,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.createNotificationBanner(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error on unexpected failure', async () => {
@@ -119,10 +113,10 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.createNotificationBanner(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to create notification banner');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Failed to create notification banner',
+      });
     });
   });
 
@@ -133,10 +127,10 @@ describe('NotificationBannerService', () => {
       const result = await NotificationBannerService.getActiveNotificationBanners(new Date());
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toHaveLength(1);
-        expect(result.data[0]).toEqual(mockNotification);
-      }
+      expect((result as { success: true; data: unknown[] }).data).toHaveLength(1);
+      expect((result as { success: true; data: (typeof mockNotification)[] }).data[0]).toEqual(
+        mockNotification
+      );
     });
 
     it('should filter by isActive, publishedAt, and date range', async () => {
@@ -165,10 +159,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.getActiveNotificationBanners(new Date());
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
   });
 
@@ -225,10 +216,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.getNotificationBannerById('notification-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockNotification);
-      }
+      expect(result).toMatchObject({ success: true, data: mockNotification });
       expect(prisma.notification.findUnique).toHaveBeenCalledWith({
         where: { id: 'notification-123' },
       });
@@ -239,10 +227,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.getNotificationBannerById('non-existent');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toBeNull();
-      }
+      expect(result).toMatchObject({ success: true, data: null });
     });
   });
 
@@ -261,9 +246,9 @@ describe('NotificationBannerService', () => {
       );
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.message).toBe('Updated message');
-      }
+      expect((result as { success: true; data: { message: string } }).data.message).toBe(
+        'Updated message'
+      );
     });
 
     it('should return error when notification not found', async () => {
@@ -278,10 +263,7 @@ describe('NotificationBannerService', () => {
         updateInput
       );
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Notification banner not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Notification banner not found' });
     });
   });
 
@@ -306,10 +288,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.deleteNotificationBanner('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Notification banner not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Notification banner not found' });
     });
   });
 
@@ -328,10 +307,14 @@ describe('NotificationBannerService', () => {
       );
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.publishedAt).toBeDefined();
-        expect(result.data.publishedBy).toBe('admin-user');
-      }
+      expect(
+        (result as { success: true; data: { publishedAt: unknown; publishedBy: string } }).data
+          .publishedAt
+      ).toBeDefined();
+      expect(
+        (result as { success: true; data: { publishedAt: unknown; publishedBy: string } }).data
+          .publishedBy
+      ).toBe('admin-user');
     });
 
     it('should return error when notification not found', async () => {
@@ -346,10 +329,7 @@ describe('NotificationBannerService', () => {
         'admin-user'
       );
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Notification banner not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Notification banner not found' });
     });
   });
 
@@ -366,10 +346,14 @@ describe('NotificationBannerService', () => {
         await NotificationBannerService.unpublishNotificationBanner('notification-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.publishedAt).toBeNull();
-        expect(result.data.publishedBy).toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { publishedAt: null; publishedBy: null } }).data
+          .publishedAt
+      ).toBeNull();
+      expect(
+        (result as { success: true; data: { publishedAt: null; publishedBy: null } }).data
+          .publishedBy
+      ).toBeNull();
     });
 
     it('should return error when notification not found', async () => {
@@ -381,10 +365,7 @@ describe('NotificationBannerService', () => {
 
       const result = await NotificationBannerService.unpublishNotificationBanner('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Notification banner not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Notification banner not found' });
     });
 
     it('should return error on database connection failure', async () => {
@@ -397,10 +378,7 @@ describe('NotificationBannerService', () => {
       const result =
         await NotificationBannerService.unpublishNotificationBanner('notification-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error on unexpected failure', async () => {
@@ -409,10 +387,10 @@ describe('NotificationBannerService', () => {
       const result =
         await NotificationBannerService.unpublishNotificationBanner('notification-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to unpublish notification banner');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Failed to unpublish notification banner',
+      });
     });
   });
 
@@ -423,10 +401,10 @@ describe('NotificationBannerService', () => {
 
         const result = await NotificationBannerService.getActiveNotificationBanners(new Date());
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to fetch notification banners');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to fetch notification banners',
+        });
       });
     });
 
@@ -440,10 +418,7 @@ describe('NotificationBannerService', () => {
 
         const result = await NotificationBannerService.getAllNotificationBanners();
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Database unavailable');
-        }
+        expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
       });
 
       it('should return generic error on unexpected failure', async () => {
@@ -451,10 +426,10 @@ describe('NotificationBannerService', () => {
 
         const result = await NotificationBannerService.getAllNotificationBanners();
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to retrieve notification banners');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to retrieve notification banners',
+        });
       });
     });
 
@@ -469,10 +444,7 @@ describe('NotificationBannerService', () => {
         const result =
           await NotificationBannerService.getNotificationBannerById('notification-123');
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Database unavailable');
-        }
+        expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
       });
 
       it('should return generic error on unexpected failure', async () => {
@@ -481,10 +453,10 @@ describe('NotificationBannerService', () => {
         const result =
           await NotificationBannerService.getNotificationBannerById('notification-123');
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to fetch notification banner');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to fetch notification banner',
+        });
       });
     });
 
@@ -503,10 +475,7 @@ describe('NotificationBannerService', () => {
           }
         );
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Database unavailable');
-        }
+        expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
       });
 
       it('should return generic error on unexpected failure', async () => {
@@ -519,10 +488,10 @@ describe('NotificationBannerService', () => {
           }
         );
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to update notification banner');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to update notification banner',
+        });
       });
     });
 
@@ -536,10 +505,7 @@ describe('NotificationBannerService', () => {
 
         const result = await NotificationBannerService.deleteNotificationBanner('notification-123');
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Database unavailable');
-        }
+        expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
       });
 
       it('should return generic error on unexpected failure', async () => {
@@ -547,10 +513,10 @@ describe('NotificationBannerService', () => {
 
         const result = await NotificationBannerService.deleteNotificationBanner('notification-123');
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to delete notification banner');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to delete notification banner',
+        });
       });
     });
 
@@ -567,10 +533,7 @@ describe('NotificationBannerService', () => {
           'user-123'
         );
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Database unavailable');
-        }
+        expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
       });
 
       it('should return generic error on unexpected failure', async () => {
@@ -581,10 +544,10 @@ describe('NotificationBannerService', () => {
           'user-123'
         );
 
-        expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe('Failed to publish notification banner');
-        }
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to publish notification banner',
+        });
       });
     });
   });

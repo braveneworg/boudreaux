@@ -491,12 +491,7 @@ describe('BulkTrackUploader', () => {
       });
     });
 
-    it('should show error toast when no tracks are ready', async () => {
-      render(<BulkTrackUploader />);
-
-      // Try to upload with no tracks (this shouldn't be possible via UI, but test the logic)
-      // This tests the edge case handling
-    });
+    it.todo('should show error toast when no tracks are ready');
 
     it('should handle presigned URL failure', async () => {
       await setupForUpload();
@@ -716,16 +711,7 @@ describe('BulkTrackUploader', () => {
   });
 
   describe('utility functions', () => {
-    it('should format file size correctly', () => {
-      // Test through the component rendering
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            metadata: { title: 'Test', duration: 180 },
-          }),
-      });
-    });
+    it.todo('should format file size correctly');
 
     it('should format duration correctly for short tracks', async () => {
       mockFetch.mockResolvedValue({
@@ -1142,10 +1128,8 @@ describe('BulkTrackUploader', () => {
 
       // Button should be disabled while extracting
       await waitFor(() => {
-        const uploadBtn = screen.queryByRole('button', { name: /upload/i });
-        if (uploadBtn) {
-          expect(uploadBtn).toBeDisabled();
-        }
+        const uploadBtn = screen.getByRole('button', { name: /upload/i });
+        expect(uploadBtn).toBeDisabled();
       });
     });
   });
@@ -1433,10 +1417,8 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       // The upload button should show "0 Tracks" and be disabled when no tracks
-      const uploadBtn = screen.queryByRole('button', { name: /upload.*track/i });
-      if (uploadBtn) {
-        expect(uploadBtn).toBeDisabled();
-      }
+      const uploadBtn = screen.getByRole('button', { name: /upload.*track/i });
+      expect(uploadBtn).toBeDisabled();
     });
 
     it('should disable title input after successful upload', async () => {

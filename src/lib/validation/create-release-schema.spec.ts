@@ -45,11 +45,13 @@ describe('create-release-schema', () => {
         title: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const titleErrors = result.error.issues.filter((issue) => issue.path[0] === 'title');
-        expect(titleErrors.length).toBeGreaterThan(0);
-        expect(titleErrors[0].message).toBe('Title is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const titleErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'title');
+      expect(titleErrors.length).toBeGreaterThan(0);
+      expect(titleErrors[0].message).toBe('Title is required');
     });
 
     it('should reject title exceeding 200 characters', () => {
@@ -58,11 +60,13 @@ describe('create-release-schema', () => {
         title: 'a'.repeat(201),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const titleErrors = result.error.issues.filter((issue) => issue.path[0] === 'title');
-        expect(titleErrors.length).toBeGreaterThan(0);
-        expect(titleErrors[0].message).toBe('Title must be less than 200 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const titleErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'title');
+      expect(titleErrors.length).toBeGreaterThan(0);
+      expect(titleErrors[0].message).toBe('Title must be less than 200 characters');
     });
 
     it('should accept title at max length', () => {
@@ -93,11 +97,13 @@ describe('create-release-schema', () => {
         releasedOn: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const dateErrors = result.error.issues.filter((issue) => issue.path[0] === 'releasedOn');
-        expect(dateErrors.length).toBeGreaterThan(0);
-        expect(dateErrors[0].message).toBe('Release date is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const dateErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'releasedOn');
+      expect(dateErrors.length).toBeGreaterThan(0);
+      expect(dateErrors[0].message).toBe('Release date is required');
     });
   });
 
@@ -124,11 +130,15 @@ describe('create-release-schema', () => {
         coverArt: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const coverArtErrors = result.error.issues.filter((issue) => issue.path[0] === 'coverArt');
-        expect(coverArtErrors.length).toBeGreaterThan(0);
-        expect(coverArtErrors[0].message).toBe('Cover art URL is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const coverArtErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'coverArt'
+      );
+      expect(coverArtErrors.length).toBeGreaterThan(0);
+      expect(coverArtErrors[0].message).toBe('Cover art URL is required');
     });
 
     it('should reject invalid URLs', () => {
@@ -140,12 +150,14 @@ describe('create-release-schema', () => {
           coverArt,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const coverArtErrors = result.error.issues.filter(
-            (issue) => issue.path[0] === 'coverArt'
-          );
-          expect(coverArtErrors.length).toBeGreaterThan(0);
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[] }> };
+        };
+        const coverArtErrors = errorResult.error.issues.filter(
+          (issue) => issue.path[0] === 'coverArt'
+        );
+        expect(coverArtErrors.length).toBeGreaterThan(0);
       });
     });
   });
@@ -169,11 +181,13 @@ describe('create-release-schema', () => {
         formats: [],
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const formatsErrors = result.error.issues.filter((issue) => issue.path[0] === 'formats');
-        expect(formatsErrors.length).toBeGreaterThan(0);
-        expect(formatsErrors[0].message).toBe('At least one format is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const formatsErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'formats');
+      expect(formatsErrors.length).toBeGreaterThan(0);
+      expect(formatsErrors[0].message).toBe('At least one format is required');
     });
 
     it('should reject invalid format values', () => {
@@ -182,10 +196,12 @@ describe('create-release-schema', () => {
         formats: ['INVALID_FORMAT'],
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const formatsErrors = result.error.issues.filter((issue) => issue.path[0] === 'formats');
-        expect(formatsErrors.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      const formatsErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'formats');
+      expect(formatsErrors.length).toBeGreaterThan(0);
     });
 
     it('should accept all valid format types', () => {
@@ -245,11 +261,13 @@ describe('create-release-schema', () => {
         labels: 'a'.repeat(501),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const labelsErrors = result.error.issues.filter((issue) => issue.path[0] === 'labels');
-        expect(labelsErrors.length).toBeGreaterThan(0);
-        expect(labelsErrors[0].message).toBe('Labels must be less than 500 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const labelsErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'labels');
+      expect(labelsErrors.length).toBeGreaterThan(0);
+      expect(labelsErrors[0].message).toBe('Labels must be less than 500 characters');
     });
 
     it('should reject catalogNumber exceeding 100 characters', () => {
@@ -258,11 +276,13 @@ describe('create-release-schema', () => {
         catalogNumber: 'a'.repeat(101),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const errors = result.error.issues.filter((issue) => issue.path[0] === 'catalogNumber');
-        expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toBe('Catalog number must be less than 100 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'catalogNumber');
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].message).toBe('Catalog number must be less than 100 characters');
     });
 
     it('should reject description exceeding 5000 characters', () => {
@@ -271,11 +291,13 @@ describe('create-release-schema', () => {
         description: 'a'.repeat(5001),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const errors = result.error.issues.filter((issue) => issue.path[0] === 'description');
-        expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toBe('Description must be less than 5000 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'description');
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].message).toBe('Description must be less than 5000 characters');
     });
 
     it('should reject notes exceeding 2000 characters', () => {
@@ -284,11 +306,13 @@ describe('create-release-schema', () => {
         notes: 'a'.repeat(2001),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const errors = result.error.issues.filter((issue) => issue.path[0] === 'notes');
-        expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toBe('Notes must be less than 2000 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'notes');
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].message).toBe('Notes must be less than 2000 characters');
     });
   });
 
@@ -320,11 +344,13 @@ describe('create-release-schema', () => {
           [field]: 'a'.repeat(501),
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const errors = result.error.issues.filter((issue) => issue.path[0] === field);
-          expect(errors.length).toBeGreaterThan(0);
-          expect(errors[0].message).toBe(`${name} must be less than 500 characters`);
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[]; message: string }> };
+        };
+        const errors = errorResult.error.issues.filter((issue) => issue.path[0] === field);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toBe(`${name} must be less than 500 characters`);
       });
     });
   });
@@ -356,13 +382,15 @@ describe('create-release-schema', () => {
         featuredDescription: 'a'.repeat(501),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const errors = result.error.issues.filter(
-          (issue) => issue.path[0] === 'featuredDescription'
-        );
-        expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toBe('Featured description must be less than 500 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const errors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'featuredDescription'
+      );
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].message).toBe('Featured description must be less than 500 characters');
     });
   });
 
@@ -392,11 +420,13 @@ describe('create-release-schema', () => {
           createdBy,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const errors = result.error.issues.filter((issue) => issue.path[0] === 'createdBy');
-          expect(errors.length).toBeGreaterThan(0);
-          expect(errors[0].message).toBe('Invalid MongoDB ObjectId format');
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[]; message: string }> };
+        };
+        const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'createdBy');
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toBe('Invalid MongoDB ObjectId format');
       });
     });
   });
@@ -431,12 +461,11 @@ describe('create-release-schema', () => {
     it('should accept complete valid data', () => {
       const result = createReleaseSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.title).toBe(validData.title);
-        expect(result.data.releasedOn).toBe(validData.releasedOn);
-        expect(result.data.coverArt).toBe(validData.coverArt);
-        expect(result.data.formats).toEqual(validData.formats);
-      }
+      const successResult = result as { success: true; data: ReleaseFormData };
+      expect(successResult.data.title).toBe(validData.title);
+      expect(successResult.data.releasedOn).toBe(validData.releasedOn);
+      expect(successResult.data.coverArt).toBe(validData.coverArt);
+      expect(successResult.data.formats).toEqual(validData.formats);
     });
 
     it('should accept minimal required data', () => {
@@ -499,9 +528,10 @@ describe('create-release-schema', () => {
         groupIds: [],
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('At least one Artist or one Group is required');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('At least one Artist or one Group is required');
     });
 
     it('should reject data with undefined artists and groups', () => {
@@ -512,9 +542,10 @@ describe('create-release-schema', () => {
         formats: ['DIGITAL'],
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('At least one Artist or one Group is required');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('At least one Artist or one Group is required');
     });
   });
 });

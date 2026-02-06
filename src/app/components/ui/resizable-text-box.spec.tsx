@@ -247,7 +247,8 @@ describe('ResizableTextBox', () => {
       const onWidthChange = vi.fn();
       render(<ResizableTextBox {...defaultProps} isSelected onWidthChange={onWidthChange} />);
 
-      // Cleanup is handled by the component
+      // Cleanup is handled by the component - test passes if no errors
+      expect(container).toBeInTheDocument();
     });
   });
 

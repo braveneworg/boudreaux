@@ -13,9 +13,7 @@ describe('signin-schema', () => {
       validEmails.forEach((email) => {
         const result = signinSchema.safeParse({ email });
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.email).toBe(email);
-        }
+        expect((result as { success: true; data: { email: string } }).data.email).toBe(email);
       });
     });
 
@@ -33,21 +31,25 @@ describe('signin-schema', () => {
       invalidEmails.forEach((email) => {
         const result = signinSchema.safeParse({ email });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const emailErrors = result.error.issues.filter((issue) => issue.path[0] === 'email');
-          expect(emailErrors.length).toBeGreaterThan(0);
-          expect(emailErrors[0].message).toBe('Invalid email address');
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[]; message: string }> };
+        };
+        const emailErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'email');
+        expect(emailErrors.length).toBeGreaterThan(0);
+        expect(emailErrors[0].message).toBe('Invalid email address');
       });
     });
 
     it('should require email field', () => {
       const result = signinSchema.safeParse({});
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const emailErrors = result.error.issues.filter((issue) => issue.path[0] === 'email');
-        expect(emailErrors.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      const emailErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'email');
+      expect(emailErrors.length).toBeGreaterThan(0);
     });
 
     it('should reject non-string email values', () => {
@@ -68,9 +70,9 @@ describe('signin-schema', () => {
 
       const result = signinSchema.safeParse(validForm);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.email).toBe('test@example.com');
-      }
+      expect((result as { success: true; data: FormSchemaType }).data.email).toBe(
+        'test@example.com'
+      );
     });
 
     it('should reject form with invalid email', () => {
@@ -80,19 +82,23 @@ describe('signin-schema', () => {
 
       const result = signinSchema.safeParse(invalidForm);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.length).toBeGreaterThan(0);
-        const emailErrors = result.error.issues.filter((issue) => issue.path[0] === 'email');
-        expect(emailErrors.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.length).toBeGreaterThan(0);
+      const emailErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'email');
+      expect(emailErrors.length).toBeGreaterThan(0);
     });
 
     it('should reject completely empty form', () => {
       const result = signinSchema.safeParse({});
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.length).toBeGreaterThan(0);
     });
   });
 
@@ -102,11 +108,10 @@ describe('signin-schema', () => {
         email: 'test@example.com',
       });
 
-      if (result.success) {
-        // TypeScript should infer these types correctly
-        const email: string = result.data.email;
-        expect(typeof email).toBe('string');
-      }
+      expect(result.success).toBe(true);
+      // TypeScript should infer these types correctly
+      const email: string = (result as { success: true; data: { email: string } }).data.email;
+      expect(typeof email).toBe('string');
     });
   });
 
@@ -119,9 +124,9 @@ describe('signin-schema', () => {
 
       // This depends on how strict the schema is - it might accept extra fields or reject them
       // For this test, we're just ensuring the email is properly validated
-      if (result.success) {
-        expect(result.data.email).toBe('test@example.com');
-      }
+      expect((result as { success: true; data: { email: string } }).data.email).toBe(
+        'test@example.com'
+      );
     });
 
     it('should have simpler structure than signup schema', () => {

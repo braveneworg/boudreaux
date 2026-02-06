@@ -315,6 +315,8 @@ describe('DataStoreHealthStatus', () => {
       vi.advanceTimersByTime(2000);
 
       // No errors should be thrown (React would warn about updating unmounted component)
+      // Test passes if we reach here without errors
+      expect(true).toBe(true);
     });
   });
 

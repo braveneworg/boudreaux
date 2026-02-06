@@ -296,11 +296,8 @@ describe('account-lockout', () => {
 
         const result = await recordFailedLogin(email);
 
-        if (i < 4) {
-          expect(result.isLocked).toBe(false);
-        } else {
-          expect(result.isLocked).toBe(true);
-        }
+        // First 4 attempts (i=0-3) should not lock, 5th attempt (i=4) should lock
+        expect(result.isLocked).toBe(i >= 4);
       }
 
       expect(prisma.user.update).toHaveBeenCalledTimes(5);

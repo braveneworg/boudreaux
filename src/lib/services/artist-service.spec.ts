@@ -110,10 +110,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.createArtist(createInput);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(prisma.artist.create).toHaveBeenCalledWith({ data: createInput });
     });
 
@@ -126,10 +123,10 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.createArtist(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist with this slug already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Artist with this slug already exists',
+      });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -138,10 +135,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.createArtist(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -149,10 +143,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.createArtist(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to create artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to create artist' });
     });
   });
 
@@ -162,10 +153,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistById('artist-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(prisma.artist.findUnique).toHaveBeenCalledWith({
         where: { id: 'artist-123' },
         include: {
@@ -181,10 +169,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistById('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -193,10 +178,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistById('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -204,10 +186,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistById('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
     });
   });
 
@@ -217,10 +196,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(prisma.artist.findUnique).toHaveBeenCalledWith({ where: { slug: 'john-doe' } });
     });
 
@@ -229,10 +205,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistBySlug('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -241,10 +214,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -252,10 +222,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistBySlug('john-doe');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
     });
   });
 
@@ -277,10 +244,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtists();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockArtists);
-      }
+      expect(result).toMatchObject({ success: true, data: mockArtists });
       expect(prisma.artist.findMany).toHaveBeenCalledWith({
         where: {},
         skip: 0,
@@ -378,10 +342,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtists();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([]);
-      }
+      expect(result).toMatchObject({ success: true, data: [] });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -390,10 +351,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtists();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -401,10 +359,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtists();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve artists');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artists' });
     });
   });
 
@@ -419,10 +374,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(updatedArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: updatedArtist });
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'artist-123' },
         data: updateData,
@@ -438,10 +390,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist('non-existent', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when slug already exists', async () => {
@@ -453,10 +402,10 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist('artist-123', { slug: 'existing-slug' });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist with this slug already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Artist with this slug already exists',
+      });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -465,10 +414,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -476,10 +422,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist('artist-123', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to update artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to update artist' });
     });
   });
 
@@ -489,10 +432,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtist('artist-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(prisma.artist.delete).toHaveBeenCalledWith({ where: { id: 'artist-123' } });
     });
 
@@ -505,10 +445,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtist('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -517,10 +454,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtist('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -528,10 +462,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtist('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to delete artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to delete artist' });
     });
   });
 
@@ -542,10 +473,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.archiveArtist('artist-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(archivedArtist);
-      }
+      expect(result).toMatchObject({ success: true, data: archivedArtist });
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'artist-123' },
         data: { deletedOn: expect.any(Date) },
@@ -562,10 +490,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.archiveArtist('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -575,10 +500,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.archiveArtist('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -587,10 +509,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.archiveArtist('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to archive artist');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to archive artist' });
     });
   });
 
@@ -623,10 +542,8 @@ describe('ArtistService', () => {
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.id).toBe('image-123');
-        expect(mockS3Send).toHaveBeenCalled();
-      }
+      expect((result as { success: true; data: { id: string } }).data.id).toBe('image-123');
+      expect(mockS3Send).toHaveBeenCalled();
     });
 
     it('should return error when artist not found', async () => {
@@ -634,10 +551,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should return error when S3 bucket not configured', async () => {
@@ -646,10 +560,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('S3 bucket not configured');
-      }
+      expect(result).toMatchObject({ success: false, error: 'S3 bucket not configured' });
     });
 
     it('should handle database unavailable error', async () => {
@@ -658,10 +569,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -670,10 +578,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to upload image');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to upload image' });
     });
 
     it('should use direct S3 URL when CDN not configured', async () => {
@@ -732,9 +637,7 @@ describe('ArtistService', () => {
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toHaveLength(2);
-      }
+      expect((result as { success: true; data: unknown[] }).data).toHaveLength(2);
     });
 
     it('should return error when artist not found', async () => {
@@ -742,10 +645,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Artist not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
 
     it('should handle unknown errors', async () => {
@@ -753,10 +653,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to upload images');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to upload images' });
     });
 
     it('should aggregate errors when all uploads fail', async () => {
@@ -768,10 +665,8 @@ describe('ArtistService', () => {
       const result = await ArtistService.uploadArtistImages('artist-123', mockImageDataArray);
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('image1.jpg');
-        expect(result.error).toContain('image2.jpg');
-      }
+      expect((result as { success: false; error: string }).error).toContain('image1.jpg');
+      expect((result as { success: false; error: string }).error).toContain('image2.jpg');
       // Restore mock for other tests
       mockS3Send.mockResolvedValue({});
     });
@@ -791,9 +686,7 @@ describe('ArtistService', () => {
 
       // Should still succeed because at least one image uploaded
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toHaveLength(1);
-      }
+      expect((result as { success: true; data: unknown[] }).data).toHaveLength(1);
       // Restore mock for other tests
       mockS3Send.mockResolvedValue({});
     });
@@ -816,9 +709,7 @@ describe('ArtistService', () => {
       const result = await ArtistService.deleteArtistImage('image-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.id).toBe('image-123');
-      }
+      expect((result as { success: true; data: { id: string } }).data.id).toBe('image-123');
     });
 
     it('should return error when image not found', async () => {
@@ -826,10 +717,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Image not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Image not found' });
     });
 
     it('should delete from S3 with S3 URL format', async () => {
@@ -866,10 +754,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle P2025 error when image is deleted during operation', async () => {
@@ -887,10 +772,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Image not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Image not found' });
     });
 
     it('should handle database init error during delete', async () => {
@@ -904,10 +786,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.deleteArtistImage('image-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
   });
 
@@ -922,9 +801,7 @@ describe('ArtistService', () => {
       const result = await ArtistService.getArtistImages('artist-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toHaveLength(2);
-      }
+      expect((result as { success: true; data: unknown[] }).data).toHaveLength(2);
     });
 
     it('should return empty array when no images found', async () => {
@@ -933,9 +810,7 @@ describe('ArtistService', () => {
       const result = await ArtistService.getArtistImages('artist-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toHaveLength(0);
-      }
+      expect((result as { success: true; data: unknown[] }).data).toHaveLength(0);
     });
 
     it('should handle database unavailable error', async () => {
@@ -944,10 +819,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistImages('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -955,10 +827,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistImages('artist-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve artist images');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist images' });
     });
   });
 
@@ -978,9 +847,9 @@ describe('ArtistService', () => {
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.caption).toBe('Updated caption');
-      }
+      expect((result as { success: true; data: { caption: string } }).data.caption).toBe(
+        'Updated caption'
+      );
     });
 
     it('should return error when image not found', async () => {
@@ -994,10 +863,7 @@ describe('ArtistService', () => {
         caption: 'Updated caption',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Image not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Image not found' });
     });
 
     it('should handle database unavailable error', async () => {
@@ -1008,10 +874,7 @@ describe('ArtistService', () => {
         caption: 'Updated caption',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -1021,10 +884,7 @@ describe('ArtistService', () => {
         caption: 'Updated caption',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to update image');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to update image' });
     });
   });
 
@@ -1049,10 +909,10 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Some images not found or do not belong to this artist');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Some images not found or do not belong to this artist',
+      });
     });
 
     it('should handle database unavailable error', async () => {
@@ -1061,10 +921,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -1072,10 +929,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to reorder images');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to reorder images' });
     });
   });
 });

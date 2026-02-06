@@ -83,10 +83,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.createTrack(mockCreateInput);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockTrack);
-      }
+      expect(result).toMatchObject({ success: true, data: mockTrack });
       expect(prisma.track.create).toHaveBeenCalledWith({
         data: mockCreateInput,
         include: {
@@ -112,10 +109,10 @@ describe('TrackService', () => {
 
       const result = await TrackService.createTrack(mockCreateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track with this title already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Track with this title already exists',
+      });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -128,10 +125,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.createTrack(mockCreateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -139,10 +133,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.createTrack(mockCreateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to create track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to create track' });
     });
   });
 
@@ -152,10 +143,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTrackById('track-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockTrack);
-      }
+      expect(result).toMatchObject({ success: true, data: mockTrack });
       expect(prisma.track.findUnique).toHaveBeenCalledWith({
         where: { id: 'track-123' },
         include: {
@@ -193,10 +181,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTrackById('nonexistent-id');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Track not found' });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -209,10 +194,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTrackById('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -220,10 +202,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTrackById('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve track' });
     });
   });
 
@@ -238,10 +217,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTracks();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockTracks);
-      }
+      expect(result).toMatchObject({ success: true, data: mockTracks });
       expect(prisma.track.findMany).toHaveBeenCalledWith({
         where: {},
         skip: 0,
@@ -283,10 +259,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTracks();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([]);
-      }
+      expect(result).toMatchObject({ success: true, data: [] });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -299,10 +272,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTracks();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -310,10 +280,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.getTracks();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve tracks');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve tracks' });
     });
   });
 
@@ -329,10 +296,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.updateTrack('track-123', mockUpdateInput);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(updatedTrack);
-      }
+      expect(result).toMatchObject({ success: true, data: updatedTrack });
       expect(prisma.track.update).toHaveBeenCalledWith({
         where: { id: 'track-123' },
         data: mockUpdateInput,
@@ -361,10 +325,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.updateTrack('nonexistent-id', mockUpdateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Track not found' });
     });
 
     it('should return error for unique constraint violation', async () => {
@@ -377,10 +338,10 @@ describe('TrackService', () => {
 
       const result = await TrackService.updateTrack('track-123', mockUpdateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track with this title already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Track with this title already exists',
+      });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -393,10 +354,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.updateTrack('track-123', mockUpdateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -404,10 +362,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.updateTrack('track-123', mockUpdateInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to update track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to update track' });
     });
   });
 
@@ -417,10 +372,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.deleteTrack('track-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockTrack);
-      }
+      expect(result).toMatchObject({ success: true, data: mockTrack });
       expect(prisma.track.delete).toHaveBeenCalledWith({
         where: { id: 'track-123' },
         include: {
@@ -442,10 +394,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.deleteTrack('nonexistent-id');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Track not found' });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -458,10 +407,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.deleteTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -469,10 +415,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.deleteTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to delete track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to delete track' });
     });
   });
 
@@ -484,9 +427,9 @@ describe('TrackService', () => {
       const result = await TrackService.softDeleteTrack('track-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.deletedOn).not.toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
+      ).not.toBeNull();
       expect(prisma.track.update).toHaveBeenCalledWith({
         where: { id: 'track-123' },
         data: { deletedOn: expect.any(Date) },
@@ -515,10 +458,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.softDeleteTrack('nonexistent-id');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Track not found' });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -531,10 +471,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.softDeleteTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -542,10 +479,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.softDeleteTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to soft delete track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to soft delete track' });
     });
   });
 
@@ -557,9 +491,9 @@ describe('TrackService', () => {
       const result = await TrackService.restoreTrack('track-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.deletedOn).toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
+      ).toBeNull();
       expect(prisma.track.update).toHaveBeenCalledWith({
         where: { id: 'track-123' },
         data: { deletedOn: null },
@@ -588,10 +522,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.restoreTrack('nonexistent-id');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Track not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Track not found' });
     });
 
     it('should return error for database initialization failure', async () => {
@@ -604,10 +535,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.restoreTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should return generic error for unknown failures', async () => {
@@ -615,10 +543,7 @@ describe('TrackService', () => {
 
       const result = await TrackService.restoreTrack('track-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to restore track');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to restore track' });
     });
   });
 });

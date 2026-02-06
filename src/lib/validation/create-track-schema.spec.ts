@@ -37,11 +37,13 @@ describe('create-track-schema', () => {
         title: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const titleErrors = result.error.issues.filter((issue) => issue.path[0] === 'title');
-        expect(titleErrors.length).toBeGreaterThan(0);
-        expect(titleErrors[0].message).toBe('Title is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const titleErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'title');
+      expect(titleErrors.length).toBeGreaterThan(0);
+      expect(titleErrors[0].message).toBe('Title is required');
     });
 
     it('should reject title exceeding 200 characters', () => {
@@ -50,11 +52,13 @@ describe('create-track-schema', () => {
         title: 'a'.repeat(201),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const titleErrors = result.error.issues.filter((issue) => issue.path[0] === 'title');
-        expect(titleErrors.length).toBeGreaterThan(0);
-        expect(titleErrors[0].message).toBe('Title must be less than 200 characters');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const titleErrors = errorResult.error.issues.filter((issue) => issue.path[0] === 'title');
+      expect(titleErrors.length).toBeGreaterThan(0);
+      expect(titleErrors[0].message).toBe('Title must be less than 200 characters');
     });
 
     it('should accept title at max length (200 characters)', () => {
@@ -85,11 +89,15 @@ describe('create-track-schema', () => {
         duration: 0,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const durationErrors = result.error.issues.filter((issue) => issue.path[0] === 'duration');
-        expect(durationErrors.length).toBeGreaterThan(0);
-        expect(durationErrors[0].message).toBe('Duration must be at least 1 second');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const durationErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'duration'
+      );
+      expect(durationErrors.length).toBeGreaterThan(0);
+      expect(durationErrors[0].message).toBe('Duration must be at least 1 second');
     });
 
     it('should reject negative duration', () => {
@@ -106,11 +114,15 @@ describe('create-track-schema', () => {
         duration: 86401,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const durationErrors = result.error.issues.filter((issue) => issue.path[0] === 'duration');
-        expect(durationErrors.length).toBeGreaterThan(0);
-        expect(durationErrors[0].message).toBe('Duration must be less than 24 hours');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const durationErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'duration'
+      );
+      expect(durationErrors.length).toBeGreaterThan(0);
+      expect(durationErrors[0].message).toBe('Duration must be less than 24 hours');
     });
 
     it('should accept duration at max (86400 seconds = 24 hours)', () => {
@@ -127,11 +139,15 @@ describe('create-track-schema', () => {
         duration: 225.5,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const durationErrors = result.error.issues.filter((issue) => issue.path[0] === 'duration');
-        expect(durationErrors.length).toBeGreaterThan(0);
-        expect(durationErrors[0].message).toBe('Duration must be a whole number');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const durationErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'duration'
+      );
+      expect(durationErrors.length).toBeGreaterThan(0);
+      expect(durationErrors[0].message).toBe('Duration must be a whole number');
     });
   });
 
@@ -158,11 +174,15 @@ describe('create-track-schema', () => {
         audioUrl: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const audioUrlErrors = result.error.issues.filter((issue) => issue.path[0] === 'audioUrl');
-        expect(audioUrlErrors.length).toBeGreaterThan(0);
-        expect(audioUrlErrors[0].message).toBe('Audio URL is required');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const audioUrlErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'audioUrl'
+      );
+      expect(audioUrlErrors.length).toBeGreaterThan(0);
+      expect(audioUrlErrors[0].message).toBe('Audio URL is required');
     });
 
     it('should reject invalid URLs', () => {
@@ -174,12 +194,14 @@ describe('create-track-schema', () => {
           audioUrl,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const audioUrlErrors = result.error.issues.filter(
-            (issue) => issue.path[0] === 'audioUrl'
-          );
-          expect(audioUrlErrors.length).toBeGreaterThan(0);
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[] }> };
+        };
+        const audioUrlErrors = errorResult.error.issues.filter(
+          (issue) => issue.path[0] === 'audioUrl'
+        );
+        expect(audioUrlErrors.length).toBeGreaterThan(0);
       });
     });
   });
@@ -225,12 +247,14 @@ describe('create-track-schema', () => {
           coverArt,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const coverArtErrors = result.error.issues.filter(
-            (issue) => issue.path[0] === 'coverArt'
-          );
-          expect(coverArtErrors.length).toBeGreaterThan(0);
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[] }> };
+        };
+        const coverArtErrors = errorResult.error.issues.filter(
+          (issue) => issue.path[0] === 'coverArt'
+        );
+        expect(coverArtErrors.length).toBeGreaterThan(0);
       });
     });
   });
@@ -254,11 +278,15 @@ describe('create-track-schema', () => {
         position: -1,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const positionErrors = result.error.issues.filter((issue) => issue.path[0] === 'position');
-        expect(positionErrors.length).toBeGreaterThan(0);
-        expect(positionErrors[0].message).toBe('Position must be 0 or greater');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const positionErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'position'
+      );
+      expect(positionErrors.length).toBeGreaterThan(0);
+      expect(positionErrors[0].message).toBe('Position must be 0 or greater');
     });
 
     it('should reject non-integer positions', () => {
@@ -267,11 +295,15 @@ describe('create-track-schema', () => {
         position: 1.5,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const positionErrors = result.error.issues.filter((issue) => issue.path[0] === 'position');
-        expect(positionErrors.length).toBeGreaterThan(0);
-        expect(positionErrors[0].message).toBe('Position must be a whole number');
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[]; message: string }> };
+      };
+      const positionErrors = errorResult.error.issues.filter(
+        (issue) => issue.path[0] === 'position'
+      );
+      expect(positionErrors.length).toBeGreaterThan(0);
+      expect(positionErrors[0].message).toBe('Position must be a whole number');
     });
   });
 
@@ -308,9 +340,10 @@ describe('create-track-schema', () => {
           artistIds: [invalidId],
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0].message).toBe('Invalid artist ID format');
-        }
+        expect(
+          (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+            .issues[0].message
+        ).toBe('Invalid artist ID format');
       });
     });
   });
@@ -348,9 +381,10 @@ describe('create-track-schema', () => {
           releaseIds: [invalidId],
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0].message).toBe('Invalid release ID format');
-        }
+        expect(
+          (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+            .issues[0].message
+        ).toBe('Invalid release ID format');
       });
     });
   });
@@ -409,11 +443,13 @@ describe('create-track-schema', () => {
           createdBy,
         });
         expect(result.success).toBe(false);
-        if (!result.success) {
-          const errors = result.error.issues.filter((issue) => issue.path[0] === 'createdBy');
-          expect(errors.length).toBeGreaterThan(0);
-          expect(errors[0].message).toBe('Invalid MongoDB ObjectId format');
-        }
+        const errorResult = result as {
+          success: false;
+          error: { issues: Array<{ path: string[]; message: string }> };
+        };
+        const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'createdBy');
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toBe('Invalid MongoDB ObjectId format');
       });
     });
   });
@@ -422,12 +458,11 @@ describe('create-track-schema', () => {
     it('should accept complete valid data', () => {
       const result = createTrackSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.title).toBe(validData.title);
-        expect(result.data.duration).toBe(validData.duration);
-        expect(result.data.audioUrl).toBe(validData.audioUrl);
-        expect(result.data.position).toBe(validData.position);
-      }
+      const successResult = result as { success: true; data: TrackFormData };
+      expect(successResult.data.title).toBe(validData.title);
+      expect(successResult.data.duration).toBe(validData.duration);
+      expect(successResult.data.audioUrl).toBe(validData.audioUrl);
+      expect(successResult.data.position).toBe(validData.position);
     });
 
     it('should accept minimal required data', () => {
@@ -483,13 +518,12 @@ describe('create-track-schema', () => {
   describe('type inference', () => {
     it('should correctly infer TrackFormData type', () => {
       const result = createTrackSchema.safeParse(validData);
-      if (result.success) {
-        const data: TrackFormData = result.data;
-        expect(typeof data.title).toBe('string');
-        expect(typeof data.duration).toBe('number');
-        expect(typeof data.audioUrl).toBe('string');
-        expect(typeof data.position).toBe('number');
-      }
+      expect(result.success).toBe(true);
+      const data: TrackFormData = (result as { success: true; data: TrackFormData }).data;
+      expect(typeof data.title).toBe('string');
+      expect(typeof data.duration).toBe('number');
+      expect(typeof data.audioUrl).toBe('string');
+      expect(typeof data.position).toBe('number');
     });
   });
 });

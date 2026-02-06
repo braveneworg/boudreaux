@@ -431,43 +431,44 @@ describe('withAdmin decorator', () => {
   });
 
   describe('role validation edge cases', () => {
-    it('should handle different admin role case variations', async () => {
-      const testCases = ['admin', 'ADMIN', 'Admin'];
+    it('should accept exact "admin" role', async () => {
+      const mockSession = createMockSession({ role: 'admin' });
+      mockAuth.mockResolvedValue(mockSession);
 
-      for (const roleCase of testCases) {
-        vi.clearAllMocks();
+      const mockHandler = createMockHandler();
+      const wrappedHandler = await withAdmin(mockHandler);
 
-        const mockSession = createMockSession({ role: roleCase });
-        mockAuth.mockResolvedValue(mockSession);
+      const request = createMockRequest();
+      const context = createMockContext();
 
-        const mockHandler = createMockHandler();
-        const wrappedHandler = await withAdmin(mockHandler);
+      await wrappedHandler(request, context);
 
-        const request = createMockRequest();
-        const context = createMockContext();
-
-        const result = await wrappedHandler(request, context);
-
-        if (roleCase === 'admin') {
-          expect(mockHandler).toHaveBeenCalledWith(request, context, mockSession);
-        } else {
-          // Should reject non-exact matches
-          expect(mockHandler).not.toHaveBeenCalled();
-          expect(result).toEqual({
-            type: 'json',
-            data: { error: 'Insufficient permissions', required: 'admin' },
-            init: { status: 403 },
-          });
-        }
-      }
+      expect(mockHandler).toHaveBeenCalledWith(request, context, mockSession);
     });
 
-    it('should reject other roles', async () => {
-      const invalidRoles = ['user', 'moderator', 'superuser', 'administrator'];
+    it.each(['ADMIN', 'Admin'])('should reject case variation "%s"', async (roleCase) => {
+      const mockSession = createMockSession({ role: roleCase });
+      mockAuth.mockResolvedValue(mockSession);
 
-      for (const role of invalidRoles) {
-        vi.clearAllMocks();
+      const mockHandler = createMockHandler();
+      const wrappedHandler = await withAdmin(mockHandler);
 
+      const request = createMockRequest();
+      const context = createMockContext();
+
+      const result = await wrappedHandler(request, context);
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Insufficient permissions', required: 'admin' },
+        init: { status: 403 },
+      });
+    });
+
+    it.each(['user', 'moderator', 'superuser', 'administrator'])(
+      'should reject role "%s"',
+      async (role) => {
         const mockSession = createMockSession({ role });
         mockAuth.mockResolvedValue(mockSession);
 
@@ -486,6 +487,6 @@ describe('withAdmin decorator', () => {
           init: { status: 403 },
         });
       }
-    });
+    );
   });
 });

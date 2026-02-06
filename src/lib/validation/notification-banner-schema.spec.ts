@@ -30,9 +30,10 @@ describe('notificationBannerSchema', () => {
         message: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Message is required');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Message is required');
     });
 
     it('should reject message longer than 500 characters', () => {
@@ -41,9 +42,10 @@ describe('notificationBannerSchema', () => {
         message: 'a'.repeat(501),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Message must be less than 500 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Message must be less than 500 characters');
     });
   });
 
@@ -70,11 +72,10 @@ describe('notificationBannerSchema', () => {
         secondaryMessage: 'a'.repeat(201),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Secondary message must be less than 200 characters'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Secondary message must be less than 200 characters');
     });
   });
 
@@ -186,11 +187,10 @@ describe('notificationBannerSchema', () => {
         backgroundColor: '',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Either an image URL or a background color is required'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Either an image URL or a background color is required');
     });
   });
 
@@ -304,9 +304,10 @@ describe('notificationBannerSchema', () => {
         notes: 'a'.repeat(1001),
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Notes must be less than 1000 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Notes must be less than 1000 characters');
     });
   });
 
@@ -349,9 +350,10 @@ describe('notificationBannerSchema', () => {
         messageRotation: 361,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Rotation must be at most 360°');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Rotation must be at most 360°');
     });
 
     it('should reject rotation less than -360', () => {
@@ -360,17 +362,18 @@ describe('notificationBannerSchema', () => {
         messageRotation: -361,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Rotation must be at least -360°');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Rotation must be at least -360°');
     });
 
     it('should default to 0 when not provided', () => {
       const result = notificationBannerSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.messageRotation).toBe(0);
-      }
+      expect(
+        (result as { success: true; data: NotificationBannerFormData }).data.messageRotation
+      ).toBe(0);
     });
   });
 
@@ -405,9 +408,10 @@ describe('notificationBannerSchema', () => {
         secondaryMessageRotation: 361,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Rotation must be at most 360°');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Rotation must be at most 360°');
     });
 
     it('should reject rotation less than -360', () => {
@@ -416,17 +420,19 @@ describe('notificationBannerSchema', () => {
         secondaryMessageRotation: -361,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Rotation must be at least -360°');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Rotation must be at least -360°');
     });
 
     it('should default to 0 when not provided', () => {
       const result = notificationBannerSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.secondaryMessageRotation).toBe(0);
-      }
+      expect(
+        (result as { success: true; data: NotificationBannerFormData }).data
+          .secondaryMessageRotation
+      ).toBe(0);
     });
   });
 
@@ -469,9 +475,10 @@ describe('notificationBannerSchema', () => {
         imageOffsetX: 101,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Offset X must be at most 100%');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Offset X must be at most 100%');
     });
 
     it('should reject offset less than -100', () => {
@@ -480,17 +487,18 @@ describe('notificationBannerSchema', () => {
         imageOffsetX: -101,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Offset X must be at least -100%');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Offset X must be at least -100%');
     });
 
     it('should default to 0 when not provided', () => {
       const result = notificationBannerSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.imageOffsetX).toBe(0);
-      }
+      expect(
+        (result as { success: true; data: NotificationBannerFormData }).data.imageOffsetX
+      ).toBe(0);
     });
   });
 
@@ -525,9 +533,10 @@ describe('notificationBannerSchema', () => {
         imageOffsetY: 101,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Offset Y must be at most 100%');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Offset Y must be at most 100%');
     });
 
     it('should reject offset less than -100', () => {
@@ -536,17 +545,18 @@ describe('notificationBannerSchema', () => {
         imageOffsetY: -101,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Offset Y must be at least -100%');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Offset Y must be at least -100%');
     });
 
     it('should default to 0 when not provided', () => {
       const result = notificationBannerSchema.safeParse(validData);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.imageOffsetY).toBe(0);
-      }
+      expect(
+        (result as { success: true; data: NotificationBannerFormData }).data.imageOffsetY
+      ).toBe(0);
     });
   });
 
@@ -573,9 +583,10 @@ describe('notificationBannerSchema', () => {
         messageFontSize: 0.4,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Message font size must be at least 0.5rem');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Message font size must be at least 0.5rem');
     });
 
     it('should reject messageFontSize above 10', () => {
@@ -584,9 +595,10 @@ describe('notificationBannerSchema', () => {
         messageFontSize: 10.1,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Message font size must be at most 10rem');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Message font size must be at most 10rem');
     });
 
     it('should accept secondaryMessageFontSize at minimum 0.5', () => {
@@ -611,11 +623,10 @@ describe('notificationBannerSchema', () => {
         secondaryMessageFontSize: 0.4,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Secondary message font size must be at least 0.5rem'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Secondary message font size must be at least 0.5rem');
     });
 
     it('should reject secondaryMessageFontSize above 10', () => {
@@ -624,11 +635,10 @@ describe('notificationBannerSchema', () => {
         secondaryMessageFontSize: 10.1,
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Secondary message font size must be at most 10rem'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Secondary message font size must be at most 10rem');
     });
   });
 });

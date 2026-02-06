@@ -145,9 +145,10 @@ describe('profile-schema', () => {
 
       const result = profileSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('First name must be less than 50 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('First name must be less than 50 characters');
     });
 
     it('should reject last name that is too long', () => {
@@ -159,9 +160,10 @@ describe('profile-schema', () => {
 
       const result = profileSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Last name must be less than 50 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Last name must be less than 50 characters');
     });
 
     it('should reject invalid phone number formats', () => {
@@ -182,9 +184,10 @@ describe('profile-schema', () => {
 
         const result = profileSchema.safeParse(data);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0].message).toBe('Please enter a valid phone number');
-        }
+        expect(
+          (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+            .issues[0].message
+        ).toBe('Please enter a valid phone number');
       });
     });
 
@@ -197,9 +200,10 @@ describe('profile-schema', () => {
 
       const result = profileSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Address must be less than 100 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Address must be less than 100 characters');
     });
 
     it('should reject cities that are too long', () => {
@@ -211,9 +215,10 @@ describe('profile-schema', () => {
 
       const result = profileSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('City must be less than 50 characters');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('City must be less than 50 characters');
     });
 
     it('should reject invalid ZIP code formats', () => {
@@ -234,11 +239,10 @@ describe('profile-schema', () => {
 
         const result = profileSchema.safeParse(data);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0].message).toBe(
-            'Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)'
-          );
-        }
+        expect(
+          (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+            .issues[0].message
+        ).toBe('Please enter a valid ZIP code (12345 or 12345-6789) or postal code (A1A 1A1)');
       });
     });
 
@@ -270,9 +274,10 @@ describe('profile-schema', () => {
 
           const result = profileSchema.safeParse(data);
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error.issues[0].message).toBe('Please select a valid country');
-          }
+          expect(
+            (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+              .issues[0].message
+          ).toBe('Please select a valid country');
         });
       });
 
