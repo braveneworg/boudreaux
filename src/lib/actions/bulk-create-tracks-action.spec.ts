@@ -955,7 +955,7 @@ describe('bulkCreateTracksAction', () => {
       );
     });
 
-    it('should create group when albumArtist matches artist', async () => {
+    it('should not create group when albumArtist matches artist', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -990,17 +990,11 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
-      // Now always creates a Group from albumArtist
-      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
-        'The Beatles',
-        expect.objectContaining({
-          artistId: 'artist-123',
-          tx: expect.anything(),
-        })
-      );
+      // Should not create a Group when albumArtist matches artist (solo artist case)
+      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
     });
 
-    it('should create group when albumArtist matches artist (case-insensitive)', async () => {
+    it('should not create group when albumArtist matches artist (case-insensitive)', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -1035,14 +1029,8 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
-      // Now always creates a Group from albumArtist (uses the albumArtist casing)
-      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
-        'THE BEATLES',
-        expect.objectContaining({
-          artistId: 'artist-123',
-          tx: expect.anything(),
-        })
-      );
+      // Should not create a Group when albumArtist matches artist case-insensitively (solo artist case)
+      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
     });
 
     it('should cache group lookups for same group name', async () => {
