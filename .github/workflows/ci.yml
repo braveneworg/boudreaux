@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm test -- --run --coverage
+        run: npm run test:coverage:check
         env:
           CI: true
 
@@ -40,6 +40,24 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage Report Summary
+        if: always()
+        run: |
+          if [ -f "./coverage/coverage-summary.json" ]; then
+            echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
+            STATEMENTS=$(cat ./coverage/coverage-summary.json | jq '.total.statements.pct')
+            BRANCHES=$(cat ./coverage/coverage-summary.json | jq '.total.branches.pct')
+            FUNCTIONS=$(cat ./coverage/coverage-summary.json | jq '.total.functions.pct')
+            LINES=$(cat ./coverage/coverage-summary.json | jq '.total.lines.pct')
+            echo "| Statements | ${STATEMENTS}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Branches | ${BRANCHES}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Functions | ${FUNCTIONS}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Lines | ${LINES}% |" >> $GITHUB_STEP_SUMMARY
+          fi
 
   lint:
     name: Lint
@@ -58,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
   typecheck:
     name: Type Check
