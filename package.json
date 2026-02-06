@@ -109,7 +109,7 @@
     "@aws-sdk/client-cloudfront": "^3.658.1",
     "@aws-sdk/client-s3": "^3.658.1",
     "@aws-sdk/lib-storage": "^3.658.1",
-    "@eslint/eslintrc": "^3",
+    "@eslint/eslintrc": "^3.3.3",
     "@faker-js/faker": "^9.9.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
