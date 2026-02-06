@@ -1,6 +1,5 @@
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { FlatCompat } from '@eslint/eslintrc';
 import prettierConfig from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
 import js from '@eslint/js';
@@ -17,11 +16,6 @@ import vitest from '@vitest/eslint-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-});
 
 const eslintConfig = [
   {
@@ -53,8 +47,6 @@ const eslintConfig = [
   },
   // Base JavaScript rules
   js.configs.recommended,
-  // Next.js configuration via compat.extends for full coverage
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
   // Prettier integration and custom rules
   {
     files: ['**/*.{js,jsx,ts,tsx}'],

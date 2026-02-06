@@ -23,6 +23,9 @@ const config = {
       },
     ],
   },
+  // Empty turbopack config to allow Turbopack builds (Next.js 16+ default)
+  // while keeping webpack config for compatibility
+  turbopack: {},
   webpack: (config: { module: { rules: unknown[] } }, { isServer }: { isServer: boolean }) => {
     // Handle Video.js worker files
     if (!isServer) {
