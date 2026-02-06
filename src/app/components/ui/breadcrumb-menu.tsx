@@ -12,14 +12,14 @@ import {
 } from '@/app/components/ui/breadcrumb';
 import { cn } from '@/lib/utils/tailwind-utils';
 
-type BreadcrumbItem = {
+type BreadcrumbItemData = {
   anchorText: string;
   url: string;
   isActive: boolean;
 };
 
 type BreadcrumbMenuProps = {
-  items: BreadcrumbItem[];
+  items: BreadcrumbItemData[];
   className?: string;
 };
 

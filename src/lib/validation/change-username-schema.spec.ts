@@ -9,10 +9,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username with letters only', () => {
@@ -22,10 +19,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username with numbers only', () => {
@@ -35,10 +29,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username with underscores', () => {
@@ -48,10 +39,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username with dashes', () => {
@@ -61,10 +49,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username at minimum length (2 characters)', () => {
@@ -74,10 +59,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept username at maximum length (100 characters)', () => {
@@ -88,10 +70,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept mixed alphanumeric with special characters', () => {
@@ -101,10 +80,7 @@ describe('changeUsernameSchema', () => {
       };
 
       const result = changeUsernameSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
   });
 
@@ -117,10 +93,12 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Usernames do not match');
-        expect(result.error.issues[0].path).toEqual(['confirmUsername']);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ message: string; path: string[] }> };
+      };
+      expect(errorResult.error.issues[0].message).toBe('Usernames do not match');
+      expect(errorResult.error.issues[0].path).toEqual(['confirmUsername']);
     });
 
     it('should reject username shorter than 2 characters', () => {
@@ -131,9 +109,11 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.some((issue) => issue.path[0] === 'username')).toBe(true);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.some((issue) => issue.path[0] === 'username')).toBe(true);
     });
 
     it('should reject username longer than 100 characters', () => {
@@ -145,9 +125,11 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues.some((issue) => issue.path[0] === 'username')).toBe(true);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorResult.error.issues.some((issue) => issue.path[0] === 'username')).toBe(true);
     });
 
     it('should reject username with spaces', () => {
@@ -158,11 +140,10 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Invalid username. You can only use letters, numbers, underscores, and dashes.'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Invalid username. You can only use letters, numbers, underscores, and dashes.');
     });
 
     it('should reject username with special characters (other than dash and underscore)', () => {
@@ -188,11 +169,10 @@ describe('changeUsernameSchema', () => {
 
         const result = changeUsernameSchema.safeParse(invalidData);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error.issues[0].message).toBe(
-            'Invalid username. You can only use letters, numbers, underscores, and dashes.'
-          );
-        }
+        expect(
+          (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+            .issues[0].message
+        ).toBe('Invalid username. You can only use letters, numbers, underscores, and dashes.');
       });
     });
 
@@ -244,9 +224,10 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Usernames do not match');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Usernames do not match');
     });
 
     it('should reject username with leading/trailing spaces', () => {
@@ -287,11 +268,10 @@ describe('changeUsernameSchema', () => {
 
       const result = changeUsernameSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe(
-          'Invalid username. You can only use letters, numbers, underscores, and dashes.'
-        );
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Invalid username. You can only use letters, numbers, underscores, and dashes.');
     });
 
     it('should handle emojis', () => {

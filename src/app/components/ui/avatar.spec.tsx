@@ -57,7 +57,8 @@ describe('Avatar', () => {
 
   describe('AvatarImage', () => {
     // Note: Radix AvatarImage only renders when src is provided and can load
-    // Testing basic component export
+    // Testing basic component export - AvatarImage only renders after image loads
+    // so we only test that it can be imported
     it('can be imported', () => {
       expect(AvatarImage).toBeDefined();
       expect(typeof AvatarImage).toBe('function');

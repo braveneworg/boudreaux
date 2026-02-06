@@ -1,6 +1,5 @@
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { FlatCompat } from '@eslint/eslintrc';
 import prettierConfig from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
 import js from '@eslint/js';
@@ -18,11 +17,6 @@ import vitest from '@vitest/eslint-plugin';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-});
-
 const eslintConfig = [
   {
     ignores: [
@@ -39,21 +33,23 @@ const eslintConfig = [
       'tsconfig.*.json',
       'eslint.config.mjs',
       'vite.config.ts',
+      'vitest.config.ts',
       'jest.config.ts',
       'postcss.config.mjs',
       '**/*.css',
       '**/*.md',
       '**/*.json',
+      '**/*.d.ts',
       '*.pem',
       '*.crt',
       '*.key',
     ],
   },
-  // Extend Next.js configurations - this includes the Next.js ESLint plugin
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  // Base JavaScript rules
+  js.configs.recommended,
   // Prettier integration and custom rules
   {
-    files: ['**/*.{js,jsx,ts,tsx,json,css,md}'],
+    files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: {
       '@typescript-eslint': typescript,
       '@next/next': nextPlugin,
@@ -78,6 +74,11 @@ const eslintConfig = [
         ...globals.node,
         ...globals.es2021,
         React: 'readonly',
+        NodeJS: 'readonly',
+        JSX: 'readonly',
+        FormDataEntryValue: 'readonly',
+        CanvasTextAlign: 'readonly',
+        CanvasTextBaseline: 'readonly',
       },
     },
     settings: {
@@ -90,6 +91,13 @@ const eslintConfig = [
       },
     },
     rules: {
+      // Next.js rules (previously from next/core-web-vitals)
+      '@next/next/no-html-link-for-pages': 'error',
+      '@next/next/no-img-element': 'warn',
+      '@next/next/no-head-import-in-document': 'error',
+      '@next/next/no-sync-scripts': 'error',
+      '@next/next/no-script-component-in-head': 'error',
+
       'react/jsx-boolean-value': ['error', 'never'],
       'no-unused-vars': 'off', // Disable the core ESLint rule
       'unused-imports/no-unused-imports': 'error', // Report unused imports
@@ -216,18 +224,25 @@ const eslintConfig = [
   },
   // Vitest testing configuration
   {
-    files: ['tests/**'], // or any other pattern
+    files: [
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'tests/**',
+      '**/test-utils/**',
+    ],
     plugins: {
       vitest,
     },
     rules: {
-      ...vitest.configs.recommended.rules, // or vitest.configs.all.rules
-      'vitest/max-nested-describe': ['error', { max: 3 }],
-    },
-    settings: {
-      vitest: {
-        typecheck: true, // if using type-testing feature
-      },
+      ...vitest.configs.recommended.rules,
+      'vitest/max-nested-describe': ['error', { max: 5 }],
+      // Disable rules that require typed linting
+      'vitest/valid-title': 'off',
+      // Relax strict rules that flag legitimate test patterns
+      'vitest/no-conditional-expect': 'warn',
+      'vitest/expect-expect': 'warn',
     },
     languageOptions: {
       globals: {

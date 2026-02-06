@@ -276,11 +276,13 @@ export async function bulkCreateTracksAction(
 
         // Determine if albumArtist represents a group (when it differs from artist)
         // Common pattern: artist is the band member, albumArtist is the band name
+        const trimmedArtist = track.artist?.trim();
+        const trimmedAlbumArtist = track.albumArtist?.trim();
         const groupName =
-          track.albumArtist?.trim() &&
-          track.artist?.trim() &&
-          track.albumArtist.trim().toLowerCase() !== track.artist.trim().toLowerCase()
-            ? track.albumArtist.trim()
+          trimmedAlbumArtist &&
+          trimmedArtist &&
+          trimmedAlbumArtist.toLowerCase() !== trimmedArtist.toLowerCase()
+            ? trimmedAlbumArtist
             : undefined;
 
         // Create track and all associations in a single transaction

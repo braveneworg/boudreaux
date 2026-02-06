@@ -891,7 +891,7 @@ describe('bulkCreateTracksAction', () => {
     });
   });
 
-  describe('group creation when albumArtist differs from artist', () => {
+  describe('group creation from albumArtist metadata', () => {
     beforeEach(() => {
       mockFindOrCreateArtist.mockResolvedValue({
         success: true,
@@ -990,6 +990,7 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
+      // Should not create a Group when albumArtist matches artist (solo artist case)
       expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
     });
 
@@ -1028,6 +1029,7 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, false);
 
+      // Should not create a Group when albumArtist matches artist case-insensitively (solo artist case)
       expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
     });
 

@@ -469,9 +469,7 @@ describe('SignupSigninForm', () => {
       );
 
       expect(termsLabel).toBeDefined();
-      if (termsLabel) {
-        expect(termsLabel).toBeInTheDocument();
-      }
+      expect(termsLabel).toBeInTheDocument();
     });
   });
 

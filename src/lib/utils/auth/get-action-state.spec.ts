@@ -61,9 +61,9 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.termsAndConditions).toBe(true);
-      }
+      expect(
+        (parsed as { success: true; data: { termsAndConditions: boolean } }).data.termsAndConditions
+      ).toBe(true);
     });
 
     it('should convert "off" to false', () => {
@@ -73,9 +73,9 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.termsAndConditions).toBe(false);
-      }
+      expect(
+        (parsed as { success: true; data: { termsAndConditions: boolean } }).data.termsAndConditions
+      ).toBe(false);
     });
 
     it('should convert "false" string to false for termsAndConditions field', () => {
@@ -85,9 +85,9 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, booleanTestSchema);
 
       expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.termsAndConditions).toBe(false);
-      }
+      expect(
+        (parsed as { success: true; data: { termsAndConditions: boolean } }).data.termsAndConditions
+      ).toBe(false);
     });
 
     it('should leave other string values unchanged', () => {
@@ -98,10 +98,9 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, mixedTestSchema);
 
       expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.email).toBe('test@example.com');
-        expect(parsed.data.username).toBe('testuser');
-      }
+      const successParsed = parsed as { success: true; data: { email: string; username?: string } };
+      expect(successParsed.data.email).toBe('test@example.com');
+      expect(successParsed.data.username).toBe('testuser');
     });
   });
 
@@ -131,10 +130,12 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.email).toBe('test@example.com');
-        expect(parsed.data.termsAndConditions).toBe(true);
-      }
+      const successParsed = parsed as {
+        success: true;
+        data: { email: string; termsAndConditions: boolean };
+      };
+      expect(successParsed.data.email).toBe('test@example.com');
+      expect(successParsed.data.termsAndConditions).toBe(true);
     });
 
     it('should fail validation with invalid email', () => {
@@ -145,10 +146,12 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(false);
-      if (!parsed.success) {
-        expect(parsed.error.issues).toHaveLength(1);
-        expect(parsed.error.issues[0].path).toEqual(['email']);
-      }
+      const errorParsed = parsed as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorParsed.error.issues).toHaveLength(1);
+      expect(errorParsed.error.issues[0].path).toEqual(['email']);
     });
 
     it('should fail validation with missing required fields', () => {
@@ -159,11 +162,13 @@ describe('get-action-state', () => {
       const { parsed } = getActionState(formData, permittedFields, mockSchema);
 
       expect(parsed.success).toBe(false);
-      if (!parsed.success) {
-        expect(parsed.error.issues.length).toBeGreaterThan(0);
-        const paths = parsed.error.issues.map((issue) => issue.path[0]);
-        expect(paths).toContain('termsAndConditions');
-      }
+      const errorParsed = parsed as {
+        success: false;
+        error: { issues: Array<{ path: string[] }> };
+      };
+      expect(errorParsed.error.issues.length).toBeGreaterThan(0);
+      const paths = errorParsed.error.issues.map((issue) => issue.path[0]);
+      expect(paths).toContain('termsAndConditions');
     });
   });
 

@@ -1,7 +1,6 @@
 import React from 'react';
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import SignedInAs from './signed-in-as';
 

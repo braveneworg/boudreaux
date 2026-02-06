@@ -9,10 +9,7 @@ describe('changeEmailSchema', () => {
       };
 
       const result = changeEmailSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept valid email data with previousEmail', () => {
@@ -23,10 +20,7 @@ describe('changeEmailSchema', () => {
       };
 
       const result = changeEmailSchema.safeParse(validData);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validData);
-      }
+      expect(result).toMatchObject({ success: true, data: validData });
     });
 
     it('should accept previousEmail as undefined', () => {
@@ -50,9 +44,10 @@ describe('changeEmailSchema', () => {
 
       const result = changeEmailSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Invalid email address');
-      }
+      expect(
+        (result as { success: false; error: { issues: Array<{ message: string }> } }).error
+          .issues[0].message
+      ).toBe('Invalid email address');
     });
 
     it('should reject mismatched emails', () => {
@@ -63,10 +58,12 @@ describe('changeEmailSchema', () => {
 
       const result = changeEmailSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Email addresses do not match');
-        expect(result.error.issues[0].path).toEqual(['confirmEmail']);
-      }
+      const errorResult = result as {
+        success: false;
+        error: { issues: Array<{ message: string; path: string[] }> };
+      };
+      expect(errorResult.error.issues[0].message).toBe('Email addresses do not match');
+      expect(errorResult.error.issues[0].path).toEqual(['confirmEmail']);
     });
 
     it('should require email field', () => {

@@ -78,10 +78,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.createRelease(createInput);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockRelease);
-      }
+      expect(result).toMatchObject({ success: true, data: mockRelease });
       expect(prisma.release.create).toHaveBeenCalledWith({
         data: createInput,
         include: {
@@ -114,10 +111,10 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.createRelease(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release with this title already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Release with this title already exists',
+      });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -126,10 +123,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.createRelease(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -137,10 +131,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.createRelease(createInput);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to create release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to create release' });
     });
   });
 
@@ -150,10 +141,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleaseById('release-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockRelease);
-      }
+      expect(result).toMatchObject({ success: true, data: mockRelease });
       expect(prisma.release.findUnique).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         include: {
@@ -184,10 +172,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleaseById('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -196,10 +181,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleaseById('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -207,10 +189,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleaseById('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve release' });
     });
   });
 
@@ -230,10 +209,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleases();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockReleases);
-      }
+      expect(result).toMatchObject({ success: true, data: mockReleases });
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {},
         skip: 0,
@@ -377,10 +353,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleases();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([]);
-      }
+      expect(result).toMatchObject({ success: true, data: [] });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -389,10 +362,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleases();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -400,10 +370,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.getReleases();
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to retrieve releases');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve releases' });
     });
   });
 
@@ -418,10 +385,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(updatedRelease);
-      }
+      expect(result).toMatchObject({ success: true, data: updatedRelease });
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         data: updateData,
@@ -455,10 +419,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.updateRelease('non-existent', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
     it('should return error when title already exists', async () => {
@@ -470,10 +431,10 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release with this title already exists');
-      }
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Release with this title already exists',
+      });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -482,10 +443,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -493,10 +451,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to update release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to update release' });
     });
   });
 
@@ -506,10 +461,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.deleteRelease('release-123');
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockRelease);
-      }
+      expect(result).toMatchObject({ success: true, data: mockRelease });
       expect(prisma.release.delete).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         include: {
@@ -530,10 +482,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.deleteRelease('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -542,10 +491,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.deleteRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -553,10 +499,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.deleteRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to delete release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to delete release' });
     });
   });
 
@@ -568,9 +511,9 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.softDeleteRelease('release-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.deletedOn).not.toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
+      ).not.toBeNull();
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         data: { deletedOn: expect.any(Date) },
@@ -604,10 +547,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.softDeleteRelease('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -616,10 +556,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.softDeleteRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -627,10 +564,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.softDeleteRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to soft delete release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to soft delete release' });
     });
   });
 
@@ -642,9 +576,9 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.restoreRelease('release-123');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.deletedOn).toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
+      ).toBeNull();
       expect(prisma.release.update).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         data: { deletedOn: null },
@@ -678,10 +612,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.restoreRelease('non-existent');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Release not found');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
     it('should return error when database is unavailable', async () => {
@@ -690,10 +621,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.restoreRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database unavailable');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('should handle unknown errors', async () => {
@@ -701,10 +629,7 @@ describe('ReleaseService', () => {
 
       const result = await ReleaseService.restoreRelease('release-123');
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to restore release');
-      }
+      expect(result).toMatchObject({ success: false, error: 'Failed to restore release' });
     });
   });
 });

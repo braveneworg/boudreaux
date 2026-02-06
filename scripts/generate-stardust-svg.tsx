@@ -194,9 +194,11 @@ function parseArgs(args: string[]): Config {
         i++;
         break;
       case '--help':
+      // falls through
       case '-h':
         printHelp();
         process.exit(0);
+        break;
       default:
         if (arg.startsWith('--')) {
           console.error(`Unknown option: ${arg}`);

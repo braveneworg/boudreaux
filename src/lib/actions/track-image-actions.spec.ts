@@ -120,7 +120,7 @@ describe('Track Image Actions', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
     });
-    it('should return error when user session has no id', async () => {
+    it('should return error when user session has no id for reorder', async () => {
       vi.mocked(auth).mockResolvedValue({
         user: { role: 'admin' },
       } as never);
@@ -130,7 +130,7 @@ describe('Track Image Actions', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
     });
-    it('should return error when user session has no id', async () => {
+    it('should return error when user session has no id for update', async () => {
       vi.mocked(auth).mockResolvedValue({
         user: { role: 'admin' },
       } as never);
