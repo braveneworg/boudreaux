@@ -265,6 +265,42 @@ describe('AudioMetadataService', () => {
       expect(result.data.lossless).toBe(true);
     });
 
+    it('should extract cover art from stream as base64 data URL', async () => {
+      const mockPictureData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG header bytes
+      const mockMetadata = {
+        format: { duration: 180 },
+        common: {
+          title: 'Stream Track with Cover',
+          picture: [
+            {
+              format: 'image/png',
+              data: mockPictureData,
+            },
+          ],
+        },
+      };
+
+      mockParseStream.mockResolvedValue(mockMetadata as Awaited<ReturnType<typeof mm.parseStream>>);
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push(null);
+        },
+      });
+
+      const result = await AudioMetadataService.extractMetadataFromStream(
+        mockStream,
+        'audio/flac',
+        1024 * 1024
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error('Expected success');
+      expect(result.data.coverArt).toMatch(/^data:image\/png;base64,/);
+      expect(result.data.coverArtMimeType).toBe('image/png');
+    });
+
     it('should return error when stream parsing fails', async () => {
       mockParseStream.mockRejectedValue(new Error('Stream read error'));
 
