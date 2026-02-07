@@ -136,10 +136,11 @@ export function TrackPlayButton({
       onClick={togglePlayback}
       disabled={isLoading}
       title={isPlaying ? 'Pause' : 'Play'}
+      aria-label={isPlaying ? 'Pause' : 'Play'}
       type="button"
     >
       {isPlaying ? <Pause className={iconSize} /> : <Play className={iconSize} />}
-      {!iconOnly && <span className="sr-only">{isPlaying ? 'Pause' : 'Play'}</span>}
+      <span className="sr-only">{isPlaying ? 'Pause' : 'Play'}</span>
     </Button>
   );
 }
