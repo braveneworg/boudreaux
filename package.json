@@ -22,6 +22,8 @@
     "test:no-css": "mv postcss.config.mjs postcss.config.mjs.bak && vitest run && mv postcss.config.mjs.bak postcss.config.mjs",
     "sync:cdn": "npx tsx scripts/sync-cdn.ts",
     "sync:cdn:no-build": "SKIP_BUILD=true npx tsx scripts/sync-cdn.ts",
+    "mongo:dump": "npx tsx scripts/mongo-backup.ts dump",
+    "mongo:restore": "npx tsx scripts/mongo-backup.ts restore",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
     "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx .",

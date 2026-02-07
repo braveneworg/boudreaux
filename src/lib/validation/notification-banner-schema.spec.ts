@@ -171,6 +171,16 @@ describe('notificationBannerSchema', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should pass when originalImageUrl is provided', () => {
+      const result = notificationBannerSchema.safeParse({
+        ...validData,
+        originalImageUrl: 'https://example.com/original.jpg',
+        imageUrl: '',
+        backgroundColor: '',
+      });
+      expect(result.success).toBe(true);
+    });
+
     it('should pass when both are provided', () => {
       const result = notificationBannerSchema.safeParse({
         ...validData,

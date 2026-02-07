@@ -1,7 +1,4 @@
-/* eslint-disable import/first */
 // Mock server-only to prevent client component error in tests
-vi.mock('server-only', () => ({}));
-
 import {
   createNotificationBannerAction,
   updateNotificationBannerAction,
@@ -17,6 +14,8 @@ import { requireRole } from '../utils/auth/require-role';
 
 import type { NotificationBanner } from '../services/notification-banner-service';
 import type { FormState } from '../types/form-state';
+
+vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 vi.mock('next/cache', () => ({

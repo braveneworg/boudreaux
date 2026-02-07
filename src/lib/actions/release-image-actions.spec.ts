@@ -156,6 +156,24 @@ describe('release-image-actions', () => {
       expect(prisma.image.delete).toHaveBeenCalled();
     });
 
+    it('should skip S3 delete when S3 URL is malformed without key path', async () => {
+      const mockImage = {
+        id: 'image-123',
+        src: 'https://bucket.s3.',
+        releaseId: 'release-123',
+      };
+
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      expect(result.success).toBe(true);
+      expect(prisma.image.delete).toHaveBeenCalled();
+      // S3 send should not be called because s3Key extraction failed
+      expect(mockS3Send).not.toHaveBeenCalled();
+    });
+
     it('should return error when image not found', async () => {
       vi.mocked(prisma.image.findUnique).mockResolvedValue(null);
 

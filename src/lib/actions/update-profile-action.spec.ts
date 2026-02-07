@@ -9,6 +9,7 @@ const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockPrismaUserUpdate = vi.hoisted(() => vi.fn());
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
+const mockLogSecurityEvent = vi.hoisted(() => vi.fn());
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -41,6 +42,10 @@ vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
 
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
+}));
+
+vi.mock('@/lib/utils/audit-log', () => ({
+  logSecurityEvent: mockLogSecurityEvent,
 }));
 
 vi.mock('@/lib/validation/profile-schema');
@@ -878,6 +883,56 @@ describe('updateProfileAction', () => {
         ],
         expect.anything()
       );
+    });
+
+    it('should log security event with metadata about updated fields', async () => {
+      const mockFormState: FormState = {
+        fields: {
+          firstName: 'Jane',
+          lastName: 'Smith',
+          city: 'Boston',
+        },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          firstName: 'Jane',
+          lastName: 'Smith',
+          phone: undefined,
+          addressLine1: undefined,
+          addressLine2: undefined,
+          city: 'Boston',
+          state: undefined,
+          zipCode: undefined,
+          country: undefined,
+          allowSmsNotifications: undefined,
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue({
+        user: { id: 'user-456' },
+      });
+
+      vi.mocked(mockPrismaUserUpdate).mockResolvedValue({});
+
+      await updateProfileAction(mockInitialState, mockFormData);
+
+      // Verify logSecurityEvent was called with correct metadata
+      expect(mockLogSecurityEvent).toHaveBeenCalledWith({
+        event: 'user.profile.updated',
+        userId: 'user-456',
+        metadata: {
+          updatedFields: ['firstName', 'lastName', 'city'],
+        },
+      });
     });
   });
 });

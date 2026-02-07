@@ -159,6 +159,59 @@ describe('useInfiniteTracksQuery', () => {
       ]);
     });
 
+    it('should deduplicate tracks with same ID across pages', async () => {
+      const page1Response = createMockTracksResponse({
+        tracks: [
+          { id: 'track-1', title: 'Track 1' },
+          { id: 'track-2', title: 'Track 2' },
+        ],
+        totalCount: 3,
+        hasMore: true,
+      });
+
+      // Page 2 has track-2 duplicated (pagination shift scenario)
+      const page2Response = createMockTracksResponse({
+        tracks: [
+          { id: 'track-2', title: 'Track 2' },
+          { id: 'track-3', title: 'Track 3' },
+        ],
+        totalCount: 3,
+        hasMore: false,
+      });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(page1Response),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(page2Response),
+        });
+
+      const { result } = renderHook(() => useInfiniteTracksQuery(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      // Fetch next page
+      await result.current.fetchNextPage();
+
+      await waitFor(() => {
+        expect(result.current.tracks).toHaveLength(3);
+      });
+
+      // Should have only 3 tracks, not 4 (track-2 deduplicated)
+      expect(result.current.tracks).toEqual([
+        { id: 'track-1', title: 'Track 1' },
+        { id: 'track-2', title: 'Track 2' },
+        { id: 'track-3', title: 'Track 3' },
+      ]);
+    });
+
     it('should return total count from first page', async () => {
       const mockResponse = createMockTracksResponse({
         tracks: [{ id: 'track-1', title: 'Track 1' }],

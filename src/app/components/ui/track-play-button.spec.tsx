@@ -456,6 +456,19 @@ describe('TrackPlayButton', () => {
       // (it might be called during cleanup, but not from URL change)
       expect(mockAudioElement.pause).not.toHaveBeenCalled();
     });
+
+    it('should not update when audioUrl changes to empty string', () => {
+      const { rerender } = render(<TrackPlayButton audioUrl={validAudioUrl} />);
+
+      // Clear pause calls
+      mockAudioElement.pause.mockClear();
+
+      // Change to empty URL (component won't render but effect runs)
+      rerender(<TrackPlayButton audioUrl="" />);
+
+      // Should not pause when URL becomes empty
+      expect(mockAudioElement.pause).not.toHaveBeenCalled();
+    });
   });
 
   describe('multiple instance coordination', () => {

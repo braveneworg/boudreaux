@@ -56,3 +56,7 @@ xmen.pem
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database backups
+/backups
+*.archive

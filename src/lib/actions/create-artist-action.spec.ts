@@ -496,4 +496,84 @@ describe('createArtistAction', () => {
       expect(setUnknownError).toHaveBeenCalled();
     });
   });
+
+  describe('slug uniqueness error handling', () => {
+    it('should handle slug error with "unique" keyword', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'Jane',
+            surname: 'Doe',
+            slug: 'existing-slug',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.createArtist).mockResolvedValue({
+        success: false,
+        error: 'Slug must be unique',
+      } as never);
+
+      const result = await createArtistAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.slug).toEqual([
+        'This slug is already in use. Please choose a different one.',
+      ]);
+    });
+
+    it('should handle slug error with "already exists" keyword', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'Jane',
+            surname: 'Doe',
+            slug: 'existing-slug',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.createArtist).mockResolvedValue({
+        success: false,
+        error: 'Slug already exists in the database',
+      } as never);
+
+      const result = await createArtistAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.slug).toEqual([
+        'This slug is already in use. Please choose a different one.',
+      ]);
+    });
+
+    it('should handle slug error with "duplicate" keyword', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'Jane',
+            surname: 'Doe',
+            slug: 'existing-slug',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.createArtist).mockResolvedValue({
+        success: false,
+        error: 'Duplicate slug detected',
+      } as never);
+
+      const result = await createArtistAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.slug).toEqual([
+        'This slug is already in use. Please choose a different one.',
+      ]);
+    });
+  });
 });

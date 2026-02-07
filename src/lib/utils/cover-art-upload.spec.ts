@@ -219,6 +219,92 @@ describe('cover-art-upload', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network failure');
     });
+
+    it('should handle webp image format', async () => {
+      const mockCdnUrl = 'https://cdn.example.com/test.webp';
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          {
+            uploadUrl: 'https://s3.example.com/presigned-url',
+            s3Key: 'test-key',
+            cdnUrl: mockCdnUrl,
+          },
+        ],
+      });
+
+      mockUploadFileToS3.mockResolvedValue({
+        success: true,
+        s3Key: 'test-key',
+        cdnUrl: mockCdnUrl,
+      });
+
+      // Minimal valid base64 for webp
+      const webpBase64 =
+        'data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAQAcJaQAA3AA/v3AgAA=';
+      const result = await uploadCoverArtToS3(webpBase64, 'Test');
+
+      expect(result.success).toBe(true);
+      expect(mockGetPresignedUploadUrlsAction).toHaveBeenCalledWith(
+        'releases',
+        'coverart',
+        expect.arrayContaining([
+          expect.objectContaining({
+            contentType: 'image/webp',
+            fileName: 'test-cover.webp',
+          }),
+        ])
+      );
+    });
+
+    it('should handle unknown image format with default extension', async () => {
+      const mockCdnUrl = 'https://cdn.example.com/test.jpg';
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          {
+            uploadUrl: 'https://s3.example.com/presigned-url',
+            s3Key: 'test-key',
+            cdnUrl: mockCdnUrl,
+          },
+        ],
+      });
+
+      mockUploadFileToS3.mockResolvedValue({
+        success: true,
+        s3Key: 'test-key',
+        cdnUrl: mockCdnUrl,
+      });
+
+      // Unknown format should default to jpg
+      const unknownBase64 = 'data:image/xyz;base64,abc123';
+      await uploadCoverArtToS3(unknownBase64, 'Test');
+
+      expect(mockGetPresignedUploadUrlsAction).toHaveBeenCalledWith(
+        'releases',
+        'coverart',
+        expect.arrayContaining([
+          expect.objectContaining({
+            fileName: 'test-cover.jpg',
+          }),
+        ])
+      );
+    });
+
+    it('should return error when presigned data is empty', async () => {
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [],
+      });
+
+      const result = await uploadCoverArtToS3(sampleBase64Jpeg, 'Test Album');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to get upload URL');
+      expect(mockUploadFileToS3).not.toHaveBeenCalled();
+    });
   });
 
   describe('uploadCoverArtsToS3', () => {
@@ -305,6 +391,58 @@ describe('cover-art-upload', () => {
       // Each track without album gets its own upload
       expect(mockGetPresignedUploadUrlsAction).toHaveBeenCalledTimes(2);
       expect(result.size).toBe(2);
+    });
+
+    it('should handle album names with only whitespace', async () => {
+      const mockCdnUrl1 = 'https://cdn.example.com/test1.jpg';
+      const mockCdnUrl2 = 'https://cdn.example.com/test2.jpg';
+
+      mockGetPresignedUploadUrlsAction
+        .mockResolvedValueOnce({
+          success: true,
+          data: [
+            {
+              uploadUrl: 'https://s3.example.com/presigned-url',
+              s3Key: 'test-key-1',
+              cdnUrl: mockCdnUrl1,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          data: [
+            {
+              uploadUrl: 'https://s3.example.com/presigned-url',
+              s3Key: 'test-key-2',
+              cdnUrl: mockCdnUrl2,
+            },
+          ],
+        });
+
+      mockUploadFileToS3
+        .mockResolvedValueOnce({
+          success: true,
+          s3Key: 'test-key-1',
+          cdnUrl: mockCdnUrl1,
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          s3Key: 'test-key-2',
+          cdnUrl: mockCdnUrl2,
+        });
+
+      const coverArts = [
+        { base64: sampleBase64, albumName: '   ' },
+        { base64: sampleBase64, albumName: '\t\n' },
+      ];
+
+      const result = await uploadCoverArtsToS3(coverArts);
+
+      // Each track with whitespace-only album gets its own upload with "unknown" key
+      expect(mockGetPresignedUploadUrlsAction).toHaveBeenCalledTimes(2);
+      expect(result.size).toBe(2);
+      expect(result.has('unknown-0')).toBe(true);
+      expect(result.has('unknown-1')).toBe(true);
     });
 
     it('should return partial results when some uploads fail', async () => {

@@ -36,6 +36,10 @@ vi.mock('./edit-profile-button', () => ({
   default: () => <div data-testid="edit-profile-button">Edit Profile Button</div>,
 }));
 
+vi.mock('./admin-link', () => ({
+  default: () => <div data-testid="admin-link">Admin Link</div>,
+}));
+
 vi.mock('../ui/vertical-separator', () => ({
   default: () => <div data-testid="vertical-separator">|</div>,
 }));
@@ -232,6 +236,48 @@ describe('SignedinToolbar', () => {
       const separators = screen.getAllByTestId('vertical-separator');
       // At least one separator should be visible
       expect(separators.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('admin functionality', () => {
+    it('shows admin link and separator when user is admin', () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: '1',
+            name: 'Admin User',
+            email: 'admin@example.com',
+            role: 'admin',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+      render(<SignedinToolbar />);
+
+      // Should have 3 separators on desktop for admin (after SignedInAs, after EditProfile, before AdminLink)
+      const separators = screen.getAllByTestId('vertical-separator');
+      expect(separators).toHaveLength(3);
+    });
+
+    it('hides admin link when user is not admin', () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: '1',
+            name: 'Regular User',
+            email: 'user@example.com',
+            role: 'user',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+      render(<SignedinToolbar />);
+
+      // Should only have 2 separators on desktop for non-admin (after SignedInAs, after EditProfile)
+      const separators = screen.getAllByTestId('vertical-separator');
+      expect(separators).toHaveLength(2);
     });
   });
 });

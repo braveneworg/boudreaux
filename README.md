@@ -31,6 +31,61 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Database Backups
+
+The project includes automated MongoDB backup and restore scripts.
+
+### Prerequisites
+
+Install MongoDB Database Tools:
+
+```bash
+# macOS
+brew install mongodb/brew/mongodb-database-tools
+
+# Ubuntu/Debian
+sudo apt-get install mongodb-database-tools
+
+# Windows
+# Download from https://www.mongodb.com/try/download/database-tools
+```
+
+### Creating Backups
+
+```bash
+# Create a backup with auto-generated timestamp filename
+npm run mongo:dump
+
+# Create a backup with custom filename
+npm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
+```
+
+Backups are automatically:
+
+- Saved to the `/backups` directory with ISO 8601 timestamps (e.g., `2026-02-07T21-49-07-mongo-backup.archive`)
+- Compressed with gzip for efficient storage (~90% compression)
+- Limited to the 5 most recent backups (older ones are automatically deleted)
+
+### Restoring from Backup
+
+```bash
+# Restore from a backup file
+npm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
+```
+
+**⚠️ Warning:** Restoring will drop existing collections and replace them with the backup data.
+
+### What's Included
+
+Each backup includes:
+
+- All database collections and documents
+- Indexes and constraints
+- Database metadata
+- Validation rules
+
+For more details, see [scripts/README.md](scripts/README.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

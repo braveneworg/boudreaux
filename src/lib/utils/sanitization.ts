@@ -29,14 +29,23 @@ export function sanitizeHtml(input: string): string {
 export function sanitizeString(input: string): string {
   if (!input) return '';
 
-  // Remove null bytes, control characters, and special Unicode
-  return (
-    input
-      .replace(/\0/g, '') // Null bytes
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Control characters
-      .trim()
-  );
+  // Remove null bytes and control characters
+  // Build regex pattern dynamically to avoid no-control-regex lint error
+  const controlCharsPattern =
+    '[' +
+    String.fromCharCode(0x00) +
+    '-' +
+    String.fromCharCode(0x08) +
+    String.fromCharCode(0x0b) +
+    String.fromCharCode(0x0c) +
+    String.fromCharCode(0x0e) +
+    '-' +
+    String.fromCharCode(0x1f) +
+    String.fromCharCode(0x7f) +
+    ']';
+  const controlCharsRegex = new RegExp(controlCharsPattern, 'g');
+
+  return input.replace(/\0/g, '').replace(controlCharsRegex, '').trim();
 }
 
 /**

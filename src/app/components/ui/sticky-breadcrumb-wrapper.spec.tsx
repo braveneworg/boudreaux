@@ -250,4 +250,24 @@ describe('StickyBreadcrumbWrapper', () => {
     expect(container.firstChild).toBeNull();
     expect(screen.queryByText('Test Content')).not.toBeInTheDocument();
   });
+
+  it('should handle SSR environment where window is undefined', () => {
+    // Save original window
+    const originalWindow = global.window;
+
+    // @ts-expect-error - Intentionally setting window to undefined for SSR test
+    delete global.window;
+
+    // Should not throw during render
+    expect(() => {
+      render(
+        <StickyBreadcrumbWrapper>
+          <div>SSR Content</div>
+        </StickyBreadcrumbWrapper>
+      );
+    }).not.toThrow();
+
+    // Restore window
+    global.window = originalWindow;
+  });
 });

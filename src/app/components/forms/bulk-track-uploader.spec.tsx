@@ -1597,4 +1597,193 @@ describe('BulkTrackUploader', () => {
       expect(screen.queryByText('new')).not.toBeInTheDocument();
     });
   });
+
+  describe('deferred upload mode', () => {
+    it.todo('should create tracks without uploading when defer upload is enabled');
+
+    it.todo('should show queued status for deferred tracks');
+  });
+
+  describe('error handling', () => {
+    it('should handle presigned URL failure', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ metadata: { title: 'Test', duration: 180 } }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const input = screen.getByLabelText(/select audio files/i);
+      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
+      });
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: false,
+        error: 'Failed to generate URLs',
+      });
+
+      const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to generate URLs');
+      });
+    });
+
+    it('should handle all uploads failing', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ metadata: { title: 'Test', duration: 180 } }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const input = screen.getByLabelText(/select audio files/i);
+      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
+      });
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
+      });
+      mockUploadFilesToS3.mockResolvedValue([{ success: false }]);
+
+      const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('All file uploads failed');
+      });
+    });
+
+    it('should handle partial upload success', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ metadata: { title: 'Track', duration: 180 } }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const input = screen.getByLabelText(/select audio files/i);
+      await userEvent.upload(input, [
+        createMockAudioFile('track1.mp3'),
+        createMockAudioFile('track2.mp3'),
+      ]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (2)')).toBeInTheDocument();
+      });
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          { uploadUrl: 'url1', cdnUrl: 'cdn1', key: 'key1' },
+          { uploadUrl: 'url2', cdnUrl: 'cdn2', key: 'key2' },
+        ],
+      });
+      mockUploadFilesToS3.mockResolvedValue([{ success: true }, { success: false }]);
+      mockBulkCreateTracksAction.mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+        results: [{ index: 0, success: true, title: 'Track', trackId: 'id' }],
+      });
+
+      const uploadButton = screen.getByRole('button', { name: /upload 2 tracks/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('1 created')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle bulk create tracks failure', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ metadata: { title: 'Test', duration: 180 } }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const input = screen.getByLabelText(/select audio files/i);
+      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
+      });
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
+      });
+      mockUploadFilesToS3.mockResolvedValue([{ success: true }]);
+      mockBulkCreateTracksAction.mockResolvedValue({
+        success: false,
+        error: 'Database error',
+        successCount: 0,
+        failedCount: 1,
+        results: [],
+      });
+
+      const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to create tracks: Database error');
+      });
+    });
+  });
+
+  describe('drag and drop', () => {
+    it('should handle drag over event', () => {
+      render(<BulkTrackUploader />);
+
+      const dropZone = screen.getByText(/drag and drop audio files/i).closest('div');
+
+      fireEvent.dragOver(dropZone!, { dataTransfer: { files: [] } });
+
+      // Should show drag over state with border-primary and bg-primary/5
+      expect(dropZone).toHaveClass('border-primary');
+      expect(dropZone).toHaveClass('bg-primary/5');
+    });
+
+    it('should handle drag leave event', () => {
+      render(<BulkTrackUploader />);
+
+      const dropZone = screen.getByText(/drag and drop audio files/i).closest('div');
+
+      fireEvent.dragOver(dropZone!, { dataTransfer: { files: [] } });
+      fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+
+      // Should clear drag over state
+      expect(dropZone).not.toHaveClass('border-primary');
+      expect(dropZone).not.toHaveClass('bg-primary/5');
+    });
+
+    it('should handle drop event with audio files', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ metadata: { title: 'Dropped', duration: 180 } }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const dropZone = screen.getByText(/drag and drop audio files/i).closest('div');
+      const file = createMockAudioFile('dropped.mp3');
+
+      fireEvent.drop(dropZone!, {
+        dataTransfer: { files: createFileList([file]) },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
+      });
+    });
+  });
 });
