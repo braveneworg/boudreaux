@@ -45,7 +45,7 @@ export async function updateTrackAudioAction(
     // Verify track exists and is in PENDING or UPLOADING state
     const track = await prisma.track.findUnique({
       where: { id: trackId },
-      select: { id: true, audioUploadStatus: true, title: true },
+      select: { id: true, audioUploadStatus: true, title: true, audioUrl: true },
     });
 
     if (!track) {
@@ -69,7 +69,7 @@ export async function updateTrackAudioAction(
     await prisma.track.update({
       where: { id: trackId },
       data: {
-        audioUrl: status === 'COMPLETED' ? audioUrl : track.title, // Keep placeholder if failed
+        audioUrl: status === 'COMPLETED' ? audioUrl : track.audioUrl, // Keep existing URL if failed
         audioUploadStatus:
           status === 'COMPLETED' ? AudioUploadStatus.COMPLETED : AudioUploadStatus.FAILED,
       },
