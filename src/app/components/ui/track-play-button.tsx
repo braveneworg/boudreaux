@@ -140,7 +140,7 @@ export function TrackPlayButton({
       type="button"
     >
       {isPlaying ? <Pause className={iconSize} /> : <Play className={iconSize} />}
-      <span className="sr-only">{isPlaying ? 'Pause' : 'Play'}</span>
+      {!iconOnly && <span className="sr-only">{isPlaying ? 'Pause' : 'Play'}</span>}
     </Button>
   );
 }
