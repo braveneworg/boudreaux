@@ -11,6 +11,7 @@ vi.mock('../prisma', () => ({
       create: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
@@ -281,6 +282,61 @@ describe('TrackService', () => {
       const result = await TrackService.getTracks();
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve tracks' });
+    });
+  });
+
+  describe('getTracksCount', () => {
+    it('should return count of all tracks without search', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(42);
+
+      const result = await TrackService.getTracksCount();
+
+      expect(result).toMatchObject({ success: true, data: 42 });
+      expect(prisma.track.count).toHaveBeenCalledWith({
+        where: {},
+      });
+    });
+
+    it('should return count of tracks matching search query', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(5);
+
+      const result = await TrackService.getTracksCount('test');
+
+      expect(result).toMatchObject({ success: true, data: 5 });
+      expect(prisma.track.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+        },
+      });
+    });
+
+    it('should return 0 when no tracks exist', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(0);
+
+      const result = await TrackService.getTracksCount();
+
+      expect(result).toMatchObject({ success: true, data: 0 });
+    });
+
+    it('should return error for database initialization failure', async () => {
+      const prismaError = new Prisma.PrismaClientInitializationError(
+        'Database connection failed',
+        '5.0.0'
+      );
+
+      vi.mocked(prisma.track.count).mockRejectedValue(prismaError);
+
+      const result = await TrackService.getTracksCount();
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should return generic error for unknown failures', async () => {
+      vi.mocked(prisma.track.count).mockRejectedValue(Error('Unknown error'));
+
+      const result = await TrackService.getTracksCount();
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to count tracks' });
     });
   });
 

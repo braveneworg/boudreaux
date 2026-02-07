@@ -21,8 +21,8 @@ export interface BulkTrackData {
   title: string;
   /** Duration in seconds */
   duration: number;
-  /** S3 URL of the uploaded audio file */
-  audioUrl: string;
+  /** S3 URL of the uploaded audio file (optional when deferUpload is true) */
+  audioUrl?: string;
   /** Track position/number */
   position?: number;
   /** Cover art URL (optional) */
@@ -43,6 +43,18 @@ export interface BulkTrackData {
   artist?: string;
   /** Whether the audio is lossless */
   lossless?: boolean;
+}
+
+/**
+ * Options for bulk track creation
+ */
+export interface BulkCreateTracksOptions {
+  /** Whether to auto-create releases from album metadata (default: true) */
+  autoCreateRelease?: boolean;
+  /** Whether to publish tracks immediately (default: false) */
+  publishTracks?: boolean;
+  /** Whether to defer audio upload - tracks created with PENDING status (default: false) */
+  deferUpload?: boolean;
 }
 
 /**
@@ -88,15 +100,14 @@ export interface BulkCreateTracksResult {
  * Each track can optionally be associated with a release (found or created from metadata)
  *
  * @param tracks - Array of track data to create
- * @param autoCreateRelease - Whether to auto-create releases from album metadata
- * @param publishTracks - Whether to publish the tracks immediately
+ * @param options - Configuration options for bulk creation
  * @returns Result with details for each track
  */
 export async function bulkCreateTracksAction(
   tracks: BulkTrackData[],
-  autoCreateRelease = true,
-  publishTracks = false
+  options: BulkCreateTracksOptions = {}
 ): Promise<BulkCreateTracksResult> {
+  const { autoCreateRelease = true, publishTracks = false, deferUpload = false } = options;
   await requireRole('admin');
 
   // Validate input
@@ -235,7 +246,8 @@ export async function bulkCreateTracksAction(
         continue;
       }
 
-      if (!track.audioUrl || track.audioUrl.trim() === '') {
+      // audioUrl is only required when not deferring upload
+      if (!deferUpload && (!track.audioUrl || track.audioUrl.trim() === '')) {
         results.push({
           index: i,
           success: false,
@@ -383,14 +395,24 @@ export async function bulkCreateTracksAction(
           }
 
           // Create the track with optional release and artist associations
+          // When deferUpload is true, use placeholder URL and PENDING status
+          const audioUrl = deferUpload
+            ? track.audioUrl?.trim() || 'pending://upload'
+            : track.audioUrl?.trim();
+
+          if (!audioUrl && !deferUpload) {
+            throw new Error('audioUrl is required when deferUpload is false');
+          }
+
           const trackData = await tx.track.create({
             data: {
               title: track.title.trim(),
               duration: track.duration,
-              audioUrl: track.audioUrl.trim(),
+              audioUrl: audioUrl || 'pending://upload',
               position: track.position ?? 0,
               coverArt: track.coverArt?.trim() || undefined,
               publishedOn: publishTracks ? new Date() : undefined,
+              audioUploadStatus: deferUpload ? 'PENDING' : 'COMPLETED',
               // Connect to release if we have one
               ...(releaseId && {
                 releaseTracks: {
@@ -453,6 +475,7 @@ export async function bulkCreateTracksAction(
         successCount,
         failedCount,
         autoCreateRelease,
+        deferUpload,
         releasesCreated: [...releaseCache.values()].filter((r) => r.created).length,
         artistsCreated: [...artistCache.values()].filter((a) => a.created).length,
         groupsCreated: [...groupCache.values()].filter((g) => g.created).length,

@@ -162,6 +162,30 @@ export class TrackService {
   }
 
   /**
+   * Get total count of tracks with optional search filter
+   */
+  static async getTracksCount(search?: string): Promise<ServiceResponse<number>> {
+    try {
+      const where: Prisma.TrackWhereInput = {
+        ...(search && {
+          OR: [{ title: { contains: search, mode: 'insensitive' } }],
+        }),
+      };
+
+      const count = await prisma.track.count({ where });
+      return { success: true, data: count };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to count tracks' };
+    }
+  }
+
+  /**
    * Update a track by ID
    */
   static async updateTrack(
