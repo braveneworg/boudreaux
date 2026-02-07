@@ -207,7 +207,7 @@ export class ReleaseService {
         });
 
         // If publishing the release, also publish all associated tracks
-        if (shouldPublishTracks) {
+        if (shouldPublishTracks && updatedRelease.publishedAt) {
           const trackIds = updatedRelease.releaseTracks.map((rt) => rt.trackId);
 
           if (trackIds.length > 0) {
@@ -217,7 +217,7 @@ export class ReleaseService {
                 publishedOn: null, // Only update tracks that aren't already published
               },
               data: {
-                publishedOn: data.publishedAt as Date,
+                publishedOn: updatedRelease.publishedAt,
               },
             });
           }
