@@ -161,7 +161,7 @@ describe('TrackDataView', () => {
       isInitialLoading: false,
       isStale: false,
       isEnabled: true,
-      promise: Promise.reject(Error('Failed to fetch')) as unknown as Promise<
+      promise: Promise.reject(Error('Failed to fetch')).catch(() => {}) as unknown as Promise<
         InfiniteData<TracksResponse>
       >,
     });
