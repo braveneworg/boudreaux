@@ -6,6 +6,8 @@
  * They can be used in both client and server code for input sanitization.
  */
 
+import { normalize, resolve, relative, isAbsolute, sep } from 'path';
+
 /**
  * Sanitize HTML input by escaping dangerous characters
  * Use this before storing user input in database
@@ -118,4 +120,54 @@ export function sanitizeTextField(input: string): string {
   if (!input) return '';
 
   return normalizeWhitespace(sanitizeString(input));
+}
+
+/**
+ * Sanitize file path to prevent path traversal attacks
+ * This treats the input as a POSIX-style path (forward slashes) and normalizes it.
+ * Rejects paths that:
+ * - Are absolute paths
+ * - Contain '..' segments that would escape the base directory
+ * - Contain null bytes or control characters
+ *
+ * @param pathKey - The path/key to sanitize (e.g., from S3 object key)
+ * @param baseDir - The base directory that the resolved path must stay within
+ * @returns Sanitized path that is safe to use within baseDir
+ * @throws Error if path is invalid or attempts to traverse outside baseDir
+ */
+export function sanitizeFilePath(pathKey: string, baseDir: string): string {
+  if (!pathKey) {
+    throw new Error('Path key cannot be empty');
+  }
+
+  // Remove null bytes and control characters
+  const cleanPath = pathKey.replace(/\0/g, '');
+  if (cleanPath !== pathKey) {
+    throw new Error('Path contains null bytes');
+  }
+
+  // Reject absolute paths
+  if (isAbsolute(cleanPath)) {
+    throw new Error('Absolute paths are not allowed');
+  }
+
+  // Normalize the path (converts to platform-specific separators and resolves . and ..)
+  const normalizedPath = normalize(cleanPath);
+
+  // Check if normalized path tries to go up with '..'
+  if (normalizedPath.startsWith('..' + sep) || normalizedPath === '..') {
+    throw new Error('Path traversal attempt detected (..)');
+  }
+
+  // Resolve the full path within the base directory
+  const resolvedBase = resolve(baseDir);
+  const resolvedPath = resolve(baseDir, normalizedPath);
+
+  // Verify the resolved path is within the base directory
+  const relativePath = relative(resolvedBase, resolvedPath);
+  if (relativePath.startsWith('..' + sep) || isAbsolute(relativePath)) {
+    throw new Error('Resolved path escapes base directory');
+  }
+
+  return normalizedPath;
 }

@@ -55,6 +55,7 @@ import {
   writeFileSync,
   readFileSync,
 } from '../src/lib/system-utils';
+import { sanitizeFilePath } from '../src/lib/utils/sanitization';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -216,7 +217,19 @@ export async function backupS3ToLocal(
       for (const object of listResponse.Contents) {
         if (!object.Key) continue;
 
-        const localPath = join(localDir, object.Key);
+        // Sanitize the S3 key to prevent path traversal attacks
+        let sanitizedKey: string;
+        try {
+          sanitizedKey = sanitizeFilePath(object.Key, localDir);
+        } catch (error) {
+          log(
+            `Skipping object with invalid key: ${object.Key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+            'warning'
+          );
+          continue;
+        }
+
+        const localPath = join(localDir, sanitizedKey);
         const localDirPath = dirname(localPath);
 
         // Create directory structure
@@ -377,7 +390,20 @@ async function restoreFile(
   overwrite: boolean,
   result: RestoreResult
 ): Promise<void> {
-  const localPath = join(localDir, key);
+  // Sanitize the key to prevent path traversal (defense in depth)
+  let sanitizedKey: string;
+  try {
+    sanitizedKey = sanitizeFilePath(key, localDir);
+  } catch (error) {
+    log(
+      `Skipping file with invalid key: ${key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+      'warning'
+    );
+    result.skipped++;
+    return;
+  }
+
+  const localPath = join(localDir, sanitizedKey);
 
   if (!existsSync(localPath)) {
     log(`Warning: File not found locally: ${key}`, 'warning');
