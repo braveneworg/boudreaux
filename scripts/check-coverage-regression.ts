@@ -40,7 +40,7 @@ function loadThresholdsFromConfig(): CoverageMetrics {
   // Parse the thresholds block from the config file
   // Format: thresholds: { lines: 95, functions: 95, branches: 85, statements: 95 }
   const thresholdsMatch = configContent.match(
-    /thresholds:\s*\{[^}]*lines:\s*(\d+)[^}]*functions:\s*(\d+)[^}]*branches:\s*(\d+)[^}]*statements:\s*(\d+)[^}]*\}/s
+    /thresholds:\s*\{[^}]*lines:\s*(\d+)[^}]*functions:\s*(\d+)[^}]*branches:\s*(\d+)[^}]*statements:\s*(\d+)[^}]*\}/
   );
 
   if (!thresholdsMatch) {
