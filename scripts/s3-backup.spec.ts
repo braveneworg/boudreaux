@@ -1064,6 +1064,32 @@ describe('S3 Backup Script', () => {
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Restore failed'));
     });
 
+    it('should default to no-overwrite when overwrite parameter is omitted (upload command behavior)', async () => {
+      const metadata = {
+        timestamp: '2026-01-01T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 1,
+        totalSize: 1024,
+        files: [{ key: 'file1.txt', size: 1024, lastModified: '2026-01-01T00:00:00Z' }],
+      };
+
+      readFileSyncMock.mockReturnValue(JSON.stringify(metadata));
+
+      // HeadObject succeeds → file exists in S3, should be skipped
+      s3ClientSendMock.mockResolvedValue({});
+
+      // Call without overwrite parameter, matching: restoreLocalToS3(localDir, bucket, region)
+      const result = await restoreLocalToS3(localDir, testBucket, testRegion);
+
+      expect(result.successful).toBe(0);
+      expect(result.skipped).toBe(1);
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping (already exists)')
+      );
+    });
+
     it('should log successful and failed counts after restore', async () => {
       const metadata = {
         timestamp: '2026-01-01T00:00:00Z',

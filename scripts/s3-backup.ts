@@ -809,11 +809,23 @@ async function main(): Promise<void> {
         break;
       }
 
+      case 'upload': {
+        const localDir = args[1];
+        if (!localDir) {
+          console.error('Error: Local directory path is required for upload');
+          console.error('Usage: npm run s3:upload <local-directory>');
+          process.exit(1);
+        }
+        await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
+        break;
+      }
+
       default:
         console.error('Usage:');
         console.error('  npm run s3:backup [local-directory]');
         console.error('  npm run s3:restore <local-directory> [--overwrite]');
         console.error('  npm run s3:list [backups-directory]');
+        console.error('  npm run s3:upload <local-directory>');
         console.error('');
         console.error('Commands:');
         console.error('  backup   - Download S3 bucket contents to local directory');
