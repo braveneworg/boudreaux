@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { render, screen } from '@testing-library/react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, useFormContext } from 'react-hook-form';
 
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
@@ -53,7 +53,7 @@ vi.mock('@/lib/utils/countries', () => ({
   ],
 }));
 
-// Test wrapper component
+// Test wrapper component that provides form context
 function TestWrapper({ children }: { children: React.ReactNode }) {
   const methods = useForm<ProfileFormData>({
     defaultValues: {
@@ -77,11 +77,19 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Helper component that renders CountryField with form context
+function CountryFieldWithContext({ onUserInteraction }: { onUserInteraction?: () => void }) {
+  const { control, setValue } = useFormContext<ProfileFormData>();
+  return (
+    <CountryField control={control} setValue={setValue} onUserInteraction={onUserInteraction} />
+  );
+}
+
 describe('CountryField', () => {
   it('should render with default props', () => {
     render(
       <TestWrapper>
-        <CountryField control={{} as never} setValue={vi.fn()} />
+        <CountryFieldWithContext />
       </TestWrapper>
     );
 
@@ -98,7 +106,7 @@ describe('CountryField', () => {
   it('should render all country options', () => {
     render(
       <TestWrapper>
-        <CountryField control={{} as never} setValue={vi.fn()} />
+        <CountryFieldWithContext />
       </TestWrapper>
     );
 
@@ -126,11 +134,7 @@ describe('CountryField', () => {
 
     render(
       <TestWrapper>
-        <CountryField
-          control={{} as never}
-          setValue={vi.fn()}
-          onUserInteraction={onUserInteraction}
-        />
+        <CountryFieldWithContext onUserInteraction={onUserInteraction} />
       </TestWrapper>
     );
 
@@ -141,11 +145,9 @@ describe('CountryField', () => {
   });
 
   it('should pass through control and setValue props to ComboboxField', () => {
-    const mockSetValue = vi.fn();
-
     render(
       <TestWrapper>
-        <CountryField control={{} as never} setValue={mockSetValue} />
+        <CountryFieldWithContext />
       </TestWrapper>
     );
 
@@ -155,7 +157,7 @@ describe('CountryField', () => {
   it('should have correct option structure for countries', () => {
     render(
       <TestWrapper>
-        <CountryField control={{} as never} setValue={vi.fn()} />
+        <CountryFieldWithContext />
       </TestWrapper>
     );
 
@@ -175,7 +177,7 @@ describe('CountryField', () => {
   it('should render without onUserInteraction prop', () => {
     render(
       <TestWrapper>
-        <CountryField control={{} as never} setValue={vi.fn()} />
+        <CountryFieldWithContext />
       </TestWrapper>
     );
 
