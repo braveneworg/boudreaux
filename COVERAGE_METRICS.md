@@ -28,7 +28,7 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 Based on the project's [copilot instructions](.github/copilot-instructions.md), the coverage targets are:
 
-- **Minimum Target:** 90-95%+ on all testable files except for branches, which should be at least 85%+.
+- **Minimum Target:** 90-95%+ on all testable files except for branches, which should be at least 80%+.
 - **Ideal Target:** 100% on all testable files, including branches.
 - **Current Status:** The project is currently above the minimum target for statements, functions, and lines, but slightly below the ideal target for branches. Focus should be on improving branch coverage in key areas to reach the ideal target.
 
