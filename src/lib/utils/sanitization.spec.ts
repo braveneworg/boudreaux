@@ -312,8 +312,10 @@ describe('sanitization utilities', () => {
       });
 
       it('handles Windows-style paths on POSIX systems', () => {
-        // On POSIX systems, backslashes are treated as regular filename characters
-        // This is acceptable since S3 uses forward slashes (POSIX-style paths)
+        // On POSIX systems (Linux, macOS), backslashes are treated as regular filename characters.
+        // This is the expected behavior since S3 uses POSIX-style paths (forward slashes).
+        // Note: On Windows, normalize() would convert backslashes to forward slashes,
+        // but this function is primarily designed for S3 keys which are always POSIX-style.
         const result = sanitizeFilePath('C:\\Windows\\System32', baseDir);
         expect(result).toBe('C:\\Windows\\System32');
       });

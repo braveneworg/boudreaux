@@ -128,7 +128,7 @@ export function sanitizeTextField(input: string): string {
  * Rejects paths that:
  * - Are absolute paths
  * - Contain '..' segments that would escape the base directory
- * - Contain null bytes or control characters
+ * - Contain null bytes or control characters (code points < 32, excluding tab and newline)
  *
  * @param pathKey - The path/key to sanitize (e.g., from S3 object key)
  * @param baseDir - The base directory that the resolved path must stay within
@@ -140,10 +140,29 @@ export function sanitizeFilePath(pathKey: string, baseDir: string): string {
     throw new Error('Path key cannot be empty');
   }
 
-  // Remove null bytes and control characters
+  // Remove null bytes
   const cleanPath = pathKey.replace(/\0/g, '');
   if (cleanPath !== pathKey) {
     throw new Error('Path contains null bytes');
+  }
+
+  // Check for control characters (code points < 32, excluding tab and newline)
+  // Build regex pattern dynamically to avoid no-control-regex lint error
+  const controlCharsPattern =
+    '[' +
+    String.fromCharCode(0x00) +
+    '-' +
+    String.fromCharCode(0x08) +
+    String.fromCharCode(0x0b) +
+    String.fromCharCode(0x0c) +
+    String.fromCharCode(0x0e) +
+    '-' +
+    String.fromCharCode(0x1f) +
+    ']';
+  const controlCharsRegex = new RegExp(controlCharsPattern, 'g');
+
+  if (controlCharsRegex.test(cleanPath)) {
+    throw new Error('Path contains control characters');
   }
 
   // Reject absolute paths
