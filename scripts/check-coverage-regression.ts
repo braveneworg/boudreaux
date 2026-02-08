@@ -37,22 +37,47 @@ function loadThresholdsFromConfig(): CoverageMetrics {
   const configPath = path.join(process.cwd(), 'vitest.config.ts');
   const configContent = fs.readFileSync(configPath, 'utf-8');
 
-  // Parse the thresholds block from the config file
-  // Format: thresholds: { lines: 95, functions: 95, branches: 85, statements: 95 }
-  const thresholdsMatch = configContent.match(
-    /thresholds:\s*\{[^}]*lines:\s*(\d+)[^}]*functions:\s*(\d+)[^}]*branches:\s*(\d+)[^}]*statements:\s*(\d+)[^}]*\}/
-  );
+  // Parse the thresholds block from the config file in an order-independent way.
+  // Supports integer and decimal threshold values, e.g. 95 or 95.5.
+  const thresholdsBlockMatch = configContent.match(/thresholds\s*:\s*\{([\s\S]*?)\}/s);
 
-  if (!thresholdsMatch) {
-    console.error('❌ Could not parse coverage thresholds from vitest.config.ts');
+  if (!thresholdsBlockMatch) {
+    console.error('❌ Could not find coverage thresholds block in vitest.config.ts');
     process.exit(1);
   }
 
+  const thresholdsBlock = thresholdsBlockMatch[1];
+  const metricKeys: (keyof CoverageMetrics)[] = ['lines', 'functions', 'branches', 'statements'];
+  const parsedThresholds: Partial<CoverageMetrics> = {};
+
+  for (const key of metricKeys) {
+    const keyRegex = new RegExp(`\\b${key}\\s*:\\s*(\\d+(?:\\.\\d+)?)`);
+    const match = thresholdsBlock.match(keyRegex);
+
+    if (!match) {
+      console.error(
+        `❌ Could not parse "${key}" coverage threshold from vitest.config.ts`
+      );
+      process.exit(1);
+    }
+
+    const value = parseFloat(match[1]);
+
+    if (Number.isNaN(value)) {
+      console.error(
+        `❌ Parsed "${key}" coverage threshold is not a valid number in vitest.config.ts`
+      );
+      process.exit(1);
+    }
+
+    parsedThresholds[key] = value;
+  }
+
   return {
-    lines: parseInt(thresholdsMatch[1], 10),
-    functions: parseInt(thresholdsMatch[2], 10),
-    branches: parseInt(thresholdsMatch[3], 10),
-    statements: parseInt(thresholdsMatch[4], 10),
+    statements: parsedThresholds.statements as number,
+    branches: parsedThresholds.branches as number,
+    functions: parsedThresholds.functions as number,
+    lines: parsedThresholds.lines as number,
   };
 }
 
