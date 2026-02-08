@@ -1,2 +1,11 @@
 export { execSync } from 'child_process';
-export { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
+export {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
