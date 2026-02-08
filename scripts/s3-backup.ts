@@ -570,6 +570,11 @@ export async function invalidateCloudFrontCache(
     const response = await cloudFrontClient.send(command);
     const invalidationId = response.Invalidation?.Id || null;
 
+    if (!invalidationId) {
+      log('Warning: CloudFront API did not return an invalidation ID', 'warning');
+      return null;
+    }
+
     log(`CloudFront invalidation created: ${invalidationId}`, 'success');
     log('Invalidation may take 5-15 minutes to complete', 'info');
 

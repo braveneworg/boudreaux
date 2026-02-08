@@ -1597,6 +1597,9 @@ describe('S3 Backup Script', () => {
 
       expect(result).toBeNull();
       expect(cloudFrontSendMock).toHaveBeenCalledTimes(1);
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('CloudFront API did not return an invalidation ID')
+      );
     });
 
     it('should throw and log error when CloudFront API fails', async () => {
