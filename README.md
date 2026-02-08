@@ -73,12 +73,13 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ### S3
 
-| Script               | Command                                | Description                        |
-| -------------------- | -------------------------------------- | ---------------------------------- |
-| `npm run s3:backup`  | `npx tsx scripts/s3-backup.ts backup`  | Back up S3 bucket contents locally |
-| `npm run s3:restore` | `npx tsx scripts/s3-backup.ts restore` | Restore local backup to S3 bucket  |
-| `npm run s3:list`    | `npx tsx scripts/s3-backup.ts list`    | List objects in the S3 bucket      |
-| `npm run s3:upload`  | `npx tsx scripts/s3-backup.ts upload`  | Upload files to the S3 bucket      |
+| Script                  | Command                                | Description                        |
+| ----------------------- | -------------------------------------- | ---------------------------------- |
+| `npm run s3:backup`     | `npx tsx scripts/s3-backup.ts backup`  | Back up S3 bucket contents locally |
+| `npm run s3:restore`    | `npx tsx scripts/s3-backup.ts restore` | Restore local backup to S3 bucket  |
+| `npm run s3:list`       | `npx tsx scripts/s3-backup.ts list`    | List objects in the S3 bucket      |
+| `npm run s3:upload`     | `npx tsx scripts/s3-backup.ts upload`  | Upload files to the S3 bucket      |
+| `npm run images:upload` | `npx tsx scripts/upload-images.ts`     | Upload images to S3 bucket         |
 
 ### Docker
 
