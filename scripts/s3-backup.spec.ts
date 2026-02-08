@@ -55,13 +55,25 @@ describe('S3 Backup Script - Utility Functions', () => {
       expect(timePart).toMatch(/^\d{2}-\d{2}-\d{2}$/);
     });
 
-    it('should generate different timestamps at different times', async () => {
-      const timestamp1 = generateTimestamp();
-      await new Promise((resolve) => setTimeout(resolve, 1100)); // Wait slightly over 1 second
-      const timestamp2 = generateTimestamp();
+    it('should generate different timestamps at different times', () => {
+      vi.useFakeTimers();
 
-      // These should be different since we waited
-      expect(timestamp1).not.toBe(timestamp2);
+      try {
+        const initialDate = new Date('2023-01-01T00:00:00Z');
+        vi.setSystemTime(initialDate);
+
+        const timestamp1 = generateTimestamp();
+
+        const laterDate = new Date(initialDate.getTime() + 1100);
+        vi.setSystemTime(laterDate);
+
+        const timestamp2 = generateTimestamp();
+
+        // These should be different since we moved time forward
+        expect(timestamp1).not.toBe(timestamp2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
