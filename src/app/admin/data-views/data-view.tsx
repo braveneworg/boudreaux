@@ -109,19 +109,12 @@ export function DataView<T extends Record<string, unknown>>({
   useEffect(() => {
     if (!hasNextPage || !fetchNextPage) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      {
-        root: null,
-        rootMargin: '100px',
-        threshold: 0,
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
       }
-    );
+    });
 
     const currentRef = loadMoreRef.current;
     if (currentRef) {
