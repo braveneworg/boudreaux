@@ -31,6 +31,8 @@
  *   S3_BUCKET - S3 bucket name (required)
  *   AWS_REGION - AWS region (default: us-east-1)
  *   S3_BACKUP_PREFIX - S3 key prefix to backup/restore (default: '' - entire bucket)
+ *   S3_MAX_BACKUPS - Maximum number of backups to keep (default: 5)
+ *               Older backups are automatically deleted after successful backup
  */
 
 import { createWriteStream, createReadStream } from 'fs';
@@ -54,7 +56,10 @@ import {
   statSync,
   writeFileSync,
   readFileSync,
+  rmdirSync,
+  unlinkSync,
 } from '../src/lib/system-utils';
+import { sanitizeFilePath } from '../src/lib/utils/sanitization';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -63,6 +68,7 @@ dotenv.config(); // This loads .env as fallback
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const S3_BACKUP_PREFIX = process.env.S3_BACKUP_PREFIX || '';
+const MAX_BACKUPS_TO_KEEP = parseInt(process.env.S3_MAX_BACKUPS || '5', 10);
 
 // Only check S3_BUCKET if running as main script (not when imported for testing)
 if (!S3_BUCKET && require.main === module) {
@@ -216,7 +222,19 @@ export async function backupS3ToLocal(
       for (const object of listResponse.Contents) {
         if (!object.Key) continue;
 
-        const localPath = join(localDir, object.Key);
+        // Sanitize the S3 key to prevent path traversal attacks
+        let sanitizedKey: string;
+        try {
+          sanitizedKey = sanitizeFilePath(object.Key, localDir);
+        } catch (error) {
+          log(
+            `Skipping object with invalid key: ${object.Key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+            'warning'
+          );
+          continue;
+        }
+
+        const localPath = join(localDir, sanitizedKey);
         const localDirPath = dirname(localPath);
 
         // Create directory structure
@@ -377,7 +395,20 @@ async function restoreFile(
   overwrite: boolean,
   result: RestoreResult
 ): Promise<void> {
-  const localPath = join(localDir, key);
+  // Sanitize the key to prevent path traversal (defense in depth)
+  let sanitizedKey: string;
+  try {
+    sanitizedKey = sanitizeFilePath(key, localDir);
+  } catch (error) {
+    log(
+      `Skipping file with invalid key: ${key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+      'warning'
+    );
+    result.skipped++;
+    return;
+  }
+
+  const localPath = join(localDir, sanitizedKey);
 
   if (!existsSync(localPath)) {
     log(`Warning: File not found locally: ${key}`, 'warning');
@@ -528,6 +559,75 @@ export function listBackups(backupDir = 'backups'): void {
 }
 
 /**
+ * Clean up old backups, keeping only the most recent N backups
+ */
+export function cleanupOldBackups(backupDir = 'backups', maxBackups = MAX_BACKUPS_TO_KEEP): number {
+  if (!existsSync(backupDir)) {
+    return 0;
+  }
+
+  const items = readdirSync(backupDir);
+  const s3Backups = items
+    .filter((item) => {
+      const itemPath = join(backupDir, item);
+      return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+    })
+    .sort()
+    .reverse();
+
+  // Calculate how many to delete
+  const backupsToDelete = s3Backups.slice(maxBackups);
+
+  if (backupsToDelete.length === 0) {
+    return 0;
+  }
+
+  log(
+    `Cleaning up ${backupsToDelete.length} old backup(s) (keeping ${maxBackups} most recent)...`,
+    'info'
+  );
+
+  let deletedCount = 0;
+  for (const backup of backupsToDelete) {
+    const backupPath = join(backupDir, backup);
+    try {
+      // Recursively delete directory
+      deleteDirectory(backupPath);
+      log(`Deleted old backup: ${backup}`, 'success');
+      deletedCount++;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log(`Failed to delete backup ${backup}: ${errorMessage}`, 'error');
+    }
+  }
+
+  return deletedCount;
+}
+
+/**
+ * Recursively delete a directory and all its contents
+ */
+function deleteDirectory(dirPath: string): void {
+  if (!existsSync(dirPath)) {
+    return;
+  }
+
+  const items = readdirSync(dirPath);
+  for (const item of items) {
+    const itemPath = join(dirPath, item);
+    const stats = statSync(itemPath);
+
+    if (stats.isDirectory()) {
+      deleteDirectory(itemPath);
+    } else {
+      unlinkSync(itemPath);
+    }
+  }
+
+  rmdirSync(dirPath);
+}
+
+/**
  * Main CLI handler
  */
 async function main(): Promise<void> {
@@ -539,6 +639,15 @@ async function main(): Promise<void> {
       case 'backup': {
         const localDir = args[1] || getDefaultBackupPath();
         await backupS3ToLocal(localDir);
+
+        // Clean up old backups after successful backup
+        const backupDir = dirname(localDir);
+        if (existsSync(backupDir)) {
+          const deletedCount = cleanupOldBackups(backupDir);
+          if (deletedCount > 0) {
+            log(`Cleanup complete: removed ${deletedCount} old backup(s)`, 'info');
+          }
+        }
         break;
       }
 
