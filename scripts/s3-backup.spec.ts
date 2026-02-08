@@ -615,6 +615,104 @@ describe('S3 Backup Script', () => {
         expect.stringContaining('Changes detected since last backup')
       );
     });
+
+    it('should handle non-nested backup directory (localDir = "backups")', async () => {
+      const nonNestedDir = 'backups';
+      const lastModified = new Date('2026-01-15T00:00:00Z');
+
+      // S3 returns same files as previous backup
+      s3ClientSendMock.mockResolvedValueOnce({
+        Contents: [{ Key: 'photo.jpg', Size: 1024, LastModified: lastModified }],
+        NextContinuationToken: undefined,
+      });
+
+      // Previous backup metadata exists in a timestamped subdirectory
+      const previousMetadata = JSON.stringify({
+        timestamp: '2026-01-15T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 1,
+        totalSize: 1024,
+        files: [{ key: 'photo.jpg', size: 1024, lastModified: lastModified.toISOString() }],
+      });
+
+      // Setup: previous backup exists in backups/s3-* subdirectory
+      readdirSyncMock.mockReturnValue(['s3-2026-01-15T00-00-00']);
+      statSyncMock.mockReturnValue({ isDirectory: () => true });
+      existsSyncMock.mockReturnValue(true);
+      readFileSyncMock.mockReturnValue(previousMetadata);
+
+      const result = await backupS3ToLocal(nonNestedDir, testBucket, '', testRegion);
+
+      // Should correctly find previous backup and skip download
+      expect(result.totalFiles).toBe(0);
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('No changes detected since last backup')
+      );
+    });
+
+    it('should handle non-nested backup directory with dot prefix (localDir = "./my-backup")', async () => {
+      const nonNestedDir = './my-backup';
+      const lastModified = new Date('2026-01-15T00:00:00Z');
+
+      // S3 returns same files as previous backup
+      s3ClientSendMock.mockResolvedValueOnce({
+        Contents: [{ Key: 'photo.jpg', Size: 1024, LastModified: lastModified }],
+        NextContinuationToken: undefined,
+      });
+
+      // Previous backup metadata exists
+      const previousMetadata = JSON.stringify({
+        timestamp: '2026-01-15T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 1,
+        totalSize: 1024,
+        files: [{ key: 'photo.jpg', size: 1024, lastModified: lastModified.toISOString() }],
+      });
+
+      // Setup: previous backup exists
+      readdirSyncMock.mockReturnValue(['s3-2026-01-15T00-00-00']);
+      statSyncMock.mockReturnValue({ isDirectory: () => true });
+      existsSyncMock.mockReturnValue(true);
+      readFileSyncMock.mockReturnValue(previousMetadata);
+
+      const result = await backupS3ToLocal(nonNestedDir, testBucket, '', testRegion);
+
+      // Should correctly find previous backup and skip download
+      expect(result.totalFiles).toBe(0);
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('No changes detected since last backup')
+      );
+    });
+
+    it('should handle timestamped backup directory correctly (localDir = "backups/s3-2026-01-15")', async () => {
+      const timestampedDir = 'backups/s3-2026-01-15T00-00-00';
+      const lastModified = new Date('2026-01-15T00:00:00Z');
+
+      // S3 returns files
+      s3ClientSendMock
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'photo.jpg', Size: 1024, LastModified: lastModified }],
+          NextContinuationToken: undefined,
+        })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
+
+      // No previous backup exists
+      readdirSyncMock.mockReturnValue([]);
+      statSyncMock.mockReturnValue({ isDirectory: () => true });
+      existsSyncMock.mockReturnValue(false);
+
+      const result = await backupS3ToLocal(timestampedDir, testBucket, '', testRegion);
+
+      // Should proceed with backup since no previous backup found
+      expect(result.totalFiles).toBe(1);
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('No previous backup found')
+      );
+    });
   });
 
   describe('restoreLocalToS3', () => {

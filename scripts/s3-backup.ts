@@ -36,7 +36,7 @@
  */
 
 import { createWriteStream, createReadStream } from 'fs';
-import { dirname, extname, join, posix } from 'path';
+import { basename, dirname, extname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
 
 import {
@@ -343,7 +343,10 @@ export async function backupS3ToLocal(
     log(`Found ${s3Manifest.length} eligible media file(s) in S3`, 'info');
 
     // Phase 2: Compare against the most recent backup to detect changes
-    const backupDir = dirname(localDir);
+    // Determine the backups root directory by checking if localDir is itself a timestamped backup
+    const localDirBasename = basename(localDir);
+    const isTimestampedBackup = localDirBasename.startsWith('s3-');
+    const backupDir = isTimestampedBackup ? dirname(localDir) : localDir;
     const previousMetadata = getLatestBackupMetadata(backupDir);
 
     if (previousMetadata && !hasChangedSinceLastBackup(s3Manifest, previousMetadata)) {
@@ -781,7 +784,10 @@ async function main(): Promise<void> {
         await backupS3ToLocal(localDir);
 
         // Clean up old backups after successful backup
-        const backupDir = dirname(localDir);
+        // Determine the backups root directory by checking if localDir is itself a timestamped backup
+        const localDirBasename = basename(localDir);
+        const isTimestampedBackup = localDirBasename.startsWith('s3-');
+        const backupDir = isTimestampedBackup ? dirname(localDir) : localDir;
         if (existsSync(backupDir)) {
           const deletedCount = cleanupOldBackups(backupDir);
           if (deletedCount > 0) {
