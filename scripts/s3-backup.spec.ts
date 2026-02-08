@@ -231,7 +231,7 @@ describe('S3 Backup Script', () => {
       expect(mkdirSyncMock).toHaveBeenCalledWith(localDir, { recursive: true });
     });
 
-    it.skip('should backup single S3 object successfully', async () => {
+    it.todo('should backup single S3 object successfully', async () => {
       // TODO: Fix vitest mock clearing issue - test is correct but mocks don't persist
       const mockObject = {
         Key: 'test-file.txt',
@@ -260,7 +260,7 @@ describe('S3 Backup Script', () => {
       expect(result.files[0].contentType).toBe('text/plain');
     });
 
-    it.skip('should backup multiple S3 objects successfully', async () => {
+    it.todo('should backup multiple S3 objects successfully', async () => {
       const mockObjects = [
         { Key: 'file1.txt', Size: 1024, LastModified: new Date() },
         { Key: 'file2.jpg', Size: 2048, LastModified: new Date() },
@@ -333,7 +333,7 @@ describe('S3 Backup Script', () => {
       expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('No body for test.txt'));
     });
 
-    it.skip('should handle individual object download failures', async () => {
+    it.todo('should handle individual object download failures', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
           Contents: [
@@ -388,7 +388,7 @@ describe('S3 Backup Script', () => {
       );
     });
 
-    it.skip('should create nested directory structure for objects', async () => {
+    it.todo('should create nested directory structure for objects', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
           Contents: [{ Key: 'path/to/file.txt', Size: 1024, LastModified: new Date() }],
@@ -454,7 +454,7 @@ describe('S3 Backup Script', () => {
       );
     });
 
-    it.skip('should restore with metadata file', async () => {
+    it.todo('should restore with metadata file', async () => {
       const metadata = {
         timestamp: '2026-01-01T00:00:00Z',
         bucket: testBucket,
@@ -497,7 +497,7 @@ describe('S3 Backup Script', () => {
       expect(result.skipped).toBe(0);
     });
 
-    it.skip('should restore without metadata file using directory scan', async () => {
+    it.todo('should restore without metadata file using directory scan', async () => {
       existsSyncMock.mockImplementation((path: string) => {
         if (path.includes('backup-metadata.json')) return false;
         return true;
@@ -540,7 +540,7 @@ describe('S3 Backup Script', () => {
       );
     });
 
-    it.skip('should overwrite existing files when overwrite is true', async () => {
+    it.todo('should overwrite existing files when overwrite is true', async () => {
       const metadata = {
         timestamp: '2026-01-01T00:00:00Z',
         bucket: testBucket,
@@ -563,7 +563,7 @@ describe('S3 Backup Script', () => {
       expect(result.skipped).toBe(0);
     });
 
-    it.skip('should skip files that do not exist locally', async () => {
+    it.todo('should skip files that do not exist locally', async () => {
       const metadata = {
         timestamp: '2026-01-01T00:00:00Z',
         bucket: testBucket,
@@ -589,7 +589,7 @@ describe('S3 Backup Script', () => {
       );
     });
 
-    it.skip('should handle file upload errors', async () => {
+    it.todo('should handle file upload errors', async () => {
       const metadata = {
         timestamp: '2026-01-01T00:00:00Z',
         bucket: testBucket,
@@ -637,7 +637,7 @@ describe('S3 Backup Script', () => {
       expect(result.successful).toBe(0);
     });
 
-    it.skip('should handle directory traversal in restore', async () => {
+    it.todo('should handle directory traversal in restore', async () => {
       existsSyncMock.mockImplementation((path: string) => {
         if (path.includes('backup-metadata.json')) return false;
         return true;
@@ -657,7 +657,7 @@ describe('S3 Backup Script', () => {
       expect(result.successful).toBe(1);
     });
 
-    it.skip('should skip metadata file during directory scan', async () => {
+    it.todo('should skip metadata file during directory scan', async () => {
       existsSyncMock.mockImplementation((path: string) => {
         if (path.includes('backup-metadata.json')) return false;
         return true;
@@ -745,7 +745,7 @@ describe('S3 Backup Script', () => {
       expect(mockConsoleInfo).toHaveBeenCalledWith(expect.stringContaining('Found 2 S3 backup(s)'));
     });
 
-    it.skip('should handle no backups directory', () => {
+    it.todo('should handle no backups directory', () => {
       existsSyncMock.mockReturnValue(false);
 
       listBackups('backups');
@@ -753,7 +753,7 @@ describe('S3 Backup Script', () => {
       expect(mockConsoleWarn).toHaveBeenCalledWith('No backups directory found');
     });
 
-    it.skip('should handle empty backups directory', () => {
+    it.todo('should handle empty backups directory', () => {
       readdirSyncMock.mockReturnValue([]);
 
       listBackups('backups');
@@ -819,7 +819,7 @@ describe('S3 Backup Script', () => {
       expect(console.info).toHaveBeenCalledWith(expect.stringContaining('(no metadata)'));
     });
 
-    it.skip('should sort backups in reverse chronological order', () => {
+    it.todo('should sort backups in reverse chronological order', () => {
       const backups = [
         's3-2026-01-01T00-00-00',
         's3-2026-01-03T00-00-00',
