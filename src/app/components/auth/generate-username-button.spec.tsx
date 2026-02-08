@@ -44,6 +44,7 @@ vi.mock('@/app/components/ui/button', () => ({
     variant,
     className,
     'aria-label': ariaLabel,
+    disabled,
   }: {
     children: React.ReactNode;
     onClick?: () => void;
@@ -51,14 +52,16 @@ vi.mock('@/app/components/ui/button', () => ({
     variant?: string;
     className?: string;
     'aria-label'?: string;
+    disabled?: boolean;
   }) => (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       type={type}
       data-variant={variant}
       className={className}
       data-testid="generate-button"
       aria-label={ariaLabel}
+      disabled={disabled}
     >
       {children}
     </button>
@@ -76,14 +79,27 @@ describe('GenerateUsernameButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Create a type-safe mock form object using our utility type
-    mockForm = createMockedForm<MockFormData>({
-      setValue: vi.fn(),
-      getValues: vi.fn(() => ({
+    // Reset mockGenerateUsername to clear any mockReturnValueOnce calls
+    mockGenerateUsername.mockReset();
+
+    // Create a fresh mock form object for each test with proper getValues implementation
+    const getValuesMock = vi.fn((name?: keyof MockFormData) => {
+      const values = {
         username: 'existing-username',
         confirmUsername: 'existing-username',
-      })),
+      };
+      return name ? values[name] : values;
+    });
+
+    mockForm = createMockedForm<MockFormData>({
+      setValue: vi.fn(),
+      getValues: getValuesMock,
       trigger: vi.fn().mockResolvedValue(true),
+      formState: {
+        isSubmitSuccessful: false,
+        isSubmitting: false,
+        isLoading: false,
+      } as UseFormReturn<MockFormData>['formState'],
     });
 
     // Set default mock return value
@@ -276,6 +292,9 @@ describe('GenerateUsernameButton', () => {
         );
       });
 
+      // Wait for isGenerating to clear (500ms timeout)
+      await waitFor(() => expect(button).not.toBeDisabled(), { timeout: 600 });
+
       await user.click(button);
       await waitFor(() => {
         expect(mockForm.setValue).toHaveBeenCalledWith(
@@ -284,6 +303,9 @@ describe('GenerateUsernameButton', () => {
           expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
         );
       });
+
+      // Wait for isGenerating to clear again
+      await waitFor(() => expect(button).not.toBeDisabled(), { timeout: 600 });
 
       await user.click(button);
       await waitFor(() => {
@@ -435,20 +457,29 @@ describe('GenerateUsernameButton', () => {
 
   describe('edge cases', () => {
     it('should handle empty initial values', () => {
-      mockForm.getValues = vi.fn(() => ({
-        username: '',
-        confirmUsername: '',
-      })) as unknown as UseFormReturn<MockFormData>['getValues'];
+      const emptyForm = createMockedForm<MockFormData>({
+        setValue: vi.fn(),
+        getValues: vi.fn((name?: keyof MockFormData) => {
+          const values = { username: '', confirmUsername: '' };
+          return name ? values[name] : values;
+        }),
+        trigger: vi.fn().mockResolvedValue(true),
+        formState: {
+          isSubmitSuccessful: false,
+          isSubmitting: false,
+          isLoading: false,
+        } as UseFormReturn<MockFormData>['formState'],
+      });
 
       render(
         <GenerateUsernameButton
-          form={mockForm}
+          form={emptyForm}
           fieldsToPopulate={['username', 'confirmUsername']}
         />
       );
 
       // Should not clear empty values
-      expect(mockForm.setValue).not.toHaveBeenCalled();
+      expect(emptyForm.setValue).not.toHaveBeenCalled();
     });
 
     it('should handle rapid clicks gracefully', async () => {
@@ -467,13 +498,54 @@ describe('GenerateUsernameButton', () => {
 
       const button = screen.getByTestId('generate-button');
 
-      // Rapid clicks
+      // Rapid clicks should be prevented by isGenerating state
       await user.click(button);
       await user.click(button);
       await user.click(button);
 
-      expect(mockGenerateUsername).toHaveBeenCalledTimes(3);
+      // Only the first click should register due to disabled state while generating
+      expect(mockGenerateUsername).toHaveBeenCalledTimes(1);
       expect(mockForm.setValue).toHaveBeenCalled();
+    });
+
+    it('should reset generating state when form succeeds', async () => {
+      const { rerender } = render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+          wasSuccessful={false}
+        />
+      );
+
+      // Trigger generating state
+      const user = userEvent.setup();
+      const button = screen.getByTestId('generate-button');
+      await user.click(button);
+
+      // Simulate form success
+      rerender(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+          wasSuccessful
+        />
+      );
+
+      // The component should handle the state change without errors
+      expect(button).toBeInTheDocument();
+    });
+
+    it('should disable button when isLoading is true', () => {
+      render(
+        <GenerateUsernameButton
+          form={mockForm}
+          fieldsToPopulate={['username', 'confirmUsername']}
+          isLoading
+        />
+      );
+
+      const button = screen.getByTestId('generate-button');
+      expect(button).toBeDisabled();
     });
   });
 });

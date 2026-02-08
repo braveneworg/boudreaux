@@ -1,6 +1,6 @@
 import { LRUCache } from 'lru-cache';
 
-type RateLimitOptions = {
+export type RateLimitOptions = {
   interval: number; // Time window in ms
   uniqueTokenPerInterval: number; // Max unique tokens (IPs) to track
 };

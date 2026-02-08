@@ -1,8 +1,7 @@
-/* eslint-disable import/first */
 // Mock server-only to prevent client component error in tests
-vi.mock('server-only', () => ({}));
-
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
+
+vi.mock('server-only', () => ({}));
 
 // Mock fetch globally
 const mockFetch = vi.fn();

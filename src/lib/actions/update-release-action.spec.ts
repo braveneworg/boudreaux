@@ -527,6 +527,32 @@ describe('updateReleaseAction', () => {
       expect(result.errors?.general).toEqual(['Database error']);
     });
 
+    it('should initialize errors when undefined on failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false }, // No errors property
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toEqual(['Database error']);
+    });
+
     it('should handle release not found error', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },

@@ -49,10 +49,9 @@ const config = {
   // Note: For API routes like /api/tracks/metadata that need larger uploads,
   // the nginx config has location-specific client_max_body_size settings.
   // For local development, Next.js uses Node.js defaults which should handle larger files.
-  // Increased to 200mb to support bulk track uploads with embedded cover art
   experimental: {
     serverActions: {
-      bodySizeLimit: '200mb',
+      bodySizeLimit: '2048mb', // probably suitable for uploading up to 100 320 Kbps tracks, but can be adjusted as needed
     },
   },
 

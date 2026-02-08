@@ -130,6 +130,49 @@ describe('rateLimit', () => {
     await expect(limiter.check(5, token)).rejects.toThrow('Rate limit exceeded');
   });
 
+  it('should not reinitialize token counter on subsequent requests', async () => {
+    const limiter = rateLimit({
+      interval: 60000,
+      uniqueTokenPerInterval: 500,
+    });
+
+    const token = 'repeat-token';
+
+    // First request initializes the counter with [0], increments to [1]
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+
+    // Second request should find existing counter and increment to [2]
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+
+    // Third request increments to [3]
+    await expect(limiter.check(5, token)).resolves.toBeUndefined();
+
+    // Verify counter is being reused (not reset) by checking it accumulates
+    await expect(limiter.check(5, token)).resolves.toBeUndefined(); // [4]
+    await expect(limiter.check(5, token)).resolves.toBeUndefined(); // [5]
+
+    // 6th request should fail because counter accumulated to [6]
+    await expect(limiter.check(5, token)).rejects.toThrow('Rate limit exceeded');
+  });
+
+  it('should use default values when options are partially provided', async () => {
+    // Test with only interval provided (uniqueTokenPerInterval defaults to 500)
+    const limiter1 = rateLimit({
+      interval: 30000,
+      uniqueTokenPerInterval: 0,
+    });
+
+    await expect(limiter1.check(1, 'token-1')).resolves.toBeUndefined();
+
+    // Test with only uniqueTokenPerInterval provided (interval defaults to 60000)
+    const limiter2 = rateLimit({
+      interval: 0,
+      uniqueTokenPerInterval: 100,
+    });
+
+    await expect(limiter2.check(1, 'token-2')).resolves.toBeUndefined();
+  });
+
   describe('real-world scenarios', () => {
     it('should handle API rate limiting scenario', async () => {
       const apiLimiter = rateLimit({

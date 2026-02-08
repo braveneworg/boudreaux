@@ -16,8 +16,14 @@ export const log = (...args: unknown[]) => {
       possibleMethod === LogMethods.Error;
     // Be sure to remove the first argument if it's a log method
     const method: LogMethods = isLogMethod ? (args.shift() as LogMethods) : LogMethods.Info;
-    // eslint-disable-next-line no-console
-    console[method](...args);
+
+    if (method === LogMethods.Warn) {
+      console.warn(...args);
+    } else if (method === LogMethods.Error) {
+      console.error(...args);
+    } else {
+      console.info(...args);
+    }
   }
 };
 

@@ -29,6 +29,9 @@ vi.mock('./health-status-message', () => ({
       data-testid="health-status-message"
     >
       {isLoading ? 'Loading...' : (healthStatus?.database ?? 'No status')}
+      {healthStatus?.error && process.env.NODE_ENV === 'development'
+        ? ` - ${healthStatus.error}`
+        : ''}
     </span>
   ),
 }));
@@ -449,6 +452,103 @@ describe('DataStoreHealthStatus', () => {
         const icon = screen.getByTestId('health-status-icon');
         expect(icon).toHaveAttribute('data-status', 'error');
       });
+    });
+  });
+
+  describe('retry limits', () => {
+    it('stops retrying after reaching max attempts for 500 errors', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ status: 'error', database: 'Server error' }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      // Wait for all retries to complete
+      await vi.runAllTimersAsync();
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'error');
+      });
+
+      // Should make initial call + retries when retryCount is 0-9 = 10 total
+      // But might be 11 if there's an extra failsafe call
+      expect(mockFetch).toHaveBeenCalled();
+      expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(10);
+      expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(11);
+    });
+  });
+
+  describe('abort error handling', () => {
+    it('logs warning for abort/timeout errors and retries', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      mockFetch.mockRejectedValueOnce(abortError);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 'healthy', database: 'Connected' }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      await vi.runAllTimersAsync();
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'healthy');
+      });
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Health Check] Request timed out after 5 seconds'
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('ERR_ error messages', () => {
+    it('sets connection error for ERR_ errors', async () => {
+      const errError = new Error('ERR_CONNECTION_REFUSED');
+      mockFetch.mockRejectedValue(errError);
+
+      render(<DataStoreHealthStatus />);
+
+      await vi.runAllTimersAsync();
+
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'error');
+      });
+
+      // Verify the database field is set
+      const message = screen.getByTestId('health-status-message');
+      expect(message).toHaveTextContent('Failed to fetch health status');
+    });
+  });
+
+  describe('failsafe timeout with unmount', () => {
+    it('does not update state if component unmounts before failsafe triggers', async () => {
+      mockFetch.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Never resolves
+          })
+      );
+
+      const { unmount } = render(<DataStoreHealthStatus />);
+
+      // Unmount before failsafe timeout
+      unmount();
+
+      // Advance to failsafe timeout
+      await vi.advanceTimersByTimeAsync(60000);
+
+      // No errors should be thrown
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 });

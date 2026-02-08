@@ -34,6 +34,7 @@ import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploade
 import { Input } from '@/app/components/ui/input';
 import { MediaUploader, type MediaItem } from '@/app/components/ui/media-uploader';
 import { Separator } from '@/app/components/ui/separator';
+import { TrackPlayButton } from '@/app/components/ui/track-play-button';
 import { createTrackAction } from '@/lib/actions/create-track-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerTrackImagesAction } from '@/lib/actions/register-image-actions';
@@ -763,12 +764,21 @@ export default function TrackForm({ trackId: initialTrackId }: TrackFormProps) {
                     </span>
                   </div>
                 </div>
-                <TextField
-                  control={control}
-                  name="audioUrl"
-                  label="Audio URL *"
-                  placeholder="https://example.com/track.mp3"
-                />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <TextField
+                      control={control}
+                      name="audioUrl"
+                      label="Audio URL *"
+                      placeholder="https://example.com/track.mp3"
+                    />
+                  </div>
+                  <TrackPlayButton
+                    audioUrl={trackForm.watch('audioUrl')}
+                    size="default"
+                    className="mb-0.5"
+                  />
+                </div>
               </section>
 
               <Separator />

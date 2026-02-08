@@ -158,33 +158,72 @@ export class ReleaseService {
 
   /**
    * Update a release by ID
+   * When a release is published (publishedAt is set), also publishes all associated tracks
    */
   static async updateRelease(
     id: string,
     data: Prisma.ReleaseUpdateInput
   ): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.update({
-        where: { id },
-        data,
-        include: {
-          images: true,
-          artistReleases: {
-            include: {
-              artist: true,
+      // Check if we're publishing the release (publishedAt is being set)
+      const isPublishing = data.publishedAt !== undefined && data.publishedAt !== null;
+
+      // If publishing, check if the release wasn't already published
+      let shouldPublishTracks = false;
+      if (isPublishing) {
+        const existingRelease = await prisma.release.findUnique({
+          where: { id },
+          select: { publishedAt: true },
+        });
+
+        // Only publish tracks if the release wasn't already published
+        shouldPublishTracks = existingRelease !== null && existingRelease.publishedAt === null;
+      }
+
+      // Use a transaction to update release and tracks atomically
+      const release = await prisma.$transaction(async (tx) => {
+        // Update the release
+        const updatedRelease = await tx.release.update({
+          where: { id },
+          data,
+          include: {
+            images: true,
+            artistReleases: {
+              include: {
+                artist: true,
+              },
+            },
+            releaseTracks: {
+              include: {
+                track: true,
+              },
+            },
+            releaseUrls: {
+              include: {
+                url: true,
+              },
             },
           },
-          releaseTracks: {
-            include: {
-              track: true,
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
+        });
+
+        // If publishing the release, also publish all associated tracks
+        if (shouldPublishTracks) {
+          const trackIds = updatedRelease.releaseTracks.map((rt) => rt.trackId);
+
+          if (trackIds.length > 0) {
+            await tx.track.updateMany({
+              where: {
+                id: { in: trackIds },
+                publishedOn: null, // Only update tracks that aren't already published
+              },
+              data: {
+                publishedOn: data.publishedAt as Date,
+              },
+            });
+          }
+        }
+
+        return updatedRelease;
       });
 
       return { success: true, data: release as unknown as Release };

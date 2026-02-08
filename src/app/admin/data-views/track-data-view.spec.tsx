@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 
-import useTracksQuery from '@/app/hooks/use-tracks-query';
+import useInfiniteTracksQuery from '@/app/hooks/use-infinite-tracks-query';
 
 import { TrackDataView } from './track-data-view';
 
-// Mock the useTracksQuery hook
-vi.mock('@/app/hooks/use-tracks-query', () => ({
+// Mock the useInfiniteTracksQuery hook
+vi.mock('@/app/hooks/use-infinite-tracks-query', () => ({
   default: vi.fn(),
 }));
 
@@ -52,36 +52,72 @@ const createWrapper = () => {
   return Wrapper;
 };
 
+interface TracksResponse {
+  tracks: Array<Record<string, unknown>>;
+  count: number;
+  totalCount: number;
+  hasMore: boolean;
+}
+
 describe('TrackDataView', () => {
-  const mockTracks = {
-    tracks: [
-      {
-        id: 'track-123',
-        title: 'Test Track',
-        duration: 225,
-        audioUrl: 'https://example.com/audio.mp3',
-        position: 1,
-        images: [],
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
-        publishedOn: null,
-        deletedOn: null,
-      },
-    ],
-    count: 1,
-  };
+  const mockTracks = [
+    {
+      id: 'track-123',
+      title: 'Test Track',
+      duration: 225,
+      audioUrl: 'https://example.com/audio.mp3',
+      position: 1,
+      images: [],
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+      publishedOn: null,
+      deletedOn: null,
+    },
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should render loading state when pending', () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: true,
       error: null,
-      data: null,
+      tracks: [],
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 0,
+      data: undefined,
+      status: 'pending',
+      fetchStatus: 'fetching',
+      isError: false,
+      isSuccess: false,
+      isLoading: true,
+      isFetching: true,
+      isRefetching: false,
+      isLoadingError: false,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 0,
+      failureReason: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      dataUpdatedAt: 0,
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: false,
+      isFetchedAfterMount: false,
+      isInitialLoading: true,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.resolve(undefined) as unknown as Promise<InfiniteData<TracksResponse>>,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 
@@ -89,12 +125,46 @@ describe('TrackDataView', () => {
   });
 
   it('should render error state when error occurs', () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: false,
       error: Error('Failed to fetch'),
-      data: null,
+      tracks: [],
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 0,
+      data: undefined,
+      status: 'error',
+      fetchStatus: 'idle',
+      isError: true,
+      isSuccess: false,
+      isLoading: false,
+      isFetching: false,
+      isRefetching: false,
+      isLoadingError: true,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 1,
+      failureReason: Error('Failed to fetch'),
+      errorUpdateCount: 1,
+      errorUpdatedAt: Date.now(),
+      dataUpdatedAt: 0,
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: true,
+      isFetchedAfterMount: true,
+      isInitialLoading: false,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.reject(Error('Failed to fetch')).catch(() => {}) as unknown as Promise<
+        InfiniteData<TracksResponse>
+      >,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 
@@ -102,12 +172,50 @@ describe('TrackDataView', () => {
   });
 
   it('should render tracks when data is available', async () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: false,
       error: null,
-      data: mockTracks,
+      tracks: mockTracks,
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 1,
+      data: {
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      },
+      status: 'success',
+      fetchStatus: 'idle',
+      isError: false,
+      isSuccess: true,
+      isLoading: false,
+      isFetching: false,
+      isRefetching: false,
+      isLoadingError: false,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 0,
+      failureReason: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      dataUpdatedAt: Date.now(),
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: true,
+      isFetchedAfterMount: true,
+      isInitialLoading: false,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.resolve({
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      }) as Promise<InfiniteData<TracksResponse>>,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 
@@ -122,12 +230,50 @@ describe('TrackDataView', () => {
   });
 
   it('should render create track button', async () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: false,
       error: null,
-      data: mockTracks,
+      tracks: mockTracks,
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 1,
+      data: {
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      },
+      status: 'success',
+      fetchStatus: 'idle',
+      isError: false,
+      isSuccess: true,
+      isLoading: false,
+      isFetching: false,
+      isRefetching: false,
+      isLoadingError: false,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 0,
+      failureReason: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      dataUpdatedAt: Date.now(),
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: true,
+      isFetchedAfterMount: true,
+      isInitialLoading: false,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.resolve({
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      }) as Promise<InfiniteData<TracksResponse>>,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 
@@ -137,12 +283,50 @@ describe('TrackDataView', () => {
   });
 
   it('should render search input', async () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: false,
       error: null,
-      data: mockTracks,
+      tracks: mockTracks,
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 1,
+      data: {
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      },
+      status: 'success',
+      fetchStatus: 'idle',
+      isError: false,
+      isSuccess: true,
+      isLoading: false,
+      isFetching: false,
+      isRefetching: false,
+      isLoadingError: false,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 0,
+      failureReason: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      dataUpdatedAt: Date.now(),
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: true,
+      isFetchedAfterMount: true,
+      isInitialLoading: false,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.resolve({
+        pages: [{ tracks: mockTracks, count: 1, totalCount: 1, hasMore: false }],
+        pageParams: [0],
+      }) as Promise<InfiniteData<TracksResponse>>,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 
@@ -152,12 +336,50 @@ describe('TrackDataView', () => {
   });
 
   it('should render no data message when tracks array is empty', async () => {
-    vi.mocked(useTracksQuery).mockReturnValue({
+    vi.mocked(useInfiniteTracksQuery).mockReturnValue({
       isPending: false,
       error: null,
-      data: { tracks: [], count: 0 },
+      tracks: [],
       refetch: vi.fn(),
-    } as never);
+      hasNextPage: false,
+      fetchNextPage: vi.fn(),
+      isFetchingNextPage: false,
+      totalCount: 0,
+      data: {
+        pages: [{ tracks: [], count: 0, totalCount: 0, hasMore: false }],
+        pageParams: [0],
+      },
+      status: 'success',
+      fetchStatus: 'idle',
+      isError: false,
+      isSuccess: true,
+      isLoading: false,
+      isFetching: false,
+      isRefetching: false,
+      isLoadingError: false,
+      isRefetchError: false,
+      isPaused: false,
+      failureCount: 0,
+      failureReason: null,
+      errorUpdateCount: 0,
+      errorUpdatedAt: 0,
+      dataUpdatedAt: Date.now(),
+      isPlaceholderData: false,
+      isFetchNextPageError: false,
+      isFetchPreviousPageError: false,
+      fetchPreviousPage: vi.fn(),
+      hasPreviousPage: false,
+      isFetchingPreviousPage: false,
+      isFetched: true,
+      isFetchedAfterMount: true,
+      isInitialLoading: false,
+      isStale: false,
+      isEnabled: true,
+      promise: Promise.resolve({
+        pages: [{ tracks: [], count: 0, totalCount: 0, hasMore: false }],
+        pageParams: [0],
+      }) as Promise<InfiniteData<TracksResponse>>,
+    });
 
     render(<TrackDataView />, { wrapper: createWrapper() });
 

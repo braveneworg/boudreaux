@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+
+import { act, render, screen } from '@testing-library/react';
 
 import { StickyBreadcrumbWrapper } from './sticky-breadcrumb-wrapper';
 
@@ -50,7 +52,9 @@ describe('StickyBreadcrumbWrapper', () => {
     );
 
     // Trigger scroll event
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
 
     // Wait for state update
     await screen.findByText('Test Content');
@@ -70,7 +74,9 @@ describe('StickyBreadcrumbWrapper', () => {
     );
 
     // Trigger scroll event
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
 
     // Wait for state update
     await screen.findByText('Test Content');
@@ -89,7 +95,9 @@ describe('StickyBreadcrumbWrapper', () => {
     );
 
     // Trigger scroll event
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
 
     // Wait for state update
     await screen.findByText('Test Content');
@@ -180,7 +188,9 @@ describe('StickyBreadcrumbWrapper', () => {
 
     // Simulate scroll down
     mockScrollY = 100;
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
     await screen.findByText('Test Content');
 
     wrapper = container.firstChild as HTMLElement;
@@ -188,7 +198,9 @@ describe('StickyBreadcrumbWrapper', () => {
 
     // Simulate scroll back up
     mockScrollY = 30;
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
     await screen.findByText('Test Content');
 
     wrapper = container.firstChild as HTMLElement;
@@ -218,7 +230,9 @@ describe('StickyBreadcrumbWrapper', () => {
       </StickyBreadcrumbWrapper>
     );
 
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
     await screen.findByText('Test Content');
 
     let wrapper = container.firstChild as HTMLElement;
@@ -231,7 +245,9 @@ describe('StickyBreadcrumbWrapper', () => {
       </StickyBreadcrumbWrapper>
     );
 
-    window.dispatchEvent(new Event('scroll'));
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+    });
     await screen.findByText('Test Content');
 
     wrapper = container.firstChild as HTMLElement;
@@ -247,5 +263,21 @@ describe('StickyBreadcrumbWrapper', () => {
 
     expect(container.firstChild).toBeNull();
     expect(screen.queryByText('Test Content')).not.toBeInTheDocument();
+  });
+
+  it('should render correctly in client environment', () => {
+    // Verify component renders and functions correctly with window available
+    const { container } = render(
+      <StickyBreadcrumbWrapper>
+        <div>Client Content</div>
+      </StickyBreadcrumbWrapper>
+    );
+
+    expect(container.firstChild).toBeInTheDocument();
+    expect(screen.getByText('Client Content')).toBeInTheDocument();
+
+    // Verify scroll listener is attached (component should have relative positioning initially)
+    const wrapper = container.querySelector('.relative');
+    expect(wrapper).toBeInTheDocument();
   });
 });

@@ -23,9 +23,10 @@ vi.mock('next/headers', () => ({
 }));
 
 // Mock rate limiter
+const mockRateLimitCheck = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: vi.fn(() => ({
-    check: vi.fn().mockResolvedValue(undefined), // Always pass rate limit in tests
+    check: mockRateLimitCheck,
   })),
 }));
 
@@ -599,6 +600,63 @@ describe('signinAction', () => {
       expect(mockRedirect).toHaveBeenCalledWith(
         `/success/signin?email=${encodeURIComponent(emailWithSpecialChars)}`
       );
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('should return error when rate limit is exceeded', async () => {
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toContain('Too many signin attempts. Please try again later.');
+    });
+
+    it('should use IP address for rate limiting', async () => {
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = { success: true, data: { email: 'test@example.com' } };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+
+      // Mock redirect to throw to prevent actual redirect
+      mockRedirect.mockImplementation(() => {
+        throw Error('NEXT_REDIRECT');
+      });
+
+      try {
+        await signinAction(mockInitialState, mockFormData);
+      } catch {
+        // Expected to throw on redirect
+      }
+
+      expect(mockRateLimitCheck).toHaveBeenCalledWith(5, '127.0.0.1');
+    });
+  });
+
+  describe('Turnstile verification with custom error', () => {
+    it('should return custom Turnstile error message when provided', async () => {
+      mockVerifyTurnstile.mockResolvedValueOnce({
+        success: false,
+        error: 'Custom error: Verification timeout',
+      });
+
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toContain('Custom error: Verification timeout');
     });
   });
 });

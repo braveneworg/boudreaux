@@ -902,4 +902,91 @@ describe('NotificationBanner', () => {
       expect(screen.getByText('Secondary')).toBeInTheDocument();
     });
   });
+
+  describe('text shadow rendering', () => {
+    it('renders message with text shadow and image', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        messageTextShadow: true,
+        messageTextShadowDarkness: 75,
+        imageUrl: '/test-image.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Test message')).toBeInTheDocument();
+    });
+
+    it('renders message with text shadow but no image', () => {
+      const notification = createMockNotification({
+        message: 'Test message',
+        messageTextShadow: true,
+        imageUrl: null,
+        originalImageUrl: null,
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Test message')).toBeInTheDocument();
+    });
+
+    it('renders secondary message with text shadow and image', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary',
+        secondaryMessageTextShadow: true,
+        secondaryMessageTextShadowDarkness: 60,
+        imageUrl: '/test-image.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Secondary')).toBeInTheDocument();
+    });
+
+    it('renders secondary message with text shadow but no image', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary',
+        secondaryMessageTextShadow: true,
+        imageUrl: null,
+        originalImageUrl: null,
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Secondary')).toBeInTheDocument();
+    });
+
+    it('renders secondary message without text shadow', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary',
+        secondaryMessageTextShadow: false,
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      expect(screen.getByText('Secondary')).toBeInTheDocument();
+    });
+  });
+
+  describe('link with secondary message', () => {
+    it('renders link with both primary and secondary messages', () => {
+      const notification = createMockNotification({
+        message: 'Primary message',
+        secondaryMessage: 'Secondary message',
+        linkUrl: 'https://example.com',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('href', 'https://example.com');
+      expect(link).toHaveAttribute(
+        'aria-label',
+        'Primary message - Secondary message (opens in new tab)'
+      );
+    });
+  });
 });

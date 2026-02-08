@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-/* eslint-disable no-console */
 /**
  * Coverage Regression Check Script
  *
@@ -94,9 +93,9 @@ function parseCurrentCoverage(): CoverageMetrics {
 function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics): boolean {
   const regressions: string[] = [];
 
-  console.log('\n📊 Coverage Comparison\n');
-  console.log('| Metric     | Baseline | Current  | Change   |');
-  console.log('|------------|----------|----------|----------|');
+  console.info('\n📊 Coverage Comparison\n');
+  console.info('| Metric     | Baseline | Current  | Change   |');
+  console.info('|------------|----------|----------|----------|');
 
   const metricNames: (keyof CoverageMetrics)[] = ['statements', 'branches', 'functions', 'lines'];
 
@@ -108,7 +107,7 @@ function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics
     const status = diff < 0 ? '⬇️' : diff > 0 ? '⬆️' : '➡️';
 
     const metricDisplay = metric.charAt(0).toUpperCase() + metric.slice(1);
-    console.log(
+    console.info(
       `| ${metricDisplay.padEnd(10)} | ${baselineValue.toFixed(2).padStart(6)}%  | ${currentValue.toFixed(2).padStart(6)}%  | ${status} ${diffStr.padStart(6)} |`
     );
 
@@ -119,7 +118,7 @@ function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics
     }
   }
 
-  console.log('');
+  console.info('');
 
   if (regressions.length > 0) {
     console.error('❌ Coverage regression detected!\n');
@@ -132,7 +131,7 @@ function checkForRegressions(baseline: CoverageMetrics, current: CoverageMetrics
     return false;
   }
 
-  console.log('✅ No coverage regression detected!\n');
+  console.info('✅ No coverage regression detected!\n');
   return true;
 }
 
@@ -157,14 +156,14 @@ function updateMetricsFile(current: CoverageMetrics): void {
   );
 
   fs.writeFileSync(METRICS_FILE, updatedContent);
-  console.log(`📝 Updated COVERAGE_METRICS.md with new baseline (${today})\n`);
+  console.info(`📝 Updated COVERAGE_METRICS.md with new baseline (${today})\n`);
 }
 
 /**
  * Main execution
  */
 function main(): void {
-  console.log('🔍 Checking for coverage regression...\n');
+  console.info('🔍 Checking for coverage regression...\n');
 
   const baseline = parseBaselineMetrics();
   const current = parseCurrentCoverage();

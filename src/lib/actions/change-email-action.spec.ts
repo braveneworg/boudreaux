@@ -821,6 +821,48 @@ describe('changeEmailAction', () => {
       expect(result.success).toBe(false);
       expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
     });
+
+    it('should initialize formState.errors when undefined on duplicate email error', async () => {
+      // Create a formState without errors property
+      const mockFormStateWithoutErrors: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+        // No errors property
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValueOnce({
+        formState: mockFormStateWithoutErrors,
+        parsed: mockParsed,
+      });
+
+      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_email_key' },
+      });
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateEmailError);
+
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.email).toEqual(['Email address is already in use']);
+    });
   });
 
   describe('signOut errors', () => {

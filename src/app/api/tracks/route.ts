@@ -34,9 +34,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get total count for pagination
+    const totalCountResult = await TrackService.getTracksCount(search || undefined);
+
     return NextResponse.json({
       tracks: result.data,
       count: result.data.length,
+      totalCount: totalCountResult.success ? totalCountResult.data : result.data.length,
+      hasMore: totalCountResult.success
+        ? parseInt(skip || '0', 10) + result.data.length < totalCountResult.data
+        : false,
     });
   } catch (error) {
     console.error('Track GET error:', error);

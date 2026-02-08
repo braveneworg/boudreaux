@@ -176,6 +176,13 @@ enum Platform {
   DISCOGS
 }
 
+enum AudioUploadStatus {
+  PENDING    // Track created, upload not yet started
+  UPLOADING  // Upload in progress
+  COMPLETED  // Upload completed successfully
+  FAILED     // Upload failed
+}
+
 enum Format {
   DIGITAL
   MP3_320KBPS
@@ -456,26 +463,28 @@ model Release {
 }
 
 model Track {
-  id              String           @id @default(auto()) @map("_id") @db.ObjectId
-  title           String
-  duration        Int // Duration in seconds
-  audioUrl        String // URL or file path to the audio file
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedOn       DateTime? // Date when the track was soft-deleted; null if not deleted
-  publishedOn     DateTime? // Date when the track was published
-  coverArt        String?
-  images          Image[]
-  position        Int // Position of the track in the release 0-based index
-  releaseTracks   ReleaseTrack[]
-  artists         TrackArtist[]
-  urls            Url[]
-  featuredArtists FeaturedArtist[]
-  trackArtists    Artist[] // Reverse relation for Artist.track
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  duration          Int // Duration in seconds
+  audioUrl          String // URL or file path to the audio file
+  audioUploadStatus AudioUploadStatus  @default(COMPLETED) // Status of audio file upload
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedOn         DateTime? // Date when the track was soft-deleted; null if not deleted
+  publishedOn       DateTime? // Date when the track was published
+  coverArt          String?
+  images            Image[]
+  position          Int // Position of the track in the release 0-based index
+  releaseTracks     ReleaseTrack[]
+  artists           TrackArtist[]
+  urls              Url[]
+  featuredArtists   FeaturedArtist[]
+  trackArtists      Artist[] // Reverse relation for Artist.track
 
   @@index([title])
   @@index([position])
   @@index([deletedOn])
+  @@index([audioUploadStatus])
 }
 
 model TrackArtist {

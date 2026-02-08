@@ -1,3 +1,5 @@
+import React from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 
 import CDNStatusBanner from './cdn-status-banner';
@@ -128,5 +130,85 @@ describe('CDNStatusBanner', () => {
     await waitFor(() => {
       expect(screen.getByText('Updating image cache across all regions')).toBeInTheDocument();
     });
+  });
+
+  it('does not display estimated time when estimatedMinutesRemaining is 0', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve({
+          status: 'invalidating',
+          message: 'CDN cache is being invalidated',
+          estimatedMinutesRemaining: 0,
+        }),
+    });
+
+    render(<CDNStatusBanner />);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Estimated time remaining/)).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not show progress bar when estimatedMinutesRemaining is undefined', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve({
+          status: 'invalidating',
+          message: 'CDN cache is being invalidated',
+        }),
+    });
+
+    render(<CDNStatusBanner />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
+    });
+
+    // Progress bar should not be rendered
+    const progressBar = screen.queryByRole('progressbar');
+    expect(progressBar).not.toBeInTheDocument();
+  });
+
+  it('does not show progress bar when status is not invalidating even with estimatedMinutesRemaining', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve({
+          status: 'error',
+          message: 'CDN status check failed',
+          estimatedMinutesRemaining: 5,
+        }),
+    });
+
+    render(<CDNStatusBanner />);
+
+    await waitFor(() => {
+      expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
+    });
+
+    // Progress bar should not be rendered because status is 'error', not 'invalidating'
+    const progressBar = screen.queryByRole('progressbar');
+    expect(progressBar).not.toBeInTheDocument();
+  });
+
+  it('does not show invalidation warning when status is not invalidating', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve({
+          status: 'unknown',
+          message: 'Site was recently updated',
+          estimatedMinutesRemaining: 3,
+        }),
+    });
+
+    render(<CDNStatusBanner />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Site Recently Updated')).toBeInTheDocument();
+    });
+
+    // Should not show the "Some assets may be temporarily unavailable" message
+    expect(
+      screen.queryByText(/Some assets may be temporarily unavailable/)
+    ).not.toBeInTheDocument();
   });
 });

@@ -183,6 +183,17 @@ describe('addTextOverlayToImage', () => {
       // Should only have fillText calls for primary message
       expect(mockFillText.mock.calls.length).toBeGreaterThan(fillTextCallsBefore);
     });
+
+    it('should handle empty message string', async () => {
+      await addTextOverlayToImage({
+        ...defaultOptions,
+        message: '',
+      });
+
+      // Should complete successfully even with empty message
+      expect(mockDrawImage).toHaveBeenCalled();
+      expect(mockFillRect).toHaveBeenCalled();
+    });
   });
 
   describe('text styling', () => {

@@ -47,11 +47,17 @@ import {
   type BulkTrackResult,
 } from '@/lib/actions/bulk-create-tracks-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
+import {
+  updateTrackAudioAction,
+  markTrackUploadingAction,
+} from '@/lib/actions/update-track-audio-action';
 import type { AudioMetadata } from '@/lib/services/audio-metadata-service';
 import { cn } from '@/lib/utils';
+import { uploadCoverArtsToS3 } from '@/lib/utils/cover-art-upload';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 
 import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
+import { TrackPlayButton } from '../ui/track-play-button';
 
 /**
  * Supported audio file types for bulk upload
@@ -89,7 +95,9 @@ interface BulkTrackItem {
     | 'uploaded'
     | 'creating'
     | 'success'
-    | 'error';
+    | 'error'
+    | 'queued' // For deferred upload - waiting for background upload
+    | 'background_uploading'; // For deferred upload - uploading in background
   progress: number;
   error?: string;
   metadata?: AudioMetadata;
@@ -160,9 +168,12 @@ export default function BulkTrackUploader() {
   const [tracks, setTracks] = useState<BulkTrackItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [autoCreateRelease, setAutoCreateRelease] = useState(true);
-  const [publishTracks, setPublishTracks] = useState(false);
+  const [publishTracks, setPublishTracks] = useState(true);
+  const [deferUpload, setDeferUpload] = useState(false);
+  const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [_results, setResults] = useState<BulkTrackResult[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -193,11 +204,10 @@ export default function BulkTrackUploader() {
   }, []);
 
   /**
-   * Handle file selection
+   * Process files from input or drag and drop
    */
-  const handleFileSelect = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
+  const handleFiles = useCallback(
+    async (files: FileList | null) => {
       if (!files || files.length === 0) return;
 
       // Filter for supported audio files
@@ -267,10 +277,49 @@ export default function BulkTrackUploader() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-
-      toast.success(`Added ${audioFiles.length} track(s)`);
     },
-    [extractMetadata, tracks.length]
+    [tracks.length, extractMetadata]
+  );
+
+  /**
+   * Handle file input change
+   */
+  const handleFileSelect = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      handleFiles(event.target.files);
+    },
+    [handleFiles]
+  );
+
+  /**
+   * Handle drag over event
+   */
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  /**
+   * Handle drag leave event
+   */
+  const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  /**
+   * Handle drop event
+   */
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDragOver(false);
+      handleFiles(event.dataTransfer.files);
+    },
+    [handleFiles]
   );
 
   /**
@@ -304,6 +353,107 @@ export default function BulkTrackUploader() {
   }, []);
 
   /**
+   * Start background uploads for tracks with PENDING status
+   * This uploads files to S3 and updates track records with the CDN URL
+   */
+  const startBackgroundUploads = useCallback(async (tracksToUpload: BulkTrackItem[]) => {
+    if (tracksToUpload.length === 0) return;
+
+    setBackgroundUploading(true);
+
+    // Track successes locally since React state updates are async
+    let localSuccessCount = 0;
+
+    try {
+      // Process uploads one at a time to avoid overwhelming the server
+      for (const track of tracksToUpload) {
+        if (!track.trackId) continue;
+
+        try {
+          // Mark track as uploading
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === track.id ? { ...t, status: 'background_uploading' as const } : t
+            )
+          );
+
+          await markTrackUploadingAction(track.trackId);
+
+          // Get presigned URL for this file
+          const fileInfo = {
+            fileName: track.file.name,
+            contentType: track.file.type,
+            fileSize: track.file.size,
+          };
+
+          const presignedResult = await getPresignedUploadUrlsAction('tracks', 'single', [
+            fileInfo,
+          ]);
+
+          if (!presignedResult.success || !presignedResult.data?.[0]) {
+            throw new Error(presignedResult.error || 'Failed to get upload URL');
+          }
+
+          // Upload file to S3
+          const uploadResults = await uploadFilesToS3([track.file], presignedResult.data);
+
+          if (!uploadResults[0]?.success) {
+            throw new Error('Upload failed');
+          }
+
+          const cdnUrl = presignedResult.data[0].cdnUrl;
+
+          // Update track with CDN URL
+          const updateResult = await updateTrackAudioAction(track.trackId, cdnUrl, 'COMPLETED');
+
+          if (!updateResult.success) {
+            throw new Error(updateResult.error || 'Failed to update track');
+          }
+
+          // Update local state
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === track.id
+                ? {
+                    ...t,
+                    status: 'success' as const,
+                    uploadedUrl: cdnUrl,
+                  }
+                : t
+            )
+          );
+
+          // Track success locally
+          localSuccessCount++;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Background upload failed';
+
+          // Mark track as failed
+          if (track.trackId) {
+            await updateTrackAudioAction(track.trackId, '', 'FAILED', errorMessage);
+          }
+
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === track.id ? { ...t, status: 'error' as const, error: errorMessage } : t
+            )
+          );
+        }
+      }
+
+      if (localSuccessCount === tracksToUpload.length) {
+        toast.success('All background uploads completed successfully');
+      } else if (localSuccessCount > 0) {
+        toast.warning(`${localSuccessCount} of ${tracksToUpload.length} uploads completed`);
+      } else {
+        toast.error('All background uploads failed');
+      }
+    } finally {
+      setBackgroundUploading(false);
+    }
+  }, []);
+
+  /**
    * Process all tracks - upload and create
    */
   const processAllTracks = useCallback(async () => {
@@ -316,7 +466,6 @@ export default function BulkTrackUploader() {
     setShowResults(false);
 
     try {
-      // Step 1: Upload all audio files to S3
       const filesToUpload = tracks.filter((t) => t.status === 'extracted');
 
       if (filesToUpload.length === 0) {
@@ -325,6 +474,136 @@ export default function BulkTrackUploader() {
         return;
       }
 
+      // Deferred upload mode - create tracks first, upload later in background
+      if (deferUpload) {
+        // Update status to creating
+        setTracks((prev) =>
+          prev.map((t) =>
+            filesToUpload.some((f) => f.id === t.id) ? { ...t, status: 'creating' as const } : t
+          )
+        );
+
+        // Upload base64 cover art to S3 first
+        console.info('[Bulk Upload Deferred] Checking for base64 cover arts:', {
+          totalTracks: filesToUpload.length,
+          tracksWithMetadata: filesToUpload.filter((t) => t.metadata).length,
+          tracksWithCoverArt: filesToUpload.filter((t) => t.metadata?.coverArt).length,
+          tracksWithBase64CoverArt: filesToUpload.filter((t) =>
+            t.metadata?.coverArt?.startsWith('data:')
+          ).length,
+        });
+        const base64CoverArts = filesToUpload
+          .filter((track) => track.metadata?.coverArt?.startsWith('data:'))
+          .map((track) => ({
+            base64: track.metadata!.coverArt!,
+            albumName: track.metadata?.album,
+          }));
+
+        let albumToCdnUrl = new Map<string, string>();
+        if (base64CoverArts.length > 0) {
+          toast.info(`Uploading ${base64CoverArts.length} cover art image(s)...`);
+          albumToCdnUrl = await uploadCoverArtsToS3(base64CoverArts);
+        }
+
+        // Create track data with uploaded cover art URLs
+        const trackData: BulkTrackData[] = filesToUpload.map((track) => {
+          const coverArt = track.metadata?.coverArt;
+          let coverArtUrl: string | undefined;
+
+          if (coverArt) {
+            if (coverArt.startsWith('data:')) {
+              // Use uploaded CDN URL for base64 cover art
+              const albumKey = (track.metadata?.album || '').toLowerCase().trim();
+              coverArtUrl = albumToCdnUrl.get(albumKey);
+            } else {
+              // Use existing URL as-is
+              coverArtUrl = coverArt;
+            }
+          }
+
+          return {
+            title: track.title,
+            duration: track.metadata?.duration || 0,
+            position: track.position,
+            coverArt: coverArtUrl,
+            album: track.metadata?.album,
+            year: track.metadata?.year,
+            date: track.metadata?.date,
+            label: track.metadata?.label,
+            catalogNumber: track.metadata?.catalogNumber,
+            albumArtist: track.metadata?.albumArtist,
+            artist: track.metadata?.artist,
+            lossless: track.metadata?.lossless,
+          };
+        });
+
+        // Debug: Log trackData size before sending to server action
+        const trackDataJson = JSON.stringify(trackData);
+        console.info('[Bulk Upload Deferred] Track data size before server action:', {
+          trackCount: trackData.length,
+          jsonSizeBytes: trackDataJson.length,
+          jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
+          hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
+        });
+
+        const createResult = await bulkCreateTracksAction(trackData, {
+          autoCreateRelease,
+          publishTracks,
+          deferUpload: true,
+        });
+
+        // Update tracks with create results and queue for background upload
+        const tracksForBackgroundUpload: BulkTrackItem[] = [];
+        for (const result of createResult.results) {
+          const track = filesToUpload[result.index];
+          if (!track) continue;
+
+          if (result.success && result.trackId) {
+            const updatedTrack = {
+              ...track,
+              status: 'queued' as const,
+              trackId: result.trackId,
+              releaseId: result.releaseId,
+              releaseTitle: result.releaseTitle,
+              releaseCreated: result.releaseCreated,
+            };
+            tracksForBackgroundUpload.push(updatedTrack);
+
+            setTracks((prev) => prev.map((t) => (t.id === track.id ? updatedTrack : t)));
+          } else {
+            setTracks((prev) =>
+              prev.map((t) =>
+                t.id === track.id
+                  ? {
+                      ...t,
+                      status: 'error' as const,
+                      error: result.error || 'Failed to create track',
+                    }
+                  : t
+              )
+            );
+          }
+        }
+
+        setResults(createResult.results);
+        setShowResults(true);
+
+        if (createResult.successCount > 0) {
+          toast.success(
+            `Created ${createResult.successCount} track(s). Starting background uploads...`
+          );
+
+          // Start background upload process
+          setIsProcessing(false);
+          startBackgroundUploads(tracksForBackgroundUpload);
+        } else {
+          toast.error(`Failed to create tracks: ${createResult.error || 'Unknown error'}`);
+        }
+
+        return;
+      }
+
+      // Standard mode - upload first, then create tracks
       // Update status to uploading
       setTracks((prev) =>
         prev.map((t) =>
@@ -388,27 +667,74 @@ export default function BulkTrackUploader() {
         )
       );
 
-      const trackData: BulkTrackData[] = uploadedTracks.map((track) => ({
-        title: track.title,
-        duration: track.metadata?.duration || 0,
-        audioUrl: track.uploadedUrl!,
-        position: track.position,
-        coverArt: track.metadata?.coverArt,
-        album: track.metadata?.album,
-        year: track.metadata?.year,
-        date: track.metadata?.date,
-        label: track.metadata?.label,
-        catalogNumber: track.metadata?.catalogNumber,
-        albumArtist: track.metadata?.albumArtist,
-        artist: track.metadata?.artist,
-        lossless: track.metadata?.lossless,
-      }));
+      // Upload base64 cover art to S3 first
+      console.info('[Bulk Upload] Checking for base64 cover arts:', {
+        totalTracks: uploadedTracks.length,
+        tracksWithMetadata: uploadedTracks.filter((t) => t.metadata).length,
+        tracksWithCoverArt: uploadedTracks.filter((t) => t.metadata?.coverArt).length,
+        tracksWithBase64CoverArt: uploadedTracks.filter((t) =>
+          t.metadata?.coverArt?.startsWith('data:')
+        ).length,
+      });
+      const base64CoverArts = uploadedTracks
+        .filter((track) => track.metadata?.coverArt?.startsWith('data:'))
+        .map((track) => ({
+          base64: track.metadata!.coverArt!,
+          albumName: track.metadata?.album,
+        }));
 
-      const createResult = await bulkCreateTracksAction(
-        trackData,
+      let albumToCdnUrl = new Map<string, string>();
+      if (base64CoverArts.length > 0) {
+        toast.info(`Uploading ${base64CoverArts.length} cover art image(s)...`);
+        albumToCdnUrl = await uploadCoverArtsToS3(base64CoverArts);
+      }
+
+      // Create track data with uploaded cover art URLs
+      const trackData: BulkTrackData[] = uploadedTracks.map((track) => {
+        const coverArt = track.metadata?.coverArt;
+        let coverArtUrl: string | undefined;
+
+        if (coverArt) {
+          if (coverArt.startsWith('data:')) {
+            // Use uploaded CDN URL for base64 cover art
+            const albumKey = (track.metadata?.album || '').toLowerCase().trim();
+            coverArtUrl = albumToCdnUrl.get(albumKey);
+          } else {
+            // Use existing URL as-is
+            coverArtUrl = coverArt;
+          }
+        }
+
+        return {
+          title: track.title,
+          duration: track.metadata?.duration || 0,
+          audioUrl: track.uploadedUrl!,
+          position: track.position,
+          coverArt: coverArtUrl,
+          album: track.metadata?.album,
+          year: track.metadata?.year,
+          date: track.metadata?.date,
+          label: track.metadata?.label,
+          catalogNumber: track.metadata?.catalogNumber,
+          albumArtist: track.metadata?.albumArtist,
+          artist: track.metadata?.artist,
+          lossless: track.metadata?.lossless,
+        };
+      });
+
+      // Debug: Log trackData size before sending to server action
+      const trackDataJson = JSON.stringify(trackData);
+      console.info('[Bulk Upload] Track data size before server action:', {
+        trackCount: trackData.length,
+        jsonSizeBytes: trackDataJson.length,
+        jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
+        hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
+      });
+
+      const createResult = await bulkCreateTracksAction(trackData, {
         autoCreateRelease,
-        publishTracks
-      );
+        publishTracks,
+      });
 
       // Update tracks with create results
       for (const result of createResult.results) {
@@ -464,7 +790,7 @@ export default function BulkTrackUploader() {
     } finally {
       setIsProcessing(false);
     }
-  }, [tracks, autoCreateRelease, publishTracks]);
+  }, [tracks, autoCreateRelease, publishTracks, deferUpload, startBackgroundUploads]);
 
   const pendingCount = tracks.filter(
     (t) => t.status === 'pending' || t.status === 'extracting' || t.status === 'extracted'
@@ -481,9 +807,12 @@ export default function BulkTrackUploader() {
         return <FileAudio className="h-4 w-4 text-blue-500" />;
       case 'uploading':
       case 'creating':
+      case 'background_uploading':
         return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
       case 'uploaded':
         return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
+      case 'queued':
+        return <Loader2 className="h-4 w-4 text-orange-500" />;
       case 'success':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
@@ -505,6 +834,10 @@ export default function BulkTrackUploader() {
         return 'Uploaded';
       case 'creating':
         return 'Creating track...';
+      case 'queued':
+        return 'Queued for upload';
+      case 'background_uploading':
+        return 'Uploading in background...';
       case 'success':
         return 'Created';
       case 'error':
@@ -547,9 +880,13 @@ export default function BulkTrackUploader() {
             </div>
 
             <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               className={cn(
                 'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8',
                 'transition-colors hover:border-primary/50',
+                isDragOver && 'border-primary bg-primary/5',
                 isProcessing && 'pointer-events-none opacity-50'
               )}
             >
@@ -607,6 +944,21 @@ export default function BulkTrackUploader() {
                   Published
                 </Label>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="defer-upload"
+                  checked={deferUpload}
+                  onCheckedChange={setDeferUpload}
+                  disabled={isProcessing || backgroundUploading}
+                />
+                <Label
+                  htmlFor="defer-upload"
+                  className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Background upload (create tracks first, upload audio in background)
+                </Label>
+              </div>
             </>
           )}
 
@@ -616,9 +968,9 @@ export default function BulkTrackUploader() {
               <Separator />
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-medium">Tracks ({tracks.length})</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {successCount > 0 && (
                       <Badge variant="default" className="bg-green-500">
                         {successCount} created
@@ -629,16 +981,115 @@ export default function BulkTrackUploader() {
                   </div>
                 </div>
 
-                <ScrollArea className="h-[400px] rounded-md border">
+                {/* Mobile Card View */}
+                <ScrollArea className="h-100 rounded-md border md:hidden">
+                  <div className="divide-y">
+                    {tracks.map((track) => (
+                      <div
+                        key={track.id}
+                        className={cn(
+                          'space-y-3 p-4',
+                          track.status === 'error' && 'bg-destructive/10',
+                          track.status === 'success' && 'bg-green-500/10'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(track.status)}
+                            {track.uploadedUrl && (
+                              <TrackPlayButton audioUrl={track.uploadedUrl} size="sm" />
+                            )}
+                            <span className="text-sm font-medium text-muted-foreground">
+                              #{track.position}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeTrack(track.id)}
+                            disabled={isProcessing || track.status === 'success'}
+                            className="h-8 w-8 shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Input
+                            value={track.title}
+                            onChange={(e) => updateTrackTitle(track.id, e.target.value)}
+                            disabled={isProcessing || track.status === 'success'}
+                            placeholder="Track title"
+                          />
+                          {track.error && (
+                            <p className="flex items-center gap-1 text-xs text-destructive">
+                              <AlertCircle className="h-3 w-3" />
+                              {track.error}
+                            </p>
+                          )}
+                          {track.releaseTitle && (
+                            <p className="text-xs text-muted-foreground">
+                              Release: {track.releaseTitle}
+                              {track.releaseCreated && (
+                                <Badge variant="outline" className="ml-1 text-[10px]">
+                                  new
+                                </Badge>
+                              )}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor={`position-${track.id}`} className="text-xs">
+                              Pos:
+                            </Label>
+                            <Input
+                              id={`position-${track.id}`}
+                              type="number"
+                              min={1}
+                              value={track.position}
+                              onChange={(e) =>
+                                updateTrackPosition(track.id, parseInt(e.target.value, 10) || 1)
+                              }
+                              disabled={isProcessing || track.status === 'success'}
+                              className="h-7 w-14"
+                            />
+                          </div>
+                          <span>{formatDuration(track.metadata?.duration)}</span>
+                          <span>{formatFileSize(track.fileSize)}</span>
+                        </div>
+
+                        {track.metadata?.album && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            Album: {track.metadata.album}
+                          </p>
+                        )}
+                        {track.metadata?.coverArt && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            Cover:{' '}
+                            {track.metadata.coverArt.startsWith('data:')
+                              ? `[embedded image - ${Math.round(track.metadata.coverArt.length / 1024)}KB]`
+                              : track.metadata.coverArt}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                {/* Desktop Table View */}
+                <ScrollArea className="hidden h-100 rounded-md border md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">Status</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead className="w-20">Position</TableHead>
-                        <TableHead className="w-[100px]">Duration</TableHead>
+                        <TableHead className="w-25">Duration</TableHead>
                         <TableHead>Album</TableHead>
-                        <TableHead className="w-[100px]">Size</TableHead>
+                        <TableHead className="w-32">Cover</TableHead>
+                        <TableHead className="w-25">Size</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
                     </TableHeader>
@@ -652,7 +1103,12 @@ export default function BulkTrackUploader() {
                           )}
                         >
                           <TableCell>
-                            <div className="flex items-center">{getStatusIcon(track.status)}</div>
+                            <div className="flex items-center gap-1">
+                              {getStatusIcon(track.status)}
+                              {track.uploadedUrl && (
+                                <TrackPlayButton audioUrl={track.uploadedUrl} size="sm" />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
@@ -698,6 +1154,13 @@ export default function BulkTrackUploader() {
                           <TableCell className="text-sm text-muted-foreground">
                             {track.metadata?.album || '-'}
                           </TableCell>
+                          <TableCell className="max-w-32 truncate text-sm text-muted-foreground">
+                            {track.metadata?.coverArt
+                              ? track.metadata.coverArt.startsWith('data:')
+                                ? `[embedded - ${Math.round(track.metadata.coverArt.length / 1024)}KB]`
+                                : track.metadata.coverArt
+                              : '-'}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {formatFileSize(track.fileSize)}
                           </TableCell>
@@ -721,13 +1184,15 @@ export default function BulkTrackUploader() {
             </>
           )}
 
-          {/* Progress during processing */}
-          {isProcessing && (
+          {/* Progress during processing or background uploading */}
+          {(isProcessing || backgroundUploading) && (
             <>
               <Separator />
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>Processing tracks...</span>
+                  <span>
+                    {backgroundUploading ? 'Uploading tracks...' : 'Processing tracks...'}
+                  </span>
                   <span>
                     {successCount + errorCount} / {tracks.length}
                   </span>
@@ -738,11 +1203,11 @@ export default function BulkTrackUploader() {
           )}
         </CardContent>
 
-        <CardFooter className="flex justify-between">
+        <CardFooter className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
           <Button variant="outline" onClick={() => router.push('/admin')} disabled={isProcessing}>
             Cancel
           </Button>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             {showResults && successCount > 0 && (
               <Button variant="outline" onClick={() => router.push('/admin')}>
                 View Tracks
@@ -753,6 +1218,7 @@ export default function BulkTrackUploader() {
               disabled={
                 isProcessing || pendingCount === 0 || tracks.some((t) => t.status === 'extracting')
               }
+              className="w-full sm:w-auto"
             >
               {isProcessing ? (
                 <>

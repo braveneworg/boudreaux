@@ -228,6 +228,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -263,6 +264,7 @@ describe('bulkCreateTracksAction', () => {
           updatedAt: new Date(),
           deletedOn: null,
           publishedOn: null,
+          audioUploadStatus: 'COMPLETED',
         })
         .mockResolvedValueOnce({
           id: 'track-2',
@@ -275,6 +277,7 @@ describe('bulkCreateTracksAction', () => {
           updatedAt: new Date(),
           deletedOn: null,
           publishedOn: null,
+          audioUploadStatus: 'COMPLETED',
         });
 
       const tracks: BulkTrackData[] = [
@@ -312,6 +315,7 @@ describe('bulkCreateTracksAction', () => {
           updatedAt: new Date(),
           deletedOn: null,
           publishedOn: null,
+          audioUploadStatus: 'COMPLETED',
         })
         .mockRejectedValueOnce(new Error('Database error'));
 
@@ -363,6 +367,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -374,7 +379,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      const result = await bulkCreateTracksAction(tracks, true);
+      const result = await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       expect(mockFindOrCreateRelease).toHaveBeenCalledWith({
         album: 'Test Album',
@@ -411,6 +416,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -424,7 +430,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       expect(mockPrismaTrackCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -456,6 +462,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -467,7 +474,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      const result = await bulkCreateTracksAction(tracks, false);
+      const result = await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockFindOrCreateRelease).not.toHaveBeenCalled();
       expect(result.results[0].releaseId).toBeUndefined();
@@ -492,6 +499,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -515,7 +523,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       // Should only call findOrCreateRelease once due to caching
       expect(mockFindOrCreateRelease).toHaveBeenCalledTimes(1);
@@ -540,6 +548,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const tracks: BulkTrackData[] = [
@@ -557,7 +566,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       // Should only call once due to case-insensitive caching
       expect(mockFindOrCreateRelease).toHaveBeenCalledTimes(1);
@@ -610,6 +619,7 @@ describe('bulkCreateTracksAction', () => {
               updatedAt: new Date(),
               deletedOn: null,
               publishedOn: null,
+              audioUploadStatus: 'COMPLETED',
             }),
           },
           artistRelease: {
@@ -637,6 +647,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -652,7 +663,7 @@ describe('bulkCreateTracksAction', () => {
         { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
       ];
 
-      await bulkCreateTracksAction(tracks, false, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false, publishTracks: false });
 
       expect(createMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -690,7 +701,7 @@ describe('bulkCreateTracksAction', () => {
         { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
       ];
 
-      await bulkCreateTracksAction(tracks, false, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false, publishTracks: true });
 
       expect(createMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -726,6 +737,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -746,7 +758,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
         'Test Artist',
@@ -769,6 +781,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -789,7 +802,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
         'Album Artist',
@@ -811,6 +824,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -837,7 +851,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       // Should only call findOrCreateArtistAction once due to caching
       expect(mockFindOrCreateArtist).toHaveBeenCalledTimes(1);
@@ -855,6 +869,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -875,7 +890,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(createMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -923,6 +938,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -944,7 +960,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
         'The Beatles',
@@ -967,6 +983,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -988,7 +1005,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       // Should not create a Group when albumArtist matches artist (solo artist case)
       expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
@@ -1006,6 +1023,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -1027,7 +1045,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       // Should not create a Group when albumArtist matches artist case-insensitively (solo artist case)
       expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
@@ -1045,6 +1063,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       const artistGroupFindUnique = vi.fn().mockResolvedValue(null);
@@ -1095,7 +1114,7 @@ describe('bulkCreateTracksAction', () => {
           trackArtistCreated: false,
         });
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       // Should only call findOrCreateGroupAction once due to caching
       expect(mockFindOrCreateGroup).toHaveBeenCalledTimes(1);
@@ -1131,6 +1150,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -1152,7 +1172,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       // Should call findOrCreateArtistAction with releaseId for albumArtist
       expect(mockFindOrCreateArtist).toHaveBeenCalledWith('Album Artist', {
@@ -1174,6 +1194,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -1189,7 +1210,7 @@ describe('bulkCreateTracksAction', () => {
         { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockPrismaTransaction).toHaveBeenCalled();
     });
@@ -1206,6 +1227,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -1226,7 +1248,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, false);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
       expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
         'Test Artist',
@@ -1280,6 +1302,7 @@ describe('bulkCreateTracksAction', () => {
         updatedAt: new Date(),
         deletedOn: null,
         publishedOn: null,
+        audioUploadStatus: 'COMPLETED',
       });
 
       mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -1308,7 +1331,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      await bulkCreateTracksAction(tracks, true);
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       // findOrCreateArtistAction should be called once for the first track
       // For subsequent tracks with same albumArtist but different album,
@@ -1333,7 +1356,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      const result = await bulkCreateTracksAction(tracks, true);
+      const result = await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       expect(result).toEqual({
         success: false,
@@ -1357,7 +1380,7 @@ describe('bulkCreateTracksAction', () => {
         },
       ];
 
-      const result = await bulkCreateTracksAction(tracks, true);
+      const result = await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       expect(result).toEqual({
         success: false,

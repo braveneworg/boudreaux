@@ -1,8 +1,7 @@
-/* eslint-disable import/first */
 // Mock server-only to prevent client component error in tests
-vi.mock('server-only', () => ({}));
-
 import { createLogger, loggers } from './logger';
+
+vi.mock('server-only', () => ({}));
 
 describe('Logger', () => {
   let consoleSpy: {

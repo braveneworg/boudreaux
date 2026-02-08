@@ -178,8 +178,9 @@ vi.mock('next/link', () => ({
 }));
 
 // Mock next/navigation
+const mockUsePathname = vi.fn(() => '/signup');
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/signup',
+  usePathname: () => mockUsePathname(),
 }));
 
 // Mock react-hook-form
@@ -505,6 +506,36 @@ describe('SignupSigninForm', () => {
       expect(screen.getByTestId('form-input-email')).toBeInTheDocument();
       expect(screen.getByTestId('switch-terms-and-conditions')).toBeInTheDocument();
       expect(screen.getByTestId('turnstile-widget')).toBeInTheDocument();
+      expect(screen.getByTestId('submit-button')).toBeInTheDocument();
+      expect(screen.getByTestId('status-indicator')).toBeInTheDocument();
+    });
+  });
+
+  describe('signin path behavior', () => {
+    beforeEach(() => {
+      mockUsePathname.mockReturnValue('/signin');
+    });
+
+    afterEach(() => {
+      mockUsePathname.mockReturnValue('/signup');
+    });
+
+    it('should not render terms and conditions on signin page even when hasTermsAndConditions is true', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions />);
+
+      expect(screen.queryByText('Accept terms and conditions?')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('switch-terms-and-conditions')).not.toBeInTheDocument();
+    });
+
+    it('should render email field on signin page', () => {
+      render(<SignupSigninForm {...defaultProps} hasTermsAndConditions={false} />);
+
+      expect(screen.getByTestId('form-input-email')).toBeInTheDocument();
+    });
+
+    it('should render submit button and status indicator on signin page', () => {
+      render(<SignupSigninForm {...defaultProps} />);
+
       expect(screen.getByTestId('submit-button')).toBeInTheDocument();
       expect(screen.getByTestId('status-indicator')).toBeInTheDocument();
     });
