@@ -25,6 +25,7 @@
     "s3:restore": "npx tsx scripts/s3-backup.ts restore",
     "s3:list": "npx tsx scripts/s3-backup.ts list",
     "s3:upload": "npx tsx scripts/s3-backup.ts upload",
+    "images:upload": "npx tsx scripts/upload-images.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
     "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx .",
