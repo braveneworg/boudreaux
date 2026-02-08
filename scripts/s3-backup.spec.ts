@@ -726,8 +726,14 @@ describe('S3 Backup Script', () => {
 
       await restoreLocalToS3(localDir, testBucket, testRegion, false);
 
-      // mime.getType should be called for content type
-      expect(s3ClientSendMock).toHaveBeenCalled();
+      // Verify that the upload command was constructed with the expected content type for .jpg files
+      const putObjectCall = s3ClientSendMock.mock.calls.find(
+        ([command]) => (command as { input?: { ContentType?: string } }).input?.ContentType !== undefined,
+      );
+
+      expect(putObjectCall).toBeDefined();
+      const putObjectCommand = putObjectCall![0] as { input?: { ContentType?: string } };
+      expect(putObjectCommand.input?.ContentType).toBe('image/jpeg');
     });
   });
 
