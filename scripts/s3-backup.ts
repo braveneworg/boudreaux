@@ -393,8 +393,18 @@ async function restoreFile(
         log(`Skipping (already exists): ${key}`, 'warning');
         result.skipped++;
         return;
-      } catch {
-        // File doesn't exist, continue with upload
+      } catch (error) {
+        const headObjectError = error as { $metadata?: { httpStatusCode?: number }; Code?: string; name?: string };
+        const statusCode = headObjectError?.$metadata?.httpStatusCode;
+        const errorCode = headObjectError?.Code ?? headObjectError?.name;
+
+        // Only treat 404/NotFound/NoSuchKey as "object does not exist"
+        if (statusCode === 404 || errorCode === 'NotFound' || errorCode === 'NoSuchKey') {
+          // File doesn't exist, continue with upload
+        } else {
+          // Re-throw other errors (permissions, region, transient, etc.)
+          throw error;
+        }
       }
     }
 
