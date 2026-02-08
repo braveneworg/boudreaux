@@ -377,7 +377,9 @@ jobs:
         env:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+          # Skip build since we already have the extracted artifact
           SKIP_BUILD: 'true'
+          # Skip invalidation since it's handled in a separate job
           SKIP_INVALIDATION: 'true'
         run: |
           echo "Syncing Next.js static assets to S3..."
@@ -410,10 +412,10 @@ jobs:
           fi
 
           echo "Creating CloudFront invalidation..."
+          # Note: CloudFront is a global service, region is not required
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --paths "/*" \
-            --region us-east-1 \
             --query 'Invalidation.Id' \
             --output text
 
