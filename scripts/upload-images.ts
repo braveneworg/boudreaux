@@ -45,7 +45,6 @@ dotenv.config(); // This loads .env as fallback
 
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-const CLOUDFRONT_DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
 // Only check S3_BUCKET if running as main script
 if (!S3_BUCKET && require.main === module) {
@@ -267,6 +266,8 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
 
 /**
  * Invalidate CloudFront cache for uploaded files
+ * CloudFront has a limit of 3,000 paths per invalidation request.
+ * For large batches, we split into multiple requests or use wildcard invalidation.
  */
 async function invalidateCloudFront(
   distributionId: string,
@@ -278,9 +279,32 @@ async function invalidateCloudFront(
   }
 
   try {
-    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-
     const cloudfront = new CloudFrontClient({ region });
+    const MAX_PATHS_PER_REQUEST = 3000;
+
+    // For very large uploads (>3000 files), use wildcard invalidation
+    // This is more cost-effective and faster than multiple requests
+    if (keys.length > MAX_PATHS_PER_REQUEST) {
+      log(`Invalidating CloudFront cache using wildcard for ${keys.length} file(s)...`, 'info');
+
+      const command = new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `upload-images-wildcard-${Date.now()}`,
+          Paths: {
+            Quantity: 1,
+            Items: ['/*'],
+          },
+        },
+      });
+
+      await cloudfront.send(command);
+      log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+      return;
+    }
+
+    // For smaller batches (≤3000 files), invalidate specific paths
+    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
 
     // CloudFront paths must start with /
     const paths = keys.map((key) => `/${key}`);
@@ -335,8 +359,9 @@ export async function uploadImages(
   }
 
   // Invalidate CloudFront cache if configured
-  if (options.invalidateCache && CLOUDFRONT_DISTRIBUTION_ID && result.uploadedKeys.length > 0) {
-    await invalidateCloudFront(CLOUDFRONT_DISTRIBUTION_ID, result.uploadedKeys, region);
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (options.invalidateCache && distributionId && result.uploadedKeys.length > 0) {
+    await invalidateCloudFront(distributionId, result.uploadedKeys, region);
   }
 
   return result;
