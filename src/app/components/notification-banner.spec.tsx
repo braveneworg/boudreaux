@@ -19,6 +19,10 @@ vi.mock('framer-motion', () => ({
       dragConstraints,
       dragElastic,
       style,
+      initial,
+      animate,
+      exit,
+      transition,
       ...props
     }: React.HTMLAttributes<HTMLDivElement> & {
       children: React.ReactNode;
@@ -30,6 +34,10 @@ vi.mock('framer-motion', () => ({
       dragConstraints?: { left?: number; right?: number };
       dragElastic?: number;
       style?: React.CSSProperties;
+      initial?: Record<string, unknown>;
+      animate?: Record<string, unknown>;
+      exit?: Record<string, unknown>;
+      transition?: Record<string, unknown>;
     }) => {
       // Store the onDragEnd callback for testing
       mockOnDragEnd = onDragEnd;
@@ -41,6 +49,10 @@ vi.mock('framer-motion', () => ({
           data-drag-constraints={dragConstraints ? JSON.stringify(dragConstraints) : undefined}
           data-drag-elastic={dragElastic !== undefined ? String(dragElastic) : undefined}
           data-touch-action={style?.touchAction}
+          data-initial={initial ? JSON.stringify(initial) : undefined}
+          data-animate={animate ? JSON.stringify(animate) : undefined}
+          data-exit={exit ? JSON.stringify(exit) : undefined}
+          data-transition={transition ? JSON.stringify(transition) : undefined}
         >
           {children}
         </div>
@@ -987,6 +999,44 @@ describe('NotificationBanner', () => {
         'aria-label',
         'Primary message - Secondary message (opens in new tab)'
       );
+    });
+  });
+
+  describe('slide transition animation', () => {
+    it('uses slide-only animation without opacity fade', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const slide = screen.getByRole('group');
+      const initial = JSON.parse(slide.getAttribute('data-initial')!);
+      const animate = JSON.parse(slide.getAttribute('data-animate')!);
+      const exit = JSON.parse(slide.getAttribute('data-exit')!);
+
+      // Should slide in from the right
+      expect(initial).toHaveProperty('x', 50);
+      // Should animate to center
+      expect(animate).toHaveProperty('x', 0);
+      // Should slide out to the left
+      expect(exit).toHaveProperty('x', -50);
+
+      // Should NOT include opacity (no fade effect)
+      expect(initial).not.toHaveProperty('opacity');
+      expect(animate).not.toHaveProperty('opacity');
+      expect(exit).not.toHaveProperty('opacity');
+    });
+
+    it('uses a fast 0.25s transition duration', () => {
+      const notification = createMockNotification({ id: '1', message: 'Test' });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const slide = screen.getByRole('group');
+      const transition = JSON.parse(slide.getAttribute('data-transition')!);
+
+      expect(transition).toHaveProperty('duration', 0.25);
+      expect(transition).toHaveProperty('ease', [0.4, 0, 0.2, 1]);
     });
   });
 });
