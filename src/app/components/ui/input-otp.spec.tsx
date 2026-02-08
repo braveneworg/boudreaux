@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from './input-otp';
 
@@ -8,6 +8,18 @@ vi.mock('input-otp', async () => {
   return {
     ...actual,
   };
+});
+
+// Use fake timers to prevent input-otp's internal setTimeout from firing
+// after JSDOM teardown, which causes "window is not defined" errors.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
 describe('InputOTP', () => {
