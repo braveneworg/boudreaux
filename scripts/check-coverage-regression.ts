@@ -29,13 +29,73 @@ interface CoverageMetrics {
   lines: number;
 }
 
-// Coverage thresholds from vitest.config.ts
-const THRESHOLDS: CoverageMetrics = {
-  statements: 95,
-  branches: 85,
-  functions: 95,
-  lines: 95,
-};
+/**
+ * Read coverage thresholds from vitest.config.ts to ensure consistency
+ * Parses the thresholds block to avoid duplication and drift
+ */
+function loadThresholdsFromConfig(): CoverageMetrics {
+  const configPath = path.join(process.cwd(), 'vitest.config.ts');
+
+  if (!fs.existsSync(configPath)) {
+    console.error('❌ vitest.config.ts not found. Please ensure it exists at the project root.');
+    process.exit(1);
+  }
+
+  let configContent: string;
+  try {
+    configContent = fs.readFileSync(configPath, 'utf-8');
+  } catch (error) {
+    console.error(
+      '❌ Failed to read vitest.config.ts. Please check file permissions and try again.'
+    );
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
+  // Parse the thresholds block from the config file in an order-independent way.
+  // Supports integer and decimal threshold values, e.g. 95 or 95.5.
+  const thresholdsBlockMatch = configContent.match(/thresholds\s*:\s*\{([\s\S]*?)\}/);
+
+  if (!thresholdsBlockMatch) {
+    console.error('❌ Could not find coverage thresholds block in vitest.config.ts');
+    process.exit(1);
+  }
+
+  const thresholdsBlock = thresholdsBlockMatch[1];
+  const metricKeys: (keyof CoverageMetrics)[] = ['lines', 'functions', 'branches', 'statements'];
+  const parsedThresholds: Partial<CoverageMetrics> = {};
+
+  for (const key of metricKeys) {
+    const keyRegex = new RegExp(`\\b${key}\\s*:\\s*(\\d+(?:\\.\\d+)?)`);
+    const match = thresholdsBlock.match(keyRegex);
+
+    if (!match) {
+      console.error(`❌ Could not parse "${key}" coverage threshold from vitest.config.ts`);
+      process.exit(1);
+    }
+
+    const value = parseFloat(match[1]);
+
+    if (Number.isNaN(value)) {
+      console.error(
+        `❌ Parsed "${key}" coverage threshold is not a valid number in vitest.config.ts`
+      );
+      process.exit(1);
+    }
+
+    parsedThresholds[key] = value;
+  }
+
+  return {
+    statements: parsedThresholds.statements as number,
+    branches: parsedThresholds.branches as number,
+    functions: parsedThresholds.functions as number,
+    lines: parsedThresholds.lines as number,
+  };
+}
+
+const THRESHOLDS: CoverageMetrics = loadThresholdsFromConfig();
 
 // Allowed tolerance: permit up to 2% decrease as long as thresholds are met
 const ALLOWED_DECREASE_TOLERANCE = 2;
