@@ -60,6 +60,7 @@ describe('updateTrackAudioAction', () => {
     id: mockTrackId,
     title: 'Test Track',
     audioUploadStatus: AudioUploadStatus.PENDING,
+    audioUrl: 'pending://upload',
   };
 
   beforeEach(() => {
@@ -236,7 +237,7 @@ describe('updateTrackAudioAction', () => {
       mockPrismaTrackUpdate.mockResolvedValue(mockTrack as never);
     });
 
-    it('should update track with title as audioUrl and FAILED status', async () => {
+    it('should update track with existing audioUrl and FAILED status', async () => {
       const result = await updateTrackAudioAction(
         mockTrackId,
         mockAudioUrl,
@@ -247,7 +248,7 @@ describe('updateTrackAudioAction', () => {
       expect(mockPrismaTrackUpdate).toHaveBeenCalledWith({
         where: { id: mockTrackId },
         data: {
-          audioUrl: mockTrack.title, // Uses title as placeholder
+          audioUrl: mockTrack.audioUrl, // Preserves existing audioUrl
           audioUploadStatus: AudioUploadStatus.FAILED,
         },
       });
