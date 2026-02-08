@@ -418,9 +418,10 @@ describe('ReleaseService', () => {
       vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
 
       const mockTrackUpdateMany = vi.fn().mockResolvedValue({ count: 2 });
+      const publishedRelease = { ...mockReleaseWithTracks, publishedAt: publishDate };
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
-          release: { update: vi.fn().mockResolvedValue(mockReleaseWithTracks) },
+          release: { update: vi.fn().mockResolvedValue(publishedRelease) },
           track: { updateMany: mockTrackUpdateMany },
         };
         return callback(tx as never);
