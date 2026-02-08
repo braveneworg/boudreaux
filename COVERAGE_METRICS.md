@@ -32,6 +32,26 @@ Based on the project's [copilot instructions](.github/copilot-instructions.md), 
 - **Ideal Target:** 100% on all testable files, including branches.
 - **Current Status:** The project is currently above the minimum target for statements, functions, and lines, but slightly below the ideal target for branches. Focus should be on improving branch coverage in key areas to reach the ideal target.
 
+### Coverage Regression Policy
+
+The project uses automated coverage regression checking during builds:
+
+- **Tolerance:** Up to **2% decrease** is permitted for any metric
+- **Condition:** The metric must remain **above the configured threshold**
+- **Thresholds:**
+  - Statements: 95%
+  - Branches: 85%
+  - Functions: 95%
+  - Lines: 95%
+
+**Examples:**
+
+- ✅ Statements: 97% → 95.5% (within 2% tolerance, above 95% threshold)
+- ❌ Statements: 97% → 94.5% (within 2% tolerance, but **below** 95% threshold)
+- ❌ Statements: 97% → 94% (exceeds 2% tolerance)
+
+This policy allows for minor coverage decreases due to new code additions while maintaining overall quality standards.
+
 ---
 
 ## How to Update
