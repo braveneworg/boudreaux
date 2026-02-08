@@ -221,7 +221,12 @@ export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata |
   const s3Backups = items
     .filter((item) => {
       const itemPath = join(backupDir, item);
-      return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+      try {
+        return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+      } catch {
+        // Ignore if the file/directory was deleted between readdirSync and statSync
+        return false;
+      }
     })
     .sort()
     .reverse();
