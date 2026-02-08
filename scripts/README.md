@@ -147,6 +147,7 @@ npx tsx scripts/s3-backup.ts list <custom-backups-directory>
 - ✅ Progress tracking and clear success/error messages
 - 🛡️ Safe restore mode (skips existing files by default)
 - 📋 Pagination support for large buckets
+- 🗑️ Automatic cleanup - keeps only the 5 most recent backups (configurable)
 
 ### Backup Format
 
@@ -180,9 +181,12 @@ S3_BUCKET="your-s3-bucket-name"
 # Optional
 AWS_REGION="us-east-1"                    # Default: us-east-1
 S3_BACKUP_PREFIX=""                       # Default: "" (entire bucket)
+S3_MAX_BACKUPS="5"                        # Default: 5 (number of backups to keep)
 ```
 
 These are automatically read from `.env.local` or `.env` files.
+
+**Automatic Cleanup**: After each successful backup, the script automatically removes old backups, keeping only the most recent `S3_MAX_BACKUPS` backups (default: 5). This prevents unlimited disk usage growth.
 
 ### Examples
 
