@@ -394,7 +394,11 @@ async function restoreFile(
         result.skipped++;
         return;
       } catch (error) {
-        const headObjectError = error as { $metadata?: { httpStatusCode?: number }; Code?: string; name?: string };
+        const headObjectError = error as {
+          $metadata?: { httpStatusCode?: number };
+          Code?: string;
+          name?: string;
+        };
         const statusCode = headObjectError?.$metadata?.httpStatusCode;
         const errorCode = headObjectError?.Code ?? headObjectError?.name;
 
