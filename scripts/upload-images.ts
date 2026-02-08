@@ -45,7 +45,6 @@ dotenv.config(); // This loads .env as fallback
 
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-const CLOUDFRONT_DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
 // Only check S3_BUCKET if running as main script
 if (!S3_BUCKET && require.main === module) {
@@ -335,8 +334,9 @@ export async function uploadImages(
   }
 
   // Invalidate CloudFront cache if configured
-  if (options.invalidateCache && CLOUDFRONT_DISTRIBUTION_ID && result.uploadedKeys.length > 0) {
-    await invalidateCloudFront(CLOUDFRONT_DISTRIBUTION_ID, result.uploadedKeys, region);
+  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  if (options.invalidateCache && distributionId && result.uploadedKeys.length > 0) {
+    await invalidateCloudFront(distributionId, result.uploadedKeys, region);
   }
 
   return result;
