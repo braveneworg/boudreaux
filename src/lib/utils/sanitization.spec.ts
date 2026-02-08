@@ -7,6 +7,7 @@ import {
   sanitizeUsername,
   normalizeWhitespace,
   sanitizeTextField,
+  sanitizeFilePath,
 } from './sanitization';
 
 describe('sanitization utilities', () => {
@@ -250,6 +251,109 @@ describe('sanitization utilities', () => {
 
     it('preserves special characters in names', () => {
       expect(sanitizeTextField("  John O'Brien  ")).toBe("John O'Brien");
+    });
+  });
+
+  describe('sanitizeFilePath', () => {
+    const baseDir = '/tmp/backup';
+
+    describe('valid paths', () => {
+      it('allows simple relative paths', () => {
+        expect(sanitizeFilePath('file.txt', baseDir)).toBe('file.txt');
+      });
+
+      it('allows nested directory paths', () => {
+        expect(sanitizeFilePath('dir/subdir/file.txt', baseDir)).toBe('dir/subdir/file.txt');
+      });
+
+      it('normalizes redundant slashes', () => {
+        expect(sanitizeFilePath('dir//file.txt', baseDir)).toBe('dir/file.txt');
+      });
+
+      it('normalizes current directory references', () => {
+        expect(sanitizeFilePath('./dir/file.txt', baseDir)).toBe('dir/file.txt');
+        expect(sanitizeFilePath('dir/./file.txt', baseDir)).toBe('dir/file.txt');
+      });
+
+      it('allows deeply nested paths', () => {
+        expect(sanitizeFilePath('a/b/c/d/e/file.txt', baseDir)).toBe('a/b/c/d/e/file.txt');
+      });
+    });
+
+    describe('path traversal prevention', () => {
+      it('rejects absolute paths', () => {
+        expect(() => sanitizeFilePath('/etc/passwd', baseDir)).toThrow(
+          'Absolute paths are not allowed'
+        );
+      });
+
+      it('rejects paths starting with ..', () => {
+        expect(() => sanitizeFilePath('../etc/passwd', baseDir)).toThrow(
+          'Path traversal attempt detected (..)'
+        );
+      });
+
+      it('rejects paths with .. in the middle', () => {
+        expect(() => sanitizeFilePath('dir/../../etc/passwd', baseDir)).toThrow(
+          'Path traversal attempt detected (..)'
+        );
+      });
+
+      it('rejects just .. path', () => {
+        expect(() => sanitizeFilePath('..', baseDir)).toThrow(
+          'Path traversal attempt detected (..)'
+        );
+      });
+
+      it('rejects multiple .. segments', () => {
+        expect(() => sanitizeFilePath('../../file.txt', baseDir)).toThrow(
+          'Path traversal attempt detected (..)'
+        );
+      });
+
+      it('handles Windows-style paths on POSIX systems', () => {
+        // On POSIX systems (Linux, macOS), backslashes are treated as regular filename characters.
+        // This is the expected behavior since S3 uses POSIX-style paths (forward slashes).
+        // Note: On Windows, normalize() would convert backslashes to forward slashes,
+        // but this function is primarily designed for S3 keys which are always POSIX-style.
+        const result = sanitizeFilePath('C:\\Windows\\System32', baseDir);
+        expect(result).toBe('C:\\Windows\\System32');
+      });
+    });
+
+    describe('null byte and control character prevention', () => {
+      it('rejects paths with null bytes', () => {
+        expect(() => sanitizeFilePath('file\x00.txt', baseDir)).toThrow('Path contains null bytes');
+      });
+
+      it('rejects empty path', () => {
+        expect(() => sanitizeFilePath('', baseDir)).toThrow('Path key cannot be empty');
+      });
+    });
+
+    describe('verification against base directory', () => {
+      it('verifies resolved path stays within base directory', () => {
+        // This should work - stays within base
+        expect(sanitizeFilePath('a/b/../c/file.txt', baseDir)).toBe('a/c/file.txt');
+      });
+
+      it('allows paths that resolve to base directory itself', () => {
+        expect(sanitizeFilePath('a/../b/../c', baseDir)).toBe('c');
+      });
+    });
+
+    describe('edge cases', () => {
+      it('handles paths with spaces', () => {
+        expect(sanitizeFilePath('my file.txt', baseDir)).toBe('my file.txt');
+      });
+
+      it('handles paths with special characters', () => {
+        expect(sanitizeFilePath('file-name_2024.txt', baseDir)).toBe('file-name_2024.txt');
+      });
+
+      it('handles paths with dots in filenames', () => {
+        expect(sanitizeFilePath('archive.tar.gz', baseDir)).toBe('archive.tar.gz');
+      });
     });
   });
 });
