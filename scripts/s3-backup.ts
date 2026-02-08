@@ -38,7 +38,7 @@
  */
 
 import { createWriteStream, createReadStream } from 'fs';
-import { dirname, extname, join, posix } from 'path';
+import { basename, dirname, extname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
@@ -215,6 +215,17 @@ function isAllowedMediaFile(key: string): boolean {
 }
 
 /**
+ * Determine the backups root directory from a given local directory path.
+ * If localDir is a timestamped backup directory (starts with 's3-'), returns its parent.
+ * Otherwise, returns localDir itself as the backups root.
+ */
+export function getBackupRootDir(localDir: string): string {
+  const localDirBasename = basename(localDir);
+  const isTimestampedBackup = localDirBasename.startsWith('s3-');
+  return isTimestampedBackup ? dirname(localDir) : localDir;
+}
+
+/**
  * Load the most recent backup's metadata for change detection
  */
 export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata | null {
@@ -226,7 +237,12 @@ export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata |
   const s3Backups = items
     .filter((item) => {
       const itemPath = join(backupDir, item);
-      return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+      try {
+        return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+      } catch {
+        // Ignore if the file/directory was deleted between readdirSync and statSync
+        return false;
+      }
     })
     .sort()
     .reverse();
@@ -348,7 +364,7 @@ export async function backupS3ToLocal(
     log(`Found ${s3Manifest.length} eligible media file(s) in S3`, 'info');
 
     // Phase 2: Compare against the most recent backup to detect changes
-    const backupDir = dirname(localDir);
+    const backupDir = getBackupRootDir(localDir);
     const previousMetadata = getLatestBackupMetadata(backupDir);
 
     if (previousMetadata && !hasChangedSinceLastBackup(s3Manifest, previousMetadata)) {
@@ -556,6 +572,11 @@ export async function invalidateCloudFrontCache(
 
     const response = await cloudFrontClient.send(command);
     const invalidationId = response.Invalidation?.Id || null;
+
+    if (!invalidationId) {
+      log('Warning: CloudFront API did not return an invalidation ID', 'warning');
+      return null;
+    }
 
     log(`CloudFront invalidation created: ${invalidationId}`, 'success');
     log('Invalidation may take 5-15 minutes to complete', 'info');
@@ -827,7 +848,7 @@ async function main(): Promise<void> {
         await backupS3ToLocal(localDir);
 
         // Clean up old backups after successful backup
-        const backupDir = dirname(localDir);
+        const backupDir = getBackupRootDir(localDir);
         if (existsSync(backupDir)) {
           const deletedCount = cleanupOldBackups(backupDir);
           if (deletedCount > 0) {
