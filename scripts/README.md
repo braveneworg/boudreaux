@@ -81,6 +81,137 @@ This is automatically read from `.env.local` or `.env` files.
 
 ---
 
+## S3 Backup/Restore Script
+
+A TypeScript script for backing up S3 bucket contents to your local machine and restoring them when needed.
+
+### Prerequisites
+
+Ensure you have AWS credentials configured:
+
+```bash
+# AWS credentials (via environment variables or ~/.aws/credentials)
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+
+# Or use AWS profile
+export AWS_PROFILE="your-profile-name"
+```
+
+### Usage
+
+#### Create a Backup
+
+```bash
+# Create backup with auto-generated directory name (e.g., backups/s3-2026-02-07T10-00-00)
+npm run s3:backup
+
+# Create backup with custom directory
+npm run s3:backup backups/my-s3-backup
+
+# Or run directly
+npx tsx scripts/s3-backup.ts backup [local-directory]
+```
+
+#### Restore from Backup
+
+```bash
+# Restore from backup directory
+npm run s3:restore backups/s3-2026-02-07T10-00-00
+
+# Restore with overwrite flag (replaces existing files in S3)
+npm run s3:restore backups/s3-2026-02-07T10-00-00 --overwrite
+
+# Or run directly
+npx tsx scripts/s3-backup.ts restore <local-directory> [--overwrite]
+```
+
+#### List Available Backups
+
+```bash
+# List all S3 backups in the backups directory
+npm run s3:list
+
+# List backups in a custom directory
+npx tsx scripts/s3-backup.ts list <custom-backups-directory>
+```
+
+### Features
+
+- 📦 Full S3 bucket backup including all files and metadata
+- 📁 Auto-creates timestamped backup directories
+- 🔄 Complete restore with optional overwrite protection
+- 📊 Detailed backup metadata in JSON format
+- 🏷️ Preserves content types and file metadata
+- 🔍 Prefix filtering support for partial backups
+- ✅ Progress tracking and clear success/error messages
+- 🛡️ Safe restore mode (skips existing files by default)
+- 📋 Pagination support for large buckets
+
+### Backup Format
+
+Backups are saved in a directory structure that mirrors your S3 bucket:
+
+```
+backups/s3-2026-02-07T10-00-00/
+├── backup-metadata.json     # Backup information and file manifest
+├── folder1/
+│   ├── file1.jpg
+│   └── file2.png
+└── folder2/
+    └── file3.txt
+```
+
+The `backup-metadata.json` file contains:
+
+- Timestamp of backup
+- Source bucket name and region
+- Total files and size
+- Complete file manifest with metadata
+
+### Environment Variables
+
+Set these environment variables before running the script:
+
+```bash
+# Required
+S3_BUCKET="your-s3-bucket-name"
+
+# Optional
+AWS_REGION="us-east-1"                    # Default: us-east-1
+S3_BACKUP_PREFIX=""                       # Default: "" (entire bucket)
+```
+
+These are automatically read from `.env.local` or `.env` files.
+
+### Examples
+
+#### Backup entire bucket
+
+```bash
+npm run s3:backup
+```
+
+#### Backup only media files
+
+```bash
+S3_BACKUP_PREFIX="media/" npm run s3:backup backups/media-only
+```
+
+#### Restore and overwrite existing files
+
+```bash
+npm run s3:restore backups/s3-2026-02-07T10-00-00 --overwrite
+```
+
+#### View all backups
+
+```bash
+npm run s3:list
+```
+
+---
+
 # CDN Sync Script
 
 A TypeScript script that syncs Next.js static assets to S3 and invalidates CloudFront distribution.
