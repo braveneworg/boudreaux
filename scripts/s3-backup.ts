@@ -35,6 +35,9 @@
  *   S3_MAX_BACKUPS - Maximum number of backups to keep (default: 5)
  *               Older backups are automatically deleted after successful backup
  *   SKIP_INVALIDATION - Skip CloudFront cache invalidation after restore/upload (default: false)
+ *   CLOUDFRONT_DISTRIBUTION_ID - CloudFront distribution ID for cache invalidation (optional)
+ *               If set, CloudFront cache will be invalidated after successful restore/upload
+ *               operations (i.e., when one or more objects are uploaded)
  */
 
 import { createWriteStream, createReadStream } from 'fs';

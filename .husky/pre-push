@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# Skip if there's nothing to push (local ref is up to date with remote)
+if ! git diff --quiet HEAD @{u} 2>/dev/null; then
+  : # there are commits to push, continue
+else
+  echo "Nothing to push, skipping pre-push checks."
+  exit 0
+fi
+
 echo "🔍 Running TypeScript type-check before push..."
 
 # Run TypeScript type-check on the entire project
