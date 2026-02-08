@@ -14,7 +14,7 @@ import { existsSync, readdirSync, rmdirSync, statSync, unlinkSync } from '../src
 
 // Mock fs utilities
 vi.mock('../src/lib/system-utils', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     existsSync: vi.fn(),
