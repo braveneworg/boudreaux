@@ -29,13 +29,34 @@ interface CoverageMetrics {
   lines: number;
 }
 
-// Coverage thresholds from vitest.config.ts
-const THRESHOLDS: CoverageMetrics = {
-  statements: 95,
-  branches: 85,
-  functions: 95,
-  lines: 95,
-};
+/**
+ * Read coverage thresholds from vitest.config.ts to ensure consistency
+ * Parses the thresholds block to avoid duplication and drift
+ */
+function loadThresholdsFromConfig(): CoverageMetrics {
+  const configPath = path.join(process.cwd(), 'vitest.config.ts');
+  const configContent = fs.readFileSync(configPath, 'utf-8');
+
+  // Parse the thresholds block from the config file
+  // Format: thresholds: { lines: 95, functions: 95, branches: 85, statements: 95 }
+  const thresholdsMatch = configContent.match(
+    /thresholds:\s*\{[^}]*lines:\s*(\d+)[^}]*functions:\s*(\d+)[^}]*branches:\s*(\d+)[^}]*statements:\s*(\d+)[^}]*\}/s
+  );
+
+  if (!thresholdsMatch) {
+    console.error('❌ Could not parse coverage thresholds from vitest.config.ts');
+    process.exit(1);
+  }
+
+  return {
+    lines: parseInt(thresholdsMatch[1], 10),
+    functions: parseInt(thresholdsMatch[2], 10),
+    branches: parseInt(thresholdsMatch[3], 10),
+    statements: parseInt(thresholdsMatch[4], 10),
+  };
+}
+
+const THRESHOLDS: CoverageMetrics = loadThresholdsFromConfig();
 
 // Allowed tolerance: permit up to 2% decrease as long as thresholds are met
 const ALLOWED_DECREASE_TOLERANCE = 2;
