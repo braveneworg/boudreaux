@@ -33,6 +33,8 @@
  *   S3_BACKUP_PREFIX - S3 key prefix to backup/restore (default: '' - entire bucket)
  *   S3_MAX_BACKUPS - Maximum number of backups to keep (default: 5)
  *               Older backups are automatically deleted after successful backup
+ *   CLOUDFRONT_DISTRIBUTION_ID - CloudFront distribution ID for cache invalidation (optional)
+ *               If set, CloudFront cache will be invalidated after restore/upload operations
  */
 
 import { createWriteStream, createReadStream } from 'fs';
