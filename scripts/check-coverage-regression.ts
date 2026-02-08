@@ -45,7 +45,9 @@ function loadThresholdsFromConfig(): CoverageMetrics {
   try {
     configContent = fs.readFileSync(configPath, 'utf-8');
   } catch (error) {
-    console.error('❌ Failed to read vitest.config.ts. Please check file permissions and try again.');
+    console.error(
+      '❌ Failed to read vitest.config.ts. Please check file permissions and try again.'
+    );
     if (error instanceof Error) {
       console.error(error.message);
     }
@@ -53,7 +55,7 @@ function loadThresholdsFromConfig(): CoverageMetrics {
   }
   // Parse the thresholds block from the config file in an order-independent way.
   // Supports integer and decimal threshold values, e.g. 95 or 95.5.
-  const thresholdsBlockMatch = configContent.match(/thresholds\s*:\s*\{([\s\S]*?)\}/s);
+  const thresholdsBlockMatch = configContent.match(/thresholds\s*:\s*\{([\s\S]*?)\}/);
 
   if (!thresholdsBlockMatch) {
     console.error('❌ Could not find coverage thresholds block in vitest.config.ts');
@@ -69,9 +71,7 @@ function loadThresholdsFromConfig(): CoverageMetrics {
     const match = thresholdsBlock.match(keyRegex);
 
     if (!match) {
-      console.error(
-        `❌ Could not parse "${key}" coverage threshold from vitest.config.ts`
-      );
+      console.error(`❌ Could not parse "${key}" coverage threshold from vitest.config.ts`);
       process.exit(1);
     }
 
