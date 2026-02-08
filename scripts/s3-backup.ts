@@ -831,6 +831,9 @@ async function main(): Promise<void> {
         console.error('  backup   - Download S3 bucket contents to local directory');
         console.error('  restore  - Upload local backup to S3 bucket');
         console.error('  list     - List available S3 backups');
+        console.error(
+          '  upload   - Upload local backup to S3 bucket (deprecated, use restore instead)'
+        );
         console.error('');
         console.error('Options:');
         console.error('  --overwrite, -f  - Overwrite existing files in S3 during restore');
