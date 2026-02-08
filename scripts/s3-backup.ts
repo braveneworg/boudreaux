@@ -36,7 +36,7 @@
  */
 
 import { createWriteStream, createReadStream } from 'fs';
-import { dirname, join } from 'path';
+import { dirname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
 
 import {
@@ -492,7 +492,8 @@ async function restoreDirectory(
     }
 
     const itemPath = join(fullPath, item);
-    const relativePath = currentPath ? join(currentPath, item) : item;
+    // Use POSIX separators for S3 keys (always forward slashes)
+    const relativePath = currentPath ? posix.join(currentPath, item) : item;
     const stats = statSync(itemPath);
 
     if (stats.isDirectory()) {
