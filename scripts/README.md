@@ -216,6 +216,227 @@ npm run s3:list
 
 ---
 
+# Image Upload Utility
+
+A TypeScript script that uploads images to S3 with support for single files, multiple comma-separated files, or entire directories.
+
+## Usage
+
+### Environment Variables
+
+Set these environment variables before running the script:
+
+```bash
+# Required
+export S3_BUCKET="your-s3-bucket-name"
+
+# Optional
+export AWS_REGION="us-east-1"  # Default: us-east-1
+export CLOUDFRONT_DISTRIBUTION_ID="your-cloudfront-distribution-id"  # For cache invalidation
+```
+
+### Upload Single Image
+
+```bash
+npm run images:upload public/media/profile.jpg
+```
+
+### Upload Multiple Images (Comma-Separated)
+
+```bash
+npm run images:upload ./images/photo1.jpg,./images/photo2.png,./images/photo3.webp
+```
+
+### Upload All Images from a Directory (Recursive)
+
+```bash
+npm run images:upload --dir public/media/gallery
+```
+
+### Upload with Custom S3 Prefix
+
+```bash
+# Single file with prefix
+npm run images:upload public/avatar.jpg --prefix user-content/
+
+# Directory with prefix
+npm run images:upload --dir ./uploads --prefix user-uploads/2026/
+```
+
+### Skip CloudFront Cache Invalidation
+
+```bash
+npm run images:upload public/photo.jpg --no-invalidate
+```
+
+### Direct Usage
+
+```bash
+# With tsx
+npx tsx scripts/upload-images.ts public/media/photo.jpg
+
+# Or run with Node
+chmod +x scripts/upload-images.ts
+./scripts/upload-images.ts --dir ./images
+```
+
+## Features
+
+- 📸 Upload single or multiple images
+- 📂 Recursive directory upload
+- 🔗 Support for both relative and absolute paths
+- 🌐 Automatic content type detection
+- ⚡ CloudFront cache invalidation
+- 🎨 Colored console output with progress
+- 📊 Upload summary with statistics
+- 🛡️ Error handling with detailed reporting
+
+## Supported Image Formats
+
+The script automatically filters for these image formats:
+
+- **JPEG**: `.jpg`, `.jpeg`
+- **PNG**: `.png`
+- **GIF**: `.gif`
+- **WebP**: `.webp`
+- **SVG**: `.svg`
+- **Icon**: `.ico`
+- **Bitmap**: `.bmp`
+- **TIFF**: `.tiff`, `.tif`
+- **AVIF**: `.avif`
+
+Non-image files are automatically skipped with a warning message.
+
+## Path Handling
+
+The script intelligently handles different path formats:
+
+### Relative Paths
+
+```bash
+# Current directory
+npm run images:upload ./photo.jpg
+
+# Subdirectories
+npm run images:upload images/gallery/photo.jpg
+```
+
+### Absolute Paths
+
+```bash
+npm run images:upload /Users/username/projects/app/public/media/photo.jpg
+```
+
+### Public Directory
+
+Files in the `public/` directory are automatically mapped correctly:
+
+```bash
+# Uploads to S3 as: media/photo.jpg (not public/media/photo.jpg)
+npm run images:upload public/media/photo.jpg
+```
+
+## S3 Key Generation
+
+The script generates S3 keys with smart path handling:
+
+- Removes `public/` prefix automatically
+- Removes leading slashes and `./`
+- Converts backslashes to forward slashes (Windows compatibility)
+- Applies optional prefix to all uploaded files
+
+### Examples
+
+```bash
+# Input: public/media/photo.jpg
+# S3 Key: media/photo.jpg
+
+# Input: ./images/avatar.png
+# S3 Key: images/avatar.png
+
+# Input: public/media/photo.jpg --prefix cdn/
+# S3 Key: cdn/media/photo.jpg
+```
+
+## Command-Line Options
+
+| Option              | Alias | Description                                  |
+| ------------------- | ----- | -------------------------------------------- |
+| `--dir <directory>` | `-d`  | Upload all images from directory (recursive) |
+| `--prefix <prefix>` | `-p`  | S3 key prefix for uploaded files             |
+| `--no-invalidate`   |       | Skip CloudFront cache invalidation           |
+| `--help`            | `-h`  | Show help message                            |
+
+## Examples
+
+### Upload Profile Picture
+
+```bash
+npm run images:upload public/media/profiles/user-123.jpg --prefix users/profiles/
+```
+
+### Upload Gallery Images
+
+```bash
+npm run images:upload --dir public/media/gallery --prefix gallery/2026/
+```
+
+### Upload Multiple Event Photos
+
+```bash
+npm run images:upload \
+  ./events/photo1.jpg,./events/photo2.jpg,./events/photo3.jpg \
+  --prefix events/conference-2026/
+```
+
+### Upload Without Cache Invalidation
+
+```bash
+npm run images:upload --dir ./temp-images --no-invalidate
+```
+
+## Output Example
+
+```
+[UPLOAD-IMAGES] Starting upload to S3 bucket: my-bucket
+[UPLOAD-IMAGES] Using S3 prefix: user-content/
+[UPLOAD-IMAGES] Uploading: ./photo.jpg → s3://my-bucket/user-content/photo.jpg
+[UPLOAD-IMAGES] ✓ Uploaded: user-content/photo.jpg (245.5 KB)
+[UPLOAD-IMAGES] Invalidating CloudFront cache for 1 file(s)...
+[UPLOAD-IMAGES] ✓ CloudFront cache invalidation initiated
+
+============================================================
+[UPLOAD-IMAGES] Upload Summary: 1 successful, 0 failed, 0 skipped
+============================================================
+```
+
+## Error Handling
+
+The script provides detailed error reporting:
+
+- File not found errors
+- Non-image file warnings
+- S3 upload failures
+- CloudFront invalidation errors (non-fatal)
+
+Errors are collected and displayed in a summary at the end.
+
+## Integration with CI/CD
+
+```yaml
+# GitHub Actions example
+- name: Upload media assets
+  env:
+    S3_BUCKET: ${{ secrets.S3_BUCKET }}
+    CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  run: |
+    npm run images:upload --dir public/media
+```
+
+---
+
 # CDN Sync Script
 
 A TypeScript script that syncs Next.js static assets to S3 and invalidates CloudFront distribution.
