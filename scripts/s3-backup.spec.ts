@@ -227,12 +227,22 @@ describe('S3 Backup Script', () => {
       existsSyncMock.mockReturnValue(true);
       mkdirSyncMock.mockReturnValue(undefined);
       writeFileSyncMock.mockReturnValue(undefined);
+      // Default: no previous backups (for change detection in getLatestBackupMetadata)
+      readdirSyncMock.mockReturnValue([]);
       s3ClientSendMock.mockReset();
     });
 
     it('should create backup directory if it does not exist', async () => {
       existsSyncMock.mockReturnValue(false);
-      s3ClientSendMock.mockResolvedValue({ Contents: [] });
+      s3ClientSendMock
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'photo.jpg', Size: 100, LastModified: new Date() }],
+          NextContinuationToken: undefined,
+        })
+        .mockResolvedValueOnce({
+          Body: { pipe: vi.fn() },
+          ContentType: 'image/jpeg',
+        });
 
       await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
@@ -241,7 +251,7 @@ describe('S3 Backup Script', () => {
 
     it('should backup single S3 object successfully', async () => {
       const mockObject = {
-        Key: 'test-file.txt',
+        Key: 'photo.jpg',
         Size: 1024,
         LastModified: new Date('2026-01-01T00:00:00Z'),
       };
@@ -253,7 +263,7 @@ describe('S3 Backup Script', () => {
         })
         .mockResolvedValueOnce({
           Body: { pipe: vi.fn() },
-          ContentType: 'text/plain',
+          ContentType: 'image/jpeg',
         });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
@@ -261,25 +271,26 @@ describe('S3 Backup Script', () => {
       expect(result.totalFiles).toBe(1);
       expect(result.totalSize).toBe(1024);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0].key).toBe('test-file.txt');
-      expect(result.files[0].contentType).toBe('text/plain');
+      expect(result.files[0].key).toBe('photo.jpg');
+      expect(result.files[0].contentType).toBe('image/jpeg');
     });
 
     it('should backup multiple S3 objects successfully', async () => {
       const mockObjects = [
-        { Key: 'file1.txt', Size: 1024, LastModified: new Date() },
+        { Key: 'file1.png', Size: 1024, LastModified: new Date() },
         { Key: 'file2.jpg', Size: 2048, LastModified: new Date() },
-        { Key: 'file3.pdf', Size: 4096, LastModified: new Date() },
+        { Key: 'file3.mp3', Size: 4096, LastModified: new Date() },
       ];
 
+      // New: listing happens first, then all downloads
       s3ClientSendMock
         .mockResolvedValueOnce({
           Contents: mockObjects,
           NextContinuationToken: undefined,
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/png' })
         .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'application/pdf' });
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'audio/mpeg' });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
@@ -289,24 +300,25 @@ describe('S3 Backup Script', () => {
     });
 
     it('should handle pagination with continuation tokens', async () => {
+      // New: all listing happens first, then all downloads
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'page1-file.txt', Size: 100, LastModified: new Date() }],
+          Contents: [{ Key: 'page1-file.jpg', Size: 100, LastModified: new Date() }],
           NextContinuationToken: 'token-page2',
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' })
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'page2-file.txt', Size: 200, LastModified: new Date() }],
+          Contents: [{ Key: 'page2-file.png', Size: 200, LastModified: new Date() }],
           NextContinuationToken: undefined,
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' });
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/png' });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(2);
       expect(result.totalSize).toBe(300);
-      expect(result.files[0].key).toBe('page1-file.txt');
-      expect(result.files[1].key).toBe('page2-file.txt');
+      expect(result.files[0].key).toBe('page1-file.jpg');
+      expect(result.files[1].key).toBe('page2-file.png');
     });
 
     it('should handle empty bucket', async () => {
@@ -316,7 +328,9 @@ describe('S3 Backup Script', () => {
 
       expect(result.totalFiles).toBe(0);
       expect(result.totalSize).toBe(0);
-      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('No objects found'));
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('No eligible media files found')
+      );
     });
 
     it('should handle undefined Contents in S3 response', async () => {
@@ -325,7 +339,9 @@ describe('S3 Backup Script', () => {
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(0);
-      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('No objects found'));
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('No eligible media files found')
+      );
     });
 
     it('should handle objects with no key', async () => {
@@ -339,6 +355,25 @@ describe('S3 Backup Script', () => {
       expect(result.totalFiles).toBe(0);
     });
 
+    it('should skip non-media files', async () => {
+      s3ClientSendMock
+        .mockResolvedValueOnce({
+          Contents: [
+            { Key: 'script.js', Size: 100, LastModified: new Date() },
+            { Key: 'style.css', Size: 200, LastModified: new Date() },
+            { Key: 'page.html', Size: 300, LastModified: new Date() },
+            { Key: 'photo.jpg', Size: 400, LastModified: new Date() },
+          ],
+          NextContinuationToken: undefined,
+        })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
+
+      const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
+
+      expect(result.totalFiles).toBe(1);
+      expect(result.files[0].key).toBe('photo.jpg');
+    });
+
     it('should skip objects with invalid keys detected by path sanitization', async () => {
       sanitizeFilePathMock.mockImplementation((pathKey: string) => {
         if (pathKey.includes('..')) throw new Error('Path traversal detected');
@@ -348,17 +383,17 @@ describe('S3 Backup Script', () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
           Contents: [
-            { Key: '../../../etc/passwd', Size: 100, LastModified: new Date() },
-            { Key: 'valid-file.txt', Size: 200, LastModified: new Date() },
+            { Key: '../../../etc/passwd.jpg', Size: 100, LastModified: new Date() },
+            { Key: 'valid-file.jpg', Size: 200, LastModified: new Date() },
           ],
           NextContinuationToken: undefined,
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' });
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(1);
-      expect(result.files[0].key).toBe('valid-file.txt');
+      expect(result.files[0].key).toBe('valid-file.jpg');
       expect(mockConsoleWarn).toHaveBeenCalledWith(
         expect.stringContaining('Skipping object with invalid key')
       );
@@ -367,53 +402,54 @@ describe('S3 Backup Script', () => {
     it('should handle objects with no body', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'test.txt', Size: 1024, LastModified: new Date() }],
+          Contents: [{ Key: 'test.jpg', Size: 1024, LastModified: new Date() }],
           NextContinuationToken: undefined,
         })
         .mockResolvedValueOnce({
           Body: undefined,
-          ContentType: 'text/plain',
+          ContentType: 'image/jpeg',
         });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(0);
-      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('No body for test.txt'));
+      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('No body for test.jpg'));
     });
 
     it('should handle individual object download failures', async () => {
+      // New: listing happens first, then downloads
       s3ClientSendMock
         .mockResolvedValueOnce({
           Contents: [
-            { Key: 'fail.txt', Size: 1024, LastModified: new Date() },
-            { Key: 'success.txt', Size: 2048, LastModified: new Date() },
+            { Key: 'fail.jpg', Size: 1024, LastModified: new Date() },
+            { Key: 'success.png', Size: 2048, LastModified: new Date() },
           ],
           NextContinuationToken: undefined,
         })
         .mockRejectedValueOnce(new Error('Download failed'))
         .mockResolvedValueOnce({
           Body: { pipe: vi.fn() },
-          ContentType: 'text/plain',
+          ContentType: 'image/png',
         });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(1);
-      expect(result.files[0].key).toBe('success.txt');
+      expect(result.files[0].key).toBe('success.png');
       expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining('Error downloading fail.txt')
+        expect.stringContaining('Error downloading fail.jpg')
       );
     });
 
     it('should save metadata file after backup', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'test.txt', Size: 1024, LastModified: new Date() }],
+          Contents: [{ Key: 'test.jpg', Size: 1024, LastModified: new Date() }],
           NextContinuationToken: undefined,
         })
         .mockResolvedValueOnce({
           Body: { pipe: vi.fn() },
-          ContentType: 'text/plain',
+          ContentType: 'image/jpeg',
         });
 
       await backupS3ToLocal(localDir, testBucket, '', testRegion);
@@ -427,12 +463,12 @@ describe('S3 Backup Script', () => {
     it('should create nested directory structure for objects', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'path/to/file.txt', Size: 1024, LastModified: new Date() }],
+          Contents: [{ Key: 'path/to/file.jpg', Size: 1024, LastModified: new Date() }],
           NextContinuationToken: undefined,
         })
         .mockResolvedValueOnce({
           Body: { pipe: vi.fn() },
-          ContentType: 'text/plain',
+          ContentType: 'image/jpeg',
         });
 
       // existsSync returns false for nested dirs to trigger mkdir
@@ -472,10 +508,10 @@ describe('S3 Backup Script', () => {
     it('should handle objects with undefined Size and LastModified', async () => {
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'file.txt', Size: undefined, LastModified: undefined }],
+          Contents: [{ Key: 'file.jpg', Size: undefined, LastModified: undefined }],
           NextContinuationToken: undefined,
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' });
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
@@ -485,20 +521,99 @@ describe('S3 Backup Script', () => {
     });
 
     it('should not warn when second page is empty after first page had results', async () => {
+      // New: all listing happens first, then downloads
       s3ClientSendMock
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'file.txt', Size: 100, LastModified: new Date() }],
+          Contents: [{ Key: 'file.jpg', Size: 100, LastModified: new Date() }],
           NextContinuationToken: 'next',
         })
-        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'text/plain' })
-        .mockResolvedValueOnce({ Contents: [], NextContinuationToken: undefined });
+        .mockResolvedValueOnce({ Contents: [], NextContinuationToken: undefined })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
 
       const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
 
       expect(result.totalFiles).toBe(1);
       // Should NOT warn about no objects since page 1 had results
       const warningCalls = mockConsoleWarn.mock.calls.map(([msg]) => String(msg));
-      expect(warningCalls.some((msg) => msg.includes('No objects found'))).toBe(false);
+      expect(warningCalls.some((msg) => msg.includes('No eligible media files'))).toBe(false);
+    });
+
+    it('should skip backup when nothing changed since last backup', async () => {
+      const lastModified = new Date('2026-01-15T00:00:00Z');
+
+      // S3 returns same files as previous backup
+      s3ClientSendMock.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'photo.jpg', Size: 1024, LastModified: lastModified },
+          { Key: 'song.mp3', Size: 2048, LastModified: lastModified },
+        ],
+        NextContinuationToken: undefined,
+      });
+
+      // Previous backup metadata matches exactly
+      const previousMetadata = JSON.stringify({
+        timestamp: '2026-01-15T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 2,
+        totalSize: 3072,
+        files: [
+          { key: 'photo.jpg', size: 1024, lastModified: lastModified.toISOString() },
+          { key: 'song.mp3', size: 2048, lastModified: lastModified.toISOString() },
+        ],
+      });
+
+      // Setup: previous backup exists
+      readdirSyncMock.mockReturnValue(['s3-2026-01-15T00-00-00']);
+      statSyncMock.mockReturnValue({ isDirectory: () => true });
+      existsSyncMock.mockReturnValue(true);
+      readFileSyncMock.mockReturnValue(previousMetadata);
+
+      const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
+
+      // Should return empty metadata (no downloads)
+      expect(result.totalFiles).toBe(0);
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('No changes detected since last backup')
+      );
+      // Should NOT write metadata or download files
+      expect(writeFileSyncMock).not.toHaveBeenCalled();
+    });
+
+    it('should proceed with backup when files changed since last backup', async () => {
+      const lastModified = new Date('2026-01-15T00:00:00Z');
+      const newModified = new Date('2026-01-20T00:00:00Z');
+
+      // S3 returns files with a different lastModified
+      s3ClientSendMock
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'photo.jpg', Size: 1024, LastModified: newModified }],
+          NextContinuationToken: undefined,
+        })
+        .mockResolvedValueOnce({ Body: { pipe: vi.fn() }, ContentType: 'image/jpeg' });
+
+      // Previous backup has older lastModified
+      const previousMetadata = JSON.stringify({
+        timestamp: '2026-01-15T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 1,
+        totalSize: 1024,
+        files: [{ key: 'photo.jpg', size: 1024, lastModified: lastModified.toISOString() }],
+      });
+
+      readdirSyncMock.mockReturnValue(['s3-2026-01-15T00-00-00']);
+      statSyncMock.mockReturnValue({ isDirectory: () => true });
+      readFileSyncMock.mockReturnValue(previousMetadata);
+
+      const result = await backupS3ToLocal(localDir, testBucket, '', testRegion);
+
+      expect(result.totalFiles).toBe(1);
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('Changes detected since last backup')
+      );
     });
   });
 
@@ -947,6 +1062,32 @@ describe('S3 Backup Script', () => {
         'Permission denied'
       );
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Restore failed'));
+    });
+
+    it('should default to no-overwrite when overwrite parameter is omitted (upload command behavior)', async () => {
+      const metadata = {
+        timestamp: '2026-01-01T00:00:00Z',
+        bucket: testBucket,
+        prefix: '',
+        region: testRegion,
+        totalFiles: 1,
+        totalSize: 1024,
+        files: [{ key: 'file1.txt', size: 1024, lastModified: '2026-01-01T00:00:00Z' }],
+      };
+
+      readFileSyncMock.mockReturnValue(JSON.stringify(metadata));
+
+      // HeadObject succeeds → file exists in S3, should be skipped
+      s3ClientSendMock.mockResolvedValue({});
+
+      // Call without overwrite parameter, matching: restoreLocalToS3(localDir, bucket, region)
+      const result = await restoreLocalToS3(localDir, testBucket, testRegion);
+
+      expect(result.successful).toBe(0);
+      expect(result.skipped).toBe(1);
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping (already exists)')
+      );
     });
 
     it('should log successful and failed counts after restore', async () => {

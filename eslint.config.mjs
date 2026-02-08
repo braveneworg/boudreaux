@@ -28,6 +28,7 @@ const eslintConfig = [
       '**/.turbo/**',
       '**/coverage/**',
       '**/.vitest/**',
+      '**/backups/**',
       'next-env.d.ts',
       'tsconfig.json',
       'tsconfig.*.json',
