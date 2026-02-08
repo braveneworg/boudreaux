@@ -35,8 +35,22 @@ interface CoverageMetrics {
  */
 function loadThresholdsFromConfig(): CoverageMetrics {
   const configPath = path.join(process.cwd(), 'vitest.config.ts');
-  const configContent = fs.readFileSync(configPath, 'utf-8');
 
+  if (!fs.existsSync(configPath)) {
+    console.error('❌ vitest.config.ts not found. Please ensure it exists at the project root.');
+    process.exit(1);
+  }
+
+  let configContent: string;
+  try {
+    configContent = fs.readFileSync(configPath, 'utf-8');
+  } catch (error) {
+    console.error('❌ Failed to read vitest.config.ts. Please check file permissions and try again.');
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
   // Parse the thresholds block from the config file in an order-independent way.
   // Supports integer and decimal threshold values, e.g. 95 or 95.5.
   const thresholdsBlockMatch = configContent.match(/thresholds\s*:\s*\{([\s\S]*?)\}/s);
