@@ -194,24 +194,24 @@ describe('S3 Backup Script', () => {
     describe('getDefaultBackupPath', () => {
       it('should return path in backups directory with s3 prefix', () => {
         const path = getDefaultBackupPath();
-        expect(path).toMatch(/^backups\/s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
+        expect(path).toMatch(/^backups[\\/]s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
       });
 
       it('should generate unique paths', () => {
         const path1 = getDefaultBackupPath();
         const path2 = getDefaultBackupPath();
 
-        // Paths should start with backups/s3-
-        expect(path1).toMatch(/^backups\/s3-/);
-        expect(path2).toMatch(/^backups\/s3-/);
+        // Paths should start with backups/s3- (supporting both POSIX and Windows separators)
+        expect(path1).toMatch(/^backups[\\/]s3-/);
+        expect(path2).toMatch(/^backups[\\/]s3-/);
       });
 
       it('should include correct path components', () => {
         const path = getDefaultBackupPath();
-        const parts = path.split('/');
+        const match = path.match(/^backups[\\/](s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$/);
 
-        expect(parts[0]).toBe('backups');
-        expect(parts[1]).toMatch(/^s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
+        expect(match).not.toBeNull();
+        expect(match?.[1]).toMatch(/^s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
       });
     });
   });
