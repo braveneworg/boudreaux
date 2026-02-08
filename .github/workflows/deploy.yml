@@ -357,6 +357,21 @@ jobs:
           tar -xzf next-build.tar.gz
           echo "✓ Build artifact extracted"
 
+      - name: Verify Next.js build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory not found after extracting build artifact."
+            exit 1
+          fi
+          if [ ! -d ".next/static" ]; then
+            echo "Error: .next/static directory not found after extracting build artifact."
+            exit 1
+          fi
+          if [ ! -f ".next/BUILD_ID" ]; then
+            echo "Error: .next/BUILD_ID file not found after extracting build artifact."
+            exit 1
+          fi
+          echo "✓ Verified Next.js build output (.next, .next/static, .next/BUILD_ID present)"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
