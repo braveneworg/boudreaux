@@ -142,7 +142,7 @@ npx tsx scripts/s3-backup.ts list <custom-backups-directory>
 - 📁 Auto-creates timestamped backup directories
 - 🔄 Complete restore with optional overwrite protection
 - 📊 Detailed backup metadata in JSON format
-- 🏷️ Preserves content types and file metadata
+- 🏷️ Preserves content types during restore (limited metadata support)
 - 🔍 Prefix filtering support for partial backups
 - ✅ Progress tracking and clear success/error messages
 - 🛡️ Safe restore mode (skips existing files by default)
