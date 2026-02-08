@@ -25,6 +25,7 @@
  *   npm run s3:backup
  *   npm run s3:backup backups/s3-2026-02-07
  *   npm run s3:restore backups/s3-2026-02-07
+ *   npm run s3:restore backups/s3-2026-02-07 --skip-invalidation
  *   npm run s3:list
  *
  * Environment Variables:
@@ -33,6 +34,7 @@
  *   S3_BACKUP_PREFIX - S3 key prefix to backup/restore (default: '' - entire bucket)
  *   S3_MAX_BACKUPS - Maximum number of backups to keep (default: 5)
  *               Older backups are automatically deleted after successful backup
+ *   SKIP_INVALIDATION - Skip CloudFront cache invalidation after restore/upload (default: false)
  *   CLOUDFRONT_DISTRIBUTION_ID - CloudFront distribution ID for cache invalidation (optional)
  *               If set, CloudFront cache will be invalidated after successful restore/upload
  *               operations (i.e., when one or more objects are uploaded)
@@ -74,6 +76,7 @@ const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const S3_BACKUP_PREFIX = process.env.S3_BACKUP_PREFIX || '';
 const MAX_BACKUPS_TO_KEEP = parseInt(process.env.S3_MAX_BACKUPS || '5', 10);
 const CLOUDFRONT_DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+const SKIP_INVALIDATION = process.env.SKIP_INVALIDATION === 'true';
 
 // Only check S3_BUCKET if running as main script (not when imported for testing)
 if (!S3_BUCKET && require.main === module) {
@@ -866,13 +869,14 @@ async function main(): Promise<void> {
           process.exit(1);
         }
         const overwrite = args.includes('--overwrite') || args.includes('-f');
+        const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
         const restoreResult = await restoreLocalToS3(
           localDir,
           S3_BUCKET as string,
           AWS_REGION,
           overwrite
         );
-        if (restoreResult.successful > 0) {
+        if (restoreResult.successful > 0 && !skipInvalidation) {
           await invalidateCloudFrontCache();
         }
         break;
@@ -891,8 +895,9 @@ async function main(): Promise<void> {
           console.error('Usage: npm run s3:upload <local-directory>');
           process.exit(1);
         }
+        const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
         const uploadResult = await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
-        if (uploadResult.successful > 0) {
+        if (uploadResult.successful > 0 && !skipInvalidation) {
           await invalidateCloudFrontCache();
         }
         break;
@@ -901,9 +906,9 @@ async function main(): Promise<void> {
       default:
         console.error('Usage:');
         console.error('  npm run s3:backup [local-directory]');
-        console.error('  npm run s3:restore <local-directory> [--overwrite]');
+        console.error('  npm run s3:restore <local-directory> [--overwrite] [--skip-invalidation]');
         console.error('  npm run s3:list [backups-directory]');
-        console.error('  npm run s3:upload <local-directory>');
+        console.error('  npm run s3:upload <local-directory> [--skip-invalidation]');
         console.error('');
         console.error('Commands:');
         console.error('  backup   - Download S3 bucket contents to local directory');
@@ -914,7 +919,8 @@ async function main(): Promise<void> {
         );
         console.error('');
         console.error('Options:');
-        console.error('  --overwrite, -f  - Overwrite existing files in S3 during restore');
+        console.error('  --overwrite, -f        - Overwrite existing files in S3 during restore');
+        console.error('  --skip-invalidation    - Skip CloudFront cache invalidation after upload');
         process.exit(1);
     }
   } catch (error) {
