@@ -31,6 +31,72 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## NPM Scripts
+
+### Development
+
+| Script          | Command                | Description                                 |
+| --------------- | ---------------------- | ------------------------------------------- |
+| `npm run dev`   | `next dev --turbopack` | Start the development server with Turbopack |
+| `npm run build` | `next build`           | Create a production build                   |
+| `npm run start` | `next start`           | Start the production server                 |
+
+### Linting & Formatting
+
+| Script                 | Command                                               | Description                              |
+| ---------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| `npm run lint`         | `eslint . --ext .ts,.tsx,.js,.jsx`                    | Run ESLint on the project                |
+| `npm run lint:fix`     | `eslint . --ext .ts,.tsx,.js,.jsx --fix`              | Run ESLint and auto-fix issues           |
+| `npm run format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files with Prettier           |
+| `npm run format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting without writing changes |
+| `npm run lint:format`  | `npm run lint:fix && npm run format`                  | Run both lint fix and format in sequence |
+
+### Testing
+
+| Script                        | Command                                                                 | Description                            |
+| ----------------------------- | ----------------------------------------------------------------------- | -------------------------------------- |
+| `npm test`                    | `vitest`                                                                | Run tests in watch mode (default)      |
+| `npm run test:run`            | `vitest run`                                                            | Run all tests once and exit            |
+| `npm run test:watch`          | `vitest --watch`                                                        | Run tests in watch mode                |
+| `npm run test:ui`             | `vitest --ui`                                                           | Open the Vitest UI in a browser        |
+| `npm run test:coverage`       | `vitest run --coverage`                                                 | Run tests with coverage report         |
+| `npm run test:coverage:check` | `vitest run --coverage && npx tsx scripts/check-coverage-regression.ts` | Run coverage and check for regressions |
+| `npm run test:no-css`         | Temporarily disables PostCSS, runs tests, then restores it              | Run tests without CSS processing       |
+
+### Database
+
+| Script                  | Command                                   | Description                                |
+| ----------------------- | ----------------------------------------- | ------------------------------------------ |
+| `npm run seed`          | `tsx prisma/seed.ts`                      | Seed the database with initial data        |
+| `npm run mongo:dump`    | `npx tsx scripts/mongo-backup.ts dump`    | Create a MongoDB backup archive            |
+| `npm run mongo:restore` | `npx tsx scripts/mongo-backup.ts restore` | Restore the database from a backup archive |
+
+### S3
+
+| Script               | Command                                | Description                        |
+| -------------------- | -------------------------------------- | ---------------------------------- |
+| `npm run s3:backup`  | `npx tsx scripts/s3-backup.ts backup`  | Back up S3 bucket contents locally |
+| `npm run s3:restore` | `npx tsx scripts/s3-backup.ts restore` | Restore local backup to S3 bucket  |
+| `npm run s3:list`    | `npx tsx scripts/s3-backup.ts list`    | List objects in the S3 bucket      |
+| `npm run s3:upload`  | `npx tsx scripts/s3-backup.ts upload`  | Upload files to the S3 bucket      |
+
+### Docker
+
+| Script                           | Command                                                   | Description                      |
+| -------------------------------- | --------------------------------------------------------- | -------------------------------- |
+| `npm run docker:build:website`   | `docker build -t ghcr.io/braveneworg/boudreaux/website .` | Build the website Docker image   |
+| `npm run docker:push:website`    | `docker push ghcr.io/braveneworg/boudreaux/website`       | Push the website image to GHCR   |
+| `npm run docker:build:nginx`     | `docker build -t ghcr.io/braveneworg/boudreaux/nginx .`   | Build the nginx Docker image     |
+| `npm run docker:push:nginx`      | `docker push ghcr.io/braveneworg/boudreaux/nginx`         | Push the nginx image to GHCR     |
+| `npm run docker:publish:website` | `docker:build:website && docker:push:website`             | Build and push the website image |
+| `npm run docker:publish:nginx`   | `docker:build:nginx && docker:push:nginx`                 | Build and push the nginx image   |
+
+### Other
+
+| Script            | Command | Description                                                   |
+| ----------------- | ------- | ------------------------------------------------------------- |
+| `npm run prepare` | `husky` | Install Husky git hooks (runs automatically on `npm install`) |
+
 ## Database Backups
 
 The project includes automated MongoDB backup and restore scripts.
