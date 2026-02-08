@@ -332,10 +332,115 @@ jobs:
           path: image-digests.json
           retention-days: 1
 
+  sync-to-s3:
+    name: Sync Next.js assets to S3
+    runs-on: ubuntu-latest
+    needs: [download-build]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-deploy
+          path: .
+
+      - name: Extract build artifact
+        run: |
+          if [ ! -f "next-build.tar.gz" ]; then
+            echo "Error: next-build.tar.gz not found!"
+            exit 1
+          fi
+          tar -xzf next-build.tar.gz
+          echo "✓ Build artifact extracted"
+
+      - name: Verify Next.js build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Error: .next directory not found after extracting build artifact."
+            exit 1
+          fi
+          if [ ! -d ".next/static" ]; then
+            echo "Error: .next/static directory not found after extracting build artifact."
+            exit 1
+          fi
+          if [ ! -f ".next/BUILD_ID" ]; then
+            echo "Error: .next/BUILD_ID file not found after extracting build artifact."
+            exit 1
+          fi
+          echo "✓ Verified Next.js build output (.next, .next/static, .next/BUILD_ID present)"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync static assets to S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
+          # Skip build since we already have the extracted artifact
+          SKIP_BUILD: 'true'
+          # Skip invalidation since it's handled in a separate job
+          SKIP_INVALIDATION: 'true'
+        run: |
+          echo "Syncing Next.js static assets to S3..."
+          npx tsx scripts/sync-cdn.ts
+
+  invalidate-cloudfront:
+    name: Invalidate CloudFront cache
+    runs-on: ubuntu-latest
+    needs: [sync-to-s3]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Invalidate CloudFront distribution
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          if [ -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
+            echo "CLOUDFRONT_DISTRIBUTION_ID not set, skipping invalidation"
+            exit 0
+          fi
+
+          echo "Creating CloudFront invalidation..."
+          # Note: CloudFront is a global service, region is not required
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text
+
+          echo "✓ CloudFront invalidation created successfully"
+          echo "Note: Invalidation may take 5-15 minutes to complete"
+
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [capture-digests]
+    needs: [capture-digests, invalidate-cloudfront]
     permissions:
       contents: read
       id-token: write
