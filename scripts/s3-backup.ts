@@ -45,7 +45,7 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
-import * as mime from 'mime';
+import mime from 'mime';
 
 import {
   existsSync,
@@ -306,10 +306,11 @@ export async function restoreLocalToS3(
   if (existsSync(metadataPath)) {
     try {
       const metadataContent = readFileSync(metadataPath, 'utf8');
-      metadata = JSON.parse(metadataContent);
-      log(`Found backup metadata from ${metadata.timestamp}`, 'info');
-      log(`Original bucket: ${metadata.bucket}`, 'info');
-      log(`Files to restore: ${metadata.totalFiles}`, 'info');
+      const parsedMetadata = JSON.parse(metadataContent) as BackupMetadata;
+      metadata = parsedMetadata;
+      log(`Found backup metadata from ${parsedMetadata.timestamp}`, 'info');
+      log(`Original bucket: ${parsedMetadata.bucket}`, 'info');
+      log(`Files to restore: ${parsedMetadata.totalFiles}`, 'info');
     } catch {
       log('Warning: Could not read backup metadata', 'warning');
     }
