@@ -153,7 +153,8 @@ export function resolvePath(filePath: string): string {
  * Generate S3 key from file path
  */
 export function generateS3Key(filePath: string, prefix?: string): string {
-  const normalizedPath = normalize(filePath);
+  // Normalize the path and convert to forward slashes for cross-platform consistency
+  const normalizedPath = normalize(filePath).split('\\').join('/');
   let key = normalizedPath;
 
   // If it's a relative path or starts with common prefixes, clean it up
@@ -172,8 +173,7 @@ export function generateS3Key(filePath: string, prefix?: string): string {
     key = cleanPrefix ? `${cleanPrefix}/${key}` : key;
   }
 
-  // Ensure forward slashes for S3 compatibility
-  return key.split('\\').join('/');
+  return key;
 }
 
 /**
