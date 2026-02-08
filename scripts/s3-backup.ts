@@ -39,6 +39,7 @@ import { createWriteStream, createReadStream } from 'fs';
 import { dirname, extname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
 
+import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import {
   S3Client,
   ListObjectsV2Command,
@@ -69,6 +70,7 @@ const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const S3_BACKUP_PREFIX = process.env.S3_BACKUP_PREFIX || '';
 const MAX_BACKUPS_TO_KEEP = parseInt(process.env.S3_MAX_BACKUPS || '5', 10);
+const CLOUDFRONT_DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
 // Only check S3_BUCKET if running as main script (not when imported for testing)
 if (!S3_BUCKET && require.main === module) {
@@ -523,6 +525,47 @@ export async function restoreLocalToS3(
 }
 
 /**
+ * Invalidate CloudFront distribution cache after restoring files to S3
+ */
+export async function invalidateCloudFrontCache(
+  distributionId: string = CLOUDFRONT_DISTRIBUTION_ID || '',
+  region: string = AWS_REGION
+): Promise<string | null> {
+  if (!distributionId) {
+    log('CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation', 'warning');
+    return null;
+  }
+
+  log('Creating CloudFront cache invalidation...', 'info');
+
+  try {
+    const cloudFrontClient = new CloudFrontClient({ region });
+    const command = new CreateInvalidationCommand({
+      DistributionId: distributionId,
+      InvalidationBatch: {
+        Paths: {
+          Quantity: 1,
+          Items: ['/*'],
+        },
+        CallerReference: `s3-restore-${Date.now()}`,
+      },
+    });
+
+    const response = await cloudFrontClient.send(command);
+    const invalidationId = response.Invalidation?.Id || null;
+
+    log(`CloudFront invalidation created: ${invalidationId}`, 'success');
+    log('Invalidation may take 5-15 minutes to complete', 'info');
+
+    return invalidationId;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log(`Failed to create CloudFront invalidation: ${errorMessage}`, 'error');
+    throw error;
+  }
+}
+
+/**
  * Restore a single file to S3
  */
 async function restoreFile(
@@ -799,7 +842,15 @@ async function main(): Promise<void> {
           process.exit(1);
         }
         const overwrite = args.includes('--overwrite') || args.includes('-f');
-        await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION, overwrite);
+        const restoreResult = await restoreLocalToS3(
+          localDir,
+          S3_BUCKET as string,
+          AWS_REGION,
+          overwrite
+        );
+        if (restoreResult.successful > 0) {
+          await invalidateCloudFrontCache();
+        }
         break;
       }
 
@@ -816,7 +867,10 @@ async function main(): Promise<void> {
           console.error('Usage: npm run s3:upload <local-directory>');
           process.exit(1);
         }
-        await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
+        const uploadResult = await restoreLocalToS3(localDir, S3_BUCKET as string, AWS_REGION);
+        if (uploadResult.successful > 0) {
+          await invalidateCloudFrontCache();
+        }
         break;
       }
 
