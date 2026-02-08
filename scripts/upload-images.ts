@@ -391,7 +391,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
-    console.log(`
+    console.info(`
 ${colors.cyan}Image Upload Utility${colors.reset}
 
 Upload images to S3 bucket with support for single files, multiple files, or entire directories.
@@ -462,17 +462,17 @@ ${colors.yellow}Environment Variables:${colors.reset}
     });
 
     // Print summary
-    console.log('\n' + '='.repeat(60));
+    console.info('\n' + '='.repeat(60));
     log(
       `Upload Summary: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`,
       result.failed > 0 ? 'warning' : 'success'
     );
-    console.log('='.repeat(60));
+    console.info('='.repeat(60));
 
     if (result.errors.length > 0) {
-      console.log(`\n${colors.red}Errors:${colors.reset}`);
+      console.error(`\n${colors.red}Errors:${colors.reset}`);
       result.errors.forEach(({ path, error }) => {
-        console.log(`  ${path}: ${error}`);
+        console.error(`  ${path}: ${error}`);
       });
     }
 
