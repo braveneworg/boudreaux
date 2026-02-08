@@ -7,6 +7,7 @@ import {
   formatBytes,
   generateTimestamp,
   getDefaultBackupPath,
+  invalidateCloudFrontCache,
   listBackups,
   restoreLocalToS3,
 } from './s3-backup';
@@ -14,6 +15,7 @@ import {
 // Hoisted mock functions - vitest moves these above imports during transformation
 const {
   s3ClientSendMock,
+  cloudFrontSendMock,
   existsSyncMock,
   mkdirSyncMock,
   readdirSyncMock,
@@ -28,8 +30,10 @@ const {
   sanitizeFilePathMock,
   mimeGetTypeMock,
   putObjectCommandMock,
+  createInvalidationCommandMock,
 } = vi.hoisted(() => ({
   s3ClientSendMock: vi.fn(),
+  cloudFrontSendMock: vi.fn(),
   existsSyncMock: vi.fn(),
   mkdirSyncMock: vi.fn(),
   readdirSyncMock: vi.fn(),
@@ -48,6 +52,7 @@ const {
   sanitizeFilePathMock: vi.fn((pathKey: string) => pathKey),
   mimeGetTypeMock: vi.fn().mockReturnValue('application/octet-stream'),
   putObjectCommandMock: vi.fn(),
+  createInvalidationCommandMock: vi.fn(),
 }));
 
 // Module mocks - vitest hoists these above imports
@@ -59,6 +64,13 @@ vi.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: vi.fn(),
   PutObjectCommand: putObjectCommandMock,
   HeadObjectCommand: vi.fn(),
+}));
+
+vi.mock('@aws-sdk/client-cloudfront', () => ({
+  CloudFrontClient: class MockCloudFrontClient {
+    send = cloudFrontSendMock;
+  },
+  CreateInvalidationCommand: createInvalidationCommandMock,
 }));
 
 vi.mock('../src/lib/system-utils', () => ({
@@ -1418,6 +1430,64 @@ describe('S3 Backup Script', () => {
       expect(unlinkSyncMock).toHaveBeenCalledWith(expect.stringContaining('nested.txt'));
       expect(rmdirSyncMock).toHaveBeenCalledWith(expect.stringContaining('subdir'));
       expect(rmdirSyncMock).toHaveBeenCalledWith(expect.stringContaining('s3-2023-01-01T00-00-00'));
+    });
+  });
+
+  describe('invalidateCloudFrontCache', () => {
+    beforeEach(() => {
+      cloudFrontSendMock.mockReset();
+    });
+
+    it('should skip invalidation when distribution ID is not set', async () => {
+      const result = await invalidateCloudFrontCache('');
+
+      expect(result).toBeNull();
+      expect(cloudFrontSendMock).not.toHaveBeenCalled();
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('CLOUDFRONT_DISTRIBUTION_ID not set')
+      );
+    });
+
+    it('should create invalidation and return invalidation ID', async () => {
+      cloudFrontSendMock.mockResolvedValueOnce({
+        Invalidation: { Id: 'INV123' },
+      });
+
+      const result = await invalidateCloudFrontCache('E2QCL9TEST', 'us-east-1');
+
+      expect(result).toBe('INV123');
+      expect(cloudFrontSendMock).toHaveBeenCalledTimes(1);
+      expect(createInvalidationCommandMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          DistributionId: 'E2QCL9TEST',
+          InvalidationBatch: expect.objectContaining({
+            Paths: { Quantity: 1, Items: ['/*'] },
+          }),
+        })
+      );
+      expect(mockConsoleInfo).toHaveBeenCalledWith(
+        expect.stringContaining('CloudFront invalidation created: INV123')
+      );
+    });
+
+    it('should return null when response has no invalidation ID', async () => {
+      cloudFrontSendMock.mockResolvedValueOnce({});
+
+      const result = await invalidateCloudFrontCache('E2QCL9TEST', 'us-east-1');
+
+      expect(result).toBeNull();
+      expect(cloudFrontSendMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw and log error when CloudFront API fails', async () => {
+      cloudFrontSendMock.mockRejectedValueOnce(new Error('Access Denied'));
+
+      await expect(invalidateCloudFrontCache('E2QCL9TEST', 'us-east-1')).rejects.toThrow(
+        'Access Denied'
+      );
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create CloudFront invalidation')
+      );
     });
   });
 });
