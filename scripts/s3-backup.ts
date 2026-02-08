@@ -36,7 +36,7 @@
  */
 
 import { createWriteStream, createReadStream } from 'fs';
-import { dirname, join, posix } from 'path';
+import { dirname, extname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
 
 import {
@@ -164,6 +164,112 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
 }
 
 /**
+ * Allowed file extensions for backup (images, audio, video only)
+ */
+const ALLOWED_EXTENSIONS = new Set([
+  // Images
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.tiff',
+  '.tif',
+  '.avif',
+  // Audio
+  '.mp3',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.aac',
+  '.m4a',
+  '.wma',
+  '.opus',
+  '.aiff',
+  // Video
+  '.mp4',
+  '.webm',
+  '.mov',
+  '.avi',
+  '.mkv',
+  '.m4v',
+  '.wmv',
+  '.flv',
+  '.ogv',
+]);
+
+/**
+ * Check if a file key has an allowed media extension
+ */
+function isAllowedMediaFile(key: string): boolean {
+  const ext = extname(key).toLowerCase();
+  return ALLOWED_EXTENSIONS.has(ext);
+}
+
+/**
+ * Load the most recent backup's metadata for change detection
+ */
+export function getLatestBackupMetadata(backupDir = 'backups'): BackupMetadata | null {
+  if (!existsSync(backupDir)) {
+    return null;
+  }
+
+  const items = readdirSync(backupDir);
+  const s3Backups = items
+    .filter((item) => {
+      const itemPath = join(backupDir, item);
+      return statSync(itemPath).isDirectory() && item.startsWith('s3-');
+    })
+    .sort()
+    .reverse();
+
+  if (s3Backups.length === 0) {
+    return null;
+  }
+
+  const latestPath = join(backupDir, s3Backups[0], 'backup-metadata.json');
+  if (!existsSync(latestPath)) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(latestPath, 'utf8');
+    return JSON.parse(content) as BackupMetadata;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if the current S3 manifest matches the previous backup
+ * Compares key, size, and lastModified for each file
+ */
+function hasChangedSinceLastBackup(
+  currentFiles: Array<{ key: string; size: number; lastModified: string }>,
+  previousMetadata: BackupMetadata
+): boolean {
+  if (currentFiles.length !== previousMetadata.files.length) {
+    return true;
+  }
+
+  const previousMap = new Map(
+    previousMetadata.files.map((f) => [f.key, { size: f.size, lastModified: f.lastModified }])
+  );
+
+  for (const file of currentFiles) {
+    const prev = previousMap.get(file.key);
+    if (!prev) return true;
+    if (prev.size !== file.size) return true;
+    if (prev.lastModified !== file.lastModified) return true;
+  }
+
+  return false;
+}
+
+/**
  * Backup S3 bucket to local directory
  */
 export async function backupS3ToLocal(
@@ -189,16 +295,15 @@ export async function backupS3ToLocal(
   };
 
   try {
-    // Ensure backup directory exists
-    if (!existsSync(localDir)) {
-      mkdirSync(localDir, { recursive: true });
-    }
-
     log(`Fetching list of objects from S3...`, 'info');
 
-    // List all objects in the bucket
+    // Phase 1: Collect the full manifest of eligible media files from S3
+    const s3Manifest: Array<{
+      key: string;
+      size: number;
+      lastModified: string;
+    }> = [];
     let continuationToken: string | undefined;
-    let totalObjects = 0;
 
     do {
       const listCommand = new ListObjectsV2Command({
@@ -210,80 +315,114 @@ export async function backupS3ToLocal(
       const listResponse = await s3Client.send(listCommand);
 
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
-        if (totalObjects === 0) {
-          log('No objects found in bucket', 'warning');
-        }
         break;
       }
 
-      totalObjects += listResponse.Contents.length;
-
-      // Download each object
       for (const object of listResponse.Contents) {
         if (!object.Key) continue;
 
-        // Sanitize the S3 key to prevent path traversal attacks
-        let sanitizedKey: string;
-        try {
-          sanitizedKey = sanitizeFilePath(object.Key, localDir);
-        } catch (error) {
-          log(
-            `Skipping object with invalid key: ${object.Key} (${error instanceof Error ? error.message : 'Invalid path'})`,
-            'warning'
-          );
+        if (!isAllowedMediaFile(object.Key)) {
           continue;
         }
 
-        const localPath = join(localDir, sanitizedKey);
-        const localDirPath = dirname(localPath);
-
-        // Create directory structure
-        if (!existsSync(localDirPath)) {
-          mkdirSync(localDirPath, { recursive: true });
-        }
-
-        log(`Downloading: ${object.Key} (${formatBytes(object.Size || 0)})`, 'info');
-
-        try {
-          // Get object metadata and content
-          const getCommand = new GetObjectCommand({
-            Bucket: bucket,
-            Key: object.Key,
-          });
-
-          const response = await s3Client.send(getCommand);
-
-          if (!response.Body) {
-            log(`Warning: No body for ${object.Key}`, 'warning');
-            continue;
-          }
-
-          // Stream to file
-          const writeStream = createWriteStream(localPath);
-          await pipeline(response.Body as NodeJS.ReadableStream, writeStream);
-
-          // Add to metadata
-          metadata.files.push({
-            key: object.Key,
-            size: object.Size || 0,
-            lastModified: object.LastModified?.toISOString() || '',
-            contentType: response.ContentType,
-          });
-
-          metadata.totalSize += object.Size || 0;
-          metadata.totalFiles++;
-
-          log(`Downloaded: ${object.Key}`, 'success');
-        } catch (error) {
-          log(
-            `Error downloading ${object.Key}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            'error'
-          );
-        }
+        s3Manifest.push({
+          key: object.Key,
+          size: object.Size || 0,
+          lastModified: object.LastModified?.toISOString() || '',
+        });
       }
 
       continuationToken = listResponse.NextContinuationToken;
     } while (continuationToken);
+
+    if (s3Manifest.length === 0) {
+      log('No eligible media files found in bucket', 'warning');
+      return metadata;
+    }
+
+    log(`Found ${s3Manifest.length} eligible media file(s) in S3`, 'info');
+
+    // Phase 2: Compare against the most recent backup to detect changes
+    const backupDir = dirname(localDir);
+    const previousMetadata = getLatestBackupMetadata(backupDir);
+
+    if (previousMetadata && !hasChangedSinceLastBackup(s3Manifest, previousMetadata)) {
+      log('No changes detected since last backup. Skipping.', 'success');
+      return metadata;
+    }
+
+    if (previousMetadata) {
+      log('Changes detected since last backup. Proceeding with download...', 'info');
+    } else {
+      log('No previous backup found. Proceeding with full download...', 'info');
+    }
+
+    // Phase 3: Download all eligible files
+    // Ensure backup directory exists
+    if (!existsSync(localDir)) {
+      mkdirSync(localDir, { recursive: true });
+    }
+
+    for (const manifest of s3Manifest) {
+      // Sanitize the S3 key to prevent path traversal attacks
+      let sanitizedKey: string;
+      try {
+        sanitizedKey = sanitizeFilePath(manifest.key, localDir);
+      } catch (error) {
+        log(
+          `Skipping object with invalid key: ${manifest.key} (${error instanceof Error ? error.message : 'Invalid path'})`,
+          'warning'
+        );
+        continue;
+      }
+
+      const localPath = join(localDir, sanitizedKey);
+      const localDirPath = dirname(localPath);
+
+      // Create directory structure
+      if (!existsSync(localDirPath)) {
+        mkdirSync(localDirPath, { recursive: true });
+      }
+
+      log(`Downloading: ${manifest.key} (${formatBytes(manifest.size)})`, 'info');
+
+      try {
+        // Get object metadata and content
+        const getCommand = new GetObjectCommand({
+          Bucket: bucket,
+          Key: manifest.key,
+        });
+
+        const response = await s3Client.send(getCommand);
+
+        if (!response.Body) {
+          log(`Warning: No body for ${manifest.key}`, 'warning');
+          continue;
+        }
+
+        // Stream to file
+        const writeStream = createWriteStream(localPath);
+        await pipeline(response.Body as NodeJS.ReadableStream, writeStream);
+
+        // Add to metadata
+        metadata.files.push({
+          key: manifest.key,
+          size: manifest.size,
+          lastModified: manifest.lastModified,
+          contentType: response.ContentType,
+        });
+
+        metadata.totalSize += manifest.size;
+        metadata.totalFiles++;
+
+        log(`Downloaded: ${manifest.key}`, 'success');
+      } catch (error) {
+        log(
+          `Error downloading ${manifest.key}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'error'
+        );
+      }
+    }
 
     // Save metadata
     const metadataPath = join(localDir, 'backup-metadata.json');

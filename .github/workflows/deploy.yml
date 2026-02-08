@@ -81,131 +81,10 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  sync-cdn:
-    name: Sync static assets to CDN
-    runs-on: ubuntu-latest
-    needs: download-build
-    outputs:
-      CHUNKS_HASH: ${{ steps.verify-build.outputs.CHUNKS_HASH }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.12.0"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nextjs-build-deploy
-          path: .
-
-      - name: Extract build
-        run: tar -xzf next-build.tar.gz
-
-      - name: Verify build before sync
-        id: verify-build
-        run: |
-          echo "=== Verifying Build Artifact Before CDN Sync ==="
-
-          if [ ! -d ".next/static/chunks" ]; then
-            echo "❌ ERROR: .next/static/chunks not found after extraction"
-            exit 1
-          fi
-
-          # Show ALL chunk files that will be uploaded (not just sample)
-          echo "Chunk files in build artifact:"
-          ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
-
-                    # Calculate checksum of entire build
-          CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
-          echo "Build artifact checksum: $CHUNKS_HASH"
-          echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_ENV
-          echo "CHUNKS_HASH=$CHUNKS_HASH" >> $GITHUB_OUTPUT
-
-          echo "✓ Build artifact verified and ready for CDN sync"
-
-      - name: Verify CloudFront OAC configuration
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          echo "Verifying CloudFront OAC is configured..."
-
-          OAC_ID=$(aws cloudfront get-distribution \
-            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' \
-            --output text 2>/dev/null || echo "None")
-
-          if [ "$OAC_ID" = "None" ] || [ -z "$OAC_ID" ]; then
-            echo "⚠️  WARNING: CloudFront OAC not configured"
-            echo "Run: scripts/manually-attach-oac.sh to configure it"
-          else
-            echo "✓ CloudFront OAC configured: $OAC_ID"
-          fi
-
-      - name: Sync to CDN
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
-          SKIP_CLEANUP: "true"
-        run: npm run sync:cdn:no-build
-
-      - name: Verify files uploaded to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-        run: |
-          echo "=== Verifying S3 Upload Completed Successfully ==="
-
-          # Check file count
-          FILE_COUNT=$(aws s3 ls "s3://$S3_BUCKET/media/_next/static/" --recursive | wc -l)
-
-          if [ "$FILE_COUNT" -gt 0 ]; then
-            echo "✓ $FILE_COUNT files in S3"
-          else
-            echo "❌ ERROR: No files found in S3"
-            exit 1
-          fi
-
-          # Verify the webpack chunk matches what we just built
-          LOCAL_WEBPACK=$(ls .next/static/chunks/webpack-*.js 2>/dev/null | head -1)
-          if [ -n "$LOCAL_WEBPACK" ]; then
-            WEBPACK_FILENAME=$(basename "$LOCAL_WEBPACK")
-            S3_WEBPACK_KEY="media/_next/static/chunks/$WEBPACK_FILENAME"
-
-            echo "Checking if webpack chunk was uploaded: $WEBPACK_FILENAME"
-            if aws s3 ls "s3://$S3_BUCKET/$S3_WEBPACK_KEY" >/dev/null 2>&1; then
-              echo "✓ Webpack chunk verified in S3: $WEBPACK_FILENAME"
-            else
-              echo "❌ ERROR: Webpack chunk NOT found in S3: $WEBPACK_FILENAME"
-              echo "Files actually in S3:"
-              aws s3 ls "s3://$S3_BUCKET/media/_next/static/chunks/" | grep webpack
-              exit 1
-            fi
-          fi
-
-          echo "✓ Build artifacts successfully synced to S3"
-
   build-images:
     name: Build & push Docker images
     runs-on: ubuntu-latest
     needs: download-build
-    # Run in parallel with sync-cdn since they don't depend on each other
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -226,40 +105,14 @@ jobs:
           echo "Artifact downloaded successfully:"
           ls -lh next-build.tar.gz
 
-          # Extract to verify build matches sync-cdn
-          echo "Extracting to verify build consistency..."
+          # Extract to verify build
+          echo "Extracting to verify build..."
           tar -xzf next-build.tar.gz
 
           if [ -f ".next/BUILD_ID" ]; then
             BUILD_ID=$(cat .next/BUILD_ID)
             echo "BUILD_ID in Docker image build: $BUILD_ID"
             echo "DOCKER_BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
-          fi
-
-          # Calculate checksum to match sync-cdn
-          echo "Chunk files that will be in Docker image:"
-          ls -lh .next/static/chunks/*.js | awk '{print $9, $5}'
-
-          DOCKER_CHUNKS_HASH=$(find .next/static/chunks -name "*.js" -exec sha256sum {} \; | sha256sum | awk '{print $1}')
-          echo "Docker build checksum: $DOCKER_CHUNKS_HASH"
-          echo "DOCKER_CHUNKS_HASH=$DOCKER_CHUNKS_HASH" >> $GITHUB_ENV
-
-          # Compare with sync-cdn checksum if available
-          SYNC_HASH="${{ needs.sync-cdn.outputs.CHUNKS_HASH }}"
-          if [ -n "$SYNC_HASH" ]; then
-            echo "Comparing checksums between jobs:"
-            echo "  sync-cdn:     $SYNC_HASH"
-            echo "  build-images: $DOCKER_CHUNKS_HASH"
-
-            if [ "$SYNC_HASH" != "$DOCKER_CHUNKS_HASH" ]; then
-              echo "⚠️ WARNING: Build artifact mismatch detected!"
-              echo "sync-cdn uploaded different files than will be in Docker images"
-              echo "This will cause 403 errors on production!"
-              exit 1
-            fi
-            echo "✓ Checksums match - build consistency verified"
-          else
-            echo "⚠️ sync-cdn checksum not available for comparison"
           fi
 
           # Clean up extraction (Dockerfile will extract fresh)
@@ -482,7 +335,7 @@ jobs:
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [capture-digests, sync-cdn]
+    needs: [capture-digests]
     permissions:
       contents: read
       id-token: write
@@ -1077,36 +930,6 @@ jobs:
             JSON
 
             $DOCKER_CMD system prune -f || true
-
-      - name: Invalidate CloudFront cache for deployed assets
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          # Invalidate all assets to ensure CloudFront serves fresh content from S3
-          # This prevents 403 errors from stale cache entries pointing to deleted/moved files
-          echo "Invalidating CloudFront cache for all deployed assets..."
-
-          if [ -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
-            echo "WARNING: CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation"
-            exit 0
-          fi
-
-          # Invalidate everything under /media/* (includes _next/static/*)
-          # This is necessary because Next.js generates new hashed filenames on each build
-          # and CloudFront may cache references to old files that no longer exist
-          aws cloudfront create-invalidation \
-            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --paths "/media/*" \
-            --query 'Invalidation.{Status:Status,Id:Id}' \
-            --output table
-
-          echo "✓ CloudFront cache invalidation initiated for all CDN assets"
-          echo "Note: Invalidation completes in 1-5 minutes. During this time, some cached assets may still be served."
-          echo ""
-          echo "✅ Deployment complete! New containers are running with fresh assets in S3."
 
       - name: Revoke runner IP from all Security Groups
         if: always()
