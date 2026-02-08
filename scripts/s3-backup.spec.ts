@@ -6,6 +6,7 @@ import {
   cleanupOldBackups,
   formatBytes,
   generateTimestamp,
+  getBackupRootDir,
   getDefaultBackupPath,
   listBackups,
   restoreLocalToS3,
@@ -215,6 +216,27 @@ describe('S3 Backup Script', () => {
         expect(match).not.toBeNull();
         expect(match?.[1]).toMatch(/^s3-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
       });
+    });
+  });
+
+  describe('getBackupRootDir', () => {
+    it('should return parent directory for timestamped backup directory', () => {
+      expect(getBackupRootDir('backups/s3-2026-01-15T00-00-00')).toBe('backups');
+      expect(getBackupRootDir('/home/user/backups/s3-2026-02-08T10-30-45')).toBe(
+        '/home/user/backups'
+      );
+    });
+
+    it('should return the same directory for non-timestamped directories', () => {
+      expect(getBackupRootDir('backups')).toBe('backups');
+      expect(getBackupRootDir('./my-backup')).toBe('./my-backup');
+      expect(getBackupRootDir('/home/user/backups')).toBe('/home/user/backups');
+    });
+
+    it('should handle edge cases', () => {
+      expect(getBackupRootDir('s3-2026-01-15')).toBe('.');
+      expect(getBackupRootDir('my-s3-backup')).toBe('my-s3-backup');
+      expect(getBackupRootDir('data/s3-files/backup')).toBe('data/s3-files/backup');
     });
   });
 
