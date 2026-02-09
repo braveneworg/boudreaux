@@ -2,9 +2,11 @@
 
 import { motion } from 'framer-motion';
 
+import { Separator } from '@/app/components/ui/separator';
 import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
 
 import SocialMediaIconLinks from './social-media-icon-links';
+import AuthToolbar from '../auth/auth-toolbar';
 
 export interface MenuItem {
   name: string;
@@ -44,6 +46,8 @@ export default function HamburgerMenuSheet({
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav className="flex flex-col" aria-label="Main navigation">
+          <AuthToolbar className="text-zinc-50" />
+          <Separator className="bg-accent" />
           <SocialMediaIconLinks className="justify-center border-b border-b-accent" />
           <ul className="pt-4 space-y-4" role="list">
             {menuItems.map((item, index) => (

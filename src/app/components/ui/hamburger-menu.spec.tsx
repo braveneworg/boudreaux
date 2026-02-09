@@ -3,6 +3,14 @@ import userEvent from '@testing-library/user-event';
 
 import HamburgerMenu from './hamburger-menu';
 
+vi.mock('../auth/auth-toolbar', () => ({
+  default: ({ className }: { className?: string }) => (
+    <div data-testid="auth-toolbar" className={className}>
+      Auth Toolbar
+    </div>
+  ),
+}));
+
 describe('HamburgerMenu', () => {
   it('renders', () => {
     render(<HamburgerMenu />);

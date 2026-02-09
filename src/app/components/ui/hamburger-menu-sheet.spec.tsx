@@ -3,6 +3,14 @@ import userEvent from '@testing-library/user-event';
 
 import HamburgerMenuSheet from './hamburger-menu-sheet';
 
+vi.mock('../auth/auth-toolbar', () => ({
+  default: ({ className }: { className?: string }) => (
+    <div data-testid="auth-toolbar" className={className}>
+      Auth Toolbar
+    </div>
+  ),
+}));
+
 describe('HamburgerMenuSheet', () => {
   const defaultMenuItems = [
     { name: 'Home', href: '/' },
