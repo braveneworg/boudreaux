@@ -1,7 +1,4 @@
-import React from 'react';
-
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import SignedinToolbar from './signout-button';
 
@@ -66,7 +63,7 @@ vi.mock('lucide-react', () => ({
 }));
 
 // Mock utils
-vi.mock('@/app/lib/utils/tailwind-utils', () => ({
+vi.mock('@/lib/utils/tailwind-utils', () => ({
   cn: (...args: Array<string | Record<string, boolean> | undefined>) => {
     return args
       .filter(Boolean)
