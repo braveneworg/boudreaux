@@ -21,7 +21,7 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
   const router = useRouter();
 
   return (
-    <div className={cn('h-3 my-2', className)}>
+    <div className={cn('h-3 my-4', className)}>
       <div
         className={cn(
           'flex h-3 items-center relative justify-center gap-2',
@@ -32,6 +32,7 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
         <SignedInAs />
         <VerticalSeparator />
         <Button
+          className="text-zinc-50 underline"
           variant="link:narrow"
           onClick={async () => {
             const { url } = await signOut({ redirect: false, callbackUrl: '/' });

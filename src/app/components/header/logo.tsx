@@ -15,6 +15,7 @@ const Logo = ({ isMobile }: LogoProps) => {
         className="block ml-2 mt-1.5 size-12 md:size-36 rounded-full bg-white"
         height={48}
         priority
+        unoptimized
         src={
           isMobile
             ? 'https://cdn.fakefourrecords.com/media/fake-four-inc-black-hand-logo.svg'

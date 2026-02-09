@@ -430,13 +430,7 @@ const InteractiveCoverArt = ({
       className={`relative w-full aspect-square group cursor-pointer focus:outline-none rounded-t-lg overflow-hidden ${className ?? ''}`}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        className="object-cover"
-        sizes="(max-width: 640px) 100vw, 333px"
-      />
+      <Image src={src} alt={alt} fill className="object-cover" sizes="calc(100vw - 1rem)" />
       {/* Overlay - visible when not playing or briefly when pausing */}
       <div
         className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
