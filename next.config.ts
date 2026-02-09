@@ -143,14 +143,14 @@ const config = {
   },
 
   // Redirect /media/* to CDN for any old links or direct access attempts
+  // Using statusCode 301 for permanent redirect (browsers fetch directly from CDN)
   async redirects() {
     return [
       {
         source: '/media/:path*',
         destination: `${CDN_DOMAIN}/media/:path*`,
-        permanent: false,
         statusCode: 301,
-      },
+      } as const,
     ];
   },
 } satisfies NextConfig;

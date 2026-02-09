@@ -9,7 +9,10 @@ const Footer = () => {
 
   return (
     <footer
-      className={`w-full bg-zinc-950 bg-[url('${getCdnUrl('particles-6.svg')}')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative`}
+      className="w-full bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative"
+      style={{
+        backgroundImage: `url('${getCdnUrl('particles-6.svg')}')`,
+      }}
     >
       <div className="relative mx-auto w-full max-w-[1920px] py-1 mt-2 z-10">
         <div className="flex flex-col items-center justify-center gap-0 md:flex-row md:justify-between px-4 md:px-8">

@@ -41,7 +41,10 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
           opacity: [0.9, 1, 0.9],
           scale: [1, 1.02, 1],
         }}
-        className={`absolute inset-0 bg-[url('${getCdnUrl('particles-6.svg')}')] bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none`}
+        className="absolute inset-0 bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none"
+        style={{
+          backgroundImage: `url('${getCdnUrl('particles-6.svg')}')`,
+        }}
         initial={{ opacity: 0.9 }}
         transition={{
           duration: 4.4,
