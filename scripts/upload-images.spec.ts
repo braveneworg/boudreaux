@@ -156,23 +156,27 @@ describe('upload-images', () => {
   });
 
   describe('generateS3Key', () => {
-    it('should generate S3 key from file path', () => {
-      expect(generateS3Key('images/photo.jpg')).toBe('images/photo.jpg');
+    it('should default to media/ prefix', () => {
+      expect(generateS3Key('images/photo.jpg')).toBe('media/images/photo.jpg');
+      expect(generateS3Key('photo.jpg')).toBe('media/photo.jpg');
+    });
+
+    it('should not double-prefix paths already starting with media/', () => {
       expect(generateS3Key('media/videos/clip.mp4')).toBe('media/videos/clip.mp4');
     });
 
     it('should remove public/ prefix', () => {
       expect(generateS3Key('public/media/photo.jpg')).toBe('media/photo.jpg');
-      expect(generateS3Key('public/images/avatar.png')).toBe('images/avatar.png');
+      expect(generateS3Key('public/images/avatar.png')).toBe('media/images/avatar.png');
     });
 
     it('should remove ./ prefix', () => {
-      expect(generateS3Key('./images/photo.jpg')).toBe('images/photo.jpg');
+      expect(generateS3Key('./images/photo.jpg')).toBe('media/images/photo.jpg');
     });
 
     it('should remove leading slashes', () => {
       expect(generateS3Key('/media/photo.jpg')).toBe('media/photo.jpg');
-      expect(generateS3Key('//images/photo.jpg')).toBe('images/photo.jpg');
+      expect(generateS3Key('//images/photo.jpg')).toBe('media/images/photo.jpg');
     });
 
     it('should add prefix when provided', () => {
@@ -193,7 +197,9 @@ describe('upload-images', () => {
     });
 
     it('should convert backslashes to forward slashes', () => {
-      expect(generateS3Key('images\\subfolder\\photo.jpg')).toBe('images/subfolder/photo.jpg');
+      expect(generateS3Key('images\\subfolder\\photo.jpg')).toBe(
+        'media/images/subfolder/photo.jpg'
+      );
       expect(generateS3Key('images\\photo.jpg', 'uploads')).toBe('uploads/images/photo.jpg');
     });
 
@@ -362,10 +368,10 @@ describe('upload-images', () => {
       expect(result.successful).toBe(1);
       expect(result.failed).toBe(0);
       expect(result.skipped).toBe(0);
-      expect(result.uploadedKeys).toEqual(['photo.jpg']);
+      expect(result.uploadedKeys).toEqual(['media/photo.jpg']);
       expect(putObjectCommandMock).toHaveBeenCalledWith({
         Bucket: 'test-bucket',
-        Key: 'photo.jpg',
+        Key: 'media/photo.jpg',
         Body: {},
         ContentType: 'image/jpeg',
       });
@@ -384,7 +390,7 @@ describe('upload-images', () => {
 
       expect(result.successful).toBe(2);
       expect(result.failed).toBe(0);
-      expect(result.uploadedKeys).toEqual(['photo1.jpg', 'photo2.png']);
+      expect(result.uploadedKeys).toEqual(['media/photo1.jpg', 'media/photo2.png']);
     });
 
     it('should skip non-image files', async () => {

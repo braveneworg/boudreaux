@@ -200,7 +200,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
         {selectedArtist && (
           <div className="flex flex-col items-center">
             {/* Cover Art with Audio Controls beneath it */}
-            <div className="w-full max-w-[333px]">
+            <div className="w-[calc(100vw-1rem)]">
               {/* Interactive Cover Art - clickable with play/pause overlay */}
               {getCoverArt(selectedArtist) && (
                 <MediaPlayer.InteractiveCoverArt
