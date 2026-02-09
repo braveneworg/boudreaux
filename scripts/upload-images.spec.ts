@@ -221,8 +221,8 @@ describe('upload-images', () => {
     });
 
     it('should handle absolute paths without /public/ segment', () => {
-      // For absolute paths without /public/, it should still remove leading slashes
-      expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe('home/user/uploads/photo.jpg');
+      // For absolute paths without /public/, it should still remove leading slashes and apply the default prefix
+      expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe('media/home/user/uploads/photo.jpg');
     });
   });
 
