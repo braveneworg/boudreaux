@@ -142,7 +142,7 @@ jobs:
             ls -la .next
             exit 1
           fi
-          tar -czf next-build.tar.gz .next/standalone .next/static
+          tar -czf next-build.tar.gz .next/standalone .next/static .next/BUILD_ID
           ls -lh next-build.tar.gz
 
       - name: Upload build artifact
