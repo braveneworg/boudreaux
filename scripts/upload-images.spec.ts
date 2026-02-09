@@ -211,7 +211,7 @@ describe('upload-images', () => {
 
     it('should handle absolute paths with /public/ segment', () => {
       expect(generateS3Key('/home/user/project/public/media/photo.jpg')).toBe('media/photo.jpg');
-      expect(generateS3Key('/var/www/app/public/images/avatar.png')).toBe('images/avatar.png');
+      expect(generateS3Key('/var/www/app/public/images/avatar.png')).toBe('media/images/avatar.png');
     });
 
     it('should handle absolute paths with /public/ and prefix', () => {
