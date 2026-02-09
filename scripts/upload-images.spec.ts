@@ -208,6 +208,44 @@ describe('upload-images', () => {
         'cdn/media/users/123/avatar.png'
       );
     });
+
+    it('should handle absolute paths with /public/ segment', () => {
+      expect(generateS3Key('/home/user/project/public/media/photo.jpg')).toBe('media/photo.jpg');
+      expect(generateS3Key('/var/www/app/public/images/avatar.png')).toBe(
+        'media/images/avatar.png'
+      );
+    });
+
+    it('should handle absolute paths with /public/ and prefix', () => {
+      expect(generateS3Key('/home/user/project/public/media/photo.jpg', 'cdn')).toBe(
+        'cdn/media/photo.jpg'
+      );
+    });
+
+    it('should handle absolute paths without /public/ segment', () => {
+      // For absolute paths without /public/, it should still remove leading slashes and apply the default prefix
+      expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe(
+        'media/home/user/uploads/photo.jpg'
+      );
+    });
+
+    it('should handle Windows-style absolute paths with \\public\\ segment', () => {
+      expect(generateS3Key('C:\\project\\public\\media\\photo.jpg')).toBe('media/photo.jpg');
+      expect(generateS3Key('D:\\www\\app\\public\\images\\avatar.png')).toBe(
+        'media/images/avatar.png'
+      );
+    });
+
+    it('should handle Windows-style absolute paths with \\public\\ and prefix', () => {
+      expect(generateS3Key('C:\\project\\public\\media\\photo.jpg', 'cdn')).toBe(
+        'cdn/media/photo.jpg'
+      );
+    });
+
+    it('should handle Windows-style absolute paths without \\public\\ segment', () => {
+      // For absolute paths without \public\, it should still remove leading slashes and apply the default prefix
+      expect(generateS3Key('C:\\uploads\\photo.jpg')).toBe('media/C:/uploads/photo.jpg');
+    });
   });
 
   describe('collectImagesFromDirectory', () => {
@@ -620,6 +658,103 @@ describe('upload-images', () => {
       const result = await uploadImages('test-bucket', ['photo.jpg'], {}, 'eu-west-1');
 
       expect(result.successful).toBe(1);
+    });
+
+    it('should generate correct S3 keys when baseDir is provided', async () => {
+      existsSyncMock.mockReturnValue(true);
+      statSyncMock.mockReturnValue({
+        isFile: () => true,
+        isDirectory: () => false,
+        size: 1024,
+      });
+      vi.spyOn(process, 'cwd').mockReturnValue('/home/user/project');
+
+      // Simulate directory upload with absolute paths
+      const result = await uploadImages(
+        'test-bucket',
+        [
+          '/home/user/project/public/media/gallery/photo1.jpg',
+          '/home/user/project/public/media/gallery/photo2.png',
+        ],
+        { baseDir: '/home/user/project/public/media/gallery' }
+      );
+
+      expect(result.successful).toBe(2);
+      // When baseDir is provided without explicit prefix, empty prefix is used (no 'media/' default)
+      expect(result.uploadedKeys).toEqual(['photo1.jpg', 'photo2.png']);
+      expect(putObjectCommandMock).toHaveBeenNthCalledWith(1, {
+        Bucket: 'test-bucket',
+        Key: 'photo1.jpg',
+        Body: {},
+        ContentType: 'image/jpeg',
+      });
+      expect(putObjectCommandMock).toHaveBeenNthCalledWith(2, {
+        Bucket: 'test-bucket',
+        Key: 'photo2.png',
+        Body: {},
+        ContentType: 'image/jpeg',
+      });
+    });
+
+    it('should generate correct S3 keys for subdirectories when baseDir is provided', async () => {
+      existsSyncMock.mockReturnValue(true);
+      statSyncMock.mockReturnValue({
+        isFile: () => true,
+        isDirectory: () => false,
+        size: 1024,
+      });
+      vi.spyOn(process, 'cwd').mockReturnValue('/home/user/project');
+
+      // Simulate directory upload with subdirectories
+      const result = await uploadImages(
+        'test-bucket',
+        [
+          '/home/user/project/public/media/photo1.jpg',
+          '/home/user/project/public/media/subfolder/photo2.png',
+          '/home/user/project/public/media/subfolder/nested/photo3.jpg',
+        ],
+        { baseDir: '/home/user/project/public/media' }
+      );
+
+      expect(result.successful).toBe(3);
+      // When baseDir is provided without explicit prefix, empty prefix is used (no 'media/' default)
+      expect(result.uploadedKeys).toEqual([
+        'photo1.jpg',
+        'subfolder/photo2.png',
+        'subfolder/nested/photo3.jpg',
+      ]);
+    });
+
+    it('should combine baseDir with prefix correctly', async () => {
+      existsSyncMock.mockReturnValue(true);
+      statSyncMock.mockReturnValue({
+        isFile: () => true,
+        isDirectory: () => false,
+        size: 1024,
+      });
+      vi.spyOn(process, 'cwd').mockReturnValue('/home/user/project');
+
+      // Simulate directory upload with prefix
+      const result = await uploadImages(
+        'test-bucket',
+        [
+          '/home/user/project/uploads/photo1.jpg',
+          '/home/user/project/uploads/subfolder/photo2.png',
+        ],
+        { baseDir: '/home/user/project/uploads', prefix: 'user-content' }
+      );
+
+      expect(result.successful).toBe(2);
+      expect(result.uploadedKeys).toEqual([
+        'user-content/photo1.jpg',
+        'user-content/subfolder/photo2.png',
+      ]);
+      expect(putObjectCommandMock).toHaveBeenNthCalledWith(1, {
+        Bucket: 'test-bucket',
+        Key: 'user-content/photo1.jpg',
+        Body: {},
+        ContentType: 'image/jpeg',
+      });
     });
   });
 

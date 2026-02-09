@@ -109,11 +109,10 @@ vi.mock('next/image', () => ({
     unoptimized?: boolean;
     className?: string;
   }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
+    <span
       data-testid="banner-image"
+      data-src={src}
+      data-alt={alt}
       data-fill={fill ? 'true' : undefined}
       data-priority={priority ? 'true' : undefined}
       data-sizes={sizes}
@@ -268,6 +267,22 @@ describe('NotificationBanner', () => {
     expect(dots[1]).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('does not change slide when clicking the already-active dot', () => {
+    const notifications = [
+      createMockNotification({ id: '1', message: 'First' }),
+      createMockNotification({ id: '2', message: 'Second' }),
+    ];
+    render(<NotificationBanner notifications={notifications} />);
+
+    // Click the first dot (already selected)
+    const dots = screen.getAllByRole('tab');
+    fireEvent.click(dots[0]);
+
+    // Should still show the first notification
+    expect(screen.getByText('First')).toBeInTheDocument();
+    expect(dots[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('auto-cycles through notifications every 6.5 seconds', () => {
     const notifications = [
       createMockNotification({ id: '1', message: 'First' }),
@@ -375,11 +390,11 @@ describe('NotificationBanner', () => {
     });
     render(<NotificationBanner notifications={[notification]} />);
 
-    // Find the visible image (not the preload image which has empty alt)
+    // Find the visible image (not the preload image which has empty data-alt)
     const images = screen.getAllByTestId('banner-image');
-    const visibleImage = images.find((img) => img.getAttribute('alt') === 'Banner with image');
-    expect(visibleImage).toHaveAttribute('src', 'https://example.com/banner.jpg');
-    expect(visibleImage).toHaveAttribute('alt', 'Banner with image');
+    const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Banner with image');
+    expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/banner.jpg');
+    expect(visibleImage).toHaveAttribute('data-alt', 'Banner with image');
   });
 
   it('renders link when linkUrl is provided', () => {
@@ -765,7 +780,7 @@ describe('NotificationBanner', () => {
         img.style.objectPosition?.includes('calc(50% + 30%)')
       );
       expect(displayedImage).toBeInTheDocument();
-      expect(displayedImage).toHaveAttribute('src', 'https://example.com/offset-image.jpg');
+      expect(displayedImage).toHaveAttribute('data-src', 'https://example.com/offset-image.jpg');
       expect(displayedImage).toHaveStyle({
         objectPosition: 'calc(50% + 30%) calc(50% + -15%)',
       });
@@ -863,8 +878,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const images = screen.getAllByTestId('banner-image');
-      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
-      expect(visibleImage).toHaveAttribute('src', 'https://example.com/original.jpg');
+      const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/original.jpg');
     });
 
     it('falls back to imageUrl when isOverlayed is true but originalImageUrl is null', () => {
@@ -877,8 +892,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const images = screen.getAllByTestId('banner-image');
-      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
-      expect(visibleImage).toHaveAttribute('src', 'https://example.com/processed.jpg');
+      const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/processed.jpg');
     });
 
     it('uses imageUrl when isOverlayed is false', () => {
@@ -893,7 +908,7 @@ describe('NotificationBanner', () => {
       const images = screen.getAllByTestId('banner-image');
       // When isOverlayed is false, the image should be the processed one with burned-in text
       expect(
-        images.some((img) => img.getAttribute('src') === 'https://example.com/processed.jpg')
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/processed.jpg')
       ).toBe(true);
     });
 
@@ -909,7 +924,7 @@ describe('NotificationBanner', () => {
       const images = screen.getAllByTestId('banner-image');
       // Should fall back to originalImageUrl when imageUrl is null
       expect(
-        images.some((img) => img.getAttribute('src') === 'https://example.com/original.jpg')
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/original.jpg')
       ).toBe(true);
     });
 
