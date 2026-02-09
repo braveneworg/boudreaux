@@ -150,7 +150,7 @@ const config = {
         source: '/media/:path*',
         destination: `${CDN_DOMAIN}/media/:path*`,
         statusCode: 301,
-      } as const,
+      },
     ];
   },
 } satisfies NextConfig;
