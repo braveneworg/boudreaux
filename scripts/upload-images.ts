@@ -265,7 +265,10 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
 }
 
 /**
- * Invalidate CloudFront cache for uploaded files
+ * Invalidate CloudFront cache for uploaded files.
+ * CloudFront has a limit of 3,000 paths per invalidation request.
+ * For 3,000 keys or fewer, a single invalidation with explicit paths is sent.
+ * For more than 3,000 keys, a single wildcard invalidation is used instead.
  */
 async function invalidateCloudFront(
   distributionId: string,
@@ -277,9 +280,32 @@ async function invalidateCloudFront(
   }
 
   try {
-    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-
     const cloudfront = new CloudFrontClient({ region });
+    const MAX_PATHS_PER_REQUEST = 3000;
+
+    // For very large uploads (>3000 files), use wildcard invalidation
+    // This is more cost-effective and faster than multiple requests
+    if (keys.length > MAX_PATHS_PER_REQUEST) {
+      log(`Invalidating CloudFront cache using wildcard for ${keys.length} file(s)...`, 'info');
+
+      const command = new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `upload-images-wildcard-${Date.now()}`,
+          Paths: {
+            Quantity: 1,
+            Items: ['/*'],
+          },
+        },
+      });
+
+      await cloudfront.send(command);
+      log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+      return;
+    }
+
+    // For smaller batches (≤3000 files), invalidate specific paths
+    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
 
     // CloudFront paths must start with /
     const paths = keys.map((key) => `/${key}`);

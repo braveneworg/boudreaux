@@ -524,6 +524,68 @@ describe('upload-images', () => {
       delete process.env.CLOUDFRONT_DISTRIBUTION_ID;
     });
 
+    it('should use wildcard invalidation for large batches (>3000 files)', async () => {
+      existsSyncMock.mockReturnValue(true);
+      statSyncMock.mockReturnValue({
+        isFile: () => true,
+        isDirectory: () => false,
+        size: 1024,
+      });
+      vi.spyOn(process, 'cwd').mockReturnValue('/test');
+      process.env.CLOUDFRONT_DISTRIBUTION_ID = 'test-dist-id';
+
+      // Create array of 3001 file paths
+      const filePaths = Array.from({ length: 3001 }, (_, i) => `photo${i}.jpg`);
+
+      await uploadImages('test-bucket', filePaths, { invalidateCache: true });
+
+      // Should use wildcard invalidation (/*) instead of individual paths
+      expect(createInvalidationCommandMock).toHaveBeenCalledWith({
+        DistributionId: 'test-dist-id',
+        InvalidationBatch: {
+          CallerReference: expect.stringContaining('upload-images-wildcard-'),
+          Paths: {
+            Quantity: 1,
+            Items: ['/*'],
+          },
+        },
+      });
+      expect(cloudFrontSendMock).toHaveBeenCalledTimes(1);
+
+      delete process.env.CLOUDFRONT_DISTRIBUTION_ID;
+    });
+
+    it('should invalidate specific paths for uploads ≤ 3000 files', async () => {
+      existsSyncMock.mockReturnValue(true);
+      statSyncMock.mockReturnValue({
+        isFile: () => true,
+        isDirectory: () => false,
+        size: 1024,
+      });
+      vi.spyOn(process, 'cwd').mockReturnValue('/test');
+      process.env.CLOUDFRONT_DISTRIBUTION_ID = 'test-dist-id';
+
+      // Create array of 100 file paths (well under the 3000 limit)
+      const filePaths = Array.from({ length: 100 }, (_, i) => `photo${i}.jpg`);
+
+      await uploadImages('test-bucket', filePaths, { invalidateCache: true });
+
+      // Should use specific path invalidation, not wildcard
+      expect(createInvalidationCommandMock).toHaveBeenCalledWith({
+        DistributionId: 'test-dist-id',
+        InvalidationBatch: {
+          CallerReference: expect.stringContaining('upload-images-'),
+          Paths: {
+            Quantity: 100,
+            Items: expect.arrayContaining(['/photo0.jpg', '/photo1.jpg']),
+          },
+        },
+      });
+      expect(cloudFrontSendMock).toHaveBeenCalledTimes(1);
+
+      delete process.env.CLOUDFRONT_DISTRIBUTION_ID;
+    });
+
     it('should skip directories when uploading', async () => {
       existsSyncMock.mockReturnValue(true);
       statSyncMock.mockReturnValue({
