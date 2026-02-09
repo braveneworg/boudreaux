@@ -265,9 +265,10 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
 }
 
 /**
- * Invalidate CloudFront cache for uploaded files
+ * Invalidate CloudFront cache for uploaded files.
  * CloudFront has a limit of 3,000 paths per invalidation request.
- * For large batches, we split into multiple requests or use wildcard invalidation.
+ * For 3,000 keys or fewer, a single invalidation with explicit paths is sent.
+ * For more than 3,000 keys, a single wildcard invalidation is used instead.
  */
 async function invalidateCloudFront(
   distributionId: string,
