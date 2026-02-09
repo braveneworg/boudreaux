@@ -2,11 +2,8 @@ import { Dawning_of_a_New_Day } from 'next/font/google';
 import { headers } from 'next/headers';
 import { userAgentFromString } from 'next/server';
 
-import { Separator } from '@radix-ui/react-separator';
-
 import { Toaster } from '@/components/ui/sonner';
 
-import AuthToolbar from './components/auth/auth-toolbar';
 import Footer from './components/footer/footer';
 import Header from './components/header/header';
 import { Providers } from './components/providers';
@@ -78,8 +75,6 @@ export default async function RootLayout({
         <Providers>
           <Header isMobile={isMobile} />
           <main className="font-sans px-1.5 flex flex-col flex-1 w-full max-w-full overflow-x-hidden">
-            <AuthToolbar />
-            <Separator className="my-0 h-px bg-zinc-300" />
             {children}
           </main>
           <Footer />

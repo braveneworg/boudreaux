@@ -4,7 +4,10 @@ import { ShieldUser as ShieldUserIcon } from 'lucide-react';
 
 const AdminLink = () => {
   return (
-    <Link className="flex items-center gap-2 text-sm underline-offset-4" href="/admin">
+    <Link
+      className="text-zinc-50 underline flex items-center gap-2 text-sm underline-offset-4"
+      href="/admin"
+    >
       <ShieldUserIcon className="h-4 w-4" />
       Admin
     </Link>
