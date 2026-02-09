@@ -577,13 +577,14 @@ describe('upload-images', () => {
       await uploadImages('test-bucket', filePaths, { invalidateCache: true });
 
       // Should use specific path invalidation, not wildcard
+      // generateS3Key prepends default 'media/' prefix, and invalidation prepends '/'
       expect(createInvalidationCommandMock).toHaveBeenCalledWith({
         DistributionId: 'test-dist-id',
         InvalidationBatch: {
           CallerReference: expect.stringContaining('upload-images-'),
           Paths: {
             Quantity: 100,
-            Items: expect.arrayContaining(['/photo0.jpg', '/photo1.jpg']),
+            Items: expect.arrayContaining(['/media/photo0.jpg', '/media/photo1.jpg']),
           },
         },
       });
