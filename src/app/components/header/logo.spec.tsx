@@ -51,14 +51,20 @@ describe('Logo', () => {
     render(<Logo isMobile />);
 
     const img = screen.getByAltText('Fake Four Inc. Hand Logo');
-    expect(img).toHaveAttribute('src', '/media/fake-four-inc-black-hand-logo.svg');
+    expect(img).toHaveAttribute(
+      'src',
+      'https://cdn.fakefourrecords.com/media/fake-four-inc-black-hand-logo.svg'
+    );
   });
 
   it('uses desktop logo source when isMobile is false', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByAltText('Fake Four Inc. Hand Logo');
-    expect(img).toHaveAttribute('src', '/media/fake-four-inc-black-stardust-hand-logo.svg');
+    expect(img).toHaveAttribute(
+      'src',
+      'https://cdn.fakefourrecords.com/media/fake-four-inc-black-stardust-hand-logo.svg'
+    );
   });
 
   it('has priority loading enabled', () => {

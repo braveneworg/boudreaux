@@ -11,7 +11,7 @@ export const TipJarsLink = () => {
     >
       Tip Jars
       <Image
-        src="/media/icons/external-link-icon.svg"
+        src="https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg"
         className="ml-2 inline-block"
         alt="Tip Jars"
         width={22}

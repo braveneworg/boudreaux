@@ -101,7 +101,10 @@ describe('Header', () => {
       render(<Header isMobile />);
       const image = screen.getByTestId('next-image');
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute('src', '/media/fake-four-inc-words.png');
+      expect(image).toHaveAttribute(
+        'src',
+        'https://cdn.fakefourrecords.com/media/fake-four-inc-words.png'
+      );
       expect(image).toHaveAttribute('alt', 'Fake Four Inc. Words');
     });
 

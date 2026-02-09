@@ -17,8 +17,8 @@ const Logo = ({ isMobile }: LogoProps) => {
         priority
         src={
           isMobile
-            ? '/media/fake-four-inc-black-hand-logo.svg'
-            : '/media/fake-four-inc-black-stardust-hand-logo.svg'
+            ? 'https://cdn.fakefourrecords.com/media/fake-four-inc-black-hand-logo.svg'
+            : 'https://cdn.fakefourrecords.com/media/fake-four-inc-black-stardust-hand-logo.svg'
         }
         width={48}
       />

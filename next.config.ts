@@ -121,11 +121,6 @@ const config = {
   // Configure rewrites if needed
   async rewrites() {
     return [
-      // Serve /media/* assets from CDN so they resolve without a /public/media directory
-      {
-        source: '/media/:path*',
-        destination: 'https://cdn.fakefourrecords.com/media/:path*',
-      },
       {
         source: '/signin',
         destination: '/signup',
@@ -139,6 +134,17 @@ const config = {
           },
         ],
         destination: '/success/signup?email=:email*',
+      },
+    ];
+  },
+
+  // Redirect /media/* to CDN for any old links or direct access attempts
+  async redirects() {
+    return [
+      {
+        source: '/media/:path*',
+        destination: 'https://cdn.fakefourrecords.com/media/:path*',
+        permanent: true,
       },
     ];
   },

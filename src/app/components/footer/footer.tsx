@@ -6,7 +6,7 @@ const Footer = () => {
   const currentYear = 2025;
 
   return (
-    <footer className="w-full bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative">
+    <footer className="w-full bg-zinc-950 bg-[url('https://cdn.fakefourrecords.com/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative">
       <div className="relative mx-auto w-full max-w-[1920px] py-1 mt-2 z-10">
         <div className="flex flex-col items-center justify-center gap-0 md:flex-row md:justify-between px-4 md:px-8">
           <div className="flex text-zinc-50 text-sm md:text-base">
