@@ -555,7 +555,7 @@ describe('upload-images', () => {
       delete process.env.CLOUDFRONT_DISTRIBUTION_ID;
     });
 
-    it('should batch CloudFront invalidations for medium-sized uploads', async () => {
+    it('should invalidate specific paths for uploads ≤ 3000 files', async () => {
       existsSyncMock.mockReturnValue(true);
       statSyncMock.mockReturnValue({
         isFile: () => true,
