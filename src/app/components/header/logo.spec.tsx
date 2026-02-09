@@ -11,6 +11,8 @@ vi.mock('next/image', () => ({
     width,
     height,
     priority,
+    unoptimized,
+    fill,
     ...props
   }: {
     src: string;
@@ -18,6 +20,8 @@ vi.mock('next/image', () => ({
     width: number;
     height: number;
     priority?: boolean;
+    unoptimized?: boolean;
+    fill?: boolean;
     className?: string;
     [key: string]: unknown;
   }) => (
@@ -28,6 +32,8 @@ vi.mock('next/image', () => ({
       width={width}
       height={height}
       data-priority={priority ? 'true' : 'false'}
+      data-unoptimized={unoptimized ? 'true' : 'false'}
+      data-fill={fill ? 'true' : 'false'}
       {...props}
     />
   ),
