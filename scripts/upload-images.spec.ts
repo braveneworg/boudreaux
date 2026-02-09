@@ -227,6 +227,7 @@ describe('upload-images', () => {
       expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe(
         'media/home/user/uploads/photo.jpg'
       );
+<<<<<<< HEAD
     });
 
     it('should handle Windows-style absolute paths with \\public\\ segment', () => {
@@ -245,6 +246,8 @@ describe('upload-images', () => {
     it('should handle Windows-style absolute paths without \\public\\ segment', () => {
       // For absolute paths without \public\, it should still remove leading slashes and apply the default prefix
       expect(generateS3Key('C:\\uploads\\photo.jpg')).toBe('media/C:/uploads/photo.jpg');
+=======
+>>>>>>> 4a73f1d (Fix tests)
     });
   });
 
@@ -680,16 +683,17 @@ describe('upload-images', () => {
       );
 
       expect(result.successful).toBe(2);
-      expect(result.uploadedKeys).toEqual(['photo1.jpg', 'photo2.png']);
+      // generateS3Key applies default 'media/' prefix when no explicit prefix is provided
+      expect(result.uploadedKeys).toEqual(['media/photo1.jpg', 'media/photo2.png']);
       expect(putObjectCommandMock).toHaveBeenNthCalledWith(1, {
         Bucket: 'test-bucket',
-        Key: 'photo1.jpg',
+        Key: 'media/photo1.jpg',
         Body: {},
         ContentType: 'image/jpeg',
       });
       expect(putObjectCommandMock).toHaveBeenNthCalledWith(2, {
         Bucket: 'test-bucket',
-        Key: 'photo2.png',
+        Key: 'media/photo2.png',
         Body: {},
         ContentType: 'image/jpeg',
       });
@@ -716,10 +720,11 @@ describe('upload-images', () => {
       );
 
       expect(result.successful).toBe(3);
+      // generateS3Key applies default 'media/' prefix when no explicit prefix is provided
       expect(result.uploadedKeys).toEqual([
-        'photo1.jpg',
-        'subfolder/photo2.png',
-        'subfolder/nested/photo3.jpg',
+        'media/photo1.jpg',
+        'media/subfolder/photo2.png',
+        'media/subfolder/nested/photo3.jpg',
       ]);
     });
 

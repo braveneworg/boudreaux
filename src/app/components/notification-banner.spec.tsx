@@ -268,6 +268,22 @@ describe('NotificationBanner', () => {
     expect(dots[1]).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('does not change slide when clicking the already-active dot', () => {
+    const notifications = [
+      createMockNotification({ id: '1', message: 'First' }),
+      createMockNotification({ id: '2', message: 'Second' }),
+    ];
+    render(<NotificationBanner notifications={notifications} />);
+
+    // Click the first dot (already selected)
+    const dots = screen.getAllByRole('tab');
+    fireEvent.click(dots[0]);
+
+    // Should still show the first notification
+    expect(screen.getByText('First')).toBeInTheDocument();
+    expect(dots[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('auto-cycles through notifications every 6.5 seconds', () => {
     const notifications = [
       createMockNotification({ id: '1', message: 'First' }),
