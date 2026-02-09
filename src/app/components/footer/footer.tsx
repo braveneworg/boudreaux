@@ -3,7 +3,7 @@ import Link from 'next/link';
 import VerticalSeparator from '../ui/vertical-separator';
 
 const Footer = () => {
-  const currentYear = 2025;
+  const currentYear = new Date().getFullYear();
 
   return (
     <footer className="w-full bg-zinc-950 bg-[url('https://cdn.fakefourrecords.com/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative">
