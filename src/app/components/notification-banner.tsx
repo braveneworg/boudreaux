@@ -152,12 +152,12 @@ export function NotificationBanner({ notifications, className }: NotificationBan
         <AnimatePresence mode="wait">
           <motion.div
             key={currentNotification?.id || currentIndex}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
+            initial={{ x: 50 }}
+            animate={{ x: 0 }}
+            exit={{ x: -50 }}
             transition={{
-              duration: 0.5,
-              ease: [0.4, 0, 0.2, 1], // Cubic bezier easing
+              duration: 0.25,
+              ease: [0.4, 0, 0.2, 1],
             }}
             drag={totalNotifications > 1 ? 'x' : false}
             dragConstraints={{ left: 0, right: 0 }}
