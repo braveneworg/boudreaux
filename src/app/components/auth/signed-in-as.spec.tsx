@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { render, screen } from '@testing-library/react';
 
 import SignedInAs from './signed-in-as';
@@ -16,24 +14,34 @@ vi.mock('@/app/hooks/use-mobile', () => ({
   useIsMobile: () => mockUseIsMobile(),
 }));
 
-// Mock UsernameLink component
-vi.mock('./username-link', () => ({
-  default: ({ username }: { username: string }) => (
-    <div data-testid="username-link">@{username}</div>
-  ),
-}));
-
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
-  KeyIcon: ({ size }: { size?: number }) => (
-    <div data-testid="key-icon" data-size={size}>
+  KeyIcon: ({ size, className }: { size?: number; className?: string }) => (
+    <div data-testid="key-icon" data-size={size} className={className}>
       KeyIcon
     </div>
   ),
 }));
 
+// Mock Next.js Link
+vi.mock('next/link', () => ({
+  default: ({
+    children,
+    href,
+    className,
+  }: {
+    children: React.ReactNode;
+    href: string;
+    className?: string;
+  }) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
+}));
+
 // Mock utils
-vi.mock('@/app/lib/utils', () => ({
+vi.mock('@/lib/utils', () => ({
   cn: (...args: Array<string | Record<string, boolean> | undefined>) => {
     return args
       .filter(Boolean)
@@ -41,7 +49,7 @@ vi.mock('@/app/lib/utils', () => ({
         if (typeof arg === 'string') return arg;
         if (typeof arg === 'object' && arg !== null) {
           return Object.keys(arg)
-            .filter((key) => arg[key])
+            .filter((key) => (arg as Record<string, boolean>)[key])
             .join(' ');
         }
         return '';
@@ -69,7 +77,7 @@ describe('SignedInAs', () => {
       });
     });
 
-    it('renders the signed in text', () => {
+    it('renders the signed in text on desktop', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
@@ -80,13 +88,12 @@ describe('SignedInAs', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
-      // Desktop mode shows KeyIcon in the desktop section
       const icons = screen.getAllByTestId('key-icon');
       expect(icons.length).toBeGreaterThan(0);
       expect(icons[0]).toHaveAttribute('data-size', '16');
     });
 
-    it('renders the username link', () => {
+    it('renders the username link with @ prefix', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
@@ -105,14 +112,39 @@ describe('SignedInAs', () => {
       expect(wrapper).toHaveClass('gap-2');
     });
 
-    it('shows appropriate content based on screen size', () => {
+    it('applies underline and text-zinc-50 classes', () => {
       mockUseIsMobile.mockReturnValue(false);
       const { container } = render(<SignedInAs />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('flex');
-      expect(wrapper).toHaveClass('items-center');
-      expect(wrapper).toHaveClass('gap-2');
+      expect(wrapper).toHaveClass('underline');
+      expect(wrapper).toHaveClass('text-zinc-50');
+    });
+
+    it('hides "Signed in as:" text on mobile', () => {
+      mockUseIsMobile.mockReturnValue(true);
+      render(<SignedInAs />);
+
+      expect(screen.queryByText('Signed in as:')).not.toBeInTheDocument();
+    });
+
+    it('shows mobile key icon with md:hidden class', () => {
+      mockUseIsMobile.mockReturnValue(true);
+      render(<SignedInAs />);
+
+      const icons = screen.getAllByTestId('key-icon');
+      const mobileIcon = icons.find((icon) => icon.className.includes('md:hidden'));
+      expect(mobileIcon).toBeDefined();
+    });
+
+    it('shows desktop key icon and signed-in text on desktop', () => {
+      mockUseIsMobile.mockReturnValue(false);
+      render(<SignedInAs />);
+
+      expect(screen.getByText('Signed in as:')).toBeInTheDocument();
+      // Desktop shows both icons: one in the flex-row section, one with md:hidden
+      const icons = screen.getAllByTestId('key-icon');
+      expect(icons).toHaveLength(2);
     });
   });
 
@@ -164,6 +196,22 @@ describe('SignedInAs', () => {
       expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
 
+    it('renders displayName without @ prefix when no username', () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            name: 'Jane Doe',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+
+      render(<SignedInAs />);
+      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+      expect(screen.queryByText('@Jane Doe')).not.toBeInTheDocument();
+    });
+
     it('returns null when user session is null', () => {
       mockUseSession.mockReturnValue({
         data: null,
@@ -173,6 +221,104 @@ describe('SignedInAs', () => {
 
       const { container } = render(<SignedInAs />);
       expect(container.firstChild).toBeNull();
+    });
+
+    it('returns null and logs warning when no display name found', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {},
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+
+      const { container } = render(<SignedInAs />);
+      expect(container.firstChild).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith('[SignedInAs] No display name found, returning null');
+
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('development logging', () => {
+    beforeEach(() => {
+      vi.stubEnv('NODE_ENV', 'development');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('logs session info in development mode', () => {
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            username: 'devuser',
+            email: 'dev@example.com',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+
+      render(<SignedInAs />);
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        '[SignedInAs] Session:',
+        expect.objectContaining({ user: expect.objectContaining({ username: 'devuser' }) })
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        '[SignedInAs] User:',
+        expect.objectContaining({ username: 'devuser' })
+      );
+      expect(infoSpy).toHaveBeenCalledWith('[SignedInAs] Display name:', 'devuser');
+
+      infoSpy.mockRestore();
+    });
+
+    it('logs session info when session is null in development', () => {
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      mockUseSession.mockReturnValue({
+        data: null,
+        status: 'unauthenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+
+      render(<SignedInAs />);
+
+      expect(infoSpy).toHaveBeenCalledWith('[SignedInAs] Session:', null);
+
+      infoSpy.mockRestore();
+    });
+  });
+
+  describe('link styling', () => {
+    beforeEach(() => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            username: 'testuser',
+          },
+        },
+        status: 'authenticated',
+      });
+      mockUseIsMobile.mockReturnValue(false);
+    });
+
+    it('profile link has correct classes', () => {
+      render(<SignedInAs />);
+
+      const link = screen.getByRole('link');
+      expect(link).toHaveClass('text-sm');
+      expect(link).toHaveClass('text-zinc-50');
+    });
+
+    it('profile link points to /profile', () => {
+      render(<SignedInAs />);
+
+      expect(screen.getByRole('link')).toHaveAttribute('href', '/profile');
     });
   });
 });
