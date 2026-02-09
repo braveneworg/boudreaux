@@ -14,7 +14,7 @@
  *   # Upload all images in a directory (recursive)
  *   npm run images:upload --dir path/to/images/
  *
- *   # Upload with custom S3 prefix
+ *   # Upload with custom S3 prefix (default: media/)
  *   npm run images:upload path/to/image.jpg --prefix media/photos/
  *
  * Examples:
@@ -178,10 +178,14 @@ export function generateS3Key(filePath: string, prefix?: string): string {
   // Remove leading slashes
   key = key.replace(/^\/+/, '');
 
-  // Add prefix if provided
-  if (prefix) {
-    const cleanPrefix = prefix.replace(/^\/+/, '').replace(/\/+$/, '');
-    key = cleanPrefix ? `${cleanPrefix}/${key}` : key;
+  // Apply prefix: use explicit prefix if provided, otherwise default to 'media'
+  const effectivePrefix = prefix !== undefined ? prefix : 'media';
+  if (effectivePrefix) {
+    const cleanPrefix = effectivePrefix.replace(/^\/+/, '').replace(/\/+$/, '');
+    // Avoid double-prefixing if key already starts with the prefix
+    if (cleanPrefix && !key.startsWith(`${cleanPrefix}/`)) {
+      key = `${cleanPrefix}/${key}`;
+    }
   }
 
   // Ensure forward slashes for S3 compatibility
@@ -277,7 +281,10 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
 }
 
 /**
- * Invalidate CloudFront cache for uploaded files
+ * Invalidate CloudFront cache for uploaded files.
+ * CloudFront has a limit of 3,000 paths per invalidation request.
+ * For 3,000 keys or fewer, a single invalidation with explicit paths is sent.
+ * For more than 3,000 keys, a single wildcard invalidation is used instead.
  */
 async function invalidateCloudFront(
   distributionId: string,
@@ -289,9 +296,32 @@ async function invalidateCloudFront(
   }
 
   try {
-    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-
     const cloudfront = new CloudFrontClient({ region });
+    const MAX_PATHS_PER_REQUEST = 3000;
+
+    // For very large uploads (>3000 files), use wildcard invalidation
+    // This is more cost-effective and faster than multiple requests
+    if (keys.length > MAX_PATHS_PER_REQUEST) {
+      log(`Invalidating CloudFront cache using wildcard for ${keys.length} file(s)...`, 'info');
+
+      const command = new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `upload-images-wildcard-${Date.now()}`,
+          Paths: {
+            Quantity: 1,
+            Items: ['/*'],
+          },
+        },
+      });
+
+      await cloudfront.send(command);
+      log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+      return;
+    }
+
+    // For smaller batches (≤3000 files), invalidate specific paths
+    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
 
     // CloudFront paths must start with /
     const paths = keys.map((key) => `/${key}`);
@@ -335,9 +365,7 @@ export async function uploadImages(
   const s3Client = new S3Client({ region });
 
   log(`Starting upload to S3 bucket: ${bucket}`, 'info');
-  if (options.prefix) {
-    log(`Using S3 prefix: ${options.prefix}`, 'info');
-  }
+  log(`Using S3 prefix: ${options.prefix ?? 'media (default)'}`, 'info');
 
   for (const filePath of filePaths) {
     const resolvedPath = resolvePath(filePath);
@@ -427,7 +455,7 @@ ${colors.yellow}Usage:${colors.reset}
 
 ${colors.yellow}Options:${colors.reset}
   --dir, -d <directory>     Upload all images from directory (recursive)
-  --prefix, -p <prefix>     S3 key prefix for uploaded files
+  --prefix, -p <prefix>     S3 key prefix for uploaded files (default: media)
   --no-invalidate           Skip CloudFront cache invalidation
 
 ${colors.yellow}Examples:${colors.reset}

@@ -153,6 +153,52 @@ Each backup includes:
 
 For more details, see [scripts/README.md](scripts/README.md).
 
+## Image Uploads
+
+Upload images to the S3 bucket (and CDN) using the `images:upload` script. Files are placed under the `media/` prefix by default.
+
+### Usage
+
+```bash
+# Upload a single image
+npm run images:upload -- ./path/to/image.jpg
+
+# Upload multiple images (comma-separated)
+npm run images:upload -- ./photo1.jpg,./photo2.png
+
+# Upload all images in a directory (recursive)
+npm run images:upload -- --dir ./path/to/images/
+
+# Upload with a custom S3 prefix (overrides default media/)
+npm run images:upload -- ./image.jpg --prefix custom-folder
+
+# Skip CloudFront cache invalidation
+npm run images:upload -- ./image.jpg --no-invalidate
+```
+
+> **Note:** The `--` after `images:upload` is required for npm to forward arguments to the script.
+
+### Options
+
+| Flag                  | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `--dir, -d <path>`    | Upload all images from a directory recursively  |
+| `--prefix, -p <path>` | S3 key prefix (default: `media`)                |
+| `--no-invalidate`     | Skip CloudFront cache invalidation after upload |
+| `--help, -h`          | Show help message                               |
+
+### Supported Formats
+
+jpg, jpeg, png, gif, webp, svg, ico, bmp, tiff, tif, avif
+
+### Environment Variables
+
+| Variable                     | Required | Description                                       |
+| ---------------------------- | -------- | ------------------------------------------------- |
+| `S3_BUCKET`                  | Yes      | S3 bucket name                                    |
+| `AWS_REGION`                 | No       | AWS region (default: `us-east-1`)                 |
+| `CLOUDFRONT_DISTRIBUTION_ID` | No       | CloudFront distribution ID for cache invalidation |
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
