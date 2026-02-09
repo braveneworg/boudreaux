@@ -62,6 +62,9 @@ export function NotificationBanner({ notifications, className }: NotificationBan
   // Navigate to specific notification
   const goToIndex = useCallback(
     (index: number) => {
+      if (index === currentIndex) {
+        return;
+      }
       setDirection(index > currentIndex ? 1 : -1);
       setCurrentIndex(index);
     },
