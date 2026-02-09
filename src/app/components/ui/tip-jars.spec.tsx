@@ -3,16 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { TipJarsLink } from './tip-jars';
 
 describe('TipJarsLink', () => {
-  it('renders', () => {
+  it('renders a link to campsite.bio/ceschi', () => {
     render(<TipJarsLink />);
 
-    expect(screen.getByRole('link')).toBeInTheDocument();
-  });
-
-  it('has correct href', () => {
-    render(<TipJarsLink />);
-
-    expect(screen.getByRole('link')).toHaveAttribute('href', 'https://campsite.bio/ceschi');
+    const link = screen.getByRole('link');
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', 'https://campsite.bio/ceschi');
   });
 
   it('displays Tip Jars text', () => {
@@ -21,34 +17,49 @@ describe('TipJarsLink', () => {
     expect(screen.getByText('Tip Jars')).toBeInTheDocument();
   });
 
-  it('opens in new tab', () => {
+  it('opens in new tab with noopener for security', () => {
     render(<TipJarsLink />);
 
-    expect(screen.getByRole('link')).toHaveAttribute('target', '_blank');
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener');
   });
 
-  it('has noopener for security', () => {
-    render(<TipJarsLink />);
+  describe('external link icon', () => {
+    it('renders with correct CDN URL and dimensions', () => {
+      render(<TipJarsLink />);
 
-    expect(screen.getByRole('link')).toHaveAttribute('rel', 'noopener');
+      const icon = screen.getByRole('img', { name: 'Tip Jars' });
+      expect(icon).toHaveAttribute(
+        'src',
+        'https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg'
+      );
+      expect(icon).toHaveAttribute('width', '22');
+      expect(icon).toHaveAttribute('height', '22');
+    });
+
+    it('has inline-block display and left margin', () => {
+      render(<TipJarsLink />);
+
+      const icon = screen.getByRole('img', { name: 'Tip Jars' });
+      expect(icon).toHaveClass('ml-2', 'inline-block');
+    });
   });
 
-  it('renders external link icon', () => {
-    render(<TipJarsLink />);
+  describe('styling', () => {
+    it('has layout and text styling classes', () => {
+      render(<TipJarsLink />);
 
-    expect(screen.getByRole('img', { name: 'Tip Jars' })).toBeInTheDocument();
-  });
+      const link = screen.getByRole('link');
+      expect(link).toHaveClass('flex', 'items-center', 'justify-center');
+      expect(link).toHaveClass('text-xl', 'text-zinc-50');
+    });
 
-  it('external link icon has correct src', () => {
-    render(<TipJarsLink />);
+    it('has correct spacing', () => {
+      render(<TipJarsLink />);
 
-    const icon = screen.getByRole('img', { name: 'Tip Jars' });
-    expect(icon).toHaveAttribute('src', expect.stringContaining('external-link-icon.svg'));
-  });
-
-  it('has styling classes for layout', () => {
-    render(<TipJarsLink />);
-
-    expect(screen.getByRole('link')).toHaveClass('flex', 'items-center', 'justify-center');
+      const link = screen.getByRole('link');
+      expect(link).toHaveClass('mt-2', 'pb-3');
+    });
   });
 });

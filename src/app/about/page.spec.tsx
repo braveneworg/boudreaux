@@ -2,11 +2,27 @@ import { render, screen } from '@testing-library/react';
 
 import AboutPage from './page';
 
-// Mock next/image
+// Mock next/image using <span> to avoid @next/next/no-img-element lint rule
 vi.mock('next/image', () => ({
-  default: function MockImage(props: { src: string; alt: string; width: number; height: number }) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={props.src} alt={props.alt} width={props.width} height={props.height} />;
+  default: function MockImage(props: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    className?: string;
+    priority?: boolean;
+  }) {
+    return (
+      <span
+        className={props.className}
+        data-alt={props.alt}
+        data-height={String(props.height)}
+        data-priority={props.priority ? 'true' : 'false'}
+        data-src={props.src}
+        data-testid={`image-${props.alt}`}
+        data-width={String(props.width)}
+      />
+    );
   },
 }));
 
@@ -73,123 +89,171 @@ vi.mock('../components/ui/page-section-paragraph', () => ({
 }));
 
 describe('AboutPage', () => {
-  it('renders page container', () => {
+  it('renders page layout structure', () => {
     render(<AboutPage />);
 
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
-  });
-
-  it('renders content container', () => {
-    render(<AboutPage />);
-
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
+    expect(screen.getByTestId('card')).toBeInTheDocument();
+    expect(screen.getByTestId('card-content')).toBeInTheDocument();
   });
 
   it('renders breadcrumb with About link', () => {
     render(<AboutPage />);
 
     expect(screen.getByTestId('breadcrumb')).toBeInTheDocument();
-    expect(screen.getByText('About')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
   });
 
-  it('renders card with content', () => {
+  it('renders main heading with anchor id', () => {
     render(<AboutPage />);
 
-    expect(screen.getByTestId('card')).toBeInTheDocument();
-    expect(screen.getByTestId('card-content')).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: 'About fake four inc.' });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveAttribute('id', 'about-fake-four-inc');
   });
 
-  it('renders main heading', () => {
-    render(<AboutPage />);
+  describe('images', () => {
+    it('renders founders image with CDN URL, dimensions, and priority', () => {
+      render(<AboutPage />);
 
-    expect(screen.getByRole('heading', { name: 'About fake four inc.' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'About fake four inc.' })).toHaveAttribute(
-      'id',
-      'about-fake-four-inc'
-    );
+      const foundersImage = screen.getByTestId(
+        'image-Ceschi and David Ramos, founders of Fake Four Inc. in 2008'
+      );
+      expect(foundersImage).toHaveAttribute(
+        'data-src',
+        'https://cdn.fakefourrecords.com/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg'
+      );
+      expect(foundersImage).toHaveAttribute('data-width', '92');
+      expect(foundersImage).toHaveAttribute('data-height', '92');
+      expect(foundersImage).toHaveAttribute('data-priority', 'true');
+    });
+
+    it('renders This Up Here bandcamp image with CDN URL and dimensions', () => {
+      render(<AboutPage />);
+
+      const bandcampImage = screen.getByTestId(
+        "image-Listen to David Ramos' This Up Here on Bandcamp"
+      );
+      expect(bandcampImage).toHaveAttribute(
+        'data-src',
+        'https://cdn.fakefourrecords.com/media/listen-david-ramos-this-up-there-bc.png'
+      );
+      expect(bandcampImage).toHaveAttribute('data-width', '380');
+      expect(bandcampImage).toHaveAttribute('data-height', '42');
+    });
   });
 
-  it('renders founders image', () => {
-    render(<AboutPage />);
+  describe('description content', () => {
+    it('mentions Fake Four Inc. as an independent record label', () => {
+      render(<AboutPage />);
 
-    expect(
-      screen.getByAltText('Ceschi and David Ramos, founders of Fake Four Inc. in 2008')
-    ).toBeInTheDocument();
+      expect(screen.getAllByText(/Fake Four Inc./).length).toBeGreaterThan(0);
+      expect(screen.getByText(/independent record label/)).toBeInTheDocument();
+    });
+
+    it('mentions founders Ceschi and founding details', () => {
+      render(<AboutPage />);
+
+      expect(screen.getAllByText(/Ceschi/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/New Haven/)).toBeInTheDocument();
+      expect(screen.getByText(/Founded in 2008/)).toBeInTheDocument();
+    });
   });
 
-  it('renders Fake Four Inc. description', () => {
-    render(<AboutPage />);
+  describe('sections', () => {
+    it.each([
+      { id: 'history', title: 'History' },
+      { id: 'style-and-philosophy', title: 'Style & Philosophy' },
+      { id: 'notable-artists', title: 'Notable Artists' },
+      { id: 'chart-success', title: 'Chart Success' },
+      { id: 'recent-releases', title: 'Recent Releases' },
+      { id: 'community-and-impact', title: 'Community & Impact' },
+    ])('renders $title section with id "$id"', ({ id, title }) => {
+      render(<AboutPage />);
 
-    expect(screen.getAllByText(/Fake Four Inc./).length).toBeGreaterThan(0);
-    expect(screen.getByText(/independent record label/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Ceschi/).length).toBeGreaterThan(0);
+      expect(screen.getByTestId(`section-${id}`)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    });
   });
 
-  it('renders History section', () => {
-    render(<AboutPage />);
+  describe('notable artists links', () => {
+    it.each([
+      { name: 'Astronautalis', href: 'https://astronautalis.bandcamp.com' },
+      { name: 'Blue Sky Black Death', href: 'https://blueskyblackdeath.bandcamp.com' },
+      { name: 'Busdriver', href: 'https://busdriver-thumbs.bandcamp.com' },
+      { name: 'Ceschi', href: 'https://ceschi.bandcamp.com' },
+      { name: 'Dark Time Sunshine', href: 'https://darktimesunshine.bandcamp.com' },
+      { name: 'Electric President', href: 'https://electricpresident.bandcamp.com' },
+      { name: 'Factor Chandelier', href: 'https://factorchandelier.bandcamp.com' },
+      { name: 'Myka 9', href: 'https://myka9.bandcamp.com' },
+      { name: 'Noah23', href: 'https://noah23.bandcamp.com' },
+      { name: 'Open Mike Eagle', href: 'https://openmikeeagle.bandcamp.com' },
+      { name: 'Onry Ozzborn', href: 'https://onryozzborn.bandcamp.com' },
+      { name: 'Sadistik', href: 'https://sadistik.bandcamp.com' },
+      { name: 'Sole', href: 'https://soleillinoise.bandcamp.com' },
+      { name: 'Gregory Pepper', href: 'https://gregorypepper.bandcamp.com' },
+    ])('renders $name link to $href', ({ name, href }) => {
+      render(<AboutPage />);
 
-    expect(screen.getByTestId('section-history')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+    });
+
+    it('renders three unordered lists for the grid layout', () => {
+      const { container } = render(<AboutPage />);
+
+      expect(container.querySelectorAll('ul')).toHaveLength(3);
+    });
+
+    it('shows And many more text', () => {
+      render(<AboutPage />);
+
+      expect(screen.getByText('And many more...')).toBeInTheDocument();
+    });
   });
 
-  it('renders Style and Philosophy section', () => {
-    render(<AboutPage />);
+  describe('bandcamp link in History', () => {
+    it('renders David Ramos bandcamp link wrapping the album image', () => {
+      render(<AboutPage />);
 
-    expect(screen.getByTestId('section-style-and-philosophy')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Style & Philosophy' })).toBeInTheDocument();
+      const bandcampImage = screen.getByTestId(
+        "image-Listen to David Ramos' This Up Here on Bandcamp"
+      );
+      const parentLink = bandcampImage.closest('a');
+      expect(parentLink).toHaveAttribute(
+        'href',
+        'https://davidramos.bandcamp.com/album/this-up-here'
+      );
+    });
   });
 
-  it('renders Notable Artists section', () => {
-    render(<AboutPage />);
+  describe('history section content', () => {
+    it('mentions Grimm Image Records origin', () => {
+      render(<AboutPage />);
 
-    expect(screen.getByTestId('section-notable-artists')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Notable Artists' })).toBeInTheDocument();
+      expect(screen.getByText(/Grimm Image Records/)).toBeInTheDocument();
+    });
+
+    it('mentions Indiegogo campaign raising $52,000', () => {
+      render(<AboutPage />);
+
+      expect(screen.getByText(/Indiegogo/)).toBeInTheDocument();
+      expect(screen.getByText(/\$52,000/)).toBeInTheDocument();
+    });
+
+    it('mentions Modern Drummer recognition', () => {
+      render(<AboutPage />);
+
+      expect(screen.getByText(/Modern Drummer/)).toBeInTheDocument();
+    });
   });
 
-  it('renders links to notable artists', () => {
-    render(<AboutPage />);
+  describe('chart success section content', () => {
+    it('mentions CMJ charts and Dark Time Sunshine Vessel album', () => {
+      render(<AboutPage />);
 
-    expect(screen.getByRole('link', { name: 'Astronautalis' })).toHaveAttribute(
-      'href',
-      'https://astronautalis.bandcamp.com'
-    );
-    expect(screen.getByRole('link', { name: 'Ceschi' })).toHaveAttribute(
-      'href',
-      'https://ceschi.bandcamp.com'
-    );
-    expect(screen.getByRole('link', { name: 'Open Mike Eagle' })).toHaveAttribute(
-      'href',
-      'https://openmikeeagle.bandcamp.com'
-    );
-  });
-
-  it('renders Chart Success section', () => {
-    render(<AboutPage />);
-
-    expect(screen.getByTestId('section-chart-success')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Chart Success' })).toBeInTheDocument();
-  });
-
-  it('renders Recent Releases section', () => {
-    render(<AboutPage />);
-
-    expect(screen.getByTestId('section-recent-releases')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Recent Releases' })).toBeInTheDocument();
-  });
-
-  it('renders Community and Impact section', () => {
-    render(<AboutPage />);
-
-    expect(screen.getByTestId('section-community-and-impact')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Community & Impact' })).toBeInTheDocument();
-  });
-
-  it('renders This Up Here bandcamp link', () => {
-    render(<AboutPage />);
-
-    expect(
-      screen.getByAltText("Listen to David Ramos' This Up Here on Bandcamp")
-    ).toBeInTheDocument();
+      expect(screen.getByText(/CMJ/)).toBeInTheDocument();
+      expect(screen.getByText(/Vessel/)).toBeInTheDocument();
+    });
   });
 });

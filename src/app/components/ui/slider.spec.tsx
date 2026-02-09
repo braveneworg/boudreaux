@@ -3,9 +3,142 @@ import userEvent from '@testing-library/user-event';
 
 import { Slider } from './slider';
 
+// Mock @radix-ui/react-slider to avoid React 19 + Radix + jsdom compatibility issues.
+// Radix primitives use internal React dispatcher patterns that break in jsdom with React 19.
+vi.mock('@radix-ui/react-slider', () => {
+  interface SliderContextValue {
+    values: number[];
+    setValues: (values: number[]) => void;
+    min: number;
+    max: number;
+    step: number;
+    onValueChange?: (values: number[]) => void;
+    thumbIndexRef: { current: number };
+  }
+
+  const SliderContext = React.createContext<SliderContextValue>({
+    values: [0, 100],
+    setValues: () => {},
+    min: 0,
+    max: 100,
+    step: 1,
+    thumbIndexRef: { current: 0 },
+  });
+
+  interface MockRootProps {
+    children?: React.ReactNode;
+    className?: string;
+    defaultValue?: number[];
+    value?: number[];
+    min?: number;
+    max?: number;
+    step?: number;
+    orientation?: string;
+    disabled?: boolean;
+    onValueChange?: (values: number[]) => void;
+    [key: string]: unknown;
+  }
+
+  function MockRoot({
+    children,
+    className,
+    defaultValue,
+    value,
+    min = 0,
+    max = 100,
+    step = 1,
+    orientation = 'horizontal',
+    disabled,
+    onValueChange,
+    ...props
+  }: MockRootProps) {
+    const initial = value ?? defaultValue ?? [min, max];
+    const [values, setValues] = React.useState<number[]>(initial);
+    const thumbIndexRef = React.useRef(0);
+    thumbIndexRef.current = 0;
+
+    return (
+      <span
+        className={className}
+        data-orientation={orientation}
+        {...(disabled ? { 'data-disabled': '' } : {})}
+        {...props}
+      >
+        <SliderContext.Provider
+          value={{ values, setValues, min, max, step, onValueChange, thumbIndexRef }}
+        >
+          {children}
+        </SliderContext.Provider>
+      </span>
+    );
+  }
+
+  function MockTrack({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    [key: string]: unknown;
+  }) {
+    return <span {...props}>{children}</span>;
+  }
+
+  function MockRange(props: Record<string, unknown>) {
+    return <span {...props} />;
+  }
+
+  function MockThumb(props: Record<string, unknown>) {
+    const ctx = React.useContext(SliderContext);
+    const [myIndex] = React.useState(() => ctx.thumbIndexRef.current++);
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      const currentVal = ctx.values[myIndex] ?? 0;
+      let newVal = currentVal;
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowUp':
+          newVal = Math.min(ctx.max, currentVal + ctx.step);
+          break;
+        case 'ArrowLeft':
+        case 'ArrowDown':
+          newVal = Math.max(ctx.min, currentVal - ctx.step);
+          break;
+        case 'Home':
+          newVal = ctx.min;
+          break;
+        case 'End':
+          newVal = ctx.max;
+          break;
+      }
+
+      if (newVal !== currentVal) {
+        const newValues = [...ctx.values];
+        newValues[myIndex] = newVal;
+        ctx.setValues(newValues);
+        ctx.onValueChange?.(newValues);
+      }
+    };
+
+    return (
+      <span
+        role="slider"
+        tabIndex={0}
+        aria-valuemin={ctx.min}
+        aria-valuemax={ctx.max}
+        aria-valuenow={ctx.values[myIndex]}
+        onKeyDown={handleKeyDown}
+        {...props}
+      />
+    );
+  }
+
+  return { Root: MockRoot, Track: MockTrack, Range: MockRange, Thumb: MockThumb };
+});
+
 describe('Slider', () => {
   it('renders', () => {
-    render(<Slider aria-label="Volume" />);
+    render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
     expect(screen.getByRole('slider')).toBeInTheDocument();
   });
@@ -23,7 +156,7 @@ describe('Slider', () => {
   });
 
   it('renders with default min and max', () => {
-    render(<Slider aria-label="Volume" />);
+    render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('aria-valuemin', '0');
@@ -31,7 +164,7 @@ describe('Slider', () => {
   });
 
   it('supports custom min and max', () => {
-    render(<Slider aria-label="Volume" min={10} max={50} />);
+    render(<Slider aria-label="Volume" min={10} max={50} defaultValue={[30]} />);
 
     const slider = screen.getByRole('slider');
     expect(slider).toHaveAttribute('aria-valuemin', '10');
@@ -59,13 +192,13 @@ describe('Slider', () => {
   });
 
   it('renders track element', () => {
-    render(<Slider aria-label="Volume" />);
+    render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
     expect(document.querySelector('[data-slot="slider-track"]')).toBeInTheDocument();
   });
 
   it('renders range element', () => {
-    render(<Slider aria-label="Volume" />);
+    render(<Slider aria-label="Volume" defaultValue={[50]} />);
 
     expect(document.querySelector('[data-slot="slider-range"]')).toBeInTheDocument();
   });
@@ -89,7 +222,6 @@ describe('Slider', () => {
 
     const slider = screen.getByRole('slider');
 
-    // Simulate keyboard interaction
     slider.focus();
     await userEvent.keyboard('{ArrowRight}');
 
