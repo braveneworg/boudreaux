@@ -375,7 +375,23 @@ export async function uploadImages(
     let pathForS3Key = filePath;
     if (options.baseDir) {
       const resolvedBaseDir = resolvePath(options.baseDir);
-      pathForS3Key = relative(resolvedBaseDir, resolvedPath);
+      const relativePath = relative(resolvedBaseDir, resolvedPath);
+
+      // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
+      const hasParentTraversal = relativePath
+        .split(/[\\/]+/)
+        .includes('..');
+
+      if (hasParentTraversal || isAbsolute(relativePath)) {
+        const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
+        log(message, 'error');
+        result.skipped += 1;
+        result.errors.push(new Error(message));
+        continue;
+      }
+
+      // Use the safe, normalized relative path for the S3 key
+      pathForS3Key = relativePath.replace(/\\/g, '/');
     }
 
     const s3Key = generateS3Key(pathForS3Key, options.prefix);
