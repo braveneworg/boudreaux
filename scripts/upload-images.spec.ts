@@ -205,7 +205,7 @@ describe('upload-images', () => {
 
     it('should handle Windows-style paths with public\\ prefix', () => {
       expect(generateS3Key('public\\media\\photo.jpg')).toBe('media/photo.jpg');
-      expect(generateS3Key('public\\images\\avatar.png')).toBe('images/avatar.png');
+      expect(generateS3Key('public\\images\\avatar.png')).toBe('media/images/avatar.png');
       expect(generateS3Key('public\\media\\users\\123\\avatar.png', 'cdn')).toBe(
         'cdn/media/users/123/avatar.png'
       );

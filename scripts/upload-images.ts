@@ -158,20 +158,16 @@ export function generateS3Key(filePath: string, prefix?: string): string {
   const normalizedPath = normalize(filePath).split('\\').join('/');
   let key = normalizedPath;
 
-  // Convert to POSIX separators for consistent searching
-  const posixPath = normalizedPath.split('\\').join('/');
-  let key = posixPath;
-
   // Handle paths that contain /public/ (Unix absolute, Windows absolute, or relative)
-  const publicIndex = posixPath.indexOf('/public/');
+  const publicIndex = normalizedPath.indexOf('/public/');
   if (publicIndex !== -1) {
     // Extract the path after /public/
-    key = posixPath.substring(publicIndex + '/public/'.length);
-  } else if (posixPath.startsWith('public/')) {
+    key = normalizedPath.substring(publicIndex + '/public/'.length);
+  } else if (normalizedPath.startsWith('public/')) {
     // If it's a relative path starting with public/, remove it
-    key = posixPath.substring('public/'.length);
-  } else if (posixPath.startsWith('./')) {
-    key = posixPath.substring(2);
+    key = normalizedPath.substring('public/'.length);
+  } else if (normalizedPath.startsWith('./')) {
+    key = normalizedPath.substring(2);
   }
 
   // Remove leading slashes
