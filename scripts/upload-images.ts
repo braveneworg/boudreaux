@@ -14,7 +14,7 @@
  *   # Upload all images in a directory (recursive)
  *   npm run images:upload --dir path/to/images/
  *
- *   # Upload with custom S3 prefix
+ *   # Upload with custom S3 prefix (default: media/)
  *   npm run images:upload path/to/image.jpg --prefix media/photos/
  *
  * Examples:
@@ -30,7 +30,7 @@
  */
 
 import { createReadStream } from 'fs';
-import { isAbsolute, join, normalize, resolve } from 'path';
+import { isAbsolute, join, normalize, relative, resolve } from 'path';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -91,6 +91,7 @@ interface UploadResult {
 interface UploadOptions {
   prefix?: string;
   invalidateCache?: boolean;
+  baseDir?: string;
 }
 
 /**
@@ -157,20 +158,33 @@ export function generateS3Key(filePath: string, prefix?: string): string {
   const normalizedPath = normalize(filePath).split('\\').join('/');
   let key = normalizedPath;
 
-  // If it's a relative path or starts with common prefixes, clean it up
-  if (normalizedPath.startsWith('public/')) {
-    key = normalizedPath.substring('public/'.length);
-  } else if (normalizedPath.startsWith('./')) {
-    key = normalizedPath.substring(2);
+  // Convert to POSIX separators for consistent searching
+  const posixPath = normalizedPath.split('\\').join('/');
+  let key = posixPath;
+
+  // Handle paths that contain /public/ (Unix absolute, Windows absolute, or relative)
+  const publicIndex = posixPath.indexOf('/public/');
+  if (publicIndex !== -1) {
+    // Extract the path after /public/
+    key = posixPath.substring(publicIndex + '/public/'.length);
+  } else if (posixPath.startsWith('public/')) {
+    // If it's a relative path starting with public/, remove it
+    key = posixPath.substring('public/'.length);
+  } else if (posixPath.startsWith('./')) {
+    key = posixPath.substring(2);
   }
 
   // Remove leading slashes
   key = key.replace(/^\/+/, '');
 
-  // Add prefix if provided
-  if (prefix) {
-    const cleanPrefix = prefix.replace(/^\/+/, '').replace(/\/+$/, '');
-    key = cleanPrefix ? `${cleanPrefix}/${key}` : key;
+  // Apply prefix: use explicit prefix if provided, otherwise default to 'media'
+  const effectivePrefix = prefix !== undefined ? prefix : 'media';
+  if (effectivePrefix) {
+    const cleanPrefix = effectivePrefix.replace(/^\/+/, '').replace(/\/+$/, '');
+    // Avoid double-prefixing if key already starts with the prefix
+    if (cleanPrefix && !key.startsWith(`${cleanPrefix}/`)) {
+      key = `${cleanPrefix}/${key}`;
+    }
   }
 
   return key;
@@ -265,7 +279,10 @@ export function collectImagesFromDirectory(dirPath: string): string[] {
 }
 
 /**
- * Invalidate CloudFront cache for uploaded files
+ * Invalidate CloudFront cache for uploaded files.
+ * CloudFront has a limit of 3,000 paths per invalidation request.
+ * For 3,000 keys or fewer, a single invalidation with explicit paths is sent.
+ * For more than 3,000 keys, a single wildcard invalidation is used instead.
  */
 async function invalidateCloudFront(
   distributionId: string,
@@ -277,9 +294,32 @@ async function invalidateCloudFront(
   }
 
   try {
-    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-
     const cloudfront = new CloudFrontClient({ region });
+    const MAX_PATHS_PER_REQUEST = 3000;
+
+    // For very large uploads (>3000 files), use wildcard invalidation
+    // This is more cost-effective and faster than multiple requests
+    if (keys.length > MAX_PATHS_PER_REQUEST) {
+      log(`Invalidating CloudFront cache using wildcard for ${keys.length} file(s)...`, 'info');
+
+      const command = new CreateInvalidationCommand({
+        DistributionId: distributionId,
+        InvalidationBatch: {
+          CallerReference: `upload-images-wildcard-${Date.now()}`,
+          Paths: {
+            Quantity: 1,
+            Items: ['/*'],
+          },
+        },
+      });
+
+      await cloudfront.send(command);
+      log('✓ CloudFront cache invalidation initiated (wildcard)', 'success');
+      return;
+    }
+
+    // For smaller batches (≤3000 files), invalidate specific paths
+    log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
 
     // CloudFront paths must start with /
     const paths = keys.map((key) => `/${key}`);
@@ -323,13 +363,37 @@ export async function uploadImages(
   const s3Client = new S3Client({ region });
 
   log(`Starting upload to S3 bucket: ${bucket}`, 'info');
-  if (options.prefix) {
-    log(`Using S3 prefix: ${options.prefix}`, 'info');
-  }
+  log(`Using S3 prefix: ${options.prefix ?? 'media (default)'}`, 'info');
 
   for (const filePath of filePaths) {
     const resolvedPath = resolvePath(filePath);
-    const s3Key = generateS3Key(filePath, options.prefix);
+
+    // If baseDir is provided, compute the relative path from baseDir
+    // This is used when uploading from a directory to get correct S3 keys
+    let pathForS3Key = filePath;
+    if (options.baseDir) {
+      const resolvedBaseDir = resolvePath(options.baseDir);
+      const relativePath = relative(resolvedBaseDir, resolvedPath);
+
+      // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
+      const hasParentTraversal = relativePath.split(/[\\/]+/).includes('..');
+
+      if (hasParentTraversal || isAbsolute(relativePath)) {
+        const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
+        log(message, 'error');
+        result.skipped += 1;
+        result.errors.push({ path: filePath, error: message });
+        continue;
+      }
+
+      // Use the safe, normalized relative path for the S3 key
+      pathForS3Key = relativePath.replace(/\\/g, '/');
+    }
+
+    // When baseDir is used without an explicit prefix, use empty prefix to preserve directory structure
+    // Otherwise, generateS3Key will apply its default 'media' prefix
+    const effectivePrefix = options.baseDir && options.prefix === undefined ? '' : options.prefix;
+    const s3Key = generateS3Key(pathForS3Key, effectivePrefix);
     await uploadFile(s3Client, bucket, resolvedPath, s3Key, result);
   }
 
@@ -350,12 +414,14 @@ export function parseArgs(args: string[]): {
   paths: string[];
   prefix?: string;
   invalidateCache: boolean;
+  baseDir?: string;
 } {
   const result = {
     mode: 'files' as 'files' | 'directory',
     paths: [] as string[],
     prefix: undefined as string | undefined,
     invalidateCache: true,
+    baseDir: undefined as string | undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -404,7 +470,7 @@ ${colors.yellow}Usage:${colors.reset}
 
 ${colors.yellow}Options:${colors.reset}
   --dir, -d <directory>     Upload all images from directory (recursive)
-  --prefix, -p <prefix>     S3 key prefix for uploaded files
+  --prefix, -p <prefix>     S3 key prefix for uploaded files (default: media)
   --no-invalidate           Skip CloudFront cache invalidation
 
 ${colors.yellow}Examples:${colors.reset}
@@ -443,6 +509,9 @@ ${colors.yellow}Environment Variables:${colors.reset}
       log(`Collecting images from directory: ${dirPath}`, 'info');
       filePaths = collectImagesFromDirectory(dirPath);
       log(`Found ${filePaths.length} image(s)`, 'info');
+
+      // Pass the base directory for proper S3 key generation
+      parsedArgs.baseDir = dirPath;
     } else {
       if (parsedArgs.paths.length === 0) {
         log('No file paths specified', 'error');
@@ -459,6 +528,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
     const result = await uploadImages(S3_BUCKET, filePaths, {
       prefix: parsedArgs.prefix,
       invalidateCache: parsedArgs.invalidateCache,
+      baseDir: parsedArgs.baseDir,
     });
 
     // Print summary

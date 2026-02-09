@@ -10,7 +10,14 @@ let mockOnDragEnd:
   | undefined;
 
 vi.mock('framer-motion', () => ({
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AnimatePresence: ({
+    children,
+    mode,
+  }: {
+    children: React.ReactNode;
+    mode?: string;
+    custom?: number;
+  }) => <div data-animate-presence-mode={mode}>{children}</div>,
   motion: {
     div: ({
       children,
@@ -19,6 +26,12 @@ vi.mock('framer-motion', () => ({
       dragConstraints,
       dragElastic,
       style,
+      initial,
+      animate,
+      exit,
+      transition,
+      variants,
+      custom,
       ...props
     }: React.HTMLAttributes<HTMLDivElement> & {
       children: React.ReactNode;
@@ -30,9 +43,32 @@ vi.mock('framer-motion', () => ({
       dragConstraints?: { left?: number; right?: number };
       dragElastic?: number;
       style?: React.CSSProperties;
+      initial?: Record<string, unknown> | string;
+      animate?: Record<string, unknown> | string;
+      exit?: Record<string, unknown> | string;
+      transition?: Record<string, unknown>;
+      variants?: Record<string, unknown>;
+      custom?: number;
     }) => {
       // Store the onDragEnd callback for testing
       mockOnDragEnd = onDragEnd;
+
+      // Resolve variant names to actual values for testing
+      const resolveVariant = (value: Record<string, unknown> | string | undefined) => {
+        if (typeof value === 'string' && variants && value in variants) {
+          const variant = variants[value];
+          if (typeof variant === 'function') {
+            return variant(custom);
+          }
+          return variant;
+        }
+        return value;
+      };
+
+      const resolvedInitial = resolveVariant(initial);
+      const resolvedAnimate = resolveVariant(animate);
+      const resolvedExit = resolveVariant(exit);
+
       return (
         <div
           {...props}
@@ -41,6 +77,11 @@ vi.mock('framer-motion', () => ({
           data-drag-constraints={dragConstraints ? JSON.stringify(dragConstraints) : undefined}
           data-drag-elastic={dragElastic !== undefined ? String(dragElastic) : undefined}
           data-touch-action={style?.touchAction}
+          data-initial={resolvedInitial ? JSON.stringify(resolvedInitial) : undefined}
+          data-animate={resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined}
+          data-exit={resolvedExit ? JSON.stringify(resolvedExit) : undefined}
+          data-transition={transition ? JSON.stringify(transition) : undefined}
+          data-custom={custom !== undefined ? String(custom) : undefined}
         >
           {children}
         </div>
@@ -54,6 +95,10 @@ vi.mock('next/image', () => ({
   default: ({
     src,
     alt,
+    fill,
+    priority,
+    sizes,
+    unoptimized,
     ...props
   }: {
     src: string;
@@ -61,10 +106,19 @@ vi.mock('next/image', () => ({
     fill?: boolean;
     priority?: boolean;
     sizes?: string;
+    unoptimized?: boolean;
     className?: string;
   }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} data-testid="banner-image" {...props} />
+    <span
+      data-testid="banner-image"
+      data-src={src}
+      data-alt={alt}
+      data-fill={fill ? 'true' : undefined}
+      data-priority={priority ? 'true' : undefined}
+      data-sizes={sizes}
+      data-unoptimized={unoptimized ? 'true' : undefined}
+      {...props}
+    />
   ),
 }));
 
@@ -213,7 +267,23 @@ describe('NotificationBanner', () => {
     expect(dots[1]).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('auto-cycles through notifications every 10 seconds', () => {
+  it('does not change slide when clicking the already-active dot', () => {
+    const notifications = [
+      createMockNotification({ id: '1', message: 'First' }),
+      createMockNotification({ id: '2', message: 'Second' }),
+    ];
+    render(<NotificationBanner notifications={notifications} />);
+
+    // Click the first dot (already selected)
+    const dots = screen.getAllByRole('tab');
+    fireEvent.click(dots[0]);
+
+    // Should still show the first notification
+    expect(screen.getByText('First')).toBeInTheDocument();
+    expect(dots[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('auto-cycles through notifications every 6.5 seconds', () => {
     const notifications = [
       createMockNotification({ id: '1', message: 'First' }),
       createMockNotification({ id: '2', message: 'Second' }),
@@ -223,13 +293,13 @@ describe('NotificationBanner', () => {
     expect(screen.getByText('First')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(6500);
     });
 
     expect(screen.getByText('Second')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(6500);
     });
 
     expect(screen.getByText('First')).toBeInTheDocument();
@@ -264,7 +334,7 @@ describe('NotificationBanner', () => {
     fireEvent.mouseLeave(banner);
 
     act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(6500);
     });
 
     expect(screen.getByText('Second')).toBeInTheDocument();
@@ -279,15 +349,21 @@ describe('NotificationBanner', () => {
     render(<NotificationBanner notifications={notifications} />);
 
     const banner = screen.getByRole('region');
-    banner.focus();
 
-    fireEvent.keyDown(banner, { key: 'ArrowRight' });
+    act(() => {
+      banner.focus();
+      fireEvent.keyDown(banner, { key: 'ArrowRight' });
+    });
     expect(screen.getByText('Second')).toBeInTheDocument();
 
-    fireEvent.keyDown(banner, { key: 'ArrowRight' });
+    act(() => {
+      fireEvent.keyDown(banner, { key: 'ArrowRight' });
+    });
     expect(screen.getByText('Third')).toBeInTheDocument();
 
-    fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+    act(() => {
+      fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+    });
     expect(screen.getByText('Second')).toBeInTheDocument();
   });
 
@@ -299,9 +375,11 @@ describe('NotificationBanner', () => {
     render(<NotificationBanner notifications={notifications} />);
 
     const banner = screen.getByRole('region');
-    banner.focus();
 
-    fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+    act(() => {
+      banner.focus();
+      fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+    });
     expect(screen.getByText('Second')).toBeInTheDocument();
   });
 
@@ -312,11 +390,11 @@ describe('NotificationBanner', () => {
     });
     render(<NotificationBanner notifications={[notification]} />);
 
-    // Find the visible image (not the preload image which has empty alt)
+    // Find the visible image (not the preload image which has empty data-alt)
     const images = screen.getAllByTestId('banner-image');
-    const visibleImage = images.find((img) => img.getAttribute('alt') === 'Banner with image');
-    expect(visibleImage).toHaveAttribute('src', 'https://example.com/banner.jpg');
-    expect(visibleImage).toHaveAttribute('alt', 'Banner with image');
+    const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Banner with image');
+    expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/banner.jpg');
+    expect(visibleImage).toHaveAttribute('data-alt', 'Banner with image');
   });
 
   it('renders link when linkUrl is provided', () => {
@@ -389,7 +467,7 @@ describe('NotificationBanner', () => {
     fireEvent.blur(banner);
 
     act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(6500);
     });
 
     expect(screen.getByText('Second')).toBeInTheDocument();
@@ -702,7 +780,7 @@ describe('NotificationBanner', () => {
         img.style.objectPosition?.includes('calc(50% + 30%)')
       );
       expect(displayedImage).toBeInTheDocument();
-      expect(displayedImage).toHaveAttribute('src', 'https://example.com/offset-image.jpg');
+      expect(displayedImage).toHaveAttribute('data-src', 'https://example.com/offset-image.jpg');
       expect(displayedImage).toHaveStyle({
         objectPosition: 'calc(50% + 30%) calc(50% + -15%)',
       });
@@ -800,8 +878,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const images = screen.getAllByTestId('banner-image');
-      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
-      expect(visibleImage).toHaveAttribute('src', 'https://example.com/original.jpg');
+      const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/original.jpg');
     });
 
     it('falls back to imageUrl when isOverlayed is true but originalImageUrl is null', () => {
@@ -814,8 +892,8 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       const images = screen.getAllByTestId('banner-image');
-      const visibleImage = images.find((img) => img.getAttribute('alt') === 'Test message');
-      expect(visibleImage).toHaveAttribute('src', 'https://example.com/processed.jpg');
+      const visibleImage = images.find((img) => img.getAttribute('data-alt') === 'Test message');
+      expect(visibleImage).toHaveAttribute('data-src', 'https://example.com/processed.jpg');
     });
 
     it('uses imageUrl when isOverlayed is false', () => {
@@ -830,7 +908,7 @@ describe('NotificationBanner', () => {
       const images = screen.getAllByTestId('banner-image');
       // When isOverlayed is false, the image should be the processed one with burned-in text
       expect(
-        images.some((img) => img.getAttribute('src') === 'https://example.com/processed.jpg')
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/processed.jpg')
       ).toBe(true);
     });
 
@@ -846,7 +924,7 @@ describe('NotificationBanner', () => {
       const images = screen.getAllByTestId('banner-image');
       // Should fall back to originalImageUrl when imageUrl is null
       expect(
-        images.some((img) => img.getAttribute('src') === 'https://example.com/original.jpg')
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/original.jpg')
       ).toBe(true);
     });
 
@@ -917,6 +995,20 @@ describe('NotificationBanner', () => {
       expect(screen.getByText('Test message')).toBeInTheDocument();
     });
 
+    it('renders message with text shadow, image, and default darkness', () => {
+      const notification = createMockNotification({
+        message: 'Default darkness',
+        messageTextShadow: true,
+        messageTextShadowDarkness: null,
+        imageUrl: '/test-image.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const el = screen.getByText('Default darkness');
+      expect(el.style.textShadow).toContain('rgba(0,0,0,');
+    });
+
     it('renders message with text shadow but no image', () => {
       const notification = createMockNotification({
         message: 'Test message',
@@ -942,6 +1034,21 @@ describe('NotificationBanner', () => {
       render(<NotificationBanner notifications={[notification]} />);
 
       expect(screen.getByText('Secondary')).toBeInTheDocument();
+    });
+
+    it('renders secondary message with text shadow, image, and default darkness', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary default',
+        secondaryMessageTextShadow: true,
+        secondaryMessageTextShadowDarkness: null,
+        imageUrl: '/test-image.jpg',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const el = screen.getByText('Secondary default');
+      expect(el.style.textShadow).toContain('rgba(0,0,0,');
     });
 
     it('renders secondary message with text shadow but no image', () => {
@@ -971,6 +1078,66 @@ describe('NotificationBanner', () => {
     });
   });
 
+  describe('font family rendering', () => {
+    it('uses system-ui font stack when messageFont is system-ui', () => {
+      const notification = createMockNotification({
+        message: 'System font text',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageFont: 'system-ui',
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('System font text');
+      expect(messageElement.style.fontFamily).toContain('system-ui');
+      expect(messageElement.style.fontFamily).toContain('BlinkMacSystemFont');
+    });
+
+    it('uses custom font family when messageFont is not system-ui', () => {
+      const notification = createMockNotification({
+        message: 'Custom font text',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageFont: 'Roboto',
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const messageElement = screen.getByText('Custom font text');
+      expect(messageElement.style.fontFamily).toContain('Roboto');
+      expect(messageElement.style.fontFamily).toContain('sans-serif');
+    });
+
+    it('uses system-ui font stack when secondaryMessageFont is system-ui', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary system font',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        secondaryMessageFont: 'system-ui',
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const secondaryElement = screen.getByText('Secondary system font');
+      expect(secondaryElement.style.fontFamily).toContain('system-ui');
+      expect(secondaryElement.style.fontFamily).toContain('BlinkMacSystemFont');
+    });
+
+    it('uses custom font family when secondaryMessageFont is not system-ui', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Secondary custom font',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        secondaryMessageFont: 'Open Sans',
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const secondaryElement = screen.getByText('Secondary custom font');
+      expect(secondaryElement.style.fontFamily).toContain('Open Sans');
+      expect(secondaryElement.style.fontFamily).toContain('sans-serif');
+    });
+  });
+
   describe('link with secondary message', () => {
     it('renders link with both primary and secondary messages', () => {
       const notification = createMockNotification({
@@ -987,6 +1154,79 @@ describe('NotificationBanner', () => {
         'aria-label',
         'Primary message - Secondary message (opens in new tab)'
       );
+    });
+  });
+
+  describe('slide transition animation', () => {
+    it('uses direction-aware slide animation without opacity fade', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const slide = screen.getByRole('group');
+      const initial = JSON.parse(slide.getAttribute('data-initial')!);
+      const animate = JSON.parse(slide.getAttribute('data-animate')!);
+      const exit = JSON.parse(slide.getAttribute('data-exit')!);
+
+      // Default direction is forward (1), so should slide in from right
+      expect(initial).toHaveProperty('x', '100%');
+      // Should animate to center
+      expect(animate).toHaveProperty('x', 0);
+      // Should slide out to the left
+      expect(exit).toHaveProperty('x', '-100%');
+
+      // Should NOT include opacity (no fade effect)
+      expect(initial).not.toHaveProperty('opacity');
+      expect(animate).not.toHaveProperty('opacity');
+      expect(exit).not.toHaveProperty('opacity');
+    });
+
+    it('slides from left when navigating backward', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+        createMockNotification({ id: '3', message: 'Third' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const banner = screen.getByRole('region');
+      act(() => {
+        fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+      });
+
+      const slide = screen.getByRole('group');
+      const initial = JSON.parse(slide.getAttribute('data-initial')!);
+      const exit = JSON.parse(slide.getAttribute('data-exit')!);
+
+      // Backward direction (-1), so should slide in from left
+      expect(initial).toHaveProperty('x', '-100%');
+      // Should slide out to the right
+      expect(exit).toHaveProperty('x', '100%');
+    });
+
+    it('uses a 0.4s tween transition', () => {
+      const notification = createMockNotification({ id: '1', message: 'Test' });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const slide = screen.getByRole('group');
+      const transition = JSON.parse(slide.getAttribute('data-transition')!);
+
+      expect(transition.x).toHaveProperty('type', 'tween');
+      expect(transition.x).toHaveProperty('duration', 0.4);
+      expect(transition.x).toHaveProperty('ease', [0.25, 0.46, 0.45, 0.94]);
+    });
+
+    it('uses popLayout mode for simultaneous enter/exit', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const presenceContainer = document.querySelector('[data-animate-presence-mode]');
+      expect(presenceContainer).toHaveAttribute('data-animate-presence-mode', 'popLayout');
     });
   });
 });

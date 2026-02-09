@@ -25,7 +25,7 @@ const SignedInAs = () => {
 
   return (
     <>
-      <div className={cn('flex items-center gap-2')}>
+      <div className={cn('flex items-center gap-2 underline text-zinc-50')}>
         {!isMobile && (
           <div className="flex flex-row gap-2">
             <KeyIcon size={16} />
@@ -33,7 +33,7 @@ const SignedInAs = () => {
           </div>
         )}
         <KeyIcon size={16} className="md:hidden" />
-        <Link className="text-sm hover:underline underline-offset-4" href="/profile">
+        <Link className="text-sm text-zinc-50 hover:underline underline-offset-4" href="/profile">
           {username ? `@${username}` : displayName}
         </Link>
       </div>

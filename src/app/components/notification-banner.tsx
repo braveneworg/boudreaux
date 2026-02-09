@@ -17,9 +17,9 @@ import { cn } from '@/lib/utils';
 const GOLDEN_RATIO = 1.618;
 
 /**
- * Auto-cycle interval in milliseconds (10 seconds as per spec)
+ * Auto-cycle interval in milliseconds (~6.5 seconds)
  */
-const AUTO_CYCLE_INTERVAL = 10000;
+const AUTO_CYCLE_INTERVAL = 6500;
 
 interface NotificationBannerProps {
   notifications: NotificationBannerType[];
@@ -41,25 +41,35 @@ interface NotificationBannerProps {
 export function NotificationBanner({ notifications, className }: NotificationBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
 
   const totalNotifications = notifications.length;
 
   // Navigate to next notification
   const goToNext = useCallback(() => {
     if (totalNotifications <= 1) return;
+    setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % totalNotifications);
   }, [totalNotifications]);
 
   // Navigate to previous notification
   const goToPrevious = useCallback(() => {
     if (totalNotifications <= 1) return;
+    setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + totalNotifications) % totalNotifications);
   }, [totalNotifications]);
 
   // Navigate to specific notification
-  const goToIndex = useCallback((index: number) => {
-    setCurrentIndex(index);
-  }, []);
+  const goToIndex = useCallback(
+    (index: number) => {
+      if (index === currentIndex) {
+        return;
+      }
+      setDirection(index > currentIndex ? 1 : -1);
+      setCurrentIndex(index);
+    },
+    [currentIndex]
+  );
 
   // Handle swipe/drag end
   const handleDragEnd = useCallback(
@@ -149,15 +159,20 @@ export function NotificationBanner({ notifications, className }: NotificationBan
           paddingBottom: `${100 / GOLDEN_RATIO}%`,
         }}
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout" custom={direction}>
           <motion.div
             key={currentNotification?.id || currentIndex}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
+            custom={direction}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            variants={{
+              enter: (dir: number) => ({ x: `${dir * 100}%` }),
+              center: { x: 0 },
+              exit: (dir: number) => ({ x: `${dir * -100}%` }),
+            }}
             transition={{
-              duration: 0.5,
-              ease: [0.4, 0, 0.2, 1], // Cubic bezier easing
+              x: { type: 'tween', duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] },
             }}
             drag={totalNotifications > 1 ? 'x' : false}
             dragConstraints={{ left: 0, right: 0 }}
