@@ -211,7 +211,9 @@ describe('upload-images', () => {
 
     it('should handle absolute paths with /public/ segment', () => {
       expect(generateS3Key('/home/user/project/public/media/photo.jpg')).toBe('media/photo.jpg');
-      expect(generateS3Key('/var/www/app/public/images/avatar.png')).toBe('media/images/avatar.png');
+      expect(generateS3Key('/var/www/app/public/images/avatar.png')).toBe(
+        'media/images/avatar.png'
+      );
     });
 
     it('should handle absolute paths with /public/ and prefix', () => {
@@ -222,7 +224,27 @@ describe('upload-images', () => {
 
     it('should handle absolute paths without /public/ segment', () => {
       // For absolute paths without /public/, it should still remove leading slashes and apply the default prefix
-      expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe('media/home/user/uploads/photo.jpg');
+      expect(generateS3Key('/home/user/uploads/photo.jpg')).toBe(
+        'media/home/user/uploads/photo.jpg'
+      );
+    });
+
+    it('should handle Windows-style absolute paths with \\public\\ segment', () => {
+      expect(generateS3Key('C:\\project\\public\\media\\photo.jpg')).toBe('media/photo.jpg');
+      expect(generateS3Key('D:\\www\\app\\public\\images\\avatar.png')).toBe(
+        'media/images/avatar.png'
+      );
+    });
+
+    it('should handle Windows-style absolute paths with \\public\\ and prefix', () => {
+      expect(generateS3Key('C:\\project\\public\\media\\photo.jpg', 'cdn')).toBe(
+        'cdn/media/photo.jpg'
+      );
+    });
+
+    it('should handle Windows-style absolute paths without \\public\\ segment', () => {
+      // For absolute paths without \public\, it should still remove leading slashes and apply the default prefix
+      expect(generateS3Key('C:\\uploads\\photo.jpg')).toBe('media/C:/uploads/photo.jpg');
     });
   });
 

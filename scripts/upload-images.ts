@@ -155,24 +155,21 @@ export function resolvePath(filePath: string): string {
  */
 export function generateS3Key(filePath: string, prefix?: string): string {
   const normalizedPath = normalize(filePath);
-  let key = normalizedPath;
 
-  // Handle absolute paths that contain /public/
-  if (isAbsolute(normalizedPath)) {
-    const publicIndex = normalizedPath.indexOf('/public/');
-    if (publicIndex !== -1) {
-      // Extract the path after /public/
-      key = normalizedPath.substring(publicIndex + '/public/'.length);
-    } else {
-      // For other absolute paths, just use the basename portion
-      // This shouldn't normally happen but provides a fallback
-      key = normalizedPath;
-    }
-  } else if (normalizedPath.startsWith('public/')) {
+  // Convert to POSIX separators for consistent searching
+  const posixPath = normalizedPath.split('\\').join('/');
+  let key = posixPath;
+
+  // Handle paths that contain /public/ (Unix absolute, Windows absolute, or relative)
+  const publicIndex = posixPath.indexOf('/public/');
+  if (publicIndex !== -1) {
+    // Extract the path after /public/
+    key = posixPath.substring(publicIndex + '/public/'.length);
+  } else if (posixPath.startsWith('public/')) {
     // If it's a relative path starting with public/, remove it
-    key = normalizedPath.substring('public/'.length);
-  } else if (normalizedPath.startsWith('./')) {
-    key = normalizedPath.substring(2);
+    key = posixPath.substring('public/'.length);
+  } else if (posixPath.startsWith('./')) {
+    key = posixPath.substring(2);
   }
 
   // Remove leading slashes
@@ -378,9 +375,7 @@ export async function uploadImages(
       const relativePath = relative(resolvedBaseDir, resolvedPath);
 
       // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
-      const hasParentTraversal = relativePath
-        .split(/[\\/]+/)
-        .includes('..');
+      const hasParentTraversal = relativePath.split(/[\\/]+/).includes('..');
 
       if (hasParentTraversal || isAbsolute(relativePath)) {
         const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
@@ -394,7 +389,10 @@ export async function uploadImages(
       pathForS3Key = relativePath.replace(/\\/g, '/');
     }
 
-    const s3Key = generateS3Key(pathForS3Key, options.prefix);
+    // When baseDir is used without an explicit prefix, use empty prefix to preserve directory structure
+    // Otherwise, generateS3Key will apply its default 'media' prefix
+    const effectivePrefix = options.baseDir && options.prefix === undefined ? '' : options.prefix;
+    const s3Key = generateS3Key(pathForS3Key, effectivePrefix);
     await uploadFile(s3Client, bucket, resolvedPath, s3Key, result);
   }
 
