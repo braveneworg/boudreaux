@@ -381,7 +381,7 @@ export async function uploadImages(
         const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
         log(message, 'error');
         result.skipped += 1;
-        result.errors.push(new Error(message));
+        result.errors.push({ path: filePath, error: message });
         continue;
       }
 
