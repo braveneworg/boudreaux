@@ -1,42 +1,43 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { getCdnUrl } from '@/lib/utils/cdn-utils';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 const menuLinks = [
   {
     href: 'https://facebook.com/fakefourinc',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/facebook-icon.svg',
+    icon: getCdnUrl('icons/social-media/facebook-icon.svg'),
     label: 'Facebook',
   },
   {
     href: 'https://instagram.com/fakefourinc',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/instagram-icon.svg',
+    icon: getCdnUrl('icons/social-media/instagram-icon.svg'),
     label: 'Instagram',
   },
   {
     href: 'https://YouTube.com/fakefourinc',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/youtube-icon.svg',
+    icon: getCdnUrl('icons/social-media/youtube-icon.svg'),
     label: 'YouTube',
   },
   {
     href: 'https://fakefour.bandcamp.com',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/bandcamp-icon.svg',
+    icon: getCdnUrl('icons/social-media/bandcamp-icon.svg'),
     label: 'Bandcamp',
   },
   {
     href: 'https://x.com/fakefour',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/x-icon.svg',
+    icon: getCdnUrl('icons/social-media/x-icon.svg'),
     label: 'X',
   },
   {
     href: 'https://tiktok.com/@fakefourinc',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/tiktok-icon.svg',
+    icon: getCdnUrl('icons/social-media/tiktok-icon.svg'),
     label: 'TikTok',
   },
   {
     href: 'https://open.spotify.com/user/fakefourinc',
-    icon: 'https://cdn.fakefourrecords.com/media/icons/social-media/spotify-icon.svg',
+    icon: getCdnUrl('icons/social-media/spotify-icon.svg'),
     label: 'Spotify',
   },
 ];

@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { getCdnUrl } from '@/lib/utils/cdn-utils';
+
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 import { Card, CardContent } from '../components/ui/card';
 import { ContentContainer } from '../components/ui/content-container';
@@ -20,7 +22,7 @@ export default function AboutPage() {
               <Image
                 width={92}
                 height={92}
-                src="https://cdn.fakefourrecords.com/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg"
+                src={getCdnUrl('ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg')}
                 alt="Ceschi and David Ramos, founders of Fake Four Inc. in 2008"
                 className="inline-block float-right ml-4 rounded-full shadow-md border-2 border-zinc-50"
                 priority
@@ -39,7 +41,7 @@ export default function AboutPage() {
               <PageSectionParagraph>
                 <Link href="https://davidramos.bandcamp.com/album/this-up-here">
                   <Image
-                    src="https://cdn.fakefourrecords.com/media/listen-david-ramos-this-up-there-bc.png"
+                    src={getCdnUrl('listen-david-ramos-this-up-there-bc.png')}
                     alt="Listen to David Ramos' This Up Here on Bandcamp"
                     width={380}
                     height={42}

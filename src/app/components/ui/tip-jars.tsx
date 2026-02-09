@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { getCdnUrl } from '@/lib/utils/cdn-utils';
+
 export const TipJarsLink = () => {
   return (
     <Link
@@ -11,7 +13,7 @@ export const TipJarsLink = () => {
     >
       Tip Jars
       <Image
-        src="https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg"
+        src={getCdnUrl('icons/external-link-icon.svg')}
         className="ml-2 inline-block"
         alt="Tip Jars"
         width={22}

@@ -13,7 +13,8 @@ describe('Footer', () => {
     it('displays copyright text with current year and all rights reserved', () => {
       render(<Footer />);
 
-      expect(screen.getByText(/© 2025 Fake Four Inc\./)).toBeInTheDocument();
+      const currentYear = new Date().getFullYear();
+      expect(screen.getByText(new RegExp(`© ${currentYear} Fake Four Inc\\.`))).toBeInTheDocument();
       expect(screen.getByText(/All rights reserved/)).toBeInTheDocument();
     });
 

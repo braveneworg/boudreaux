@@ -16,6 +16,13 @@ export const CONSTANTS = {
       AUTH_TOOLBAR: '[AuthToolbar]',
     },
   },
+  CDN: {
+    // Use NEXT_PUBLIC_CDN_DOMAIN for client-side or fallback to default
+    BASE_URL:
+      (typeof window !== 'undefined'
+        ? process.env.NEXT_PUBLIC_CDN_DOMAIN
+        : process.env.NEXT_PUBLIC_CDN_DOMAIN) || 'https://cdn.fakefourrecords.com',
+  },
   NA: 'N/A',
 };
 
