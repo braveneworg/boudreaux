@@ -1,7 +1,4 @@
-import React from 'react';
-
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
 
 import SignInLink from './signin-link';
 
@@ -58,6 +55,13 @@ describe('SignInLink', () => {
     render(<SignInLink />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass('flex', 'items-center', 'gap-2', 'text-sm');
+    expect(link).toHaveClass(
+      'flex',
+      'text-zinc-50',
+      'underline',
+      'items-center',
+      'gap-2',
+      'text-sm'
+    );
   });
 });

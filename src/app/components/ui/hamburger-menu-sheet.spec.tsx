@@ -112,4 +112,63 @@ describe('HamburgerMenuSheet', () => {
 
     expect(screen.getByText('Navigation Menu')).toHaveClass('sr-only');
   });
+
+  it('renders auth toolbar with text-zinc-50 class', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const authToolbar = screen.getByTestId('auth-toolbar');
+    expect(authToolbar).toBeInTheDocument();
+    expect(authToolbar).toHaveClass('text-zinc-50');
+  });
+
+  it('renders separator between auth toolbar and social media links', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    // Sheet content renders in a Radix portal on document.body, not inside container
+    const separators = document.querySelectorAll('[data-slot="separator"]');
+    expect(separators.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders empty menu list when no items provided', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={[]}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  it('menu links have correct styling classes', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const homeLink = screen.getByRole('link', { name: 'Home' });
+    expect(homeLink).toHaveClass('text-white');
+    expect(homeLink).toHaveClass('text-2xl');
+    expect(homeLink).toHaveClass('font-light');
+  });
+
+  it('menu links have tabIndex 0 for keyboard accessibility', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const homeLink = screen.getByRole('link', { name: 'Home' });
+    expect(homeLink).toHaveAttribute('tabindex', '0');
+  });
 });
