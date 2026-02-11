@@ -114,7 +114,7 @@ describe('AboutPage', () => {
   });
 
   describe('images', () => {
-    it('renders founders image with CDN URL, dimensions, and priority', () => {
+    it('renders founders image with correct path, dimensions, and priority', () => {
       render(<AboutPage />);
 
       const foundersImage = screen.getByTestId(
@@ -122,14 +122,14 @@ describe('AboutPage', () => {
       );
       expect(foundersImage).toHaveAttribute(
         'data-src',
-        'https://cdn.fakefourrecords.com/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg'
+        '/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg'
       );
       expect(foundersImage).toHaveAttribute('data-width', '92');
       expect(foundersImage).toHaveAttribute('data-height', '92');
       expect(foundersImage).toHaveAttribute('data-priority', 'true');
     });
 
-    it('renders This Up Here bandcamp image with CDN URL and dimensions', () => {
+    it('renders This Up Here bandcamp image with correct path and dimensions', () => {
       render(<AboutPage />);
 
       const bandcampImage = screen.getByTestId(
@@ -137,7 +137,7 @@ describe('AboutPage', () => {
       );
       expect(bandcampImage).toHaveAttribute(
         'data-src',
-        'https://cdn.fakefourrecords.com/media/listen-david-ramos-this-up-there-bc.png'
+        '/media/listen-david-ramos-this-up-there-bc.png'
       );
       expect(bandcampImage).toHaveAttribute('data-width', '380');
       expect(bandcampImage).toHaveAttribute('data-height', '42');

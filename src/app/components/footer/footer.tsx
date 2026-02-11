@@ -1,19 +1,12 @@
 import Link from 'next/link';
 
-import { getCdnUrl } from '@/lib/utils/cdn-utils';
-
 import VerticalSeparator from '../ui/vertical-separator';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer
-      className="w-full bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative"
-      style={{
-        backgroundImage: `url('${getCdnUrl('particles-6.svg')}')`,
-      }}
-    >
+    <footer className="w-full bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative">
       <div className="relative mx-auto w-full max-w-[1920px] py-1 mt-2 z-10">
         <div className="flex flex-col items-center justify-center gap-0 md:flex-row md:justify-between px-4 md:px-8">
           <div className="flex text-zinc-50 text-sm md:text-base">

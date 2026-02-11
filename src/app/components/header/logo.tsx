@@ -3,8 +3,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { getCdnUrl } from '@/lib/utils/cdn-utils';
-
 interface LogoProps {
   isMobile: boolean;
 }
@@ -20,8 +18,8 @@ const Logo = ({ isMobile }: LogoProps) => {
         unoptimized
         src={
           isMobile
-            ? getCdnUrl('fake-four-inc-black-hand-logo.svg')
-            : getCdnUrl('fake-four-inc-black-stardust-hand-logo.svg')
+            ? '/media/fake-four-inc-black-hand-logo.svg'
+            : '/media/fake-four-inc-black-stardust-hand-logo.svg'
         }
         width={48}
       />

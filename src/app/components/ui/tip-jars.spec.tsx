@@ -26,14 +26,11 @@ describe('TipJarsLink', () => {
   });
 
   describe('external link icon', () => {
-    it('renders with correct CDN URL and dimensions', () => {
+    it('renders with correct path and dimensions', () => {
       render(<TipJarsLink />);
 
       const icon = screen.getByRole('img', { name: 'Tip Jars' });
-      expect(icon).toHaveAttribute(
-        'src',
-        'https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg'
-      );
+      expect(icon).toHaveAttribute('src', '/media/icons/external-link-icon.svg');
       expect(icon).toHaveAttribute('width', '22');
       expect(icon).toHaveAttribute('height', '22');
     });

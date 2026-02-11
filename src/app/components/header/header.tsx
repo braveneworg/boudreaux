@@ -6,8 +6,6 @@ import Image from 'next/image';
 
 import { motion } from 'framer-motion';
 
-import { getCdnUrl } from '@/lib/utils/cdn-utils';
-
 import Logo from './logo';
 import HamburgerMenu from '../ui/hamburger-menu';
 
@@ -41,10 +39,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
           opacity: [0.9, 1, 0.9],
           scale: [1, 1.02, 1],
         }}
-        className="absolute inset-0 bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none"
-        style={{
-          backgroundImage: `url('${getCdnUrl('particles-6.svg')}')`,
-        }}
+        className="absolute inset-0 bg-[url('/media/particles-6.svg')] bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none"
         initial={{ opacity: 0.9 }}
         transition={{
           duration: 4.4,
@@ -109,7 +104,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
                 alt="Fake Four Inc. Words"
                 className="relative -right-1.5 w-[222px] h-auto"
                 priority
-                src={getCdnUrl('fake-four-inc-words.png')}
+                src="/media/fake-four-inc-words.png"
                 width={222}
                 height={40}
               />

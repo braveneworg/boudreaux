@@ -78,32 +78,26 @@ describe('Logo', () => {
       render(<Logo isMobile />);
 
       const img = screen.getByTestId('logo-image');
-      expect(img).toHaveAttribute(
-        'data-src',
-        'https://cdn.fakefourrecords.com/media/fake-four-inc-black-hand-logo.svg'
-      );
+      expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-hand-logo.svg');
     });
 
     it('uses desktop logo source when isMobile is false', () => {
       render(<Logo isMobile={false} />);
 
       const img = screen.getByTestId('logo-image');
-      expect(img).toHaveAttribute(
-        'data-src',
-        'https://cdn.fakefourrecords.com/media/fake-four-inc-black-stardust-hand-logo.svg'
-      );
+      expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-stardust-hand-logo.svg');
     });
 
-    it('both variants use SVG format from CDN', () => {
+    it('both variants use SVG format', () => {
       const { unmount } = render(<Logo isMobile />);
       expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
-        /^https:\/\/cdn\.fakefourrecords\.com\/.*\.svg$/
+        /^\/media\/.*\.svg$/
       );
       unmount();
 
       render(<Logo isMobile={false} />);
       expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
-        /^https:\/\/cdn\.fakefourrecords\.com\/.*\.svg$/
+        /^\/media\/.*\.svg$/
       );
     });
   });
