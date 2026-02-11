@@ -48,7 +48,7 @@ const AuthToolbar = ({ className }: { className?: string }) => {
   // Show sign in/up links for unauthenticated users
   log(loggingPrefix, 'Rendering unauthenticated links');
   return (
-    <div className={cn('h-3 my-2', className, { hidden: isSigninOrSignupPage })}>
+    <div className={cn('h-3 mt-2 mb-4', className, { hidden: isSigninOrSignupPage })}>
       <div
         className={cn('flex h-3 items-center relative justify-center gap-2', className, {
           hidden: isSigninOrSignupPage,

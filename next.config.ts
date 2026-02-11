@@ -1,13 +1,10 @@
 import type { NextConfig } from 'next';
 
-// CDN domain configuration - can be overridden via environment variable
-const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_DOMAIN || 'https://cdn.fakefourrecords.com';
-const CDN_HOSTNAME = new URL(CDN_DOMAIN).hostname;
-
 const config = {
   // Use full CDN URL for all static assets in production
   // This eliminates the need for NGINX redirects and avoids 301 caching issues
-  assetPrefix: process.env.NODE_ENV === 'production' ? `${CDN_DOMAIN}/media` : '',
+  assetPrefix:
+    process.env.NODE_ENV === 'production' ? 'https://cdn.fakefourrecords.com' : undefined,
   devIndicators: false,
 
   // Configure images for CDN
@@ -15,7 +12,7 @@ const config = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: CDN_HOSTNAME,
+        hostname: 'cdn.fakefourrecords.com',
         port: '',
         pathname: '/**',
       },

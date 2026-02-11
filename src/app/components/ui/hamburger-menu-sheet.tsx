@@ -52,7 +52,8 @@ export default function HamburgerMenuSheet({
         <nav className="flex flex-col" aria-label="Main navigation">
           <AuthToolbar className="text-zinc-50" />
           <Separator className="bg-accent" />
-          <SocialMediaIconLinks className="justify-center border-b border-b-accent" />
+          <SocialMediaIconLinks className="justify-center" />
+          <Separator className="bg-accent" />
           <ul className="pt-4 space-y-4" role="list">
             {menuItems.map((item, index) => (
               <motion.li
