@@ -757,14 +757,15 @@ jobs:
             if [ "$NEEDS_CERT" = true ]; then
               echo "Obtaining/renewing Let's Encrypt certificate for $DOMAIN..."
 
-              # Stop containers that might be using port 80 (needed for both renewal methods)
-              $DOCKER_CMD stop nginx website 2>/dev/null || true
-
-              # Try renewal first (works if certbot already manages this domain)
+              # Try renewal first WITHOUT stopping containers (in case cert uses webroot authenticator)
+              # The renewal config at /etc/letsencrypt/renewal/$DOMAIN.conf determines the method
               if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
                 echo "✓ Certificate renewed successfully via certbot renew."
               else
                 echo "certbot renew failed or no existing cert — trying standalone issuance..."
+
+                # Stop containers that might be using port 80 (needed for standalone mode)
+                $DOCKER_CMD stop nginx website 2>/dev/null || true
 
                 # Request certificate using standalone mode
                 sudo certbot certonly --standalone --non-interactive --agree-tos \
