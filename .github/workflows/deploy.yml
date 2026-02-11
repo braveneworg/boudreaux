@@ -791,9 +791,15 @@ jobs:
                 DEPLOY_EXPIRY=$(sudo openssl x509 -enddate -noout -in "$TARGET_DIR/certificate.pem" | cut -d= -f2)
                 echo "✓ Deployed certificate is valid (expires: $DEPLOY_EXPIRY)"
               else
-                echo "❌ ERROR: Deployed certificate is expired even after renewal attempt."
-                echo "Removing stale cert files so self-signed fallback can take over."
-                rm -f "$TARGET_DIR/certificate.pem" "$TARGET_DIR/private_key.pem"
+                OPENSSL_STATUS=$?
+                if [ "$OPENSSL_STATUS" -eq 1 ]; then
+                  echo "❌ ERROR: Deployed certificate is expired even after renewal attempt."
+                  echo "Removing stale cert files so self-signed fallback can take over."
+                  rm -f "$TARGET_DIR/certificate.pem" "$TARGET_DIR/private_key.pem"
+                else
+                  echo "❌ ERROR: Failed to verify deployed certificate with openssl (exit code: $OPENSSL_STATUS)."
+                  echo "Leaving existing certificate files in place. Check certificate PEM, permissions, and openssl output on the server."
+                fi
               fi
 
               # Setup automatic renewal cron (idempotent)
