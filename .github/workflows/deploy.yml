@@ -757,13 +757,14 @@ jobs:
             if [ "$NEEDS_CERT" = true ]; then
               echo "Obtaining/renewing Let's Encrypt certificate for $DOMAIN..."
 
+              # Stop containers that might be using port 80 (needed for both renewal methods)
+              $DOCKER_CMD stop nginx website 2>/dev/null || true
+
               # Try renewal first (works if certbot already manages this domain)
-              if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive 2>/dev/null; then
+              if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
                 echo "✓ Certificate renewed successfully via certbot renew."
               else
                 echo "certbot renew failed or no existing cert — trying standalone issuance..."
-                # Stop containers that might be using port 80
-                $DOCKER_CMD stop nginx website 2>/dev/null || true
 
                 # Request certificate using standalone mode
                 sudo certbot certonly --standalone --non-interactive --agree-tos \
@@ -774,13 +775,32 @@ jobs:
               fi
             fi
 
-            # Copy Let's Encrypt cert to deployment directory if available
+            # Always copy the latest cert from letsencrypt to deployment directory
+            # This ensures the deployed cert matches what certbot has, even if
+            # renewal happened outside the deploy (e.g., via cron) but the local
+            # certificate.pem was never updated
             if [ -f "$CERT_PATH/fullchain.pem" ]; then
               echo "Installing Let's Encrypt certificate to deployment directory..."
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$TARGET_DIR/certificate.pem"
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$TARGET_DIR/private_key.pem"
               sudo chmod 644 "$TARGET_DIR/certificate.pem"
               sudo chmod 600 "$TARGET_DIR/private_key.pem"
+
+              # Verify the deployed cert is not expired before proceeding
+              if sudo openssl x509 -checkend 0 -noout -in "$TARGET_DIR/certificate.pem" 2>/dev/null; then
+                DEPLOY_EXPIRY=$(sudo openssl x509 -enddate -noout -in "$TARGET_DIR/certificate.pem" | cut -d= -f2)
+                echo "✓ Deployed certificate is valid (expires: $DEPLOY_EXPIRY)"
+              else
+                OPENSSL_STATUS=$?
+                if [ "$OPENSSL_STATUS" -eq 1 ]; then
+                  echo "❌ ERROR: Deployed certificate is expired even after renewal attempt."
+                  echo "Removing stale cert files so self-signed fallback can take over."
+                  rm -f "$TARGET_DIR/certificate.pem" "$TARGET_DIR/private_key.pem"
+                else
+                  echo "❌ ERROR: Failed to verify deployed certificate with openssl (exit code: $OPENSSL_STATUS)."
+                  echo "Leaving existing certificate files in place. Check certificate PEM, permissions, and openssl output on the server."
+                fi
+              fi
 
               # Setup automatic renewal cron (idempotent)
               # This ensures certificate auto-renewal even if cert was issued outside of deployment
