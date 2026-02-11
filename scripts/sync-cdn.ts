@@ -459,8 +459,18 @@ class CDNSync {
   }
 
   private async clearS3MediaDirectory(): Promise<void> {
-    await this.clearS3Prefix('media/');
+    // Always clear _next/ — build artifacts change every deploy
     await this.clearS3Prefix('_next/');
+
+    // Only clear media/ if local media files exist to re-upload.
+    // In CI, public/media is gitignored and empty, so clearing would
+    // permanently delete CDN-hosted media (logos, icons, etc.) with
+    // nothing to replace them.
+    if (existsSync(this.config.mediaDir) && readdirSync(this.config.mediaDir).length > 0) {
+      await this.clearS3Prefix('media/');
+    } else {
+      this.log('Skipping media/ cleanup — no local media files to re-upload', 'info');
+    }
   }
 
   private async setContentTypes(): Promise<void> {
