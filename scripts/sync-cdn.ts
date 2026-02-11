@@ -459,8 +459,27 @@ class CDNSync {
   }
 
   private async clearS3MediaDirectory(): Promise<void> {
-    await this.clearS3Prefix('media/');
-    await this.clearS3Prefix('_next/');
+    // Only clear _next/ when we have local build artifacts to re-upload and we're not skipping the build.
+    const nextStaticDir = join(process.cwd(), '.next', 'static');
+    const isSkipBuild = process.env.SKIP_BUILD === 'true';
+
+    if (!isSkipBuild && existsSync(nextStaticDir)) {
+      await this.clearS3Prefix('_next/');
+    } else {
+      this.log(
+        'Skipping _next/ cleanup — either SKIP_BUILD is enabled or no local .next/static directory exists',
+        'info'
+      );
+    }
+    // Only clear media/ if local media files exist to re-upload.
+    // In CI, public/media is gitignored and empty, so clearing would
+    // permanently delete CDN-hosted media (logos, icons, etc.) with
+    // nothing to replace them.
+    if (existsSync(this.config.mediaDir) && readdirSync(this.config.mediaDir).length > 0) {
+      await this.clearS3Prefix('media/');
+    } else {
+      this.log('Skipping media/ cleanup — no local media files to re-upload', 'info');
+    }
   }
 
   private async setContentTypes(): Promise<void> {
