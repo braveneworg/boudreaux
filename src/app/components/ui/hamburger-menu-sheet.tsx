@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 
 import { Separator } from '@/app/components/ui/separator';
 import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
-import { getCdnUrl } from '@/lib/utils/cdn-utils';
 
 import SocialMediaIconLinks from './social-media-icon-links';
 import AuthToolbar from '../auth/auth-toolbar';
@@ -43,7 +42,7 @@ export default function HamburgerMenuSheet({
         side="right"
         className="w-screen h-[calc(100vh-65px)] md:h-[calc(100vh-144px)] top-[65px] md:top-36 border-0 z-200 pt-0 px-8 fixed bg-transparent backdrop-blur before:inset-0 bg-zinc-950 bg-cover bg-center opacity-90 bg-no-repeat pointer-events-auto"
         style={{
-          backgroundImage: `url('${getCdnUrl('particles-6.svg')}')`,
+          backgroundImage: "url('media/particles-6.svg')",
         }}
         aria-label="Navigation menu"
         isOpen={isOpen}
