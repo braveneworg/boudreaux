@@ -9,53 +9,79 @@ describe('Footer', () => {
     expect(document.querySelector('footer')).toBeInTheDocument();
   });
 
-  it('displays copyright text with current year', () => {
-    render(<Footer />);
+  describe('copyright', () => {
+    it('displays copyright text with current year and all rights reserved', () => {
+      render(<Footer />);
 
-    expect(screen.getByText(/© 2025 Fake Four Inc\./)).toBeInTheDocument();
+      const currentYear = new Date().getFullYear();
+      expect(screen.getByText(new RegExp(`© ${currentYear} Fake Four Inc\\.`))).toBeInTheDocument();
+      expect(screen.getByText(/All rights reserved/)).toBeInTheDocument();
+    });
+
+    it('copyright section has correct text color', () => {
+      const { container } = render(<Footer />);
+
+      const copyrightText = container.querySelector('.text-zinc-50.text-sm');
+      expect(copyrightText).toBeInTheDocument();
+    });
   });
 
-  it('displays all rights reserved text', () => {
-    render(<Footer />);
+  describe('legal links', () => {
+    it('renders exactly three legal links', () => {
+      render(<Footer />);
 
-    expect(screen.getByText(/All rights reserved/)).toBeInTheDocument();
+      expect(screen.getAllByRole('link')).toHaveLength(3);
+    });
+
+    it.each([
+      { name: /terms and conditions/i, href: '/legal/terms-and-conditions' },
+      { name: /privacy policy/i, href: '/legal/privacy-policy' },
+      { name: /cookies policy/i, href: '/legal/cookies-policy' },
+    ])('renders $name link to $href', ({ name, href }) => {
+      render(<Footer />);
+
+      const link = screen.getByRole('link', { name });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute('href', href);
+    });
+
+    it('legal links have text styling and hover underline', () => {
+      render(<Footer />);
+
+      const links = screen.getAllByRole('link');
+      links.forEach((link) => {
+        expect(link).toHaveClass('text-zinc-50', 'text-sm', 'hover:underline');
+      });
+    });
   });
 
-  it('renders Terms and Conditions link', () => {
-    render(<Footer />);
+  describe('layout and styling', () => {
+    it('footer has background, full width, and relative positioning', () => {
+      render(<Footer />);
 
-    const termsLink = screen.getByRole('link', { name: /terms and conditions/i });
-    expect(termsLink).toBeInTheDocument();
-    expect(termsLink).toHaveAttribute('href', '/legal/terms-and-conditions');
-  });
+      const footer = document.querySelector('footer');
+      expect(footer).toHaveClass('bg-zinc-950', 'w-full', 'relative');
+    });
 
-  it('renders Privacy Policy link', () => {
-    render(<Footer />);
+    it('renders content container with max width', () => {
+      render(<Footer />);
 
-    const privacyLink = screen.getByRole('link', { name: /privacy policy/i });
-    expect(privacyLink).toBeInTheDocument();
-    expect(privacyLink).toHaveAttribute('href', '/legal/privacy-policy');
-  });
+      const container = document.querySelector('footer > div');
+      expect(container).toHaveClass('max-w-[1920px]');
+    });
 
-  it('renders Cookies Policy link', () => {
-    render(<Footer />);
+    it('renders navigation with flex-wrap for responsive layout', () => {
+      render(<Footer />);
 
-    const cookiesLink = screen.getByRole('link', { name: /cookies policy/i });
-    expect(cookiesLink).toBeInTheDocument();
-    expect(cookiesLink).toHaveAttribute('href', '/legal/cookies-policy');
-  });
+      const nav = document.querySelector('nav');
+      expect(nav).toHaveClass('flex', 'flex-wrap', 'items-center', 'justify-center');
+    });
 
-  it('renders navigation element', () => {
-    render(<Footer />);
+    it('renders vertical separators', () => {
+      render(<Footer />);
 
-    expect(document.querySelector('nav')).toBeInTheDocument();
-  });
-
-  it('renders vertical separators', () => {
-    render(<Footer />);
-
-    // There should be separators between links and in the copyright section
-    const separators = document.querySelectorAll('[data-slot="separator"]');
-    expect(separators.length).toBeGreaterThan(0);
+      const separators = document.querySelectorAll('[data-slot="separator"]');
+      expect(separators.length).toBeGreaterThan(0);
+    });
   });
 });

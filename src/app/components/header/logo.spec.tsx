@@ -40,55 +40,65 @@ vi.mock('next/image', () => ({
 }));
 
 describe('Logo', () => {
-  it('renders a link to home page', () => {
+  it('renders a link to home page wrapping the logo image', () => {
     render(<Logo isMobile={false} />);
 
     const link = screen.getByRole('link');
+    const img = screen.getByTestId('logo-image');
     expect(link).toHaveAttribute('href', '/');
+    expect(link).toContainElement(img);
   });
 
-  it('renders logo image', () => {
+  it('renders logo image with correct alt text and dimensions', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByTestId('logo-image');
-    expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('data-alt', 'Fake Four Inc. Hand Logo');
-  });
-
-  it('uses mobile logo source when isMobile is true', () => {
-    render(<Logo isMobile />);
-
-    const img = screen.getByTestId('logo-image');
-    expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-hand-logo.svg');
-  });
-
-  it('uses desktop logo source when isMobile is false', () => {
-    render(<Logo isMobile={false} />);
-
-    const img = screen.getByTestId('logo-image');
-    expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-stardust-hand-logo.svg');
-  });
-
-  it('has priority loading enabled', () => {
-    render(<Logo isMobile={false} />);
-
-    const img = screen.getByTestId('logo-image');
-    expect(img).toHaveAttribute('data-priority', 'true');
-  });
-
-  it('applies correct dimensions', () => {
-    render(<Logo isMobile={false} />);
-
-    const img = screen.getByTestId('logo-image');
     expect(img).toHaveAttribute('data-width', '48');
     expect(img).toHaveAttribute('data-height', '48');
   });
 
-  it('has correct base styling classes', () => {
+  it('has priority loading and unoptimized flags', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByTestId('logo-image');
-    expect(img).toHaveClass('rounded-full');
-    expect(img).toHaveClass('bg-white');
+    expect(img).toHaveAttribute('data-priority', 'true');
+    expect(img).toHaveAttribute('data-unoptimized', 'true');
+  });
+
+  it('has correct styling classes', () => {
+    render(<Logo isMobile={false} />);
+
+    const img = screen.getByTestId('logo-image');
+    expect(img).toHaveClass('rounded-full', 'bg-white', 'size-12', 'md:size-36');
+  });
+
+  describe('mobile vs desktop logo source', () => {
+    it('uses mobile logo source when isMobile is true', () => {
+      render(<Logo isMobile />);
+
+      const img = screen.getByTestId('logo-image');
+      expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-hand-logo.svg');
+    });
+
+    it('uses desktop logo source when isMobile is false', () => {
+      render(<Logo isMobile={false} />);
+
+      const img = screen.getByTestId('logo-image');
+      expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-stardust-hand-logo.svg');
+    });
+
+    it('both variants use SVG format', () => {
+      const { unmount } = render(<Logo isMobile />);
+      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
+        /^\/media\/.*\.svg$/
+      );
+      unmount();
+
+      render(<Logo isMobile={false} />);
+      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
+        /^\/media\/.*\.svg$/
+      );
+    });
   });
 });
