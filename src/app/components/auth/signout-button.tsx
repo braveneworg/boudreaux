@@ -14,7 +14,13 @@ import { Button } from '../ui/button';
 import VerticalSeparator from '../ui/vertical-separator';
 
 // Use in hamburger menu on mobile
-const SignedinToolbar = ({ className }: { className?: string }) => {
+const SignedinToolbar = ({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) => {
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
@@ -29,12 +35,13 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
           className
         )}
       >
-        <SignedInAs />
+        <SignedInAs onClick={onNavigate} />
         <VerticalSeparator />
         <Button
           className="text-zinc-50 underline"
           variant="link:narrow"
           onClick={async () => {
+            onNavigate?.();
             const { url } = await signOut({ redirect: false, callbackUrl: '/' });
             router.push(url);
           }}
@@ -47,7 +54,7 @@ const SignedinToolbar = ({ className }: { className?: string }) => {
         {isAdmin && (
           <>
             <VerticalSeparator />
-            <AdminLink />
+            <AdminLink onClick={onNavigate} />
           </>
         )}
       </div>

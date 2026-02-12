@@ -49,10 +49,10 @@ export default function HamburgerMenuSheet({
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav className="flex flex-col" aria-label="Main navigation">
-          <AuthToolbar className="text-zinc-50" />
+          <AuthToolbar className="text-zinc-50 pb-4" onNavigate={() => onOpenChange(false)} />
           <Separator className="bg-accent" />
           <SocialMediaIconLinks className="justify-center" />
-          <Separator className="bg-accent" />
+          <Separator className="bg-accent mb-2" />
           <ul className="pt-4 space-y-4" role="list">
             {menuItems.map((item, index) => (
               <motion.li
