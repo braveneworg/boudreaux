@@ -85,37 +85,38 @@ export default function CoverArtField<
     const fetchArtistImages = async () => {
       setIsLoadingArtistImages(true);
       try {
-        const allImages: ArtistImageOption[] = [];
+        const imageResults = await Promise.all(
+          parsedIds.map(async (artistId) => {
+            const [artistResponse, imagesResult] = await Promise.all([
+              fetch(`/api/artists/${artistId}`),
+              getArtistImagesAction(artistId),
+            ]);
 
-        for (const artistId of parsedIds) {
-          const [artistResponse, imagesResult] = await Promise.all([
-            fetch(`/api/artists/${artistId}`),
-            getArtistImagesAction(artistId),
-          ]);
+            let artistName = 'Unknown Artist';
+            if (artistResponse.ok) {
+              const artist = await artistResponse.json();
+              artistName =
+                artist.displayName ||
+                [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
+                'Unknown Artist';
+            }
 
-          let artistName = 'Unknown Artist';
-          if (artistResponse.ok) {
-            const artist = await artistResponse.json();
-            artistName =
-              artist.displayName ||
-              [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
-              'Unknown Artist';
-          }
-
-          if (imagesResult.success && imagesResult.data) {
-            for (const img of imagesResult.data) {
-              allImages.push({
+            if (imagesResult.success && imagesResult.data) {
+              return imagesResult.data.map<ArtistImageOption>((img) => ({
                 id: img.id,
                 src: img.src,
                 artistId,
                 artistName,
                 caption: img.caption,
                 altText: img.altText,
-              });
+              }));
             }
-          }
-        }
 
+            return [];
+          }),
+        );
+
+        const allImages: ArtistImageOption[] = imageResults.flat();
         if (!cancelled) {
           setArtistImages(allImages);
         }
