@@ -299,6 +299,7 @@ const FeaturedArtistCarousel = ({
                 type="button"
                 onClick={() => onSelect?.(featured)}
                 className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                aria-label={`Select ${displayName}`}
               >
                 <div className="absolute inset-0 overflow-hidden rounded-lg">
                   {coverArt && !imageError ? (
