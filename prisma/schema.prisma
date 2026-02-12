@@ -177,10 +177,10 @@ enum Platform {
 }
 
 enum AudioUploadStatus {
-  PENDING // Track created, upload not yet started
+  PENDING   // Track created, upload not yet started
   UPLOADING // Upload in progress
   COMPLETED // Upload completed successfully
-  FAILED // Upload failed
+  FAILED    // Upload failed
 }
 
 enum Format {
