@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/app/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/app/lib/*": ["./src/lib/*"],
+      "@/utils/*": ["./src/lib/utils/*"],
+      "@/ui/*": ["./src/app/components/ui/*"],
+      "@/hooks/*": ["./src/app/hooks/*"]
+    },
+    "types": ["vitest/globals", "node"]
+  },
+  "include": [],
+  "exclude": ["node_modules"],
+  "files": [
+    "types/next-auth.d.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/app/components/forms/fields/index.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/app/components/forms/fields/index.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/bulk-create-tracks-action.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/bulk-create-tracks-action.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/check-duplicate-tracks-action.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/check-duplicate-tracks-action.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/create-featured-artist-action.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/presigned-upload-actions.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/update-track-audio-action.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/actions/update-track-audio-action.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/services/audio-metadata-service.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/services/audio-metadata-service.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/services/featured-artists-service.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/services/featured-artists-service.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/types/media-models.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/utils/s3-key-utils.spec.ts",
+    "/Users/cchaos/projects/braveneworg/boudreaux/src/lib/utils/s3-key-utils.ts"
+  ]
+}

@@ -177,10 +177,10 @@ enum Platform {
 }
 
 enum AudioUploadStatus {
-  PENDING    // Track created, upload not yet started
-  UPLOADING  // Upload in progress
-  COMPLETED  // Upload completed successfully
-  FAILED     // Upload failed
+  PENDING // Track created, upload not yet started
+  UPLOADING // Upload in progress
+  COMPLETED // Upload completed successfully
+  FAILED // Upload failed
 }
 
 enum Format {
@@ -322,6 +322,7 @@ model FeaturedArtist {
   trackId               String?                @db.ObjectId
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  publishedOn           DateTime? // Date when the featured artist was published
   position              Int                    @default(0) // Position in the featured artists list; lower numbers appear first
   description           String? // Markdown supported post-MVP; A special description to use when the artist is featured; keep it brief
   coverArt              String? // Optional cover art to use when featuring the artist; if not provided,
@@ -463,13 +464,14 @@ model Release {
 }
 
 model Track {
-  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  id                String            @id @default(auto()) @map("_id") @db.ObjectId
   title             String
   duration          Int // Duration in seconds
   audioUrl          String // URL or file path to the audio file
-  audioUploadStatus AudioUploadStatus  @default(COMPLETED) // Status of audio file upload
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  audioFileHash     String? // SHA-256 hash of the audio file content for duplicate detection
+  audioUploadStatus AudioUploadStatus @default(COMPLETED) // Status of audio file upload
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   deletedOn         DateTime? // Date when the track was soft-deleted; null if not deleted
   publishedOn       DateTime? // Date when the track was published
   coverArt          String?
@@ -485,6 +487,7 @@ model Track {
   @@index([position])
   @@index([deletedOn])
   @@index([audioUploadStatus])
+  @@index([audioFileHash])
 }
 
 model TrackArtist {

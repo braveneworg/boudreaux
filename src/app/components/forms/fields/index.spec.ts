@@ -1,10 +1,22 @@
 import CheckboxField from './checkbox-field';
 import ComboboxField from './combobox-field';
 import CountryField from './country-field';
+import CoverArtField from './cover-art-field';
 import StateField from './state-field';
 import TextField from './text-field';
 
 import * as Fields from './index';
+
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/actions/presigned-upload-actions', () => ({
+  getPresignedUploadUrlsAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/artist-image-actions', () => ({
+  getArtistImagesAction: vi.fn(),
+}));
+vi.mock('@/lib/utils/direct-upload', () => ({
+  uploadFileToS3: vi.fn(),
+}));
 
 describe('Form Fields Index', () => {
   it('should export TextField', () => {
@@ -22,6 +34,11 @@ describe('Form Fields Index', () => {
     expect(Fields.ComboboxField).toBe(ComboboxField);
   });
 
+  it('should export CoverArtField', () => {
+    expect(Fields.CoverArtField).toBeDefined();
+    expect(Fields.CoverArtField).toBe(CoverArtField);
+  });
+
   it('should export StateField', () => {
     expect(Fields.StateField).toBeDefined();
     expect(Fields.StateField).toBe(StateField);
@@ -32,9 +49,9 @@ describe('Form Fields Index', () => {
     expect(Fields.CountryField).toBe(CountryField);
   });
 
-  it('should only export 5 fields', () => {
+  it('should only export 6 fields', () => {
     const exportedKeys = Object.keys(Fields);
-    expect(exportedKeys).toHaveLength(5);
+    expect(exportedKeys).toHaveLength(6);
   });
 
   it('should export all expected fields', () => {
@@ -42,6 +59,7 @@ describe('Form Fields Index', () => {
     expect(exportedKeys).toContain('TextField');
     expect(exportedKeys).toContain('CheckboxField');
     expect(exportedKeys).toContain('ComboboxField');
+    expect(exportedKeys).toContain('CoverArtField');
     expect(exportedKeys).toContain('StateField');
     expect(exportedKeys).toContain('CountryField');
   });

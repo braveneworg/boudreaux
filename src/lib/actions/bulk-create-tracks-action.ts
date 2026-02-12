@@ -43,6 +43,8 @@ export interface BulkTrackData {
   artist?: string;
   /** Whether the audio is lossless */
   lossless?: boolean;
+  /** SHA-256 hash of the audio file for duplicate detection */
+  audioFileHash?: string;
 }
 
 /**
@@ -411,6 +413,7 @@ export async function bulkCreateTracksAction(
               audioUrl: audioUrl || 'pending://upload',
               position: track.position ?? 0,
               coverArt: track.coverArt?.trim() || undefined,
+              audioFileHash: track.audioFileHash || undefined,
               publishedOn: publishTracks ? new Date() : undefined,
               audioUploadStatus: deferUpload ? 'PENDING' : 'COMPLETED',
               // Connect to release if we have one

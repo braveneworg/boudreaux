@@ -146,18 +146,16 @@ describe('updateTrackAudioAction', () => {
       });
     });
 
-    it('should reject if track is already FAILED', async () => {
+    it('should allow update when track is FAILED', async () => {
       mockPrismaTrackFindUnique.mockResolvedValue({
         ...mockTrack,
         audioUploadStatus: AudioUploadStatus.FAILED,
       } as never);
+      mockPrismaTrackUpdate.mockResolvedValue(mockTrack as never);
 
       const result = await updateTrackAudioAction(mockTrackId, mockAudioUrl, 'COMPLETED');
 
-      expect(result).toEqual({
-        success: false,
-        error: 'Track upload status is already FAILED',
-      });
+      expect(result.success).toBe(true);
     });
 
     it('should allow update when track is PENDING', async () => {
