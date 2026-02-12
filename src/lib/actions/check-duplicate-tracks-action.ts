@@ -72,14 +72,16 @@ export async function checkDuplicateTracksAction(
       },
     });
 
-    const duplicates: ExistingTrackInfo[] = existingTracks.map((track) => ({
-      audioFileHash: track.audioFileHash!,
-      trackId: track.id,
-      title: track.title,
-      audioUrl: track.audioUrl,
-      audioUploadStatus: track.audioUploadStatus,
-      existingS3Key: extractS3KeyFromUrl(track.audioUrl),
-    }));
+    const duplicates: ExistingTrackInfo[] = existingTracks
+      .filter((track) => track.audioFileHash != null)
+      .map((track) => ({
+        audioFileHash: track.audioFileHash,
+        trackId: track.id,
+        title: track.title,
+        audioUrl: track.audioUrl,
+        audioUploadStatus: track.audioUploadStatus,
+        existingS3Key: extractS3KeyFromUrl(track.audioUrl),
+      }));
 
     return { success: true, duplicates };
   } catch (error) {
