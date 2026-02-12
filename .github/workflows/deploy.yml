@@ -733,7 +733,7 @@ jobs:
 
             # Check if certificate needs acquisition or renewal
             NEEDS_CERT=false
-            if [ ! -f "$CERT_PATH/fullchain.pem" ]; then
+            if ! sudo test -f "$CERT_PATH/fullchain.pem"; then
               echo "No certificate found at $CERT_PATH — need initial issuance."
               NEEDS_CERT=true
             else
@@ -780,7 +780,8 @@ jobs:
             # This ensures the deployed cert matches what certbot has, even if
             # renewal happened outside the deploy (e.g., via cron) but the local
             # certificate.pem was never updated
-            if [ -f "$CERT_PATH/fullchain.pem" ]; then
+            # Note: sudo required because /etc/letsencrypt/live/ is root-only (drwx------)
+            if sudo test -f "$CERT_PATH/fullchain.pem"; then
               echo "Installing Let's Encrypt certificate to deployment directory..."
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$TARGET_DIR/certificate.pem"
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$TARGET_DIR/private_key.pem"
@@ -1021,7 +1022,7 @@ jobs:
                 fi
               done
 
-              if [ -f "$CERT_PATH/fullchain.pem" ]; then
+              if sudo test -f "$CERT_PATH/fullchain.pem"; then
                 echo "Webroot issuance succeeded; activating Let's Encrypt certificate."
                 sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$HOME/boudreaux/certificate.pem"
                 sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$HOME/boudreaux/private_key.pem"
