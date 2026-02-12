@@ -113,7 +113,7 @@ export default function CoverArtField<
             }
 
             return [];
-          }),
+          })
         );
 
         const allImages: ArtistImageOption[] = imageResults.flat();

@@ -73,7 +73,9 @@ export async function checkDuplicateTracksAction(
     });
 
     const duplicates: ExistingTrackInfo[] = existingTracks
-      .filter((track) => track.audioFileHash != null)
+      .filter(
+        (track): track is typeof track & { audioFileHash: string } => track.audioFileHash != null
+      )
       .map((track) => ({
         audioFileHash: track.audioFileHash,
         trackId: track.id,
