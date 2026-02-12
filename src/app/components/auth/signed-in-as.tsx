@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
-const SignedInAs = () => {
+const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const username = session?.user?.username;
@@ -33,7 +33,11 @@ const SignedInAs = () => {
           </div>
         )}
         <KeyIcon size={16} className="md:hidden" />
-        <Link className="text-sm text-zinc-50 hover:underline underline-offset-4" href="/profile">
+        <Link
+          className="text-sm text-zinc-50 hover:underline underline-offset-4"
+          href="/profile"
+          onClick={onClick}
+        >
           {username ? `@${username}` : displayName}
         </Link>
       </div>
