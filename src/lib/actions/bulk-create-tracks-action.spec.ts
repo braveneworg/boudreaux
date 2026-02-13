@@ -229,6 +229,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -265,6 +266,7 @@ describe('bulkCreateTracksAction', () => {
           deletedOn: null,
           publishedOn: null,
           audioUploadStatus: 'COMPLETED',
+          audioFileHash: null,
         })
         .mockResolvedValueOnce({
           id: 'track-2',
@@ -278,6 +280,7 @@ describe('bulkCreateTracksAction', () => {
           deletedOn: null,
           publishedOn: null,
           audioUploadStatus: 'COMPLETED',
+          audioFileHash: null,
         });
 
       const tracks: BulkTrackData[] = [
@@ -316,6 +319,7 @@ describe('bulkCreateTracksAction', () => {
           deletedOn: null,
           publishedOn: null,
           audioUploadStatus: 'COMPLETED',
+          audioFileHash: null,
         })
         .mockRejectedValueOnce(new Error('Database error'));
 
@@ -368,6 +372,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -417,6 +422,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -463,6 +469,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -500,6 +507,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [
@@ -549,6 +557,7 @@ describe('bulkCreateTracksAction', () => {
         deletedOn: null,
         publishedOn: null,
         audioUploadStatus: 'COMPLETED',
+        audioFileHash: null,
       });
 
       const tracks: BulkTrackData[] = [

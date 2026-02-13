@@ -32,7 +32,7 @@ const getS3Client = () => {
  * Generate a unique file key for S3
  */
 const generateS3Key = (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications',
+  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   fileName: string
 ): string => {
@@ -55,6 +55,8 @@ export interface PresignedUrlRequest {
   fileName: string;
   contentType: string;
   fileSize: number;
+  /** If provided, generate presigned URL for this existing S3 key instead of a new one (for overwriting) */
+  existingS3Key?: string;
 }
 
 /**
@@ -157,7 +159,7 @@ const validateFile = (
  * This allows clients to upload directly to S3, bypassing Next.js server body size limits
  */
 export const getPresignedUploadUrlsAction = async (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications',
+  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {
@@ -230,7 +232,8 @@ export const getPresignedUploadUrlsAction = async (
     const results: PresignedUrlResult[] = [];
 
     for (const file of files) {
-      const s3Key = generateS3Key(entityType, entityId, file.fileName);
+      // Use existing S3 key for overwrites, or generate a new one
+      const s3Key = file.existingS3Key || generateS3Key(entityType, entityId, file.fileName);
 
       const putCommand = new PutObjectCommand({
         Bucket: s3Bucket,

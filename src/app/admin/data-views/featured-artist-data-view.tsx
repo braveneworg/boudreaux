@@ -3,6 +3,7 @@
 import useFeaturedArtistsQuery from '@/app/hooks/use-featured-artists-query';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
 import { DataView } from './data-view';
 
@@ -33,6 +34,7 @@ export const FeaturedArtistDataView = () => {
       fieldsToShow={fieldsToShow}
       refetch={refetch}
       isPending={isPending}
+      getItemDisplayName={getFeaturedArtistDisplayName}
     />
   );
 };
