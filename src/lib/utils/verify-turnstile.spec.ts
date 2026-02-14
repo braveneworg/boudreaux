@@ -117,6 +117,29 @@ describe('verifyTurnstile', () => {
     });
   });
 
+  describe('test secret key bypass', () => {
+    it('should return success immediately when using Cloudflare test secret key', async () => {
+      process.env.CLOUDFLARE_SECRET = '1x0000000000000000000000000000000AA';
+
+      const result = await verifyTurnstile('any-token', '127.0.0.1');
+
+      expect(result).toEqual({ success: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should not bypass verification for non-test secret keys', async () => {
+      process.env.CLOUDFLARE_SECRET = 'real-production-secret';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await verifyTurnstile('valid-token', '127.0.0.1');
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
+
   describe('missing configuration', () => {
     it('should return error when CLOUDFLARE_SECRET is not set', async () => {
       delete process.env.CLOUDFLARE_SECRET;
