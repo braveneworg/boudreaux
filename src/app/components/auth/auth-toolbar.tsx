@@ -14,7 +14,13 @@ import SignUpLink from './signup-link';
 import { MessageSpinner } from '../ui/spinners/message-spinner';
 import VerticalSeparator from '../ui/vertical-separator';
 
-const AuthToolbar = ({ className }: { className?: string }) => {
+const AuthToolbar = ({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) => {
   const { data: session, status } = useSession();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
   const isDevelopment = process.env.NODE_ENV === CONSTANTS.ENV.DEVELOPMENT;
@@ -42,21 +48,21 @@ const AuthToolbar = ({ className }: { className?: string }) => {
     }
 
     log(loggingPrefix, 'Rendering authenticated toolbar');
-    return <SignedinToolbar className={className} />;
+    return <SignedinToolbar className={className} onNavigate={onNavigate} />;
   }
 
   // Show sign in/up links for unauthenticated users
   log(loggingPrefix, 'Rendering unauthenticated links');
   return (
-    <div className={cn('h-3 my-2', className, { hidden: isSigninOrSignupPage })}>
+    <div className={cn('h-3 mt-2 mb-4', className, { hidden: isSigninOrSignupPage })}>
       <div
         className={cn('flex h-3 items-center relative justify-center gap-2', className, {
           hidden: isSigninOrSignupPage,
         })}
       >
-        <SignInLink />
+        <SignInLink onClick={onNavigate} />
         <VerticalSeparator />
-        <SignUpLink />
+        <SignUpLink onClick={onNavigate} />
       </div>
     </div>
   );

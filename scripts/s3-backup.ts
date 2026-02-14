@@ -21,6 +21,11 @@
  *   # or
  *   ts-node scripts/s3-backup.ts list
  *
+ *   # Upload local directory to S3 bucket (without backup metadata)
+ *   npm run s3:upload <local-directory>
+ *   # or
+ * ts-node scripts/s3-backup.ts upload <local-directory>
+ *
  * Examples:
  *   npm run s3:backup
  *   npm run s3:backup backups/s3-2026-02-07

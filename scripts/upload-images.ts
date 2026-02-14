@@ -30,7 +30,7 @@
  */
 
 import { createReadStream } from 'fs';
-import { isAbsolute, join, normalize, resolve } from 'path';
+import { isAbsolute, join, normalize, relative, resolve } from 'path';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -91,6 +91,7 @@ interface UploadResult {
 interface UploadOptions {
   prefix?: string;
   invalidateCache?: boolean;
+  baseDir?: string;
 }
 
 /**
@@ -154,13 +155,21 @@ export function resolvePath(filePath: string): string {
  */
 export function generateS3Key(filePath: string, prefix?: string): string {
   const normalizedPath = normalize(filePath);
-  let key = normalizedPath;
 
-  // If it's a relative path or starts with common prefixes, clean it up
-  if (normalizedPath.startsWith('public/')) {
-    key = normalizedPath.substring('public/'.length);
-  } else if (normalizedPath.startsWith('./')) {
-    key = normalizedPath.substring(2);
+  // Convert to POSIX separators for consistent searching
+  const posixPath = normalizedPath.split('\\').join('/');
+  let key = posixPath;
+
+  // Handle paths that contain /public/ (Unix absolute, Windows absolute, or relative)
+  const publicIndex = posixPath.indexOf('/public/');
+  if (publicIndex !== -1) {
+    // Extract the path after /public/
+    key = posixPath.substring(publicIndex + '/public/'.length);
+  } else if (posixPath.startsWith('public/')) {
+    // If it's a relative path starting with public/, remove it
+    key = posixPath.substring('public/'.length);
+  } else if (posixPath.startsWith('./')) {
+    key = posixPath.substring(2);
   }
 
   // Remove leading slashes
@@ -359,7 +368,33 @@ export async function uploadImages(
 
   for (const filePath of filePaths) {
     const resolvedPath = resolvePath(filePath);
-    const s3Key = generateS3Key(filePath, options.prefix);
+
+    // If baseDir is provided, compute the relative path from baseDir
+    // This is used when uploading from a directory to get correct S3 keys
+    let pathForS3Key = filePath;
+    if (options.baseDir) {
+      const resolvedBaseDir = resolvePath(options.baseDir);
+      const relativePath = relative(resolvedBaseDir, resolvedPath);
+
+      // Ensure the resolvedPath is within resolvedBaseDir and does not traverse upwards
+      const hasParentTraversal = relativePath.split(/[\\/]+/).includes('..');
+
+      if (hasParentTraversal || isAbsolute(relativePath)) {
+        const message = `Skipping file outside baseDir: filePath="${filePath}", baseDir="${options.baseDir}"`;
+        log(message, 'error');
+        result.skipped += 1;
+        result.errors.push({ path: filePath, error: message });
+        continue;
+      }
+
+      // Use the safe, normalized relative path for the S3 key
+      pathForS3Key = relativePath.replace(/\\/g, '/');
+    }
+
+    // When baseDir is used without an explicit prefix, use empty prefix to preserve directory structure
+    // Otherwise, generateS3Key will apply its default 'media' prefix
+    const effectivePrefix = options.baseDir && options.prefix === undefined ? '' : options.prefix;
+    const s3Key = generateS3Key(pathForS3Key, effectivePrefix);
     await uploadFile(s3Client, bucket, resolvedPath, s3Key, result);
   }
 
@@ -380,12 +415,14 @@ export function parseArgs(args: string[]): {
   paths: string[];
   prefix?: string;
   invalidateCache: boolean;
+  baseDir?: string;
 } {
   const result = {
     mode: 'files' as 'files' | 'directory',
     paths: [] as string[],
     prefix: undefined as string | undefined,
     invalidateCache: true,
+    baseDir: undefined as string | undefined,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -473,6 +510,9 @@ ${colors.yellow}Environment Variables:${colors.reset}
       log(`Collecting images from directory: ${dirPath}`, 'info');
       filePaths = collectImagesFromDirectory(dirPath);
       log(`Found ${filePaths.length} image(s)`, 'info');
+
+      // Pass the base directory for proper S3 key generation
+      parsedArgs.baseDir = dirPath;
     } else {
       if (parsedArgs.paths.length === 0) {
         log('No file paths specified', 'error');
@@ -489,6 +529,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
     const result = await uploadImages(S3_BUCKET, filePaths, {
       prefix: parsedArgs.prefix,
       invalidateCache: parsedArgs.invalidateCache,
+      baseDir: parsedArgs.baseDir,
     });
 
     // Print summary

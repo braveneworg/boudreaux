@@ -25,7 +25,7 @@ vi.mock('framer-motion', () => ({
   },
 }));
 
-// Mock next/image
+// Mock next/image using <span> to avoid @next/next/no-img-element lint rule
 vi.mock('next/image', () => ({
   default: function MockImage(props: {
     src: string;
@@ -36,15 +36,14 @@ vi.mock('next/image', () => ({
     priority?: boolean;
   }) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- Mock for testing next/image
-      <img
-        alt={props.alt}
+      <span
         className={props.className}
-        data-priority={props.priority}
+        data-alt={props.alt}
+        data-height={props.height}
+        data-priority={props.priority ? 'true' : 'false'}
+        data-src={props.src}
         data-testid="next-image"
-        height={props.height}
-        src={props.src}
-        width={props.width}
+        data-width={props.width}
       />
     );
   },
@@ -78,6 +77,14 @@ describe('Header', () => {
     expect(headerWrapper).toHaveClass('z-100');
   });
 
+  it('renders full-width wrapper', () => {
+    const { container } = render(<Header />);
+    const headerWrapper = container.firstChild as HTMLElement;
+    expect(headerWrapper).toHaveClass('w-full');
+    expect(headerWrapper).toHaveClass('left-0');
+    expect(headerWrapper).toHaveClass('right-0');
+  });
+
   it('renders Logo component with isMobile=false by default', () => {
     render(<Header />);
     const logo = screen.getByTestId('logo');
@@ -101,21 +108,27 @@ describe('Header', () => {
       render(<Header isMobile />);
       const image = screen.getByTestId('next-image');
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute('src', '/media/fake-four-inc-words.png');
-      expect(image).toHaveAttribute('alt', 'Fake Four Inc. Words');
+      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words.png');
+      expect(image).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
     });
 
     it('renders image with correct dimensions', () => {
       render(<Header isMobile />);
       const image = screen.getByTestId('next-image');
-      expect(image).toHaveAttribute('width', '222');
-      expect(image).toHaveAttribute('height', '40');
+      expect(image).toHaveAttribute('data-width', '222');
+      expect(image).toHaveAttribute('data-height', '40');
     });
 
     it('image has priority flag set', () => {
       render(<Header isMobile />);
       const image = screen.getByTestId('next-image');
       expect(image).toHaveAttribute('data-priority', 'true');
+    });
+
+    it('renders both image and hamburger menu together', () => {
+      render(<Header isMobile />);
+      expect(screen.getByTestId('next-image')).toBeInTheDocument();
+      expect(screen.getByTestId('hamburger-menu')).toBeInTheDocument();
     });
   });
 
@@ -137,6 +150,13 @@ describe('Header', () => {
       const motionDivs = screen.getAllByTestId('motion-div');
       expect(motionDivs.length).toBeGreaterThan(0);
     });
+
+    it('renders background with particles SVG class', () => {
+      render(<Header />);
+      const motionDivs = screen.getAllByTestId('motion-div');
+      const bgDiv = motionDivs[0];
+      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-zinc-950');
+    });
   });
 
   describe('sparkle effects', () => {
@@ -146,12 +166,36 @@ describe('Header', () => {
       expect(sparkleContainer).toBeInTheDocument();
     });
 
-    it('generates sparkles on initial render', () => {
+    it('generates 20 sparkles and 15 extinguish particles', () => {
       render(<Header />);
-      // The motion divs include sparkles which are rendered as motion.div
       const motionDivs = screen.getAllByTestId('motion-div');
-      // Should have animated background + sparkles + extinguish particles
-      expect(motionDivs.length).toBeGreaterThanOrEqual(1);
+      // 1 animated background + 20 sparkles + 15 extinguish particles = 36
+      expect(motionDivs).toHaveLength(36);
+    });
+
+    it('sparkles have absolute positioning', () => {
+      render(<Header />);
+      const motionDivs = screen.getAllByTestId('motion-div');
+      // Sparkle divs start at index 1 (index 0 is the background)
+      const sparkle = motionDivs[1];
+      expect(sparkle).toHaveClass('absolute', 'rounded-full');
+    });
+
+    it('sparkle elements have percentage-based positions', () => {
+      render(<Header />);
+      const motionDivs = screen.getAllByTestId('motion-div');
+      // Sparkle at index 1 has inline style with left/top percentages
+      const sparkle = motionDivs[1];
+      expect(sparkle.style.left).toMatch(/%$/);
+      expect(sparkle.style.top).toMatch(/%$/);
+    });
+
+    it('extinguish particles have orange color class', () => {
+      render(<Header />);
+      const motionDivs = screen.getAllByTestId('motion-div');
+      // Extinguish particles start after background (1) + sparkles (20) = index 21
+      const extinguishParticle = motionDivs[21];
+      expect(extinguishParticle).toHaveClass('bg-orange-400');
     });
   });
 
@@ -175,6 +219,24 @@ describe('Header', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('h-[58px]');
+    });
+
+    it('renders content layer with proper z-index', () => {
+      const { container } = render(<Header />);
+      const contentLayer = container.querySelector('.z-20');
+      expect(contentLayer).toBeInTheDocument();
+    });
+
+    it('content layer has max-width constraint', () => {
+      const { container } = render(<Header />);
+      const contentLayer = container.querySelector('.z-20');
+      expect(contentLayer).toHaveClass('max-w-[1920px]');
+    });
+
+    it('content layer has overflow hidden', () => {
+      const { container } = render(<Header />);
+      const contentLayer = container.querySelector('.z-20');
+      expect(contentLayer).toHaveClass('overflow-hidden');
     });
   });
 });

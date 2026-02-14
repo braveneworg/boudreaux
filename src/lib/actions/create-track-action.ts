@@ -2,13 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { TrackService } from '../services/track-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createTrackSchema } from '../validation/create-track-schema';
 
 import type { FormState } from '../types/form-state';
@@ -17,7 +17,7 @@ export const createTrackAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   const permittedFieldNames = [
     'title',
@@ -25,25 +25,15 @@ export const createTrackAction = async (
     'audioUrl',
     'coverArt',
     'position',
+    'artistIds',
+    'releaseIds',
     'publishedOn',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createTrackSchema);
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id || session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be a logged in admin user to create a track'];
-        return formState;
-      }
-
-      const { title, duration, audioUrl, coverArt, position } = parsed.data;
+      const { title, duration, audioUrl, coverArt, position, artistIds, releaseIds } = parsed.data;
 
       // Create track in database
       const response = await TrackService.createTrack({
@@ -53,6 +43,26 @@ export const createTrackAction = async (
         coverArt: coverArt || undefined,
         position: position ?? 0,
       });
+
+      // Create TrackArtist associations if track was created and artistIds provided
+      if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
+        const createdTrackId = response.data.id;
+        await prisma.trackArtist.createMany({
+          data: artistIds.map((artistId) => ({ artistId, trackId: createdTrackId })),
+        });
+      }
+
+      // Create ReleaseTrack associations if track was created and releaseIds provided
+      if (response.success && response.data?.id && releaseIds && releaseIds.length > 0) {
+        const createdTrackId = response.data.id;
+        await prisma.releaseTrack.createMany({
+          data: releaseIds.map((releaseId) => ({
+            releaseId,
+            trackId: createdTrackId,
+            position: position ?? 0,
+          })),
+        });
+      }
 
       // Log track creation for security audit
       logSecurityEvent({
@@ -86,7 +96,7 @@ export const createTrackAction = async (
         ) {
           formState.errors.title = ['This title is already in use. Please choose a different one.'];
         } else {
-          formState.errors = { general: [errorMessage] };
+          formState.errors = { general: ['Failed to create track'] };
         }
       }
 

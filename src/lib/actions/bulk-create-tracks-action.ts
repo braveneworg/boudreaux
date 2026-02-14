@@ -2,16 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 
 import { findOrCreateArtistAction } from './find-or-create-artist-action';
 import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { auth } from '../../../auth';
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
 
 import type { Prisma } from '@prisma/client';
+
+const logger = loggers.media;
 
 /**
  * Data for a single track in a bulk upload
@@ -43,6 +45,8 @@ export interface BulkTrackData {
   artist?: string;
   /** Whether the audio is lossless */
   lossless?: boolean;
+  /** SHA-256 hash of the audio file for duplicate detection */
+  audioFileHash?: string;
 }
 
 /**
@@ -108,7 +112,7 @@ export async function bulkCreateTracksAction(
   options: BulkCreateTracksOptions = {}
 ): Promise<BulkCreateTracksResult> {
   const { autoCreateRelease = true, publishTracks = false, deferUpload = false } = options;
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   // Validate input
   if (!tracks || tracks.length === 0) {
@@ -132,18 +136,6 @@ export async function bulkCreateTracksAction(
   }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return {
-        success: false,
-        successCount: 0,
-        failedCount: tracks.length,
-        results: [],
-        error: 'You must be a logged in admin user to create tracks',
-      };
-    }
-
     const results: BulkTrackResult[] = [];
     const releaseCache = new Map<
       string,
@@ -157,7 +149,7 @@ export async function bulkCreateTracksAction(
 
     // First pass: Find or create all releases (outside transaction since they're
     // shared resources that shouldn't be rolled back if individual tracks fail)
-    // Also link albumArtist to the release if present
+    // Also pre-create Groups from albumArtist metadata if present
     for (const track of tracks) {
       if (autoCreateRelease && track.album && track.album.trim() !== '') {
         const albumKey = track.album.trim().toLowerCase();
@@ -177,52 +169,27 @@ export async function bulkCreateTracksAction(
           const releaseResult = await findOrCreateReleaseAction(releaseMetadata);
 
           if (releaseResult.success && releaseResult.releaseId) {
-            const releaseId = releaseResult.releaseId;
-
-            // If albumArtist is present, find/create them and link to the release
-            // This represents the "main" artist on the album (e.g., the band name)
+            // If albumArtist is present, find/create a Group (not an Artist)
+            // The albumArtist represents the group/band name on the album
             if (track.albumArtist?.trim()) {
               const albumArtistName = track.albumArtist.trim();
-              const albumArtistKey = albumArtistName.toLowerCase();
+              const groupKey = albumArtistName.toLowerCase();
 
-              // Check if we've already processed this album artist
-              if (!artistCache.has(albumArtistKey)) {
-                const albumArtistResult = await findOrCreateArtistAction(albumArtistName, {
-                  releaseId,
-                });
+              if (!groupCache.has(groupKey)) {
+                const groupResult = await findOrCreateGroupAction(albumArtistName);
 
-                if (albumArtistResult.success && albumArtistResult.artistId) {
-                  artistCache.set(albumArtistKey, {
-                    artistId: albumArtistResult.artistId,
-                    artistName: albumArtistResult.artistName || albumArtistName,
-                    created: albumArtistResult.created || false,
-                  });
-                }
-              } else {
-                // Artist already exists, just create the ArtistRelease if needed
-                const cachedAlbumArtist = artistCache.get(albumArtistKey)!;
-                const existingArtistRelease = await prisma.artistRelease.findUnique({
-                  where: {
-                    artistId_releaseId: {
-                      artistId: cachedAlbumArtist.artistId,
-                      releaseId,
-                    },
-                  },
-                });
-
-                if (!existingArtistRelease) {
-                  await prisma.artistRelease.create({
-                    data: {
-                      artistId: cachedAlbumArtist.artistId,
-                      releaseId,
-                    },
+                if (groupResult.success && groupResult.groupId) {
+                  groupCache.set(groupKey, {
+                    groupId: groupResult.groupId,
+                    groupName: groupResult.groupName || albumArtistName,
+                    created: groupResult.created || false,
                   });
                 }
               }
             }
 
             releaseCache.set(albumKey, {
-              releaseId,
+              releaseId: releaseResult.releaseId,
               releaseTitle: releaseResult.releaseTitle || track.album,
               created: releaseResult.created || false,
             });
@@ -283,19 +250,26 @@ export async function bulkCreateTracksAction(
           }
         }
 
-        // Get artist name (priority: track artist > album artist)
-        const artistName = track.artist?.trim() || track.albumArtist?.trim();
+        const trimmedArtist = track.artist?.trim() || undefined;
+        const trimmedAlbumArtist = track.albumArtist?.trim() || undefined;
 
-        // Determine if albumArtist represents a group (when it differs from artist)
-        // Common pattern: artist is the band member, albumArtist is the band name
-        const trimmedArtist = track.artist?.trim();
-        const trimmedAlbumArtist = track.albumArtist?.trim();
-        const groupName =
-          trimmedAlbumArtist &&
-          trimmedArtist &&
-          trimmedAlbumArtist.toLowerCase() !== trimmedArtist.toLowerCase()
-            ? trimmedAlbumArtist
-            : undefined;
+        // albumArtist always creates a Group (the band/ensemble).
+        // An individual Artist is only created when:
+        //   - artist differs from albumArtist (individual member on this track)
+        //   - OR no albumArtist exists (legacy behavior: artist field creates an Artist)
+        const hasAlbumArtist = !!trimmedAlbumArtist;
+        const hasDistinctArtist =
+          !!trimmedArtist &&
+          hasAlbumArtist &&
+          trimmedArtist.toLowerCase() !== trimmedAlbumArtist!.toLowerCase();
+
+        const artistName = hasAlbumArtist
+          ? hasDistinctArtist
+            ? trimmedArtist
+            : undefined
+          : trimmedArtist;
+
+        const groupName = hasAlbumArtist ? trimmedAlbumArtist : undefined;
 
         // Create track and all associations in a single transaction
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -348,33 +322,36 @@ export async function bulkCreateTracksAction(
             }
           }
 
-          // Handle group creation/association if albumArtist differs from artist
+          // Handle group creation/association from albumArtist
+          // Groups are created even without an individual artist
           let groupId: string | undefined;
 
-          if (groupName && artistId) {
+          if (groupName) {
             const groupKey = groupName.toLowerCase();
             const cachedGroup = groupCache.get(groupKey);
 
             if (cachedGroup) {
               groupId = cachedGroup.groupId;
 
-              // Still need to create ArtistGroup association for cached groups
-              const existingArtistGroup = await tx.artistGroup.findUnique({
-                where: {
-                  artistId_groupId: {
-                    artistId,
-                    groupId,
-                  },
-                },
-              });
-
-              if (!existingArtistGroup) {
-                await tx.artistGroup.create({
-                  data: {
-                    artistId,
-                    groupId,
+              // Create ArtistGroup association if we have an individual artist
+              if (artistId) {
+                const existingArtistGroup = await tx.artistGroup.findUnique({
+                  where: {
+                    artistId_groupId: {
+                      artistId,
+                      groupId,
+                    },
                   },
                 });
+
+                if (!existingArtistGroup) {
+                  await tx.artistGroup.create({
+                    data: {
+                      artistId,
+                      groupId,
+                    },
+                  });
+                }
               }
             } else {
               // Find or create group with artist association in transaction
@@ -411,6 +388,7 @@ export async function bulkCreateTracksAction(
               audioUrl: audioUrl || 'pending://upload',
               position: track.position ?? 0,
               coverArt: track.coverArt?.trim() || undefined,
+              audioFileHash: track.audioFileHash || undefined,
               publishedOn: publishTracks ? new Date() : undefined,
               audioUploadStatus: deferUpload ? 'PENDING' : 'COMPLETED',
               // Connect to release if we have one
@@ -447,18 +425,18 @@ export async function bulkCreateTracksAction(
           releaseCreated,
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create track';
+        const rawMessage = error instanceof Error ? error.message : '';
 
         // Check for duplicate title error
         const isDuplicate =
-          errorMessage.toLowerCase().includes('unique') ||
-          errorMessage.toLowerCase().includes('duplicate');
+          rawMessage.toLowerCase().includes('unique') ||
+          rawMessage.toLowerCase().includes('duplicate');
 
         results.push({
           index: i,
           success: false,
           title: track.title,
-          error: isDuplicate ? 'A track with this title already exists' : errorMessage,
+          error: isDuplicate ? 'A track with this title already exists' : 'Failed to create track',
         });
       }
     }
@@ -496,14 +474,14 @@ export async function bulkCreateTracksAction(
       results,
     };
   } catch (error) {
-    console.error('Bulk track creation error:', error);
+    logger.error('Bulk track creation error', error);
 
     return {
       success: false,
       successCount: 0,
       failedCount: tracks.length,
       results: [],
-      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      error: 'An unexpected error occurred',
     };
   }
 }

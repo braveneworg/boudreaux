@@ -6,6 +6,12 @@ import AuthToolbar from './auth-toolbar';
 
 import type { Session } from 'next-auth';
 
+// Mock next/navigation
+const mockUsePathname = vi.fn(() => '/');
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockUsePathname(),
+}));
+
 // Mock next-auth
 const mockUseSession = vi.fn();
 vi.mock('next-auth/react', () => ({
@@ -42,7 +48,20 @@ vi.mock('../ui/spinners/message-spinner', () => ({
 }));
 
 vi.mock('@/lib/utils/tailwind-utils', () => ({
-  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+  cn: (...args: unknown[]): string => {
+    const classes: string[] = [];
+    for (const arg of args) {
+      if (!arg) continue;
+      if (typeof arg === 'string') {
+        classes.push(arg);
+      } else if (typeof arg === 'object' && !Array.isArray(arg)) {
+        for (const [key, value] of Object.entries(arg as Record<string, boolean>)) {
+          if (value) classes.push(key);
+        }
+      }
+    }
+    return classes.join(' ');
+  },
 }));
 
 // Mock console logger
@@ -55,6 +74,7 @@ describe('AuthToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLog.mockClear();
+    mockUsePathname.mockReturnValue('/');
   });
 
   describe('when user is unauthenticated', () => {
@@ -806,6 +826,55 @@ describe('AuthToolbar', () => {
       });
 
       vi.unstubAllEnvs();
+    });
+  });
+
+  describe('signin/signup page hiding behavior', () => {
+    beforeEach(() => {
+      mockUseSession.mockReturnValue({
+        status: 'unauthenticated',
+        data: null,
+      });
+    });
+
+    it('hides unauthenticated links on /signin page', () => {
+      mockUsePathname.mockReturnValue('/signin');
+      const { container } = render(<AuthToolbar />);
+
+      const outerDiv = container.firstElementChild;
+      expect(outerDiv).toHaveClass('hidden');
+    });
+
+    it('hides unauthenticated links on /signup page', () => {
+      mockUsePathname.mockReturnValue('/signup');
+      const { container } = render(<AuthToolbar />);
+
+      const outerDiv = container.firstElementChild;
+      expect(outerDiv).toHaveClass('hidden');
+    });
+
+    it('shows unauthenticated links on non-auth pages', () => {
+      mockUsePathname.mockReturnValue('/about');
+      const { container } = render(<AuthToolbar />);
+
+      const outerDiv = container.firstElementChild;
+      expect(outerDiv).not.toHaveClass('hidden');
+    });
+
+    it('detects signin case-insensitively', () => {
+      mockUsePathname.mockReturnValue('/SignIn');
+      const { container } = render(<AuthToolbar />);
+
+      const outerDiv = container.firstElementChild;
+      expect(outerDiv).toHaveClass('hidden');
+    });
+
+    it('hides inner flex container on signin/signup pages', () => {
+      mockUsePathname.mockReturnValue('/signin');
+      const { container } = render(<AuthToolbar />);
+
+      const innerDiv = container.querySelector('.flex');
+      expect(innerDiv).toHaveClass('hidden');
     });
   });
 });

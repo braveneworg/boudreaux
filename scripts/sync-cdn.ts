@@ -261,7 +261,7 @@ class CDNSync {
       return;
     }
 
-    const filesToUpload = this.getFilesToUpload(staticDir, 'media/_next/static', {
+    const filesToUpload = this.getFilesToUpload(staticDir, '_next/static', {
       cacheControl: 'public, max-age=31536000, immutable',
       excludePatterns: ['*.map', '*.DS_Store'],
     });
@@ -403,20 +403,19 @@ class CDNSync {
     await Promise.all(uploadPromises);
   }
 
-  private async clearS3MediaDirectory(): Promise<void> {
-    this.log('Clearing existing media files from S3...');
+  private async clearS3Prefix(prefix: string): Promise<void> {
+    this.log(`Clearing existing files with prefix '${prefix}' from S3...`);
 
     try {
-      // List all objects with the 'media/' prefix
       const listCommand = new ListObjectsV2Command({
         Bucket: this.config.s3Bucket,
-        Prefix: 'media/',
+        Prefix: prefix,
       });
 
       const response = await this.s3Client.send(listCommand);
 
       if (!response.Contents || response.Contents.length === 0) {
-        this.log('No existing media files found in S3', 'info');
+        this.log(`No existing files found with prefix '${prefix}' in S3`, 'info');
         return;
       }
 
@@ -436,7 +435,7 @@ class CDNSync {
       const deletedCount = deleteResponse.Deleted?.length || 0;
       const errorCount = deleteResponse.Errors?.length || 0;
 
-      this.log(`Successfully deleted ${deletedCount} files from S3`, 'success');
+      this.log(`Successfully deleted ${deletedCount} files from S3 (prefix: ${prefix})`, 'success');
 
       if (errorCount > 0) {
         this.log(`Failed to delete ${errorCount} files`, 'warning');
@@ -448,14 +447,38 @@ class CDNSync {
       // Handle pagination if there are more than 1000 objects
       if (response.IsTruncated) {
         this.log('More files to delete, continuing...', 'info');
-        await this.clearS3MediaDirectory(); // Recursive call for remaining files
+        await this.clearS3Prefix(prefix); // Recursive call for remaining files
       }
     } catch (error: unknown) {
       this.log(
-        `Failed to clear S3 media directory: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to clear S3 prefix '${prefix}': ${error instanceof Error ? error.message : String(error)}`,
         'error'
       );
       throw error;
+    }
+  }
+
+  private async clearS3MediaDirectory(): Promise<void> {
+    // Only clear _next/ when we have local build artifacts to re-upload and we're not skipping the build.
+    const nextStaticDir = join(process.cwd(), '.next', 'static');
+    const isSkipBuild = process.env.SKIP_BUILD === 'true';
+
+    if (!isSkipBuild && existsSync(nextStaticDir)) {
+      await this.clearS3Prefix('_next/');
+    } else {
+      this.log(
+        'Skipping _next/ cleanup — either SKIP_BUILD is enabled or no local .next/static directory exists',
+        'info'
+      );
+    }
+    // Only clear media/ if local media files exist to re-upload.
+    // In CI, public/media is gitignored and empty, so clearing would
+    // permanently delete CDN-hosted media (logos, icons, etc.) with
+    // nothing to replace them.
+    if (existsSync(this.config.mediaDir) && readdirSync(this.config.mediaDir).length > 0) {
+      await this.clearS3Prefix('media/');
+    } else {
+      this.log('Skipping media/ cleanup — no local media files to re-upload', 'info');
     }
   }
 
@@ -504,7 +527,7 @@ class CDNSync {
   private async testSampleFile(): Promise<void> {
     // Test files in media directory
     const testFiles = [
-      'media/_next/static/chunks/webpack.js',
+      '_next/static/chunks/webpack.js',
       'media/next.svg', // from public/media directory
       'media/index.html', // if you have HTML files
     ];

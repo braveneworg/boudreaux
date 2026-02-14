@@ -731,33 +731,83 @@ jobs:
               CERTBOT_EMAIL_ARGS=(--register-unsafely-without-email)
             fi
 
-            # Initial standalone issuance (only if Let's Encrypt cert doesn't exist)
-            if [ ! -f "$CERT_PATH/fullchain.pem" ]; then
-              echo "Obtaining Let's Encrypt certificate for $DOMAIN using standalone mode..."
-              # Stop containers that might be using port 80
-              $DOCKER_CMD stop nginx website 2>/dev/null || true
-
-              # Request certificate using standalone mode
-              sudo certbot certonly --standalone --non-interactive --agree-tos \
-                "${CERTBOT_EMAIL_ARGS[@]}" \
-                -d "$DOMAIN" -d "www.$DOMAIN" || {
-                echo "WARNING: Standalone certificate acquisition failed."
-              }
+            # Check if certificate needs acquisition or renewal
+            NEEDS_CERT=false
+            if ! sudo test -f "$CERT_PATH/fullchain.pem"; then
+              echo "No certificate found at $CERT_PATH — need initial issuance."
+              NEEDS_CERT=true
+            else
+              # Check if existing cert is expired or expiring within 30 days
+              echo "Checking certificate expiration..."
+              CERT_EXPIRY=$(sudo openssl x509 -enddate -noout -in "$CERT_PATH/fullchain.pem" 2>/dev/null | cut -d= -f2 || true)
+              if [ -n "$CERT_EXPIRY" ]; then
+                echo "Certificate expires: $CERT_EXPIRY"
+                if ! sudo openssl x509 -checkend 2592000 -noout -in "$CERT_PATH/fullchain.pem" 2>/dev/null; then
+                  echo "⚠️  Certificate is expired or expiring within 30 days — forcing renewal."
+                  NEEDS_CERT=true
+                else
+                  echo "✓ Certificate is valid for more than 30 days."
+                fi
+              else
+                echo "WARNING: Could not read certificate expiration — forcing renewal."
+                NEEDS_CERT=true
+              fi
             fi
 
-            # Copy Let's Encrypt cert to deployment directory if available
-            if [ -f "$CERT_PATH/fullchain.pem" ]; then
+            if [ "$NEEDS_CERT" = true ]; then
+              echo "Obtaining/renewing Let's Encrypt certificate for $DOMAIN..."
+
+              # Stop containers that might be using port 80 (needed for both renewal methods)
+              $DOCKER_CMD stop nginx website 2>/dev/null || true
+
+              # Try renewal first (works if certbot already manages this domain)
+              if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
+                echo "✓ Certificate renewed successfully via certbot renew."
+              else
+                echo "certbot renew failed or no existing cert — trying standalone issuance..."
+
+                # Request certificate using standalone mode
+                sudo certbot certonly --standalone --non-interactive --agree-tos \
+                  "${CERTBOT_EMAIL_ARGS[@]}" \
+                  -d "$DOMAIN" -d "www.$DOMAIN" || {
+                  echo "WARNING: Standalone certificate acquisition failed."
+                }
+              fi
+            fi
+
+            # Always copy the latest cert from letsencrypt to deployment directory
+            # This ensures the deployed cert matches what certbot has, even if
+            # renewal happened outside the deploy (e.g., via cron) but the local
+            # certificate.pem was never updated
+            # Note: sudo required because /etc/letsencrypt/live/ is root-only (drwx------)
+            if sudo test -f "$CERT_PATH/fullchain.pem"; then
               echo "Installing Let's Encrypt certificate to deployment directory..."
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$TARGET_DIR/certificate.pem"
               sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$TARGET_DIR/private_key.pem"
               sudo chmod 644 "$TARGET_DIR/certificate.pem"
               sudo chmod 600 "$TARGET_DIR/private_key.pem"
 
+              # Verify the deployed cert is not expired before proceeding
+              if sudo openssl x509 -checkend 0 -noout -in "$TARGET_DIR/certificate.pem" 2>/dev/null; then
+                DEPLOY_EXPIRY=$(sudo openssl x509 -enddate -noout -in "$TARGET_DIR/certificate.pem" | cut -d= -f2)
+                echo "✓ Deployed certificate is valid (expires: $DEPLOY_EXPIRY)"
+              else
+                OPENSSL_STATUS=$?
+                if [ "$OPENSSL_STATUS" -eq 1 ]; then
+                  echo "❌ ERROR: Deployed certificate is expired even after renewal attempt."
+                  echo "Removing stale cert files so self-signed fallback can take over."
+                  rm -f "$TARGET_DIR/certificate.pem" "$TARGET_DIR/private_key.pem"
+                else
+                  echo "❌ ERROR: Failed to verify deployed certificate with openssl (exit code: $OPENSSL_STATUS)."
+                  echo "Leaving existing certificate files in place. Check certificate PEM, permissions, and openssl output on the server."
+                fi
+              fi
+
               # Setup automatic renewal cron (idempotent)
               # This ensures certificate auto-renewal even if cert was issued outside of deployment
               echo "Ensuring automatic certificate renewal cron job is configured..."
               if ! sudo crontab -l 2>/dev/null | grep -Fq "certbot renew"; then
-                CRON_CMD="0 3 * * * certbot renew --quiet --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $TARGET_DIR/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $TARGET_DIR/private_key.pem && chmod 600 $TARGET_DIR/private_key.pem && chmod 644 $TARGET_DIR/certificate.pem && (docker restart nginx || true)\""
+                CRON_CMD="0 3 * * * certbot renew --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $TARGET_DIR/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $TARGET_DIR/private_key.pem && chmod 600 $TARGET_DIR/private_key.pem && chmod 644 $TARGET_DIR/certificate.pem && (docker restart nginx || true)\" >> /var/log/certbot-renew.log 2>&1"
                 (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
                 echo "✓ Cron job added: Certificate will auto-renew daily at 3 AM"
               else
@@ -971,7 +1021,7 @@ jobs:
                 fi
               done
 
-              if [ -f "$CERT_PATH/fullchain.pem" ]; then
+              if sudo test -f "$CERT_PATH/fullchain.pem"; then
                 echo "Webroot issuance succeeded; activating Let's Encrypt certificate."
                 sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 644 "$CERT_PATH/fullchain.pem" "$HOME/boudreaux/certificate.pem"
                 sudo install -o "$LOCAL_USER" -g "$LOCAL_GROUP" -m 600 "$CERT_PATH/privkey.pem" "$HOME/boudreaux/private_key.pem"
@@ -983,7 +1033,7 @@ jobs:
                 # This is idempotent - will only add the cron job if it doesn't exist
                 echo "Setting up automatic certificate renewal cron job..."
                 if ! sudo crontab -l 2>/dev/null | grep -Fq "certbot renew"; then
-                  CRON_CMD="0 3 * * * certbot renew --quiet --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $HOME/boudreaux/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $HOME/boudreaux/private_key.pem && chmod 600 $HOME/boudreaux/private_key.pem && chmod 644 $HOME/boudreaux/certificate.pem && (docker restart nginx || true)\""
+                  CRON_CMD="0 3 * * * certbot renew --deploy-hook \"install -o $LOCAL_USER -g $LOCAL_GROUP -m 644 $CERT_PATH/fullchain.pem $HOME/boudreaux/certificate.pem && install -o $LOCAL_USER -g $LOCAL_GROUP -m 600 $CERT_PATH/privkey.pem $HOME/boudreaux/private_key.pem && chmod 600 $HOME/boudreaux/private_key.pem && chmod 644 $HOME/boudreaux/certificate.pem && (docker restart nginx || true)\" >> /var/log/certbot-renew.log 2>&1"
                   (sudo crontab -l 2>/dev/null; printf '%s\n' "$CRON_CMD") | sudo crontab -
                   echo "✓ Cron job added: Certificate will auto-renew daily at 3 AM"
                 else

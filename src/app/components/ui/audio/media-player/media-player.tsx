@@ -248,6 +248,7 @@ const FeaturedArtistCarousel = ({
 }) => {
   // Sort by position (lower numbers first)
   const sortedArtists = [...featuredArtists].sort((a, b) => a.position - b.position);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   /**
    * Get the cover art URL for a featured artist
@@ -261,8 +262,18 @@ const FeaturedArtistCarousel = ({
     if (featured.release?.coverArt) {
       return featured.release.coverArt;
     }
-    // Fall back to track's release coverArt if available
-    // Note: This would require including track.release in the query
+    // Fall back to first image in the release
+    if (featured.release?.images?.length && featured.release.images[0].src) {
+      return featured.release.images[0].src;
+    }
+    // Fall back to first artist's first image
+    if (featured.artists?.length > 0) {
+      for (const artist of featured.artists) {
+        if (artist.images?.length > 0) {
+          return artist.images[0].src;
+        }
+      }
+    }
     return null;
   };
 
@@ -277,6 +288,7 @@ const FeaturedArtistCarousel = ({
         {sortedArtists.map((featured) => {
           const coverArt = getCoverArt(featured);
           const displayName = getFeaturedArtistDisplayName(featured);
+          const imageError = failedImages.has(featured.id);
 
           return (
             <CarouselItem
@@ -287,15 +299,19 @@ const FeaturedArtistCarousel = ({
                 type="button"
                 onClick={() => onSelect?.(featured)}
                 className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                aria-label={`Select ${displayName}`}
               >
                 <div className="absolute inset-0 overflow-hidden rounded-lg">
-                  {coverArt ? (
+                  {coverArt && !imageError ? (
                     <Image
                       src={coverArt}
                       alt={displayName}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"
                       sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
+                      onError={() => {
+                        setFailedImages((prev) => new Set(prev).add(featured.id));
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
@@ -404,6 +420,7 @@ const InteractiveCoverArt = ({
   className,
 }: InteractiveCoverArtProps) => {
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleClick = () => {
     if (isPlaying) {
@@ -430,7 +447,20 @@ const InteractiveCoverArt = ({
       className={`relative w-full aspect-square group cursor-pointer focus:outline-none rounded-t-lg overflow-hidden ${className ?? ''}`}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
-      <Image src={src} alt={alt} fill className="object-cover" sizes="calc(100vw - 1rem)" />
+      {imageError ? (
+        <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
+          <Play className="w-12 h-12 text-zinc-400" />
+        </div>
+      ) : (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          className="object-cover"
+          sizes="calc(100vw - 1rem)"
+          onError={() => setImageError(true)}
+        />
+      )}
       {/* Overlay - visible when not playing or briefly when pausing */}
       <div
         className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${

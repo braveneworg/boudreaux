@@ -185,6 +185,7 @@ export const loggers = {
   presignedUrls: createLogger('PRESIGNED_URLS'),
   auth: createLogger('AUTH'),
   database: createLogger('DATABASE'),
+  media: createLogger('MEDIA'),
   s3: createLogger('S3'),
   notifications: createLogger('NOTIFICATIONS'),
 };
