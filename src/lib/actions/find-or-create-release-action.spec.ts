@@ -48,7 +48,15 @@ describe('findOrCreateReleaseAction', () => {
       expires: new Date(Date.now() + 86400000).toISOString(),
     });
 
-    mockRequireRole.mockResolvedValue();
+    mockRequireRole.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        role: 'admin',
+        name: 'Test Admin',
+        email: 'admin@test.com',
+      },
+      expires: new Date(Date.now() + 86400000).toISOString(),
+    } as never);
   });
 
   describe('validation', () => {

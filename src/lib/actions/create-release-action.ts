@@ -3,14 +3,13 @@
 import { revalidatePath } from 'next/cache';
 
 import type { Format } from '@/lib/types/media-models';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createReleaseSchema } from '../validation/create-release-schema';
 
 import type { FormState } from '../types/form-state';
@@ -19,7 +18,7 @@ export const createReleaseAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   const permittedFieldNames = [
     'title',
@@ -37,18 +36,6 @@ export const createReleaseAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id || session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be a logged in admin user to create a release'];
-        return formState;
-      }
-
       const {
         title,
         releasedOn,
@@ -123,7 +110,7 @@ export const createReleaseAction = async (
         ) {
           formState.errors.title = ['This title is already in use. Please choose a different one.'];
         } else {
-          formState.errors = { general: [errorMessage] };
+          formState.errors = { general: ['Failed to create release'] };
         }
       }
 

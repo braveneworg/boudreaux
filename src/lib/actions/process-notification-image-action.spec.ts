@@ -42,6 +42,14 @@ const createValidInput = (
 });
 
 describe('processNotificationImageAction', () => {
+  const mockSession = {
+    user: {
+      id: 'user-123',
+      role: 'admin',
+      email: 'admin@example.com',
+    },
+  };
+
   const resetSharpMock = () => {
     const mockPipeline = {
       metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
@@ -57,7 +65,7 @@ describe('processNotificationImageAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireRole.mockResolvedValue(undefined);
+    mockRequireRole.mockResolvedValue(mockSession as never);
     resetSharpMock();
   });
 
