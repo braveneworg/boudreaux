@@ -551,6 +551,15 @@ describe('Carousel button disabled states', () => {
 });
 
 describe('Carousel loop cycling behavior', () => {
+  beforeEach(() => {
+    // Reset mock return values to prevent test pollution
+    mockApi.canScrollPrev.mockReturnValue(true);
+    mockApi.canScrollNext.mockReturnValue(true);
+    mockApi.scrollPrev.mockClear();
+    mockApi.scrollNext.mockClear();
+    mockApi.scrollTo.mockClear();
+  });
+
   it('wraps to the first slide when clicking next at the end with loop enabled', async () => {
     const user = userEvent.setup();
 
