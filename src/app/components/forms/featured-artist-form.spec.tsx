@@ -12,6 +12,9 @@ import FeaturedArtistForm from './featured-artist-form';
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
 
+// Spy for react-hook-form setValue
+const mockSetValue = vi.fn();
+
 const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -40,6 +43,25 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to capture setValue calls
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  type ReactHookForm = typeof actual;
+  return {
+    ...actual,
+    useForm: (options?: Parameters<ReactHookForm['useForm']>[0]) => {
+      const originalForm = actual.useForm(options);
+      const originalSetValue = originalForm.setValue;
+      // Wrap setValue to spy on it while preserving original behavior
+      originalForm.setValue = ((...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      }) as typeof originalSetValue;
+      return originalForm;
+    },
   };
 });
 
@@ -217,15 +239,18 @@ describe('FeaturedArtistForm', () => {
         expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
       });
 
+      // Clear the mock to isolate the deselect call
+      mockSetValue.mockClear();
+
       // Then deselect
       await act(() => {
         capturedOnTrackChange?.(null);
       });
 
-      await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        // empty string releaseId becomes undefined via || undefined, rendered as ''
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+      // Verify setValue was called with empty string for releaseId
+      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
       });
     });
 
