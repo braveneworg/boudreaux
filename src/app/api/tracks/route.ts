@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/tracks
  * Get all tracks or search for tracks
- * Query params: skip, take, search
+ * Query params: skip, take, search, releaseId
  */
 export async function GET(request: NextRequest) {
   try {
@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
     const search = searchParams.get('search');
+    const releaseId = searchParams.get('releaseId');
 
     const params = {
       ...(skip && { skip: parseInt(skip, 10) }),
       ...(take && { take: parseInt(take, 10) }),
       ...(search && { search }),
+      ...(releaseId && { releaseId }),
     };
 
     const result = await TrackService.getTracks(params);
@@ -35,7 +37,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count for pagination
-    const totalCountResult = await TrackService.getTracksCount(search || undefined);
+    const totalCountResult = await TrackService.getTracksCount(
+      search || undefined,
+      releaseId || undefined
+    );
 
     return NextResponse.json({
       tracks: result.data,
