@@ -749,9 +749,7 @@ describe('Carousel loop cycling behavior', () => {
 
     render(
       <Carousel opts={{ loop: true }}>
-        <CarouselContent>
-          <CarouselItem>Item 1</CarouselItem>
-        </CarouselContent>
+        <CarouselContent />
         <CarouselPrevious />
       </Carousel>
     );
@@ -772,9 +770,7 @@ describe('Carousel loop cycling behavior', () => {
 
     render(
       <Carousel opts={{ loop: true }}>
-        <CarouselContent>
-          <CarouselItem>Item 1</CarouselItem>
-        </CarouselContent>
+        <CarouselContent />
         <CarouselNext />
       </Carousel>
     );
