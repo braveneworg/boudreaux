@@ -20,6 +20,9 @@ export const createFeaturedArtistAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
+  if (!session?.user?.id) {
+    throw new Error('Session user id is required for audit logging.');
+  }
   // Parse artistIds as array from form data
   const artistIds = payload.getAll('artistIds') as string[];
   payload.delete('artistIds');
