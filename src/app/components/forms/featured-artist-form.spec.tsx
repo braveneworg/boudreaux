@@ -19,8 +19,10 @@ vi.mock('react-hook-form', async () => {
 
   return {
     ...rest,
-    useForm: (options?: unknown) => {
-      const form = actualUseForm(options as Parameters<typeof actualUseForm>[0]);
+    useForm: <TFieldValues extends ReactHookForm.FieldValues = ReactHookForm.FieldValues>(
+      options?: ReactHookForm.UseFormProps<TFieldValues>
+    ) => {
+      const form = actualUseForm(options);
       const originalSetValue = form.setValue;
 
       // Wrap setValue with our spy
@@ -209,6 +211,7 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      // Clear spy to isolate deselection assertion from selection call
       mockSetValue.mockClear();
 
       // Then deselect
