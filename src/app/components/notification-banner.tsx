@@ -18,8 +18,12 @@ const GOLDEN_RATIO = 1.618;
 
 /**
  * Auto-cycle interval in milliseconds (~6.5 seconds)
+ * Can be overridden via NEXT_PUBLIC_BANNER_INTERVAL env var for E2E testing
  */
-const AUTO_CYCLE_INTERVAL = 6500;
+const AUTO_CYCLE_INTERVAL =
+  typeof window !== 'undefined' && process.env.NEXT_PUBLIC_BANNER_INTERVAL
+    ? parseInt(process.env.NEXT_PUBLIC_BANNER_INTERVAL, 10)
+    : 6500;
 
 interface NotificationBannerProps {
   notifications: NotificationBannerType[];

@@ -60,11 +60,8 @@ test.describe('Notification Banner Carousel', () => {
     const tabs = page.getByRole('tab');
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Wait for auto-cycle (6500ms interval + buffer)
-    await page.waitForTimeout(7_500);
-
-    // Should have moved to the second banner
-    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    // Wait for auto-cycle with assertion timeout (1s interval + buffer)
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 2000 });
   });
 
   test('should pause auto-cycling on hover', async ({ page }) => {
@@ -78,8 +75,9 @@ test.describe('Notification Banner Carousel', () => {
     // Hover over the carousel to pause
     await carousel.hover();
 
-    // Wait longer than the auto-cycle interval
-    await page.waitForTimeout(8_000);
+    // Wait longer than the auto-cycle interval (1s) to verify cycling is paused
+    // Use a generous timeout to account for potential delays
+    await page.waitForTimeout(2000);
 
     // Should still be on first banner because hovering pauses cycling
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
