@@ -22,7 +22,7 @@ As a distinguished senior full-stack TypeScript developer with over a decade of 
 
 ## Project Context
 
-Next.js v15.5.0 app with TypeScript, Tailwind v4, shadcn/ui, React Hook Form, Zod, Auth.js, Prisma, MongoDB, Vitest, Docker, AWS, and more. The project follows best practices for file structure, naming conventions, data fetching, styling, and testing.
+Next.js v16.1.6+ app with TypeScript, Tanstack Query for data fetching and mutations, Tailwind v4, shadcn/ui, React Hook Form, Zod, Auth.js, Prisma, MongoDB, Vitest, Docker, AWS, and more. The project follows best practices for file structure, naming conventions, styling, and testing.
 
 ## Key Rules
 
@@ -89,6 +89,19 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - app/ - pages and layouts
 - components/ui/ - shadcn components
 - lib/ - utilities, validations, hooks
+
+### Development Workflow
+
+- Run `npm run dev` to start the development server
+- Run `npm run build` to create a production build
+- Run `npm run lint` to check code quality
+- Run `npm run lint:fix` to auto-fix linting issues
+- Run `npm run format` to format code with Prettier
+- Run `npm run test` to run tests in watch mode
+- Run `npm run test:run` to run all tests once
+- Run `npm run test:coverage` to generate coverage reports
+- Always run tests after making changes
+- Always run lint and format before committing
 
 ### Naming Conventions
 
