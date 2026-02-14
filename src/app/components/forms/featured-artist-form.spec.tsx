@@ -41,6 +41,31 @@ vi.mock('react', async () => {
   };
 });
 
+// Mock react-hook-form to spy on setValue
+vi.mock('react-hook-form', async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await vi.importActual('react-hook-form')) as any;
+  return {
+    ...actual,
+    useForm: (options?: unknown) => {
+      const form = actual.useForm(options);
+      // Replace setValue with a spy that also calls the original
+      const originalSetValue = form.setValue;
+      // Only create a new spy if we don't have one yet
+      if (!capturedSetValue) {
+        capturedSetValue = vi.fn((...args: Parameters<typeof originalSetValue>) => {
+          return originalSetValue(...args);
+        });
+      }
+      // Always return the same spy
+      return {
+        ...form,
+        setValue: capturedSetValue,
+      };
+    },
+  };
+});
+
 // Mock all form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
@@ -67,10 +92,9 @@ vi.mock('@/app/components/forms/fields/group-select', () => ({
 }));
 
 vi.mock('@/app/components/forms/fields/release-select', () => ({
-  default: ({ name, setValue }: { name: string; setValue: unknown }) => {
-    capturedSetValue = setValue as ReturnType<typeof vi.fn>;
-    return <div data-testid={`release-select-${name}`}>ReleaseSelect</div>;
-  },
+  default: ({ name }: { name: string }) => (
+    <div data-testid={`release-select-${name}`}>ReleaseSelect</div>
+  ),
 }));
 
 vi.mock('@/app/components/forms/fields/track-select', () => ({
@@ -98,6 +122,7 @@ describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnTrackChange = undefined;
+    capturedSetValue = undefined as unknown as ReturnType<typeof vi.fn>;
   });
 
   describe('rendering', () => {
@@ -206,12 +231,18 @@ describe('FeaturedArtistForm', () => {
         releaseTracks: [],
       };
 
+      // Capture the spy before calling the handler (before any re-renders)
+      const setValueSpy = capturedSetValue;
+
       await act(() => {
         capturedOnTrackChange?.(trackWithoutReleases);
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(setValueSpy).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -223,12 +254,18 @@ describe('FeaturedArtistForm', () => {
         title: 'Legacy Track',
       };
 
+      // Capture the spy before calling the handler (before any re-renders)
+      const setValueSpy = capturedSetValue;
+
       await act(() => {
         capturedOnTrackChange?.(trackWithUndefinedReleases);
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(setValueSpy).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
   });
