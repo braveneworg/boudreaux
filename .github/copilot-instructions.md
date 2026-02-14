@@ -22,7 +22,7 @@ As a distinguished senior full-stack TypeScript developer with over a decade of 
 
 ## Project Context
 
-Next.js v16.1.6+ app with TypeScript, Tailwind v4, shadcn/ui, React Hook Form, Zod, Auth.js, Prisma, MongoDB, Vitest, Docker, AWS, and more. The project follows best practices for file structure, naming conventions, data fetching, styling, and testing.
+Next.js v16.1.6+ app with TypeScript, Tanstack Query for data fetching and mutations, Tailwind v4, shadcn/ui, React Hook Form, Zod, Auth.js, Prisma, MongoDB, Vitest, Docker, AWS, and more. The project follows best practices for file structure, naming conventions, styling, and testing.
 
 ## Key Rules
 
