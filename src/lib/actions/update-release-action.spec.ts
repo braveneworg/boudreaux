@@ -1,12 +1,13 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { getActionState } from '@/lib/utils/auth/get-action-state';
+
 import { updateReleaseAction } from './update-release-action';
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { requireRole } from '../utils/auth/require-role';
 
 import type { FormState } from '../types/form-state';
@@ -27,7 +28,7 @@ vi.mock('next/cache');
 vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('../utils/auth/get-action-state');
+vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('../utils/auth/require-role');
 
 describe('updateReleaseAction', () => {
@@ -363,7 +364,7 @@ describe('updateReleaseAction', () => {
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Database error']);
+      expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
     it('should handle title uniqueness error', async () => {
@@ -494,7 +495,7 @@ describe('updateReleaseAction', () => {
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Database error']);
+      expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
     it('should initialize errors when undefined on failure', async () => {
@@ -520,7 +521,7 @@ describe('updateReleaseAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
-      expect(result.errors?.general).toEqual(['Database error']);
+      expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
     it('should handle release not found error', async () => {

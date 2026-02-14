@@ -2,12 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
+import { loggers } from '@/lib/utils/logger';
 
 import type { Prisma } from '@prisma/client';
+
+const logger = loggers.media;
 
 /**
  * Result of finding or creating a group
@@ -177,13 +179,11 @@ export async function findOrCreateGroupAction(
       artistGroupCreated: !!artistId,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to find or create group';
-
-    console.error('Find or create group error:', error);
+    logger.error('Find or create group error', error);
 
     return {
       success: false,
-      error: errorMessage,
+      error: 'Failed to find or create group',
     };
   }
 }

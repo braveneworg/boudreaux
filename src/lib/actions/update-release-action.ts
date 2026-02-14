@@ -3,18 +3,17 @@
 import { revalidatePath } from 'next/cache';
 
 import type { Format } from '@/lib/types/media-models';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createReleaseSchema } from '../validation/create-release-schema';
 
 import type { FormState } from '../types/form-state';
-
-const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
 
 export const updateReleaseAction = async (
   releaseId: string,
@@ -207,7 +206,7 @@ export const updateReleaseAction = async (
       } else if (errorMessage.toLowerCase().includes('not found')) {
         formState.errors.general = ['Release not found'];
       } else {
-        formState.errors = { general: [errorMessage] };
+        formState.errors = { general: ['Failed to update release'] };
       }
     }
 

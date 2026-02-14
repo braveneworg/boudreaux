@@ -2,14 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { NotificationBannerService } from '../services/notification-banner-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { requireRole } from '../utils/auth/require-role';
-import { loggers } from '../utils/logger';
-import { notificationBannerSchema } from '../validation/notification-banner-schema';
+import { NotificationBannerService } from '@/lib/services/notification-banner-service';
+import type { FormState } from '@/lib/types/form-state';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
+import { notificationBannerSchema } from '@/lib/validation/notification-banner-schema';
 
-import type { FormState } from '../types/form-state';
 import type { Session } from 'next-auth';
 
 const logger = loggers.notifications;
@@ -86,14 +87,9 @@ export const createNotificationBannerAction = async (
   const messageTextShadowValue = payload.get('messageTextShadow');
   const secondaryMessageTextShadowValue = payload.get('secondaryMessageTextShadow');
 
-  const processedPayload = new FormData();
-  for (const [key, value] of payload.entries()) {
-    processedPayload.append(key, value);
-  }
-
   // Handle checkbox/switch boolean conversion
   const formDataObj: Record<string, unknown> = {};
-  for (const [key, value] of processedPayload.entries()) {
+  for (const [key, value] of payload.entries()) {
     if (key === 'sortOrder') {
       formDataObj[key] = parseInt(value.toString(), 10) || 0;
     } else if (
@@ -334,6 +330,14 @@ export const updateNotificationBannerAction = async (
     };
   }
 
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['Invalid notification ID'] },
+    };
+  }
+
   // Remove notificationId from payload for validation
   payload.delete('notificationId');
 
@@ -562,6 +566,10 @@ export const deleteNotificationBannerAction = async (
     return { success: false, error: 'Unauthorized' };
   }
 
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
+  }
+
   try {
     const result = await NotificationBannerService.deleteNotificationBanner(notificationId);
 
@@ -594,6 +602,10 @@ export const publishNotificationBannerAction = async (
     session = await requireRole('admin');
   } catch {
     return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
   }
 
   try {
@@ -631,6 +643,10 @@ export const unpublishNotificationBannerAction = async (
     session = await requireRole('admin');
   } catch {
     return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
   }
 
   try {

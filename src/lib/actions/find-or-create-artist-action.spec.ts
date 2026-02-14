@@ -495,12 +495,26 @@ describe('findOrCreateArtistAction', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Database connection failed',
+        error: 'Failed to find or create artist',
       });
     });
 
     it('should handle unknown errors', async () => {
       mockPrismaArtistFindFirst.mockRejectedValue('Unknown error');
+
+      const result = await findOrCreateArtistAction('Test Artist');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to find or create artist',
+      });
+    });
+
+    it('should throw error when slug generation exceeds max attempts', async () => {
+      // No existing artist with this name
+      mockPrismaArtistFindFirst.mockResolvedValue(null);
+      // Every slug check returns an existing artist (all taken)
+      mockPrismaArtistFindUnique.mockResolvedValue({ id: 'existing-id' } as never);
 
       const result = await findOrCreateArtistAction('Test Artist');
 

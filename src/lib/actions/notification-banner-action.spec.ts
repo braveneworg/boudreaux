@@ -1,4 +1,11 @@
 // Mock server-only to prevent client component error in tests
+// Import mocked modules after vi.mock calls
+import { NotificationBannerService } from '@/lib/services/notification-banner-service';
+import type { NotificationBanner } from '@/lib/services/notification-banner-service';
+import type { FormState } from '@/lib/types/form-state';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { requireRole } from '@/lib/utils/auth/require-role';
+
 import {
   createNotificationBannerAction,
   updateNotificationBannerAction,
@@ -6,13 +13,6 @@ import {
   publishNotificationBannerAction,
   unpublishNotificationBannerAction,
 } from './notification-banner-action';
-// Import mocked modules after vi.mock calls
-import { NotificationBannerService } from '../services/notification-banner-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { requireRole } from '../utils/auth/require-role';
-
-import type { NotificationBanner } from '../services/notification-banner-service';
-import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
 
@@ -21,7 +21,7 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock('../services/notification-banner-service', () => ({
+vi.mock('@/lib/services/notification-banner-service', () => ({
   NotificationBannerService: {
     createNotificationBanner: vi.fn(),
     updateNotificationBanner: vi.fn(),
@@ -31,17 +31,17 @@ vi.mock('../services/notification-banner-service', () => ({
   },
 }));
 
-vi.mock('../utils/audit-log', () => ({
+vi.mock('@/lib/utils/audit-log', () => ({
   logSecurityEvent: vi.fn(),
 }));
 
-vi.mock('../utils/auth/auth-utils', () => ({
+vi.mock('@/lib/utils/auth/auth-utils', () => ({
   setUnknownError: vi.fn((state: FormState) => {
-    state.errors = { general: ['An unknown error occurred. Please try again.'] };
+    state.errors = { general: ['An unknown error occurred'] };
   }),
 }));
 
-vi.mock('../utils/auth/require-role', () => ({
+vi.mock('@/lib/utils/auth/require-role', () => ({
   requireRole: vi.fn(),
 }));
 
@@ -92,7 +92,7 @@ const createValidFormData = (overrides: Record<string, string> = {}): FormData =
 };
 
 const mockNotificationBanner: NotificationBanner = {
-  id: 'notification-123',
+  id: 'aabbccddee112233ff445566',
   message: 'Test notification message',
   secondaryMessage: null,
   notes: null,
@@ -158,12 +158,12 @@ describe('notification-banner-action', () => {
       const result = await createNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(true);
-      expect(result.data?.notificationId).toBe('notification-123');
+      expect(result.data?.notificationId).toBe('aabbccddee112233ff445566');
       expect(mockLogSecurityEvent).toHaveBeenCalledWith({
         event: 'notification.banner.created',
         userId: 'admin-user-id',
         metadata: {
-          notificationId: 'notification-123',
+          notificationId: 'aabbccddee112233ff445566',
           message: 'Test notification message'.substring(0, 50),
         },
       });
@@ -199,7 +199,7 @@ describe('notification-banner-action', () => {
       const result = await createNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain('An unknown error occurred. Please try again.');
+      expect(result.errors?.general).toContain('An unknown error occurred');
     });
 
     it('should process boolean fields correctly', async () => {
@@ -362,17 +362,17 @@ describe('notification-banner-action', () => {
       });
 
       const formData = createValidFormData();
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(true);
-      expect(result.data?.notificationId).toBe('notification-123');
+      expect(result.data?.notificationId).toBe('aabbccddee112233ff445566');
       expect(mockLogSecurityEvent).toHaveBeenCalledWith({
         event: 'notification.banner.updated',
         userId: 'admin-user-id',
         metadata: {
-          notificationId: 'notification-123',
+          notificationId: 'aabbccddee112233ff445566',
           message: 'Test notification message'.substring(0, 50),
         },
       });
@@ -388,7 +388,7 @@ describe('notification-banner-action', () => {
 
     it('should return validation errors for invalid data', async () => {
       const formData = createValidFormData({ message: '' });
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
@@ -403,7 +403,7 @@ describe('notification-banner-action', () => {
       });
 
       const formData = createValidFormData();
-      formData.append('notificationId', 'non-existent');
+      formData.append('notificationId', 'aabbccddee112233ff445567');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
@@ -417,12 +417,12 @@ describe('notification-banner-action', () => {
       );
 
       const formData = createValidFormData();
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain('An unknown error occurred. Please try again.');
+      expect(result.errors?.general).toContain('An unknown error occurred');
     });
 
     it('should set boolean fields to false when not present in payload', async () => {
@@ -432,7 +432,7 @@ describe('notification-banner-action', () => {
       });
 
       const formData = new FormData();
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
       formData.append('message', 'Test message');
       formData.append('imageUrl', 'https://example.com/image.jpg');
       formData.append('messageFont', 'system-ui');
@@ -465,7 +465,7 @@ describe('notification-banner-action', () => {
       const formData = createValidFormData({
         sortOrder: 'invalid',
       });
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
@@ -476,7 +476,7 @@ describe('notification-banner-action', () => {
       mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
 
       const formData = createValidFormData();
-      formData.append('notificationId', 'notification-123');
+      formData.append('notificationId', 'aabbccddee112233ff445566');
 
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
@@ -484,6 +484,16 @@ describe('notification-banner-action', () => {
       expect(result.errors?.general).toContain(
         'You must be a logged in admin user to update a notification banner'
       );
+    });
+
+    it('should return error for invalid notificationId format', async () => {
+      const formData = createValidFormData();
+      formData.append('notificationId', 'invalid-id');
+
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('Invalid notification ID');
     });
   });
 
@@ -494,13 +504,13 @@ describe('notification-banner-action', () => {
         data: mockNotificationBanner,
       });
 
-      const result = await deleteNotificationBannerAction('notification-123');
+      const result = await deleteNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(true);
       expect(mockLogSecurityEvent).toHaveBeenCalledWith({
         event: 'notification.banner.deleted',
         userId: 'admin-user-id',
-        metadata: { notificationId: 'notification-123' },
+        metadata: { notificationId: 'aabbccddee112233ff445566' },
       });
     });
 
@@ -510,7 +520,7 @@ describe('notification-banner-action', () => {
         error: 'Notification banner not found',
       });
 
-      const result = await deleteNotificationBannerAction('non-existent');
+      const result = await deleteNotificationBannerAction('aabbccddee112233ff445567');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to delete notification banner');
@@ -521,7 +531,7 @@ describe('notification-banner-action', () => {
         new Error('Unexpected error')
       );
 
-      const result = await deleteNotificationBannerAction('notification-123');
+      const result = await deleteNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to delete notification banner');
@@ -530,10 +540,17 @@ describe('notification-banner-action', () => {
     it('should return error when requireRole throws', async () => {
       mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
 
-      const result = await deleteNotificationBannerAction('notification-123');
+      const result = await deleteNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error for invalid notificationId format', async () => {
+      const result = await deleteNotificationBannerAction('invalid-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid notification ID');
     });
   });
 
@@ -544,13 +561,13 @@ describe('notification-banner-action', () => {
         data: { ...mockNotificationBanner, publishedAt: new Date(), publishedBy: 'admin-user-id' },
       });
 
-      const result = await publishNotificationBannerAction('notification-123');
+      const result = await publishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(true);
       expect(mockLogSecurityEvent).toHaveBeenCalledWith({
         event: 'notification.banner.published',
         userId: 'admin-user-id',
-        metadata: { notificationId: 'notification-123' },
+        metadata: { notificationId: 'aabbccddee112233ff445566' },
       });
     });
 
@@ -560,7 +577,7 @@ describe('notification-banner-action', () => {
         error: 'Notification banner not found',
       });
 
-      const result = await publishNotificationBannerAction('non-existent');
+      const result = await publishNotificationBannerAction('aabbccddee112233ff445567');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to publish notification banner');
@@ -571,7 +588,7 @@ describe('notification-banner-action', () => {
         new Error('Unexpected error')
       );
 
-      const result = await publishNotificationBannerAction('notification-123');
+      const result = await publishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to publish notification banner');
@@ -580,10 +597,17 @@ describe('notification-banner-action', () => {
     it('should return error when requireRole throws', async () => {
       mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
 
-      const result = await publishNotificationBannerAction('notification-123');
+      const result = await publishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error for invalid notificationId format', async () => {
+      const result = await publishNotificationBannerAction('invalid-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid notification ID');
     });
   });
 
@@ -594,13 +618,13 @@ describe('notification-banner-action', () => {
         data: { ...mockNotificationBanner, publishedAt: null, publishedBy: null },
       });
 
-      const result = await unpublishNotificationBannerAction('notification-123');
+      const result = await unpublishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(true);
       expect(mockLogSecurityEvent).toHaveBeenCalledWith({
         event: 'notification.banner.unpublished',
         userId: 'admin-user-id',
-        metadata: { notificationId: 'notification-123' },
+        metadata: { notificationId: 'aabbccddee112233ff445566' },
       });
     });
 
@@ -610,7 +634,7 @@ describe('notification-banner-action', () => {
         error: 'Notification banner not found',
       });
 
-      const result = await unpublishNotificationBannerAction('non-existent');
+      const result = await unpublishNotificationBannerAction('aabbccddee112233ff445567');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to unpublish notification banner');
@@ -621,7 +645,7 @@ describe('notification-banner-action', () => {
         new Error('Unexpected error')
       );
 
-      const result = await unpublishNotificationBannerAction('notification-123');
+      const result = await unpublishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to unpublish notification banner');
@@ -630,10 +654,17 @@ describe('notification-banner-action', () => {
     it('should return error when requireRole throws', async () => {
       mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
 
-      const result = await unpublishNotificationBannerAction('notification-123');
+      const result = await unpublishNotificationBannerAction('aabbccddee112233ff445566');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should return error for invalid notificationId format', async () => {
+      const result = await unpublishNotificationBannerAction('invalid-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid notification ID');
     });
   });
 });

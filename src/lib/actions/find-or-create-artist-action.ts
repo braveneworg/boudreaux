@@ -2,12 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
+import { loggers } from '@/lib/utils/logger';
 
 import type { Prisma } from '@prisma/client';
+
+const logger = loggers.media;
 
 /**
  * Result of finding or creating an artist
@@ -242,12 +244,12 @@ export async function findOrCreateArtistAction(
 
       slug = `${baseSlug}-${slugSuffix}`;
       slugSuffix++;
+    }
 
-      if (slugSuffix > MAX_SLUG_ATTEMPTS) {
-        throw new Error(
-          `Could not generate unique slug for artist "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`
-        );
-      }
+    if (slugSuffix > MAX_SLUG_ATTEMPTS) {
+      throw new Error(
+        `Could not generate unique slug for artist "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`
+      );
     }
 
     // Build artist creation data with optional associations
@@ -310,13 +312,11 @@ export async function findOrCreateArtistAction(
       trackArtistCreated: !!trackId,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to find or create artist';
-
-    console.error('Find or create artist error:', error);
+    logger.error('Find or create artist error', error);
 
     return {
       success: false,
-      error: errorMessage,
+      error: 'Failed to find or create artist',
     };
   }
 }

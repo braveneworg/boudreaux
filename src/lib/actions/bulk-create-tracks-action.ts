@@ -2,15 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
 
 import { findOrCreateArtistAction } from './find-or-create-artist-action';
 import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
 
 import type { Prisma } from '@prisma/client';
+
+const logger = loggers.media;
 
 /**
  * Data for a single track in a bulk upload
@@ -422,18 +425,18 @@ export async function bulkCreateTracksAction(
           releaseCreated,
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create track';
+        const rawMessage = error instanceof Error ? error.message : '';
 
         // Check for duplicate title error
         const isDuplicate =
-          errorMessage.toLowerCase().includes('unique') ||
-          errorMessage.toLowerCase().includes('duplicate');
+          rawMessage.toLowerCase().includes('unique') ||
+          rawMessage.toLowerCase().includes('duplicate');
 
         results.push({
           index: i,
           success: false,
           title: track.title,
-          error: isDuplicate ? 'A track with this title already exists' : errorMessage,
+          error: isDuplicate ? 'A track with this title already exists' : 'Failed to create track',
         });
       }
     }
@@ -471,14 +474,14 @@ export async function bulkCreateTracksAction(
       results,
     };
   } catch (error) {
-    console.error('Bulk track creation error:', error);
+    logger.error('Bulk track creation error', error);
 
     return {
       success: false,
       successCount: 0,
       failedCount: tracks.length,
       results: [],
-      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      error: 'An unexpected error occurred',
     };
   }
 }

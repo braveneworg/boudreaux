@@ -284,7 +284,7 @@ describe('bulkCreateTracksAction', () => {
       expect(result.failedCount).toBe(1);
       expect(result.results[0].success).toBe(true);
       expect(result.results[1].success).toBe(false);
-      expect(result.results[1].error).toBe('Database error');
+      expect(result.results[1].error).toBe('Failed to create track');
     });
 
     it('should detect duplicate title errors', async () => {
@@ -557,7 +557,7 @@ describe('bulkCreateTracksAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.results[0].success).toBe(false);
-      expect(result.results[0].error).toBe('Connection failed');
+      expect(result.results[0].error).toBe('Failed to create track');
     });
   });
 
@@ -1350,7 +1350,7 @@ describe('bulkCreateTracksAction', () => {
         successCount: 0,
         failedCount: 1,
         results: [],
-        error: 'Unexpected error',
+        error: 'An unexpected error occurred',
       });
     });
 

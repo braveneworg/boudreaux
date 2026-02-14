@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import getActionState from './get-action-state';
+import { getActionState } from './get-action-state';
 
 describe('get-action-state', () => {
   const mockSchema = z.object({

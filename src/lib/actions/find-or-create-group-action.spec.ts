@@ -326,7 +326,7 @@ describe('findOrCreateGroupAction', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Database connection failed',
+        error: 'Failed to find or create group',
       });
     });
 
@@ -349,7 +349,7 @@ describe('findOrCreateGroupAction', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Failed to create group',
+        error: 'Failed to find or create group',
       });
     });
   });

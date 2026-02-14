@@ -70,4 +70,4 @@ const getActionState = <TForm>(
   return { formState, parsed };
 };
 
-export default getActionState;
+export { getActionState };
