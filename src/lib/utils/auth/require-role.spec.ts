@@ -74,7 +74,9 @@ describe('requireRole', () => {
         user: { role: 'admin' },
       });
 
-      await expect(requireRole('admin')).rejects.toThrow('Invalid session: user ID missing');
+      await expect(requireRole('admin')).rejects.toThrow(
+        'Invalid session: user ID missing. User ID is required for audit logging and security tracking.'
+      );
     });
   });
 

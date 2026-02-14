@@ -13,7 +13,9 @@ export const requireRole = async (role: string): Promise<Session> => {
 
   // Ensure user.id is present for audit logging and security tracking
   if (!session.user.id) {
-    throw Error('Invalid session: user ID missing');
+    throw Error(
+      `Invalid session: user ID missing. User ID is required for audit logging and security tracking.`
+    );
   }
 
   return session;
