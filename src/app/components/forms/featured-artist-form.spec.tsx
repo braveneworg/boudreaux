@@ -13,6 +13,7 @@ let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
 
 const mockPush = vi.fn();
+const mockSetValue = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -40,6 +41,29 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form useForm to inject our setValue spy
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actualUseForm = (actual as any).useForm;
+
+  return {
+    ...actual,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useForm: (config?: any) => {
+      const form = actualUseForm(config);
+      // Wrap the real setValue with our mock to track calls
+      const realSetValue = form.setValue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      form.setValue = (...args: any[]) => {
+        mockSetValue(...args);
+        return realSetValue(...args);
+      };
+      return form;
+    },
   };
 });
 
@@ -105,6 +129,7 @@ vi.mock('../ui/datepicker', () => ({
 describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetValue.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
   });
@@ -170,11 +195,12 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
-      // After handleTrackChange calls setValue('releaseId', ...),
-      // useWatch triggers re-render and the value flows to TrackSelect's releaseId prop
+      // Verify setValue was called with the correct releaseId and options
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -194,9 +220,12 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
       });
 
+      // Verify setValue was called with the first release ID
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('first00000000000000000000');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -213,19 +242,26 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
+
+      // Clear the mock to check the next call
+      mockSetValue.mockClear();
 
       // Then deselect
       await act(() => {
         capturedOnTrackChange?.(null);
       });
 
+      // Verify setValue was called with empty string
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        // empty string releaseId becomes undefined via || undefined, rendered as ''
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -240,9 +276,12 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      // Verify setValue was called with empty string
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -256,9 +295,12 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      // Verify setValue was called with empty string
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
   });
