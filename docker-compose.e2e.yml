@@ -1,0 +1,30 @@
+services:
+  mongodb-e2e:
+    image: mongo:7
+    container_name: boudreaux-e2e-mongo
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: boudreaux-e2e
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - e2e-mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --eval "
+          try {
+            rs.status().ok
+          } catch(e) {
+            rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27017'}]});
+            sleep(1000);
+            rs.status().ok
+          }
+        "
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  e2e-mongo-data:
+    driver: local
