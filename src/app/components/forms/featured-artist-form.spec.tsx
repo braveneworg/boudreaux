@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 
 import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
-// Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
 // Capture props passed to mocked child components
