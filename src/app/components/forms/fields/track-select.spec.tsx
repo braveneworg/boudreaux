@@ -752,6 +752,7 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
+        expect(screen.getByText('Failed to fetch tracks')).toBeInTheDocument();
       });
     });
 
@@ -771,6 +772,7 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
+        expect(screen.getByText('Network error')).toBeInTheDocument();
       });
     });
   });

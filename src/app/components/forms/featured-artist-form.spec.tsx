@@ -4,13 +4,35 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 
 import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
-// Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
+
+import type * as ReactHookForm from 'react-hook-form';
 
 // Capture the onTrackChange prop passed to TrackSelect
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
-// Capture setValue calls for releaseId
-let capturedSetValue: ReturnType<typeof vi.fn>;
+// Spy on setValue
+const mockSetValue = vi.fn();
+
+vi.mock('react-hook-form', async () => {
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
+  const { useForm: actualUseForm, ...rest } = actual;
+
+  return {
+    ...rest,
+    useForm: (options?: unknown) => {
+      const form = actualUseForm(options as Parameters<typeof actualUseForm>[0]);
+      const originalSetValue = form.setValue;
+
+      // Wrap setValue with our spy
+      form.setValue = (...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      };
+
+      return form;
+    },
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -67,10 +89,9 @@ vi.mock('@/app/components/forms/fields/group-select', () => ({
 }));
 
 vi.mock('@/app/components/forms/fields/release-select', () => ({
-  default: ({ name, setValue }: { name: string; setValue: unknown }) => {
-    capturedSetValue = setValue as ReturnType<typeof vi.fn>;
-    return <div data-testid={`release-select-${name}`}>ReleaseSelect</div>;
-  },
+  default: ({ name }: { name: string }) => (
+    <div data-testid={`release-select-${name}`}>ReleaseSelect</div>
+  ),
 }));
 
 vi.mock('@/app/components/forms/fields/track-select', () => ({
@@ -98,6 +119,7 @@ describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnTrackChange = undefined;
+    mockSetValue.mockClear();
   });
 
   describe('rendering', () => {
@@ -143,13 +165,11 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
-      // The form's setValue should have been called for releaseId via the
-      // shared setValue function. We verify by checking the captured setValue
-      // from ReleaseSelect was the same one used to set releaseId.
-      // Since both TrackSelect.onTrackChange and ReleaseSelect share the same
-      // form.setValue, we verify it was called.
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'release-abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -169,9 +189,11 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
       });
 
-      // The handler should pick the first release
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'release-first00000000000000', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -187,13 +209,18 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      mockSetValue.mockClear();
+
       // Then deselect
       await act(() => {
         capturedOnTrackChange?.(null);
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -211,7 +238,10 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -228,7 +258,10 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
   });
