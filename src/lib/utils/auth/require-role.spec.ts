@@ -68,6 +68,14 @@ describe('requireRole', () => {
 
       await expect(requireRole('admin')).rejects.toThrow('Unauthorized');
     });
+
+    it('should throw error when user.id is missing', async () => {
+      mockAuth.mockResolvedValue({
+        user: { role: 'admin' },
+      });
+
+      await expect(requireRole('admin')).rejects.toThrow('Invalid session: user ID missing');
+    });
   });
 
   describe('edge cases', () => {
