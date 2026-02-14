@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/braveneworg/boudreaux)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.5.1-blue)](CHANGELOG.md)
 [![Node Version](https://img.shields.io/badge/node-22.x-brightgreen.svg)](package.json)
-[![Next.js](https://img.shields.io/badge/Next.js-15.5.0-black)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org)
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 

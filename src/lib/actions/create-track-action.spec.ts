@@ -1,13 +1,13 @@
 // Mock server-only and prisma first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { getActionState } from '@/lib/utils/auth/get-action-state';
+
 import { createTrackAction } from './create-track-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { TrackService } from '../services/track-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { requireRole } from '../utils/auth/require-role';
 
 import type { FormState } from '../types/form-state';
@@ -55,11 +55,10 @@ vi.mock('@prisma/client', () => ({
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('../../../auth');
 vi.mock('../services/track-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('../utils/auth/get-action-state');
+vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('../utils/auth/require-role');
 
 describe('createTrackAction', () => {
@@ -85,8 +84,7 @@ describe('createTrackAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(undefined);
-    vi.mocked(auth).mockResolvedValue(mockSession as never);
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -101,56 +99,7 @@ describe('createTrackAction', () => {
       expect(requireRole).toHaveBeenCalledWith('admin');
     });
 
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Track',
-            duration: 225,
-            audioUrl: 'https://example.com/audio.mp3',
-            position: 1,
-          },
-        },
-      } as never);
-
-      const result = await createTrackAction(initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to create a track',
-      ]);
-    });
-
-    it('should return error when user is not admin', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user', email: 'user@example.com' },
-      } as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Track',
-            duration: 225,
-            audioUrl: 'https://example.com/audio.mp3',
-            position: 1,
-          },
-        },
-      } as never);
-
-      const result = await createTrackAction(initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to create a track',
-      ]);
-    });
-
     it('should allow admin users to create tracks', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -378,7 +327,7 @@ describe('createTrackAction', () => {
       const result = await createTrackAction(initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Database connection failed']);
+      expect(result.errors?.general).toEqual(['Failed to create track']);
     });
 
     it('should handle service returning error without message', async () => {
@@ -612,8 +561,7 @@ describe('createTrackAction', () => {
 
       for (const errorMessage of errorMessages) {
         vi.clearAllMocks();
-        vi.mocked(requireRole).mockResolvedValue(undefined);
-        vi.mocked(auth).mockResolvedValue(mockSession as never);
+        vi.mocked(requireRole).mockResolvedValue(mockSession as never);
 
         vi.mocked(getActionState).mockReturnValue({
           formState: { fields: {}, success: false },

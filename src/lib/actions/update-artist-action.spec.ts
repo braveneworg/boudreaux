@@ -1,12 +1,13 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { getActionState } from '@/lib/utils/auth/get-action-state';
+
 import { updateArtistAction } from './update-artist-action';
 import { auth } from '../../../auth';
 import { ArtistService } from '../services/artist-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { requireRole } from '../utils/auth/require-role';
 
 import type { FormState } from '../types/form-state';
@@ -19,7 +20,7 @@ vi.mock('../../../auth');
 vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('../utils/auth/get-action-state');
+vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('../utils/auth/require-role');
 
 describe('updateArtistAction', () => {
@@ -48,7 +49,7 @@ describe('updateArtistAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(undefined);
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(auth).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });

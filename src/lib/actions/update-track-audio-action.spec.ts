@@ -66,7 +66,7 @@ describe('updateTrackAudioAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(mockSession);
-    mockRequireRole.mockResolvedValue();
+    mockRequireRole.mockResolvedValue(mockSession as never);
   });
 
   describe('authorization', () => {
@@ -339,7 +339,7 @@ describe('markTrackUploadingAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(mockSession);
-    mockRequireRole.mockResolvedValue();
+    mockRequireRole.mockResolvedValue(mockSession as never);
   });
 
   describe('authorization', () => {

@@ -3,14 +3,14 @@
 import { revalidatePath } from 'next/cache';
 
 import type { Format } from '@/lib/types/media-models';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createReleaseSchema } from '../validation/create-release-schema';
 
 import type { FormState } from '../types/form-state';
@@ -20,7 +20,16 @@ export const updateReleaseAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
+
+  // Validate releaseId format
+  if (!OBJECT_ID_REGEX.test(releaseId)) {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['Invalid release ID'] },
+    };
+  }
 
   const permittedFieldNames = [
     'title',
@@ -67,18 +76,6 @@ export const updateReleaseAction = async (
   }
 
   try {
-    // Get current user session
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      formState.success = false;
-      if (!formState.errors) {
-        formState.errors = {};
-      }
-      formState.errors.general = ['You must be a logged in admin user to update a release'];
-      return formState;
-    }
-
     const {
       title,
       releasedOn,
@@ -150,21 +147,26 @@ export const updateReleaseAction = async (
       const existingArtistIds = new Set(existingArtistReleases.map((ar) => ar.artistId));
       const newArtistIds = new Set(artistIds);
 
-      // Delete removed associations
+      // Delete removed and create new associations in parallel
       const toDelete = existingArtistReleases.filter((ar) => !newArtistIds.has(ar.artistId));
-      if (toDelete.length > 0) {
-        await prisma.artistRelease.deleteMany({
-          where: { id: { in: toDelete.map((ar) => ar.id) } },
-        });
-      }
-
-      // Create new associations
       const toCreate = artistIds.filter((id) => !existingArtistIds.has(id));
-      if (toCreate.length > 0) {
-        await prisma.artistRelease.createMany({
-          data: toCreate.map((artistId) => ({ artistId, releaseId })),
-        });
+
+      const ops: Promise<unknown>[] = [];
+      if (toDelete.length > 0) {
+        ops.push(
+          prisma.artistRelease.deleteMany({
+            where: { id: { in: toDelete.map((ar) => ar.id) } },
+          })
+        );
       }
+      if (toCreate.length > 0) {
+        ops.push(
+          prisma.artistRelease.createMany({
+            data: toCreate.map((artistId) => ({ artistId, releaseId })),
+          })
+        );
+      }
+      await Promise.all(ops);
     }
 
     // groupIds is validated but not persisted (no GroupRelease model in schema yet)
@@ -204,7 +206,7 @@ export const updateReleaseAction = async (
       } else if (errorMessage.toLowerCase().includes('not found')) {
         formState.errors.general = ['Release not found'];
       } else {
-        formState.errors = { general: [errorMessage] };
+        formState.errors = { general: ['Failed to update release'] };
       }
     }
 
