@@ -11,7 +11,8 @@ const AUTH_DIR = path.join(__dirname, '.auth');
  * Playwright passes this as a process env var to the Next.js dev server,
  * and process env takes precedence over .env.local / .env files.
  */
-const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
+const AUTH_SECRET =
+  process.env.AUTH_SECRET ?? 'e2e-test-secret-key-that-is-at-least-32-characters-long';
 
 export default async function globalSetup() {
   // Ensure .auth directory exists
