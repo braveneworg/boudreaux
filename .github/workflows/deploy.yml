@@ -760,7 +760,7 @@ jobs:
               # Try renewal first WITHOUT stopping containers (works if cert uses webroot authenticator)
               # The renewal config at /etc/letsencrypt/renewal/$DOMAIN.conf determines the method
               if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
-                echo "✓ Certificate renewed successfully via certbot renew (webroot mode)."
+                echo "✓ Certificate renewed successfully via certbot renew (with containers running)."
               else
                 echo "certbot renew failed with containers running — trying with containers stopped..."
 
@@ -769,7 +769,7 @@ jobs:
 
                 # Retry renewal with containers stopped (works if cert uses standalone authenticator)
                 if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
-                  echo "✓ Certificate renewed successfully via certbot renew (standalone mode)."
+                  echo "✓ Certificate renewed successfully via certbot renew (with containers stopped)."
                 else
                   echo "certbot renew failed — no existing cert found, trying initial issuance..."
 
