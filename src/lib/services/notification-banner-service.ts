@@ -65,7 +65,7 @@ export class NotificationBannerService {
    * Create a new notification banner
    */
   static async createNotificationBanner(
-    data: Prisma.NotificationCreateInput
+    data: Prisma.NotificationUncheckedCreateInput
   ): Promise<ServiceResponse<NotificationBanner>> {
     try {
       const notification = await prisma.notification.create({
@@ -79,7 +79,8 @@ export class NotificationBannerService {
       }
 
       console.error('Unexpected error:', error);
-      return { success: false, error: 'Failed to create notification banner' };
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: `Failed to create notification banner: ${detail}` };
     }
   }
 

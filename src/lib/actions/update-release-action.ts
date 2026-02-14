@@ -6,6 +6,7 @@ import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -83,6 +84,8 @@ export const updateReleaseAction = async (
       releasedOn,
       coverArt,
       formats,
+      artistIds,
+      groupIds,
       labels,
       catalogNumber,
       description,
@@ -135,6 +138,37 @@ export const updateReleaseAction = async (
       featuredUntil: featuredUntil ? new Date(featuredUntil) : undefined,
       featuredDescription: featuredDescription || undefined,
     });
+
+    // Sync ArtistRelease associations if artistIds provided
+    if (response.success && artistIds) {
+      // Get current artist associations
+      const existingArtistReleases = await prisma.artistRelease.findMany({
+        where: { releaseId },
+        select: { id: true, artistId: true },
+      });
+
+      const existingArtistIds = new Set(existingArtistReleases.map((ar) => ar.artistId));
+      const newArtistIds = new Set(artistIds);
+
+      // Delete removed associations
+      const toDelete = existingArtistReleases.filter((ar) => !newArtistIds.has(ar.artistId));
+      if (toDelete.length > 0) {
+        await prisma.artistRelease.deleteMany({
+          where: { id: { in: toDelete.map((ar) => ar.id) } },
+        });
+      }
+
+      // Create new associations
+      const toCreate = artistIds.filter((id) => !existingArtistIds.has(id));
+      if (toCreate.length > 0) {
+        await prisma.artistRelease.createMany({
+          data: toCreate.map((artistId) => ({ artistId, releaseId })),
+        });
+      }
+    }
+
+    // groupIds is validated but not persisted (no GroupRelease model in schema yet)
+    void groupIds;
 
     // Log release update for security audit
     logSecurityEvent({

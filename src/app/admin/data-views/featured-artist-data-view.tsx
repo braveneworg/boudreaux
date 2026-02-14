@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback } from 'react';
+
 import useFeaturedArtistsQuery from '@/app/hooks/use-featured-artists-query';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
@@ -19,6 +21,22 @@ export const FeaturedArtistDataView = () => {
   ];
   const { isPending, error, data, refetch } = useFeaturedArtistsQuery();
 
+  const getSearchableText = useCallback((item: FeaturedArtist) => {
+    const parts: string[] = [];
+    if (item.displayName) parts.push(item.displayName);
+    if (item.description) parts.push(item.description);
+    if (item.artists) {
+      for (const artist of item.artists) {
+        if (artist.displayName) parts.push(artist.displayName);
+      }
+    }
+    if (item.group) {
+      if (item.group.name) parts.push(item.group.name);
+      if (item.group.displayName) parts.push(item.group.displayName);
+    }
+    return parts.join(' ');
+  }, []);
+
   if (error) {
     return <div>Error loading featured artists</div>;
   }
@@ -35,6 +53,7 @@ export const FeaturedArtistDataView = () => {
       refetch={refetch}
       isPending={isPending}
       getItemDisplayName={getFeaturedArtistDisplayName}
+      getSearchableText={getSearchableText}
     />
   );
 };

@@ -1157,7 +1157,11 @@ export default function BulkTrackUploader() {
                         {duplicateCount} duplicate{duplicateCount !== 1 ? 's' : ''}
                       </Badge>
                     )}
-                    {pendingCount > 0 && <Badge variant="secondary">{pendingCount} pending</Badge>}
+                    {pendingCount > 0 && (
+                      <Badge variant="secondary" className="animate-pulse-scale">
+                        {pendingCount} pending
+                      </Badge>
+                    )}
                   </div>
                 </div>
 

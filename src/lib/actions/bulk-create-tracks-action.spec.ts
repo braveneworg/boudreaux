@@ -778,7 +778,7 @@ describe('bulkCreateTracksAction', () => {
       );
     });
 
-    it('should use albumArtist when artist is not provided', async () => {
+    it('should use albumArtist as group when artist is not provided', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -802,6 +802,14 @@ describe('bulkCreateTracksAction', () => {
         return callback(mockTx as never);
       });
 
+      mockFindOrCreateGroup.mockResolvedValue({
+        success: true,
+        groupId: 'group-123',
+        groupName: 'Album Artist',
+        created: true,
+        artistGroupCreated: false,
+      });
+
       const tracks: BulkTrackData[] = [
         {
           title: 'Test Track',
@@ -813,12 +821,14 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+      // albumArtist without a distinct artist creates a Group, not an Artist
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
         'Album Artist',
         expect.objectContaining({
           tx: expect.anything(),
         })
       );
+      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
     });
 
     it('should cache artist lookups for same artist name', async () => {
@@ -980,7 +990,7 @@ describe('bulkCreateTracksAction', () => {
       );
     });
 
-    it('should not create group when albumArtist matches artist', async () => {
+    it('should create group when albumArtist matches artist', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -1002,6 +1012,14 @@ describe('bulkCreateTracksAction', () => {
           artistGroup: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
         };
         return callback(mockTx as never);
+      });
+
+      mockFindOrCreateGroup.mockResolvedValue({
+        success: true,
+        groupId: 'group-123',
+        groupName: 'The Beatles',
+        created: true,
+        artistGroupCreated: false,
       });
 
       const tracks: BulkTrackData[] = [
@@ -1016,11 +1034,17 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      // Should not create a Group when albumArtist matches artist (solo artist case)
-      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+      // When albumArtist matches artist, treat albumArtist as Group and skip individual Artist
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
+        'The Beatles',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
+      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
     });
 
-    it('should not create group when albumArtist matches artist (case-insensitive)', async () => {
+    it('should create group when albumArtist matches artist (case-insensitive)', async () => {
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
         title: 'Test Track',
@@ -1044,6 +1068,14 @@ describe('bulkCreateTracksAction', () => {
         return callback(mockTx as never);
       });
 
+      mockFindOrCreateGroup.mockResolvedValue({
+        success: true,
+        groupId: 'group-123',
+        groupName: 'THE BEATLES',
+        created: true,
+        artistGroupCreated: false,
+      });
+
       const tracks: BulkTrackData[] = [
         {
           title: 'Test Track',
@@ -1056,8 +1088,14 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      // Should not create a Group when albumArtist matches artist case-insensitively (solo artist case)
-      expect(mockFindOrCreateGroup).not.toHaveBeenCalled();
+      // Case-insensitive match: albumArtist treated as Group, no individual Artist created
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
+        'THE BEATLES',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
+      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
     });
 
     it('should cache group lookups for same group name', async () => {
@@ -1131,7 +1169,7 @@ describe('bulkCreateTracksAction', () => {
   });
 
   describe('albumArtist and release association', () => {
-    it('should link albumArtist to release when both are present', async () => {
+    it('should link albumArtist as group to release when both are present', async () => {
       mockFindOrCreateRelease.mockResolvedValue({
         success: true,
         releaseId: 'release-123',
@@ -1139,13 +1177,12 @@ describe('bulkCreateTracksAction', () => {
         created: true,
       });
 
-      mockFindOrCreateArtist.mockResolvedValue({
+      mockFindOrCreateGroup.mockResolvedValue({
         success: true,
-        artistId: 'artist-123',
-        artistName: 'Album Artist',
+        groupId: 'group-123',
+        groupName: 'Album Artist',
         created: true,
-        artistReleaseCreated: true,
-        trackArtistCreated: false,
+        artistGroupCreated: false,
       });
 
       const createMock = vi.fn().mockResolvedValue({
@@ -1183,10 +1220,10 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
-      // Should call findOrCreateArtistAction with releaseId for albumArtist
-      expect(mockFindOrCreateArtist).toHaveBeenCalledWith('Album Artist', {
-        releaseId: 'release-123',
-      });
+      // albumArtist creates a Group in the first pass (outside transaction)
+      // when autoCreateRelease is true and album is present
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith('Album Artist');
+      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
     });
   });
 
@@ -1269,9 +1306,7 @@ describe('bulkCreateTracksAction', () => {
   });
 
   describe('albumArtist caching across multiple tracks', () => {
-    it('should create ArtistRelease for cached albumArtist on new release', async () => {
-      const artistReleaseCreateMock = vi.fn();
-
+    it('should cache group for albumArtist across tracks with different albums', async () => {
       // First release setup
       mockFindOrCreateRelease
         .mockResolvedValueOnce({
@@ -1287,18 +1322,13 @@ describe('bulkCreateTracksAction', () => {
           created: true,
         });
 
-      mockFindOrCreateArtist.mockResolvedValue({
+      mockFindOrCreateGroup.mockResolvedValue({
         success: true,
-        artistId: 'artist-123',
-        artistName: 'Same Artist',
-        created: false,
-        artistReleaseCreated: true,
-        trackArtistCreated: false,
+        groupId: 'group-123',
+        groupName: 'Same Artist',
+        created: true,
+        artistGroupCreated: false,
       });
-
-      // Mock prisma.artistRelease for the first pass check
-      mockPrismaArtistReleaseFindUnique.mockResolvedValue(null);
-      mockPrismaArtistReleaseCreate.mockImplementation(artistReleaseCreateMock);
 
       const createMock = vi.fn().mockResolvedValue({
         id: 'track-123',
@@ -1342,12 +1372,11 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
-      // findOrCreateArtistAction should be called once for the first track
-      // For subsequent tracks with same albumArtist but different album,
-      // it should create ArtistRelease directly from the cache
-      expect(mockFindOrCreateArtist).toHaveBeenCalledWith('Same Artist', {
-        releaseId: 'release-1',
-      });
+      // findOrCreateGroupAction should be called once in the first pass
+      // (outside transaction); the second track uses the cached group
+      expect(mockFindOrCreateGroup).toHaveBeenCalledTimes(1);
+      expect(mockFindOrCreateGroup).toHaveBeenCalledWith('Same Artist');
+      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
     });
   });
 
