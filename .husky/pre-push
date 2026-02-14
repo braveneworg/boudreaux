@@ -41,7 +41,8 @@ echo ""
 echo "🧪 Running tests before push..."
 
 # Run tests excluding the unrelated failing SSR test
-npm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx
+# Suppress console output during tests to reduce verbosity
+SUPPRESS_CONSOLE=1 npm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx --reporter=dot --silent
 
 if [ $? -ne 0 ]; then
   echo ""
