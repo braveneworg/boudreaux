@@ -2,7 +2,6 @@
 import { revalidatePath } from 'next/cache';
 
 import { createReleaseAction } from './create-release-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
@@ -23,7 +22,7 @@ vi.mock('../prisma', () => ({
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('../../../auth');
+
 vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
@@ -55,8 +54,7 @@ describe('createReleaseAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(undefined);
-    vi.mocked(auth).mockResolvedValue(mockSession as never);
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -71,31 +69,7 @@ describe('createReleaseAction', () => {
       expect(requireRole).toHaveBeenCalledWith('admin');
     });
 
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-          },
-        },
-      } as never);
-
-      const result = await createReleaseAction(initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to create a release',
-      ]);
-    });
-
     it('should allow admin users to create releases', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -595,8 +569,7 @@ describe('createReleaseAction', () => {
 
       for (const errorMessage of errorMessages) {
         vi.clearAllMocks();
-        vi.mocked(requireRole).mockResolvedValue(undefined);
-        vi.mocked(auth).mockResolvedValue(mockSession as never);
+        vi.mocked(requireRole).mockResolvedValue(mockSession as never);
 
         vi.mocked(getActionState).mockReturnValue({
           formState: { fields: {}, success: false },

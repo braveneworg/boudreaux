@@ -7,7 +7,6 @@ import {
   unpublishNotificationBannerAction,
 } from './notification-banner-action';
 // Import mocked modules after vi.mock calls
-import { auth } from '../../../auth';
 import { NotificationBannerService } from '../services/notification-banner-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { requireRole } from '../utils/auth/require-role';
@@ -20,10 +19,6 @@ vi.mock('server-only', () => ({}));
 // Mock dependencies
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
-}));
-
-vi.mock('../../../auth', () => ({
-  auth: vi.fn(),
 }));
 
 vi.mock('../services/notification-banner-service', () => ({
@@ -60,17 +55,6 @@ const mockSession = {
     username: 'adminuser',
     email: 'admin@example.com',
     role: 'admin',
-  },
-  expires: new Date(Date.now() + 86400000).toISOString(),
-};
-
-const mockNonAdminSession = {
-  user: {
-    id: 'user-id',
-    name: 'Regular User',
-    username: 'regularuser',
-    email: 'user@example.com',
-    role: 'user',
   },
   expires: new Date(Date.now() + 86400000).toISOString(),
 };
@@ -160,12 +144,11 @@ const initialFormState: FormState = {
 describe('notification-banner-action', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireRole.mockResolvedValue(undefined);
+    mockRequireRole.mockResolvedValue(mockSession as never);
   });
 
   describe('createNotificationBannerAction', () => {
     it('should create notification banner successfully with valid data', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -187,8 +170,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should return validation errors for invalid message', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
-
       const formData = createValidFormData({ message: '' });
       const result = await createNotificationBannerAction(initialFormState, formData);
 
@@ -196,32 +177,7 @@ describe('notification-banner-action', () => {
       expect(result.errors?.message).toContain('Message is required');
     });
 
-    it('should return error when user is not an admin', async () => {
-      vi.mocked(auth).mockResolvedValue(mockNonAdminSession as never);
-
-      const formData = createValidFormData();
-      const result = await createNotificationBannerAction(initialFormState, formData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain(
-        'You must be a logged in admin user to create a notification banner'
-      );
-    });
-
-    it('should return error when user session is missing', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-
-      const formData = createValidFormData();
-      const result = await createNotificationBannerAction(initialFormState, formData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain(
-        'You must be a logged in admin user to create a notification banner'
-      );
-    });
-
     it('should return error when service fails', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: false,
         error: 'Database error',
@@ -231,11 +187,10 @@ describe('notification-banner-action', () => {
       const result = await createNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain('Database error');
+      expect(result.errors?.general).toContain('Failed to create notification banner');
     });
 
     it('should handle unexpected errors', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockRejectedValue(
         new Error('Unexpected error')
       );
@@ -248,7 +203,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should process boolean fields correctly', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -264,7 +218,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should process numeric fields correctly', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -281,7 +234,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should handle date fields', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -297,7 +249,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should accept backgroundColor instead of imageUrl', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: { ...mockNotificationBanner, imageUrl: null, backgroundColor: '#ff0000' },
@@ -313,8 +264,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should require either imageUrl or backgroundColor', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
-
       const formData = createValidFormData({
         imageUrl: '',
         backgroundColor: '',
@@ -326,7 +275,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should use fallback values when boolean fields are omitted from form data', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -359,7 +307,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should handle checkbox "on" values for boolean fields', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -391,7 +338,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should pass addedById to service when creating notification banner', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -410,7 +356,6 @@ describe('notification-banner-action', () => {
 
   describe('updateNotificationBannerAction', () => {
     it('should update notification banner successfully', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -441,23 +386,7 @@ describe('notification-banner-action', () => {
       expect(result.errors?.general).toContain('Notification ID is required');
     });
 
-    it('should return error when user is not an admin', async () => {
-      vi.mocked(auth).mockResolvedValue(mockNonAdminSession as never);
-
-      const formData = createValidFormData();
-      formData.append('notificationId', 'notification-123');
-
-      const result = await updateNotificationBannerAction(initialFormState, formData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain(
-        'You must be a logged in admin user to update a notification banner'
-      );
-    });
-
     it('should return validation errors for invalid data', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
-
       const formData = createValidFormData({ message: '' });
       formData.append('notificationId', 'notification-123');
 
@@ -468,7 +397,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should return error when service fails', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
         success: false,
         error: 'Notification banner not found',
@@ -480,11 +408,10 @@ describe('notification-banner-action', () => {
       const result = await updateNotificationBannerAction(initialFormState, formData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toContain('Notification banner not found');
+      expect(result.errors?.general).toContain('Failed to update notification banner');
     });
 
     it('should handle unexpected errors', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.updateNotificationBanner).mockRejectedValue(
         new Error('Unexpected error')
       );
@@ -499,7 +426,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should set boolean fields to false when not present in payload', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
         success: true,
         data: { ...mockNotificationBanner, isOverlayed: false, isActive: false },
@@ -531,7 +457,6 @@ describe('notification-banner-action', () => {
     });
 
     it('should default sortOrder to 0 when invalid value provided', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -564,7 +489,6 @@ describe('notification-banner-action', () => {
 
   describe('deleteNotificationBannerAction', () => {
     it('should delete notification banner successfully', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.deleteNotificationBanner).mockResolvedValue({
         success: true,
         data: mockNotificationBanner,
@@ -580,26 +504,7 @@ describe('notification-banner-action', () => {
       });
     });
 
-    it('should return error when user is not an admin', async () => {
-      vi.mocked(auth).mockResolvedValue(mockNonAdminSession as never);
-
-      const result = await deleteNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session is missing', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-
-      const result = await deleteNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
     it('should return error when service fails', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.deleteNotificationBanner).mockResolvedValue({
         success: false,
         error: 'Notification banner not found',
@@ -608,11 +513,10 @@ describe('notification-banner-action', () => {
       const result = await deleteNotificationBannerAction('non-existent');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Notification banner not found');
+      expect(result.error).toBe('Failed to delete notification banner');
     });
 
     it('should handle unexpected errors', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.deleteNotificationBanner).mockRejectedValue(
         new Error('Unexpected error')
       );
@@ -635,7 +539,6 @@ describe('notification-banner-action', () => {
 
   describe('publishNotificationBannerAction', () => {
     it('should publish notification banner successfully', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.publishNotificationBanner).mockResolvedValue({
         success: true,
         data: { ...mockNotificationBanner, publishedAt: new Date(), publishedBy: 'admin-user-id' },
@@ -651,26 +554,7 @@ describe('notification-banner-action', () => {
       });
     });
 
-    it('should return error when user is not an admin', async () => {
-      vi.mocked(auth).mockResolvedValue(mockNonAdminSession as never);
-
-      const result = await publishNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session is missing', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-
-      const result = await publishNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
     it('should return error when service fails', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.publishNotificationBanner).mockResolvedValue({
         success: false,
         error: 'Notification banner not found',
@@ -679,11 +563,10 @@ describe('notification-banner-action', () => {
       const result = await publishNotificationBannerAction('non-existent');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Notification banner not found');
+      expect(result.error).toBe('Failed to publish notification banner');
     });
 
     it('should handle unexpected errors', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.publishNotificationBanner).mockRejectedValue(
         new Error('Unexpected error')
       );
@@ -706,7 +589,6 @@ describe('notification-banner-action', () => {
 
   describe('unpublishNotificationBannerAction', () => {
     it('should unpublish notification banner successfully', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.unpublishNotificationBanner).mockResolvedValue({
         success: true,
         data: { ...mockNotificationBanner, publishedAt: null, publishedBy: null },
@@ -722,26 +604,7 @@ describe('notification-banner-action', () => {
       });
     });
 
-    it('should return error when user is not an admin', async () => {
-      vi.mocked(auth).mockResolvedValue(mockNonAdminSession as never);
-
-      const result = await unpublishNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session is missing', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-
-      const result = await unpublishNotificationBannerAction('notification-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
     it('should return error when service fails', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.unpublishNotificationBanner).mockResolvedValue({
         success: false,
         error: 'Notification banner not found',
@@ -750,11 +613,10 @@ describe('notification-banner-action', () => {
       const result = await unpublishNotificationBannerAction('non-existent');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Notification banner not found');
+      expect(result.error).toBe('Failed to unpublish notification banner');
     });
 
     it('should handle unexpected errors', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(NotificationBannerService.unpublishNotificationBanner).mockRejectedValue(
         new Error('Unexpected error')
       );

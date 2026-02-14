@@ -6,10 +6,10 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Metric     | Coverage |
 | ---------- | -------- |
-| Statements | 95.78%   |
-| Branches   | 89.13%   |
-| Functions  | 95.20%   |
-| Lines      | 96.04%   |
+| Statements | 98.72%   |
+| Branches   | 91.47%   |
+| Functions  | 98.89%   |
+| Lines      | 98.89%   |
 
 **Last Updated:** 2026-02-07
 

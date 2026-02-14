@@ -2,7 +2,6 @@ import {
   findOrCreateGroupAction,
   type FindOrCreateGroupOptions,
 } from './find-or-create-group-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 import { requireRole } from '../utils/auth/require-role';
@@ -13,7 +12,6 @@ import type { Session } from 'next-auth';
 vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
-vi.mock('../../../auth');
 vi.mock('../prisma', () => ({
   prisma: {
     group: {
@@ -30,7 +28,6 @@ vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
 
-const mockAuth = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>;
 const mockRequireRole = vi.mocked(requireRole);
 const mockPrismaGroupFindFirst = vi.mocked(prisma.group.findFirst);
 const mockPrismaGroupCreate = vi.mocked(prisma.group.create);
@@ -51,8 +48,7 @@ describe('findOrCreateGroupAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue(mockAdminSession);
-    mockRequireRole.mockResolvedValue();
+    mockRequireRole.mockResolvedValue(mockAdminSession as never);
   });
 
   describe('validation', () => {
@@ -78,38 +74,6 @@ describe('findOrCreateGroupAction', () => {
       mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
 
       await expect(findOrCreateGroupAction('Test Group')).rejects.toThrow('Unauthorized');
-    });
-  });
-
-  describe('authentication', () => {
-    it('should reject if session is missing', async () => {
-      mockAuth.mockResolvedValue(null);
-
-      const result = await findOrCreateGroupAction('Test Group');
-
-      expect(result).toEqual({
-        success: false,
-        error: 'You must be a logged in admin user to manage groups',
-      });
-    });
-
-    it('should reject if user is not admin', async () => {
-      mockAuth.mockResolvedValue({
-        user: {
-          id: 'user-123',
-          role: 'user',
-          name: 'Test User',
-          email: 'user@test.com',
-        },
-        expires: new Date(Date.now() + 86400000).toISOString(),
-      });
-
-      const result = await findOrCreateGroupAction('Test Group');
-
-      expect(result).toEqual({
-        success: false,
-        error: 'You must be a logged in admin user to manage groups',
-      });
     });
   });
 

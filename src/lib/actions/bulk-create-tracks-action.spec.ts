@@ -3,16 +3,12 @@ import { bulkCreateTracksAction, type BulkTrackData } from './bulk-create-tracks
 import { findOrCreateArtistAction } from './find-or-create-artist-action';
 import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction } from './find-or-create-release-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { requireRole } from '../utils/auth/require-role';
-
-import type { Session } from 'next-auth';
 
 vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
-vi.mock('../../../auth');
 vi.mock('../prisma', () => ({
   prisma: {
     track: {
@@ -36,7 +32,6 @@ vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
 
-const mockAuth = auth as unknown as ReturnType<typeof vi.fn<() => Promise<Session | null>>>;
 const mockRequireRole = vi.mocked(requireRole);
 const mockPrismaTrackCreate = vi.mocked(prisma.track.create);
 const mockPrismaTransaction = vi.mocked(prisma.$transaction);
@@ -47,21 +42,21 @@ const mockFindOrCreateArtist = vi.mocked(findOrCreateArtistAction);
 const mockFindOrCreateGroup = vi.mocked(findOrCreateGroupAction);
 
 describe('bulkCreateTracksAction', () => {
+  const mockSession = {
+    user: {
+      id: 'user-123',
+      role: 'admin',
+      name: 'Test Admin',
+      email: 'admin@test.com',
+    },
+    expires: new Date(Date.now() + 86400000).toISOString(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Default auth setup - admin user
-    mockAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        role: 'admin',
-        name: 'Test Admin',
-        email: 'admin@test.com',
-      },
-      expires: new Date(Date.now() + 86400000).toISOString(),
-    } as Session);
-
-    mockRequireRole.mockResolvedValue();
+    mockRequireRole.mockResolvedValue(mockSession as never);
 
     // Default transaction mock
     mockPrismaTransaction.mockImplementation(async (callback) => {
@@ -121,52 +116,6 @@ describe('bulkCreateTracksAction', () => {
       ];
 
       await expect(bulkCreateTracksAction(tracks)).rejects.toThrow('Unauthorized');
-    });
-  });
-
-  describe('authentication', () => {
-    it('should reject if session is missing', async () => {
-      mockAuth.mockResolvedValue(null);
-
-      const tracks: BulkTrackData[] = [
-        { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
-      ];
-
-      const result = await bulkCreateTracksAction(tracks);
-
-      expect(result).toEqual({
-        success: false,
-        successCount: 0,
-        failedCount: 1,
-        results: [],
-        error: 'You must be a logged in admin user to create tracks',
-      });
-    });
-
-    it('should reject if user is not admin', async () => {
-      mockAuth.mockResolvedValue({
-        user: {
-          id: 'user-123',
-          role: 'user',
-          name: 'Test User',
-          email: 'user@test.com',
-        },
-        expires: new Date(Date.now() + 86400000).toISOString(),
-      } as Session);
-
-      const tracks: BulkTrackData[] = [
-        { title: 'Test Track', duration: 180, audioUrl: 'https://example.com/track.mp3' },
-      ];
-
-      const result = await bulkCreateTracksAction(tracks);
-
-      expect(result).toEqual({
-        success: false,
-        successCount: 0,
-        failedCount: 1,
-        results: [],
-        error: 'You must be a logged in admin user to create tracks',
-      });
     });
   });
 

@@ -7,7 +7,6 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { findOrCreateArtistAction } from './find-or-create-artist-action';
 import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 
@@ -110,7 +109,7 @@ export async function bulkCreateTracksAction(
   options: BulkCreateTracksOptions = {}
 ): Promise<BulkCreateTracksResult> {
   const { autoCreateRelease = true, publishTracks = false, deferUpload = false } = options;
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   // Validate input
   if (!tracks || tracks.length === 0) {
@@ -134,18 +133,6 @@ export async function bulkCreateTracksAction(
   }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return {
-        success: false,
-        successCount: 0,
-        failedCount: tracks.length,
-        results: [],
-        error: 'You must be a logged in admin user to create tracks',
-      };
-    }
-
     const results: BulkTrackResult[] = [];
     const releaseCache = new Map<
       string,

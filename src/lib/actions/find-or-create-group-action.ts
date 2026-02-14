@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 
@@ -50,7 +49,7 @@ export async function findOrCreateGroupAction(
   groupName: string,
   options: FindOrCreateGroupOptions = {}
 ): Promise<FindOrCreateGroupResult> {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   // Validate required field
   if (!groupName || groupName.trim() === '') {
@@ -66,15 +65,6 @@ export async function findOrCreateGroupAction(
   const db = tx || prisma;
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return {
-        success: false,
-        error: 'You must be a logged in admin user to manage groups',
-      };
-    }
-
     // Try to find an existing group by name or displayName (case-insensitive)
     const existingGroup = await db.group.findFirst({
       where: {
