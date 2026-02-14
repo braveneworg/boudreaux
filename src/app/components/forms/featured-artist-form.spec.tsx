@@ -8,6 +8,8 @@ import type { TrackOption } from '@/app/components/forms/fields/track-select';
 // Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
+import type { UseFormReturn } from 'react-hook-form';
+
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
@@ -47,19 +49,23 @@ vi.mock('react', async () => {
 // Mock react-hook-form to capture setValue calls
 vi.mock('react-hook-form', async () => {
   const actual = await vi.importActual('react-hook-form');
-  type ReactHookForm = typeof actual;
+
   return {
     ...actual,
-    useForm: (options?: unknown) => {
-      const formMethods = (actual as ReactHookForm).useForm(options);
+    useForm: ((options?: unknown) => {
+      const formMethods = (
+        actual as {
+          useForm: (opts?: unknown) => UseFormReturn;
+        }
+      ).useForm(options);
       // Wrap setValue to capture calls while preserving functionality
       const originalSetValue = formMethods.setValue;
-      formMethods.setValue = (...args: Parameters<typeof originalSetValue>) => {
+      formMethods.setValue = ((...args) => {
         mockSetValue(...args);
         return originalSetValue(...args);
-      };
+      }) as typeof originalSetValue;
       return formMethods;
-    },
+    }) as (typeof actual)['useForm'],
   };
 });
 
