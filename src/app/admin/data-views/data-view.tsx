@@ -79,6 +79,8 @@ export function DataView<T extends Record<string, unknown>>({
   hasNextPage,
   fetchNextPage,
   isFetchingNextPage,
+  getItemDisplayName,
+  getSearchableText,
 }: {
   entity: AdminEntity;
   data: Record<string, T[]> | null;
@@ -96,6 +98,10 @@ export function DataView<T extends Record<string, unknown>>({
   fetchNextPage?: () => void;
   /** For infinite scroll - whether currently fetching next page */
   isFetchingNextPage?: boolean;
+  /** Custom display name resolver for entity-specific name formatting */
+  getItemDisplayName?: (item: T) => string;
+  /** Custom searchable text builder for searching nested/related fields */
+  getSearchableText?: (item: T) => string;
 }) {
   const [showDeleted, setShowDeleted] = useState(false);
   const [showPublished, setShowPublished] = useState(true);
@@ -104,6 +110,11 @@ export function DataView<T extends Record<string, unknown>>({
   const [previewImage, setPreviewImage] = useState<{ src: string; altText?: string } | null>(null);
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const resolveDisplayName = useCallback(
+    (item: T) => (getItemDisplayName ? getItemDisplayName(item) : getDisplayName(item)),
+    [getItemDisplayName]
+  );
 
   // Infinite scroll observer
   useEffect(() => {
@@ -152,14 +163,16 @@ export function DataView<T extends Record<string, unknown>>({
 
       // Filter by search query
       if (searchQuery) {
-        return Object.values(item).some((value) =>
-          String(value).toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const query = searchQuery.toLowerCase();
+        if (getSearchableText) {
+          return getSearchableText(item).toLowerCase().includes(query);
+        }
+        return Object.values(item).some((value) => String(value).toLowerCase().includes(query));
       }
 
       return true;
     });
-  }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery]);
+  }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery, getSearchableText]);
 
   // Get the URL-friendly path for the entity (e.g., "featuredArtist" -> "featured-artists")
   const entityUrlPath = toEntityUrlPath(entity);
@@ -225,13 +238,7 @@ export function DataView<T extends Record<string, unknown>>({
         });
 
         if (response.id) {
-          // Build display name based on available response fields
-          const displayName =
-            response.title ||
-            response.displayName ||
-            (response.firstName && response.surname
-              ? `${response.firstName} ${response.surname}`
-              : response.name || response.id);
+          const displayName = resolveDisplayName(response as T);
           toast.success(`Successfully published ${entityDisplayLabel} - ${displayName}`);
           refetch();
         } else {
@@ -243,7 +250,7 @@ export function DataView<T extends Record<string, unknown>>({
         toast.error(`Failed to publish: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entity, entityDisplayLabel, updateEntity, refetch]
+    [entity, entityDisplayLabel, updateEntity, refetch, resolveDisplayName]
   );
 
   const handleClickDeleteButton = useCallback(
@@ -270,7 +277,7 @@ export function DataView<T extends Record<string, unknown>>({
 
           if (response.id) {
             toast.success(
-              `Successfully deleted ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+              `Successfully deleted ${entityDisplayLabel} - ${resolveDisplayName(response as T)}`
             );
             refetch();
           } else {
@@ -283,7 +290,14 @@ export function DataView<T extends Record<string, unknown>>({
         toast.error(`Failed to delete: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entityDisplayLabel, updateEntity, deleteEntity, refetch, supportsSoftDelete]
+    [
+      entityDisplayLabel,
+      updateEntity,
+      deleteEntity,
+      refetch,
+      supportsSoftDelete,
+      resolveDisplayName,
+    ]
   );
 
   const handleClickRestoreButton = useCallback(
@@ -292,9 +306,8 @@ export function DataView<T extends Record<string, unknown>>({
       if (id) {
         const response = await updateEntity(id, { deletedOn: null });
         if (response.id) {
-          // Add more properties to display in the abscense of displayName
           toast.success(
-            `Successfully restored ${entityDisplayLabel} - ${response.displayName || `${response.firstName} ${response.surname}`}`
+            `Successfully restored ${entityDisplayLabel} - ${resolveDisplayName(response as T)}`
           );
           refetch();
         } else {
@@ -306,7 +319,7 @@ export function DataView<T extends Record<string, unknown>>({
         toast.error(`Failed to restore: Missing ${entityDisplayLabel} ID`);
       }
     },
-    [entityDisplayLabel, updateEntity, refetch]
+    [entityDisplayLabel, updateEntity, refetch, resolveDisplayName]
   );
 
   return (
@@ -489,7 +502,12 @@ export function DataView<T extends Record<string, unknown>>({
                               .split(/(?=[A-Z])/)
                               .join(' ')}
                           </b>
-                          : <span>{String(item[field] ?? '-')}</span>
+                          :{' '}
+                          <span>
+                            {field === 'displayName' && !item[field]
+                              ? resolveDisplayName(item)
+                              : String(item[field] ?? '-')}
+                          </span>
                         </span>
                       );
                     })}
@@ -531,7 +549,8 @@ export function DataView<T extends Record<string, unknown>>({
                                   </DialogTitle>
                                 </DialogHeader>
                                 <p className="mt-1 mb-4">
-                                  Are you sure you want to publish <b>{getDisplayName(item)}</b>?
+                                  Are you sure you want to publish <b>{resolveDisplayName(item)}</b>
+                                  ?
                                 </p>
                                 <DialogFooter>
                                   <DialogClose asChild>
@@ -581,7 +600,7 @@ export function DataView<T extends Record<string, unknown>>({
                             <p className="mt-1 mb-4">
                               Are you sure you want to{' '}
                               {supportsSoftDelete && item.deletedOn ? 'restore' : 'delete'}{' '}
-                              <b>{getDisplayName(item)}</b>?
+                              <b>{resolveDisplayName(item)}</b>?
                             </p>
                             <DialogFooter>
                               <DialogClose asChild>

@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/utils/auth/get-action-state', () => ({
-  default: mockGetActionState,
+  getActionState: mockGetActionState,
 }));
 
 vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {

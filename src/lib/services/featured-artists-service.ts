@@ -16,7 +16,11 @@ export class FeaturedArtistsService {
       const artist = await prisma.featuredArtist.create({
         data,
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -25,6 +29,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,
@@ -62,7 +67,11 @@ export class FeaturedArtistsService {
               },
             },
             include: {
-              artists: true,
+              artists: {
+                include: {
+                  images: true,
+                },
+              },
               track: true,
               release: {
                 include: {
@@ -71,6 +80,7 @@ export class FeaturedArtistsService {
                       track: true,
                     },
                   },
+                  images: true,
                 },
               },
               group: true,
@@ -124,7 +134,11 @@ export class FeaturedArtistsService {
         take,
         orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -133,6 +147,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,
@@ -159,7 +174,11 @@ export class FeaturedArtistsService {
       const featuredArtist = await prisma.featuredArtist.findUnique({
         where: { id },
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -168,6 +187,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,
@@ -202,7 +222,11 @@ export class FeaturedArtistsService {
         where: { id },
         data,
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -211,6 +235,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,
@@ -244,7 +269,11 @@ export class FeaturedArtistsService {
           // Note: FeaturedArtist model doesn't have deletedOn, so we do a hard delete
         },
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -253,6 +282,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,
@@ -283,7 +313,11 @@ export class FeaturedArtistsService {
       const featuredArtist = await prisma.featuredArtist.delete({
         where: { id },
         include: {
-          artists: true,
+          artists: {
+            include: {
+              images: true,
+            },
+          },
           track: true,
           release: {
             include: {
@@ -292,6 +326,7 @@ export class FeaturedArtistsService {
                   track: true,
                 },
               },
+              images: true,
             },
           },
           group: true,

@@ -318,6 +318,21 @@ nextjs-portal {
   animation: marquee 15s linear infinite;
 }
 
+/* Pulse scale animation for pending status indicators */
+@keyframes pulse-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.animate-pulse-scale {
+  animation: pulse-scale 1.5s ease-in-out infinite;
+}
+
 /* Marching ants animation for selection borders */
 @keyframes marching-ants {
   0% {

@@ -6,10 +6,10 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Metric     | Coverage |
 | ---------- | -------- |
-| Statements | 95.78%   |
-| Branches   | 89.13%   |
-| Functions  | 95.20%   |
-| Lines      | 96.04%   |
+| Statements | 98.73%   |
+| Branches   | 91.50%   |
+| Functions  | 98.74%   |
+| Lines      | 98.93%   |
 
 **Last Updated:** 2026-02-07
 
@@ -19,8 +19,8 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Date       | Statements | Branches | Functions | Lines  | Notes            |
 | ---------- | ---------- | -------- | --------- | ------ | ---------------- |
-| 2026-02-07 | 90.00%     | 80.00%   | 90.00%    | 90.00% | Updated baseline |
-| 2026-02-02 | 90.00%     | 80.00%   | 90.00%    | 90.00% | Initial tracking |
+| 2026-02-07 | 95.00%     | 92.00%   | 95.00%    | 95.00% | Updated baseline |
+| 2026-02-02 | 98.76%     | 91.35%   | 98.89%    | 98.93% | Initial tracking |
 
 ---
 
@@ -28,7 +28,7 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 Based on the project's [copilot instructions](.github/copilot-instructions.md), the coverage targets are:
 
-- **Minimum Target:** 90-95%+ on all testable files except for branches, which should be at least 80%+.
+- **Minimum Target:** 90-95%+ on all testable files except for branches, which should be at least 92%+.
 - **Ideal Target:** 100% on all testable files, including branches.
 - **Current Status:** The project is currently above the minimum target for statements, functions, and lines, but slightly below the ideal target for branches. Focus should be on improving branch coverage in key areas to reach the ideal target.
 
@@ -40,7 +40,7 @@ The project uses automated coverage regression checking during builds:
 - **Condition:** The metric must remain **above the configured threshold**
 - **Thresholds:**
   - Statements: 95%
-  - Branches: 85%
+  - Branches: 92%
   - Functions: 95%
   - Lines: 95%
 

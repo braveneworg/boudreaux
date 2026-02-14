@@ -75,7 +75,7 @@ describe('Track Image Actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(undefined);
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(auth).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
     vi.mocked(logSecurityEvent).mockImplementation(() => {});

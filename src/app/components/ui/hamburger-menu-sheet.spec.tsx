@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import HamburgerMenuSheet from './hamburger-menu-sheet';
 
 vi.mock('../auth/auth-toolbar', () => ({
-  default: ({ className }: { className?: string }) => (
+  default: ({ className, onNavigate }: { className?: string; onNavigate?: () => void }) => (
     <div data-testid="auth-toolbar" className={className}>
-      Auth Toolbar
+      <button data-testid="auth-toolbar-action" onClick={onNavigate}>
+        Auth Toolbar
+      </button>
     </div>
   ),
 }));
@@ -159,6 +161,19 @@ describe('HamburgerMenuSheet', () => {
     expect(homeLink).toHaveClass('text-white');
     expect(homeLink).toHaveClass('text-2xl');
     expect(homeLink).toHaveClass('font-light');
+  });
+
+  it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {
+    const user = userEvent.setup();
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    await user.click(screen.getByTestId('auth-toolbar-action'));
+
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('menu links have tabIndex 0 for keyboard accessibility', () => {

@@ -11,6 +11,18 @@ vi.mock('music-metadata', () => ({
   parseStream: vi.fn(),
 }));
 
+// Mock node:crypto for hash generation
+vi.mock('node:crypto', () => {
+  const mockCreateHash = vi.fn(() => ({
+    update: vi.fn().mockReturnThis(),
+    digest: vi.fn().mockReturnValue('mock-sha256-hash'),
+  }));
+  return {
+    default: { createHash: mockCreateHash },
+    createHash: mockCreateHash,
+  };
+});
+
 const mockParseBuffer = vi.mocked(mm.parseBuffer);
 const mockParseStream = vi.mocked(mm.parseStream);
 
@@ -73,6 +85,7 @@ describe('AudioMetadataService', () => {
         lossless: false,
         coverArt: undefined,
         coverArtMimeType: undefined,
+        audioFileHash: 'mock-sha256-hash',
       } satisfies AudioMetadata);
     });
 
@@ -136,6 +149,7 @@ describe('AudioMetadataService', () => {
         lossless: undefined,
         coverArt: undefined,
         coverArtMimeType: undefined,
+        audioFileHash: 'mock-sha256-hash',
       } satisfies AudioMetadata);
     });
 

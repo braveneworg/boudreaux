@@ -46,6 +46,10 @@ import {
   type BulkTrackData,
   type BulkTrackResult,
 } from '@/lib/actions/bulk-create-tracks-action';
+import {
+  checkDuplicateTracksAction,
+  type ExistingTrackInfo,
+} from '@/lib/actions/check-duplicate-tracks-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import {
   updateTrackAudioAction,
@@ -109,6 +113,10 @@ interface BulkTrackItem {
   // Editable fields
   title: string;
   position: number;
+  /** Whether this track was identified as a duplicate of an existing DB record */
+  isDuplicate?: boolean;
+  /** Info about the existing track in the database (set when isDuplicate is true) */
+  existingTrackInfo?: ExistingTrackInfo;
 }
 
 /**
@@ -248,11 +256,16 @@ export default function BulkTrackUploader() {
       // Extract metadata in parallel batches (3 concurrent extractions)
       // This significantly speeds up bulk uploads while not overwhelming the server
       const CONCURRENCY_LIMIT = 3;
+      const extractedHashes: { trackId: string; hash: string }[] = [];
 
       await processInBatches(
         newTracks,
         async (track) => {
           const metadata = await extractMetadata(track.file);
+
+          if (metadata?.audioFileHash) {
+            extractedHashes.push({ trackId: track.id, hash: metadata.audioFileHash });
+          }
 
           setTracks((prev) =>
             prev.map((t) =>
@@ -272,6 +285,32 @@ export default function BulkTrackUploader() {
         },
         CONCURRENCY_LIMIT
       );
+
+      // Check for duplicate tracks in the database by SHA-256 hash
+      if (extractedHashes.length > 0) {
+        const hashes = extractedHashes.map((e) => e.hash);
+        const dupeResult = await checkDuplicateTracksAction(hashes);
+
+        if (dupeResult.success && dupeResult.duplicates.length > 0) {
+          const dupeMap = new Map(dupeResult.duplicates.map((d) => [d.audioFileHash, d]));
+
+          setTracks((prev) =>
+            prev.map((t) => {
+              const hash = t.metadata?.audioFileHash;
+              if (hash && dupeMap.has(hash)) {
+                return { ...t, isDuplicate: true, existingTrackInfo: dupeMap.get(hash) };
+              }
+              return t;
+            })
+          );
+
+          const dupeCount = dupeResult.duplicates.length;
+          toast.info(
+            `${dupeCount} file${dupeCount !== 1 ? 's' : ''} already exist in the database. ` +
+              `They will be re-uploaded to S3 but not duplicated in the database.`
+          );
+        }
+      }
 
       // Clear the input
       if (fileInputRef.current) {
@@ -377,13 +416,20 @@ export default function BulkTrackUploader() {
             )
           );
 
-          await markTrackUploadingAction(track.trackId);
+          // Only mark as uploading in DB for new tracks (not duplicates)
+          if (!track.isDuplicate) {
+            await markTrackUploadingAction(track.trackId);
+          }
 
           // Get presigned URL for this file
+          // For duplicates, use the existing S3 key to overwrite the same object
           const fileInfo = {
             fileName: track.file.name,
             contentType: track.file.type,
             fileSize: track.file.size,
+            ...(track.isDuplicate && track.existingTrackInfo?.existingS3Key
+              ? { existingS3Key: track.existingTrackInfo.existingS3Key }
+              : {}),
           };
 
           const presignedResult = await getPresignedUploadUrlsAction('tracks', 'single', [
@@ -403,11 +449,26 @@ export default function BulkTrackUploader() {
 
           const cdnUrl = presignedResult.data[0].cdnUrl;
 
-          // Update track with CDN URL
-          const updateResult = await updateTrackAudioAction(track.trackId, cdnUrl, 'COMPLETED');
+          if (track.isDuplicate) {
+            // For duplicates: only update audioUrl in DB if the path changed
+            const existingAudioUrl = track.existingTrackInfo?.audioUrl;
+            if (cdnUrl !== existingAudioUrl) {
+              const updateResult = await updateTrackAudioAction(track.trackId, cdnUrl, 'COMPLETED');
 
-          if (!updateResult.success) {
-            throw new Error(updateResult.error || 'Failed to update track');
+              if (!updateResult.success) {
+                console.warn(
+                  `[Background Upload] Failed to update audioUrl for duplicate ${track.trackId}:`,
+                  updateResult.error
+                );
+              }
+            }
+          } else {
+            // For new tracks: always update (existing behavior)
+            const updateResult = await updateTrackAudioAction(track.trackId, cdnUrl, 'COMPLETED');
+
+            if (!updateResult.success) {
+              throw new Error(updateResult.error || 'Failed to update track');
+            }
           }
 
           // Update local state
@@ -428,8 +489,8 @@ export default function BulkTrackUploader() {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Background upload failed';
 
-          // Mark track as failed
-          if (track.trackId) {
+          // Mark track as failed (only update DB for new tracks)
+          if (track.trackId && !track.isDuplicate) {
             await updateTrackAudioAction(track.trackId, '', 'FAILED', errorMessage);
           }
 
@@ -476,23 +537,31 @@ export default function BulkTrackUploader() {
 
       // Deferred upload mode - create tracks first, upload later in background
       if (deferUpload) {
-        // Update status to creating
-        setTracks((prev) =>
-          prev.map((t) =>
-            filesToUpload.some((f) => f.id === t.id) ? { ...t, status: 'creating' as const } : t
-          )
-        );
+        // Separate files into new tracks and duplicates
+        const newFilesToUpload = filesToUpload.filter((t) => !t.isDuplicate);
+        const duplicateFilesToUpload = filesToUpload.filter((t) => t.isDuplicate);
 
-        // Upload base64 cover art to S3 first
+        // Update status to creating for new tracks only
+        if (newFilesToUpload.length > 0) {
+          setTracks((prev) =>
+            prev.map((t) =>
+              newFilesToUpload.some((f) => f.id === t.id)
+                ? { ...t, status: 'creating' as const }
+                : t
+            )
+          );
+        }
+
+        // Upload base64 cover art to S3 first (only for new tracks)
         console.info('[Bulk Upload Deferred] Checking for base64 cover arts:', {
-          totalTracks: filesToUpload.length,
-          tracksWithMetadata: filesToUpload.filter((t) => t.metadata).length,
-          tracksWithCoverArt: filesToUpload.filter((t) => t.metadata?.coverArt).length,
-          tracksWithBase64CoverArt: filesToUpload.filter((t) =>
+          totalTracks: newFilesToUpload.length,
+          tracksWithMetadata: newFilesToUpload.filter((t) => t.metadata).length,
+          tracksWithCoverArt: newFilesToUpload.filter((t) => t.metadata?.coverArt).length,
+          tracksWithBase64CoverArt: newFilesToUpload.filter((t) =>
             t.metadata?.coverArt?.startsWith('data:')
           ).length,
         });
-        const base64CoverArts = filesToUpload
+        const base64CoverArts = newFilesToUpload
           .filter((track) => track.metadata?.coverArt?.startsWith('data:'))
           .map((track) => ({
             base64: track.metadata!.coverArt!,
@@ -505,99 +574,127 @@ export default function BulkTrackUploader() {
           albumToCdnUrl = await uploadCoverArtsToS3(base64CoverArts);
         }
 
-        // Create track data with uploaded cover art URLs
-        const trackData: BulkTrackData[] = filesToUpload.map((track) => {
-          const coverArt = track.metadata?.coverArt;
-          let coverArtUrl: string | undefined;
+        const tracksForBackgroundUpload: BulkTrackItem[] = [];
 
-          if (coverArt) {
-            if (coverArt.startsWith('data:')) {
-              // Use uploaded CDN URL for base64 cover art
-              const albumKey = (track.metadata?.album || '').toLowerCase().trim();
-              coverArtUrl = albumToCdnUrl.get(albumKey);
+        // Create DB records only for new tracks
+        if (newFilesToUpload.length > 0) {
+          // Create track data with uploaded cover art URLs
+          const trackData: BulkTrackData[] = newFilesToUpload.map((track) => {
+            const coverArt = track.metadata?.coverArt;
+            let coverArtUrl: string | undefined;
+
+            if (coverArt) {
+              if (coverArt.startsWith('data:')) {
+                // Use uploaded CDN URL for base64 cover art
+                const albumKey = (track.metadata?.album || '').toLowerCase().trim();
+                coverArtUrl = albumToCdnUrl.get(albumKey);
+              } else {
+                // Use existing URL as-is
+                coverArtUrl = coverArt;
+              }
+            }
+
+            return {
+              title: track.title,
+              duration: track.metadata?.duration || 0,
+              position: track.position,
+              audioFileHash: track.metadata?.audioFileHash,
+              coverArt: coverArtUrl,
+              album: track.metadata?.album,
+              year: track.metadata?.year,
+              date: track.metadata?.date,
+              label: track.metadata?.label,
+              catalogNumber: track.metadata?.catalogNumber,
+              albumArtist: track.metadata?.albumArtist,
+              artist: track.metadata?.artist,
+              lossless: track.metadata?.lossless,
+            };
+          });
+
+          // Debug: Log trackData size before sending to server action
+          const trackDataJson = JSON.stringify(trackData);
+          console.info('[Bulk Upload Deferred] Track data size before server action:', {
+            trackCount: trackData.length,
+            jsonSizeBytes: trackDataJson.length,
+            jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
+            hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
+          });
+
+          const createResult = await bulkCreateTracksAction(trackData, {
+            autoCreateRelease,
+            publishTracks,
+            deferUpload: true,
+          });
+
+          // Update new tracks with create results and queue for background upload
+          for (const result of createResult.results) {
+            const track = newFilesToUpload[result.index];
+            if (!track) continue;
+
+            if (result.success && result.trackId) {
+              const updatedTrack = {
+                ...track,
+                status: 'queued' as const,
+                trackId: result.trackId,
+                releaseId: result.releaseId,
+                releaseTitle: result.releaseTitle,
+                releaseCreated: result.releaseCreated,
+              };
+              tracksForBackgroundUpload.push(updatedTrack);
+
+              setTracks((prev) => prev.map((t) => (t.id === track.id ? updatedTrack : t)));
             } else {
-              // Use existing URL as-is
-              coverArtUrl = coverArt;
+              setTracks((prev) =>
+                prev.map((t) =>
+                  t.id === track.id
+                    ? {
+                        ...t,
+                        status: 'error' as const,
+                        error: result.error || 'Failed to create track',
+                      }
+                    : t
+                )
+              );
             }
           }
 
-          return {
-            title: track.title,
-            duration: track.metadata?.duration || 0,
-            position: track.position,
-            coverArt: coverArtUrl,
-            album: track.metadata?.album,
-            year: track.metadata?.year,
-            date: track.metadata?.date,
-            label: track.metadata?.label,
-            catalogNumber: track.metadata?.catalogNumber,
-            albumArtist: track.metadata?.albumArtist,
-            artist: track.metadata?.artist,
-            lossless: track.metadata?.lossless,
-          };
-        });
-
-        // Debug: Log trackData size before sending to server action
-        const trackDataJson = JSON.stringify(trackData);
-        console.info('[Bulk Upload Deferred] Track data size before server action:', {
-          trackCount: trackData.length,
-          jsonSizeBytes: trackDataJson.length,
-          jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
-          hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
-        });
-
-        const createResult = await bulkCreateTracksAction(trackData, {
-          autoCreateRelease,
-          publishTracks,
-          deferUpload: true,
-        });
-
-        // Update tracks with create results and queue for background upload
-        const tracksForBackgroundUpload: BulkTrackItem[] = [];
-        for (const result of createResult.results) {
-          const track = filesToUpload[result.index];
-          if (!track) continue;
-
-          if (result.success && result.trackId) {
-            const updatedTrack = {
-              ...track,
-              status: 'queued' as const,
-              trackId: result.trackId,
-              releaseId: result.releaseId,
-              releaseTitle: result.releaseTitle,
-              releaseCreated: result.releaseCreated,
-            };
-            tracksForBackgroundUpload.push(updatedTrack);
-
-            setTracks((prev) => prev.map((t) => (t.id === track.id ? updatedTrack : t)));
-          } else {
-            setTracks((prev) =>
-              prev.map((t) =>
-                t.id === track.id
-                  ? {
-                      ...t,
-                      status: 'error' as const,
-                      error: result.error || 'Failed to create track',
-                    }
-                  : t
-              )
-            );
-          }
+          setResults(createResult.results);
         }
 
-        setResults(createResult.results);
+        // Queue duplicate tracks for background upload (they already have trackIds)
+        for (const track of duplicateFilesToUpload) {
+          const updatedTrack = {
+            ...track,
+            status: 'queued' as const,
+            trackId: track.existingTrackInfo?.trackId,
+          };
+          tracksForBackgroundUpload.push(updatedTrack);
+          setTracks((prev) => prev.map((t) => (t.id === track.id ? updatedTrack : t)));
+        }
+
         setShowResults(true);
 
-        if (createResult.successCount > 0) {
-          toast.success(
-            `Created ${createResult.successCount} track(s). Starting background uploads...`
-          );
+        const newCreatedCount = tracksForBackgroundUpload.filter((t) => !t.isDuplicate).length;
+        const dupeQueuedCount = duplicateFilesToUpload.length;
+
+        if (tracksForBackgroundUpload.length > 0) {
+          if (newCreatedCount > 0 && dupeQueuedCount > 0) {
+            toast.success(
+              `Created ${newCreatedCount} track(s). ${dupeQueuedCount} duplicate(s) queued for S3 re-upload. Starting background uploads...`
+            );
+          } else if (newCreatedCount > 0) {
+            toast.success(`Created ${newCreatedCount} track(s). Starting background uploads...`);
+          } else if (dupeQueuedCount > 0) {
+            toast.success(
+              `${dupeQueuedCount} duplicate(s) queued for S3 re-upload. Starting background uploads...`
+            );
+          }
 
           // Start background upload process
           setIsProcessing(false);
           startBackgroundUploads(tracksForBackgroundUpload);
         } else {
-          toast.error(`Failed to create tracks: ${createResult.error || 'Unknown error'}`);
+          toast.error('No tracks to upload');
         }
 
         return;
@@ -614,10 +711,14 @@ export default function BulkTrackUploader() {
       );
 
       // Get presigned URLs for all files
+      // Duplicates get the existing S3 key for overwriting the same object
       const fileInfos = filesToUpload.map((track) => ({
         fileName: track.file.name,
         contentType: track.file.type,
         fileSize: track.file.size,
+        ...(track.isDuplicate && track.existingTrackInfo?.existingS3Key
+          ? { existingS3Key: track.existingTrackInfo.existingS3Key }
+          : {}),
       }));
 
       const presignedResult = await getPresignedUploadUrlsAction('tracks', 'bulk', fileInfos);
@@ -660,115 +761,183 @@ export default function BulkTrackUploader() {
         throw new Error('All file uploads failed');
       }
 
-      // Step 2: Create tracks in database
-      setTracks((prev) =>
-        prev.map((t) =>
-          uploadedTracks.some((u) => u.id === t.id) ? { ...t, status: 'creating' as const } : t
-        )
-      );
+      // Separate uploaded tracks into new tracks and duplicates
+      const newUploadedTracks = uploadedTracks.filter((t) => !t.isDuplicate);
+      const duplicateUploadedTracks = uploadedTracks.filter((t) => t.isDuplicate);
 
-      // Upload base64 cover art to S3 first
-      console.info('[Bulk Upload] Checking for base64 cover arts:', {
-        totalTracks: uploadedTracks.length,
-        tracksWithMetadata: uploadedTracks.filter((t) => t.metadata).length,
-        tracksWithCoverArt: uploadedTracks.filter((t) => t.metadata?.coverArt).length,
-        tracksWithBase64CoverArt: uploadedTracks.filter((t) =>
-          t.metadata?.coverArt?.startsWith('data:')
-        ).length,
-      });
-      const base64CoverArts = uploadedTracks
-        .filter((track) => track.metadata?.coverArt?.startsWith('data:'))
-        .map((track) => ({
-          base64: track.metadata!.coverArt!,
-          albumName: track.metadata?.album,
-        }));
+      // Step 2: Create tracks in database (only for new tracks)
+      let createResult: Awaited<ReturnType<typeof bulkCreateTracksAction>> | null = null;
+      if (newUploadedTracks.length > 0) {
+        setTracks((prev) =>
+          prev.map((t) =>
+            newUploadedTracks.some((u) => u.id === t.id) ? { ...t, status: 'creating' as const } : t
+          )
+        );
 
-      let albumToCdnUrl = new Map<string, string>();
-      if (base64CoverArts.length > 0) {
-        toast.info(`Uploading ${base64CoverArts.length} cover art image(s)...`);
-        albumToCdnUrl = await uploadCoverArtsToS3(base64CoverArts);
+        // Upload base64 cover art to S3 first
+        console.info('[Bulk Upload] Checking for base64 cover arts:', {
+          totalTracks: newUploadedTracks.length,
+          tracksWithMetadata: newUploadedTracks.filter((t) => t.metadata).length,
+          tracksWithCoverArt: newUploadedTracks.filter((t) => t.metadata?.coverArt).length,
+          tracksWithBase64CoverArt: newUploadedTracks.filter((t) =>
+            t.metadata?.coverArt?.startsWith('data:')
+          ).length,
+        });
+        const base64CoverArts = newUploadedTracks
+          .filter((track) => track.metadata?.coverArt?.startsWith('data:'))
+          .map((track) => ({
+            base64: track.metadata!.coverArt!,
+            albumName: track.metadata?.album,
+          }));
+
+        let albumToCdnUrl = new Map<string, string>();
+        if (base64CoverArts.length > 0) {
+          toast.info(`Uploading ${base64CoverArts.length} cover art image(s)...`);
+          albumToCdnUrl = await uploadCoverArtsToS3(base64CoverArts);
+        }
+
+        // Create track data with uploaded cover art URLs
+        const trackData: BulkTrackData[] = newUploadedTracks.map((track) => {
+          const coverArt = track.metadata?.coverArt;
+          let coverArtUrl: string | undefined;
+
+          if (coverArt) {
+            if (coverArt.startsWith('data:')) {
+              // Use uploaded CDN URL for base64 cover art
+              const albumKey = (track.metadata?.album || '').toLowerCase().trim();
+              coverArtUrl = albumToCdnUrl.get(albumKey);
+            } else {
+              // Use existing URL as-is
+              coverArtUrl = coverArt;
+            }
+          }
+
+          return {
+            title: track.title,
+            duration: track.metadata?.duration || 0,
+            audioUrl: track.uploadedUrl!,
+            position: track.position,
+            audioFileHash: track.metadata?.audioFileHash,
+            coverArt: coverArtUrl,
+            album: track.metadata?.album,
+            year: track.metadata?.year,
+            date: track.metadata?.date,
+            label: track.metadata?.label,
+            catalogNumber: track.metadata?.catalogNumber,
+            albumArtist: track.metadata?.albumArtist,
+            artist: track.metadata?.artist,
+            lossless: track.metadata?.lossless,
+          };
+        });
+
+        // Debug: Log trackData size before sending to server action
+        const trackDataJson = JSON.stringify(trackData);
+        console.info('[Bulk Upload] Track data size before server action:', {
+          trackCount: trackData.length,
+          jsonSizeBytes: trackDataJson.length,
+          jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
+          hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
+        });
+
+        createResult = await bulkCreateTracksAction(trackData, {
+          autoCreateRelease,
+          publishTracks,
+        });
+
+        // Update tracks with create results
+        for (const result of createResult.results) {
+          const track = newUploadedTracks[result.index];
+          if (!track) continue;
+
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === track.id
+                ? {
+                    ...t,
+                    status: result.success ? ('success' as const) : ('error' as const),
+                    error: result.error,
+                    trackId: result.trackId,
+                    releaseId: result.releaseId,
+                    releaseTitle: result.releaseTitle,
+                    releaseCreated: result.releaseCreated,
+                  }
+                : t
+            )
+          );
+        }
+
+        setResults(createResult.results);
+        setShowResults(true);
       }
 
-      // Create track data with uploaded cover art URLs
-      const trackData: BulkTrackData[] = uploadedTracks.map((track) => {
-        const coverArt = track.metadata?.coverArt;
-        let coverArtUrl: string | undefined;
+      // Handle duplicate tracks: update audioUrl in DB if the S3 path changed
+      for (const track of duplicateUploadedTracks) {
+        const existingInfo = track.existingTrackInfo;
+        if (!existingInfo) continue;
 
-        if (coverArt) {
-          if (coverArt.startsWith('data:')) {
-            // Use uploaded CDN URL for base64 cover art
-            const albumKey = (track.metadata?.album || '').toLowerCase().trim();
-            coverArtUrl = albumToCdnUrl.get(albumKey);
-          } else {
-            // Use existing URL as-is
-            coverArtUrl = coverArt;
+        const newCdnUrl = track.uploadedUrl;
+        const existingAudioUrl = existingInfo.audioUrl;
+
+        // If the new CDN URL differs from what's stored (e.g., was pending://upload),
+        // update the track's audioUrl in the database
+        if (newCdnUrl && newCdnUrl !== existingAudioUrl) {
+          try {
+            const updateResult = await updateTrackAudioAction(
+              existingInfo.trackId,
+              newCdnUrl,
+              'COMPLETED'
+            );
+
+            if (!updateResult.success) {
+              console.warn(
+                `[Bulk Upload] Failed to update audioUrl for duplicate track ${existingInfo.trackId}:`,
+                updateResult.error
+              );
+            }
+          } catch (err) {
+            console.warn('[Bulk Upload] Error updating duplicate track audioUrl:', err);
           }
         }
 
-        return {
-          title: track.title,
-          duration: track.metadata?.duration || 0,
-          audioUrl: track.uploadedUrl!,
-          position: track.position,
-          coverArt: coverArtUrl,
-          album: track.metadata?.album,
-          year: track.metadata?.year,
-          date: track.metadata?.date,
-          label: track.metadata?.label,
-          catalogNumber: track.metadata?.catalogNumber,
-          albumArtist: track.metadata?.albumArtist,
-          artist: track.metadata?.artist,
-          lossless: track.metadata?.lossless,
-        };
-      });
-
-      // Debug: Log trackData size before sending to server action
-      const trackDataJson = JSON.stringify(trackData);
-      console.info('[Bulk Upload] Track data size before server action:', {
-        trackCount: trackData.length,
-        jsonSizeBytes: trackDataJson.length,
-        jsonSizeMB: (trackDataJson.length / (1024 * 1024)).toFixed(2),
-        hasCoverArtData: trackData.some((t) => t.coverArt?.startsWith('data:')),
-      });
-
-      const createResult = await bulkCreateTracksAction(trackData, {
-        autoCreateRelease,
-        publishTracks,
-      });
-
-      // Update tracks with create results
-      for (const result of createResult.results) {
-        const track = uploadedTracks[result.index];
-        if (!track) continue;
-
+        // Mark duplicate as success in the UI
         setTracks((prev) =>
           prev.map((t) =>
             t.id === track.id
               ? {
                   ...t,
-                  status: result.success ? ('success' as const) : ('error' as const),
-                  error: result.error,
-                  trackId: result.trackId,
-                  releaseId: result.releaseId,
-                  releaseTitle: result.releaseTitle,
-                  releaseCreated: result.releaseCreated,
+                  status: 'success' as const,
+                  trackId: existingInfo.trackId,
                 }
               : t
           )
         );
       }
 
-      setResults(createResult.results);
       setShowResults(true);
 
-      if (createResult.success) {
-        toast.success(`Successfully created ${createResult.successCount} track(s)`);
-      } else if (createResult.successCount > 0) {
-        toast.warning(
-          `Created ${createResult.successCount} track(s), ${createResult.failedCount} failed`
+      // Show appropriate toast messages
+      const newCount = newUploadedTracks.length;
+      const dupeCount = duplicateUploadedTracks.length;
+
+      // Check if track creation had failures
+      if (createResult && !createResult.success) {
+        if (createResult.error) {
+          toast.error(`Failed to create tracks: ${createResult.error}`);
+        } else if (createResult.successCount > 0) {
+          toast.warning(
+            `Created ${createResult.successCount} track(s), ${createResult.failedCount} failed`
+          );
+        } else {
+          toast.error('Failed to create tracks');
+        }
+      } else if (newCount > 0 && dupeCount > 0) {
+        toast.success(
+          `Created ${newCount} new track(s). ${dupeCount} duplicate(s) re-uploaded to S3.`
         );
-      } else {
-        toast.error(`Failed to create tracks: ${createResult.error || 'Unknown error'}`);
+      } else if (newCount > 0) {
+        toast.success(`Successfully created ${newCount} track(s)`);
+      } else if (dupeCount > 0) {
+        toast.success(`${dupeCount} duplicate(s) re-uploaded to S3. No new tracks created.`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Bulk upload failed';
@@ -797,14 +966,20 @@ export default function BulkTrackUploader() {
   ).length;
   const successCount = tracks.filter((t) => t.status === 'success').length;
   const errorCount = tracks.filter((t) => t.status === 'error').length;
+  const duplicateCount = tracks.filter((t) => t.isDuplicate).length;
 
-  const getStatusIcon = (status: BulkTrackItem['status']) => {
+  const getStatusIcon = (track: BulkTrackItem) => {
+    const { status, isDuplicate } = track;
     switch (status) {
       case 'pending':
       case 'extracting':
         return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
       case 'extracted':
-        return <FileAudio className="h-4 w-4 text-blue-500" />;
+        return isDuplicate ? (
+          <AlertCircle className="h-4 w-4 text-amber-500" />
+        ) : (
+          <FileAudio className="h-4 w-4 text-blue-500" />
+        );
       case 'uploading':
       case 'creating':
       case 'background_uploading':
@@ -977,7 +1152,16 @@ export default function BulkTrackUploader() {
                       </Badge>
                     )}
                     {errorCount > 0 && <Badge variant="destructive">{errorCount} failed</Badge>}
-                    {pendingCount > 0 && <Badge variant="secondary">{pendingCount} pending</Badge>}
+                    {duplicateCount > 0 && (
+                      <Badge variant="outline" className="border-amber-500 text-amber-600">
+                        {duplicateCount} duplicate{duplicateCount !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                    {pendingCount > 0 && (
+                      <Badge variant="secondary" className="animate-pulse-scale">
+                        {pendingCount} pending
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -995,7 +1179,7 @@ export default function BulkTrackUploader() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            {getStatusIcon(track.status)}
+                            {getStatusIcon(track)}
                             {track.uploadedUrl && (
                               <TrackPlayButton audioUrl={track.uploadedUrl} size="sm" />
                             )}
@@ -1025,6 +1209,11 @@ export default function BulkTrackUploader() {
                             <p className="flex items-center gap-1 text-xs text-destructive">
                               <AlertCircle className="h-3 w-3" />
                               {track.error}
+                            </p>
+                          )}
+                          {track.isDuplicate && (
+                            <p className="text-xs text-amber-600">
+                              Duplicate of &ldquo;{track.existingTrackInfo?.title}&rdquo;
                             </p>
                           )}
                           {track.releaseTitle && (
@@ -1104,7 +1293,7 @@ export default function BulkTrackUploader() {
                         >
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              {getStatusIcon(track.status)}
+                              {getStatusIcon(track)}
                               {track.uploadedUrl && (
                                 <TrackPlayButton audioUrl={track.uploadedUrl} size="sm" />
                               )}
@@ -1122,6 +1311,12 @@ export default function BulkTrackUploader() {
                                 <p className="flex items-center gap-1 text-xs text-destructive">
                                   <AlertCircle className="h-3 w-3" />
                                   {track.error}
+                                </p>
+                              )}
+                              {track.isDuplicate && (
+                                <p className="text-xs text-amber-600">
+                                  Duplicate of &ldquo;{track.existingTrackInfo?.title}&rdquo;
+                                  &mdash; will re-upload to S3, skip DB insert
                                 </p>
                               )}
                               {track.releaseTitle && (
@@ -1228,7 +1423,9 @@ export default function BulkTrackUploader() {
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload {pendingCount} Track{pendingCount !== 1 ? 's' : ''}
+                  {duplicateCount > 0
+                    ? `Upload ${pendingCount} Track${pendingCount !== 1 ? 's' : ''} (${pendingCount - duplicateCount} new, ${duplicateCount} re-upload)`
+                    : `Upload ${pendingCount} Track${pendingCount !== 1 ? 's' : ''}`}
                 </>
               )}
             </Button>

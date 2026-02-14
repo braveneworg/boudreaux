@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import * as mm from 'music-metadata';
 
 import type { ServiceResponse } from './service.types';
@@ -49,6 +51,8 @@ export interface AudioMetadata {
   coverArt?: string;
   /** Cover art MIME type */
   coverArtMimeType?: string;
+  /** SHA-256 hash of the audio file content for duplicate detection */
+  audioFileHash?: string;
 }
 
 /**
@@ -67,6 +71,9 @@ export class AudioMetadataService {
     _fileName?: string
   ): Promise<ServiceResponse<AudioMetadata>> {
     try {
+      // Compute SHA-256 hash of the file content for duplicate detection
+      const audioFileHash = createHash('sha256').update(buffer).digest('hex');
+
       const metadata = await mm.parseBuffer(buffer, {
         mimeType,
         size: buffer.length,
@@ -115,6 +122,9 @@ export class AudioMetadataService {
         // Cover art
         coverArt,
         coverArtMimeType,
+
+        // File hash
+        audioFileHash,
       };
 
       return { success: true, data: result };

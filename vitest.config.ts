@@ -152,6 +152,10 @@ export default defineConfig({
         '**/**/media-uploader.tsx',
         '**/**/image-uploader.tsx',
         '**/components/forms/artist-form.tsx',
+        '**/components/forms/featured-artist-form.tsx',
+        '**/components/forms/release-form.tsx',
+        '**/components/forms/bulk-track-uploader.tsx',
+        '**/components/forms/fields/cover-art-field.tsx',
         '**/admin/data-views/data-view.tsx',
         // TODO: add E2E tests for these components using playwright
         // Media player with Video.js integration - requires E2E testing

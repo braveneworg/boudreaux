@@ -135,9 +135,22 @@ const initialFormState: FormState = {
   success: false,
 };
 
-const ToastContent = ({ message }: { message: string }) => (
+const ToastContent = ({
+  message,
+  secondaryMessage,
+}: {
+  message: string;
+  secondaryMessage?: string;
+}) => (
   <>
-    Notification banner <b>{message.substring(0, 30) || 'entry'}</b> saved successfully.
+    Notification banner <b>{message.substring(0, 30) || 'entry'}</b>
+    {secondaryMessage ? (
+      <>
+        {' '}
+        &mdash; <em>{secondaryMessage.substring(0, 30)}</em>
+      </>
+    ) : null}{' '}
+    saved successfully.
   </>
 );
 
@@ -402,7 +415,10 @@ export default function NotificationBannerForm({
         skipRedirectOnSaveRef.current = false;
       } else {
         const message = form.getValues('message');
-        toast.success(<ToastContent message={message || ''} />);
+        const secondaryMessage = form.getValues('secondaryMessage');
+        toast.success(
+          <ToastContent message={message || ''} secondaryMessage={secondaryMessage || undefined} />
+        );
         router.push('/admin/notifications');
       }
     }
@@ -744,121 +760,101 @@ export default function NotificationBannerForm({
   const submitForm = useCallback(async () => {
     const isValid = await form.trigger();
     if (!isValid) {
-      console.warn('[NotificationBanner] Form validation failed, skipping auto-save');
+      const fieldErrors = form.formState.errors;
+      const errorMessages = Object.entries(fieldErrors)
+        .map(([field, err]) => `${field}: ${err?.message}`)
+        .filter(Boolean);
+      if (errorMessages.length > 0) {
+        toast.error(errorMessages.join('; '));
+      }
       return false;
     }
 
-    if (!formRef.current) {
-      console.warn('[NotificationBanner] Form ref not available');
-      return false;
-    }
-
-    const formData = new FormData(formRef.current);
+    // Build FormData entirely from React Hook Form state to avoid DOM sync issues
+    const values = form.getValues();
+    const formData = new FormData();
 
     // Add notification ID for update
     if (notificationId) {
-      formData.append('notificationId', notificationId);
+      formData.set('notificationId', notificationId);
     }
 
-    // Ensure message fields are included from form state (not just DOM)
-    const message = form.getValues('message');
-    const secondaryMessage = form.getValues('secondaryMessage');
-    formData.set('message', message || '');
-    if (secondaryMessage) {
-      formData.set('secondaryMessage', secondaryMessage);
+    // String fields
+    formData.set('message', values.message || '');
+    if (values.secondaryMessage) {
+      formData.set('secondaryMessage', values.secondaryMessage);
+    }
+    if (values.notes) {
+      formData.set('notes', values.notes);
+    }
+    if (values.linkUrl) {
+      formData.set('linkUrl', values.linkUrl);
+    }
+    if (values.imageUrl) {
+      formData.set('imageUrl', values.imageUrl);
+    }
+    if (values.originalImageUrl) {
+      formData.set('originalImageUrl', values.originalImageUrl);
+    }
+    if (values.backgroundColor) {
+      formData.set('backgroundColor', values.backgroundColor);
     }
 
-    // Ensure image URLs are included (critical for saving uploaded images)
-    const imageUrl = form.getValues('imageUrl');
-    const originalImageUrl = form.getValues('originalImageUrl');
-
-    console.info('[NotificationBanner] Auto-save - image values:', {
-      imageUrl,
-      originalImageUrl,
-    });
-
-    if (imageUrl) {
-      formData.set('imageUrl', imageUrl);
+    // Date fields (DatePicker doesn't create hidden inputs)
+    if (values.displayFrom) {
+      formData.set('displayFrom', values.displayFrom);
     }
-    if (originalImageUrl) {
-      formData.set('originalImageUrl', originalImageUrl);
+    if (values.displayUntil) {
+      formData.set('displayUntil', values.displayUntil);
     }
 
-    // Ensure boolean fields are included
-    const isOverlayed = form.getValues('isOverlayed');
-    const isActive = form.getValues('isActive');
-    formData.set('isOverlayed', isOverlayed ? 'true' : 'false');
-    formData.set('isActive', isActive ? 'true' : 'false');
+    // Boolean fields
+    formData.set('isOverlayed', values.isOverlayed ? 'true' : 'false');
+    formData.set('isActive', values.isActive ? 'true' : 'false');
+    formData.set('messageTextShadow', values.messageTextShadow ? 'true' : 'false');
+    formData.set(
+      'secondaryMessageTextShadow',
+      values.secondaryMessageTextShadow ? 'true' : 'false'
+    );
 
-    // Ensure numeric font fields are included
-    const messageFontSize = form.getValues('messageFontSize');
-    const messageContrast = form.getValues('messageContrast');
-    const secondaryMessageFontSize = form.getValues('secondaryMessageFontSize');
-    const secondaryMessageContrast = form.getValues('secondaryMessageContrast');
-    formData.set('messageFontSize', String(messageFontSize));
-    formData.set('messageContrast', String(messageContrast));
-    formData.set('secondaryMessageFontSize', String(secondaryMessageFontSize));
-    formData.set('secondaryMessageContrast', String(secondaryMessageContrast));
+    // Font fields
+    formData.set('messageFont', values.messageFont || 'system-ui');
+    formData.set('secondaryMessageFont', values.secondaryMessageFont || 'system-ui');
 
-    // Ensure text color fields are included
-    const messageTextColor = form.getValues('messageTextColor');
-    const secondaryMessageTextColor = form.getValues('secondaryMessageTextColor');
-    formData.set('messageTextColor', messageTextColor || '#ffffff');
-    formData.set('secondaryMessageTextColor', secondaryMessageTextColor || '#ffffff');
+    // Numeric fields
+    formData.set('messageFontSize', String(values.messageFontSize));
+    formData.set('messageContrast', String(values.messageContrast));
+    formData.set('secondaryMessageFontSize', String(values.secondaryMessageFontSize));
+    formData.set('secondaryMessageContrast', String(values.secondaryMessageContrast));
+    formData.set('messageTextShadowDarkness', String(values.messageTextShadowDarkness));
+    formData.set(
+      'secondaryMessageTextShadowDarkness',
+      String(values.secondaryMessageTextShadowDarkness)
+    );
 
-    // Ensure text shadow fields are included
-    const messageTextShadow = form.getValues('messageTextShadow');
-    const messageTextShadowDarkness = form.getValues('messageTextShadowDarkness');
-    const secondaryMessageTextShadow = form.getValues('secondaryMessageTextShadow');
-    const secondaryMessageTextShadowDarkness = form.getValues('secondaryMessageTextShadowDarkness');
-    formData.set('messageTextShadow', messageTextShadow ? 'true' : 'false');
-    formData.set('messageTextShadowDarkness', String(messageTextShadowDarkness));
-    formData.set('secondaryMessageTextShadow', secondaryMessageTextShadow ? 'true' : 'false');
-    formData.set('secondaryMessageTextShadowDarkness', String(secondaryMessageTextShadowDarkness));
+    // Text color fields
+    formData.set('messageTextColor', values.messageTextColor || '#ffffff');
+    formData.set('secondaryMessageTextColor', values.secondaryMessageTextColor || '#ffffff');
 
-    // Ensure backgroundColor is included
-    const backgroundColor = form.getValues('backgroundColor');
-    if (backgroundColor) {
-      formData.set('backgroundColor', backgroundColor);
-    }
+    // Position fields
+    formData.set('messagePositionX', String(values.messagePositionX ?? 50));
+    formData.set('messagePositionY', String(values.messagePositionY ?? 10));
+    formData.set('secondaryMessagePositionX', String(values.secondaryMessagePositionX ?? 50));
+    formData.set('secondaryMessagePositionY', String(values.secondaryMessagePositionY ?? 90));
 
-    // Ensure font family fields are included
-    const messageFont = form.getValues('messageFont');
-    const secondaryMessageFont = form.getValues('secondaryMessageFont');
-    formData.set('messageFont', messageFont || 'system-ui');
-    formData.set('secondaryMessageFont', secondaryMessageFont || 'system-ui');
+    // Rotation fields
+    formData.set('messageRotation', String(values.messageRotation ?? 0));
+    formData.set('secondaryMessageRotation', String(values.secondaryMessageRotation ?? 0));
 
-    // Ensure position fields are included
-    const messagePositionX = form.getValues('messagePositionX');
-    const messagePositionY = form.getValues('messagePositionY');
-    const secondaryMessagePositionX = form.getValues('secondaryMessagePositionX');
-    const secondaryMessagePositionY = form.getValues('secondaryMessagePositionY');
-    formData.set('messagePositionX', String(messagePositionX ?? 50));
-    formData.set('messagePositionY', String(messagePositionY ?? 10));
-    formData.set('secondaryMessagePositionX', String(secondaryMessagePositionX ?? 50));
-    formData.set('secondaryMessagePositionY', String(secondaryMessagePositionY ?? 90));
+    // Image offset fields
+    formData.set('imageOffsetX', String(values.imageOffsetX ?? 0));
+    formData.set('imageOffsetY', String(values.imageOffsetY ?? 0));
 
-    // Ensure rotation fields are included
-    const messageRotation = form.getValues('messageRotation');
-    const secondaryMessageRotation = form.getValues('secondaryMessageRotation');
-    formData.set('messageRotation', String(messageRotation ?? 0));
-    formData.set('secondaryMessageRotation', String(secondaryMessageRotation ?? 0));
-
-    // Ensure image offset fields are included
-    const imageOffsetX = form.getValues('imageOffsetX');
-    const imageOffsetY = form.getValues('imageOffsetY');
-    formData.set('imageOffsetX', String(imageOffsetX ?? 0));
-    formData.set('imageOffsetY', String(imageOffsetY ?? 0));
-
-    // Ensure text box dimension fields are included
-    const messageWidth = form.getValues('messageWidth');
-    const messageHeight = form.getValues('messageHeight');
-    const secondaryMessageWidth = form.getValues('secondaryMessageWidth');
-    const secondaryMessageHeight = form.getValues('secondaryMessageHeight');
-    formData.set('messageWidth', String(messageWidth ?? 80));
-    formData.set('messageHeight', String(messageHeight ?? 30));
-    formData.set('secondaryMessageWidth', String(secondaryMessageWidth ?? 80));
-    formData.set('secondaryMessageHeight', String(secondaryMessageHeight ?? 30));
+    // Text box dimension fields
+    formData.set('messageWidth', String(values.messageWidth ?? 80));
+    formData.set('messageHeight', String(values.messageHeight ?? 30));
+    formData.set('secondaryMessageWidth', String(values.secondaryMessageWidth ?? 80));
+    formData.set('secondaryMessageHeight', String(values.secondaryMessageHeight ?? 30));
 
     // Wrap formAction in startTransition for proper React 19 useActionState behavior
     startTransition(() => {
