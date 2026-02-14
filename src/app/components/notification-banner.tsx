@@ -32,7 +32,7 @@ interface NotificationBannerProps {
  *
  * Features:
  * - Golden ratio-based responsive height
- * - Auto-cycling every 10 seconds
+ * - Auto-cycling every ~6.5 seconds
  * - Smooth transitions with easing
  * - Navigation dots for manual selection
  * - Full viewport width images

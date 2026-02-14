@@ -30,6 +30,12 @@ export const verifyTurnstile = async (
     return { success: false, error: 'Turnstile token is required' };
   }
 
+  // Cloudflare's well-known test secret key — skip the API call during testing
+  // @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+  if (secret === '1x0000000000000000000000000000000AA') {
+    return { success: true };
+  }
+
   try {
     const formData = new URLSearchParams();
     formData.append('secret', secret);
