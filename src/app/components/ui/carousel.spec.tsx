@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -704,7 +704,9 @@ describe('Carousel loop cycling behavior', () => {
     expect(nextButton).not.toBeDisabled();
   });
 
-  it('wraps via keyboard ArrowRight at the end with loop enabled', () => {
+  it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
+    const user = userEvent.setup();
+
     render(
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
@@ -717,12 +719,16 @@ describe('Carousel loop cycling behavior', () => {
     mockApi.canScrollNext.mockReturnValue(false);
 
     const carousel = screen.getByRole('region');
-    fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+    carousel.setAttribute('tabIndex', '0');
+    carousel.focus();
+    await user.keyboard('{ArrowRight}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(0);
   });
 
-  it('wraps via keyboard ArrowLeft at the beginning with loop enabled', () => {
+  it('wraps via keyboard ArrowLeft at the beginning with loop enabled', async () => {
+    const user = userEvent.setup();
+
     render(
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
@@ -735,7 +741,9 @@ describe('Carousel loop cycling behavior', () => {
     mockApi.canScrollPrev.mockReturnValue(false);
 
     const carousel = screen.getByRole('region');
-    fireEvent.keyDown(carousel, { key: 'ArrowLeft' });
+    carousel.setAttribute('tabIndex', '0');
+    carousel.focus();
+    await user.keyboard('{ArrowLeft}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
   });
