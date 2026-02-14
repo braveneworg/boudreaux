@@ -739,4 +739,50 @@ describe('Carousel loop cycling behavior', () => {
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
   });
+
+  it('does not call scrollTo when empty carousel with loop enabled on previous', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    await user.click(prevButton);
+
+    // scrollTo should not be called with -1 when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalledWith(-1);
+  });
+
+  it('does not call scrollTo when empty carousel with loop enabled on next', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    await user.click(nextButton);
+
+    // scrollTo should not be called when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
+  });
 });
