@@ -60,7 +60,8 @@ test.describe('Notification Banner Carousel', () => {
     const tabs = page.getByRole('tab');
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Wait for auto-cycle with assertion timeout (1s interval + buffer)
+    // Wait for auto-cycle with assertion timeout
+    // 1s interval configured in playwright.config.ts + 1s buffer = 2s timeout
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 2000 });
   });
 
