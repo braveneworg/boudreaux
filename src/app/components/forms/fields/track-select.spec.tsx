@@ -430,6 +430,17 @@ describe('TrackSelect', () => {
 
     it('deselects track when clicking on already selected item', async () => {
       const user = userEvent.setup();
+      // Re-open to verify selection persists
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
+      });
+    });
+
+    it('calls onTrackChange when a track is selected', async () => {
+      const user = userEvent.setup();
+      const mockOnTrackChange = vi.fn();
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -439,6 +450,7 @@ describe('TrackSelect', () => {
               label="Track"
               placeholder="Select a track..."
               setValue={setValue}
+              onTrackChange={mockOnTrackChange}
             />
           )}
         </TestWrapper>

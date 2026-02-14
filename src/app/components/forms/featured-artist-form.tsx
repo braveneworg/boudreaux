@@ -96,6 +96,7 @@ export default function FeaturedArtistForm({
   });
   const { control, setValue } = form;
   const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
+  const watchedReleaseId = useWatch({ control, name: 'releaseId' }) as string | undefined;
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -324,6 +325,7 @@ export default function FeaturedArtistForm({
                     placeholder="Select a track..."
                     setValue={setValue}
                     onTrackChange={handleTrackChange}
+                    releaseId={watchedReleaseId || undefined}
                   />
 
                   <ReleaseSelect

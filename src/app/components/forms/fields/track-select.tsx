@@ -47,6 +47,7 @@ interface TrackSelectProps<
   disabled?: boolean;
   showCreateLink?: boolean;
   onTrackChange?: (track: TrackOption | null) => void;
+  releaseId?: string;
 }
 
 /**
@@ -74,6 +75,7 @@ export default function TrackSelect<
   disabled = false,
   showCreateLink = true,
   onTrackChange,
+  releaseId,
 }: TrackSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -82,31 +84,45 @@ export default function TrackSelect<
   const [error, setError] = useState<string | null>(null);
 
   // Fetch tracks from API
-  const fetchTracks = useCallback(async (search?: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (search) {
-        params.set('search', search);
-      }
-      params.set('take', '50');
+  const fetchTracks = useCallback(
+    async (search?: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (search) {
+          params.set('search', search);
+        }
+        if (releaseId) {
+          params.set('releaseId', releaseId);
+        }
+        params.set('take', '50');
 
-      const response = await fetch(`/api/tracks?${params.toString()}`);
-      if (!response.ok) {
-        throw Error('Failed to fetch tracks');
-      }
+        const response = await fetch(`/api/tracks?${params.toString()}`);
+        if (!response.ok) {
+          throw Error('Failed to fetch tracks');
+        }
 
-      const data: { tracks: TrackOption[] } = await response.json();
-      setTracks(data.tracks || []);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
-      setError(errorMessage);
-      setTracks([]);
-    } finally {
-      setIsLoading(false);
+        const data: { tracks: TrackOption[] } = await response.json();
+        setTracks(data.tracks || []);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
+        setError(errorMessage);
+        setTracks([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [releaseId]
+  );
+
+  // Re-fetch when releaseId changes
+  useEffect(() => {
+    setTracks([]);
+    if (open) {
+      fetchTracks();
     }
-  }, []);
+  }, [releaseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial fetch when popover opens
   useEffect(() => {

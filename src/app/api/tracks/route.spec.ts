@@ -115,7 +115,48 @@ describe('Tracks API Routes', () => {
       expect(TrackService.getTracks).toHaveBeenCalledWith({
         search: 'test',
       });
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test');
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', undefined);
+    });
+
+    it('should handle releaseId parameter', async () => {
+      vi.mocked(TrackService.getTracks).mockResolvedValue({
+        success: true,
+        data: [mockTrack] as never,
+      });
+      vi.mocked(TrackService.getTracksCount).mockResolvedValue({
+        success: true,
+        data: 1,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/tracks?releaseId=release-456');
+      await GET(request);
+
+      expect(TrackService.getTracks).toHaveBeenCalledWith({
+        releaseId: 'release-456',
+      });
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, 'release-456');
+    });
+
+    it('should handle both search and releaseId parameters', async () => {
+      vi.mocked(TrackService.getTracks).mockResolvedValue({
+        success: true,
+        data: [mockTrack] as never,
+      });
+      vi.mocked(TrackService.getTracksCount).mockResolvedValue({
+        success: true,
+        data: 1,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/tracks?search=test&releaseId=release-456'
+      );
+      await GET(request);
+
+      expect(TrackService.getTracks).toHaveBeenCalledWith({
+        search: 'test',
+        releaseId: 'release-456',
+      });
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', 'release-456');
     });
 
     it('should return empty search when search param is empty', async () => {
@@ -135,7 +176,7 @@ describe('Tracks API Routes', () => {
       expect(response.status).toBe(200);
       expect(data.tracks).toEqual([]);
       expect(data.count).toBe(0);
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined);
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, undefined);
     });
 
     it('should calculate hasMore correctly when more tracks exist', async () => {
