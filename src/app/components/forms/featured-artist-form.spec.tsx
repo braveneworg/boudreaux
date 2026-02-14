@@ -13,6 +13,7 @@ let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
 
 const mockPush = vi.fn();
+const mockSetValue = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -40,6 +41,25 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to capture setValue calls
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  type ReactHookForm = typeof actual;
+  return {
+    ...actual,
+    useForm: (options?: unknown) => {
+      const formMethods = (actual as ReactHookForm).useForm(options);
+      // Wrap setValue to capture calls while preserving functionality
+      const originalSetValue = formMethods.setValue;
+      formMethods.setValue = (...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      };
+      return formMethods;
+    },
   };
 });
 
@@ -253,6 +273,13 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.({
           id: 'track-4',
           title: 'Legacy Track',
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
         });
       });
 
