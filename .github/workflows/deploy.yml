@@ -757,22 +757,29 @@ jobs:
             if [ "$NEEDS_CERT" = true ]; then
               echo "Obtaining/renewing Let's Encrypt certificate for $DOMAIN..."
 
-              # Try renewal first WITHOUT stopping containers (in case cert uses webroot authenticator)
+              # Try renewal first WITHOUT stopping containers (works if cert uses webroot authenticator)
               # The renewal config at /etc/letsencrypt/renewal/$DOMAIN.conf determines the method
               if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
-                echo "✓ Certificate renewed successfully via certbot renew."
+                echo "✓ Certificate renewed successfully via certbot renew (webroot mode)."
               else
-                echo "certbot renew failed or no existing cert — trying standalone issuance..."
+                echo "certbot renew failed with containers running — trying with containers stopped..."
 
-                # Stop containers that might be using port 80 (needed for standalone mode)
+                # Stop containers that might be using port 80 (needed for standalone authenticator)
                 $DOCKER_CMD stop nginx website 2>/dev/null || true
 
-                # Request certificate using standalone mode
-                sudo certbot certonly --standalone --non-interactive --agree-tos \
-                  "${CERTBOT_EMAIL_ARGS[@]}" \
-                  -d "$DOMAIN" -d "www.$DOMAIN" || {
-                  echo "WARNING: Standalone certificate acquisition failed."
-                }
+                # Retry renewal with containers stopped (works if cert uses standalone authenticator)
+                if sudo certbot renew --cert-name "$DOMAIN" --force-renewal --non-interactive; then
+                  echo "✓ Certificate renewed successfully via certbot renew (standalone mode)."
+                else
+                  echo "certbot renew failed — no existing cert found, trying initial issuance..."
+
+                  # Request certificate using standalone mode (first-time issuance)
+                  sudo certbot certonly --standalone --non-interactive --agree-tos \
+                    "${CERTBOT_EMAIL_ARGS[@]}" \
+                    -d "$DOMAIN" -d "www.$DOMAIN" || {
+                    echo "WARNING: Standalone certificate acquisition failed."
+                  }
+                fi
               fi
             fi
 
