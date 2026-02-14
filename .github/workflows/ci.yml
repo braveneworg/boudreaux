@@ -201,7 +201,7 @@ jobs:
           DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e"
           AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
           AUTH_URL: "http://localhost:3000"
-          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x0000000000000000000000000000000AA"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x00000000000000000000AA"
           SKIP_ENV_VALIDATION: "true"
           NODE_ENV: "test"
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"
