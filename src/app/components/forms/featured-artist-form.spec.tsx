@@ -5,8 +5,11 @@ import userEvent from '@testing-library/user-event';
 
 import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
-// Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
+
+import type * as ReactHookFormTypes from 'react-hook-form';
+
+// Need to import after mocks are set up
 
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
@@ -48,11 +51,10 @@ vi.mock('react', async () => {
 
 // Mock react-hook-form to capture setValue calls
 vi.mock('react-hook-form', async () => {
-  const actual = await vi.importActual('react-hook-form');
-  type ReactHookForm = typeof actual;
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
   return {
     ...actual,
-    useForm: (options?: Parameters<ReactHookForm['useForm']>[0]) => {
+    useForm: (options?: Parameters<typeof actual.useForm>[0]) => {
       const originalForm = actual.useForm(options);
       const originalSetValue = originalForm.setValue;
       // Wrap setValue to spy on it while preserving original behavior
