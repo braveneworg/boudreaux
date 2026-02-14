@@ -720,7 +720,7 @@ describe('Carousel loop cycling behavior', () => {
 
     const carousel = screen.getByRole('region');
     carousel.setAttribute('tabIndex', '0');
-    carousel.focus();
+    await user.click(carousel);
     await user.keyboard('{ArrowRight}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(0);
@@ -742,7 +742,7 @@ describe('Carousel loop cycling behavior', () => {
 
     const carousel = screen.getByRole('region');
     carousel.setAttribute('tabIndex', '0');
-    carousel.focus();
+    await user.click(carousel);
     await user.keyboard('{ArrowLeft}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
