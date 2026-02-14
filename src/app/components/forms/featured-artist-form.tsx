@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSession } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
 import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
+import CoverArtField from '@/app/components/forms/fields/cover-art-field';
 import GroupSelect from '@/app/components/forms/fields/group-select';
 import ReleaseSelect from '@/app/components/forms/fields/release-select';
 import TrackSelect from '@/app/components/forms/fields/track-select';
@@ -94,6 +95,7 @@ export default function FeaturedArtistForm({
     },
   });
   const { control, setValue } = form;
+  const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -188,18 +190,26 @@ export default function FeaturedArtistForm({
       return;
     }
 
-    // Submit the form
-    if (formRef.current) {
-      const formData = new FormData(formRef.current);
+    // Build FormData from React Hook Form state instead of the DOM.
+    // Custom select components (TrackSelect, ReleaseSelect, GroupSelect)
+    // and DatePicker don't render <input> elements with name attributes,
+    // so new FormData(formRef) would miss their values.
+    const values = form.getValues();
+    const formData = new FormData();
 
-      // Add artistIds to formData (they may not be in the form directly)
-      const artistIds = form.getValues('artistIds');
-      artistIds.forEach((id) => {
-        formData.append('artistIds', id);
-      });
-
-      formAction(formData);
+    for (const [key, value] of Object.entries(values)) {
+      if (key === 'artistIds') continue; // handled separately below
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, String(value));
+      }
     }
+
+    // Append artistIds individually (server action uses getAll('artistIds'))
+    values.artistIds.forEach((id) => {
+      formData.append('artistIds', id);
+    });
+
+    formAction(formData);
   };
 
   const handleCancel = () => {
@@ -363,22 +373,13 @@ export default function FeaturedArtistForm({
                   </FormItem>
                 </div>
 
-                <FormField
+                <CoverArtField
                   control={control}
                   name="coverArt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cover Art URL (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="url" placeholder="https://example.com/cover.jpg" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Custom cover art for this featured entry. If not provided, the track or
-                        release cover will be used.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  setValue={setValue}
+                  artistIds={watchedArtistIds || []}
+                  entityType="featured-artists"
+                  disabled={isPending}
                 />
               </div>
             </CardContent>

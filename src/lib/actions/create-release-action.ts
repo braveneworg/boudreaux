@@ -3,13 +3,13 @@
 import { revalidatePath } from 'next/cache';
 
 import type { Format } from '@/lib/types/media-models';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createReleaseSchema } from '../validation/create-release-schema';
 
 import type { FormState } from '../types/form-state';
@@ -18,7 +18,7 @@ export const createReleaseAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   const permittedFieldNames = [
     'title',
@@ -36,20 +36,17 @@ export const createReleaseAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id || session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be a logged in admin user to create a release'];
-        return formState;
-      }
-
-      const { title, releasedOn, coverArt, formats, labels, catalogNumber, description } =
-        parsed.data;
+      const {
+        title,
+        releasedOn,
+        coverArt,
+        formats,
+        artistIds,
+        groupIds,
+        labels,
+        catalogNumber,
+        description,
+      } = parsed.data;
 
       // Parse labels from comma-separated string to array
       const labelsArray = labels
@@ -69,6 +66,17 @@ export const createReleaseAction = async (
         catalogNumber: catalogNumber || undefined,
         description: description || undefined,
       });
+
+      // Create ArtistRelease associations if release was created and artistIds provided
+      if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
+        const createdReleaseId = response.data.id;
+        await prisma.artistRelease.createMany({
+          data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
+        });
+      }
+
+      // groupIds is validated but not persisted (no GroupRelease model in schema yet)
+      void groupIds;
 
       // Log release creation for security audit
       logSecurityEvent({
@@ -102,7 +110,7 @@ export const createReleaseAction = async (
         ) {
           formState.errors.title = ['This title is already in use. Please choose a different one.'];
         } else {
-          formState.errors = { general: [errorMessage] };
+          formState.errors = { general: ['Failed to create release'] };
         }
       }
 

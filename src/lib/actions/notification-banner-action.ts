@@ -2,15 +2,16 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '../../../auth';
-import { NotificationBannerService } from '../services/notification-banner-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { requireRole } from '../utils/auth/require-role';
-import { loggers } from '../utils/logger';
-import { notificationBannerSchema } from '../validation/notification-banner-schema';
+import { NotificationBannerService } from '@/lib/services/notification-banner-service';
+import type { FormState } from '@/lib/types/form-state';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
+import { setUnknownError } from '@/lib/utils/auth/auth-utils';
+import { requireRole } from '@/lib/utils/auth/require-role';
+import { loggers } from '@/lib/utils/logger';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
+import { notificationBannerSchema } from '@/lib/validation/notification-banner-schema';
 
-import type { FormState } from '../types/form-state';
+import type { Session } from 'next-auth';
 
 const logger = loggers.notifications;
 
@@ -57,7 +58,16 @@ export const createNotificationBannerAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  let session: Session;
+  try {
+    session = await requireRole('admin');
+  } catch {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['You must be a logged in admin user to create a notification banner'] },
+    };
+  }
 
   // Debug: Log received payload
   logger.debug('CREATE - Received FormData entries');
@@ -77,14 +87,9 @@ export const createNotificationBannerAction = async (
   const messageTextShadowValue = payload.get('messageTextShadow');
   const secondaryMessageTextShadowValue = payload.get('secondaryMessageTextShadow');
 
-  const processedPayload = new FormData();
-  for (const [key, value] of payload.entries()) {
-    processedPayload.append(key, value);
-  }
-
   // Handle checkbox/switch boolean conversion
   const formDataObj: Record<string, unknown> = {};
-  for (const [key, value] of processedPayload.entries()) {
+  for (const [key, value] of payload.entries()) {
     if (key === 'sortOrder') {
       formDataObj[key] = parseInt(value.toString(), 10) || 0;
     } else if (
@@ -179,15 +184,6 @@ export const createNotificationBannerAction = async (
   }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      formState.errors = {
-        general: ['You must be a logged in admin user to create a notification banner'],
-      };
-      return formState;
-    }
-
     const {
       message,
       secondaryMessage,
@@ -269,13 +265,14 @@ export const createNotificationBannerAction = async (
       messageHeight: messageHeight ?? 30,
       secondaryMessageWidth: secondaryMessageWidth ?? 80,
       secondaryMessageHeight: secondaryMessageHeight ?? 30,
-      addedBy: { connect: { id: session.user.id } },
+      addedById: session.user.id,
     };
 
     const result = await NotificationBannerService.createNotificationBanner(createData);
 
     if (!result.success) {
-      formState.errors = { general: [result.error] };
+      logger.error('CREATE - Service error', { error: result.error });
+      formState.errors = { general: ['Failed to create notification banner'] };
       return formState;
     }
 
@@ -306,7 +303,16 @@ export const updateNotificationBannerAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  let session: Session;
+  try {
+    session = await requireRole('admin');
+  } catch {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['You must be a logged in admin user to update a notification banner'] },
+    };
+  }
 
   // Debug: Log received payload
   logger.debug('UPDATE - Received FormData entries');
@@ -321,6 +327,14 @@ export const updateNotificationBannerAction = async (
       fields: {},
       success: false,
       errors: { general: ['Notification ID is required'] },
+    };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['Invalid notification ID'] },
     };
   }
 
@@ -420,15 +434,6 @@ export const updateNotificationBannerAction = async (
   }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      formState.errors = {
-        general: ['You must be a logged in admin user to update a notification banner'],
-      };
-      return formState;
-    }
-
     const {
       message,
       secondaryMessage,
@@ -523,7 +528,8 @@ export const updateNotificationBannerAction = async (
     logger.debug('UPDATE - Service result', { success: result.success });
 
     if (!result.success) {
-      formState.errors = { general: [result.error] };
+      logger.error('UPDATE - Service error', { error: result.error, notificationId });
+      formState.errors = { general: ['Failed to update notification banner'] };
       return formState;
     }
 
@@ -553,19 +559,23 @@ export const updateNotificationBannerAction = async (
 export const deleteNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  let session: Session;
+  try {
+    session = await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
+  }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     const result = await NotificationBannerService.deleteNotificationBanner(notificationId);
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      logger.error('DELETE - Service error', { error: result.error, notificationId });
+      return { success: false, error: 'Failed to delete notification banner' };
     }
 
     logSecurityEvent({
@@ -587,22 +597,26 @@ export const deleteNotificationBannerAction = async (
 export const publishNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  let session: Session;
+  try {
+    session = await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
+  }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     const result = await NotificationBannerService.publishNotificationBanner(
       notificationId,
       session.user.id
     );
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      logger.error('PUBLISH - Service error', { error: result.error, notificationId });
+      return { success: false, error: 'Failed to publish notification banner' };
     }
 
     logSecurityEvent({
@@ -624,19 +638,23 @@ export const publishNotificationBannerAction = async (
 export const unpublishNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  let session: Session;
+  try {
+    session = await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!OBJECT_ID_REGEX.test(notificationId)) {
+    return { success: false, error: 'Invalid notification ID' };
+  }
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     const result = await NotificationBannerService.unpublishNotificationBanner(notificationId);
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      logger.error('UNPUBLISH - Service error', { error: result.error, notificationId });
+      return { success: false, error: 'Failed to unpublish notification banner' };
     }
 
     logSecurityEvent({

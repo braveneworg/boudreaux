@@ -20,7 +20,7 @@ describe('requireRole', () => {
         user: { id: '1', role: 'admin' },
       });
 
-      await expect(requireRole('admin')).resolves.toBeUndefined();
+      await expect(requireRole('admin')).resolves.toEqual({ user: { id: '1', role: 'admin' } });
     });
 
     it('should resolve successfully for user role', async () => {
@@ -28,7 +28,7 @@ describe('requireRole', () => {
         user: { id: '1', role: 'user' },
       });
 
-      await expect(requireRole('user')).resolves.toBeUndefined();
+      await expect(requireRole('user')).resolves.toEqual({ user: { id: '1', role: 'user' } });
     });
   });
 

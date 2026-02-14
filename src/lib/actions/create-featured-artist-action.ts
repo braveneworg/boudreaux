@@ -2,13 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { z } from 'zod';
+
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
 import { FeaturedArtistsService } from '../services/featured-artists-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { createFeaturedArtistSchema } from '../validation/create-featured-artist-schema';
 
 import type { FormState } from '../types/form-state';
@@ -40,11 +42,20 @@ export const createFeaturedArtistAction = async (
     'groupId',
   ];
 
+  // FormData sends all values as strings, so use z.coerce.number() for position
+  // on the server side (the client schema uses z.number() for React Hook Form compatibility)
+  const serverSchema = createFeaturedArtistSchema.omit({ artistIds: true, position: true }).extend({
+    position: z.coerce
+      .number()
+      .int({ message: 'Position must be a whole number' })
+      .min(0, { message: 'Position must be 0 or greater' }),
+  });
+
   // Get form state without artistIds first
   const { formState, parsed: baseParsed } = getActionState(
     payloadWithArtistIds,
     permittedFieldNames,
-    createFeaturedArtistSchema.omit({ artistIds: true })
+    serverSchema
   );
 
   // Validate artistIds separately

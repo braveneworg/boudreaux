@@ -39,10 +39,35 @@ const getActionState = <TForm>(
 
   formState.fields = fields;
 
+  // Parse JSON-stringified arrays back to actual arrays before validation.
+  // The client serializes arrays via JSON.stringify() when appending to FormData,
+  // so they arrive as strings like '["value1","value2"]'. Zod expects real arrays.
+  // Also coerce numeric strings to numbers (FormData sends all values as strings).
+  for (const key of Object.keys(formData)) {
+    const val = formData[key];
+    if (typeof val === 'string') {
+      if (val.startsWith('[')) {
+        try {
+          const jsonParsed = JSON.parse(val);
+          if (Array.isArray(jsonParsed)) {
+            formData[key] = jsonParsed as unknown as FormDataEntryValue;
+          }
+        } catch {
+          // Not valid JSON, keep as string
+        }
+      } else if (val !== '' && !isNaN(Number(val)) && isFinite(Number(val))) {
+        // Convert numeric strings to numbers so Zod z.number() fields validate correctly.
+        // Non-numeric fields (URLs, dates, ObjectIds) contain non-numeric characters
+        // and won't match this check.
+        formData[key] = Number(val) as unknown as FormDataEntryValue;
+      }
+    }
+  }
+
   // Validate the form data
   const parsed = formSchema.safeParse(formData);
 
   return { formState, parsed };
 };
 
-export default getActionState;
+export { getActionState };
