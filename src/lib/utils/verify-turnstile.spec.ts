@@ -118,8 +118,9 @@ describe('verifyTurnstile', () => {
   });
 
   describe('test secret key bypass', () => {
-    it('should return success immediately when using Cloudflare test secret key', async () => {
+    it('should return success immediately when using Cloudflare test secret key and E2E_MODE is enabled', async () => {
       process.env.CLOUDFLARE_SECRET = '1x0000000000000000000000000000000AA';
+      process.env.E2E_MODE = 'true';
 
       const result = await verifyTurnstile('any-token', '127.0.0.1');
 
@@ -127,8 +128,35 @@ describe('verifyTurnstile', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('should not bypass verification for non-test secret keys', async () => {
+    it('should not bypass verification when test secret is used but E2E_MODE is not enabled', async () => {
+      process.env.CLOUDFLARE_SECRET = '1x0000000000000000000000000000000AA';
+      delete process.env.E2E_MODE;
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await verifyTurnstile('valid-token', '127.0.0.1');
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should not bypass verification when test secret is used but E2E_MODE is false', async () => {
+      process.env.CLOUDFLARE_SECRET = '1x0000000000000000000000000000000AA';
+      process.env.E2E_MODE = 'false';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await verifyTurnstile('valid-token', '127.0.0.1');
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should not bypass verification for non-test secret keys even with E2E_MODE enabled', async () => {
       process.env.CLOUDFLARE_SECRET = 'real-production-secret';
+      process.env.E2E_MODE = 'true';
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),

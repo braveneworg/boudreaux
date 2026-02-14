@@ -40,6 +40,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       NODE_ENV: 'development',
+      E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,
       AUTH_SECRET,
       AUTH_URL: 'http://localhost:3000',
