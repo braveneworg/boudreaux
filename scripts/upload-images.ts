@@ -175,9 +175,6 @@ export function generateS3Key(filePath: string, prefix?: string): string {
   // Remove leading slashes
   key = key.replace(/^\/+/, '');
 
-  // Normalize to forward slashes before prefix check (for cross-platform compatibility)
-  key = key.split('\\').join('/');
-
   // Apply prefix: use explicit prefix if provided, otherwise default to 'media'
   const effectivePrefix = prefix !== undefined ? prefix : 'media';
   if (effectivePrefix) {
