@@ -46,14 +46,18 @@ vi.mock('react', async () => {
 
 // Mock react-hook-form to capture setValue calls
 vi.mock('react-hook-form', async () => {
-  const actual = await vi.importActual('react-hook-form');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await vi.importActual('react-hook-form')) as any;
+
   return {
     ...actual,
-    useForm: (...args: Parameters<typeof actual.useForm>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useForm: (...args: any[]) => {
       const form = actual.useForm(...args);
       // Wrap setValue with a spy
       const originalSetValue = form.setValue;
-      const spy = vi.fn((...setValueArgs: Parameters<typeof originalSetValue>) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const spy = vi.fn((...setValueArgs: any[]) => {
         return originalSetValue(...setValueArgs);
       });
       setValueSpies.push(spy);
