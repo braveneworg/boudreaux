@@ -255,6 +255,43 @@ describe('TrackService', () => {
       );
     });
 
+    it('should apply releaseId filter', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({ releaseId: 'release-456' });
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            releaseTracks: {
+              some: {
+                releaseId: 'release-456',
+              },
+            },
+          },
+        })
+      );
+    });
+
+    it('should apply both search and releaseId filters together', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({ search: 'test', releaseId: 'release-456' });
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+            releaseTracks: {
+              some: {
+                releaseId: 'release-456',
+              },
+            },
+          },
+        })
+      );
+    });
+
     it('should return empty array when no tracks exist', async () => {
       vi.mocked(prisma.track.findMany).mockResolvedValue([]);
 
@@ -306,6 +343,41 @@ describe('TrackService', () => {
       expect(prisma.track.count).toHaveBeenCalledWith({
         where: {
           OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+        },
+      });
+    });
+
+    it('should return count of tracks matching releaseId', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(8);
+
+      const result = await TrackService.getTracksCount(undefined, 'release-456');
+
+      expect(result).toMatchObject({ success: true, data: 8 });
+      expect(prisma.track.count).toHaveBeenCalledWith({
+        where: {
+          releaseTracks: {
+            some: {
+              releaseId: 'release-456',
+            },
+          },
+        },
+      });
+    });
+
+    it('should return count with both search and releaseId filters', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(3);
+
+      const result = await TrackService.getTracksCount('test', 'release-456');
+
+      expect(result).toMatchObject({ success: true, data: 3 });
+      expect(prisma.track.count).toHaveBeenCalledWith({
+        where: {
+          OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+          releaseTracks: {
+            some: {
+              releaseId: 'release-456',
+            },
+          },
         },
       });
     });

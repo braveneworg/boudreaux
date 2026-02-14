@@ -104,13 +104,21 @@ export class TrackService {
     skip?: number;
     take?: number;
     search?: string;
+    releaseId?: string;
   }): Promise<ServiceResponse<Track[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
+      const { skip = 0, take = 50, search, releaseId } = params || {};
 
       const where: Prisma.TrackWhereInput = {
         ...(search && {
           OR: [{ title: { contains: search, mode: 'insensitive' } }],
+        }),
+        ...(releaseId && {
+          releaseTracks: {
+            some: {
+              releaseId,
+            },
+          },
         }),
       };
 
@@ -164,11 +172,21 @@ export class TrackService {
   /**
    * Get total count of tracks with optional search filter
    */
-  static async getTracksCount(search?: string): Promise<ServiceResponse<number>> {
+  static async getTracksCount(
+    search?: string,
+    releaseId?: string
+  ): Promise<ServiceResponse<number>> {
     try {
       const where: Prisma.TrackWhereInput = {
         ...(search && {
           OR: [{ title: { contains: search, mode: 'insensitive' } }],
+        }),
+        ...(releaseId && {
+          releaseTracks: {
+            some: {
+              releaseId,
+            },
+          },
         }),
       };
 
