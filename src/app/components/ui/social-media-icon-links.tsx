@@ -42,7 +42,7 @@ const menuLinks = [
 ];
 
 const SocialMediaIconLinks = ({ className }: { className: string }) => (
-  <div className={cn(['flex flex-wrap py-1 justify-end', className])}>
+  <div className={cn(['flex flex-wrap pt-4 justify-end', className])}>
     {menuLinks.map((link) => (
       <Link
         aria-label={link.label}

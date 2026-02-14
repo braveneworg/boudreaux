@@ -63,6 +63,18 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     if (featured.release?.coverArt) {
       return featured.release.coverArt;
     }
+    // Fallback to first image in the release
+    if (featured.release?.images?.length && featured.release.images[0].src) {
+      return featured.release.images[0].src;
+    }
+    // Fallback to first artist's first image
+    if (featured.artists?.length > 0) {
+      for (const artist of featured.artists) {
+        if (artist.images?.length > 0) {
+          return artist.images[0].src;
+        }
+      }
+    }
     return null;
   };
 
@@ -200,7 +212,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
         {selectedArtist && (
           <div className="flex flex-col items-center">
             {/* Cover Art with Audio Controls beneath it */}
-            <div className="w-[calc(100vw-1rem)]">
+            <div className="w-full max-w-xl mx-auto">
               {/* Interactive Cover Art - clickable with play/pause overlay */}
               {getCoverArt(selectedArtist) && (
                 <MediaPlayer.InteractiveCoverArt

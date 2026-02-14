@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
 import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
+import CoverArtField from '@/app/components/forms/fields/cover-art-field';
 import GroupMultiSelect, {
   type GroupOption,
 } from '@/app/components/forms/fields/group-multi-select';
@@ -454,6 +455,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
   const _title = useWatch({ control, name: 'title' });
   const formats = useWatch({ control, name: 'formats' });
+  const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
 
   const handleSelectDate = (dateString: string, fieldName: string): void => {
     releaseForm.setValue(fieldName as FormFieldName, dateString, { shouldDirty: true });
@@ -655,11 +657,12 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                         })}
                     </div>
                   )}
-                <TextField
+                <CoverArtField
                   control={control}
                   name="coverArt"
-                  label="Cover Art URL *"
-                  placeholder="https://example.com/cover.jpg"
+                  setValue={releaseForm.setValue}
+                  artistIds={watchedArtistIds || []}
+                  disabled={isSubmitting}
                 />
                 <FormField
                   control={control}

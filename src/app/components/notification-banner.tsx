@@ -62,6 +62,9 @@ export function NotificationBanner({ notifications, className }: NotificationBan
   // Navigate to specific notification
   const goToIndex = useCallback(
     (index: number) => {
+      if (index === currentIndex) {
+        return;
+      }
       setDirection(index > currentIndex ? 1 : -1);
       setCurrentIndex(index);
     },
@@ -115,11 +118,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
 
   return (
     <section
-      className={cn(
-        // Full-bleed: break out of parent padding to span full viewport width
-        'relative w-screen overflow-hidden -mx-1.5',
-        className
-      )}
+      className={cn('relative w-full max-w-xl mx-auto overflow-hidden mt-1', className)}
       role="region"
       aria-label="Notification banner"
       aria-roledescription="carousel"

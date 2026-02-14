@@ -1,25 +1,33 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { getActionState } from '@/lib/utils/auth/get-action-state';
+
 import { createReleaseAction } from './create-release-action';
-import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
-import getActionState from '../utils/auth/get-action-state';
 import { requireRole } from '../utils/auth/require-role';
 
 import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
+vi.mock('../prisma', () => ({
+  prisma: {
+    artistRelease: {
+      createMany: vi.fn(),
+    },
+  },
+}));
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('../../../auth');
+
 vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('../utils/auth/get-action-state');
+vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('../utils/auth/require-role');
 
 describe('createReleaseAction', () => {
@@ -47,8 +55,7 @@ describe('createReleaseAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(undefined);
-    vi.mocked(auth).mockResolvedValue(mockSession as never);
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -63,31 +70,7 @@ describe('createReleaseAction', () => {
       expect(requireRole).toHaveBeenCalledWith('admin');
     });
 
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-          },
-        },
-      } as never);
-
-      const result = await createReleaseAction(initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to create a release',
-      ]);
-    });
-
     it('should allow admin users to create releases', async () => {
-      vi.mocked(auth).mockResolvedValue(mockSession as never);
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -352,7 +335,7 @@ describe('createReleaseAction', () => {
       const result = await createReleaseAction(initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Database connection failed']);
+      expect(result.errors?.general).toEqual(['Failed to create release']);
     });
 
     it('should handle service returning error without message', async () => {
@@ -587,8 +570,7 @@ describe('createReleaseAction', () => {
 
       for (const errorMessage of errorMessages) {
         vi.clearAllMocks();
-        vi.mocked(requireRole).mockResolvedValue(undefined);
-        vi.mocked(auth).mockResolvedValue(mockSession as never);
+        vi.mocked(requireRole).mockResolvedValue(mockSession as never);
 
         vi.mocked(getActionState).mockReturnValue({
           formState: { fields: {}, success: false },
@@ -614,6 +596,112 @@ describe('createReleaseAction', () => {
           'This title is already in use. Please choose a different one.',
         ]);
       }
+    });
+  });
+
+  describe('Artist Associations', () => {
+    it('should create ArtistRelease associations when artistIds provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: ['artist-1', 'artist-2'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
+        data: [
+          { artistId: 'artist-1', releaseId: 'release-123' },
+          { artistId: 'artist-2', releaseId: 'release-123' },
+        ],
+      });
+    });
+
+    it('should not create associations when artistIds is empty', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: [],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create associations when release creation fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: ['artist-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create associations when artistIds is not provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,13 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { auth } from '../../../auth';
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
+import { loggers } from '@/lib/utils/logger';
 
 import type { Prisma } from '@prisma/client';
+
+const logger = loggers.media;
 
 /**
  * Result of finding or creating an artist
@@ -99,7 +100,7 @@ export async function findOrCreateArtistAction(
   artistName: string,
   options: FindOrCreateArtistOptions = {}
 ): Promise<FindOrCreateArtistResult> {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   // Validate required field
   if (!artistName || artistName.trim() === '') {
@@ -115,15 +116,6 @@ export async function findOrCreateArtistAction(
   const db = tx || prisma;
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return {
-        success: false,
-        error: 'You must be a logged in admin user to manage artists',
-      };
-    }
-
     // Try to find an existing artist by display name (case-insensitive)
     const existingArtist = await db.artist.findFirst({
       where: {
@@ -235,11 +227,12 @@ export async function findOrCreateArtistAction(
     const { firstName, surname, displayName } = parseArtistName(name);
     const baseSlug = generateSlug(name);
 
-    // Ensure unique slug by checking if it exists
+    // Ensure unique slug by checking if it exists (capped at 100 iterations)
     let slug = baseSlug;
     let slugSuffix = 1;
+    const MAX_SLUG_ATTEMPTS = 100;
 
-    while (true) {
+    while (slugSuffix <= MAX_SLUG_ATTEMPTS) {
       const existingSlug = await db.artist.findUnique({
         where: { slug },
         select: { id: true },
@@ -251,6 +244,12 @@ export async function findOrCreateArtistAction(
 
       slug = `${baseSlug}-${slugSuffix}`;
       slugSuffix++;
+    }
+
+    if (slugSuffix > MAX_SLUG_ATTEMPTS) {
+      throw new Error(
+        `Could not generate unique slug for artist "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`
+      );
     }
 
     // Build artist creation data with optional associations
@@ -313,13 +312,11 @@ export async function findOrCreateArtistAction(
       trackArtistCreated: !!trackId,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to find or create artist';
-
-    console.error('Find or create artist error:', error);
+    logger.error('Find or create artist error', error);
 
     return {
       success: false,
-      error: errorMessage,
+      error: 'Failed to find or create artist',
     };
   }
 }

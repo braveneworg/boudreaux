@@ -210,7 +210,11 @@ export interface Instrument {
 
 export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
   include: {
-    artists: true;
+    artists: {
+      include: {
+        images: true;
+      };
+    };
     track: true;
     release: {
       include: {
@@ -219,6 +223,7 @@ export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
             track: true;
           };
         };
+        images: true;
       };
     };
     group: true;

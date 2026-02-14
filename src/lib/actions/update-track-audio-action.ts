@@ -57,7 +57,8 @@ export async function updateTrackAudioAction(
 
     if (
       track.audioUploadStatus !== AudioUploadStatus.PENDING &&
-      track.audioUploadStatus !== AudioUploadStatus.UPLOADING
+      track.audioUploadStatus !== AudioUploadStatus.UPLOADING &&
+      track.audioUploadStatus !== AudioUploadStatus.FAILED
     ) {
       return {
         success: false,

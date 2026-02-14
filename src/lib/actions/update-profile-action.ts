@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import getActionState from '@/lib/utils/auth/get-action-state';
+import { getActionState } from '@/lib/utils/auth/get-action-state';
 import profileSchema from '@/lib/validation/profile-schema';
 
 import { auth } from '../../../auth';
