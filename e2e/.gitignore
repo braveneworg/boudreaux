@@ -1,0 +1,6 @@
+# Test artifacts
+test-results/
+playwright-report/
+
+# Auth state files (contain JWT tokens)
+.auth/

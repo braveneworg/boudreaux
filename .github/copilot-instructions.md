@@ -207,6 +207,8 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't commit generated files or build artifacts
 - Don't use any type in TypeScript code
 - Don't disable ESLint or Prettier rules globally
+- Don't use eslint-disable or prettier-ignore comments without a very good reason
+- Don't write large files with multiple components or functions (break them down into smaller files)
 - Don't write large functions or components (break them down)
 - Don't ignore TypeScript errors or warnings
 - Don't use inline styles in JSX
