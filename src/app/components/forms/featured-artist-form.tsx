@@ -14,7 +14,7 @@ import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
 import GroupSelect from '@/app/components/forms/fields/group-select';
 import ReleaseSelect from '@/app/components/forms/fields/release-select';
-import TrackSelect from '@/app/components/forms/fields/track-select';
+import TrackSelect, { type TrackOption } from '@/app/components/forms/fields/track-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -181,6 +181,14 @@ export default function FeaturedArtistForm({
     setValue('featuredOn', dateOnly);
   };
 
+  const handleTrackChange = (track: TrackOption | null) => {
+    const releaseId = track?.releaseTracks?.[0]?.release?.id ?? '';
+    setValue('releaseId', releaseId, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -315,6 +323,7 @@ export default function FeaturedArtistForm({
                     label="Track"
                     placeholder="Select a track..."
                     setValue={setValue}
+                    onTrackChange={handleTrackChange}
                   />
 
                   <ReleaseSelect

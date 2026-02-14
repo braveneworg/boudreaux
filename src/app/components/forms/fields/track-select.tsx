@@ -24,6 +24,12 @@ export interface TrackOption {
   id: string;
   title: string;
   duration?: number;
+  releaseTracks?: {
+    release: {
+      id: string;
+      title: string;
+    };
+  }[];
 }
 
 interface TrackSelectProps<
