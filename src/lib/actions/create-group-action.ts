@@ -18,6 +18,9 @@ export const createGroupAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
+  if (!session?.user?.id) {
+    throw new Error('Admin session is missing user id');
+  }
   const permittedFieldNames = ['name', 'displayName', 'bio', 'shortBio', 'formedOn', 'publishedOn'];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createGroupSchema);
 
