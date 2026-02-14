@@ -11,6 +11,7 @@ import FeaturedArtistForm from './featured-artist-form';
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
+const setValueSpies: Array<ReturnType<typeof vi.fn>> = [];
 
 const mockPush = vi.fn();
 
@@ -40,6 +41,27 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to capture setValue calls
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  return {
+    ...actual,
+    useForm: (...args: Parameters<typeof actual.useForm>) => {
+      const form = actual.useForm(...args);
+      // Wrap setValue with a spy
+      const originalSetValue = form.setValue;
+      const spy = vi.fn((...setValueArgs: Parameters<typeof originalSetValue>) => {
+        return originalSetValue(...setValueArgs);
+      });
+      setValueSpies.push(spy);
+      return {
+        ...form,
+        setValue: spy,
+      };
+    },
   };
 });
 
@@ -104,9 +126,10 @@ vi.mock('../ui/datepicker', () => ({
 
 describe('FeaturedArtistForm', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockPush.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
+    setValueSpies.length = 0; // Clear the array
   });
 
   describe('rendering', () => {
@@ -192,6 +215,20 @@ describe('FeaturedArtistForm', () => {
 
       await act(() => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
+      });
+
+      // Assert that setValue was called with the first release ID on any of the spies
+      await waitFor(() => {
+        const wasCalledCorrectly = setValueSpies.some((spy) =>
+          spy.mock.calls.some(
+            (call) =>
+              call[0] === 'releaseId' &&
+              call[1] === 'first00000000000000000000' &&
+              call[2]?.shouldDirty === true &&
+              call[2]?.shouldValidate === true
+          )
+        );
+        expect(wasCalledCorrectly).toBe(true);
       });
 
       await waitFor(() => {
