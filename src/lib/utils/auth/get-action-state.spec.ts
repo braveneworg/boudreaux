@@ -203,4 +203,121 @@ describe('get-action-state', () => {
       expect(formState.fields.termsAndConditions).toBe('off');
     });
   });
+
+  describe('JSON array parsing', () => {
+    it('should parse JSON-stringified arrays back to real arrays', () => {
+      const arraySchema = z.object({ tags: z.array(z.string()) });
+      formData.append('tags', '["tag1","tag2","tag3"]');
+
+      const permittedFields = ['tags'];
+      const { parsed } = getActionState(formData, permittedFields, arraySchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { tags: string[] } };
+      expect(successParsed.data.tags).toEqual(['tag1', 'tag2', 'tag3']);
+    });
+
+    it('should handle JSON-stringified arrays of numbers', () => {
+      const arraySchema = z.object({ ids: z.array(z.string()) });
+      formData.append('ids', '["id1","id2"]');
+
+      const permittedFields = ['ids'];
+      const { parsed } = getActionState(formData, permittedFields, arraySchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { ids: string[] } };
+      expect(successParsed.data.ids).toEqual(['id1', 'id2']);
+    });
+
+    it('should not parse invalid JSON strings starting with [', () => {
+      const stringSchema = z.object({ value: z.string() });
+      formData.append('value', '[invalid json');
+
+      const permittedFields = ['value'];
+      const { parsed } = getActionState(formData, permittedFields, stringSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { value: string } };
+      expect(successParsed.data.value).toBe('[invalid json');
+    });
+
+    it('should not parse non-array JSON', () => {
+      const stringSchema = z.object({ data: z.string() });
+      formData.append('data', '{"key":"value"}');
+
+      const permittedFields = ['data'];
+      const { parsed } = getActionState(formData, permittedFields, stringSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { data: string } };
+      expect(successParsed.data.data).toBe('{"key":"value"}');
+    });
+  });
+
+  describe('numeric coercion', () => {
+    it('should coerce numeric strings to numbers', () => {
+      const numberSchema = z.object({ duration: z.number(), position: z.number() });
+      formData.append('duration', '180');
+      formData.append('position', '3');
+
+      const permittedFields = ['duration', 'position'];
+      const { parsed } = getActionState(formData, permittedFields, numberSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as {
+        success: true;
+        data: { duration: number; position: number };
+      };
+      expect(successParsed.data.duration).toBe(180);
+      expect(successParsed.data.position).toBe(3);
+    });
+
+    it('should coerce decimal numeric strings', () => {
+      const numberSchema = z.object({ fontSize: z.number() });
+      formData.append('fontSize', '2.5');
+
+      const permittedFields = ['fontSize'];
+      const { parsed } = getActionState(formData, permittedFields, numberSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { fontSize: number } };
+      expect(successParsed.data.fontSize).toBe(2.5);
+    });
+
+    it('should not coerce empty strings to numbers', () => {
+      const optionalSchema = z.object({ value: z.string().optional() });
+      formData.append('value', '');
+
+      const permittedFields = ['value'];
+      const { parsed } = getActionState(formData, permittedFields, optionalSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { value?: string } };
+      expect(successParsed.data.value).toBe('');
+    });
+
+    it('should not coerce non-numeric strings to numbers', () => {
+      const stringSchema = z.object({ url: z.string() });
+      formData.append('url', 'https://example.com');
+
+      const permittedFields = ['url'];
+      const { parsed } = getActionState(formData, permittedFields, stringSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { url: string } };
+      expect(successParsed.data.url).toBe('https://example.com');
+    });
+
+    it('should not coerce strings with NaN or Infinity', () => {
+      const optionalSchema = z.object({ value: z.string().optional() });
+      formData.append('value', 'NaN');
+
+      const permittedFields = ['value'];
+      const { parsed } = getActionState(formData, permittedFields, optionalSchema);
+
+      expect(parsed.success).toBe(true);
+      const successParsed = parsed as { success: true; data: { value?: string } };
+      expect(successParsed.data.value).toBe('NaN');
+    });
+  });
 });

@@ -6,6 +6,7 @@ import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -48,8 +49,17 @@ export const createReleaseAction = async (
         return formState;
       }
 
-      const { title, releasedOn, coverArt, formats, labels, catalogNumber, description } =
-        parsed.data;
+      const {
+        title,
+        releasedOn,
+        coverArt,
+        formats,
+        artistIds,
+        groupIds,
+        labels,
+        catalogNumber,
+        description,
+      } = parsed.data;
 
       // Parse labels from comma-separated string to array
       const labelsArray = labels
@@ -69,6 +79,17 @@ export const createReleaseAction = async (
         catalogNumber: catalogNumber || undefined,
         description: description || undefined,
       });
+
+      // Create ArtistRelease associations if release was created and artistIds provided
+      if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
+        const createdReleaseId = response.data.id;
+        await prisma.artistRelease.createMany({
+          data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
+        });
+      }
+
+      // groupIds is validated but not persisted (no GroupRelease model in schema yet)
+      void groupIds;
 
       // Log release creation for security audit
       logSecurityEvent({

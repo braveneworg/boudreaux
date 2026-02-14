@@ -57,7 +57,15 @@ export const createNotificationBannerAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  try {
+    await requireRole('admin');
+  } catch {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['You must be a logged in admin user to create a notification banner'] },
+    };
+  }
 
   // Debug: Log received payload
   logger.debug('CREATE - Received FormData entries');
@@ -269,7 +277,7 @@ export const createNotificationBannerAction = async (
       messageHeight: messageHeight ?? 30,
       secondaryMessageWidth: secondaryMessageWidth ?? 80,
       secondaryMessageHeight: secondaryMessageHeight ?? 30,
-      addedBy: { connect: { id: session.user.id } },
+      addedById: session.user.id,
     };
 
     const result = await NotificationBannerService.createNotificationBanner(createData);
@@ -297,7 +305,8 @@ export const createNotificationBannerAction = async (
     return formState;
   } catch (error) {
     logger.error('Error creating notification banner', error);
-    setUnknownError(formState);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    setUnknownError(formState, `Failed to create notification banner: ${message}`);
     return formState;
   }
 };
@@ -306,7 +315,15 @@ export const updateNotificationBannerAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  try {
+    await requireRole('admin');
+  } catch {
+    return {
+      fields: {},
+      success: false,
+      errors: { general: ['You must be a logged in admin user to update a notification banner'] },
+    };
+  }
 
   // Debug: Log received payload
   logger.debug('UPDATE - Received FormData entries');
@@ -545,7 +562,8 @@ export const updateNotificationBannerAction = async (
     return formState;
   } catch (error) {
     logger.error('Error updating notification banner', error, { notificationId });
-    setUnknownError(formState);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    setUnknownError(formState, `Failed to update notification banner: ${message}`);
     return formState;
   }
 };
@@ -553,7 +571,11 @@ export const updateNotificationBannerAction = async (
 export const deleteNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  try {
+    await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
 
   try {
     const session = await auth();
@@ -587,7 +609,11 @@ export const deleteNotificationBannerAction = async (
 export const publishNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  try {
+    await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
 
   try {
     const session = await auth();
@@ -624,7 +650,11 @@ export const publishNotificationBannerAction = async (
 export const unpublishNotificationBannerAction = async (
   notificationId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  await requireRole('admin');
+  try {
+    await requireRole('admin');
+  } catch {
+    return { success: false, error: 'Unauthorized' };
+  }
 
   try {
     const session = await auth();

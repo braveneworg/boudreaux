@@ -80,6 +80,7 @@ export function DataView<T extends Record<string, unknown>>({
   fetchNextPage,
   isFetchingNextPage,
   getItemDisplayName,
+  getSearchableText,
 }: {
   entity: AdminEntity;
   data: Record<string, T[]> | null;
@@ -99,6 +100,8 @@ export function DataView<T extends Record<string, unknown>>({
   isFetchingNextPage?: boolean;
   /** Custom display name resolver for entity-specific name formatting */
   getItemDisplayName?: (item: T) => string;
+  /** Custom searchable text builder for searching nested/related fields */
+  getSearchableText?: (item: T) => string;
 }) {
   const [showDeleted, setShowDeleted] = useState(false);
   const [showPublished, setShowPublished] = useState(true);
@@ -160,14 +163,16 @@ export function DataView<T extends Record<string, unknown>>({
 
       // Filter by search query
       if (searchQuery) {
-        return Object.values(item).some((value) =>
-          String(value).toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const query = searchQuery.toLowerCase();
+        if (getSearchableText) {
+          return getSearchableText(item).toLowerCase().includes(query);
+        }
+        return Object.values(item).some((value) => String(value).toLowerCase().includes(query));
       }
 
       return true;
     });
-  }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery]);
+  }, [data, entity, showDeleted, showPublished, showUnpublished, searchQuery, getSearchableText]);
 
   // Get the URL-friendly path for the entity (e.g., "featuredArtist" -> "featured-artists")
   const entityUrlPath = toEntityUrlPath(entity);
@@ -497,7 +502,12 @@ export function DataView<T extends Record<string, unknown>>({
                               .split(/(?=[A-Z])/)
                               .join(' ')}
                           </b>
-                          : <span>{String(item[field] ?? '-')}</span>
+                          :{' '}
+                          <span>
+                            {field === 'displayName' && !item[field]
+                              ? resolveDisplayName(item)
+                              : String(item[field] ?? '-')}
+                          </span>
                         </span>
                       );
                     })}

@@ -82,9 +82,9 @@ describe('NotificationBannerService', () => {
   });
 
   describe('createNotificationBanner', () => {
-    const createInput: Prisma.NotificationCreateInput = {
+    const createInput: Prisma.NotificationUncheckedCreateInput = {
       message: 'Test notification',
-      addedBy: { connect: { id: 'user-123' } },
+      addedById: 'user-123',
     };
 
     it('should create a notification banner successfully', async () => {
@@ -115,7 +115,7 @@ describe('NotificationBannerService', () => {
 
       expect(result).toMatchObject({
         success: false,
-        error: 'Failed to create notification banner',
+        error: 'Failed to create notification banner: Unexpected error',
       });
     });
   });

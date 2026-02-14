@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { TrackService } from '../services/track-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -25,6 +26,8 @@ export const createTrackAction = async (
     'audioUrl',
     'coverArt',
     'position',
+    'artistIds',
+    'releaseIds',
     'publishedOn',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createTrackSchema);
@@ -43,7 +46,7 @@ export const createTrackAction = async (
         return formState;
       }
 
-      const { title, duration, audioUrl, coverArt, position } = parsed.data;
+      const { title, duration, audioUrl, coverArt, position, artistIds, releaseIds } = parsed.data;
 
       // Create track in database
       const response = await TrackService.createTrack({
@@ -53,6 +56,26 @@ export const createTrackAction = async (
         coverArt: coverArt || undefined,
         position: position ?? 0,
       });
+
+      // Create TrackArtist associations if track was created and artistIds provided
+      if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
+        const createdTrackId = response.data.id;
+        await prisma.trackArtist.createMany({
+          data: artistIds.map((artistId) => ({ artistId, trackId: createdTrackId })),
+        });
+      }
+
+      // Create ReleaseTrack associations if track was created and releaseIds provided
+      if (response.success && response.data?.id && releaseIds && releaseIds.length > 0) {
+        const createdTrackId = response.data.id;
+        await prisma.releaseTrack.createMany({
+          data: releaseIds.map((releaseId) => ({
+            releaseId,
+            trackId: createdTrackId,
+            position: position ?? 0,
+          })),
+        });
+      }
 
       // Log track creation for security audit
       logSecurityEvent({

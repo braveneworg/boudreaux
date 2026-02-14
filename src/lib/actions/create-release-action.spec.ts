@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 
 import { createReleaseAction } from './create-release-action';
 import { auth } from '../../../auth';
+import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -12,6 +13,13 @@ import { requireRole } from '../utils/auth/require-role';
 import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
+vi.mock('../prisma', () => ({
+  prisma: {
+    artistRelease: {
+      createMany: vi.fn(),
+    },
+  },
+}));
 
 // Mock all dependencies
 vi.mock('next/cache');
@@ -614,6 +622,112 @@ describe('createReleaseAction', () => {
           'This title is already in use. Please choose a different one.',
         ]);
       }
+    });
+  });
+
+  describe('Artist Associations', () => {
+    it('should create ArtistRelease associations when artistIds provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: ['artist-1', 'artist-2'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
+        data: [
+          { artistId: 'artist-1', releaseId: 'release-123' },
+          { artistId: 'artist-2', releaseId: 'release-123' },
+        ],
+      });
+    });
+
+    it('should not create associations when artistIds is empty', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: [],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create associations when release creation fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            artistIds: ['artist-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: false,
+        error: 'Database error',
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create associations when artistIds is not provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
     });
   });
 });

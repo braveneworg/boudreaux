@@ -377,6 +377,35 @@ describe('notification-banner-action', () => {
 
       expect(result.success).toBe(true);
     });
+
+    it('should return error when requireRole throws', async () => {
+      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+
+      const formData = createValidFormData();
+      const result = await createNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain(
+        'You must be a logged in admin user to create a notification banner'
+      );
+    });
+
+    it('should pass addedById to service when creating notification banner', async () => {
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData();
+      await createNotificationBannerAction(initialFormState, formData);
+
+      expect(NotificationBannerService.createNotificationBanner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          addedById: 'admin-user-id',
+        })
+      );
+    });
   });
 
   describe('updateNotificationBannerAction', () => {
@@ -517,6 +546,20 @@ describe('notification-banner-action', () => {
 
       expect(result.success).toBe(true);
     });
+
+    it('should return error when requireRole throws', async () => {
+      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+
+      const formData = createValidFormData();
+      formData.append('notificationId', 'notification-123');
+
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain(
+        'You must be a logged in admin user to update a notification banner'
+      );
+    });
   });
 
   describe('deleteNotificationBannerAction', () => {
@@ -578,6 +621,15 @@ describe('notification-banner-action', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to delete notification banner');
+    });
+
+    it('should return error when requireRole throws', async () => {
+      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+
+      const result = await deleteNotificationBannerAction('notification-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
     });
   });
 
@@ -641,6 +693,15 @@ describe('notification-banner-action', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to publish notification banner');
     });
+
+    it('should return error when requireRole throws', async () => {
+      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+
+      const result = await publishNotificationBannerAction('notification-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
+    });
   });
 
   describe('unpublishNotificationBannerAction', () => {
@@ -702,6 +763,15 @@ describe('notification-banner-action', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to unpublish notification banner');
+    });
+
+    it('should return error when requireRole throws', async () => {
+      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+
+      const result = await unpublishNotificationBannerAction('notification-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized');
     });
   });
 });
