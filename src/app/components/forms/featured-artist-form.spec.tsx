@@ -36,15 +36,6 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock react useActionState to provide a stable formState
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
-  };
-});
-
 // Mock all form field subcomponents as simple stubs, capturing props we care about
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
