@@ -131,6 +131,7 @@ vi.mock('../ui/datepicker', () => ({
 describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetValue.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
   });
