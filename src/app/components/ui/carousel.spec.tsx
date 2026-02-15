@@ -9,8 +9,9 @@ import {
   CarouselNext,
 } from './carousel';
 
-// Track the current mock api instance for test assertions
-let mockApi = {
+// Stable mock api instance — same reference survives re-renders so test
+// overrides (e.g. mockReturnValue) are never lost to a factory re-create.
+const mockApi = {
   canScrollPrev: vi.fn(() => true),
   canScrollNext: vi.fn(() => true),
   scrollPrev: vi.fn(),
@@ -26,19 +27,20 @@ vi.mock('embla-carousel-react', () => ({
   __esModule: true,
   default: () => {
     const ref = vi.fn();
-    mockApi = {
-      canScrollPrev: vi.fn(() => true),
-      canScrollNext: vi.fn(() => true),
-      scrollPrev: vi.fn(),
-      scrollNext: vi.fn(),
-      scrollTo: vi.fn(),
-      scrollSnapList: vi.fn(() => [0, 1, 2, 3, 4]),
-      on: vi.fn(),
-      off: vi.fn(),
-    };
     return [ref, mockApi];
   },
 }));
+
+beforeEach(() => {
+  mockApi.canScrollPrev.mockReset().mockReturnValue(true);
+  mockApi.canScrollNext.mockReset().mockReturnValue(true);
+  mockApi.scrollPrev.mockReset();
+  mockApi.scrollNext.mockReset();
+  mockApi.scrollTo.mockReset();
+  mockApi.scrollSnapList.mockReset().mockReturnValue([0, 1, 2, 3, 4]);
+  mockApi.on.mockReset();
+  mockApi.off.mockReset();
+});
 
 describe('Carousel', () => {
   it('renders with children', () => {
