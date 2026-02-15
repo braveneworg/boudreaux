@@ -1,19 +1,23 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
 import { render, screen, waitFor, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
 // Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
-// Capture the onTrackChange prop passed to TrackSelect
+// Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
-// Capture setValue calls for releaseId
-let capturedSetValue: ReturnType<typeof vi.fn>;
+let capturedTrackSelectReleaseId: string | undefined;
+const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 vi.mock('next-auth/react', () => ({
@@ -41,32 +45,8 @@ vi.mock('react', async () => {
   };
 });
 
-// Mock react-hook-form to spy on setValue
-vi.mock('react-hook-form', async () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = (await vi.importActual('react-hook-form')) as any;
-  return {
-    ...actual,
-    useForm: (options?: unknown) => {
-      const form = actual.useForm(options);
-      // Replace setValue with a spy that also calls the original
-      const originalSetValue = form.setValue;
-      // Only create a new spy if we don't have one yet
-      if (!capturedSetValue) {
-        capturedSetValue = vi.fn((...args: Parameters<typeof originalSetValue>) => {
-          return originalSetValue(...args);
-        });
-      }
-      // Always return the same spy
-      return {
-        ...form,
-        setValue: capturedSetValue,
-      };
-    },
-  };
-});
-
 // Mock all form field subcomponents as simple stubs, capturing props we care about
+// Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
     <div data-testid={`text-field-${name}`}>{label}</div>
@@ -101,12 +81,19 @@ vi.mock('@/app/components/forms/fields/track-select', () => ({
   default: ({
     name,
     onTrackChange,
+    releaseId,
   }: {
     name: string;
     onTrackChange?: (track: TrackOption | null) => void;
+    releaseId?: string;
   }) => {
     capturedOnTrackChange = onTrackChange;
-    return <div data-testid={`track-select-${name}`}>TrackSelect</div>;
+    capturedTrackSelectReleaseId = releaseId;
+    return (
+      <div data-testid={`track-select-${name}`} data-release-id={releaseId ?? ''}>
+        TrackSelect
+      </div>
+    );
   },
 }));
 
@@ -122,30 +109,48 @@ describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnTrackChange = undefined;
-    capturedSetValue = undefined as unknown as ReturnType<typeof vi.fn>;
+    capturedTrackSelectReleaseId = undefined;
   });
 
   describe('rendering', () => {
-    it('renders the create form with correct title', () => {
+    it('renders the create form title and submit button', () => {
       render(<FeaturedArtistForm />);
 
       const titles = screen.getAllByText('Create Featured Artist');
       expect(titles.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders the TrackSelect component', () => {
+    it('renders all media association fields', () => {
       render(<FeaturedArtistForm />);
 
       expect(screen.getByTestId('track-select-trackId')).toBeInTheDocument();
+      expect(screen.getByTestId('release-select-releaseId')).toBeInTheDocument();
+      expect(screen.getByTestId('group-select-groupId')).toBeInTheDocument();
     });
 
-    it('renders the ReleaseSelect component', () => {
+    it('renders artist multi-select and cover art field', () => {
       render(<FeaturedArtistForm />);
 
-      expect(screen.getByTestId('release-select-releaseId')).toBeInTheDocument();
+      expect(screen.getByTestId('artist-multi-select-artistIds')).toBeInTheDocument();
+      expect(screen.getByTestId('cover-art-field-coverArt')).toBeInTheDocument();
     });
 
-    it('passes onTrackChange to TrackSelect', () => {
+    it('renders breadcrumb, date picker, and display name field', () => {
+      render(<FeaturedArtistForm />);
+
+      expect(screen.getByTestId('breadcrumb-menu')).toBeInTheDocument();
+      expect(screen.getByTestId('date-picker')).toBeInTheDocument();
+      expect(screen.getByTestId('text-field-displayName')).toBeInTheDocument();
+    });
+
+    it('renders cancel and submit buttons', () => {
+      render(<FeaturedArtistForm />);
+
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /create featured artist/i })).toBeInTheDocument();
+    });
+
+    it('passes onTrackChange callback to TrackSelect', () => {
       render(<FeaturedArtistForm />);
 
       expect(capturedOnTrackChange).toBeDefined();
@@ -154,39 +159,37 @@ describe('FeaturedArtistForm', () => {
   });
 
   describe('auto-populate release from track selection', () => {
-    it('sets releaseId from the first releaseTrack when a track with releases is selected', async () => {
+    it('populates releaseId from the first release when a track with one release is selected', async () => {
       render(<FeaturedArtistForm />);
 
       const trackWithRelease: TrackOption = {
         id: 'track-1',
         title: 'My Track',
         duration: 200,
-        releaseTracks: [{ release: { id: 'release-abc123def456abc123def456', title: 'My Album' } }],
+        releaseTracks: [{ release: { id: 'abc123def456abc123def456', title: 'My Album' } }],
       };
 
       await act(() => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
-      // The form's setValue should have been called for releaseId via the
-      // shared setValue function. We verify by checking the captured setValue
-      // from ReleaseSelect was the same one used to set releaseId.
-      // Since both TrackSelect.onTrackChange and ReleaseSelect share the same
-      // form.setValue, we verify it was called.
+      // After handleTrackChange calls setValue('releaseId', ...),
+      // useWatch triggers re-render and the value flows to TrackSelect's releaseId prop
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
       });
     });
 
-    it('sets releaseId from the first release when track has multiple releases', async () => {
+    it('uses the first release when track has multiple releases', async () => {
       render(<FeaturedArtistForm />);
 
       const trackWithMultipleReleases: TrackOption = {
         id: 'track-2',
         title: 'Multi-Release Track',
         releaseTracks: [
-          { release: { id: 'release-first00000000000000', title: 'First Album' } },
-          { release: { id: 'release-second0000000000000', title: 'Second Album' } },
+          { release: { id: 'first00000000000000000000', title: 'First Album' } },
+          { release: { id: 'second000000000000000000', title: 'Second Album' } },
         ],
       };
 
@@ -194,22 +197,27 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
       });
 
-      // The handler should pick the first release
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        expect(trackSelect.getAttribute('data-release-id')).toBe('first00000000000000000000');
       });
     });
 
     it('clears releaseId when track is deselected (null)', async () => {
       render(<FeaturedArtistForm />);
 
-      // First select a track
+      // First select a track to populate releaseId
       await act(() => {
         capturedOnTrackChange?.({
           id: 'track-1',
           title: 'Track',
-          releaseTracks: [{ release: { id: 'release-abc123def456abc123def456', title: 'Album' } }],
+          releaseTracks: [{ release: { id: 'abc123def456abc123def456', title: 'Album' } }],
         });
+      });
+
+      await waitFor(() => {
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
       });
 
       // Then deselect
@@ -218,55 +226,78 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(capturedSetValue).toBeDefined();
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        // empty string releaseId becomes undefined via || undefined, rendered as ''
+        expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
     });
 
-    it('clears releaseId when track has no releaseTracks', async () => {
+    it('sets empty releaseId when track has no releaseTracks', async () => {
       render(<FeaturedArtistForm />);
 
-      const trackWithoutReleases: TrackOption = {
-        id: 'track-3',
-        title: 'Standalone Track',
-        releaseTracks: [],
-      };
-
-      // Capture the spy before calling the handler (before any re-renders)
-      const setValueSpy = capturedSetValue;
-
       await act(() => {
-        capturedOnTrackChange?.(trackWithoutReleases);
+        capturedOnTrackChange?.({
+          id: 'track-3',
+          title: 'Standalone Track',
+          releaseTracks: [],
+        });
       });
 
       await waitFor(() => {
-        expect(setValueSpy).toHaveBeenCalledWith('releaseId', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
     });
 
-    it('clears releaseId when track has undefined releaseTracks', async () => {
+    it('sets empty releaseId when track has undefined releaseTracks', async () => {
       render(<FeaturedArtistForm />);
 
-      const trackWithUndefinedReleases: TrackOption = {
-        id: 'track-4',
-        title: 'Legacy Track',
-      };
-
-      // Capture the spy before calling the handler (before any re-renders)
-      const setValueSpy = capturedSetValue;
-
       await act(() => {
-        capturedOnTrackChange?.(trackWithUndefinedReleases);
+        capturedOnTrackChange?.({
+          id: 'track-4',
+          title: 'Legacy Track',
+        });
       });
 
       await waitFor(() => {
-        expect(setValueSpy).toHaveBeenCalledWith('releaseId', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
+        const trackSelect = screen.getByTestId('track-select-trackId');
+        expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
+    });
+  });
+
+  describe('releaseId pass-through to TrackSelect', () => {
+    it('passes empty releaseId to TrackSelect initially (no release selected)', () => {
+      render(<FeaturedArtistForm />);
+
+      // watchedReleaseId starts as '' which becomes undefined via || undefined
+      expect(capturedTrackSelectReleaseId).toBeUndefined();
+    });
+  });
+
+  describe('cancel navigation', () => {
+    it('navigates to admin featured artist list when cancel is clicked', async () => {
+      render(<FeaturedArtistForm />);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+      expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist');
+    });
+  });
+
+  describe('edit mode', () => {
+    it('shows loading state when featuredArtistId is provided', () => {
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      expect(screen.getByText('Loading featured artist...')).toBeInTheDocument();
+    });
+
+    it('does not render form fields while loading', () => {
+      render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
+
+      expect(screen.queryByTestId('track-select-trackId')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('release-select-releaseId')).not.toBeInTheDocument();
     });
   });
 });
