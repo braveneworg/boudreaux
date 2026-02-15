@@ -13,6 +13,7 @@ let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
 
 const mockPush = vi.fn();
+const mockSetValue = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -40,6 +41,29 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to spy on setValue
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  return {
+    ...actual,
+    useForm: (...args: unknown[]) => {
+      const form = (actual as { useForm: (...args: unknown[]) => unknown }).useForm(...args);
+      const formTyped = form as {
+        setValue: (...args: unknown[]) => void;
+        [key: string]: unknown;
+      };
+      const originalSetValue = formTyped.setValue;
+      return {
+        ...(formTyped as object),
+        setValue: (...setValueArgs: unknown[]) => {
+          mockSetValue(...setValueArgs);
+          return originalSetValue(...setValueArgs);
+        },
+      };
+    },
   };
 });
 
@@ -244,6 +268,12 @@ describe('FeaturedArtistForm', () => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
+
+      // Verify setValue was called to clear releaseId
+      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     });
 
     it('sets empty releaseId when track has undefined releaseTracks', async () => {
@@ -259,6 +289,12 @@ describe('FeaturedArtistForm', () => {
       await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
+      });
+
+      // Verify setValue was called to clear releaseId
+      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
       });
     });
   });
