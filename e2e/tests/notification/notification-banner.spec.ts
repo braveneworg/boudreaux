@@ -60,11 +60,9 @@ test.describe('Notification Banner Carousel', () => {
     const tabs = page.getByRole('tab');
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Wait for auto-cycle (6500ms interval + buffer)
-    await page.waitForTimeout(7_500);
-
-    // Should have moved to the second banner
-    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    // Wait for auto-cycle with assertion timeout
+    // 1s interval configured in playwright.config.ts + 1s buffer = 2s timeout
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 2000 });
   });
 
   test('should pause auto-cycling on hover', async ({ page }) => {
@@ -73,16 +71,32 @@ test.describe('Notification Banner Carousel', () => {
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
 
+    // Wait for initial state to be stable
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Hover over the carousel to pause
+    // Capture which tab is selected before hovering
+    const getSelectedIndex = async () => {
+      return await tabs.evaluateAll((tabList) => {
+        return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+      });
+    };
+
+    const selectedTab = await getSelectedIndex();
+
+    // Hover over the carousel to pause auto-cycling
     await carousel.hover();
 
-    // Wait longer than the auto-cycle interval
-    await page.waitForTimeout(8_000);
+    // Poll for 2 seconds (2x the interval) to ensure the selection doesn't change
+    // If auto-cycling were still active, it would have changed after 1 second
+    const pollDuration = 2000;
+    const pollInterval = 200;
+    const iterations = pollDuration / pollInterval;
 
-    // Should still be on first banner because hovering pauses cycling
-    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    for (let i = 0; i < iterations; i++) {
+      await page.waitForTimeout(pollInterval);
+      const currentSelected = await getSelectedIndex();
+      expect(currentSelected).toBe(selectedTab);
+    }
   });
 
   test('should wrap around when navigating past the last banner', async ({ page }) => {

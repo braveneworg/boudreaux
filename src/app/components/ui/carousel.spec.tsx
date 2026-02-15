@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -9,8 +9,9 @@ import {
   CarouselNext,
 } from './carousel';
 
-// Track the current mock api instance for test assertions
-let mockApi = {
+// Stable mock api instance — same reference survives re-renders so test
+// overrides (e.g. mockReturnValue) are never lost to a factory re-create.
+const mockApi = {
   canScrollPrev: vi.fn(() => true),
   canScrollNext: vi.fn(() => true),
   scrollPrev: vi.fn(),
@@ -26,19 +27,20 @@ vi.mock('embla-carousel-react', () => ({
   __esModule: true,
   default: () => {
     const ref = vi.fn();
-    mockApi = {
-      canScrollPrev: vi.fn(() => true),
-      canScrollNext: vi.fn(() => true),
-      scrollPrev: vi.fn(),
-      scrollNext: vi.fn(),
-      scrollTo: vi.fn(),
-      scrollSnapList: vi.fn(() => [0, 1, 2, 3, 4]),
-      on: vi.fn(),
-      off: vi.fn(),
-    };
     return [ref, mockApi];
   },
 }));
+
+beforeEach(() => {
+  mockApi.canScrollPrev.mockReset().mockReturnValue(true);
+  mockApi.canScrollNext.mockReset().mockReturnValue(true);
+  mockApi.scrollPrev.mockReset();
+  mockApi.scrollNext.mockReset();
+  mockApi.scrollTo.mockReset();
+  mockApi.scrollSnapList.mockReset().mockReturnValue([0, 1, 2, 3, 4]);
+  mockApi.on.mockReset();
+  mockApi.off.mockReset();
+});
 
 describe('Carousel', () => {
   it('renders with children', () => {
@@ -551,6 +553,15 @@ describe('Carousel button disabled states', () => {
 });
 
 describe('Carousel loop cycling behavior', () => {
+  beforeEach(() => {
+    // Reset mock return values to prevent test pollution
+    mockApi.canScrollPrev.mockReturnValue(true);
+    mockApi.canScrollNext.mockReturnValue(true);
+    mockApi.scrollPrev.mockClear();
+    mockApi.scrollNext.mockClear();
+    mockApi.scrollTo.mockClear();
+  });
+
   it('wraps to the first slide when clicking next at the end with loop enabled', async () => {
     const user = userEvent.setup();
 
@@ -653,6 +664,9 @@ describe('Carousel loop cycling behavior', () => {
       </Carousel>
     );
 
+    // Simulate being at the end of the carousel
+    mockApi.canScrollNext.mockReturnValue(false);
+
     // Without loop and canScrollNext=false, button should be disabled
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     expect(nextButton).toBeDisabled();
@@ -669,6 +683,9 @@ describe('Carousel loop cycling behavior', () => {
         <CarouselPrevious />
       </Carousel>
     );
+
+    // Simulate being at the beginning of the carousel
+    mockApi.canScrollPrev.mockReturnValue(false);
 
     // Without loop and canScrollPrev=false, button should be disabled
     const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
@@ -704,7 +721,9 @@ describe('Carousel loop cycling behavior', () => {
     expect(nextButton).not.toBeDisabled();
   });
 
-  it('wraps via keyboard ArrowRight at the end with loop enabled', () => {
+  it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
+    const user = userEvent.setup();
+
     render(
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
@@ -717,12 +736,16 @@ describe('Carousel loop cycling behavior', () => {
     mockApi.canScrollNext.mockReturnValue(false);
 
     const carousel = screen.getByRole('region');
-    fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+    carousel.setAttribute('tabIndex', '0');
+    await user.click(carousel);
+    await user.keyboard('{ArrowRight}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(0);
   });
 
-  it('wraps via keyboard ArrowLeft at the beginning with loop enabled', () => {
+  it('wraps via keyboard ArrowLeft at the beginning with loop enabled', async () => {
+    const user = userEvent.setup();
+
     render(
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
@@ -735,7 +758,9 @@ describe('Carousel loop cycling behavior', () => {
     mockApi.canScrollPrev.mockReturnValue(false);
 
     const carousel = screen.getByRole('region');
-    fireEvent.keyDown(carousel, { key: 'ArrowLeft' });
+    carousel.setAttribute('tabIndex', '0');
+    await user.click(carousel);
+    await user.keyboard('{ArrowLeft}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
   });

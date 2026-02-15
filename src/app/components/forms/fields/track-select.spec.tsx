@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -778,6 +781,13 @@ describe('TrackSelect', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
       });
+
+      // Assert error message is displayed in UI
+      await waitFor(() => {
+        const errorElement = screen.getByText('Failed to fetch tracks');
+        expect(errorElement).toBeInTheDocument();
+        expect(errorElement).toHaveClass('text-destructive');
+      });
     });
 
     it('handles non-Error thrown during fetch', async () => {
@@ -796,6 +806,13 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // Assert error message is displayed in UI
+      await waitFor(() => {
+        const errorElement = screen.getByText('Failed to load tracks');
+        expect(errorElement).toBeInTheDocument();
+        expect(errorElement).toHaveClass('text-destructive');
       });
     });
 
