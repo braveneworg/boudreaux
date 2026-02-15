@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
 import { Prisma } from '@prisma/client';
@@ -104,13 +107,21 @@ export class TrackService {
     skip?: number;
     take?: number;
     search?: string;
+    releaseId?: string;
   }): Promise<ServiceResponse<Track[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
+      const { skip = 0, take = 50, search, releaseId } = params || {};
 
       const where: Prisma.TrackWhereInput = {
         ...(search && {
           OR: [{ title: { contains: search, mode: 'insensitive' } }],
+        }),
+        ...(releaseId && {
+          releaseTracks: {
+            some: {
+              releaseId,
+            },
+          },
         }),
       };
 
@@ -164,11 +175,21 @@ export class TrackService {
   /**
    * Get total count of tracks with optional search filter
    */
-  static async getTracksCount(search?: string): Promise<ServiceResponse<number>> {
+  static async getTracksCount(
+    search?: string,
+    releaseId?: string
+  ): Promise<ServiceResponse<number>> {
     try {
       const where: Prisma.TrackWhereInput = {
         ...(search && {
           OR: [{ title: { contains: search, mode: 'insensitive' } }],
+        }),
+        ...(releaseId && {
+          releaseTracks: {
+            some: {
+              releaseId,
+            },
+          },
         }),
       };
 

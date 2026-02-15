@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only to prevent client component error in tests
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 
@@ -114,6 +117,29 @@ describe('verifyTurnstile', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Verification failed. Please refresh and try again.');
+    });
+  });
+
+  describe('test secret key bypass', () => {
+    it('should return success immediately when using Cloudflare test secret key', async () => {
+      process.env.CLOUDFLARE_SECRET = '1x0000000000000000000000000000000AA';
+
+      const result = await verifyTurnstile('any-token', '127.0.0.1');
+
+      expect(result).toEqual({ success: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should not bypass verification for non-test secret keys', async () => {
+      process.env.CLOUDFLARE_SECRET = 'real-production-secret';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await verifyTurnstile('valid-token', '127.0.0.1');
+
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 

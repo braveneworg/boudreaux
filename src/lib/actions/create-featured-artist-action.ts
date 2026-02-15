@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -20,6 +23,9 @@ export const createFeaturedArtistAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
+  if (!session?.user?.id) {
+    throw new Error('Session user id is required for audit logging.');
+  }
   // Parse artistIds as array from form data
   const artistIds = payload.getAll('artistIds') as string[];
   payload.delete('artistIds');
