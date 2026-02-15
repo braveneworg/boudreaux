@@ -1204,8 +1204,22 @@ jobs:
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
           git tag "${{ steps.version.outputs.tag }}"
-          git push origin main --follow-tags
 
+          max_retries=3
+          attempt=1
+
+          until git push origin main --follow-tags; do
+            if [ "$attempt" -ge "$max_retries" ]; then
+              echo "Error: Failed to push main with tags after $max_retries attempts."
+              echo "The local commit and tag '${{ steps.version.outputs.tag }}' were created but not pushed to origin."
+              echo "Please resolve any issues (e.g., non-fast-forward, permissions, or network problems) and push manually or re-run this workflow."
+              exit 1
+            fi
+
+            echo "git push failed (attempt $attempt of $max_retries). Retrying in 5 seconds..."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
       - name: Create GitHub Release
         if: steps.bump-type.outputs.skip != 'true'
         env:
