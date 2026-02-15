@@ -1067,9 +1067,9 @@ jobs:
           COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
           echo "Looking for PR that merged commit: $COMMIT_SHA"
 
-          # Find the PR associated with this commit
+          # Find the PR associated with this commit, preferring the one targeting the main branch
           PR_JSON=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
-            --jq '.[0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
+            --jq '[.[] | select(.base.ref == "main")][0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
 
           if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
             echo "No PR found for commit $COMMIT_SHA — skipping version bump."
