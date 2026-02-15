@@ -223,6 +223,7 @@ describe('FeaturedArtistForm', () => {
 
       // Assert that setValue was called with the first release ID on any of the spies
       await waitFor(() => {
+        const allCalls = setValueSpies.flatMap((spy) => spy.mock.calls);
         const wasCalledCorrectly = setValueSpies.some((spy) =>
           spy.mock.calls.some(
             (call) =>
@@ -232,6 +233,11 @@ describe('FeaturedArtistForm', () => {
               call[2]?.shouldValidate === true
           )
         );
+
+        // If this fails, check allCalls to see what setValue was actually called with
+        if (!wasCalledCorrectly) {
+          console.error('setValue was not called correctly. All calls:', allCalls);
+        }
         expect(wasCalledCorrectly).toBe(true);
       });
 
