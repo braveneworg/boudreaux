@@ -157,19 +157,12 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [build]
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27018:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Start MongoDB replica set
+        run: docker compose -f docker-compose.e2e.yml up -d --wait
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -198,10 +191,10 @@ jobs:
         run: npm run e2e
         env:
           CI: true
-          DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e"
+          DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e?directConnection=true"
           AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
           AUTH_URL: "http://localhost:3000"
-          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x0000000000000000000000000000000AA"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x00000000000000000000AA"
           SKIP_ENV_VALIDATION: "true"
           NODE_ENV: "test"
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"

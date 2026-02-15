@@ -89,8 +89,10 @@ test.describe('Admin Track Management', () => {
       const editLink = adminPage.locator('a[href*="/admin/tracks/"]').first();
       await editLink.click();
 
-      // Wait for the edit form to load
-      await expect(adminPage.getByText('Edit Track')).toBeVisible({ timeout: 10_000 });
+      // Wait for the edit form to load (use card-title to avoid matching breadcrumb)
+      await expect(
+        adminPage.locator('[data-slot="card-title"]', { hasText: 'Edit Track' })
+      ).toBeVisible({ timeout: 10_000 });
     });
 
     test('should load existing track data in edit form', async ({ adminPage }) => {
@@ -100,7 +102,9 @@ test.describe('Admin Track Management', () => {
       // Navigate to edit page
       const editLink = adminPage.locator('a[href*="/admin/tracks/"]').first();
       await editLink.click();
-      await expect(adminPage.getByText('Edit Track')).toBeVisible({ timeout: 10_000 });
+      await expect(
+        adminPage.locator('[data-slot="card-title"]', { hasText: 'Edit Track' })
+      ).toBeVisible({ timeout: 10_000 });
 
       // Verify the title field is pre-populated
       const titleInput = adminPage.locator('input[name="title"]');
@@ -114,7 +118,9 @@ test.describe('Admin Track Management', () => {
       // Find and click edit link for a track
       const editLinks = adminPage.locator('a[href*="/admin/tracks/"]');
       await editLinks.first().click();
-      await expect(adminPage.getByText('Edit Track')).toBeVisible({ timeout: 10_000 });
+      await expect(
+        adminPage.locator('[data-slot="card-title"]', { hasText: 'Edit Track' })
+      ).toBeVisible({ timeout: 10_000 });
 
       // Wait for form data to fully load before modifying
       const titleInput = adminPage.locator('input[name="title"]');
