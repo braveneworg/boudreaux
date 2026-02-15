@@ -71,17 +71,35 @@ test.describe('Notification Banner Carousel', () => {
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
 
+    // Wait for initial state to be stable
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Hover over the carousel to pause
+    // Capture which tab is selected before hovering
+    const selectedTab = await tabs.evaluateAll((tabList) => {
+      return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+    });
+
+    // Hover over the carousel to pause auto-cycling
     await carousel.hover();
 
-    // Wait longer than the auto-cycle interval (1s) to verify cycling is paused
-    // Use a generous timeout to account for potential delays
-    await page.waitForTimeout(2000);
+    // Verify the same tab remains selected for longer than the auto-cycle interval (1s)
+    // by polling with a timeout that exceeds the interval (2s total)
+    // If auto-cycling were still active, it would have moved to the next banner
+    const startTime = Date.now();
+    const minWaitTime = 1500; // Wait at least 1.5x the interval to be sure
 
-    // Should still be on first banner because hovering pauses cycling
-    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    await expect(async () => {
+      const currentSelected = await tabs.evaluateAll((tabList) => {
+        return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+      });
+
+      // Verify selection hasn't changed
+      expect(currentSelected).toBe(selectedTab);
+
+      // Ensure we've waited long enough to confirm cycling is paused
+      const elapsed = Date.now() - startTime;
+      expect(elapsed).toBeGreaterThanOrEqual(minWaitTime);
+    }).toPass({ timeout: 3000, intervals: [100] });
   });
 
   test('should wrap around when navigating past the last banner', async ({ page }) => {
