@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { ArtistService } from '../services/artist-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -17,7 +16,7 @@ export const createArtistAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   const permittedFieldNames = [
     'firstName',
@@ -31,18 +30,6 @@ export const createArtistAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id && session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be a logged in admin user to create an artist'];
-        return formState;
-      }
-
       const { firstName, surname, slug, middleName, displayName } = parsed.data;
 
       // Create artist in database
