@@ -664,6 +664,9 @@ describe('Carousel loop cycling behavior', () => {
       </Carousel>
     );
 
+    // Simulate being at the end of the carousel
+    mockApi.canScrollNext.mockReturnValue(false);
+
     // Without loop and canScrollNext=false, button should be disabled
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     expect(nextButton).toBeDisabled();
@@ -680,6 +683,9 @@ describe('Carousel loop cycling behavior', () => {
         <CarouselPrevious />
       </Carousel>
     );
+
+    // Simulate being at the beginning of the carousel
+    mockApi.canScrollPrev.mockReturnValue(false);
 
     // Without loop and canScrollPrev=false, button should be disabled
     const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
