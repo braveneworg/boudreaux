@@ -16,7 +16,6 @@ import type { UseFormReturn } from 'react-hook-form';
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
-
 const mockPush = vi.fn();
 const mockSetValue = vi.fn();
 
