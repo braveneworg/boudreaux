@@ -11,6 +11,8 @@ import type { TrackOption } from '@/app/components/forms/fields/track-select';
 // Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
+import type * as ReactHookForm from 'react-hook-form';
+
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
@@ -49,9 +51,7 @@ vi.mock('react', async () => {
 
 // Mock react-hook-form to capture setValue calls
 vi.mock('react-hook-form', async () => {
-  const actual = await vi.importActual<typeof import('react-hook-form')>(
-    'react-hook-form',
-  );
+  const actual = await vi.importActual<typeof ReactHookForm>('react-hook-form');
 
   return {
     ...actual,
@@ -59,8 +59,8 @@ vi.mock('react-hook-form', async () => {
       const form = actual.useForm(...args);
       // Wrap setValue with a spy
       const originalSetValue = form.setValue;
-      const spy = vi.fn<typeof originalSetValue>(
-        (...setValueArgs) => originalSetValue(...setValueArgs),
+      const spy = vi.fn<typeof originalSetValue>((...setValueArgs) =>
+        originalSetValue(...setValueArgs)
       );
       setValueSpies.push(spy);
       return {
@@ -132,7 +132,7 @@ vi.mock('../ui/datepicker', () => ({
 
 describe('FeaturedArtistForm', () => {
   beforeEach(() => {
-    mockPush.mockClear();
+    vi.clearAllMocks();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
     setValueSpies.length = 0; // Clear the array
@@ -225,7 +225,6 @@ describe('FeaturedArtistForm', () => {
 
       // Assert that setValue was called with the first release ID on any of the spies
       await waitFor(() => {
-        const allCalls = setValueSpies.flatMap((spy) => spy.mock.calls);
         const wasCalledCorrectly = setValueSpies.some((spy) =>
           spy.mock.calls.some(
             (call) =>
@@ -236,10 +235,6 @@ describe('FeaturedArtistForm', () => {
           )
         );
 
-        // If this fails, check allCalls to see what setValue was actually called with
-        if (!wasCalledCorrectly) {
-          console.error('setValue was not called correctly. All calls:', allCalls);
-        }
         expect(wasCalledCorrectly).toBe(true);
       });
 
