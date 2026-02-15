@@ -1171,13 +1171,23 @@ jobs:
           # Build the new changelog entry
           ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
 
-          # Prepend to CHANGELOG.md after the header block (first 7 lines)
+          # Prepend to CHANGELOG.md after the header block, detected dynamically.
+          # The header is considered everything before the first '## [' version heading.
           if [ -f CHANGELOG.md ]; then
-            head -n 7 CHANGELOG.md > CHANGELOG.tmp
+            HEADER_END_LINE=$(awk '/^## \[/{print NR; exit}' CHANGELOG.md)
+            if [ -n "$HEADER_END_LINE" ]; then
+              HEADER_LINES=$((HEADER_END_LINE - 1))
+            else
+              HEADER_LINES=$(wc -l < CHANGELOG.md)
+            fi
+
+            head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
             echo -e "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
+
+            TAIL_START=$((HEADER_LINES + 1))
+            tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
             printf '%s\n\n%s\n\n%b\n' \
