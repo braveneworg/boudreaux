@@ -1044,3 +1044,182 @@ jobs:
               --cidr "${{ steps.ip.outputs.ipv4 }}/32" \
               2>&1 | grep -v "does not exist" || true
           done
+
+  version-bump:
+    name: Bump version & release
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find merged PR and determine bump type
+        id: bump-type
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get the HEAD commit SHA from the CI workflow run that triggered deploy
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "Looking for PR that merged commit: $COMMIT_SHA"
+
+          # Find the PR associated with this commit
+          PR_JSON=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
+            --jq '.[0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
+
+          if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+            echo "No PR found for commit $COMMIT_SHA — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          LABELS=$(echo "$PR_JSON" | jq -r '.labels[]' 2>/dev/null || echo "")
+
+          echo "PR #$PR_NUMBER: $PR_TITLE"
+          echo "Labels: $LABELS"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+
+          if echo "$LABELS" | grep -q "version:major"; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:minor"; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:patch"; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "No version label found — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.bump-type.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+
+      - name: Bump version
+        if: steps.bump-type.outputs.skip != 'true'
+        id: version
+        run: |
+          OLD_VERSION=$(jq -r '.version' package.json)
+          npm version ${{ steps.bump-type.outputs.bump }} --no-git-tag-version
+          NEW_VERSION=$(jq -r '.version' package.json)
+          echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped: $OLD_VERSION → $NEW_VERSION"
+
+      - name: Generate changelog entry
+        if: steps.bump-type.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.new }}"
+          DATE=$(date +%Y-%m-%d)
+          PR_TITLE="${{ steps.bump-type.outputs.pr_title }}"
+          PR_NUMBER="${{ steps.bump-type.outputs.pr_number }}"
+          BUMP_TYPE="${{ steps.bump-type.outputs.bump }}"
+
+          # Get all merged PR titles since the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS_RANGE="${LAST_TAG}..HEAD"
+          else
+            COMMITS_RANGE=""
+          fi
+
+          # Collect unique PR entries from merge commits since last tag
+          MERGED_PRS=""
+          SEEN_PRS=""
+          if [ -n "$COMMITS_RANGE" ]; then
+            while IFS= read -r sha; do
+              [ -z "$sha" ] && continue
+              PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
+                --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
+              if [ -n "$PR_INFO" ]; then
+                PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
+                PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
+                if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
+                  SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
+                  MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
+                fi
+              fi
+            done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
+          fi
+
+          # Fallback: if no PR entries found, use the triggering PR
+          if [ -z "$MERGED_PRS" ]; then
+            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
+          fi
+
+          # Determine section header based on bump type
+          case "$BUMP_TYPE" in
+            major) SECTION="### Changed" ;;
+            minor) SECTION="### Added" ;;
+            patch) SECTION="### Fixed" ;;
+          esac
+
+          # Build the new changelog entry
+          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
+
+          # Prepend to CHANGELOG.md after the header block (first 7 lines)
+          if [ -f CHANGELOG.md ]; then
+            head -n 7 CHANGELOG.md > CHANGELOG.tmp
+            echo "" >> CHANGELOG.tmp
+            echo -e "$ENTRY" >> CHANGELOG.tmp
+            echo "" >> CHANGELOG.tmp
+            tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
+            mv CHANGELOG.tmp CHANGELOG.md
+          else
+            printf '%s\n\n%s\n\n%b\n' \
+              "# Changelog" \
+              "All notable changes to this project will be documented in this file." \
+              "$ENTRY" > CHANGELOG.md
+          fi
+
+      - name: Commit, tag, and push
+        if: steps.bump-type.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin main --follow-tags
+
+      - name: Create GitHub Release
+        if: steps.bump-type.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.new }}"
+
+          # Extract the new version's section from CHANGELOG.md for release notes
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release v$VERSION"
+          fi
+
+          echo "$NOTES" > release-notes.txt
+
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.txt \
+            --target main
