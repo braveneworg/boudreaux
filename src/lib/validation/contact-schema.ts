@@ -8,7 +8,13 @@ import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
 const PHONE_REGEX = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
 
 const contactSchema = z.object({
-  reason: z.string().min(1, { message: 'Please select a reason for contacting us' }),
+  reason: z
+    .string()
+    .min(1, { message: 'Please select a reason for contacting us' })
+    .refine(
+      (val) => CONTACT_REASONS.some((reason) => reason.value === val),
+      { message: 'Please select a valid reason for contacting us' },
+    ),
   firstName: z
     .string()
     .min(1, { message: 'First name is required' })
