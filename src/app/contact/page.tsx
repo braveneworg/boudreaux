@@ -83,6 +83,8 @@ const ContactPage = () => {
         if (result.success) {
           toast.success("Your message has been sent. We'll get back to you soon.");
           form.reset();
+          setIsVerified(false);
+          setTurnstileToken(undefined);
           setIsSubmitting(false);
         } else {
           setIsSubmitting(false);
