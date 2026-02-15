@@ -1190,7 +1190,7 @@ jobs:
             tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
-            printf '%s\n\n%s\n\n%b\n' \
+            printf '%s\n\n%s\n\n%s\n' \
               "# Changelog" \
               "All notable changes to this project will be documented in this file." \
               "$ENTRY" > CHANGELOG.md
