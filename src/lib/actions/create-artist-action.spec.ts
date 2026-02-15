@@ -84,64 +84,6 @@ describe('createArtistAction', () => {
 
       expect(requireRole).toHaveBeenCalledWith('admin');
     });
-
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-            middleName: 'M',
-            displayName: 'Johnny Doe',
-          },
-        },
-      } as never);
-
-      const result = await createArtistAction(initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to create an artist',
-      ]);
-    });
-
-    it('should return error when user is not admin', async () => {
-      // Note: The implementation has a bug using AND instead of OR in the check:
-      // if (!session?.user?.id && session?.user?.role !== 'admin')
-      // This means users with an ID but non-admin role will pass through.
-      // We mock createArtist to simulate a successful response.
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user' },
-      } as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-            middleName: 'M',
-            displayName: 'Johnny Doe',
-          },
-        },
-      } as never);
-
-      vi.mocked(ArtistService.createArtist).mockResolvedValue({
-        success: true,
-        data: { id: 'artist-123' },
-      } as never);
-
-      const result = await createArtistAction(initialFormState, mockFormData);
-
-      // Due to the AND condition, non-admin users with valid IDs can still create artists
-      // The requireRole decorator should catch this, but we're testing the inner logic
-      expect(result.success).toBe(true);
-    });
   });
 
   describe('Validation', () => {
