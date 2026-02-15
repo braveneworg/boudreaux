@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock PrismaClient to avoid real database connections
 vi.mock('@prisma/client', () => ({
   PrismaClient: vi.fn(function PrismaClient(config: { log?: string[] }) {
