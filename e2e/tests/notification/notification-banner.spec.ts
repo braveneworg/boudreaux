@@ -75,30 +75,28 @@ test.describe('Notification Banner Carousel', () => {
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
     // Capture which tab is selected before hovering
-    const selectedTab = await tabs.evaluateAll((tabList) => {
-      return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
-    });
+    const getSelectedIndex = async () => {
+      return await tabs.evaluateAll((tabList) => {
+        return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+      });
+    };
+
+    const selectedTab = await getSelectedIndex();
 
     // Hover over the carousel to pause auto-cycling
     await carousel.hover();
 
-    // Verify the same tab remains selected for longer than the auto-cycle interval (1s)
-    // by polling with a timeout that exceeds the interval (2s total)
-    // If auto-cycling were still active, it would have moved to the next banner
-    const startTime = Date.now();
-    const minWaitTime = 1500; // Wait at least 1.5x the interval to be sure
+    // Poll for 2 seconds (2x the interval) to ensure the selection doesn't change
+    // If auto-cycling were still active, it would have changed after 1 second
+    const pollDuration = 2000;
+    const pollInterval = 200;
+    const iterations = pollDuration / pollInterval;
 
-    await expect(async () => {
-      const currentSelected = await tabs.evaluateAll((tabList) => {
-        return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
-      });
-
-      // Verify selection hasn't changed
+    for (let i = 0; i < iterations; i++) {
+      await page.waitForTimeout(pollInterval);
+      const currentSelected = await getSelectedIndex();
       expect(currentSelected).toBe(selectedTab);
-
-      // Ensure we've waited long enough to confirm cycling is paused
-      expect(Date.now() - startTime).toBeGreaterThanOrEqual(minWaitTime);
-    }).toPass({ timeout: 3000, intervals: [100] });
+    }
   });
 
   test('should wrap around when navigating past the last banner', async ({ page }) => {
