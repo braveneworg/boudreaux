@@ -97,8 +97,7 @@ test.describe('Notification Banner Carousel', () => {
       expect(currentSelected).toBe(selectedTab);
 
       // Ensure we've waited long enough to confirm cycling is paused
-      const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeGreaterThanOrEqual(minWaitTime);
+      expect(Date.now() - startTime).toBeGreaterThanOrEqual(minWaitTime);
     }).toPass({ timeout: 3000, intervals: [100] });
   });
 
