@@ -7,14 +7,27 @@ import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
 
+export const CONTACT_REASONS = [
+  { value: 'new-opportunity', label: 'New opportunity' },
+  { value: 'licensing', label: 'Licensing & sync' },
+  { value: 'press', label: 'Press & media inquiry' },
+  { value: 'distribution', label: 'Distribution' },
+  { value: 'demo-submission', label: 'Demo submission' },
+  { value: 'collaboration', label: 'Collaboration' },
+  { value: 'question', label: 'Question' },
+  { value: 'concern', label: 'Concern' },
+  { value: 'general-feedback', label: 'General feedback' },
+  { value: 'merchandise', label: 'Merchandise' },
+  { value: 'other', label: 'Other' },
+] as const;
+
 const contactSchema = z.object({
   reason: z
     .string()
     .min(1, { message: 'Please select a reason for contacting us' })
-    .refine(
-      (val) => CONTACT_REASONS.some((reason) => reason.value === val),
-      { message: 'Please select a valid reason for contacting us' },
-    ),
+    .refine((val) => CONTACT_REASONS.some((reason) => reason.value === val), {
+      message: 'Please select a valid reason for contacting us',
+    }),
   firstName: z
     .string()
     .min(1, { message: 'First name is required' })
@@ -39,19 +52,5 @@ const contactSchema = z.object({
 });
 
 export type ContactFormSchemaType = z.infer<typeof contactSchema>;
-
-export const CONTACT_REASONS = [
-  { value: 'new-opportunity', label: 'New opportunity' },
-  { value: 'licensing', label: 'Licensing & sync' },
-  { value: 'press', label: 'Press & media inquiry' },
-  { value: 'distribution', label: 'Distribution' },
-  { value: 'demo-submission', label: 'Demo submission' },
-  { value: 'collaboration', label: 'Collaboration' },
-  { value: 'question', label: 'Question' },
-  { value: 'concern', label: 'Concern' },
-  { value: 'general-feedback', label: 'General feedback' },
-  { value: 'merchandise', label: 'Merchandise' },
-  { value: 'other', label: 'Other' },
-] as const;
 
 export default contactSchema;
