@@ -1,5 +1,48 @@
+# Dependencies (installed fresh in Docker)
 node_modules
+
+# Build output (injected via artifact, not build context)
 .next
-.DS_Store
 dist
+
+# CI/CD and tooling
+.github
+.husky
+.vscode
+.claude
+
+# Tests
+e2e
+coverage
+**/*.test.*
+**/*.spec.*
+vitest.config.*
+playwright.config.*
+
+# Linting/formatting config
+eslint.config.*
+.eslintrc*
+.prettierrc*
+.prettierignore
+
+# Documentation
+docs
+*.md
+LICENSE*
+HEADER.txt
+
+# Scripts not needed in container
+scripts
+
+# Environment files (secrets injected at runtime)
+.env*
+!.env.example
+
+# OS files
+.DS_Store
+.gitignore
+
+# Docker files (prevent recursive context)
 docker
+docker-compose*.yml
+Dockerfile
