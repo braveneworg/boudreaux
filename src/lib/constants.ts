@@ -25,6 +25,11 @@ export const CONSTANTS = {
     // Use NEXT_PUBLIC_CDN_DOMAIN for client-side or fallback to default
     BASE_URL: process.env.NEXT_PUBLIC_CDN_DOMAIN || 'https://cdn.fakefourrecords.com',
   },
+  TURNSTILE: {
+    // Cloudflare's well-known test secret key for E2E testing
+    // @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+    TEST_SECRET: '1x0000000000000000000000000000000AA',
+  },
   NA: 'N/A',
 };
 
