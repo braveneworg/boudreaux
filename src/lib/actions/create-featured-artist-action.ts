@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -7,7 +10,6 @@ import { z } from 'zod';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { FeaturedArtistsService } from '../services/featured-artists-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -19,8 +21,11 @@ export const createFeaturedArtistAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
+  if (!session?.user?.id) {
+    throw new Error('Session user id is required for audit logging.');
+  }
   // Parse artistIds as array from form data
   const artistIds = payload.getAll('artistIds') as string[];
   payload.delete('artistIds');
@@ -72,20 +77,6 @@ export const createFeaturedArtistAction = async (
 
   if (baseParsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id || session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = [
-          'You must be a logged in admin user to create a featured artist',
-        ];
-        return formState;
-      }
-
       const {
         displayName,
         description,

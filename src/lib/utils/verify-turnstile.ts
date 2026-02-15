@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
 import 'server-only';
@@ -28,6 +31,12 @@ export const verifyTurnstile = async (
 
   if (!token) {
     return { success: false, error: 'Turnstile token is required' };
+  }
+
+  // Cloudflare's well-known test secret key — skip the API call during testing
+  // @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+  if (secret === '1x0000000000000000000000000000000AA') {
+    return { success: true };
   }
 
   try {
