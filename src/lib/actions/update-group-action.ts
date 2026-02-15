@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -5,7 +8,6 @@ import { revalidatePath } from 'next/cache';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { GroupService } from '../services/group-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -18,7 +20,7 @@ export const updateGroupAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  await requireRole('admin');
+  const session = await requireRole('admin');
 
   const permittedFieldNames = [
     'name',
@@ -33,18 +35,6 @@ export const updateGroupAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id && session?.user?.role !== 'admin') {
-        formState.success = false;
-        if (!formState.errors) {
-          formState.errors = {};
-        }
-        formState.errors.general = ['You must be a logged in admin user to update a group'];
-        return formState;
-      }
-
       const { name, displayName, bio, shortBio, formedOn, endedOn, publishedOn } = parsed.data;
 
       // Update group in database

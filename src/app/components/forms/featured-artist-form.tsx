@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
@@ -14,7 +17,7 @@ import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
 import GroupSelect from '@/app/components/forms/fields/group-select';
 import ReleaseSelect from '@/app/components/forms/fields/release-select';
-import TrackSelect from '@/app/components/forms/fields/track-select';
+import TrackSelect, { type TrackOption } from '@/app/components/forms/fields/track-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -96,6 +99,7 @@ export default function FeaturedArtistForm({
   });
   const { control, setValue } = form;
   const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
+  const watchedReleaseId = useWatch({ control, name: 'releaseId' }) as string | undefined;
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -179,6 +183,14 @@ export default function FeaturedArtistForm({
   const handleDateSelect = (dateString: string, _fieldName: string) => {
     const dateOnly = dateString.split('T')[0];
     setValue('featuredOn', dateOnly);
+  };
+
+  const handleTrackChange = (track: TrackOption | null) => {
+    const releaseId = track?.releaseTracks?.[0]?.release?.id ?? '';
+    setValue('releaseId', releaseId, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -315,6 +327,8 @@ export default function FeaturedArtistForm({
                     label="Track"
                     placeholder="Select a track..."
                     setValue={setValue}
+                    onTrackChange={handleTrackChange}
+                    releaseId={watchedReleaseId || undefined}
                   />
 
                   <ReleaseSelect

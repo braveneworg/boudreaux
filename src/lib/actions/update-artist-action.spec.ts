@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
@@ -63,78 +66,6 @@ describe('updateArtistAction', () => {
       ).rejects.toThrow('Unauthorized');
 
       expect(requireRole).toHaveBeenCalledWith('admin');
-    });
-
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-            middleName: 'M',
-            displayName: 'Johnny Doe',
-          },
-        },
-      } as never);
-
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to update an artist',
-      ]);
-    });
-
-    it('should return error when user is not admin', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user' },
-      } as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-          },
-        },
-      } as never);
-
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to update an artist',
-      ]);
-    });
-
-    it('should return error when session user is missing id', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { role: 'admin' },
-      } as never);
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-          },
-        },
-      } as never);
-
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual([
-        'You must be a logged in admin user to update an artist',
-      ]);
     });
   });
 
