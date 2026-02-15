@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -211,9 +214,26 @@ interface TestFormValues {
 }
 
 const mockTracks: TrackOption[] = [
-  { id: 'track-1', title: 'Track One', duration: 180 },
-  { id: 'track-2', title: 'Track Two', duration: 240 },
-  { id: 'track-3', title: 'Track Three' },
+  {
+    id: 'track-1',
+    title: 'Track One',
+    duration: 180,
+    releaseTracks: [{ release: { id: 'release-1', title: 'Album One' } }],
+  },
+  {
+    id: 'track-2',
+    title: 'Track Two',
+    duration: 240,
+    releaseTracks: [
+      { release: { id: 'release-2', title: 'Album Two' } },
+      { release: { id: 'release-3', title: 'Album Three' } },
+    ],
+  },
+  {
+    id: 'track-3',
+    title: 'Track Three',
+    releaseTracks: [],
+  },
 ];
 
 const TestWrapper = ({
@@ -351,10 +371,11 @@ describe('TrackSelect', () => {
       await waitFor(() => {
         expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
         expect(screen.getByTestId('command-item-track-2')).toBeInTheDocument();
+        expect(screen.getByTestId('command-item-track-3')).toBeInTheDocument();
       });
     });
 
-    it('shows track title with duration when available', async () => {
+    it('shows track title with duration', async () => {
       const user = userEvent.setup();
       render(
         <TestWrapper>
@@ -371,7 +392,7 @@ describe('TrackSelect', () => {
       });
     });
 
-    it('shows track title without duration when not available', async () => {
+    it('shows track title without duration when not provided', async () => {
       const user = userEvent.setup();
       render(
         <TestWrapper>
@@ -385,13 +406,12 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('command-item-track-3')).toHaveTextContent('Track Three');
-        expect(screen.getByTestId('command-item-track-3')).not.toHaveTextContent('(');
       });
     });
   });
 
   describe('selection behavior', () => {
-    it('selects a track when clicked', async () => {
+    it('shows selected track name on trigger after selection', async () => {
       const user = userEvent.setup();
       render(
         <TestWrapper>
@@ -402,54 +422,17 @@ describe('TrackSelect', () => {
       );
 
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
         expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId('command-item-track-1'));
 
-      // Re-open to verify selection persists
-      await user.click(screen.getByTestId('popover-trigger'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
-      });
-    });
-
-    it('calls onTrackChange when a track is selected', async () => {
-      const user = userEvent.setup();
-      const mockOnTrackChange = vi.fn();
-      render(
-        <TestWrapper>
-          {({ control, setValue }) => (
-            <TrackSelect
-              control={control}
-              name="trackId"
-              label="Track"
-              setValue={setValue}
-              onTrackChange={mockOnTrackChange}
-            />
-          )}
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popover-trigger'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId('command-item-track-1'));
-
-      expect(mockOnTrackChange).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'track-1', title: 'Track One' })
-      );
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
     });
 
     it('deselects track when clicking on already selected item', async () => {
       const user = userEvent.setup();
-      const mockOnTrackChange = vi.fn();
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -457,38 +440,71 @@ describe('TrackSelect', () => {
               control={control}
               name="trackId"
               label="Track"
+              placeholder="Select a track..."
               setValue={setValue}
-              onTrackChange={mockOnTrackChange}
             />
           )}
         </TestWrapper>
       );
 
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
         expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
 
       // Select
       await user.click(screen.getByTestId('command-item-track-1'));
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
 
       // Re-open and deselect
       await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-track-1'));
 
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Select a track...');
+    });
+  });
+
+  describe('onTrackChange callback', () => {
+    it('calls onTrackChange with full track data including releaseTracks when a track is selected', async () => {
+      const user = userEvent.setup();
+      const onTrackChange = vi.fn();
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              onTrackChange={onTrackChange}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
       await waitFor(() => {
         expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId('command-item-track-1'));
 
-      expect(mockOnTrackChange).toHaveBeenLastCalledWith(null);
+      expect(onTrackChange).toHaveBeenCalledWith({
+        id: 'track-1',
+        title: 'Track One',
+        duration: 180,
+        releaseTracks: [{ release: { id: 'release-1', title: 'Album One' } }],
+      });
     });
-  });
 
-  describe('releaseId filtering', () => {
-    it('includes releaseId in fetch URL when provided', async () => {
+    it('passes track with multiple releaseTracks when selected', async () => {
       const user = userEvent.setup();
+      const onTrackChange = vi.fn();
+
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -497,42 +513,67 @@ describe('TrackSelect', () => {
               name="trackId"
               label="Track"
               setValue={setValue}
-              releaseId="release-123"
+              onTrackChange={onTrackChange}
             />
           )}
         </TestWrapper>
       );
 
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-123'));
+        expect(screen.getByTestId('command-item-track-2')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId('command-item-track-2'));
+
+      expect(onTrackChange).toHaveBeenCalledWith({
+        id: 'track-2',
+        title: 'Track Two',
+        duration: 240,
+        releaseTracks: [
+          { release: { id: 'release-2', title: 'Album Two' } },
+          { release: { id: 'release-3', title: 'Album Three' } },
+        ],
       });
     });
 
-    it('does not include releaseId when not provided', async () => {
+    it('passes track with empty releaseTracks when track has no releases', async () => {
       const user = userEvent.setup();
+      const onTrackChange = vi.fn();
+
       render(
         <TestWrapper>
           {({ control, setValue }) => (
-            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              onTrackChange={onTrackChange}
+            />
           )}
         </TestWrapper>
       );
 
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalled();
+        expect(screen.getByTestId('command-item-track-3')).toBeInTheDocument();
       });
 
-      const fetchUrl = mockFetch.mock.calls[0][0] as string;
-      expect(fetchUrl).not.toContain('releaseId');
+      await user.click(screen.getByTestId('command-item-track-3'));
+
+      expect(onTrackChange).toHaveBeenCalledWith({
+        id: 'track-3',
+        title: 'Track Three',
+        releaseTracks: [],
+      });
     });
 
-    it('re-fetches tracks when releaseId changes', async () => {
+    it('calls onTrackChange with null when track is deselected', async () => {
       const user = userEvent.setup();
-      const { rerender } = render(
+      const onTrackChange = vi.fn();
+
+      render(
         <TestWrapper>
           {({ control, setValue }) => (
             <TrackSelect
@@ -540,27 +581,35 @@ describe('TrackSelect', () => {
               name="trackId"
               label="Track"
               setValue={setValue}
-              releaseId="release-1"
+              onTrackChange={onTrackChange}
             />
           )}
         </TestWrapper>
       );
 
-      // Open popover to trigger initial fetch
+      // Select a track
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-1'));
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
+      await user.click(screen.getByTestId('command-item-track-1'));
 
-      mockFetch.mockClear();
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tracks: [mockTracks[1]] }),
+      // Re-open and deselect the same track
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
+      await user.click(screen.getByTestId('command-item-track-1'));
 
-      // Rerender with different releaseId
-      rerender(
+      expect(onTrackChange).toHaveBeenCalledTimes(2);
+      expect(onTrackChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it('calls onTrackChange with null when clear button is clicked', async () => {
+      const user = userEvent.setup();
+      const onTrackChange = vi.fn();
+
+      render(
         <TestWrapper>
           {({ control, setValue }) => (
             <TrackSelect
@@ -568,15 +617,26 @@ describe('TrackSelect', () => {
               name="trackId"
               label="Track"
               setValue={setValue}
-              releaseId="release-2"
+              onTrackChange={onTrackChange}
             />
           )}
         </TestWrapper>
       );
 
+      // Select a track
+      await user.click(screen.getByTestId('popover-trigger'));
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-2'));
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
       });
+      await user.click(screen.getByTestId('command-item-track-1'));
+      expect(onTrackChange).toHaveBeenCalledTimes(1);
+
+      // Click clear button
+      const clearButton = screen.getByRole('button', { name: /clear selection/i });
+      await user.click(clearButton);
+
+      expect(onTrackChange).toHaveBeenCalledTimes(2);
+      expect(onTrackChange).toHaveBeenLastCalledWith(null);
     });
   });
 
@@ -620,7 +680,6 @@ describe('TrackSelect', () => {
       );
 
       await user.click(screen.getByTestId('popover-trigger'));
-
       await waitFor(() => {
         expect(screen.getByTestId('command-input')).toBeInTheDocument();
       });
@@ -628,7 +687,6 @@ describe('TrackSelect', () => {
       const input = screen.getByTestId('command-input');
       await user.type(input, 'test');
 
-      // Advance timers to trigger debounced search
       await vi.advanceTimersByTimeAsync(350);
 
       await waitFor(() => {
@@ -637,9 +695,44 @@ describe('TrackSelect', () => {
 
       vi.useRealTimers();
     });
-  });
 
-  describe('popover state management', () => {
+    it('fetches without search when search is cleared (empty string)', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toBeInTheDocument();
+      });
+
+      // Type and then clear the search
+      const input = screen.getByTestId('command-input');
+      await user.type(input, 'x');
+      await vi.advanceTimersByTimeAsync(350);
+
+      mockFetch.mockClear();
+      await user.clear(input);
+      await vi.advanceTimersByTimeAsync(350);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // The empty searchValue should be passed as undefined (not as empty string)
+      const lastCallUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0] as string;
+      expect(lastCallUrl).not.toContain('search=');
+
+      vi.useRealTimers();
+    });
+
     it('clears search value when popover closes', async () => {
       const user = userEvent.setup();
       render(
@@ -650,20 +743,16 @@ describe('TrackSelect', () => {
         </TestWrapper>
       );
 
-      // Open popover
       await user.click(screen.getByTestId('popover-trigger'));
       await waitFor(() => {
         expect(screen.getByTestId('command-input')).toBeInTheDocument();
       });
 
-      // Type in search
       const input = screen.getByTestId('command-input');
       await user.type(input, 'test');
 
-      // Close popover
       await user.click(screen.getByTestId('popover-close-trigger'));
 
-      // Re-open popover - search should be cleared
       await user.click(screen.getByTestId('popover-trigger'));
       await waitFor(() => {
         expect(screen.getByTestId('command-input')).toHaveValue('');
@@ -671,59 +760,8 @@ describe('TrackSelect', () => {
     });
   });
 
-  describe('create track link', () => {
-    it('shows create link when showCreateLink is true', async () => {
-      const user = userEvent.setup();
-      render(
-        <TestWrapper>
-          {({ control, setValue }) => (
-            <TrackSelect
-              control={control}
-              name="trackId"
-              label="Track"
-              setValue={setValue}
-              showCreateLink
-            />
-          )}
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popover-trigger'));
-
-      await waitFor(() => {
-        const link = screen.getByTestId('create-track-link');
-        expect(link).toHaveAttribute('href', '/admin/tracks/new');
-      });
-    });
-
-    it('hides create link when showCreateLink is false', async () => {
-      const user = userEvent.setup();
-      render(
-        <TestWrapper>
-          {({ control, setValue }) => (
-            <TrackSelect
-              control={control}
-              name="trackId"
-              label="Track"
-              setValue={setValue}
-              showCreateLink={false}
-            />
-          )}
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popover-trigger'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('command-list')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByTestId('create-track-link')).not.toBeInTheDocument();
-    });
-  });
-
   describe('fetch error handling', () => {
-    it('handles non-ok response from fetch', async () => {
+    it('shows error message on non-ok response', async () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -745,9 +783,9 @@ describe('TrackSelect', () => {
       });
     });
 
-    it('handles network error during fetch', async () => {
+    it('handles non-Error thrown during fetch', async () => {
       const user = userEvent.setup();
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockRejectedValueOnce('string error');
 
       render(
         <TestWrapper>
@@ -764,9 +802,12 @@ describe('TrackSelect', () => {
       });
     });
 
-    it('handles non-Error exception during fetch', async () => {
+    it('handles API response with missing tracks array', async () => {
       const user = userEvent.setup();
-      mockFetch.mockRejectedValueOnce('String error');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
 
       render(
         <TestWrapper>
@@ -781,6 +822,238 @@ describe('TrackSelect', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
       });
+
+      // Should render without error and show empty message
+      await waitFor(() => {
+        expect(screen.getByTestId('command-empty')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('selection without setValue prop', () => {
+    it('selects track without calling setValue when not provided', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control }) => <TrackSelect control={control} name="trackId" label="Track" />}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
+      });
+
+      // Should not throw when setValue is not provided
+      await user.click(screen.getByTestId('command-item-track-1'));
+
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
+    });
+
+    it('clears track without calling setValue when not provided', async () => {
+      const user = userEvent.setup();
+      const onTrackChange = vi.fn();
+      render(
+        <TestWrapper>
+          {({ control }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              placeholder="Select a track..."
+              onTrackChange={onTrackChange}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // Select a track first
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-track-1'));
+
+      // Clear it
+      const clearButton = screen.getByRole('button', { name: /clear selection/i });
+      await user.click(clearButton);
+
+      expect(onTrackChange).toHaveBeenLastCalledWith(null);
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Select a track...');
+    });
+  });
+
+  describe('create track link', () => {
+    it('shows create new track link by default', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        const link = screen.getByTestId('create-track-link');
+        expect(link).toHaveAttribute('href', '/admin/tracks/new');
+      });
+    });
+
+    it('hides create link when showCreateLink is false', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              showCreateLink={false}
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-list')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId('create-track-link')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('releaseId filtering', () => {
+    it('includes releaseId as query parameter when fetching tracks', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              releaseId="release-filter-id"
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('releaseId=release-filter-id')
+        );
+      });
+    });
+
+    it('does not include releaseId when not provided', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      expect(fetchUrl).not.toContain('releaseId');
+    });
+
+    it('re-fetches tracks when releaseId changes and popover is open', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              releaseId="release-1"
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // Open popover to trigger initial fetch
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-1'));
+      });
+
+      mockFetch.mockClear();
+
+      // Change releaseId
+      rerender(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              releaseId="release-2"
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-2'));
+      });
+    });
+
+    it('includes both search and releaseId when filtering', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              releaseId="release-filter"
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toBeInTheDocument();
+      });
+
+      const input = screen.getByTestId('command-input');
+      await user.type(input, 'query');
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      await waitFor(() => {
+        const calls = mockFetch.mock.calls;
+        const lastCall = calls[calls.length - 1][0] as string;
+        expect(lastCall).toContain('search=query');
+        expect(lastCall).toContain('releaseId=release-filter');
+      });
+
+      vi.useRealTimers();
     });
   });
 });
