@@ -270,7 +270,8 @@ describe('FeaturedArtistForm', () => {
       });
 
       // Verify setValue was called to clear releaseId
-      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+      // Note: Using toHaveBeenLastCalledWith to check the most recent call is correct
+      expect(mockSetValue).toHaveBeenLastCalledWith('releaseId', '', {
         shouldDirty: true,
         shouldValidate: true,
       });
@@ -292,7 +293,8 @@ describe('FeaturedArtistForm', () => {
       });
 
       // Verify setValue was called to clear releaseId
-      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+      // Note: Using toHaveBeenLastCalledWith to check the most recent call is correct
+      expect(mockSetValue).toHaveBeenLastCalledWith('releaseId', '', {
         shouldDirty: true,
         shouldValidate: true,
       });
