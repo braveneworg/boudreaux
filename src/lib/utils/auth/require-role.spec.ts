@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { requireRole } from './require-role';
 
 // Mock server-only
@@ -67,6 +70,26 @@ describe('requireRole', () => {
       mockAuth.mockResolvedValue({});
 
       await expect(requireRole('admin')).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw error when user.id is missing', async () => {
+      mockAuth.mockResolvedValue({
+        user: { role: 'admin' },
+      });
+
+      await expect(requireRole('admin')).rejects.toThrow(
+        'Invalid session: user ID missing. User ID is required for audit logging and security tracking.'
+      );
+    });
+
+    it('should throw error when user.id is an empty string', async () => {
+      mockAuth.mockResolvedValue({
+        user: { id: '', role: 'admin' },
+      });
+
+      await expect(requireRole('admin')).rejects.toThrow(
+        'Invalid session: user ID missing. User ID is required for audit logging and security tracking.'
+      );
     });
   });
 
