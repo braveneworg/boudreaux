@@ -89,34 +89,29 @@ const ContactPage = () => {
         } else {
           setIsSubmitting(false);
 
-          if (result.errors?.general) {
-            toast.error(result.errors.general[0] || 'Something went wrong. Please try again.');
-            form.setError('general', { message: result.errors.general.join(', ') });
-          }
+          const errorFields = [
+            'general',
+            'reason',
+            'firstName',
+            'lastName',
+            'email',
+            'phone',
+            'message',
+          ] as const;
 
-          if (result.errors?.reason) {
-            form.setError('reason', { message: result.errors.reason.join(', ') });
-          }
+          errorFields.forEach((field) => {
+            const messages = result.errors?.[field];
 
-          if (result.errors?.firstName) {
-            form.setError('firstName', { message: result.errors.firstName.join(', ') });
-          }
+            if (!messages || messages.length === 0) {
+              return;
+            }
 
-          if (result.errors?.lastName) {
-            form.setError('lastName', { message: result.errors.lastName.join(', ') });
-          }
+            if (field === 'general') {
+              toast.error(messages[0] || 'Something went wrong. Please try again.');
+            }
 
-          if (result.errors?.email) {
-            form.setError('email', { message: result.errors.email.join(', ') });
-          }
-
-          if (result.errors?.phone) {
-            form.setError('phone', { message: result.errors.phone.join(', ') });
-          }
-
-          if (result.errors?.message) {
-            form.setError('message', { message: result.errors.message.join(', ') });
-          }
+            form.setError(field, { message: messages.join(', ') });
+          });
         }
       } catch (error) {
         console.error('Contact form submission error:', error);
