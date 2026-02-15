@@ -1138,8 +1138,8 @@ jobs:
           fi
 
           # Collect unique PR entries from merge commits since last tag
-          MERGED_PRS=""
-          SEEN_PRS=""
+          MERGED_PRS=()
+          declare -A SEEN_PRS
           if [ -n "$COMMITS_RANGE" ]; then
             while IFS= read -r sha; do
               [ -z "$sha" ] && continue
@@ -1148,17 +1148,17 @@ jobs:
               if [ -n "$PR_INFO" ]; then
                 PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
                 PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
-                if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
-                  SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
-                  MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
+                if [ -z "${SEEN_PRS[$PR_NUM]}" ]; then
+                  SEEN_PRS[$PR_NUM]=1
+                  MERGED_PRS+=("- ${PR_TTL} (#${PR_NUM})")
                 fi
               fi
             done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
           fi
 
           # Fallback: if no PR entries found, use the triggering PR
-          if [ -z "$MERGED_PRS" ]; then
-            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
+          if [ ${#MERGED_PRS[@]} -eq 0 ]; then
+            MERGED_PRS=("- ${PR_TITLE} (#${PR_NUMBER})")
           fi
 
           # Determine section header based on bump type
@@ -1169,7 +1169,9 @@ jobs:
           esac
 
           # Build the new changelog entry
-          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
+          # Join array elements with newlines
+          MERGED_PRS_TEXT=$(printf '%s\n' "${MERGED_PRS[@]}")
+          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n${MERGED_PRS_TEXT}"
 
           # Prepend to CHANGELOG.md after the header block (first 7 lines)
           if [ -f CHANGELOG.md ]; then
