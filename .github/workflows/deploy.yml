@@ -335,6 +335,7 @@ jobs:
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
           SKIP_BUILD: "true"
           CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          SKIP_INVALIDATION: "true"
         run: |
           echo "Syncing Next.js static assets to S3..."
           npx tsx scripts/sync-cdn.ts
