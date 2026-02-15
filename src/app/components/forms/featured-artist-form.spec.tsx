@@ -19,6 +19,7 @@ let capturedTrackSelectReleaseId: string | undefined;
 const setValueSpies: Array<ReturnType<typeof vi.fn>> = [];
 
 const mockPush = vi.fn();
+const mockSetValue = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -199,6 +200,13 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
       // After handleTrackChange calls setValue('releaseId', ...),
       // useWatch triggers re-render and the value flows to TrackSelect's releaseId prop
       await waitFor(() => {
@@ -239,6 +247,13 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         expect(trackSelect.getAttribute('data-release-id')).toBe('first00000000000000000000');
       });
@@ -267,6 +282,13 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         // empty string releaseId becomes undefined via || undefined, rendered as ''
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
@@ -285,6 +307,13 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
@@ -297,6 +326,13 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.({
           id: 'track-4',
           title: 'Legacy Track',
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
         });
       });
 
