@@ -5,6 +5,8 @@
 
 import 'server-only';
 
+import { CONSTANTS } from '@/lib/constants';
+
 interface TurnstileVerifyResponse {
   success: boolean;
   'error-codes'?: string[];
@@ -39,7 +41,7 @@ export const verifyTurnstile = async (
   // 1. Using Cloudflare's test secret key
   // 2. E2E_MODE is explicitly enabled
   // This prevents accidental bypass in production if test secret is misconfigured
-  if (secret === '1x0000000000000000000000000000000AA' && process.env.E2E_MODE === 'true') {
+  if (secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.E2E_MODE === 'true') {
     return { success: true };
   }
 
