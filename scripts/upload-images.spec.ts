@@ -165,6 +165,11 @@ describe('upload-images', () => {
       expect(generateS3Key('media/videos/clip.mp4')).toBe('media/videos/clip.mp4');
     });
 
+    it('should not double-prefix Windows paths already starting with media\\', () => {
+      expect(generateS3Key('media\\videos\\clip.mp4')).toBe('media/videos/clip.mp4');
+      expect(generateS3Key('media\\photo.jpg')).toBe('media/photo.jpg');
+    });
+
     it('should remove public/ prefix', () => {
       expect(generateS3Key('public/media/photo.jpg')).toBe('media/photo.jpg');
       expect(generateS3Key('public/images/avatar.png')).toBe('media/images/avatar.png');
@@ -209,6 +214,11 @@ describe('upload-images', () => {
       expect(generateS3Key('public\\media\\users\\123\\avatar.png', 'cdn')).toBe(
         'cdn/media/users/123/avatar.png'
       );
+    });
+
+    it('should not double-prefix custom prefix with Windows paths', () => {
+      expect(generateS3Key('uploads\\videos\\clip.mp4', 'uploads')).toBe('uploads/videos/clip.mp4');
+      expect(generateS3Key('cdn\\assets\\logo.png', 'cdn')).toBe('cdn/assets/logo.png');
     });
 
     it('should handle complex paths', () => {

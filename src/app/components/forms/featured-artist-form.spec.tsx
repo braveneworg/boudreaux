@@ -14,7 +14,6 @@ import FeaturedArtistForm from './featured-artist-form';
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
-
 const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -37,15 +36,7 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock react useActionState to provide a stable formState
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
-  };
-});
-
+// Mock all form field subcomponents as simple stubs, capturing props we care about
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
