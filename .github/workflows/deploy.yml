@@ -1079,6 +1079,20 @@ jobs:
 
           PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
           PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          
+          # Validate that PR_NUMBER and PR_TITLE are non-empty
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "Failed to extract PR number from PR data — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          if [ -z "$PR_TITLE" ] || [ "$PR_TITLE" = "null" ]; then
+            echo "Failed to extract PR title from PR data — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
           LABELS=$(echo "$PR_JSON" | jq -r '.labels[]' 2>/dev/null || echo "")
 
           echo "PR #$PR_NUMBER: $PR_TITLE"
