@@ -1045,10 +1045,66 @@ jobs:
               2>&1 | grep -v "does not exist" || true
           done
 
+  verify-deployment:
+    name: Verify deployment health
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    steps:
+      - name: Wait for application startup
+        run: |
+          echo "Waiting 30 seconds for application to fully initialize..."
+          sleep 30
+
+      - name: Verify application health
+        run: |
+          echo "Checking application health at https://fakefourrecords.com/api/health"
+          
+          max_attempts=5
+          attempt=1
+          backoff=10
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts..."
+            
+            response=$(curl -fsS --max-time 10 https://fakefourrecords.com/api/health 2>&1) || {
+              echo "Health check failed (attempt $attempt/$max_attempts)"
+              if [ $attempt -lt $max_attempts ]; then
+                sleep_duration=$((backoff * attempt))
+                echo "Retrying in $sleep_duration seconds..."
+                sleep $sleep_duration
+                attempt=$((attempt + 1))
+                continue
+              else
+                echo "❌ All health check attempts failed"
+                echo "Response: $response"
+                exit 1
+              fi
+            }
+            
+            # Parse and validate the health check response
+            status=$(echo "$response" | jq -r '.status' 2>/dev/null || echo "")
+            database=$(echo "$response" | jq -r '.database' 2>/dev/null || echo "")
+            
+            if [ "$status" = "healthy" ] && [ "$database" = "connected" ]; then
+              echo "✓ Application is healthy"
+              echo "  Status: $status"
+              echo "  Database: $database"
+              latency=$(echo "$response" | jq -r '.latency' 2>/dev/null || echo "N/A")
+              if [ "$latency" != "N/A" ] && [ "$latency" != "null" ]; then
+                echo "  Database latency: ${latency}ms"
+              fi
+              exit 0
+            else
+              echo "❌ Health check returned unhealthy status"
+              echo "Response: $response"
+              exit 1
+            fi
+          done
+
   version-bump:
     name: Bump version & release
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [verify-deployment]
     permissions:
       contents: write
       pull-requests: read
