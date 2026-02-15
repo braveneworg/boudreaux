@@ -185,8 +185,7 @@ export function generateS3Key(filePath: string, prefix?: string): string {
     }
   }
 
-  // Ensure forward slashes for S3 compatibility
-  return key.split('\\').join('/');
+  return key;
 }
 
 /**
