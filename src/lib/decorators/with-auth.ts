@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // These decorators wrap API route handlers to enforce authentication and role-based access control.
 // They can be used in the new Next.js App Router API routes (app/api/*/route.ts).
 
