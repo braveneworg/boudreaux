@@ -134,6 +134,27 @@ const ContactPage = () => {
         <Card>
           <CardContent>
             <h1>Contact Us</h1>
+            <div className="flex flex-col space-y-2 mb-4">
+              <p>
+                <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos
+              </p>
+              <p>
+                <strong>Label Manager:</strong> Dylan
+              </p>
+              <p>dylanowenmusic@gmail.com</p>
+              <p>
+                <strong>Distribution:</strong> Jeep Ward at Redeye Worldwide
+              </p>
+              <p>jeephalo@gmail.com</p>
+              <p>
+                <strong>Media and Fan Support:</strong> Niki
+              </p>
+              <p>nikianarchy@gmail.com</p>
+              <p>
+                <strong>Customer Service:</strong> Mo Niklz
+              </p>
+              <p>djmoniklz@gmail.com</p>
+            </div>
             <p className="text-muted-foreground mb-6">
               Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
               back to you.

@@ -165,6 +165,37 @@ describe('ContactPage', () => {
       await importAndRender();
       expect(screen.getByRole('button', { name: /send message/i })).toBeInTheDocument();
     });
+
+    it('should render co-founders info', async () => {
+      await importAndRender();
+      expect(screen.getByText(/co-founders\/owners/i)).toBeInTheDocument();
+      expect(screen.getByText(/ceschi ramos and david ramos/i)).toBeInTheDocument();
+    });
+
+    it('should render label manager info', async () => {
+      await importAndRender();
+      expect(screen.getByText(/label manager/i)).toBeInTheDocument();
+      expect(screen.getByText('dylanowenmusic@gmail.com')).toBeInTheDocument();
+    });
+
+    it('should render distribution info', async () => {
+      await importAndRender();
+      expect(screen.getByText(/distribution/i)).toBeInTheDocument();
+      expect(screen.getByText(/jeep ward at redeye worldwide/i)).toBeInTheDocument();
+      expect(screen.getByText('jeephalo@gmail.com')).toBeInTheDocument();
+    });
+
+    it('should render media and fan support info', async () => {
+      await importAndRender();
+      expect(screen.getByText(/media and fan support/i)).toBeInTheDocument();
+      expect(screen.getByText('nikianarchy@gmail.com')).toBeInTheDocument();
+    });
+
+    it('should render customer service info', async () => {
+      await importAndRender();
+      expect(screen.getByText(/customer service/i)).toBeInTheDocument();
+      expect(screen.getByText('djmoniklz@gmail.com')).toBeInTheDocument();
+    });
   });
 
   describe('session auto-population', () => {
