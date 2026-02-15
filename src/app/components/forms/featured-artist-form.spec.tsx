@@ -55,17 +55,15 @@ vi.mock('react-hook-form', async () => {
     useForm: (...args: unknown[]) => {
       const form = (actual as { useForm: (...args: unknown[]) => unknown }).useForm(...args);
       const formTyped = form as {
-        setValue: (...args: unknown[]) => void;
+        setValue: (...args: unknown[]) => unknown;
         [key: string]: unknown;
       };
-      const originalSetValue = formTyped.setValue;
-      return {
-        ...(formTyped as object),
-        setValue: (...setValueArgs: unknown[]) => {
-          mockSetValue(...setValueArgs);
-          return originalSetValue(...setValueArgs);
-        },
+      const originalSetValue = formTyped.setValue.bind(formTyped);
+      formTyped.setValue = (...setValueArgs: unknown[]) => {
+        mockSetValue(...setValueArgs);
+        return originalSetValue(...setValueArgs);
       };
+      return formTyped;
     },
   };
 });
