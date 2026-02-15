@@ -1153,14 +1153,16 @@ jobs:
                 MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
               fi
             fi
-          done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
+          done < <(git log "${COMMITS_RANGE}" --format='%H' 2>/dev/null)
 
           # Always include the triggering PR if not already in the list
           if ! echo "$SEEN_PRS" | grep -q "^${PR_NUMBER}$"; then
             MERGED_PRS="${MERGED_PRS}- ${PR_TITLE} (#${PR_NUMBER})\n"
+            SEEN_PRS="${SEEN_PRS}${PR_NUMBER}\n"
           fi
 
-          # Final fallback: if still no PR entries, use just the triggering PR
+          # Final fallback: if still no PR entries, something went wrong
+          # This should rarely happen since we always add the triggering PR above
           if [ -z "$MERGED_PRS" ]; then
             MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
           fi
