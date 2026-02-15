@@ -194,6 +194,24 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Zod for runtime validation of external data (API responses, user input)
 - Always write tests for new features and bug fixes
 - Always aim for high test coverage (90-95%+)
+- Alwayas use ESLint and Prettier for code quality and consistency
+- Always follow the project's coding standards and guidelines
+- Always use shadcn/ui components and design patterns for UI consistency
+- Always use Tailwind v4 CSS for styling
+- Always use React Hook Form for form handling and validation
+- Always use Prisma for database access and operations
+- Always use AWS services for cloud infrastructure and deployment
+- Always use TypeScript for type safety and better developer experience
+- Always use Next.js for server-side rendering and routing
+- Always use Tanstack Query for data fetching and state management
+- Always use React for building user interfaces
+- Always use Vitest for testing
+- Always use Docker for containerization and deployment
+- Always use meaningful commit messages that describe the changes made
+- Always run tests, lint, and format before committing code
+- Always review code changes for potential bugs, security issues, and performance optimizations
+- Always put the MPL license header in all source files from HEADER.txt
+- Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 
 ## Never Do
 
