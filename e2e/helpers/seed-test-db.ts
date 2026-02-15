@@ -42,12 +42,33 @@ const TEST_USERS: Record<string, TestUser> = {
  * and creates deterministic test data.
  */
 async function seedTestDatabase() {
-  // Safety guard: refuse to run against a remote database
-  if (E2E_DATABASE_URL.includes('mongodb+srv') || E2E_DATABASE_URL.includes('mongodb.net')) {
-    throw new Error(
-      `E2E seed script refusing to run against a remote database: ${E2E_DATABASE_URL}\n` +
-        'Set E2E_DATABASE_URL to a local MongoDB instance (e.g. mongodb://localhost:27018/boudreaux-e2e)'
-    );
+  const allowNonLocal = process.env.E2E_SEED_ALLOW_NONLOCAL === 'true';
+
+  // Safety guard: by default refuse to run against anything except a local test database
+  if (!allowNonLocal) {
+    let url: URL;
+
+    try {
+      url = new URL(E2E_DATABASE_URL);
+    } catch {
+      throw new Error(
+        `E2E seed script could not parse E2E_DATABASE_URL: ${E2E_DATABASE_URL}\n` +
+          'Set E2E_DATABASE_URL to a valid local MongoDB URL (e.g. mongodb://localhost:27018/boudreaux-e2e), ' +
+          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
+      );
+    }
+
+    const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const isExpectedPort = url.port === '27018';
+    const isExpectedProtocol = url.protocol === 'mongodb:';
+
+    if (!isLocalHost || !isExpectedPort || !isExpectedProtocol) {
+      throw new Error(
+        `E2E seed script refusing to run against a non-local or unexpected database: ${E2E_DATABASE_URL}\n` +
+          'Set E2E_DATABASE_URL to a local MongoDB instance on mongodb://localhost:27018/boudreaux-e2e, ' +
+          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
+      );
+    }
   }
 
   const prisma = new PrismaClient({
