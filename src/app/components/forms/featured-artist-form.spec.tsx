@@ -11,8 +11,6 @@ import type { TrackOption } from '@/app/components/forms/fields/track-select';
 // Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
-import type { UseFormReturn } from 'react-hook-form';
-
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
