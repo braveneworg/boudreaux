@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -32,7 +35,7 @@ interface NotificationBannerProps {
  *
  * Features:
  * - Golden ratio-based responsive height
- * - Auto-cycling every 10 seconds
+ * - Auto-cycling every ~6.5 seconds
  * - Smooth transitions with easing
  * - Navigation dots for manual selection
  * - Full viewport width images
