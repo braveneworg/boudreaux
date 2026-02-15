@@ -1061,7 +1061,7 @@ jobs:
           
           max_attempts=5
           attempt=1
-          backoff=10
+          backoff_base=10
           
           while [ $attempt -le $max_attempts ]; do
             echo "Health check attempt $attempt of $max_attempts..."
@@ -1069,7 +1069,7 @@ jobs:
             response=$(curl -fsS --max-time 10 https://fakefourrecords.com/api/health 2>&1) || {
               echo "Health check failed (attempt $attempt/$max_attempts)"
               if [ $attempt -lt $max_attempts ]; then
-                sleep_duration=$((backoff * attempt))
+                sleep_duration=$((backoff_base * attempt))
                 echo "Retrying in $sleep_duration seconds..."
                 sleep $sleep_duration
                 attempt=$((attempt + 1))
