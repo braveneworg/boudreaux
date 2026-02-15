@@ -50,6 +50,7 @@ export default defineConfig({
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,
       SKIP_ENV_VALIDATION: 'true',
+      NEXT_PUBLIC_BANNER_INTERVAL: '1000', // 1 second for faster E2E tests
     },
   },
 });
