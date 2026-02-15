@@ -1,4 +1,13 @@
-// Mock modules before imports using vi.hoisted to avoid temporal dead zone
+import { join } from 'path';
+
+import {
+  cleanupOldBackups,
+  dumpDatabase,
+  parseMongoUri,
+  restoreDatabase,
+  showUsage,
+} from './mongo-backup';
+
 const {
   execSyncMock,
   existsSyncMock,
@@ -23,18 +32,6 @@ vi.mock('../src/lib/system-utils', () => ({
   statSync: statSyncMock,
   unlinkSync: unlinkSyncMock,
 }));
-
-// eslint-disable-next-line import/first
-import { join } from 'path';
-
-// eslint-disable-next-line import/first
-import {
-  cleanupOldBackups,
-  dumpDatabase,
-  parseMongoUri,
-  restoreDatabase,
-  showUsage,
-} from './mongo-backup';
 
 describe('mongo-backup', () => {
   const mockConsoleInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
