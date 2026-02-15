@@ -81,6 +81,16 @@ describe('requireRole', () => {
         'Invalid session: user ID missing. User ID is required for audit logging and security tracking.'
       );
     });
+
+    it('should throw error when user.id is an empty string', async () => {
+      mockAuth.mockResolvedValue({
+        user: { id: '', role: 'admin' },
+      });
+
+      await expect(requireRole('admin')).rejects.toThrow(
+        'Invalid session: user ID missing. User ID is required for audit logging and security tracking.'
+      );
+    });
   });
 
   describe('edge cases', () => {
