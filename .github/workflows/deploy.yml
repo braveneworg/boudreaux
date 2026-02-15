@@ -1161,7 +1161,7 @@ jobs:
             SEEN_PRS="${SEEN_PRS}${PR_NUMBER}\n"
           fi
 
-          # Final fallback: if still no PR entries, something went wrong
+          # Final fallback: if still no PR entries (e.g., PR_NUMBER/PR_TITLE are empty)
           # This should rarely happen since we always add the triggering PR above
           if [ -z "$MERGED_PRS" ]; then
             MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
