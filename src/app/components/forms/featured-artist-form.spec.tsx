@@ -11,10 +11,13 @@ import type { TrackOption } from '@/app/components/forms/fields/track-select';
 // Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
+import type { UseFormReturn } from 'react-hook-form';
+
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 let capturedTrackSelectReleaseId: string | undefined;
 const mockPush = vi.fn();
+const mockSetValue = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -36,7 +39,38 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock all form field subcomponents as simple stubs, capturing props we care about
+// Mock react useActionState to provide a stable formState
+vi.mock('react', async () => {
+  const actual = await vi.importActual('react');
+  return {
+    ...actual,
+    useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to capture setValue calls
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+
+  return {
+    ...actual,
+    useForm: ((options?: unknown) => {
+      const formMethods = (
+        actual as {
+          useForm: (opts?: unknown) => UseFormReturn;
+        }
+      ).useForm(options);
+      // Wrap setValue to capture calls while preserving functionality
+      const originalSetValue = formMethods.setValue;
+      formMethods.setValue = ((...args) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      }) as typeof originalSetValue;
+      return formMethods;
+    }) as (typeof actual)['useForm'],
+  };
+});
+
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
@@ -164,6 +198,13 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
       // After handleTrackChange calls setValue('releaseId', ...),
       // useWatch triggers re-render and the value flows to TrackSelect's releaseId prop
       await waitFor(() => {
@@ -186,6 +227,13 @@ describe('FeaturedArtistForm', () => {
 
       await act(() => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
+      });
+
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
 
       await waitFor(() => {
@@ -217,6 +265,13 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         // empty string releaseId becomes undefined via || undefined, rendered as ''
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
@@ -235,6 +290,13 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
         const trackSelect = screen.getByTestId('track-select-trackId');
         expect(trackSelect.getAttribute('data-release-id')).toBe('');
       });
@@ -247,6 +309,13 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.({
           id: 'track-4',
           title: 'Legacy Track',
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
         });
       });
 
