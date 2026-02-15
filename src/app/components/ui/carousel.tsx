@@ -76,13 +76,25 @@ function Carousel({
     setCanScrollNext(api.canScrollNext());
   }, []);
 
+  const loop = opts?.loop ?? false;
+
   const scrollPrev = useCallback(() => {
-    api?.scrollPrev();
-  }, [api]);
+    if (!api) return;
+    if (api.canScrollPrev()) {
+      api.scrollPrev();
+    } else if (loop) {
+      api.scrollTo(api.scrollSnapList().length - 1);
+    }
+  }, [api, loop]);
 
   const scrollNext = useCallback(() => {
-    api?.scrollNext();
-  }, [api]);
+    if (!api) return;
+    if (api.canScrollNext()) {
+      api.scrollNext();
+    } else if (loop) {
+      api.scrollTo(0);
+    }
+  }, [api, loop]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
