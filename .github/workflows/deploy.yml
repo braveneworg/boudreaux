@@ -1139,7 +1139,7 @@ jobs:
 
           # Collect unique PR entries from merge commits since last tag
           MERGED_PRS=()
-          declare -A SEEN_PRS
+          declare -A SEEN_PRS  # Track seen PR numbers to avoid duplicates
           if [ -n "$COMMITS_RANGE" ]; then
             while IFS= read -r sha; do
               [ -z "$sha" ] && continue
@@ -1171,18 +1171,19 @@ jobs:
           # Build the new changelog entry
           # Join array elements with newlines
           MERGED_PRS_TEXT=$(printf '%s\n' "${MERGED_PRS[@]}")
-          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n${MERGED_PRS_TEXT}"
+          # Build entry using printf for proper newline handling
+          ENTRY=$(printf "## [%s] - %s\n\n%s\n\n%s" "${VERSION}" "${DATE}" "${SECTION}" "${MERGED_PRS_TEXT}")
 
           # Prepend to CHANGELOG.md after the header block (first 7 lines)
           if [ -f CHANGELOG.md ]; then
             head -n 7 CHANGELOG.md > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            echo -e "$ENTRY" >> CHANGELOG.tmp
+            printf '%s\n' "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
             tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
-            printf '%s\n\n%s\n\n%b\n' \
+            printf '%s\n\n%s\n\n%s\n' \
               "# Changelog" \
               "All notable changes to this project will be documented in this file." \
               "$ENTRY" > CHANGELOG.md
