@@ -27,11 +27,12 @@ permissions:
   packages: write
 
 jobs:
-  download-build:
-    name: Download build from CI
+  build-images:
+    name: Build & push website image
     runs-on: ubuntu-latest
-    # Only run if CI workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      digest: ${{ steps.capture-digest.outputs.digest }}
     steps:
       - name: Check artifact presence in triggering CI run
         uses: actions/github-script@v7
@@ -56,44 +57,16 @@ jobs:
               core.setFailed("Missing required artifact 'nextjs-build' from CI run. Ensure ci.yml 'build' job uploaded it.");
             }
 
-      - name: Download build artifact from triggering CI run
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact from CI run
         uses: dawidd6/action-download-artifact@v6
         with:
           run_id: ${{ github.event.workflow_run.id }}
           name: nextjs-build
           path: .
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify artifact
-        run: |
-          if [ ! -f "next-build.tar.gz" ]; then
-            echo "Error: next-build.tar.gz not found!"
-            ls -la
-            exit 1
-          fi
-          ls -lh next-build.tar.gz
-
-      - name: Re-upload for downstream jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: nextjs-build-deploy
-          path: next-build.tar.gz
-          retention-days: 1
-          if-no-files-found: error
-
-  build-images:
-    name: Build & push Docker images
-    runs-on: ubuntu-latest
-    needs: download-build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nextjs-build-deploy
-          path: .
 
       - name: Verify and extract artifact
         run: |
@@ -131,9 +104,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-website-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            ${{ runner.os }}-buildx-website-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -198,10 +171,27 @@ jobs:
             exit 1
           fi
 
+      - name: Capture image digest
+        id: capture-digest
+        run: |
+          set -e
+          echo "Fetching website image digest..."
+          DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          echo "Website digest: $DIGEST"
+
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "ERROR: Failed to get website digest"
+            exit 1
+          fi
+
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
   build-nginx:
-    name: Build nginx image (with retry)
+    name: Build & push nginx image
     runs-on: ubuntu-latest
-    needs: download-build
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      digest: ${{ steps.capture-digest.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -217,9 +207,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-nginx-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            ${{ runner.os }}-buildx-nginx-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -275,111 +265,62 @@ jobs:
             exit 1
           fi
 
-  capture-digests:
-    name: Capture image digests after both builds complete
-    runs-on: ubuntu-latest
-    needs: [build-images, build-nginx]
-    steps:
-      - name: Log in to container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Wait for registry sync
-        run: |
-          echo "Waiting for registry to sync both images..."
-          echo "This ensures both images are fully propagated before capture"
-          sleep 20
-
-      - name: Capture both image digests
+      - name: Capture image digest
+        id: capture-digest
         run: |
           set -e
-
-          echo "Fetching website image digest..."
-          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
-
           echo "Fetching nginx image digest..."
-          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          echo "Nginx digest: $DIGEST"
 
-          echo "Website digest: $WEBSITE_DIGEST"
-          echo "Nginx digest: $NGINX_DIGEST"
-
-          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
-            echo "❌ ERROR: Failed to get website digest"
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "ERROR: Failed to get nginx digest"
             exit 1
           fi
 
-          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
-            echo "❌ ERROR: Failed to get nginx digest"
-            exit 1
-          fi
-
-          printf '{"website":"%s","nginx":"%s"}' "$WEBSITE_DIGEST" "$NGINX_DIGEST" > image-digests.json
-
-          echo "✓ Digests captured successfully:"
-          cat image-digests.json
-
-          echo ""
-          echo "These digests will be used for deployment to ensure"
-          echo "containers match the build artifacts synced to S3"
-
-      - name: Upload image digest artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-digests
-          path: image-digests.json
-          retention-days: 1
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
   sync-to-s3:
-    name: Sync Next.js assets to S3
+    name: Sync assets to S3 & invalidate CloudFront
     runs-on: ubuntu-latest
-    needs: [download-build]
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Download build artifact from CI run
+        uses: dawidd6/action-download-artifact@v6
         with:
-          name: nextjs-build-deploy
+          run_id: ${{ github.event.workflow_run.id }}
+          name: nextjs-build
           path: .
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract build artifact
+      - name: Extract and verify build artifact
         run: |
           if [ ! -f "next-build.tar.gz" ]; then
             echo "Error: next-build.tar.gz not found!"
             exit 1
           fi
           tar -xzf next-build.tar.gz
-          echo "✓ Build artifact extracted"
 
-      - name: Verify Next.js build output
-        run: |
-          if [ ! -d ".next" ]; then
-            echo "Error: .next directory not found after extracting build artifact."
+          if [ ! -d ".next" ] || [ ! -d ".next/static" ] || [ ! -f ".next/BUILD_ID" ]; then
+            echo "Error: Missing expected .next output after extraction"
+            ls -la .next 2>/dev/null || echo ".next directory not found"
             exit 1
           fi
-          if [ ! -d ".next/static" ]; then
-            echo "Error: .next/static directory not found after extracting build artifact."
-            exit 1
-          fi
-          if [ ! -f ".next/BUILD_ID" ]; then
-            echo "Error: .next/BUILD_ID file not found after extracting build artifact."
-            exit 1
-          fi
-          echo "✓ Verified Next.js build output (.next, .next/static, .next/BUILD_ID present)"
+          echo "✓ Build artifact extracted and verified"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22.12.0"
-          cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install minimal dependencies for sync script
+        run: npm install --no-save @aws-sdk/client-s3 @aws-sdk/client-cloudfront @aws-sdk/lib-storage dotenv mime tsx
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -392,30 +333,12 @@ jobs:
         env:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
-          # Skip build since we already have the extracted artifact
           SKIP_BUILD: "true"
-          # Skip invalidation since it's handled in a separate job
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           SKIP_INVALIDATION: "true"
         run: |
           echo "Syncing Next.js static assets to S3..."
           npx tsx scripts/sync-cdn.ts
-
-  invalidate-cloudfront:
-    name: Invalidate CloudFront cache
-    runs-on: ubuntu-latest
-    needs: [sync-to-s3]
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Invalidate CloudFront distribution
         env:
@@ -427,7 +350,6 @@ jobs:
           fi
 
           echo "Creating CloudFront invalidation..."
-          # Note: CloudFront is a global service, region is not required
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --paths "/*" \
@@ -435,12 +357,11 @@ jobs:
             --output text
 
           echo "✓ CloudFront invalidation created successfully"
-          echo "Note: Invalidation may take 5-15 minutes to complete"
 
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [capture-digests, invalidate-cloudfront]
+    needs: [build-images, build-nginx, sync-to-s3]
     permissions:
       contents: read
       id-token: write
@@ -451,27 +372,26 @@ jobs:
       AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
       # Toggle: set to 'true' to fail deploy if self-signed cert remains after issuance attempts
       REQUIRE_TRUSTED_CERT: ${{ vars.REQUIRE_TRUSTED_CERT || 'false' }}
+      WEBSITE_DIGEST: ${{ needs.build-images.outputs.digest }}
+      NGINX_DIGEST: ${{ needs.build-nginx.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download image digests artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: image-digests
-          path: .
-
-      - name: Export digest environment variables
-        shell: bash
+      - name: Validate image digests
         run: |
-          WEBSITE_DIGEST=$(jq -r '.website' image-digests.json)
-          NGINX_DIGEST=$(jq -r '.nginx' image-digests.json)
-          echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
-          echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
-
           echo "Will deploy with digests:"
           echo "  Website: $WEBSITE_DIGEST"
           echo "  Nginx: $NGINX_DIGEST"
+
+          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
+            echo "ERROR: Missing website image digest"
+            exit 1
+          fi
+          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
+            echo "ERROR: Missing nginx image digest"
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
