@@ -25,11 +25,14 @@ const GOLDEN_RATIO = 1.618;
  */
 const AUTO_CYCLE_INTERVAL = (() => {
   const envInterval = process.env.NEXT_PUBLIC_BANNER_INTERVAL;
-  if (envInterval) {
-    const parsed = parseInt(envInterval, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
+  if (envInterval == null) {
+    return 6500;
+  }
+
+  const parsed = Number(envInterval);
+
+  if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
   }
   return 6500;
 })();
