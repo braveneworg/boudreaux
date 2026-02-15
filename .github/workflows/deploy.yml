@@ -27,11 +27,12 @@ permissions:
   packages: write
 
 jobs:
-  download-build:
-    name: Download build from CI
+  build-images:
+    name: Build & push website image
     runs-on: ubuntu-latest
-    # Only run if CI workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      digest: ${{ steps.capture-digest.outputs.digest }}
     steps:
       - name: Check artifact presence in triggering CI run
         uses: actions/github-script@v7
@@ -56,44 +57,16 @@ jobs:
               core.setFailed("Missing required artifact 'nextjs-build' from CI run. Ensure ci.yml 'build' job uploaded it.");
             }
 
-      - name: Download build artifact from triggering CI run
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact from CI run
         uses: dawidd6/action-download-artifact@v6
         with:
           run_id: ${{ github.event.workflow_run.id }}
           name: nextjs-build
           path: .
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify artifact
-        run: |
-          if [ ! -f "next-build.tar.gz" ]; then
-            echo "Error: next-build.tar.gz not found!"
-            ls -la
-            exit 1
-          fi
-          ls -lh next-build.tar.gz
-
-      - name: Re-upload for downstream jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: nextjs-build-deploy
-          path: next-build.tar.gz
-          retention-days: 1
-          if-no-files-found: error
-
-  build-images:
-    name: Build & push Docker images
-    runs-on: ubuntu-latest
-    needs: download-build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nextjs-build-deploy
-          path: .
 
       - name: Verify and extract artifact
         run: |
@@ -131,9 +104,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-website-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            ${{ runner.os }}-buildx-website-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -198,10 +171,27 @@ jobs:
             exit 1
           fi
 
+      - name: Capture image digest
+        id: capture-digest
+        run: |
+          set -e
+          echo "Fetching website image digest..."
+          DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          echo "Website digest: $DIGEST"
+
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "ERROR: Failed to get website digest"
+            exit 1
+          fi
+
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
   build-nginx:
-    name: Build nginx image (with retry)
+    name: Build & push nginx image
     runs-on: ubuntu-latest
-    needs: download-build
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      digest: ${{ steps.capture-digest.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -217,9 +207,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-nginx-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            ${{ runner.os }}-buildx-nginx-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -275,111 +265,62 @@ jobs:
             exit 1
           fi
 
-  capture-digests:
-    name: Capture image digests after both builds complete
-    runs-on: ubuntu-latest
-    needs: [build-images, build-nginx]
-    steps:
-      - name: Log in to container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Wait for registry sync
-        run: |
-          echo "Waiting for registry to sync both images..."
-          echo "This ensures both images are fully propagated before capture"
-          sleep 20
-
-      - name: Capture both image digests
+      - name: Capture image digest
+        id: capture-digest
         run: |
           set -e
-
-          echo "Fetching website image digest..."
-          WEBSITE_DIGEST=$(docker buildx imagetools inspect ${{ env.WEBSITE_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
-
           echo "Fetching nginx image digest..."
-          NGINX_DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          DIGEST=$(docker buildx imagetools inspect ${{ env.NGINX_IMAGE }}:latest --format '{{json .}}' | jq -r '.manifest.digest')
+          echo "Nginx digest: $DIGEST"
 
-          echo "Website digest: $WEBSITE_DIGEST"
-          echo "Nginx digest: $NGINX_DIGEST"
-
-          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
-            echo "❌ ERROR: Failed to get website digest"
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "ERROR: Failed to get nginx digest"
             exit 1
           fi
 
-          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
-            echo "❌ ERROR: Failed to get nginx digest"
-            exit 1
-          fi
-
-          printf '{"website":"%s","nginx":"%s"}' "$WEBSITE_DIGEST" "$NGINX_DIGEST" > image-digests.json
-
-          echo "✓ Digests captured successfully:"
-          cat image-digests.json
-
-          echo ""
-          echo "These digests will be used for deployment to ensure"
-          echo "containers match the build artifacts synced to S3"
-
-      - name: Upload image digest artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-digests
-          path: image-digests.json
-          retention-days: 1
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
   sync-to-s3:
-    name: Sync Next.js assets to S3
+    name: Sync assets to S3 & invalidate CloudFront
     runs-on: ubuntu-latest
-    needs: [download-build]
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Download build artifact from CI run
+        uses: dawidd6/action-download-artifact@v6
         with:
-          name: nextjs-build-deploy
+          run_id: ${{ github.event.workflow_run.id }}
+          name: nextjs-build
           path: .
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract build artifact
+      - name: Extract and verify build artifact
         run: |
           if [ ! -f "next-build.tar.gz" ]; then
             echo "Error: next-build.tar.gz not found!"
             exit 1
           fi
           tar -xzf next-build.tar.gz
-          echo "✓ Build artifact extracted"
 
-      - name: Verify Next.js build output
-        run: |
-          if [ ! -d ".next" ]; then
-            echo "Error: .next directory not found after extracting build artifact."
+          if [ ! -d ".next" ] || [ ! -d ".next/static" ] || [ ! -f ".next/BUILD_ID" ]; then
+            echo "Error: Missing expected .next output after extraction"
+            ls -la .next 2>/dev/null || echo ".next directory not found"
             exit 1
           fi
-          if [ ! -d ".next/static" ]; then
-            echo "Error: .next/static directory not found after extracting build artifact."
-            exit 1
-          fi
-          if [ ! -f ".next/BUILD_ID" ]; then
-            echo "Error: .next/BUILD_ID file not found after extracting build artifact."
-            exit 1
-          fi
-          echo "✓ Verified Next.js build output (.next, .next/static, .next/BUILD_ID present)"
+          echo "✓ Build artifact extracted and verified"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22.12.0"
-          cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install minimal dependencies for sync script
+        run: npm install --no-save @aws-sdk/client-s3 @aws-sdk/client-cloudfront @aws-sdk/lib-storage dotenv mime tsx
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -392,30 +333,12 @@ jobs:
         env:
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
           CDN_DOMAIN: ${{ secrets.CDN_DOMAIN }}
-          # Skip build since we already have the extracted artifact
           SKIP_BUILD: "true"
-          # Skip invalidation since it's handled in a separate job
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           SKIP_INVALIDATION: "true"
         run: |
           echo "Syncing Next.js static assets to S3..."
           npx tsx scripts/sync-cdn.ts
-
-  invalidate-cloudfront:
-    name: Invalidate CloudFront cache
-    runs-on: ubuntu-latest
-    needs: [sync-to-s3]
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Invalidate CloudFront distribution
         env:
@@ -427,7 +350,6 @@ jobs:
           fi
 
           echo "Creating CloudFront invalidation..."
-          # Note: CloudFront is a global service, region is not required
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --paths "/*" \
@@ -435,12 +357,11 @@ jobs:
             --output text
 
           echo "✓ CloudFront invalidation created successfully"
-          echo "Note: Invalidation may take 5-15 minutes to complete"
 
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [capture-digests, invalidate-cloudfront]
+    needs: [build-images, build-nginx, sync-to-s3]
     permissions:
       contents: read
       id-token: write
@@ -451,27 +372,26 @@ jobs:
       AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
       # Toggle: set to 'true' to fail deploy if self-signed cert remains after issuance attempts
       REQUIRE_TRUSTED_CERT: ${{ vars.REQUIRE_TRUSTED_CERT || 'false' }}
+      WEBSITE_DIGEST: ${{ needs.build-images.outputs.digest }}
+      NGINX_DIGEST: ${{ needs.build-nginx.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download image digests artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: image-digests
-          path: .
-
-      - name: Export digest environment variables
-        shell: bash
+      - name: Validate image digests
         run: |
-          WEBSITE_DIGEST=$(jq -r '.website' image-digests.json)
-          NGINX_DIGEST=$(jq -r '.nginx' image-digests.json)
-          echo "WEBSITE_DIGEST=$WEBSITE_DIGEST" >> $GITHUB_ENV
-          echo "NGINX_DIGEST=$NGINX_DIGEST" >> $GITHUB_ENV
-
           echo "Will deploy with digests:"
           echo "  Website: $WEBSITE_DIGEST"
           echo "  Nginx: $NGINX_DIGEST"
+
+          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
+            echo "ERROR: Missing website image digest"
+            exit 1
+          fi
+          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
+            echo "ERROR: Missing nginx image digest"
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -1124,3 +1044,206 @@ jobs:
               --cidr "${{ steps.ip.outputs.ipv4 }}/32" \
               2>&1 | grep -v "does not exist" || true
           done
+
+  version-bump:
+    name: Bump version & release
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find merged PR and determine bump type
+        id: bump-type
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get the HEAD commit SHA from the CI workflow run that triggered deploy
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "Looking for PR that merged commit: $COMMIT_SHA"
+
+          # Find the PR associated with this commit, preferring the one targeting the main branch
+          PR_JSON=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
+            --jq '[.[] | select(.base.ref == "main")][0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
+
+          if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+            echo "No PR found for commit $COMMIT_SHA — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          LABELS=$(echo "$PR_JSON" | jq -r '.labels[]' 2>/dev/null || echo "")
+
+          echo "PR #$PR_NUMBER: $PR_TITLE"
+          echo "Labels: $LABELS"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+
+          if echo "$LABELS" | grep -q "version:major"; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:minor"; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "version:patch"; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "No version label found — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.bump-type.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+
+      - name: Bump version
+        if: steps.bump-type.outputs.skip != 'true'
+        id: version
+        run: |
+          OLD_VERSION=$(jq -r '.version' package.json)
+          npm version ${{ steps.bump-type.outputs.bump }} --no-git-tag-version
+          NEW_VERSION=$(jq -r '.version' package.json)
+          echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped: $OLD_VERSION → $NEW_VERSION"
+
+      - name: Generate changelog entry
+        if: steps.bump-type.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.new }}"
+          DATE=$(date +%Y-%m-%d)
+          PR_TITLE="${{ steps.bump-type.outputs.pr_title }}"
+          PR_NUMBER="${{ steps.bump-type.outputs.pr_number }}"
+          BUMP_TYPE="${{ steps.bump-type.outputs.bump }}"
+
+          # Get all merged PR titles since the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS_RANGE="${LAST_TAG}..HEAD"
+          else
+            COMMITS_RANGE=""
+          fi
+
+          # Collect unique PR entries from merge commits since last tag
+          MERGED_PRS=""
+          SEEN_PRS=""
+          if [ -n "$COMMITS_RANGE" ]; then
+            while IFS= read -r sha; do
+              [ -z "$sha" ] && continue
+              PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
+                --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
+              if [ -n "$PR_INFO" ]; then
+                PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
+                PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
+                if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
+                  SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
+                  MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
+                fi
+              fi
+            done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
+          fi
+
+          # Fallback: if no PR entries found, use the triggering PR
+          if [ -z "$MERGED_PRS" ]; then
+            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
+          fi
+
+          # Determine section header based on bump type
+          case "$BUMP_TYPE" in
+            major) SECTION="### Changed" ;;
+            minor) SECTION="### Added" ;;
+            patch) SECTION="### Fixed" ;;
+          esac
+
+          # Build the new changelog entry
+          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
+
+          # Prepend to CHANGELOG.md after the header block, detected dynamically.
+          # The header is considered everything before the first '## [' version heading.
+          if [ -f CHANGELOG.md ]; then
+            HEADER_END_LINE=$(awk '/^## \[/{print NR; exit}' CHANGELOG.md)
+            if [ -n "$HEADER_END_LINE" ]; then
+              HEADER_LINES=$((HEADER_END_LINE - 1))
+            else
+              HEADER_LINES=$(wc -l < CHANGELOG.md)
+            fi
+
+            head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
+            echo "" >> CHANGELOG.tmp
+            echo -e "$ENTRY" >> CHANGELOG.tmp
+            echo "" >> CHANGELOG.tmp
+
+            TAIL_START=$((HEADER_LINES + 1))
+            tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
+            mv CHANGELOG.tmp CHANGELOG.md
+          else
+            printf '%s\n\n%s\n\n%s\n' \
+              "# Changelog" \
+              "All notable changes to this project will be documented in this file." \
+              "$ENTRY" > CHANGELOG.md
+          fi
+
+      - name: Commit, tag, and push
+        if: steps.bump-type.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
+          git tag "${{ steps.version.outputs.tag }}"
+
+          max_retries=3
+          attempt=1
+
+          until git push origin main --follow-tags; do
+            if [ "$attempt" -ge "$max_retries" ]; then
+              echo "Error: Failed to push main with tags after $max_retries attempts."
+              echo "The local commit and tag '${{ steps.version.outputs.tag }}' were created but not pushed to origin."
+              echo "Please resolve any issues (e.g., non-fast-forward, permissions, or network problems) and push manually or re-run this workflow."
+              exit 1
+            fi
+
+            echo "git push failed (attempt $attempt of $max_retries). Retrying in 5 seconds..."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
+      - name: Create GitHub Release
+        if: steps.bump-type.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.new }}"
+
+          # Extract the new version's section from CHANGELOG.md for release notes
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release v$VERSION"
+          fi
+
+          echo "$NOTES" > release-notes.txt
+
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.txt \
+            --target main
