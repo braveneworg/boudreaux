@@ -1239,31 +1239,37 @@ jobs:
           if [ -n "$LAST_TAG" ]; then
             COMMITS_RANGE="${LAST_TAG}..HEAD"
           else
-            COMMITS_RANGE=""
+            # No tags exist, get all commits from the beginning
+            COMMITS_RANGE="HEAD"
           fi
 
-          # Collect unique PR entries from merge commits since last tag
-          MERGED_PRS=()
-          declare -A SEEN_PRS  # Track seen PR numbers to avoid duplicates
-          if [ -n "$COMMITS_RANGE" ]; then
-            while IFS= read -r sha; do
-              [ -z "$sha" ] && continue
-              PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
-                --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
-              if [ -n "$PR_INFO" ]; then
-                PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
-                PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
-                if [ -z "${SEEN_PRS[$PR_NUM]}" ]; then
-                  SEEN_PRS[$PR_NUM]=1
-                  MERGED_PRS+=("- ${PR_TTL} (#${PR_NUM})")
-                fi
+          # Collect unique PR entries from merge commits
+          MERGED_PRS=""
+          SEEN_PRS=""
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+            PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
+              --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
+            if [ -n "$PR_INFO" ]; then
+              PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
+              PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
+              if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
+                SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
+                MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
               fi
-            done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
+            fi
+          done < <(git log "${COMMITS_RANGE}" --format='%H' 2>/dev/null)
+
+          # Always include the triggering PR if not already in the list
+          if ! echo "$SEEN_PRS" | grep -q "^${PR_NUMBER}$"; then
+            MERGED_PRS="${MERGED_PRS}- ${PR_TITLE} (#${PR_NUMBER})\n"
+            SEEN_PRS="${SEEN_PRS}${PR_NUMBER}\n"
           fi
 
-          # Fallback: if no PR entries found, use the triggering PR
-          if [ ${#MERGED_PRS[@]} -eq 0 ]; then
-            MERGED_PRS=("- ${PR_TITLE} (#${PR_NUMBER})")
+          # Final fallback: if still no PR entries (e.g., PR_NUMBER/PR_TITLE are empty)
+          # This should rarely happen since we always add the triggering PR above
+          if [ -z "$MERGED_PRS" ]; then
+            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
           fi
 
           # Determine section header based on bump type
