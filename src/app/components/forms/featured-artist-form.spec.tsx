@@ -64,7 +64,36 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock all form field subcomponents as simple stubs, capturing props we care about
+// Mock react useActionState to provide a stable formState
+vi.mock('react', async () => {
+  const actual = await vi.importActual('react');
+  return {
+    ...actual,
+    useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to spy on setValue
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  return {
+    ...actual,
+    useForm: (...args: unknown[]) => {
+      const form = (actual as { useForm: (...args: unknown[]) => unknown }).useForm(...args);
+      const formTyped = form as {
+        setValue: (...args: unknown[]) => unknown;
+        [key: string]: unknown;
+      };
+      const originalSetValue = formTyped.setValue.bind(formTyped);
+      formTyped.setValue = (...setValueArgs: unknown[]) => {
+        mockSetValue(...setValueArgs);
+        return originalSetValue(...setValueArgs);
+      };
+      return formTyped;
+    },
+  };
+});
+
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
@@ -270,6 +299,13 @@ describe('FeaturedArtistForm', () => {
           shouldValidate: true,
         });
       });
+
+      // Verify setValue was called to clear releaseId
+      // Note: Using toHaveBeenLastCalledWith to check the most recent call is correct
+      expect(mockSetValue).toHaveBeenLastCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     });
 
     it('sets empty releaseId when track has undefined releaseTracks', async () => {
@@ -287,6 +323,13 @@ describe('FeaturedArtistForm', () => {
           shouldDirty: true,
           shouldValidate: true,
         });
+      });
+
+      // Verify setValue was called to clear releaseId
+      // Note: Using toHaveBeenLastCalledWith to check the most recent call is correct
+      expect(mockSetValue).toHaveBeenLastCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
       });
     });
   });

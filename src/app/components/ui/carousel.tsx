@@ -76,13 +76,31 @@ function Carousel({
     setCanScrollNext(api.canScrollNext());
   }, []);
 
+  const loop = opts?.loop ?? false;
+
   const scrollPrev = useCallback(() => {
-    api?.scrollPrev();
-  }, [api]);
+    if (!api) return;
+    if (api.canScrollPrev()) {
+      api.scrollPrev();
+    } else if (loop) {
+      const snapList = api.scrollSnapList();
+      if (snapList.length > 0) {
+        api.scrollTo(snapList.length - 1);
+      }
+    }
+  }, [api, loop]);
 
   const scrollNext = useCallback(() => {
-    api?.scrollNext();
-  }, [api]);
+    if (!api) return;
+    if (api.canScrollNext()) {
+      api.scrollNext();
+    } else if (loop) {
+      const snapList = api.scrollSnapList();
+      if (snapList.length > 0) {
+        api.scrollTo(0);
+      }
+    }
+  }, [api, loop]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {

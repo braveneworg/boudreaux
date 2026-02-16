@@ -819,6 +819,13 @@ describe('TrackSelect', () => {
         expect(mockFetch).toHaveBeenCalled();
         expect(screen.getByText('Failed to fetch tracks')).toBeInTheDocument();
       });
+
+      // Assert error message is displayed in UI
+      await waitFor(() => {
+        const errorElement = screen.getByText('Failed to fetch tracks');
+        expect(errorElement).toBeInTheDocument();
+        expect(errorElement).toHaveClass('text-destructive');
+      });
     });
 
     it('handles non-Error thrown during fetch', async () => {
@@ -837,6 +844,13 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // Assert error message is displayed in UI
+      await waitFor(() => {
+        const errorElement = screen.getByText('Failed to load tracks');
+        expect(errorElement).toBeInTheDocument();
+        expect(errorElement).toHaveClass('text-destructive');
       });
     });
 
