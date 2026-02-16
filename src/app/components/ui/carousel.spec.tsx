@@ -721,6 +721,15 @@ describe('Carousel loop cycling behavior', () => {
     expect(nextButton).not.toBeDisabled();
   });
 
+  // Note: The following keyboard navigation tests use fireEvent.keyDown instead of
+  // userEvent.keyboard as suggested in the code review. While userEvent is generally
+  // preferred for consistency, it doesn't work in this case because:
+  // 1. The carousel uses onKeyDownCapture to handle keyboard events
+  // 2. userEvent.keyboard() only sends events to the currently focused element
+  // 3. The carousel is not focusable by default (no tabIndex)
+  // 4. Making the carousel focusable would require a component change and UX review
+  // Therefore, fireEvent.keyDown is the appropriate testing tool here.
+
   it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
     const user = userEvent.setup();
 
