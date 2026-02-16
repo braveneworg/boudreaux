@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -18,8 +21,21 @@ const GOLDEN_RATIO = 1.618;
 
 /**
  * Auto-cycle interval in milliseconds (~6.5 seconds)
+ * Can be overridden via NEXT_PUBLIC_BANNER_INTERVAL env var for E2E testing
  */
-const AUTO_CYCLE_INTERVAL = 6500;
+const AUTO_CYCLE_INTERVAL = (() => {
+  const envInterval = process.env.NEXT_PUBLIC_BANNER_INTERVAL;
+  if (envInterval == null) {
+    return 6500;
+  }
+
+  const parsed = Number(envInterval);
+
+  if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return 6500;
+})();
 
 interface NotificationBannerProps {
   notifications: NotificationBannerType[];

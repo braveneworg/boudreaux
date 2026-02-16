@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build 2>&1 | grep -v 'SyntaxError: Expected property name'",
+    "build": "next build --webpack 2>&1 | grep -v 'SyntaxError: Expected property name'",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
+    "@aws-sdk/client-ses": "^3.990.0",
     "@aws-sdk/s3-request-presigner": "^3.966.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",

@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -18,6 +21,9 @@ export const updateGroupAction = async (
   payload: FormData
 ): Promise<FormState> => {
   const session = await requireRole('admin');
+  if (!session?.user?.id) {
+    throw new Error('Invalid admin session: missing user id for audit logging.');
+  }
 
   const permittedFieldNames = [
     'name',
