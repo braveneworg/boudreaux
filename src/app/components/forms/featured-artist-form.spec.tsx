@@ -16,7 +16,7 @@ import type * as ReactHookForm from 'react-hook-form';
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 // Capture the releaseId prop passed to TrackSelect
 let capturedTrackSelectReleaseId: string | undefined;
-// Spy on setValue
+// Mock setValue call
 const mockSetValue = vi.fn();
 // Mock router push
 const mockPush = vi.fn();
@@ -70,29 +70,6 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
-  };
-});
-
-// Mock react-hook-form useForm to inject our setValue spy
-vi.mock('react-hook-form', async () => {
-  const actual = await vi.importActual('react-hook-form');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actualUseForm = (actual as any).useForm;
-
-  return {
-    ...actual,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useForm: (config?: any) => {
-      const form = actualUseForm(config);
-      // Wrap the real setValue with our mock to track calls
-      const realSetValue = form.setValue;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      form.setValue = (...args: any[]) => {
-        mockSetValue(...args);
-        return realSetValue(...args);
-      };
-      return form;
-    },
   };
 });
 
@@ -161,7 +138,6 @@ describe('FeaturedArtistForm', () => {
     mockSetValue.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
-    mockSetValue.mockClear();
   });
 
   describe('rendering', () => {
@@ -250,7 +226,7 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
       });
 
-      // Verify setValue was called with the first release ID
+      // Assert that setValue was called with the first release ID
       await waitFor(() => {
         expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
           shouldDirty: true,

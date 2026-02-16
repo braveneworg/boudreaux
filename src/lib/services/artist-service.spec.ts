@@ -751,6 +751,20 @@ describe('ArtistService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should skip S3 deletion when image URL does not match CDN or S3 patterns', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://some-other-host.example.com/media/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue({ id: 'image-123' } as never);
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result.success).toBe(true);
+      expect(mockS3Send).not.toHaveBeenCalled();
+    });
+
     it('should handle database unavailable error', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
       vi.mocked(prisma.image.findUnique).mockRejectedValue(initError);
@@ -791,6 +805,19 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
+
+    it('should handle generic error during delete operation', async () => {
+      vi.mocked(prisma.image.findUnique).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',
+        artistId: 'artist-123',
+      } as never);
+      vi.mocked(prisma.image.delete).mockRejectedValue(new Error('Unexpected failure'));
+
+      const result = await ArtistService.deleteArtistImage('image-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to delete image' });
+    });
   });
 
   describe('getArtistImages', () => {
@@ -805,6 +832,31 @@ describe('ArtistService', () => {
 
       expect(result.success).toBe(true);
       expect((result as { success: true; data: unknown[] }).data).toHaveLength(2);
+    });
+
+    it('should use fallback values when image fields are null or missing', async () => {
+      const mockImages = [{ id: 'image-1', src: null, caption: null, altText: null }];
+      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+
+      const result = await ArtistService.getArtistImages('artist-123');
+
+      expect(result.success).toBe(true);
+      const data = (
+        result as {
+          success: true;
+          data: {
+            id: string;
+            src: string;
+            caption?: string;
+            altText?: string;
+            sortOrder: number;
+          }[];
+        }
+      ).data;
+      expect(data[0].src).toBe('');
+      expect(data[0].caption).toBeUndefined();
+      expect(data[0].altText).toBeUndefined();
+      expect(data[0].sortOrder).toBe(0);
     });
 
     it('should return empty array when no images found', async () => {
@@ -853,6 +905,32 @@ describe('ArtistService', () => {
       expect((result as { success: true; data: { caption: string } }).data.caption).toBe(
         'Updated caption'
       );
+    });
+
+    it('should use fallback values when updated image has null fields', async () => {
+      vi.mocked(prisma.image.update).mockResolvedValue({
+        id: 'image-123',
+        src: null,
+        caption: null,
+        altText: null,
+      } as never);
+
+      const result = await ArtistService.updateArtistImage('image-123', {
+        caption: undefined,
+        altText: undefined,
+      });
+
+      expect(result.success).toBe(true);
+      const data = (
+        result as {
+          success: true;
+          data: { src: string; caption?: string; altText?: string; sortOrder: number };
+        }
+      ).data;
+      expect(data.src).toBe('');
+      expect(data.caption).toBeUndefined();
+      expect(data.altText).toBeUndefined();
+      expect(data.sortOrder).toBe(0);
     });
 
     it('should return error when image not found', async () => {
@@ -905,6 +983,38 @@ describe('ArtistService', () => {
 
       expect(result.success).toBe(true);
       expect(prisma.image.update).toHaveBeenCalled();
+    });
+
+    it('should use fallback values when reordered images have null fields', async () => {
+      vi.mocked(prisma.image.findMany)
+        .mockResolvedValueOnce([{ id: 'image-1' }, { id: 'image-2' }] as never)
+        .mockResolvedValueOnce([
+          { id: 'image-2', src: null, caption: null, altText: null },
+          { id: 'image-1', src: null, caption: null, altText: null },
+        ] as never);
+      vi.mocked(prisma.image.update).mockResolvedValue({} as never);
+
+      const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
+
+      expect(result.success).toBe(true);
+      const data = (
+        result as {
+          success: true;
+          data: {
+            id: string;
+            src: string;
+            caption?: string;
+            altText?: string;
+            sortOrder: number;
+          }[];
+        }
+      ).data;
+      expect(data[0].src).toBe('');
+      expect(data[0].caption).toBeUndefined();
+      expect(data[0].altText).toBeUndefined();
+      expect(data[0].sortOrder).toBe(0);
+      expect(data[1].src).toBe('');
+      expect(data[1].sortOrder).toBe(0);
     });
 
     it('should return error when images not found', async () => {

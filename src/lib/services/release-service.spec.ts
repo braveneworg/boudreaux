@@ -470,6 +470,36 @@ describe('ReleaseService', () => {
       expect(mockTrackUpdateMany).not.toHaveBeenCalled();
     });
 
+    it('should not publish tracks when release has no tracks', async () => {
+      const publishDate = new Date('2024-06-01');
+      const publishData: Prisma.ReleaseUpdateInput = {
+        publishedAt: publishDate,
+      };
+
+      // Release was not previously published
+      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
+
+      const mockTrackUpdateMany = vi.fn();
+      const publishedReleaseNoTracks = {
+        ...mockRelease,
+        publishedAt: publishDate,
+        releaseTracks: [],
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        const tx = {
+          release: { update: vi.fn().mockResolvedValue(publishedReleaseNoTracks) },
+          track: { updateMany: mockTrackUpdateMany },
+        };
+        return callback(tx as never);
+      });
+
+      const result = await ReleaseService.updateRelease('release-123', publishData);
+
+      expect(result.success).toBe(true);
+      // trackIds.length is 0, so updateMany should NOT be called
+      expect(mockTrackUpdateMany).not.toHaveBeenCalled();
+    });
+
     it('should not publish tracks when updating non-publish fields', async () => {
       vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
 

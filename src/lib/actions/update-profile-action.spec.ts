@@ -464,6 +464,43 @@ describe('updateProfileAction', () => {
       expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
     });
 
+    it('should initialize formState.errors when it is undefined', async () => {
+      const mockFormState: FormState = {
+        fields: {},
+        success: false,
+        // errors is intentionally undefined to test the `if (!formState.errors)` branch
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          firstName: 'John',
+          lastName: 'Doe',
+          phone: '',
+          addressLine1: '',
+          addressLine2: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: '',
+          allowSmsNotifications: false,
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue(null);
+
+      const result = await updateProfileAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
+    });
+
     it('should return error when session exists but user is undefined', async () => {
       const mockFormState: FormState = {
         fields: {},
