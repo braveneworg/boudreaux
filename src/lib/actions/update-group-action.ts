@@ -21,6 +21,9 @@ export const updateGroupAction = async (
   payload: FormData
 ): Promise<FormState> => {
   const session = await requireRole('admin');
+  if (!session?.user?.id) {
+    throw new Error('Invalid admin session: missing user id for audit logging.');
+  }
 
   const permittedFieldNames = [
     'name',

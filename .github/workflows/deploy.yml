@@ -1067,9 +1067,9 @@ jobs:
           COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
           echo "Looking for PR that merged commit: $COMMIT_SHA"
 
-          # Find the PR associated with this commit
+          # Find the PR associated with this commit, preferring the one targeting the main branch
           PR_JSON=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
-            --jq '.[0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
+            --jq '[.[] | select(.base.ref == "main")][0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
 
           if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
             echo "No PR found for commit $COMMIT_SHA — skipping version bump."
@@ -1174,13 +1174,23 @@ jobs:
           # Build entry using printf for proper newline handling
           ENTRY=$(printf "## [%s] - %s\n\n%s\n\n%s" "${VERSION}" "${DATE}" "${SECTION}" "${MERGED_PRS_TEXT}")
 
-          # Prepend to CHANGELOG.md after the header block (first 7 lines)
+          # Prepend to CHANGELOG.md after the header block, detected dynamically.
+          # The header is considered everything before the first '## [' version heading.
           if [ -f CHANGELOG.md ]; then
-            head -n 7 CHANGELOG.md > CHANGELOG.tmp
+            HEADER_END_LINE=$(awk '/^## \[/{print NR; exit}' CHANGELOG.md)
+            if [ -n "$HEADER_END_LINE" ]; then
+              HEADER_LINES=$((HEADER_END_LINE - 1))
+            else
+              HEADER_LINES=$(wc -l < CHANGELOG.md)
+            fi
+
+            head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
             printf '%s\n' "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
+
+            TAIL_START=$((HEADER_LINES + 1))
+            tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
             printf '%s\n\n%s\n\n%s\n' \
@@ -1197,8 +1207,22 @@ jobs:
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
           git tag "${{ steps.version.outputs.tag }}"
-          git push origin main --follow-tags
 
+          max_retries=3
+          attempt=1
+
+          until git push origin main --follow-tags; do
+            if [ "$attempt" -ge "$max_retries" ]; then
+              echo "Error: Failed to push main with tags after $max_retries attempts."
+              echo "The local commit and tag '${{ steps.version.outputs.tag }}' were created but not pushed to origin."
+              echo "Please resolve any issues (e.g., non-fast-forward, permissions, or network problems) and push manually or re-run this workflow."
+              exit 1
+            fi
+
+            echo "git push failed (attempt $attempt of $max_retries). Retrying in 5 seconds..."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
       - name: Create GitHub Release
         if: steps.bump-type.outputs.skip != 'true'
         env:

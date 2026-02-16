@@ -329,6 +329,18 @@ describe('sanitization utilities', () => {
         expect(() => sanitizeFilePath('file\x00.txt', baseDir)).toThrow('Path contains null bytes');
       });
 
+      it('rejects paths with control characters', () => {
+        expect(() => sanitizeFilePath('file\x01name.txt', baseDir)).toThrow(
+          'Path contains control characters'
+        );
+      });
+
+      it('rejects paths with tab control character', () => {
+        expect(() => sanitizeFilePath('file\x07name.txt', baseDir)).toThrow(
+          'Path contains control characters'
+        );
+      });
+
       it('rejects empty path', () => {
         expect(() => sanitizeFilePath('', baseDir)).toThrow('Path key cannot be empty');
       });
