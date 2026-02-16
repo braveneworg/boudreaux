@@ -14,12 +14,36 @@ import type * as ReactHookFormTypes from 'react-hook-form';
 
 // Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
+// Capture the releaseId prop passed to TrackSelect
 let capturedTrackSelectReleaseId: string | undefined;
 
 // Spy for react-hook-form setValue
 const mockSetValue = vi.fn();
 
 const mockPush = vi.fn();
+
+vi.mock('react-hook-form', async () => {
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
+  const { useForm: actualUseForm, ...rest } = actual;
+
+  return {
+    ...rest,
+    useForm: <TFieldValues extends ReactHookForm.FieldValues = ReactHookForm.FieldValues>(
+      options?: ReactHookForm.UseFormProps<TFieldValues>
+    ) => {
+      const form = actualUseForm(options);
+      const originalSetValue = form.setValue;
+
+      // Wrap setValue with our spy
+      form.setValue = (...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      };
+
+      return form;
+    },
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -130,6 +154,7 @@ vi.mock('../ui/datepicker', () => ({
 describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetValue.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
   });
@@ -195,11 +220,12 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithRelease);
       });
 
-      // After handleTrackChange calls setValue('releaseId', ...),
-      // useWatch triggers re-render and the value flows to TrackSelect's releaseId prop
+      // Verify setValue was called with the correct releaseId and options
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -219,9 +245,12 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(trackWithMultipleReleases);
       });
 
+      // Assert that setValue was called with the first release ID
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('first00000000000000000000');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -238,8 +267,10 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('abc123def456abc123def456');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
 
       // Clear the mock to isolate the deselect call
@@ -268,9 +299,12 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      // Verify setValue was called with empty string
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
 
@@ -284,9 +318,12 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
+      // Verify setValue was called with empty string
       await waitFor(() => {
-        const trackSelect = screen.getByTestId('track-select-trackId');
-        expect(trackSelect.getAttribute('data-release-id')).toBe('');
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
     });
   });
