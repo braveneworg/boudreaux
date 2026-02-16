@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
 import {
@@ -80,7 +83,10 @@ function Carousel({
     if (api.canScrollPrev()) {
       api.scrollPrev();
     } else if (loop) {
-      api.scrollTo(api.scrollSnapList().length - 1);
+      const snapList = api.scrollSnapList();
+      if (snapList.length > 0) {
+        api.scrollTo(snapList.length - 1);
+      }
     }
   }, [api, loop]);
 
@@ -89,7 +95,10 @@ function Carousel({
     if (api.canScrollNext()) {
       api.scrollNext();
     } else if (loop) {
-      api.scrollTo(0);
+      const snapList = api.scrollSnapList();
+      if (snapList.length > 0) {
+        api.scrollTo(0);
+      }
     }
   }, [api, loop]);
 

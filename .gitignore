@@ -68,4 +68,5 @@ e2e/.auth/
 # database backups
 /backups
 *.archive
+
 /public/media
