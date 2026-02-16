@@ -1045,10 +1045,101 @@ jobs:
               2>&1 | grep -v "does not exist" || true
           done
 
+  verify-deployment:
+    name: Verify deployment health
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    steps:
+      - name: Wait for application startup
+        run: |
+          echo "Waiting 30 seconds for application to fully initialize..."
+          sleep 30
+
+      - name: Verify application health
+        run: |
+          echo "Checking application health at https://fakefourrecords.com/api/health"
+          
+          # Verify jq is available
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "ERROR: jq is not installed"
+            exit 1
+          fi
+          
+          max_attempts=5
+          attempt=1
+          backoff_base=10
+          allow_insecure=false
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts..."
+            
+            # Build curl options
+            CURL_OPTS="-fsS --max-time 10"
+            if [ "$allow_insecure" = true ]; then
+              echo "Using insecure mode for self-signed certificate"
+              CURL_OPTS="-k $CURL_OPTS"
+            fi
+            
+            response=$(curl $CURL_OPTS https://fakefourrecords.com/api/health 2>&1) || {
+              echo "Health check failed (attempt $attempt/$max_attempts)"
+              
+              # Check if failure was due to SSL certificate verification
+              if echo "$response" | grep -qi "SSL certificate problem\|certificate verify failed"; then
+                if [ "$allow_insecure" = false ]; then
+                  echo "SSL certificate error detected - retrying with insecure mode for self-signed certificates"
+                  allow_insecure=true
+                  # Don't increment attempt counter, just retry immediately with -k flag
+                  continue
+                fi
+              fi
+              
+              if [ $attempt -lt $max_attempts ]; then
+                sleep_duration=$((backoff_base * attempt))
+                echo "Retrying in $sleep_duration seconds..."
+                sleep $sleep_duration
+                attempt=$((attempt + 1))
+                continue
+              else
+                echo "❌ All health check attempts failed after $max_attempts attempts"
+                echo "Expected: status='healthy' and database='connected'"
+                echo "Last response: $response"
+                exit 1
+              fi
+            }
+            
+            # Parse and validate the health check response
+            status=$(echo "$response" | jq -r '.status' 2>/dev/null || echo "")
+            database=$(echo "$response" | jq -r '.database' 2>/dev/null || echo "")
+            
+            if [ "$status" = "healthy" ] && [ "$database" = "connected" ]; then
+              echo "✓ Application is healthy"
+              echo "  Status: $status"
+              echo "  Database: $database"
+              latency=$(echo "$response" | jq -r '.latency' 2>/dev/null || echo "N/A")
+              if [ "$latency" != "N/A" ] && [ "$latency" != "null" ]; then
+                echo "  Database latency: ${latency}ms"
+              fi
+              exit 0
+            else
+              echo "❌ Health check returned unhealthy status (attempt $attempt/$max_attempts)"
+              echo "Response: $response"
+              if [ $attempt -lt $max_attempts ]; then
+                sleep_duration=$((backoff_base * attempt))
+                echo "Retrying in $sleep_duration seconds..."
+                sleep $sleep_duration
+                attempt=$((attempt + 1))
+                continue
+              else
+                echo "❌ All health check attempts returned unhealthy status"
+                exit 1
+              fi
+            fi
+          done
+
   version-bump:
     name: Bump version & release
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [verify-deployment]
     permissions:
       contents: write
       pull-requests: read
