@@ -200,6 +200,42 @@ jpg, jpeg, png, gif, webp, svg, ico, bmp, tiff, tif, avif
 | `AWS_REGION`                 | No       | AWS region (default: `us-east-1`)                 |
 | `CLOUDFRONT_DISTRIBUTION_ID` | No       | CloudFront distribution ID for cache invalidation |
 
+## Version Bumping
+
+Version bumping, changelog generation, and GitHub Releases are fully automated via the deploy pipeline. After a successful deploy to production, the `version-bump` job in `deploy.yml` reads a PR label to determine the bump level.
+
+### PR Labels
+
+Every new PR is automatically labeled `version:minor`. Change the label before merging to control the version bump:
+
+| Label           | Bump    | When to use                        | Example           |
+| --------------- | ------- | ---------------------------------- | ----------------- |
+| `version:patch` | `0.0.x` | Bug fixes, small changes           | `0.5.1` → `0.5.2` |
+| `version:minor` | `0.x.0` | New features, non-breaking changes | `0.5.1` → `0.6.0` |
+| `version:major` | `x.0.0` | Breaking changes                   | `0.5.1` → `1.0.0` |
+
+Remove all version labels to skip the version bump entirely.
+
+### What Happens Automatically
+
+1. PR merges into `main`
+2. CI runs (tests, lint, typecheck, build, e2e)
+3. Deploy workflow builds Docker images and deploys to EC2
+4. **Version bump job** (after successful deploy):
+   - Reads the merged PR's label to determine bump type
+   - Runs `npm version <patch|minor|major>`
+   - Generates a CHANGELOG.md entry from the titles of pull requests associated with commits since the last tag
+   - Commits with `chore(release): v<version> [skip ci]`
+   - Creates a git tag and GitHub Release
+
+### Changelog Format
+
+Changelog entries follow [Keep a Changelog](https://keepachangelog.com/) format. The section header is inferred from the bump type:
+
+- **major** → `### Changed`
+- **minor** → `### Added`
+- **patch** → `### Fixed`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
