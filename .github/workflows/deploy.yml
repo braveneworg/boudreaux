@@ -1081,7 +1081,6 @@ jobs:
             fi
             
             response=$(curl $CURL_OPTS https://fakefourrecords.com/api/health 2>&1) || {
-              curl_exit_code=$?
               echo "Health check failed (attempt $attempt/$max_attempts)"
               
               # Check if failure was due to SSL certificate verification
