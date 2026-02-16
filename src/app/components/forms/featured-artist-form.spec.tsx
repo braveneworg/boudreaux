@@ -10,25 +10,26 @@ import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
 import FeaturedArtistForm from './featured-artist-form';
 
-import type * as ReactHookForm from 'react-hook-form';
+import type * as ReactHookFormTypes from 'react-hook-form';
 
-// Capture the onTrackChange prop passed to TrackSelect
+// Capture props passed to mocked child components
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
 // Capture the releaseId prop passed to TrackSelect
 let capturedTrackSelectReleaseId: string | undefined;
-// Mock setValue call
+
+// Spy for react-hook-form setValue
 const mockSetValue = vi.fn();
-// Mock router push
+
 const mockPush = vi.fn();
 
 vi.mock('react-hook-form', async () => {
-  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
   const { useForm: actualUseForm, ...rest } = actual;
 
   return {
     ...rest,
-    useForm: <TFieldValues extends ReactHookForm.FieldValues = ReactHookForm.FieldValues>(
-      options?: ReactHookForm.UseFormProps<TFieldValues>
+    useForm: <TFieldValues extends ReactHookFormTypes.FieldValues = ReactHookFormTypes.FieldValues>(
+      options?: ReactHookFormTypes.UseFormProps<TFieldValues>
     ) => {
       const form = actualUseForm(options);
       const originalSetValue = form.setValue;
@@ -70,6 +71,24 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
+  };
+});
+
+// Mock react-hook-form to capture setValue calls
+vi.mock('react-hook-form', async () => {
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
+  return {
+    ...actual,
+    useForm: (options?: Parameters<typeof actual.useForm>[0]) => {
+      const originalForm = actual.useForm(options);
+      const originalSetValue = originalForm.setValue;
+      // Wrap setValue to spy on it while preserving original behavior
+      originalForm.setValue = ((...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      }) as typeof originalSetValue;
+      return originalForm;
+    },
   };
 });
 
@@ -254,7 +273,7 @@ describe('FeaturedArtistForm', () => {
         });
       });
 
-      // Clear the mock to check the next call
+      // Clear the mock to isolate the deselect call
       mockSetValue.mockClear();
 
       // Then deselect
@@ -262,12 +281,10 @@ describe('FeaturedArtistForm', () => {
         capturedOnTrackChange?.(null);
       });
 
-      // Verify setValue was called with empty string
-      await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
+      // Verify setValue was called with empty string for releaseId
+      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
       });
     });
 
