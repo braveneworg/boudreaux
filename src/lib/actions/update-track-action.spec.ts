@@ -201,6 +201,24 @@ describe('updateTrackAction', () => {
       expect(TrackService.updateTrack).not.toHaveBeenCalled();
     });
 
+    it('should initialize formState.errors when it is undefined', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: false,
+          error: {
+            issues: [{ path: ['title'], message: 'Title is required' }],
+          },
+        },
+      } as never);
+
+      const result = await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.title).toEqual(['Title is required']);
+    });
+
     it('should handle errors without path as general errors', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
@@ -216,6 +234,29 @@ describe('updateTrackAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Something went wrong']);
+    });
+
+    it('should accumulate multiple errors for the same field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: {} },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['title'], message: 'Title is required' },
+              { path: ['title'], message: 'Title must be at least 2 characters' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.title).toEqual([
+        'Title is required',
+        'Title must be at least 2 characters',
+      ]);
     });
   });
 
@@ -392,6 +433,32 @@ describe('updateTrackAction', () => {
       const result = await updateTrackAction(mockTrackId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Failed to update track']);
+    });
+
+    it('should initialize formState.errors when service returns failure and errors is undefined', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: false,
+        error: 'Database connection failed',
+      } as never);
+
+      const result = await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
       expect(result.errors?.general).toEqual(['Failed to update track']);
     });
 
@@ -770,6 +837,165 @@ describe('updateTrackAction', () => {
       await updateTrackAction(mockTrackId, initialFormState, mockFormData);
 
       expect(prisma.trackArtist.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should only delete artist associations without creating new ones', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/audio.mp3',
+            position: 1,
+            artistIds: [],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([
+        { id: 'ta-1', artistId: 'artist-1' },
+      ] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.trackArtist.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['ta-1'] } },
+      });
+      expect(prisma.trackArtist.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should only create artist associations without deleting any', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/audio.mp3',
+            position: 1,
+            artistIds: ['artist-1', 'artist-2'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.trackArtist.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.trackArtist.createMany).toHaveBeenCalledWith({
+        data: [
+          { artistId: 'artist-1', trackId: mockTrackId },
+          { artistId: 'artist-2', trackId: mockTrackId },
+        ],
+      });
+    });
+
+    it('should only delete release associations without creating new ones', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/audio.mp3',
+            position: 1,
+            releaseIds: [],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([
+        { id: 'rt-1', releaseId: 'release-1' },
+      ] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.releaseTrack.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['rt-1'] } },
+      });
+      expect(prisma.releaseTrack.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should only create release associations without deleting any', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/audio.mp3',
+            position: 1,
+            releaseIds: ['release-1', 'release-2'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.releaseTrack.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.releaseTrack.createMany).toHaveBeenCalledWith({
+        data: [
+          { releaseId: 'release-1', trackId: mockTrackId, position: 1 },
+          { releaseId: 'release-2', trackId: mockTrackId, position: 1 },
+        ],
+      });
+    });
+
+    it('should use default position 0 for release associations when position is undefined', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/audio.mp3',
+            position: undefined,
+            releaseIds: ['release-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.releaseTrack.createMany).toHaveBeenCalledWith({
+        data: [{ releaseId: 'release-1', trackId: mockTrackId, position: 0 }],
+      });
     });
 
     it('should not sync associations when update fails', async () => {

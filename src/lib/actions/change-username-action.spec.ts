@@ -376,6 +376,66 @@ describe('changeUsernameAction', () => {
       expect(result.success).toBe(false);
       expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
     });
+
+    it('should initialize formState.errors when undefined on timeout error', async () => {
+      const mockFormStateWithoutErrors: FormState = {
+        fields: { username: 'newusername', confirmUsername: 'newusername' },
+        success: false,
+        hasTimeout: false,
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { username: 'newusername', confirmUsername: 'newusername' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValueOnce({
+        formState: mockFormStateWithoutErrors,
+        parsed: mockParsed,
+      });
+
+      const timeoutError = Error('Connection ETIMEOUT');
+      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.hasTimeout).toBe(true);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
+    });
+
+    it('should initialize formState.errors when undefined on duplicate username error', async () => {
+      const mockFormStateWithoutErrors: FormState = {
+        fields: { username: 'newusername', confirmUsername: 'newusername' },
+        success: false,
+        hasTimeout: false,
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { username: 'newusername', confirmUsername: 'newusername' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValueOnce({
+        formState: mockFormStateWithoutErrors,
+        parsed: mockParsed,
+      });
+
+      const duplicateUsernameError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: 'User_username_key' },
+      });
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(duplicateUsernameError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.username).toEqual(['Username is already taken.']);
+    });
   });
 
   describe('edge cases', () => {

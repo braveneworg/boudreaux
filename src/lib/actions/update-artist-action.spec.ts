@@ -67,6 +67,14 @@ describe('updateArtistAction', () => {
 
       expect(requireRole).toHaveBeenCalledWith('admin');
     });
+
+    it('should throw when session user id is missing', async () => {
+      vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+
+      await expect(
+        updateArtistAction(mockArtistId, initialFormState, mockFormData)
+      ).rejects.toThrow('Invalid admin session: missing user id for audit logging.');
+    });
   });
 
   describe('Validation', () => {
