@@ -1075,8 +1075,9 @@ jobs:
                 attempt=$((attempt + 1))
                 continue
               else
-                echo "❌ All health check attempts failed"
-                echo "Response: $response"
+                echo "❌ All health check attempts failed after $max_attempts attempts"
+                echo "Expected: status='healthy' and database='connected'"
+                echo "Last response: $response"
                 exit 1
               fi
             }
