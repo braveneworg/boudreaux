@@ -6,10 +6,10 @@ This file tracks the test coverage metrics for the Boudreaux project.
 
 | Metric     | Coverage |
 | ---------- | -------- |
-| Statements | 98.73%   |
-| Branches   | 91.78%   |
-| Functions  | 98.77%   |
-| Lines      | 98.92%   |
+| Statements | 99.23%   |
+| Branches   | 95.64%   |
+| Functions  | 98.93%   |
+| Lines      | 99.40%   |
 
 **Last Updated:** 2026-02-14
 
@@ -39,10 +39,10 @@ The project uses automated coverage regression checking during builds:
 - **Tolerance:** Up to **2% decrease** is permitted for any metric
 - **Condition:** The metric must remain **above the configured threshold**
 - **Thresholds:**
-  - Statements: 95%
-  - Branches: 92%
-  - Functions: 95%
-  - Lines: 95%
+  - Statements: 98%
+  - Branches: 95%
+  - Functions: 98%
+  - Lines: 98%
 
 **Examples:**
 

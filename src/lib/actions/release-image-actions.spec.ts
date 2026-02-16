@@ -610,6 +610,32 @@ describe('release-image-actions', () => {
       expect(result.data?.[1].id).toBe('image-1');
     });
 
+    it('should handle null values in returned images after reorder', async () => {
+      const mockImages = [
+        {
+          id: 'image-1',
+          src: null,
+          caption: null,
+          altText: null,
+          sortOrder: null,
+        },
+      ];
+
+      vi.mocked(prisma.$transaction).mockResolvedValue([]);
+      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+
+      const result = await reorderReleaseImagesAction('release-123', ['image-1']);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.[0]).toEqual({
+        id: 'image-1',
+        src: '',
+        caption: undefined,
+        altText: undefined,
+        sortOrder: 0,
+      });
+    });
+
     it('should return error on database failure', async () => {
       vi.mocked(prisma.$transaction).mockRejectedValue(Error('Database error'));
 
@@ -617,6 +643,29 @@ describe('release-image-actions', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to reorder images');
+    });
+  });
+
+  describe('getS3Client env var fallbacks', () => {
+    it('should use fallback values when AWS env vars are not set', async () => {
+      delete process.env.AWS_REGION;
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+
+      const mockImage = {
+        id: 'image-123',
+        src: 'https://cdn.example.com/images/release-cover.jpg',
+        releaseId: 'release-123',
+      };
+
+      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
+      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+
+      const result = await deleteReleaseImageAction('image-123');
+
+      // Should still succeed - S3Client uses fallback values
+      expect(result.success).toBe(true);
+      expect(mockS3Send).toHaveBeenCalled();
     });
   });
 });

@@ -12,7 +12,7 @@ const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockHeaders = vi.hoisted(() =>
   vi.fn(() => ({
-    get: vi.fn(() => '127.0.0.1'),
+    get: vi.fn((_header: string): string | null => '127.0.0.1'),
   }))
 );
 const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
@@ -649,6 +649,19 @@ describe('signinAction', () => {
   });
 
   describe('Turnstile verification with custom error', () => {
+    it('should return default CAPTCHA message when Turnstile error is empty string', async () => {
+      mockVerifyTurnstile.mockResolvedValueOnce({
+        success: false,
+        error: '',
+      });
+
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
+      expect(mockSignIn).not.toHaveBeenCalled();
+    });
+
     it('should return custom Turnstile error message when provided', async () => {
       mockVerifyTurnstile.mockResolvedValueOnce({
         success: false,
@@ -660,6 +673,48 @@ describe('signinAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
       expect(result.errors?.general).toContain('Custom error: Verification timeout');
+    });
+
+    it('should use default error message when Turnstile returns no error string', async () => {
+      mockVerifyTurnstile.mockResolvedValueOnce({
+        success: false,
+        error: undefined,
+      });
+
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
+    });
+  });
+
+  describe('IP address resolution', () => {
+    it('should fall back to x-real-ip when x-forwarded-for is not set', async () => {
+      mockHeaders.mockReturnValueOnce({
+        get: vi.fn((header: string) => {
+          if (header === 'x-forwarded-for') return null;
+          if (header === 'x-real-ip') return '10.0.0.1';
+          return null;
+        }),
+      });
+
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limit'));
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockRateLimitCheck).toHaveBeenCalledWith(5, '10.0.0.1');
+    });
+
+    it('should fall back to anonymous when no IP headers are set', async () => {
+      mockHeaders.mockReturnValueOnce({
+        get: vi.fn(() => null),
+      });
+
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limit'));
+      const result = await signinAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockRateLimitCheck).toHaveBeenCalledWith(5, 'anonymous');
     });
   });
 });

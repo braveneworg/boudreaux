@@ -1,6 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -12,22 +9,38 @@ import {
   CarouselNext,
 } from './carousel';
 
+// Stable mock api instance — same reference survives re-renders so test
+// overrides (e.g. mockReturnValue) are never lost to a factory re-create.
+const mockApi = {
+  canScrollPrev: vi.fn(() => true),
+  canScrollNext: vi.fn(() => true),
+  scrollPrev: vi.fn(),
+  scrollNext: vi.fn(),
+  scrollTo: vi.fn(),
+  scrollSnapList: vi.fn(() => [0, 1, 2, 3, 4]),
+  on: vi.fn(),
+  off: vi.fn(),
+};
+
 // Mock embla-carousel-react
 vi.mock('embla-carousel-react', () => ({
   __esModule: true,
   default: () => {
     const ref = vi.fn();
-    const api = {
-      canScrollPrev: vi.fn(() => true),
-      canScrollNext: vi.fn(() => true),
-      scrollPrev: vi.fn(),
-      scrollNext: vi.fn(),
-      on: vi.fn(),
-      off: vi.fn(),
-    };
-    return [ref, api];
+    return [ref, mockApi];
   },
 }));
+
+// Reset mock functions before each test to ensure test isolation
+beforeEach(() => {
+  // Reset all mock function calls and implementations
+  vi.clearAllMocks();
+
+  // Reset mockApi to default return values
+  mockApi.canScrollPrev.mockReturnValue(true);
+  mockApi.canScrollNext.mockReturnValue(true);
+  mockApi.scrollSnapList.mockReturnValue([0, 1, 2, 3, 4]);
+});
 
 describe('Carousel', () => {
   it('renders with children', () => {
@@ -536,5 +549,270 @@ describe('Carousel button disabled states', () => {
 
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     expect(nextButton).toBeInTheDocument();
+  });
+});
+
+describe('Carousel loop cycling behavior', () => {
+  beforeEach(() => {
+    // Reset mock return values to prevent test pollution
+    mockApi.canScrollPrev.mockReturnValue(true);
+    mockApi.canScrollNext.mockReturnValue(true);
+    mockApi.scrollPrev.mockClear();
+    mockApi.scrollNext.mockClear();
+    mockApi.scrollTo.mockClear();
+  });
+
+  it('wraps to the first slide when clicking next at the end with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+          <CarouselItem>Item 3</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    // Simulate being at the end of the carousel
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    await user.click(nextButton);
+
+    expect(mockApi.scrollTo).toHaveBeenCalledWith(0);
+    expect(mockApi.scrollNext).not.toHaveBeenCalled();
+  });
+
+  it('wraps to the last slide when clicking previous at the beginning with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+          <CarouselItem>Item 3</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    // Simulate being at the beginning of the carousel
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    await user.click(prevButton);
+
+    // scrollSnapList returns [0,1,2,3,4] (5 items), so last index is 4
+    expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
+    expect(mockApi.scrollPrev).not.toHaveBeenCalled();
+  });
+
+  it('scrolls normally when canScrollNext is true even with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    // canScrollNext returns true by default
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    await user.click(nextButton);
+
+    expect(mockApi.scrollNext).toHaveBeenCalledTimes(1);
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('scrolls normally when canScrollPrev is true even with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    // canScrollPrev returns true by default
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    await user.click(prevButton);
+
+    expect(mockApi.scrollPrev).toHaveBeenCalledTimes(1);
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('does not wrap when clicking next at the end without loop', () => {
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    // Simulate being at the end of the carousel
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    // Without loop and canScrollNext=false, button should be disabled
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    expect(nextButton).toBeDisabled();
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('does not wrap when clicking previous at the beginning without loop', () => {
+    render(
+      <Carousel>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    // Simulate being at the beginning of the carousel
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    // Without loop and canScrollPrev=false, button should be disabled
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    expect(prevButton).toBeDisabled();
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps previous button enabled when loop is enabled regardless of scroll state', () => {
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    expect(prevButton).not.toBeDisabled();
+  });
+
+  it('keeps next button enabled when loop is enabled regardless of scroll state', () => {
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item</CarouselItem>
+        </CarouselContent>
+        <CarouselNext />
+      </Carousel>
+    );
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    expect(nextButton).not.toBeDisabled();
+  });
+
+  // Note: The following keyboard navigation tests use fireEvent.keyDown instead of
+  // userEvent.keyboard as suggested in the code review. While userEvent is generally
+  // preferred for consistency, it doesn't work in this case because:
+  // 1. The carousel uses onKeyDownCapture to handle keyboard events
+  // 2. userEvent.keyboard() only sends events to the currently focused element
+  // 3. The carousel is not focusable by default (no tabIndex)
+  // 4. Making the carousel focusable would require a component change and UX review
+  // Therefore, fireEvent.keyDown is the appropriate testing tool here.
+
+  it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    const carousel = screen.getByRole('region');
+    carousel.setAttribute('tabIndex', '0');
+    await user.click(carousel);
+    await user.keyboard('{ArrowRight}');
+
+    expect(mockApi.scrollTo).toHaveBeenCalledWith(0);
+  });
+
+  it('wraps via keyboard ArrowLeft at the beginning with loop enabled', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent>
+          <CarouselItem>Item 1</CarouselItem>
+          <CarouselItem>Item 2</CarouselItem>
+        </CarouselContent>
+      </Carousel>
+    );
+
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    const carousel = screen.getByRole('region');
+    carousel.setAttribute('tabIndex', '0');
+    await user.click(carousel);
+    await user.keyboard('{ArrowLeft}');
+
+    expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
+  });
+
+  it('does not call scrollTo when empty carousel with loop enabled on previous', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent />
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    await user.click(prevButton);
+
+    // scrollTo should not be called with -1 when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalledWith(-1);
+  });
+
+  it('does not call scrollTo when empty carousel with loop enabled on next', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent />
+        <CarouselNext />
+      </Carousel>
+    );
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    await user.click(nextButton);
+
+    // scrollTo should not be called when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
   });
 });

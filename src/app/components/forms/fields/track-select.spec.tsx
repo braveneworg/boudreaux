@@ -433,6 +433,43 @@ describe('TrackSelect', () => {
 
     it('deselects track when clicking on already selected item', async () => {
       const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              placeholder="Select a track..."
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // First select a track
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-track-1'));
+
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Track One (3:00)');
+
+      // Re-open and deselect by clicking the same track
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-track-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-track-1'));
+
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('Select a track...');
+    });
+
+    it('calls onTrackChange when a track is selected', async () => {
+      const user = userEvent.setup();
+      const _mockOnTrackChange = vi.fn();
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -835,12 +872,9 @@ describe('TrackSelect', () => {
 
       await user.click(screen.getByTestId('popover-trigger'));
 
+      // Should render without error and show empty message when response json has no tracks
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
-      });
-
-      // Should render without error and show empty message
-      await waitFor(() => {
         expect(screen.getByTestId('command-empty')).toBeInTheDocument();
       });
     });
