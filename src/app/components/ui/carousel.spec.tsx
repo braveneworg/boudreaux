@@ -31,15 +31,15 @@ vi.mock('embla-carousel-react', () => ({
   },
 }));
 
+// Reset mock functions before each test to ensure test isolation
 beforeEach(() => {
-  mockApi.canScrollPrev.mockReset().mockReturnValue(true);
-  mockApi.canScrollNext.mockReset().mockReturnValue(true);
-  mockApi.scrollPrev.mockReset();
-  mockApi.scrollNext.mockReset();
-  mockApi.scrollTo.mockReset();
-  mockApi.scrollSnapList.mockReset().mockReturnValue([0, 1, 2, 3, 4]);
-  mockApi.on.mockReset();
-  mockApi.off.mockReset();
+  // Reset all mock function calls and implementations
+  vi.clearAllMocks();
+
+  // Reset mockApi to default return values
+  mockApi.canScrollPrev.mockReturnValue(true);
+  mockApi.canScrollNext.mockReturnValue(true);
+  mockApi.scrollSnapList.mockReturnValue([0, 1, 2, 3, 4]);
 });
 
 describe('Carousel', () => {
@@ -664,6 +664,9 @@ describe('Carousel loop cycling behavior', () => {
       </Carousel>
     );
 
+    // Simulate being at the end of the carousel
+    mockApi.canScrollNext.mockReturnValue(false);
+
     // Without loop and canScrollNext=false, button should be disabled
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     expect(nextButton).toBeDisabled();
@@ -680,6 +683,9 @@ describe('Carousel loop cycling behavior', () => {
         <CarouselPrevious />
       </Carousel>
     );
+
+    // Simulate being at the beginning of the carousel
+    mockApi.canScrollPrev.mockReturnValue(false);
 
     // Without loop and canScrollPrev=false, button should be disabled
     const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
@@ -714,6 +720,15 @@ describe('Carousel loop cycling behavior', () => {
     const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
     expect(nextButton).not.toBeDisabled();
   });
+
+  // Note: The following keyboard navigation tests use fireEvent.keyDown instead of
+  // userEvent.keyboard as suggested in the code review. While userEvent is generally
+  // preferred for consistency, it doesn't work in this case because:
+  // 1. The carousel uses onKeyDownCapture to handle keyboard events
+  // 2. userEvent.keyboard() only sends events to the currently focused element
+  // 3. The carousel is not focusable by default (no tabIndex)
+  // 4. Making the carousel focusable would require a component change and UX review
+  // Therefore, fireEvent.keyDown is the appropriate testing tool here.
 
   it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
     const user = userEvent.setup();
@@ -757,5 +772,47 @@ describe('Carousel loop cycling behavior', () => {
     await user.keyboard('{ArrowLeft}');
 
     expect(mockApi.scrollTo).toHaveBeenCalledWith(4);
+  });
+
+  it('does not call scrollTo when empty carousel with loop enabled on previous', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollPrev.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent />
+        <CarouselPrevious />
+      </Carousel>
+    );
+
+    const prevButton = document.querySelector('[data-slot="carousel-previous"]') as HTMLElement;
+    await user.click(prevButton);
+
+    // scrollTo should not be called with -1 when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalledWith(-1);
+  });
+
+  it('does not call scrollTo when empty carousel with loop enabled on next', async () => {
+    const user = userEvent.setup();
+
+    // Mock empty carousel (no items)
+    mockApi.scrollSnapList.mockReturnValue([]);
+    mockApi.canScrollNext.mockReturnValue(false);
+
+    render(
+      <Carousel opts={{ loop: true }}>
+        <CarouselContent />
+        <CarouselNext />
+      </Carousel>
+    );
+
+    const nextButton = document.querySelector('[data-slot="carousel-next"]') as HTMLElement;
+    await user.click(nextButton);
+
+    // scrollTo should not be called when scrollSnapList is empty
+    expect(mockApi.scrollTo).not.toHaveBeenCalled();
   });
 });

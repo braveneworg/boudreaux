@@ -225,6 +225,32 @@ describe('signupAction', () => {
       expect(mockAdapter.createUser).not.toHaveBeenCalled();
     });
 
+    it('should use default error message when Turnstile returns no error string', async () => {
+      mockVerifyTurnstile.mockResolvedValue({
+        success: false,
+        error: undefined,
+      });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it('should use default CAPTCHA error message when Turnstile error is empty string', async () => {
+      mockVerifyTurnstile.mockResolvedValue({
+        success: false,
+        error: '',
+      });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toContain('CAPTCHA verification failed. Please try again.');
+      expect(mockAdapter.createUser).not.toHaveBeenCalled();
+    });
+
     it('should proceed when Turnstile verification succeeds', async () => {
       mockVerifyTurnstile.mockResolvedValue({ success: true });
 

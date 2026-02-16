@@ -82,6 +82,7 @@ export default function FeaturedArtistForm({
   const router = useRouter();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
+  const previousReleaseIdRef = useRef<string | undefined>(undefined);
 
   const form = useForm<FeaturedArtistFormData>({
     resolver: zodResolver(createFeaturedArtistSchema),
@@ -179,6 +180,26 @@ export default function FeaturedArtistForm({
       });
     }
   }, [formState.errors, form]);
+
+  // Clear trackId when releaseId changes to prevent inconsistent associations
+  useEffect(() => {
+    // Skip on initial render (when previousReleaseIdRef is undefined)
+    if (previousReleaseIdRef.current === undefined) {
+      previousReleaseIdRef.current = watchedReleaseId;
+      return;
+    }
+
+    // Skip if loading featured artist data (form is being populated)
+    if (isLoadingFeaturedArtist) {
+      return;
+    }
+
+    // If releaseId changed, clear trackId
+    if (previousReleaseIdRef.current !== watchedReleaseId) {
+      setValue('trackId', '');
+      previousReleaseIdRef.current = watchedReleaseId;
+    }
+  }, [watchedReleaseId, setValue, isLoadingFeaturedArtist]);
 
   const handleDateSelect = (dateString: string, _fieldName: string) => {
     const dateOnly = dateString.split('T')[0];
