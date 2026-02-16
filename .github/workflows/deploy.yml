@@ -1154,6 +1154,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Validate that this workflow was triggered by a workflow_run event
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "::warning::This workflow was triggered by '${{ github.event_name }}' instead of 'workflow_run'."
+            echo "::warning::Version bumping requires the workflow to be triggered by a workflow_run event from the CI workflow."
+            echo "::warning::Skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Get the HEAD commit SHA from the CI workflow run that triggered deploy
           COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
           echo "Looking for PR that merged commit: $COMMIT_SHA"
