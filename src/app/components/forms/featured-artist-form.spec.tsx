@@ -8,14 +8,41 @@ import userEvent from '@testing-library/user-event';
 
 import type { TrackOption } from '@/app/components/forms/fields/track-select';
 
-// Need to import after mocks are set up
 import FeaturedArtistForm from './featured-artist-form';
 
-// Capture props passed to mocked child components
+import type * as ReactHookForm from 'react-hook-form';
+
+// Capture the onTrackChange prop passed to TrackSelect
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
+// Capture the releaseId prop passed to TrackSelect
 let capturedTrackSelectReleaseId: string | undefined;
-const mockPush = vi.fn();
+// Spy on setValue
 const mockSetValue = vi.fn();
+// Mock router push
+const mockPush = vi.fn();
+
+vi.mock('react-hook-form', async () => {
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
+  const { useForm: actualUseForm, ...rest } = actual;
+
+  return {
+    ...rest,
+    useForm: <TFieldValues extends ReactHookForm.FieldValues = ReactHookForm.FieldValues>(
+      options?: ReactHookForm.UseFormProps<TFieldValues>
+    ) => {
+      const form = actualUseForm(options);
+      const originalSetValue = form.setValue;
+
+      // Wrap setValue with our spy
+      form.setValue = (...args: Parameters<typeof originalSetValue>) => {
+        mockSetValue(...args);
+        return originalSetValue(...args);
+      };
+
+      return form;
+    },
+  };
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -134,6 +161,7 @@ describe('FeaturedArtistForm', () => {
     mockSetValue.mockClear();
     capturedOnTrackChange = undefined;
     capturedTrackSelectReleaseId = undefined;
+    mockSetValue.mockClear();
   });
 
   describe('rendering', () => {
