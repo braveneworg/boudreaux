@@ -224,7 +224,7 @@ Remove all version labels to skip the version bump entirely.
 4. **Version bump job** (after successful deploy):
    - Reads the merged PR's label to determine bump type
    - Runs `npm version <patch|minor|major>`
-   - Generates a CHANGELOG.md entry from merged PR titles
+   - Generates a CHANGELOG.md entry from the titles of pull requests associated with commits since the last tag
    - Commits with `chore(release): v<version> [skip ci]`
    - Creates a git tag and GitHub Release
 

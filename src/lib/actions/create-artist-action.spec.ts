@@ -246,6 +246,30 @@ describe('createArtistAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Failed to create artist']);
     });
+
+    it('should preserve existing errors object when service fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: { someField: ['prior error'] } },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.createArtist).mockResolvedValue({
+        success: false,
+        error: 'Database connection failed',
+      } as never);
+
+      const result = await createArtistAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Database connection failed']);
+    });
   });
 
   describe('Security Logging', () => {

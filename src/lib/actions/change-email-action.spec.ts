@@ -680,6 +680,34 @@ describe('changeEmailAction', () => {
       expect(mockUpdateUser).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
+
+    it('should initialize formState.errors when undefined for unauthenticated user', async () => {
+      const mockFormStateWithoutErrors: FormState = {
+        fields: { email: 'newemail@example.com', confirmEmail: 'newemail@example.com' },
+        success: false,
+        hasTimeout: false,
+      };
+
+      const mockParsed = {
+        success: true,
+        data: { email: 'newemail@example.com', confirmEmail: 'newemail@example.com' },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValueOnce({
+        formState: mockFormStateWithoutErrors,
+        parsed: mockParsed,
+      });
+
+      vi.mocked(mockAuth).mockResolvedValue(null);
+
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toEqual(['You must be logged in to change your email']);
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+      expect(mockSignOut).not.toHaveBeenCalled();
+    });
   });
 
   describe('database errors', () => {
@@ -865,6 +893,43 @@ describe('changeEmailAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
       expect(result.errors?.email).toEqual(['Email address is already in use']);
+    });
+
+    it('should initialize formState.errors when undefined on timeout error', async () => {
+      const mockFormStateWithoutErrors: FormState = {
+        fields: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+        success: false,
+        hasTimeout: false,
+      };
+
+      const mockParsed = {
+        success: true,
+        data: {
+          email: 'newemail@example.com',
+          confirmEmail: 'newemail@example.com',
+          previousEmail: 'oldemail@example.com',
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValueOnce({
+        formState: mockFormStateWithoutErrors,
+        parsed: mockParsed,
+      });
+
+      const timeoutError = Error('Connection ETIMEOUT');
+      vi.mocked(mockUpdateUser).mockRejectedValue(timeoutError);
+
+      const result = await changeEmailAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.hasTimeout).toBe(true);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.general).toEqual(['Connection timed out. Please try again.']);
+      expect(mockSignOut).not.toHaveBeenCalled();
     });
   });
 
