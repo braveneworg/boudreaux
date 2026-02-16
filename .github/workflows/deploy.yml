@@ -1045,10 +1045,101 @@ jobs:
               2>&1 | grep -v "does not exist" || true
           done
 
+  verify-deployment:
+    name: Verify deployment health
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    steps:
+      - name: Wait for application startup
+        run: |
+          echo "Waiting 30 seconds for application to fully initialize..."
+          sleep 30
+
+      - name: Verify application health
+        run: |
+          echo "Checking application health at https://fakefourrecords.com/api/health"
+          
+          # Verify jq is available
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "ERROR: jq is not installed"
+            exit 1
+          fi
+          
+          max_attempts=5
+          attempt=1
+          backoff_base=10
+          allow_insecure=false
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts..."
+            
+            # Build curl options
+            CURL_OPTS="-fsS --max-time 10"
+            if [ "$allow_insecure" = true ]; then
+              echo "Using insecure mode for self-signed certificate"
+              CURL_OPTS="-k $CURL_OPTS"
+            fi
+            
+            response=$(curl $CURL_OPTS https://fakefourrecords.com/api/health 2>&1) || {
+              echo "Health check failed (attempt $attempt/$max_attempts)"
+              
+              # Check if failure was due to SSL certificate verification
+              if echo "$response" | grep -qi "SSL certificate problem\|certificate verify failed"; then
+                if [ "$allow_insecure" = false ]; then
+                  echo "SSL certificate error detected - retrying with insecure mode for self-signed certificates"
+                  allow_insecure=true
+                  # Don't increment attempt counter, just retry immediately with -k flag
+                  continue
+                fi
+              fi
+              
+              if [ $attempt -lt $max_attempts ]; then
+                sleep_duration=$((backoff_base * attempt))
+                echo "Retrying in $sleep_duration seconds..."
+                sleep $sleep_duration
+                attempt=$((attempt + 1))
+                continue
+              else
+                echo "❌ All health check attempts failed after $max_attempts attempts"
+                echo "Expected: status='healthy' and database='connected'"
+                echo "Last response: $response"
+                exit 1
+              fi
+            }
+            
+            # Parse and validate the health check response
+            status=$(echo "$response" | jq -r '.status' 2>/dev/null || echo "")
+            database=$(echo "$response" | jq -r '.database' 2>/dev/null || echo "")
+            
+            if [ "$status" = "healthy" ] && [ "$database" = "connected" ]; then
+              echo "✓ Application is healthy"
+              echo "  Status: $status"
+              echo "  Database: $database"
+              latency=$(echo "$response" | jq -r '.latency' 2>/dev/null || echo "N/A")
+              if [ "$latency" != "N/A" ] && [ "$latency" != "null" ]; then
+                echo "  Database latency: ${latency}ms"
+              fi
+              exit 0
+            else
+              echo "❌ Health check returned unhealthy status (attempt $attempt/$max_attempts)"
+              echo "Response: $response"
+              if [ $attempt -lt $max_attempts ]; then
+                sleep_duration=$((backoff_base * attempt))
+                echo "Retrying in $sleep_duration seconds..."
+                sleep $sleep_duration
+                attempt=$((attempt + 1))
+                continue
+              else
+                echo "❌ All health check attempts returned unhealthy status"
+                exit 1
+              fi
+            fi
+          done
+
   version-bump:
     name: Bump version & release
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [verify-deployment]
     permissions:
       contents: write
       pull-requests: read
@@ -1063,6 +1154,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Validate that this workflow was triggered by a workflow_run event
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "::warning::This workflow was triggered by '${{ github.event_name }}' instead of 'workflow_run'."
+            echo "::warning::Version bumping requires the workflow to be triggered by a workflow_run event from the CI workflow."
+            echo "::warning::Skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Get the HEAD commit SHA from the CI workflow run that triggered deploy
           COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
           echo "Looking for PR that merged commit: $COMMIT_SHA"
@@ -1079,6 +1179,20 @@ jobs:
 
           PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
           PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          
+          # Validate that PR_NUMBER and PR_TITLE are non-empty
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "Failed to extract PR number from PR data — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          if [ -z "$PR_TITLE" ] || [ "$PR_TITLE" = "null" ]; then
+            echo "Failed to extract PR title from PR data — skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
           LABELS=$(echo "$PR_JSON" | jq -r '.labels[]' 2>/dev/null || echo "")
 
           echo "PR #$PR_NUMBER: $PR_TITLE"
@@ -1134,29 +1248,35 @@ jobs:
           if [ -n "$LAST_TAG" ]; then
             COMMITS_RANGE="${LAST_TAG}..HEAD"
           else
-            COMMITS_RANGE=""
+            # No tags exist, get all commits from the beginning
+            COMMITS_RANGE="HEAD"
           fi
 
-          # Collect unique PR entries from merge commits since last tag
+          # Collect unique PR entries from merge commits
           MERGED_PRS=""
           SEEN_PRS=""
-          if [ -n "$COMMITS_RANGE" ]; then
-            while IFS= read -r sha; do
-              [ -z "$sha" ] && continue
-              PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
-                --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
-              if [ -n "$PR_INFO" ]; then
-                PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
-                PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
-                if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
-                  SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
-                  MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
-                fi
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+            PR_INFO=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" \
+              --jq '.[0] | "\(.number)|\(.title)"' 2>/dev/null || true)
+            if [ -n "$PR_INFO" ]; then
+              PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
+              PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
+              if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
+                SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
+                MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
               fi
-            done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
+            fi
+          done < <(git log "${COMMITS_RANGE}" --format='%H' 2>/dev/null)
+
+          # Always include the triggering PR if not already in the list
+          if ! echo "$SEEN_PRS" | grep -q "^${PR_NUMBER}$"; then
+            MERGED_PRS="${MERGED_PRS}- ${PR_TITLE} (#${PR_NUMBER})\n"
+            SEEN_PRS="${SEEN_PRS}${PR_NUMBER}\n"
           fi
 
-          # Fallback: if no PR entries found, use the triggering PR
+          # Final fallback: if still no PR entries (e.g., PR_NUMBER/PR_TITLE are empty)
+          # This should rarely happen since we always add the triggering PR above
           if [ -z "$MERGED_PRS" ]; then
             MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
           fi
@@ -1169,7 +1289,10 @@ jobs:
           esac
 
           # Build the new changelog entry
-          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
+          # Join array elements with newlines
+          MERGED_PRS_TEXT=$(printf '%s\n' "${MERGED_PRS[@]}")
+          # Build entry using printf for proper newline handling
+          ENTRY=$(printf "## [%s] - %s\n\n%s\n\n%s" "${VERSION}" "${DATE}" "${SECTION}" "${MERGED_PRS_TEXT}")
 
           # Prepend to CHANGELOG.md after the header block, detected dynamically.
           # The header is considered everything before the first '## [' version heading.
@@ -1183,7 +1306,7 @@ jobs:
 
             head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            echo -e "$ENTRY" >> CHANGELOG.tmp
+            printf '%s\n' "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
 
             TAIL_START=$((HEADER_LINES + 1))

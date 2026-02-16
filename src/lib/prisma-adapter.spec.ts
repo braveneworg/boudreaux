@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only before any imports that use it
+import { PrismaAdapter } from '@auth/prisma-adapter';
+
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 
 import type { AdapterUser, Adapter } from 'next-auth/adapters';
@@ -935,6 +937,39 @@ describe('CustomPrismaAdapter', () => {
           token: 'abc123',
         })
       ).rejects.toThrow('Token error');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should return null when base adapter lacks useVerificationToken', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Re-mock PrismaAdapter to return an adapter object WITHOUT useVerificationToken (once)
+      vi.mocked(PrismaAdapter).mockReturnValueOnce({
+        createSession: vi.fn(),
+        getSessionAndUser: vi.fn(),
+        updateSession: vi.fn(),
+        deleteSession: vi.fn(),
+        createVerificationToken: vi.fn(),
+        // useVerificationToken deliberately omitted
+        createAccount: vi.fn(),
+        deleteAccount: vi.fn(),
+        linkAccount: vi.fn(),
+        unlinkAccount: vi.fn(),
+      } as unknown as ReturnType<typeof PrismaAdapter>);
+
+      // Create a fresh adapter that uses the re-mocked PrismaAdapter
+      const freshAdapter = CustomPrismaAdapter(mockPrisma as never);
+
+      const result = await freshAdapter.useVerificationToken!({
+        identifier: 'test@example.com',
+        token: 'abc123',
+      });
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[CustomPrismaAdapter] useVerificationToken not found on base adapter'
+      );
 
       consoleSpy.mockRestore();
     });
