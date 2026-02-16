@@ -844,6 +844,7 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
+        expect(screen.getByText('Failed to load tracks')).toBeInTheDocument();
       });
 
       // Assert error message is displayed in UI
