@@ -69,6 +69,12 @@ describe('extractS3KeyFromUrl', () => {
       expect(extractS3KeyFromUrl(url)).toBeNull();
     });
 
+    it('should return null for malformed S3 URL without path after region', () => {
+      process.env.CDN_DOMAIN = '';
+      const url = 'https://bucket.s3.';
+      expect(extractS3KeyFromUrl(url)).toBeNull();
+    });
+
     it('should prefer CDN extraction when CDN_DOMAIN matches', () => {
       process.env.CDN_DOMAIN = 'cdn.example.com';
       const url = 'https://cdn.example.com/media/tracks/special-file.wav';

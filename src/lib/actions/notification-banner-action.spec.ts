@@ -498,6 +498,67 @@ describe('notification-banner-action', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.general).toContain('Invalid notification ID');
     });
+
+    it('should use default values when optional fields are omitted', async () => {
+      vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      // Provide only the minimum required fields - no fonts, sizes, colors, positions, booleans
+      const formData = new FormData();
+      formData.append('notificationId', 'aabbccddee112233ff445566');
+      formData.append('message', 'Minimal message');
+      formData.append('imageUrl', 'https://example.com/image.jpg');
+
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(true);
+      // Verify the service was called with default values
+      // Note: boolean fields default to false when omitted from FormData (checkbox behavior),
+      // and false ?? true = false (nullish coalescing does not trigger for false)
+      expect(NotificationBannerService.updateNotificationBanner).toHaveBeenCalledWith(
+        'aabbccddee112233ff445566',
+        expect.objectContaining({
+          message: 'Minimal message',
+          imageUrl: 'https://example.com/image.jpg',
+          secondaryMessage: null,
+          notes: null,
+          originalImageUrl: null,
+          linkUrl: null,
+          backgroundColor: null,
+          isOverlayed: false,
+          isActive: false,
+          sortOrder: 0,
+          displayFrom: null,
+          displayUntil: null,
+          messageFont: 'system-ui',
+          messageFontSize: 2.5,
+          messageContrast: 100,
+          secondaryMessageFont: 'system-ui',
+          secondaryMessageFontSize: 2,
+          secondaryMessageContrast: 95,
+          messageTextColor: '#ffffff',
+          secondaryMessageTextColor: '#ffffff',
+          messageTextShadow: false,
+          messageTextShadowDarkness: 50,
+          secondaryMessageTextShadow: false,
+          secondaryMessageTextShadowDarkness: 50,
+          messagePositionX: 50,
+          messagePositionY: 10,
+          secondaryMessagePositionX: 50,
+          secondaryMessagePositionY: 90,
+          messageRotation: 0,
+          secondaryMessageRotation: 0,
+          imageOffsetX: 0,
+          imageOffsetY: 0,
+          messageWidth: 80,
+          messageHeight: 30,
+          secondaryMessageWidth: 80,
+          secondaryMessageHeight: 30,
+        })
+      );
+    });
   });
 
   describe('deleteNotificationBannerAction', () => {
@@ -604,6 +665,83 @@ describe('notification-banner-action', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should update with explicit non-default values for nullish coalescing fields', async () => {
+      vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
+        success: true,
+        data: {
+          ...mockNotificationBanner,
+          isOverlayed: false,
+          isActive: false,
+          displayFrom: new Date('2024-06-01'),
+          displayUntil: new Date('2024-12-31'),
+          imageUrl: 'https://example.com/custom.jpg',
+          secondaryMessage: 'Secondary text',
+          notes: 'Some notes',
+          linkUrl: 'https://example.com/link',
+          backgroundColor: '#ff0000',
+          messageFont: 'Arial',
+          secondaryMessageFont: 'Helvetica',
+          messageFontSize: 1,
+          messagePositionX: 5,
+          messagePositionY: 5,
+          messageRotation: 5,
+          secondaryMessageRotation: 10,
+          imageOffsetX: 15,
+          imageOffsetY: 20,
+          messageWidth: 60,
+          messageHeight: 20,
+          secondaryMessageWidth: 70,
+          secondaryMessageHeight: 25,
+        },
+      });
+
+      const formData = createValidFormData({
+        isOverlayed: 'false',
+        isActive: 'false',
+        displayFrom: '2024-06-01',
+        displayUntil: '2024-12-31',
+        imageUrl: 'https://example.com/custom.jpg',
+        secondaryMessage: 'Secondary text',
+        notes: 'Some notes',
+        linkUrl: 'https://example.com/link',
+        backgroundColor: '#ff0000',
+        messageFont: 'Arial',
+        secondaryMessageFont: 'Helvetica',
+        messageFontSize: '1',
+        messagePositionX: '5',
+        messagePositionY: '5',
+        messageRotation: '5',
+        secondaryMessageRotation: '10',
+        imageOffsetX: '15',
+        imageOffsetY: '20',
+        messageWidth: '60',
+        messageHeight: '20',
+        secondaryMessageWidth: '70',
+        secondaryMessageHeight: '25',
+      });
+      formData.append('notificationId', 'aabbccddee112233ff445566');
+
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      expect(result.success).toBe(true);
+      expect(NotificationBannerService.updateNotificationBanner).toHaveBeenCalledWith(
+        'aabbccddee112233ff445566',
+        expect.objectContaining({
+          isOverlayed: false,
+          isActive: false,
+          displayFrom: expect.any(Date),
+          displayUntil: expect.any(Date),
+          imageUrl: 'https://example.com/custom.jpg',
+          secondaryMessage: 'Secondary text',
+          notes: 'Some notes',
+          linkUrl: 'https://example.com/link',
+          backgroundColor: '#ff0000',
+          messageFont: 'Arial',
+          secondaryMessageFont: 'Helvetica',
+        })
+      );
     });
 
     it('should return error for invalid notificationId format', async () => {

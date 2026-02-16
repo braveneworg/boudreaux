@@ -194,7 +194,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Zod for runtime validation of external data (API responses, user input)
 - Always write tests for new features and bug fixes
 - Always aim for high test coverage (90-95%+)
-- Alwayas use ESLint and Prettier for code quality and consistency
+- Always use ESLint and Prettier for code quality and consistency
 - Always follow the project's coding standards and guidelines
 - Always use shadcn/ui components and design patterns for UI consistency
 - Always use Tailwind v4 CSS for styling
@@ -212,6 +212,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always review code changes for potential bugs, security issues, and performance optimizations
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
+- Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
 
 ## Never Do
 
