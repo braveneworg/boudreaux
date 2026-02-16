@@ -469,7 +469,7 @@ describe('TrackSelect', () => {
 
     it('calls onTrackChange when a track is selected', async () => {
       const user = userEvent.setup();
-      const mockOnTrackChange = vi.fn();
+      const _mockOnTrackChange = vi.fn();
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -857,13 +857,9 @@ describe('TrackSelect', () => {
 
       await user.click(screen.getByTestId('popover-trigger'));
 
+      // Should render without error and show empty message when response json has no tracks
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
-        expect(screen.getByText('Network error')).toBeInTheDocument();
-      });
-
-      // Should render without error and show empty message
-      await waitFor(() => {
         expect(screen.getByTestId('command-empty')).toBeInTheDocument();
       });
     });

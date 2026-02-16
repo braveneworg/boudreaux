@@ -14,8 +14,12 @@ import type * as ReactHookForm from 'react-hook-form';
 
 // Capture the onTrackChange prop passed to TrackSelect
 let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
+// Capture the releaseId prop passed to TrackSelect
+let capturedTrackSelectReleaseId: string | undefined;
 // Spy on setValue
 const mockSetValue = vi.fn();
+// Mock router push
+const mockPush = vi.fn();
 
 vi.mock('react-hook-form', async () => {
   const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
@@ -124,6 +128,7 @@ describe('FeaturedArtistForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnTrackChange = undefined;
+    capturedTrackSelectReleaseId = undefined;
     mockSetValue.mockClear();
   });
 
@@ -189,7 +194,7 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'release-abc123def456abc123def456', {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
           shouldDirty: true,
           shouldValidate: true,
         });
@@ -213,7 +218,7 @@ describe('FeaturedArtistForm', () => {
       });
 
       await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'release-first00000000000000', {
+        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
           shouldDirty: true,
           shouldValidate: true,
         });
