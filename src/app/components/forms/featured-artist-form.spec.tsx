@@ -23,13 +23,13 @@ const mockSetValue = vi.fn();
 const mockPush = vi.fn();
 
 vi.mock('react-hook-form', async () => {
-  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookForm;
+  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
   const { useForm: actualUseForm, ...rest } = actual;
 
   return {
     ...rest,
-    useForm: <TFieldValues extends ReactHookForm.FieldValues = ReactHookForm.FieldValues>(
-      options?: ReactHookForm.UseFormProps<TFieldValues>
+    useForm: <TFieldValues extends ReactHookFormTypes.FieldValues = ReactHookFormTypes.FieldValues>(
+      options?: ReactHookFormTypes.UseFormProps<TFieldValues>
     ) => {
       const form = actualUseForm(options);
       const originalSetValue = form.setValue;
