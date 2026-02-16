@@ -4,8 +4,6 @@ import { test as base } from '@playwright/test';
 
 import type { Page } from '@playwright/test';
 
-/* eslint-disable react-hooks/rules-of-hooks */
-
 const USER_STORAGE_STATE = path.join(__dirname, '../.auth/user.json');
 const ADMIN_STORAGE_STATE = path.join(__dirname, '../.auth/admin.json');
 
@@ -21,21 +19,21 @@ interface AuthFixtures {
  * - `adminPage`: A Page pre-loaded with an admin user session cookie.
  */
 const test = base.extend<AuthFixtures>({
-  userPage: async ({ browser }, use) => {
+  userPage: async ({ browser }, provide) => {
     const context = await browser.newContext({
       storageState: USER_STORAGE_STATE,
     });
     const page = await context.newPage();
-    await use(page);
+    await provide(page);
     await context.close();
   },
 
-  adminPage: async ({ browser }, use) => {
+  adminPage: async ({ browser }, provide) => {
     const context = await browser.newContext({
       storageState: ADMIN_STORAGE_STATE,
     });
     const page = await context.newPage();
-    await use(page);
+    await provide(page);
     await context.close();
   },
 });
