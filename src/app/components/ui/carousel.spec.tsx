@@ -730,7 +730,9 @@ describe('Carousel loop cycling behavior', () => {
   // 4. Making the carousel focusable would require a component change and UX review
   // Therefore, fireEvent.keyDown is the appropriate testing tool here.
 
-  it('wraps via keyboard ArrowRight at the end with loop enabled', () => {
+  it('wraps via keyboard ArrowRight at the end with loop enabled', async () => {
+    const user = userEvent.setup();
+
     render(
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
