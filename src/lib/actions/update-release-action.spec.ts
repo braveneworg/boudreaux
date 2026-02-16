@@ -186,6 +186,49 @@ describe('updateReleaseAction', () => {
       expect(result.errors?.coverArt).toEqual(['Cover art URL is required']);
       expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
     });
+
+    it('should initialize formState.errors when undefined on validation failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false }, // No errors property
+        parsed: {
+          success: false,
+          error: {
+            issues: [{ path: ['title'], message: 'Title is required' }],
+          },
+        },
+      } as never);
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.title).toEqual(['Title is required']);
+      expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
+    });
+
+    it('should accumulate multiple errors for the same field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: {} },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['title'], message: 'Title is required' },
+              { path: ['title'], message: 'Title must be at least 3 characters' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.title).toEqual([
+        'Title is required',
+        'Title must be at least 3 characters',
+      ]);
+      expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
+    });
   });
 
   describe('Release Update', () => {

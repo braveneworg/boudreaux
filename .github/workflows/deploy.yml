@@ -1133,9 +1133,9 @@ jobs:
           COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
           echo "Looking for PR that merged commit: $COMMIT_SHA"
 
-          # Find the PR associated with this commit
+          # Find the PR associated with this commit, preferring the one targeting the main branch
           PR_JSON=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" \
-            --jq '.[0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
+            --jq '[.[] | select(.base.ref == "main")][0] | {number, title, labels: [.labels[].name]}' 2>/dev/null || echo "")
 
           if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
             echo "No PR found for commit $COMMIT_SHA — skipping version bump."
@@ -1204,8 +1204,8 @@ jobs:
           fi
 
           # Collect unique PR entries from merge commits since last tag
-          MERGED_PRS=""
-          SEEN_PRS=""
+          MERGED_PRS=()
+          declare -A SEEN_PRS  # Track seen PR numbers to avoid duplicates
           if [ -n "$COMMITS_RANGE" ]; then
             while IFS= read -r sha; do
               [ -z "$sha" ] && continue
@@ -1214,17 +1214,17 @@ jobs:
               if [ -n "$PR_INFO" ]; then
                 PR_NUM=$(echo "$PR_INFO" | cut -d'|' -f1)
                 PR_TTL=$(echo "$PR_INFO" | cut -d'|' -f2-)
-                if ! echo "$SEEN_PRS" | grep -q "^${PR_NUM}$"; then
-                  SEEN_PRS="${SEEN_PRS}${PR_NUM}\n"
-                  MERGED_PRS="${MERGED_PRS}- ${PR_TTL} (#${PR_NUM})\n"
+                if [ -z "${SEEN_PRS[$PR_NUM]}" ]; then
+                  SEEN_PRS[$PR_NUM]=1
+                  MERGED_PRS+=("- ${PR_TTL} (#${PR_NUM})")
                 fi
               fi
             done < <(git log ${COMMITS_RANGE} --format='%H' 2>/dev/null)
           fi
 
           # Fallback: if no PR entries found, use the triggering PR
-          if [ -z "$MERGED_PRS" ]; then
-            MERGED_PRS="- ${PR_TITLE} (#${PR_NUMBER})"
+          if [ ${#MERGED_PRS[@]} -eq 0 ]; then
+            MERGED_PRS=("- ${PR_TITLE} (#${PR_NUMBER})")
           fi
 
           # Determine section header based on bump type
@@ -1235,18 +1235,31 @@ jobs:
           esac
 
           # Build the new changelog entry
-          ENTRY="## [${VERSION}] - ${DATE}\n\n${SECTION}\n\n$(echo -e "$MERGED_PRS")"
+          # Join array elements with newlines
+          MERGED_PRS_TEXT=$(printf '%s\n' "${MERGED_PRS[@]}")
+          # Build entry using printf for proper newline handling
+          ENTRY=$(printf "## [%s] - %s\n\n%s\n\n%s" "${VERSION}" "${DATE}" "${SECTION}" "${MERGED_PRS_TEXT}")
 
-          # Prepend to CHANGELOG.md after the header block (first 7 lines)
+          # Prepend to CHANGELOG.md after the header block, detected dynamically.
+          # The header is considered everything before the first '## [' version heading.
           if [ -f CHANGELOG.md ]; then
-            head -n 7 CHANGELOG.md > CHANGELOG.tmp
+            HEADER_END_LINE=$(awk '/^## \[/{print NR; exit}' CHANGELOG.md)
+            if [ -n "$HEADER_END_LINE" ]; then
+              HEADER_LINES=$((HEADER_END_LINE - 1))
+            else
+              HEADER_LINES=$(wc -l < CHANGELOG.md)
+            fi
+
+            head -n "$HEADER_LINES" CHANGELOG.md > CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            echo -e "$ENTRY" >> CHANGELOG.tmp
+            printf '%s\n' "$ENTRY" >> CHANGELOG.tmp
             echo "" >> CHANGELOG.tmp
-            tail -n +8 CHANGELOG.md >> CHANGELOG.tmp
+
+            TAIL_START=$((HEADER_LINES + 1))
+            tail -n +"$TAIL_START" CHANGELOG.md >> CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
-            printf '%s\n\n%s\n\n%b\n' \
+            printf '%s\n\n%s\n\n%s\n' \
               "# Changelog" \
               "All notable changes to this project will be documented in this file." \
               "$ENTRY" > CHANGELOG.md
@@ -1260,8 +1273,22 @@ jobs:
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
           git tag "${{ steps.version.outputs.tag }}"
-          git push origin main --follow-tags
 
+          max_retries=3
+          attempt=1
+
+          until git push origin main --follow-tags; do
+            if [ "$attempt" -ge "$max_retries" ]; then
+              echo "Error: Failed to push main with tags after $max_retries attempts."
+              echo "The local commit and tag '${{ steps.version.outputs.tag }}' were created but not pushed to origin."
+              echo "Please resolve any issues (e.g., non-fast-forward, permissions, or network problems) and push manually or re-run this workflow."
+              exit 1
+            fi
+
+            echo "git push failed (attempt $attempt of $max_retries). Retrying in 5 seconds..."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
       - name: Create GitHub Release
         if: steps.bump-type.outputs.skip != 'true'
         env:

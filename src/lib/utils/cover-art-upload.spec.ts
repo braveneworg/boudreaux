@@ -296,6 +296,77 @@ describe('cover-art-upload', () => {
       );
     });
 
+    it('should fallback to image/jpeg for malformed data URL without data: prefix', async () => {
+      const mockCdnUrl = 'https://cdn.example.com/test.jpg';
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          {
+            uploadUrl: 'https://s3.example.com/presigned-url',
+            s3Key: 'test-key',
+            cdnUrl: mockCdnUrl,
+          },
+        ],
+      });
+
+      mockUploadFileToS3.mockResolvedValue({
+        success: true,
+        s3Key: 'test-key',
+        cdnUrl: mockCdnUrl,
+      });
+
+      // String without data: prefix - getMimeTypeFromDataUrl regex won't match
+      const malformedDataUrl = 'not-a-data-url,dGVzdA==';
+      const result = await uploadCoverArtToS3(malformedDataUrl, 'Test');
+
+      expect(result.success).toBe(true);
+      // Should default to jpeg when mime type can't be extracted
+      expect(mockGetPresignedUploadUrlsAction).toHaveBeenCalledWith(
+        'releases',
+        'coverart',
+        expect.arrayContaining([
+          expect.objectContaining({
+            contentType: 'image/jpeg',
+            fileName: 'test-cover.jpg',
+          }),
+        ])
+      );
+    });
+
+    it('should return fallback error when S3 upload fails without error message', async () => {
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          {
+            uploadUrl: 'https://s3.example.com/presigned-url',
+            s3Key: 'media/releases/coverart/test-cover.jpg',
+            cdnUrl: 'https://cdn.example.com/test.jpg',
+          },
+        ],
+      });
+
+      mockUploadFileToS3.mockResolvedValue({
+        success: false,
+        s3Key: 'media/releases/coverart/test-cover.jpg',
+        cdnUrl: 'https://cdn.example.com/test.jpg',
+      });
+
+      const result = await uploadCoverArtToS3(sampleBase64Jpeg, 'Test Album');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Upload failed');
+    });
+
+    it('should return Unknown error for non-Error exceptions', async () => {
+      mockGetPresignedUploadUrlsAction.mockRejectedValue('string-error');
+
+      const result = await uploadCoverArtToS3(sampleBase64Jpeg, 'Test Album');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unknown error');
+    });
+
     it('should return error when presigned data is empty', async () => {
       mockGetPresignedUploadUrlsAction.mockResolvedValue({
         success: true,
