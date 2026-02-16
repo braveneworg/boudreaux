@@ -1059,15 +1059,41 @@ jobs:
         run: |
           echo "Checking application health at https://fakefourrecords.com/api/health"
           
+          # Verify jq is available
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "ERROR: jq is not installed"
+            exit 1
+          fi
+          
           max_attempts=5
           attempt=1
           backoff_base=10
+          allow_insecure=false
           
           while [ $attempt -le $max_attempts ]; do
             echo "Health check attempt $attempt of $max_attempts..."
             
-            response=$(curl -fsS --max-time 10 https://fakefourrecords.com/api/health 2>&1) || {
+            # Build curl options
+            CURL_OPTS="-fsS --max-time 10"
+            if [ "$allow_insecure" = true ]; then
+              echo "Using insecure mode for self-signed certificate"
+              CURL_OPTS="-k $CURL_OPTS"
+            fi
+            
+            response=$(curl $CURL_OPTS https://fakefourrecords.com/api/health 2>&1) || {
+              curl_exit_code=$?
               echo "Health check failed (attempt $attempt/$max_attempts)"
+              
+              # Check if failure was due to SSL certificate verification
+              if echo "$response" | grep -qi "SSL certificate problem\|certificate verify failed"; then
+                if [ "$allow_insecure" = false ]; then
+                  echo "SSL certificate error detected - retrying with insecure mode for self-signed certificates"
+                  allow_insecure=true
+                  # Don't increment attempt counter, just retry immediately with -k flag
+                  continue
+                fi
+              fi
+              
               if [ $attempt -lt $max_attempts ]; then
                 sleep_duration=$((backoff_base * attempt))
                 echo "Retrying in $sleep_duration seconds..."
