@@ -51,6 +51,36 @@ describe('Logger', () => {
       expect(typeof logger.debug).toBe('function');
     });
 
+    it('debug logs in development mode', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const logger = createLogger('TEST');
+      logger.debug('debug message');
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(expect.stringContaining('[DEBUG]'), '');
+      vi.unstubAllEnvs();
+    });
+
+    it('debug does not log in production mode', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const logger = createLogger('TEST');
+      logger.debug('debug message');
+
+      expect(consoleSpy.info).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it('debug logs with data in development mode', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const logger = createLogger('TEST');
+      logger.debug('debug message', { count: 42 });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.stringContaining('[DEBUG]'),
+        expect.objectContaining({ count: 42 })
+      );
+      vi.unstubAllEnvs();
+    });
+
     it('logs info messages', () => {
       const logger = createLogger('TEST');
       logger.info('info message');
@@ -348,6 +378,38 @@ describe('Logger', () => {
           error: 'Test error',
         })
       );
+    });
+
+    it('includes stack trace for Error objects in development mode', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const logger = createLogger('TEST');
+      const error = new Error('Dev error');
+      logger.error('error occurred', error);
+
+      expect(consoleSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('[ERROR]'),
+        expect.objectContaining({
+          error: 'Dev error',
+          stack: expect.stringContaining('Error: Dev error'),
+        })
+      );
+      vi.unstubAllEnvs();
+    });
+
+    it('omits stack trace for Error objects in production mode', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const logger = createLogger('TEST');
+      const error = new Error('Prod error');
+      logger.error('error occurred', error);
+
+      expect(consoleSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('[ERROR]'),
+        expect.objectContaining({
+          error: 'Prod error',
+          stack: undefined,
+        })
+      );
+      vi.unstubAllEnvs();
     });
 
     it('handles error logging with string error', () => {

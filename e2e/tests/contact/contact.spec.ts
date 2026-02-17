@@ -6,6 +6,8 @@ test.describe('Contact Page', () => {
   test.beforeEach(async ({ page }) => {
     await mockTurnstile(page);
     await page.goto('/contact');
+    // Wait for the form to load - the combobox is the first interactive field
+    await page.getByRole('combobox').waitFor({ state: 'visible', timeout: 10_000 });
   });
 
   test.describe('static content', () => {
@@ -14,7 +16,7 @@ test.describe('Contact Page', () => {
     });
 
     test('should display the breadcrumb', async ({ page }) => {
-      await expect(page.getByText('Contact')).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Contact' })).toBeVisible();
     });
 
     test('should display the intro paragraph', async ({ page }) => {
@@ -79,29 +81,29 @@ test.describe('Contact Page', () => {
   test.describe('reason combobox interaction', () => {
     test('should open combobox and show reason options', async ({ page }) => {
       await page.getByRole('combobox').click();
+      // Wait for popover content to be visible after click
+      await page.locator('role=option').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-      await expect(page.getByText('Question')).toBeVisible();
-      await expect(page.getByText('New opportunity')).toBeVisible();
-      await expect(page.getByText('Demo submission')).toBeVisible();
-      await expect(page.getByText('Other')).toBeVisible();
+      await expect(page.getByRole('option', { name: 'Question' })).toBeVisible();
+      await expect(page.getByRole('option', { name: 'New opportunity' })).toBeVisible();
+      await expect(page.getByRole('option', { name: 'Demo submission' })).toBeVisible();
+      await expect(page.getByRole('option', { name: 'Other' })).toBeVisible();
     });
 
     test('should select a reason from the combobox', async ({ page }) => {
-      await page.getByRole('combobox').click();
-      await page.getByText('Question').click();
+      const comboboxButton = page.getByRole('combobox', { name: 'Reason' });
+      await comboboxButton.click();
+      // Click on the Question option
+      await page.locator('role=option').filter({ hasText: 'Question' }).click();
 
-      // The combobox should now display the selected reason
-      await expect(page.getByRole('combobox')).toContainText('Question');
+      // The combobox button should now display the selected reason
+      await expect(comboboxButton).toContainText('Question');
     });
   });
 
   test.describe('form validation', () => {
     test('should show validation errors when submitting empty form', async ({ page }) => {
-      // Wait for Turnstile to auto-verify
-      await page.waitForTimeout(500);
-
       await page.getByRole('button', { name: /send message/i }).click();
-
       // Validation error messages should appear
       await expect(page.locator('[data-slot="form-message"]').first()).toBeVisible({
         timeout: 5_000,
@@ -109,8 +111,6 @@ test.describe('Contact Page', () => {
     });
 
     test('should show reason validation error', async ({ page }) => {
-      await page.waitForTimeout(500);
-
       // Fill everything except reason
       await page.locator('input[name="firstName"]').fill('Jane');
       await page.locator('input[name="lastName"]').fill('Doe');
@@ -127,10 +127,9 @@ test.describe('Contact Page', () => {
     });
 
     test('should show email validation error for invalid email', async ({ page }) => {
-      await page.waitForTimeout(500);
-
       await page.getByRole('combobox').click();
-      await page.getByText('Question').click();
+      await page.locator('role=option').filter({ hasText: 'Question' }).click();
+
       await page.locator('input[name="firstName"]').fill('Jane');
       await page.locator('input[name="lastName"]').fill('Doe');
       await page.locator('input[name="email"]').fill('not-an-email');
@@ -146,10 +145,9 @@ test.describe('Contact Page', () => {
     });
 
     test('should show message length validation error', async ({ page }) => {
-      await page.waitForTimeout(500);
-
       await page.getByRole('combobox').click();
-      await page.getByText('Question').click();
+      await page.locator('role=option').filter({ hasText: 'Question' }).click();
+
       await page.locator('input[name="firstName"]').fill('Jane');
       await page.locator('input[name="lastName"]').fill('Doe');
       await page.locator('input[name="email"]').fill('jane@example.com');
@@ -168,8 +166,9 @@ test.describe('Contact Page', () => {
   test.describe('form interaction', () => {
     test('should allow filling all form fields', async ({ page }) => {
       // Select reason
-      await page.getByRole('combobox').click();
-      await page.getByText('Question').click();
+      const comboboxButton = page.getByRole('combobox', { name: 'Reason' });
+      await comboboxButton.click();
+      await page.locator('role=option').filter({ hasText: 'Question' }).click();
 
       // Fill text fields
       await page.locator('input[name="firstName"]').fill('Jane');
@@ -181,7 +180,7 @@ test.describe('Contact Page', () => {
         .fill('I have a question about your label releases.');
 
       // Verify fields are populated
-      await expect(page.getByRole('combobox')).toContainText('Question');
+      await expect(comboboxButton).toContainText('Question');
       await expect(page.locator('input[name="firstName"]')).toHaveValue('Jane');
       await expect(page.locator('input[name="lastName"]')).toHaveValue('Doe');
       await expect(page.locator('input[name="email"]')).toHaveValue('jane@example.com');

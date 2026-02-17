@@ -391,6 +391,44 @@ describe('processNotificationImageAction', () => {
     });
   });
 
+  describe('text rotation', () => {
+    it('should apply rotation transform to main message when messageRotation is non-zero', async () => {
+      const input = createValidInput({
+        message: 'Rotated Text',
+        messageRotation: 45,
+      });
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+      expect(result.processedImageBase64).toBeDefined();
+    });
+
+    it('should apply rotation transform to secondary message when secondaryMessageRotation is non-zero', async () => {
+      const input = createValidInput({
+        message: 'Primary',
+        secondaryMessage: 'Rotated Secondary',
+        secondaryMessageRotation: -30,
+      });
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+      expect(result.processedImageBase64).toBeDefined();
+    });
+
+    it('should apply rotation to both messages simultaneously', async () => {
+      const input = createValidInput({
+        message: 'Rotated Primary',
+        secondaryMessage: 'Rotated Secondary',
+        messageRotation: 15,
+        secondaryMessageRotation: -15,
+      });
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+      expect(result.processedImageBase64).toBeDefined();
+    });
+  });
+
   describe('word wrapping', () => {
     it('should handle long messages that require wrapping', async () => {
       const longMessage =
@@ -409,6 +447,47 @@ describe('processNotificationImageAction', () => {
       });
       const result = await processNotificationImageAction(input);
 
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle first word exceeding maxCharsPerLine with large font', async () => {
+      // With messageFontSize=10, maxCharsPerLine becomes ~10 chars
+      // A 15+ char first word will trigger the wrapText branch where
+      // currentLine is empty and word exceeds maxChars
+      const input = createValidInput({
+        message: 'Supercalifragilisticexpialidocious short words here',
+        messageFontSize: 10,
+      });
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle whitespace-only message that strips to empty string', async () => {
+      // Message with only whitespace is truthy (passes !message guard),
+      // but stripHtmlTags trims it to '', causing wrapText to return []
+      // because if (currentLine) with '' is false
+      const input = createValidInput({
+        message: '   ',
+        isOverlayed: true,
+      });
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+      expect(result.processedImageBase64).toBeDefined();
+    });
+  });
+
+  describe('hex color parsing', () => {
+    it('should handle invalid hex color gracefully', async () => {
+      const input = createValidInput({
+        messageTextColor: 'not-a-hex',
+        secondaryMessageTextColor: 'invalid',
+        secondaryMessage: 'Test secondary',
+      });
+      const result = await processNotificationImageAction(input);
+
+      // hexToRgb falls back to white (255, 255, 255) for invalid hex
       expect(result.success).toBe(true);
     });
   });

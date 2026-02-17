@@ -1,0 +1,18 @@
+name: 'Setup Node.js Environment'
+description: 'Checkout, setup Node.js, and install dependencies'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.12.0'
+        cache: 'npm'
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci

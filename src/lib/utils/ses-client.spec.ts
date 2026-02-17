@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { describe, it, expect, vi } from 'vitest';
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
 
 // Use a class-based mock to properly handle `new SESClient()`
 const constructorSpy = vi.fn();

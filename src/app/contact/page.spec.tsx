@@ -229,6 +229,51 @@ describe('ContactPage', () => {
       expect(screen.getByTestId('field-lastName')).not.toBeDisabled();
       expect(screen.getByTestId('field-email')).not.toBeDisabled();
     });
+
+    it('should handle partial session data (only firstName and email)', async () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'user-2',
+            firstName: 'Jane',
+            lastName: undefined,
+            email: 'jane@example.com',
+            phone: undefined,
+          },
+          expires: new Date(Date.now() + 86400000).toISOString(),
+        },
+        status: 'authenticated',
+        update: vi.fn(),
+      });
+
+      await importAndRender();
+
+      expect(screen.getByTestId('field-firstName')).not.toBeDisabled();
+      expect(screen.getByTestId('field-email')).not.toBeDisabled();
+    });
+
+    it('should handle session data with no optional fields', async () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'user-3',
+            firstName: 'Bob',
+            lastName: 'Jones',
+            email: 'bob@example.com',
+            // phone is optional and not provided
+          },
+          expires: new Date(Date.now() + 86400000).toISOString(),
+        },
+        status: 'authenticated',
+        update: vi.fn(),
+      });
+
+      await importAndRender();
+
+      expect(screen.getByTestId('field-firstName')).not.toBeDisabled();
+      expect(screen.getByTestId('field-lastName')).not.toBeDisabled();
+      expect(screen.getByTestId('field-email')).not.toBeDisabled();
+    });
   });
 
   describe('form submission — unverified', () => {

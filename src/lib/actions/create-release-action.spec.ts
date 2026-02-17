@@ -365,6 +365,31 @@ describe('createReleaseAction', () => {
       expect(result.errors?.general).toEqual(['Failed to create release']);
     });
 
+    it('should preserve existing errors object when service fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: { someField: ['prior error'] } },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: false,
+        error: 'Database connection failed',
+      } as never);
+
+      const result = await createReleaseAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Failed to create release']);
+    });
+
     it('should use default format when formats is undefined', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },

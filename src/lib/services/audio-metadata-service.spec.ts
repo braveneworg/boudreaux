@@ -318,6 +318,44 @@ describe('AudioMetadataService', () => {
       expect(result.data.coverArtMimeType).toBe('image/png');
     });
 
+    it('should return undefined duration when format.duration is missing from stream', async () => {
+      const mockMetadata = {
+        format: {
+          bitrate: 128000,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          codec: 'MP3',
+          container: 'MPEG',
+          lossless: false,
+        },
+        common: {
+          title: 'No Duration Track',
+          artist: 'Test Artist',
+        },
+      };
+
+      mockParseStream.mockResolvedValue(mockMetadata as Awaited<ReturnType<typeof mm.parseStream>>);
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {
+          this.push(null);
+        },
+      });
+
+      const result = await AudioMetadataService.extractMetadataFromStream(
+        mockStream,
+        'audio/mpeg',
+        1024 * 1024
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error('Expected success');
+      expect(result.data.duration).toBeUndefined();
+      expect(result.data.title).toBe('No Duration Track');
+      expect(result.data.bitrate).toBe(128);
+    });
+
     it('should return error when stream parsing fails', async () => {
       mockParseStream.mockRejectedValue(new Error('Stream read error'));
 
