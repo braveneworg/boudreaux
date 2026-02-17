@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import 'server-only';
 import { headers } from 'next/headers';
 
 import { SendEmailCommand } from '@aws-sdk/client-ses';
