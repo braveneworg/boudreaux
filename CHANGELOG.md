@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.2.0] - 2026-02-18
+
+### Added
+
+- Fix coverage badge update to use git worktree (#238)\n- Fix coverage badge update to use git worktree (#238)\n- Fix coverage badge update to use git worktree (#238)\n- Update coverage badge (#237)\n- Update coverage badge (#237)\n- Update coverage badge (#237)\n- Fix playwright sign out test (#236)\n- Fix playwright sign out test (#236)\n- Fix playwright sign out test (#236)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add permissions for badges (#234)\n- Add moar badges (#233)\n- Add moar badges (#233)\n- Add moar badges (#233)\n- Update coverage badge (#232)\n- Update coverage badge (#232)\n- Update coverage badge (#232)\n- Added code coverage badge (#231)\n- Added code coverage badge (#231)\n- Fix coverage badge update to use git worktree (#238)\n
+
 ## [1.1.0] - 2026-02-18
 
 ### Added
