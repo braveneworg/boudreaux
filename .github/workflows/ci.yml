@@ -87,15 +87,13 @@ jobs:
             COLOR="red"
           fi
           BADGE_JSON="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${PCT}%\",\"color\":\"${COLOR}\"}"
-          # Push badge JSON to badges branch
+          # Commit badge JSON to the current branch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin badges:badges
-          git checkout badges
           echo "$BADGE_JSON" > coverage-badge.json
           git add coverage-badge.json
           git diff --staged --quiet || git commit -m "Update coverage badge to ${PCT}%"
-          git push origin badges
+          git push
 
   build:
     name: Build Next.js app
