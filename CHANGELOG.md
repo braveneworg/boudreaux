@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.3.0] - 2026-02-18
+
+### Added
+
+- Update badges (#239)\n- Update badges (#239)\n- Update badges (#239)\n
+
 ## [1.2.0] - 2026-02-18
 
 ### Added
