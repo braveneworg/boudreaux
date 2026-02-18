@@ -3,7 +3,7 @@
 [![CI](https://github.com/braveneworg/boudreaux/actions/workflows/ci.yml/badge.svg)](https://github.com/braveneworg/boudreaux/actions/workflows/ci.yml)
 [![Deploy](https://github.com/braveneworg/boudreaux/actions/workflows/deploy.yml/badge.svg)](https://github.com/braveneworg/boudreaux/actions/workflows/deploy.yml)
 [![codecov](https://codecov.io/gh/braveneworg/boudreaux/branch/main/graph/badge.svg)](https://codecov.io/gh/braveneworg/boudreaux)
-[![License](https://img.shields.io/github/license/braveneworg/boudreaux)](LICENSE)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Version](https://img.shields.io/badge/version-0.5.1-blue)](CHANGELOG.md)
 [![Node Version](https://img.shields.io/badge/node-22.x-brightgreen.svg)](package.json)
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org)
