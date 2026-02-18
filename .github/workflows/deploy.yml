@@ -1322,9 +1322,12 @@ jobs:
 
       - name: Commit, tag, and push
         if: steps.bump-type.outputs.skip != 'true'
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v${{ steps.version.outputs.new }} [skip ci]"
           git tag "${{ steps.version.outputs.tag }}"
