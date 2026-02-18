@@ -135,15 +135,28 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   const InfoTickerTape = ({
     featuredArtist,
     isPlaying,
-    onTrackSelect,
   }: {
     featuredArtist: FeaturedArtist;
     isPlaying?: boolean;
-    onTrackSelect?: (trackId: string) => void;
   }) => (
     <div data-testid="info-ticker-tape" data-is-playing={isPlaying?.toString()}>
       {featuredArtist.track?.title}
-      {featuredArtist.release?.releaseTracks?.map((rt) => (
+    </div>
+  );
+  InfoTickerTape.displayName = 'InfoTickerTape';
+  MockMediaPlayer.InfoTickerTape = InfoTickerTape;
+
+  const TrackListDrawer = ({
+    artistRelease,
+    currentTrackId,
+    onTrackSelect,
+  }: {
+    artistRelease: { release: { releaseTracks: Array<{ track: { id: string; title: string } }> } };
+    currentTrackId?: string;
+    onTrackSelect?: (trackId: string) => void;
+  }) => (
+    <div data-testid="track-list-drawer" data-current-track-id={currentTrackId}>
+      {artistRelease.release.releaseTracks.map((rt) => (
         <button
           key={rt.track.id}
           data-testid={`track-select-${rt.track.id}`}
@@ -154,8 +167,8 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
       ))}
     </div>
   );
-  InfoTickerTape.displayName = 'InfoTickerTape';
-  MockMediaPlayer.InfoTickerTape = InfoTickerTape;
+  TrackListDrawer.displayName = 'TrackListDrawer';
+  MockMediaPlayer.TrackListDrawer = TrackListDrawer;
 
   return { MediaPlayer: MockMediaPlayer };
 });
@@ -473,6 +486,49 @@ describe('FeaturedArtistsPlayer', () => {
     fireEvent.click(screen.getByTestId('pause-button'));
 
     // InfoTickerTape should show not playing state
+    expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'false');
+  });
+
+  it('should resume playback when clicking the thumbnail of the already-selected paused artist', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    // Select artist with track
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+    // Play then pause
+    fireEvent.click(screen.getByTestId('play-button'));
+    fireEvent.click(screen.getByTestId('pause-button'));
+
+    // Verify paused
+    expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'false');
+
+    // Click the same artist's thumbnail again to resume
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+    // Should resume playback (the mock play() calls onPlay which sets isPlaying to true)
+    expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'true');
+  });
+
+  it('should pause playback when clicking the thumbnail of the already-selected playing artist', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+      wrapper: createWrapper(),
+    });
+
+    // Select artist with track
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+    // Start playing
+    fireEvent.click(screen.getByTestId('play-button'));
+
+    // Verify playing
+    expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'true');
+
+    // Click the same artist's thumbnail again to pause
+    fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+    // Should pause playback (the mock pause() calls onPause which sets isPlaying to false)
     expect(screen.getByTestId('info-ticker-tape')).toHaveAttribute('data-is-playing', 'false');
   });
 
@@ -859,6 +915,144 @@ describe('FeaturedArtistsPlayer', () => {
       });
 
       expect(screen.queryByTestId('cover-art-image')).not.toBeInTheDocument();
+    });
+
+    it('should fall back to release images when no coverArt', () => {
+      const artistWithReleaseImages: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: {
+          ...mockRelease,
+          coverArt: null,
+          images: [{ src: 'https://example.com/release-image.jpg' }],
+        },
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithReleaseImages]} />, {
+        wrapper: createWrapper(),
+      });
+
+      expect(screen.getByTestId('cover-art-image')).toHaveAttribute(
+        'data-src',
+        'https://example.com/release-image.jpg'
+      );
+    });
+
+    it('should fall back to artist images when no coverArt or release images', () => {
+      const artistWithArtistImages: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: { ...mockRelease, coverArt: null, images: [] },
+        artists: [
+          {
+            id: 'artist-1',
+            firstName: 'Test',
+            surname: 'Artist',
+            displayName: null,
+            images: [{ src: 'https://example.com/artist-image.jpg' }],
+          },
+        ],
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithArtistImages]} />, {
+        wrapper: createWrapper(),
+      });
+
+      expect(screen.getByTestId('cover-art-image')).toHaveAttribute(
+        'data-src',
+        'https://example.com/artist-image.jpg'
+      );
+    });
+  });
+
+  describe('release info display', () => {
+    it('should show release title and artist name when artist is selected', () => {
+      const { container } = render(
+        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
+        { wrapper: createWrapper() }
+      );
+
+      // Select artist with a release
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
+      expect(releaseInfo).toBeInTheDocument();
+      expect(releaseInfo?.innerHTML).toContain('Test Album');
+      expect(releaseInfo?.innerHTML).toContain('Test Artist 2');
+    });
+
+    it('should render artist name in bold', () => {
+      const { container } = render(
+        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
+        { wrapper: createWrapper() }
+      );
+
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
+      expect(releaseInfo?.innerHTML).toContain('<strong>Test Artist 2</strong>');
+    });
+
+    it('should show empty release title when no release', () => {
+      const { container } = render(
+        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
+        { wrapper: createWrapper() }
+      );
+
+      // First artist has no release
+      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
+      expect(releaseInfo).toBeInTheDocument();
+      expect(releaseInfo?.innerHTML).toContain('<strong>Test Artist 1</strong>');
+    });
+  });
+
+  describe('track list drawer', () => {
+    it('should render TrackListDrawer when selected artist has release tracks', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with release
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      expect(screen.getByTestId('track-list-drawer')).toBeInTheDocument();
+    });
+
+    it('should not render TrackListDrawer when selected artist has no release', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // First artist has no release
+      expect(screen.queryByTestId('track-list-drawer')).not.toBeInTheDocument();
+    });
+
+    it('should pass currentTrackId to TrackListDrawer', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with track and release
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      expect(screen.getByTestId('track-list-drawer')).toHaveAttribute(
+        'data-current-track-id',
+        'track-1'
+      );
+    });
+
+    it('should update currentTrackId when track changes', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+      fireEvent.click(screen.getByTestId('track-select-track-2'));
+
+      expect(screen.getByTestId('track-list-drawer')).toHaveAttribute(
+        'data-current-track-id',
+        'track-2'
+      );
     });
   });
 });

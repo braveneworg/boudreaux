@@ -138,19 +138,27 @@ const ContactPage = () => {
               <p>
                 <strong>Label Manager:</strong> Dylan
               </p>
-              <p>dylanowenmusic@gmail.com</p>
+              <p>
+                <a href="mailto:dylanowenmusic@gmail.com">dylanowenmusic@gmail.com</a>
+              </p>
               <p>
                 <strong>Distribution:</strong> Jeep Ward at Redeye Worldwide
               </p>
-              <p>jeephalo@gmail.com</p>
+              <p>
+                <a href="mailto:jeephalo@gmail.com">jeephalo@gmail.com</a>
+              </p>
               <p>
                 <strong>Media and Fan Support:</strong> Niki
               </p>
-              <p>nikianarchy@gmail.com</p>
+              <p>
+                <a href="mailto:nikianarchy@gmail.com">nikianarchy@gmail.com</a>
+              </p>
               <p>
                 <strong>Customer Service:</strong> Mo Niklz
               </p>
-              <p>djmoniklz@gmail.com</p>
+              <p>
+                <a href="mailto:djmoniklz@gmail.com">djmoniklz@gmail.com</a>
+              </p>
             </div>
             <p className="text-muted-foreground mb-6">
               Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
