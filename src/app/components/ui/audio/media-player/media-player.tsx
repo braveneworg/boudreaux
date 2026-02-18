@@ -21,6 +21,7 @@ import videojs from 'video.js';
 import TextField from '@/components/forms/fields/text-field';
 import { Button } from '@/components/ui/button';
 import {
+  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -62,6 +63,31 @@ const registerVideoJSComponents = () => {
   videojs.registerComponent('SkipPreviousButton', SkipPreviousButton);
   videojs.registerComponent('SkipNextButton', SkipNextButton);
   componentsRegistered = true;
+};
+
+/**
+ * Determines the correct MIME type for an audio URL based on its file extension.
+ * Falls back to 'audio/mpeg' if the extension cannot be determined.
+ *
+ * @param url - The audio file URL (may include query parameters)
+ * @returns The corresponding MIME type string
+ */
+const getAudioMimeType = (url: string): string => {
+  const extension = url.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    mp3: 'audio/mpeg',
+    mpeg: 'audio/mpeg',
+    wav: 'audio/wav',
+    wave: 'audio/wav',
+    ogg: 'audio/ogg',
+    flac: 'audio/flac',
+    aac: 'audio/aac',
+    m4a: 'audio/mp4',
+    webm: 'audio/webm',
+    aiff: 'audio/aiff',
+    aif: 'audio/aiff',
+  };
+  return mimeTypes[extension ?? ''] ?? 'audio/mpeg';
 };
 
 /**
@@ -252,6 +278,12 @@ const FeaturedArtistCarousel = ({
   // Sort by position (lower numbers first)
   const sortedArtists = [...featuredArtists].sort((a, b) => a.position - b.position);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+
+  const handleSelect = (featured: FeaturedArtist, index: number) => {
+    carouselApi?.scrollTo(index);
+    onSelect?.(featured);
+  };
 
   /**
    * Get the cover art URL for a featured artist
@@ -284,11 +316,12 @@ const FeaturedArtistCarousel = ({
     <Carousel
       aria-label="Featured Artists"
       orientation="horizontal"
-      className="w-full px-10 mb-5"
-      opts={{ loop: true, align: 'start' }}
+      className="w-full px-10 mb-0"
+      opts={{ loop: true, align: 'center' }}
+      setApi={setCarouselApi}
     >
       <CarouselContent className="-ml-2">
-        {sortedArtists.map((featured) => {
+        {sortedArtists.map((featured, index) => {
           const coverArt = getCoverArt(featured);
           const displayName = getFeaturedArtistDisplayName(featured);
           const imageError = failedImages.has(featured.id);
@@ -300,7 +333,7 @@ const FeaturedArtistCarousel = ({
             >
               <button
                 type="button"
-                onClick={() => onSelect?.(featured)}
+                onClick={() => handleSelect(featured, index)}
                 className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 aria-label={`Select ${displayName}`}
               >
@@ -540,49 +573,22 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
   let displayName: string;
   let releaseTitle: string | null;
   let trackTitle: string;
-  let showTrackListDrawer = false;
-  let artistReleaseForDrawer: { release: Release; artist: Artist } | null = null;
-  let currentTrackId: string | undefined;
 
   if ('featuredArtist' in props && props.featuredArtist) {
     const { featuredArtist } = props;
     displayName = getFeaturedArtistDisplayName(featuredArtist);
     releaseTitle = featuredArtist.release?.title ?? null;
     trackTitle = featuredArtist.track?.title ?? '';
-    currentTrackId = featuredArtist.track?.id;
-    // Show TrackListDrawer if the release has more than 1 track and a primary artist is available
-    const primaryArtist = featuredArtist.artists?.[0];
-    if (
-      featuredArtist.release &&
-      featuredArtist.release.releaseTracks.length > 1 &&
-      primaryArtist
-    ) {
-      showTrackListDrawer = true;
-      // Convert FeaturedArtist to the artistRelease format expected by TrackListDrawer
-      artistReleaseForDrawer = {
-        release: featuredArtist.release as Release,
-        artist: primaryArtist as Artist,
-      };
-    }
   } else {
     const { artistRelease, trackName } = props;
     displayName = getArtistDisplayName(artistRelease.artist);
     releaseTitle = artistRelease.release.title;
     trackTitle = trackName;
-    // For artistRelease format, find the track ID by matching title
-    const matchingTrack = artistRelease.release.releaseTracks.find(
-      (rt) => rt.track.title === trackName
-    );
-    currentTrackId = matchingTrack?.track.id;
-    showTrackListDrawer = artistRelease.release.releaseTracks.length > 1;
-    artistReleaseForDrawer = artistRelease;
   }
 
   return (
-    <>
-      <div
-        className={`w-full overflow-hidden bg-zinc-800 py-2 rounded-b-lg ${isPlaying ? '' : 'text-center'}`}
-      >
+    <div className={`w-full bg-zinc-800 py-2 rounded-b-lg ${isPlaying ? '' : 'text-center'}`}>
+      <div className="overflow-hidden mx-3">
         <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-xs font-medium text-zinc-100">
             {trackTitle} • by {displayName}
@@ -590,14 +596,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
           </span>
         </div>
       </div>
-      {showTrackListDrawer && artistReleaseForDrawer && (
-        <MediaPlayer.TrackListDrawer
-          artistRelease={artistReleaseForDrawer}
-          currentTrackId={currentTrackId}
-          onTrackSelect={'featuredArtist' in props ? props.onTrackSelect : undefined}
-        />
-      )}
-    </>
+    </div>
   );
 };
 
@@ -676,6 +675,9 @@ const Controls = ({
     // Create audio element dynamically
     const audioEl = document.createElement('audio');
     audioEl.className = 'video-js vjs-default-skin';
+    // iOS requires playsinline for inline media playback
+    audioEl.setAttribute('playsinline', '');
+    audioEl.setAttribute('webkit-playsinline', '');
     containerRef.current.appendChild(audioEl);
     audioElRef.current = audioEl;
 
@@ -683,12 +685,13 @@ const Controls = ({
       controls: true,
       autoplay: false,
       preload: 'auto',
+      playsinline: true,
       responsive: true,
       inactivityTimeout: 0,
       userActions: {
         hotkeys: true,
       },
-      sources: [{ src: audioSrc, type: 'audio/mp3' }],
+      sources: [{ src: audioSrc, type: getAudioMimeType(audioSrc) }],
       fluid: false,
       fill: false,
       controlBar: {
@@ -727,11 +730,23 @@ const Controls = ({
       // Expose player controls via controlsRef after player is ready
       if (controlsRefCallback.current) {
         const controls: MediaPlayerControls = {
-          play: () => player.play(),
+          play: () => {
+            const playPromise = player.play();
+            if (playPromise !== undefined) {
+              (playPromise as Promise<void>).catch(() => {
+                // iOS may reject play() if not initiated by a user gesture
+              });
+            }
+          },
           pause: () => player.pause(),
           toggle: () => {
             if (player.paused()) {
-              player.play();
+              const playPromise = player.play();
+              if (playPromise !== undefined) {
+                (playPromise as Promise<void>).catch(() => {
+                  // iOS may reject play() if not initiated by a user gesture
+                });
+              }
             } else {
               player.pause();
             }
@@ -777,7 +792,12 @@ const Controls = ({
         player.currentTime(0);
         // If was playing, continue playing
         if (wasPlaying) {
-          player.play();
+          const playPromise = player.play();
+          if (playPromise !== undefined) {
+            (playPromise as Promise<void>).catch(() => {
+              // iOS may reject play() after seeking
+            });
+          }
         }
       }
     });
@@ -809,7 +829,7 @@ const Controls = ({
   useEffect(() => {
     if (playerRef.current && isInitializedRef.current) {
       const isInitialSource = audioSrc === initialSourceRef.current;
-      playerRef.current.src({ src: audioSrc, type: 'audio/mp3' });
+      playerRef.current.src({ src: audioSrc, type: getAudioMimeType(audioSrc) });
       playerRef.current.load();
       // Ensure controls remain visible after source change
       playerRef.current.addClass('vjs-has-started');
@@ -817,7 +837,12 @@ const Controls = ({
 
       // Auto-play if enabled and this is not the initial source
       if (autoPlay && !isInitialSource) {
-        playerRef.current.play();
+        const playPromise = playerRef.current.play();
+        if (playPromise !== undefined) {
+          (playPromise as Promise<void>).catch(() => {
+            // iOS may reject autoplay after source change
+          });
+        }
       }
       // Update initial source ref after first change
       if (isInitialSource) {
@@ -926,7 +951,7 @@ const TrackListDrawer = ({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900"
+          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
         >
           <span>View all {releaseTracks.length} tracks</span>
           <ChevronDown className="h-4 w-4" />

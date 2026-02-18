@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import React from 'react';
+
 import { render, screen, fireEvent, within } from '@testing-library/react';
 
 import type {
@@ -79,10 +81,31 @@ vi.mock('@/components/ui/drawer', () => ({
 }));
 
 // Mock Carousel components
+const mockScrollTo = vi.fn();
+const mockCarouselApi = {
+  scrollTo: mockScrollTo,
+};
+
 vi.mock('@/components/ui/carousel', () => ({
-  Carousel: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="carousel">{children}</div>
-  ),
+  Carousel: ({
+    children,
+    setApi,
+    opts,
+  }: {
+    children: React.ReactNode;
+    setApi?: (api: typeof mockCarouselApi) => void;
+    opts?: { loop?: boolean; align?: string };
+  }) => {
+    // Use useEffect to avoid setState-during-render warning
+    React.useEffect(() => {
+      setApi?.(mockCarouselApi);
+    }, [setApi]);
+    return (
+      <div data-testid="carousel" data-align={opts?.align} data-loop={opts?.loop?.toString()}>
+        {children}
+      </div>
+    );
+  },
   CarouselContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="carousel-content">{children}</div>
   ),
@@ -464,36 +487,36 @@ describe('MediaPlayer', () => {
       expect(screen.getByText(/Unknown Artist/)).toBeInTheDocument();
     });
 
-    it('should show TrackListDrawer when release has more than 1 track', () => {
-      const track1 = createMockTrack({ id: 'track-1', title: 'Track 1', position: 1 });
-      const track2 = createMockTrack({ id: 'track-2', title: 'Track 2', position: 2 });
-      const releaseTracks = [createMockReleaseTrack(track1), createMockReleaseTrack(track2)];
-      const mockRelease = createMockRelease(releaseTracks);
+    it('should render overflow wrapper with horizontal margin', () => {
+      const mockTrack = createMockTrack();
+      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
+      const release = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: track1,
-        release: mockRelease,
-        // Include an artist so TrackListDrawer is shown (requires primaryArtist)
-        artists: [{ id: 'artist-1', firstName: 'Test', surname: 'Artist', displayName: null }],
+        track: mockTrack,
+        release,
       });
 
-      render(
+      const { container } = render(
         <MediaPlayer>
           <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
         </MediaPlayer>
       );
 
-      expect(screen.getByTestId('drawer')).toBeInTheDocument();
+      const overflowDiv = container.querySelector('.overflow-hidden.mx-3');
+      expect(overflowDiv).toBeInTheDocument();
     });
 
-    it('should not show TrackListDrawer when release has only 1 track', () => {
-      const mockTrack = createMockTrack();
-      const releaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(releaseTracks);
+    it('should not render TrackListDrawer inside InfoTickerTape', () => {
+      const track1 = createMockTrack({ id: 'track-1', title: 'Track 1', position: 1 });
+      const track2 = createMockTrack({ id: 'track-2', title: 'Track 2', position: 2 });
+      const releaseTracks = [createMockReleaseTrack(track1), createMockReleaseTrack(track2)];
+      const release = createMockRelease(releaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: mockTrack,
-        release: mockRelease,
+        track: track1,
+        release,
+        artists: [{ id: 'artist-1', firstName: 'Test', surname: 'Artist', displayName: null }],
       });
 
       render(
@@ -855,6 +878,75 @@ describe('MediaPlayer', () => {
 
       // The artist with position 1 should be first
       expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }));
+    });
+
+    it('should use center alignment for carousel', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByTestId('carousel')).toHaveAttribute('data-align', 'center');
+    });
+
+    it('should scroll to the selected artist index on click', () => {
+      const onSelect = vi.fn();
+      mockScrollTo.mockClear();
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={mockFeaturedArtists}
+            onSelect={onSelect}
+          />
+        </MediaPlayer>
+      );
+
+      // Click on the second carousel item
+      const carouselItems = screen.getAllByTestId('carousel-item');
+      const secondItemButton = within(carouselItems[1]).getByRole('button');
+      fireEvent.click(secondItemButton);
+
+      expect(mockScrollTo).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1]);
+    });
+
+    it('should scroll to index 0 when first artist is clicked', () => {
+      const onSelect = vi.fn();
+      mockScrollTo.mockClear();
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={mockFeaturedArtists}
+            onSelect={onSelect}
+          />
+        </MediaPlayer>
+      );
+
+      const carouselItems = screen.getAllByTestId('carousel-item');
+      const firstItemButton = within(carouselItems[0]).getByRole('button');
+      fireEvent.click(firstItemButton);
+
+      expect(mockScrollTo).toHaveBeenCalledWith(0);
+    });
+
+    it('should work without onSelect callback', () => {
+      mockScrollTo.mockClear();
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
+        </MediaPlayer>
+      );
+
+      const carouselItems = screen.getAllByTestId('carousel-item');
+      const firstItemButton = within(carouselItems[0]).getByRole('button');
+      fireEvent.click(firstItemButton);
+
+      // Should still scroll even without onSelect
+      expect(mockScrollTo).toHaveBeenCalledWith(0);
     });
   });
 });

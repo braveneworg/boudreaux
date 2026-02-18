@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react';
 
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
-import type { FeaturedArtist } from '@/lib/types/media-models';
+import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
 
 interface FeaturedArtistsPlayerProps {
   featuredArtists: FeaturedArtist[];
@@ -82,7 +82,16 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   };
 
   const handleSelectArtist = (artist: FeaturedArtist) => {
-    setIsPlaying(false); // Reset playing state when selecting a new artist
+    // If clicking the already-selected artist, toggle play/pause
+    if (selectedArtist?.id === artist.id) {
+      if (isPlaying) {
+        playerControls?.pause();
+      } else {
+        playerControls?.play();
+      }
+      return;
+    }
+
     setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
   };
@@ -202,6 +211,9 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     );
   }
 
+  const showTrackListDrawer = !!selectedArtist?.release?.releaseTracks;
+  const currentTrackId = selectedArtist?.track?.id || null;
+
   return (
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
@@ -210,7 +222,19 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           featuredArtists={featuredArtists}
           onSelect={handleSelectArtist}
         />
-
+        {selectedArtist && (
+          <div className="flex justify-center text-sm gap-1 items-center px-2 -mb-1.5">
+            <span>{selectedArtist.release?.title ?? ''} by </span>
+            <strong>{getDisplayName(selectedArtist)}</strong>
+          </div>
+        )}
+        {showTrackListDrawer && selectedArtist && (
+          <MediaPlayer.TrackListDrawer
+            artistRelease={selectedArtist as unknown as ArtistRelease}
+            currentTrackId={currentTrackId ?? ''}
+            onTrackSelect={handleTrackSelect}
+          />
+        )}
         {/* Selected Artist Details */}
         {selectedArtist && (
           <div className="flex flex-col items-center">
@@ -245,11 +269,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
               {/* Info Ticker Tape - beneath the controls */}
               {selectedArtist.track?.title && (
-                <MediaPlayer.InfoTickerTape
-                  featuredArtist={selectedArtist}
-                  isPlaying={isPlaying}
-                  onTrackSelect={handleTrackSelect}
-                />
+                <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} isPlaying={isPlaying} />
               )}
             </div>
           </div>
