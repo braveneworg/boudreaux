@@ -19,7 +19,8 @@ test.describe('Signout Flow', () => {
 
     await signOutButton.click();
 
-    // After signout, should redirect and show sign in/up links
+    // After signout, should redirect and show sign in/up links in the hamburger menu
+    await userPage.getByRole('button', { name: /open menu/i }).click();
     await expect(userPage.getByRole('link', { name: /sign in/i })).toBeVisible({ timeout: 10_000 });
   });
 
