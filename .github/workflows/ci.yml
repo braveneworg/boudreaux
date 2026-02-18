@@ -32,14 +32,12 @@ jobs:
         env:
           CI: true
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Vitest Coverage Report
+        if: github.event_name == 'pull_request'
+        uses: davelosert/vitest-coverage-report-action@v2
         with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+          json-summary-path: ./coverage/coverage-summary.json
+          json-final-path: ./coverage/coverage-final.json
 
       - name: Coverage Report Summary
         if: always()
@@ -58,6 +56,46 @@ jobs:
             echo "| Functions | ${FUNCTIONS}% |" >> $GITHUB_STEP_SUMMARY
             echo "| Lines | ${LINES}% |" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Extract coverage percentage
+        id: coverage-pct
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          if [ -f "./coverage/coverage-summary.json" ]; then
+            PCT=$(cat ./coverage/coverage-summary.json | jq '.total.lines.pct')
+            echo "pct=${PCT}" >> $GITHUB_OUTPUT
+          else
+            echo "pct=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          PCT="${{ steps.coverage-pct.outputs.pct }}"
+          # Determine badge color based on coverage percentage
+          if [ "$(echo "$PCT >= 90" | bc)" -eq 1 ]; then
+            COLOR="brightgreen"
+          elif [ "$(echo "$PCT >= 80" | bc)" -eq 1 ]; then
+            COLOR="green"
+          elif [ "$(echo "$PCT >= 70" | bc)" -eq 1 ]; then
+            COLOR="yellowgreen"
+          elif [ "$(echo "$PCT >= 60" | bc)" -eq 1 ]; then
+            COLOR="yellow"
+          elif [ "$(echo "$PCT >= 50" | bc)" -eq 1 ]; then
+            COLOR="orange"
+          else
+            COLOR="red"
+          fi
+          BADGE_JSON="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${PCT}%\",\"color\":\"${COLOR}\"}"
+          # Push badge JSON to badges branch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin badges:badges
+          git checkout badges
+          echo "$BADGE_JSON" > coverage-badge.json
+          git add coverage-badge.json
+          git diff --staged --quiet || git commit -m "Update coverage badge to ${PCT}%"
+          git push origin badges
 
   build:
     name: Build Next.js app
