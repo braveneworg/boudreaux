@@ -5,8 +5,20 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/braveneworg/boudreaux/main/coverage-badge.json)](https://github.com/braveneworg/boudreaux/actions/workflows/ci.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Version](https://img.shields.io/badge/version-0.5.1-blue)](CHANGELOG.md)
+[![Last Commit](https://img.shields.io/github/last-commit/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/commits)
+[![Issues](https://img.shields.io/github/issues/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/pulls)
+[![Repo Size](https://img.shields.io/github/repo-size/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux)
 [![Node Version](https://img.shields.io/badge/node-22.x-brightgreen.svg)](package.json)
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-Styling-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Docker](https://img.shields.io/badge/Docker-Container-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![AWS](https://img.shields.io/badge/AWS-EC2%20%2B%20S3-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com)
+[![Vitest](https://img.shields.io/badge/Vitest-Testing-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev)
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
