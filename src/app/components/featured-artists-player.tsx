@@ -224,12 +224,10 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           onSelect={handleSelectArtist}
         />
         {selectedArtist && (
-          <div
-            className="flex justify-center text-sm gap-1 items-center px-2 -mb-1.5"
-            dangerouslySetInnerHTML={{
-              __html: `${selectedArtist?.release?.title ?? ''} by <strong>${getDisplayName(selectedArtist)}</strong>`,
-            }}
-          />
+          <div className="flex justify-center text-sm gap-1 items-center px-2 -mb-1.5">
+            <span>{selectedArtist.release?.title ?? ''} by </span>
+            <strong>{getDisplayName(selectedArtist)}</strong>
+          </div>
         )}
         {showTrackListDrawer && selectedArtist && (
           <MediaPlayer.TrackListDrawer
