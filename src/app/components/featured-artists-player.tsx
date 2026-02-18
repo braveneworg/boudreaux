@@ -92,7 +92,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
       return;
     }
 
-    // setIsPlaying(false); // Reset playing state when selecting a new artist
     setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
   };
