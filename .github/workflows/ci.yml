@@ -89,13 +89,18 @@ jobs:
             COLOR="red"
           fi
           BADGE_JSON="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${PCT}%\",\"color\":\"${COLOR}\"}"
-          # Commit badge JSON to the current branch
+          # Push badge JSON to the badges branch using a worktree to avoid conflicts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          echo "$BADGE_JSON" > coverage-badge.json
+          git fetch origin badges:badges 2>/dev/null || git branch badges
+          git worktree add /tmp/badges-worktree badges
+          echo "$BADGE_JSON" > /tmp/badges-worktree/coverage-badge.json
+          cd /tmp/badges-worktree
           git add coverage-badge.json
-          git diff --staged --quiet || git commit --no-verify -m "Update coverage badge to ${PCT}%"
-          git push --no-verify
+          git diff --staged --quiet || git commit --no-verify -m "Update coverage badge to ${PCT}% [skip ci]"
+          git push origin badges
+          cd -
+          git worktree remove /tmp/badges-worktree
 
   build:
     name: Build Next.js app
