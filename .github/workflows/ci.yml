@@ -15,7 +15,6 @@ jobs:
     name: Tests & Quality
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       pull-requests: write
     steps:
       - name: Checkout code
@@ -90,18 +89,11 @@ jobs:
             COLOR="red"
           fi
           BADGE_JSON="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${PCT}%\",\"color\":\"${COLOR}\"}"
-          # Push badge JSON to the badges branch using a worktree to avoid conflicts
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin badges:badges 2>/dev/null || git branch badges
-          git worktree add /tmp/badges-worktree badges
-          echo "$BADGE_JSON" > /tmp/badges-worktree/coverage-badge.json
-          cd /tmp/badges-worktree
-          git add coverage-badge.json
-          git diff --staged --quiet || git commit --no-verify -m "Update coverage badge to ${PCT}% [skip ci]"
-          git push origin badges
-          cd -
-          git worktree remove /tmp/badges-worktree
+          # Update coverage badge in public gist
+          echo "$BADGE_JSON" > /tmp/coverage-badge.json
+          gh gist edit dfb9819d47ec197bb8df7c3165cf472d /tmp/coverage-badge.json
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
 
   build:
     name: Build Next.js app
