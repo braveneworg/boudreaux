@@ -1374,3 +1374,13 @@ jobs:
             --title "${{ steps.version.outputs.tag }}" \
             --notes-file release-notes.txt \
             --target main
+
+      - name: Update version badge
+        if: steps.bump-type.outputs.skip != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.new }}"
+          BADGE_JSON="{\"schemaVersion\":1,\"label\":\"version\",\"message\":\"v${VERSION}\",\"color\":\"blue\"}"
+          echo "$BADGE_JSON" > /tmp/version-badge.json
+          gh gist edit 60abe6ab220986485503670eafd1ec2e /tmp/version-badge.json
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
