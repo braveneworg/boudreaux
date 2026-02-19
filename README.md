@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/braveneworg/boudreaux/actions/workflows/deploy.yml/badge.svg)](https://github.com/braveneworg/boudreaux/actions/workflows/deploy.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mkelley33/dfb9819d47ec197bb8df7c3165cf472d/raw/coverage-badge.json)](https://github.com/braveneworg/boudreaux/actions/workflows/ci.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
-[![Version](https://img.shields.io/badge/version-0.5.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mkelley33/60abe6ab220986485503670eafd1ec2e/raw/version-badge.json)](CHANGELOG.md)
 [![Node Version](https://img.shields.io/badge/node-22.x-brightgreen.svg)](package.json)
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)

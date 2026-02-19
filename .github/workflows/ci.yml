@@ -96,6 +96,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIST_TOKEN }}
 
+      - name: Update version badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          BADGE_JSON="{\"schemaVersion\":1,\"label\":\"version\",\"message\":\"v${VERSION}\",\"color\":\"blue\"}"
+          echo "$BADGE_JSON" > /tmp/version-badge.json
+          gh gist edit 60abe6ab220986485503670eafd1ec2e /tmp/version-badge.json
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+
   build:
     name: Build Next.js app
     runs-on: ubuntu-latest
