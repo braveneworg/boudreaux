@@ -20,7 +20,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Purpose
 
-To build and deploy a Next.js app with Docker, GitHub Container Registry, GitHub Actions, AWS EC2, and AWS S3 behind Cloudfront CDN.
+To create a record label web app that allows the artists and labels to spread their music, fans to discover new releases, and administrators to build and deploy a Next.js app with TypeScript, Docker, GitHub Container Registry, GitHub Actions, AWS EC2, and AWS S3 behind Cloudfront CDN.
 
 ## Set github secrets
 
