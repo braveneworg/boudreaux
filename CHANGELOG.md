@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
+
+## [1.5.0] - 2026-02-19
+
+### Added
+
+- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n- Update readme purpose section (#243)\n
+
+## [1.4.1] - 2026-02-19
+
+### Fixed
+
+- Add version badge update to CI workflow and update README (#242)\n- Add version badge update to CI workflow and update README (#242)\n- Add version badge update to CI workflow and update README (#242)\n- null (#null)\n- Add version badge update to CI workflow and update README (#242)\n
+
+## [1.4.0] - 2026-02-18
+
+### Added
+
+- Fix the build! permission! CI! (#241)\n- Fix the build! permission! CI! (#241)\n- Fix the build! permission! CI! (#241)\n- Update code coverage badge (#240)\n- Update code coverage badge (#240)\n- Update code coverage badge (#240)\n- Fix the build! permission! CI! (#241)\n
+
+## [1.3.0] - 2026-02-18
+
+### Added
+
+- Update badges (#239)\n- Update badges (#239)\n- Update badges (#239)\n
+
 ## [1.2.0] - 2026-02-18
 
 ### Added
