@@ -8,7 +8,7 @@ import type { Prisma } from '@prisma/client';
 export type GetReleasesParams = {
   skip?: number;
   take?: number;
-  search?: string | null;
+  search?: string;
 };
 
 /**
