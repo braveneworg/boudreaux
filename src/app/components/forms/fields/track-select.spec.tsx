@@ -1120,6 +1120,142 @@ describe('TrackSelect', () => {
     });
   });
 
+  describe('artistIds filtering', () => {
+    it('includes artistIds as separate query parameters when fetching tracks', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              artistIds={['artist-1', 'artist-2']}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      const parsedUrl = new URL(fetchUrl, 'http://localhost');
+      expect(parsedUrl.searchParams.getAll('artistIds')).toEqual(['artist-1', 'artist-2']);
+    });
+
+    it('does not include artistIds when not provided', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      expect(fetchUrl).not.toContain('artistIds');
+    });
+
+    it('re-fetches tracks when artistIds changes and popover is open', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              artistIds={['artist-1']}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('artistIds=artist-1'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
+      });
+
+      mockFetch.mockClear();
+
+      rerender(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              artistIds={['artist-1', 'artist-2']}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+        const fetchUrl = mockFetch.mock.calls[0][0] as string;
+        const parsedUrl = new URL(fetchUrl, 'http://localhost');
+        expect(parsedUrl.searchParams.getAll('artistIds')).toEqual(['artist-1', 'artist-2']);
+      });
+    });
+
+    it('includes both search and artistIds when both are active', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect
+              control={control}
+              name="trackId"
+              label="Track"
+              setValue={setValue}
+              artistIds={['artist-abc']}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-input')).toBeInTheDocument();
+      });
+
+      const input = screen.getByTestId('command-input');
+      await user.type(input, 'blues');
+
+      await vi.advanceTimersByTimeAsync(350);
+
+      await waitFor(() => {
+        const calls = mockFetch.mock.calls;
+        const lastCall = calls[calls.length - 1][0] as string;
+        const parsedUrl = new URL(lastCall, 'http://localhost');
+        expect(parsedUrl.searchParams.get('search')).toBe('blues');
+        expect(parsedUrl.searchParams.getAll('artistIds')).toEqual(['artist-abc']);
+      });
+
+      vi.useRealTimers();
+    });
+  });
+
   describe('abort controller / race condition prevention', () => {
     it('passes an AbortSignal to every fetch call', async () => {
       const user = userEvent.setup();
