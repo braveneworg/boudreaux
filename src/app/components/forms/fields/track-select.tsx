@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import Link from 'next/link';
 
@@ -51,6 +51,7 @@ interface TrackSelectProps<
   showCreateLink?: boolean;
   onTrackChange?: (track: TrackOption | null) => void;
   releaseId?: string;
+  artistIds?: string[];
 }
 
 /**
@@ -79,6 +80,7 @@ export default function TrackSelect<
   showCreateLink = true,
   onTrackChange,
   releaseId,
+  artistIds,
 }: TrackSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -86,9 +88,30 @@ export default function TrackSelect<
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Persist the selected track so it survives the tracks array being cleared
+  // (e.g. when releaseId changes after a track selection triggers onTrackChange)
+  const selectedTrackRef = useRef<TrackOption | null>(null);
+
+  // AbortController ref to cancel stale in-flight requests. Prevents a race
+  // condition where an older fetch completes after a newer one was initiated
+  // (e.g. selecting artist A, then artist B — the response for A must not
+  // overwrite the cleared tracks state, otherwise the initial-fetch effect
+  // sees tracks.length > 0 and skips fetching for both artists).
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Serialize artistIds for stable dependency comparison (arrays create new
+  // references on every render from useWatch, which would cause useEffect /
+  // useCallback deps to fire continuously and clear tracks)
+  const artistIdsKey = artistIds?.join(',') ?? '';
+
   // Fetch tracks from API
   const fetchTracks = useCallback(
     async (search?: string) => {
+      // Abort any in-flight request to prevent stale data from landing
+      abortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       setIsLoading(true);
       setError(null);
       try {
@@ -99,9 +122,19 @@ export default function TrackSelect<
         if (releaseId) {
           params.set('releaseId', releaseId);
         }
+        // Append each artistId as a separate query param so the API receives
+        // ?artistIds=id1&artistIds=id2 instead of ?artistIds=id1,id2
+        if (artistIdsKey) {
+          const ids = artistIdsKey.split(',');
+          for (const id of ids) {
+            params.append('artistIds', id);
+          }
+        }
         params.set('take', '50');
 
-        const response = await fetch(`/api/tracks?${params.toString()}`);
+        const response = await fetch(`/api/tracks?${params.toString()}`, {
+          signal: abortController.signal,
+        });
         if (!response.ok) {
           throw Error('Failed to fetch tracks');
         }
@@ -109,23 +142,31 @@ export default function TrackSelect<
         const data: { tracks: TrackOption[] } = await response.json();
         setTracks(data.tracks || []);
       } catch (err) {
+        // Silently ignore aborted requests — a newer fetch is already in progress
+        if (abortController.signal.aborted) return;
+
         const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
         setError(errorMessage);
         setTracks([]);
       } finally {
-        setIsLoading(false);
+        // Only clear loading if this request wasn't superseded
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     },
-    [releaseId]
+    [releaseId, artistIdsKey]
   );
 
-  // Re-fetch when releaseId changes
+  // Re-fetch when releaseId or artistIds changes
   useEffect(() => {
+    // Abort stale in-flight request so its response cannot overwrite state
+    abortControllerRef.current?.abort();
     setTracks([]);
     if (open) {
       fetchTracks();
     }
-  }, [releaseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [releaseId, artistIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial fetch when popover opens
   useEffect(() => {
@@ -145,6 +186,13 @@ export default function TrackSelect<
     return () => clearTimeout(timeoutId);
   }, [searchValue, open, fetchTracks]);
 
+  // Abort any in-flight request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
@@ -163,11 +211,19 @@ export default function TrackSelect<
       name={name}
       render={({ field }) => {
         const selectedId = field.value as string | undefined;
-        const selectedTrack = tracks.find((t) => t.id === selectedId);
+        // Look up in current tracks array first, then fall back to persisted ref
+        const selectedTrack =
+          tracks.find((t) => t.id === selectedId) ||
+          (selectedId && selectedTrackRef.current?.id === selectedId
+            ? selectedTrackRef.current
+            : undefined);
 
         const handleSelect = (trackId: string) => {
           const newValue = selectedId === trackId ? '' : trackId;
           const newTrack = newValue ? tracks.find((t) => t.id === newValue) || null : null;
+
+          // Persist so it survives the tracks array being cleared
+          selectedTrackRef.current = newTrack;
 
           if (setValue) {
             setValue(name, newValue as TFieldValues[TName], {
@@ -181,6 +237,8 @@ export default function TrackSelect<
         };
 
         const handleClear = () => {
+          selectedTrackRef.current = null;
+
           if (setValue) {
             setValue(name, '' as TFieldValues[TName], {
               shouldDirty: true,

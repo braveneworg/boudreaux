@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/releases
  * Get all releases or search for releases
- * Query params: skip, take, search
+ * Query params: skip, take, search, artistIds, published
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,11 +23,15 @@ export async function GET(request: NextRequest) {
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
     const search = searchParams.get('search');
+    const artistIds = searchParams.getAll('artistIds');
+    const published = searchParams.get('published');
 
     const params = {
       ...(skip && { skip: parseInt(skip, 10) }),
       ...(take && { take: parseInt(take, 10) }),
       ...(search && { search }),
+      ...(artistIds.length > 0 && { artistIds }),
+      ...(published !== null && { published: published === 'true' }),
     };
 
     const result = await ReleaseService.getReleases(params);

@@ -220,10 +220,12 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
         {/* Featured Artists Carousel */}
-        <MediaPlayer.FeaturedArtistCarousel
-          featuredArtists={featuredArtists}
-          onSelect={handleSelectArtist}
-        />
+        {featuredArtists.length > 1 && (
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={featuredArtists}
+            onSelect={handleSelectArtist}
+          />
+        )}
         {selectedArtist && (
           <>
             <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">

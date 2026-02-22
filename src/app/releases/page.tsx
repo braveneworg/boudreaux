@@ -7,7 +7,6 @@
  * Server Component that fetches all published releases and renders
  * a searchable card grid with breadcrumb navigation.
  */
-import 'server-only';
 
 import Link from 'next/link';
 
@@ -54,7 +53,7 @@ const toCardRelease = (release: PublishedReleaseListing) => {
 /**
  * Releases listing page — renders all published releases in a searchable grid.
  */
-const ReleasesPage = async () => {
+export default async function ReleasesPage() {
   const result = await ReleaseService.getPublishedReleases();
 
   const releases: PublishedReleaseListing[] = result.success ? result.data : [];
@@ -87,6 +86,4 @@ const ReleasesPage = async () => {
       </ContentContainer>
     </PageContainer>
   );
-};
-
-export default ReleasesPage;
+}

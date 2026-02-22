@@ -83,6 +83,7 @@ export default function FeaturedArtistForm({
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
   const previousReleaseIdRef = useRef<string | undefined>(undefined);
+  const releaseSetByTrackRef = useRef(false);
 
   const form = useForm<FeaturedArtistFormData>({
     resolver: zodResolver(createFeaturedArtistSchema),
@@ -181,7 +182,9 @@ export default function FeaturedArtistForm({
     }
   }, [formState.errors, form]);
 
-  // Clear trackId when releaseId changes to prevent inconsistent associations
+  // Clear trackId when releaseId changes to prevent inconsistent associations.
+  // Skip if the releaseId change was triggered by selecting a track (handleTrackChange),
+  // since in that case we want to keep the track the user just chose.
   useEffect(() => {
     // Skip on initial render (when previousReleaseIdRef is undefined)
     if (previousReleaseIdRef.current === undefined) {
@@ -194,9 +197,14 @@ export default function FeaturedArtistForm({
       return;
     }
 
-    // If releaseId changed, clear trackId
+    // If releaseId changed, clear trackId only when the user changed the release directly
     if (previousReleaseIdRef.current !== watchedReleaseId) {
-      setValue('trackId', '');
+      if (releaseSetByTrackRef.current) {
+        // Release was set by handleTrackChange — keep the track
+        releaseSetByTrackRef.current = false;
+      } else {
+        setValue('trackId', '');
+      }
       previousReleaseIdRef.current = watchedReleaseId;
     }
   }, [watchedReleaseId, setValue, isLoadingFeaturedArtist]);
@@ -208,6 +216,9 @@ export default function FeaturedArtistForm({
 
   const handleTrackChange = (track: TrackOption | null) => {
     const releaseId = track?.releaseTracks?.[0]?.release?.id ?? '';
+    // Flag that this releaseId change originated from a track selection,
+    // so the useEffect above does not clear the trackId the user just chose.
+    releaseSetByTrackRef.current = true;
     setValue('releaseId', releaseId, {
       shouldDirty: true,
       shouldValidate: true,
@@ -349,7 +360,14 @@ export default function FeaturedArtistForm({
                     placeholder="Select a track..."
                     setValue={setValue}
                     onTrackChange={handleTrackChange}
-                    releaseId={watchedReleaseId || undefined}
+                    releaseId={
+                      watchedArtistIds && watchedArtistIds.length > 0
+                        ? undefined
+                        : watchedReleaseId || undefined
+                    }
+                    artistIds={
+                      watchedArtistIds && watchedArtistIds.length > 0 ? watchedArtistIds : undefined
+                    }
                   />
 
                   <ReleaseSelect
@@ -358,6 +376,9 @@ export default function FeaturedArtistForm({
                     label="Release"
                     placeholder="Select a release..."
                     setValue={setValue}
+                    artistIds={
+                      watchedArtistIds && watchedArtistIds.length > 0 ? watchedArtistIds : undefined
+                    }
                   />
                 </div>
 

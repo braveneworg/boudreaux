@@ -365,6 +365,15 @@ describe('FeaturedArtistsPlayer', () => {
     expect(screen.getByText('No featured artists available at this time.')).toBeInTheDocument();
   });
 
+  it('should not render carousel when only one featured artist', () => {
+    render(<FeaturedArtistsPlayer featuredArtists={[mockFeaturedArtists[0]]} />, {
+      wrapper: createWrapper(),
+    });
+
+    expect(screen.getByTestId('media-player')).toBeInTheDocument();
+    expect(screen.queryByTestId('featured-artist-carousel')).not.toBeInTheDocument();
+  });
+
   it('should render the media player with featured artists', () => {
     render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
       wrapper: createWrapper(),

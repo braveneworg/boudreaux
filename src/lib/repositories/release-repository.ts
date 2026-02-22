@@ -5,15 +5,17 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
-import { TrackService } from '@/lib/services/track-service';
+import { ReleaseService } from '@/lib/services/release-service';
 import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/tracks
- * Get all tracks or search for tracks
- * Query params: skip, take, search, releaseId, artistIds (comma-separated)
+ * GET /api/releases
+ * Get all releases or search for releases
+ * Query params: skip, take, search
  */
 export async function GET(request: NextRequest) {
   try {
@@ -21,19 +23,14 @@ export async function GET(request: NextRequest) {
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
     const search = searchParams.get('search');
-    const releaseId = searchParams.get('releaseId');
-    const artistIdsParam = searchParams.get('artistIds');
-    const artistIds = artistIdsParam ? artistIdsParam.split(',').filter(Boolean) : undefined;
 
     const params = {
       ...(skip && { skip: parseInt(skip, 10) }),
       ...(take && { take: parseInt(take, 10) }),
       ...(search && { search }),
-      ...(releaseId && { releaseId }),
-      ...(artistIds && artistIds.length > 0 && { artistIds }),
     };
 
-    const result = await TrackService.getTracks(params);
+    const result = await ReleaseService.getReleases(params);
 
     if (!result.success) {
       return NextResponse.json(
@@ -42,30 +39,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get total count for pagination
-    const totalCountResult = await TrackService.getTracksCount(
-      search || undefined,
-      releaseId || undefined,
-      artistIds && artistIds.length > 0 ? artistIds : undefined
-    );
-
     return NextResponse.json({
-      tracks: result.data,
+      releases: result.data,
       count: result.data.length,
-      totalCount: totalCountResult.success ? totalCountResult.data : result.data.length,
-      hasMore: totalCountResult.success
-        ? parseInt(skip || '0', 10) + result.data.length < totalCountResult.data
-        : false,
     });
   } catch (error) {
-    console.error('Track GET error:', error);
+    console.error('Release GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 /**
- * POST /api/tracks
- * Create a new track (admin only)
+ * POST /api/releases
+ * Create a new release (admin only)
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
@@ -75,21 +61,15 @@ export const POST = await withAdmin(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    if (body.duration === undefined || body.duration === null) {
-      return NextResponse.json({ error: 'Duration is required' }, { status: 400 });
+    if (!body.releasedOn) {
+      return NextResponse.json({ error: 'Release date is required' }, { status: 400 });
     }
 
-    if (!body.audioUrl) {
-      return NextResponse.json({ error: 'Audio URL is required' }, { status: 400 });
+    if (!body.coverArt) {
+      return NextResponse.json({ error: 'Cover art is required' }, { status: 400 });
     }
 
-    const result = await TrackService.createTrack({
-      title: body.title as string,
-      duration: body.duration as number,
-      audioUrl: body.audioUrl as string,
-      coverArt: (body.coverArt as string) || undefined,
-      position: (body.position as number) || 0,
-    });
+    const result = await ReleaseService.createRelease(body as Prisma.ReleaseCreateInput);
 
     if (!result.success) {
       return NextResponse.json(
@@ -100,7 +80,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
 
     return NextResponse.json(result.data, { status: 201 });
   } catch (error) {
-    console.error('Track POST error:', error);
+    console.error('Release POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

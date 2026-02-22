@@ -102,11 +102,9 @@
   select {
     @apply bg-zinc-50! text-zinc-900! placeholder:text-zinc-800!;
   }
-  h1,
-  h2 {
-    @apply lowercase;
+  h1 {
+    text-transform: lowercase;
   }
-
   h1,
   h2,
   h3,

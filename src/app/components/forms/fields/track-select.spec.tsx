@@ -350,7 +350,10 @@ describe('TrackSelect', () => {
       await user.click(screen.getByTestId('popover-trigger'));
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/tracks'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/tracks'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
     });
   });
@@ -727,7 +730,10 @@ describe('TrackSelect', () => {
       await vi.advanceTimersByTimeAsync(350);
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('search=test'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('search=test'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
 
       vi.useRealTimers();
@@ -999,7 +1005,8 @@ describe('TrackSelect', () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
-          expect.stringContaining('releaseId=release-filter-id')
+          expect.stringContaining('releaseId=release-filter-id'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
         );
       });
     });
@@ -1043,7 +1050,10 @@ describe('TrackSelect', () => {
       // Open popover to trigger initial fetch
       await user.click(screen.getByTestId('popover-trigger'));
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-1'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('releaseId=release-1'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
 
       mockFetch.mockClear();
@@ -1064,7 +1074,10 @@ describe('TrackSelect', () => {
       );
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('releaseId=release-2'));
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('releaseId=release-2'),
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
       });
     });
 
@@ -1104,6 +1117,69 @@ describe('TrackSelect', () => {
       });
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('abort controller / race condition prevention', () => {
+    it('passes an AbortSignal to every fetch call', async () => {
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // Every fetch call should include a signal in the options
+      mockFetch.mock.calls.forEach((call: unknown[]) => {
+        expect(call[1]).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      });
+    });
+
+    it('aborts the previous request when a new fetch is triggered', async () => {
+      // Simulate a slow first response so we can verify its signal was aborted
+      let firstSignal: AbortSignal | undefined;
+      let secondSignal: AbortSignal | undefined;
+
+      mockFetch.mockReset();
+      mockFetch.mockImplementation((_url: string, options?: { signal?: AbortSignal }) => {
+        if (!firstSignal) {
+          firstSignal = options?.signal;
+        } else if (!secondSignal) {
+          secondSignal = options?.signal;
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ tracks: mockTracks }),
+        });
+      });
+
+      const user = userEvent.setup();
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <TrackSelect control={control} name="trackId" label="Track" setValue={setValue} />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      // The first request should have been aborted by the second
+      expect(firstSignal?.aborted).toBe(true);
+      // The second (latest) request should NOT be aborted
+      expect(secondSignal?.aborted).toBe(false);
     });
   });
 });
