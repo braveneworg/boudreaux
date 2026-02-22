@@ -15,7 +15,6 @@ agent: speckit.constitution
 - Functional programming paradigms should be favored where appropriate.
 - Maintain a clean and organized codebase with clear separation of concerns.
 - Adopt a test-driven development (TDD) approach to ensure code quality and reliability.
-- Document all functions and components with JSDoc comments for clarity and maintainability.
 - Adhere to the DRY (Don't Repeat Yourself) principle to minimize code duplication.
 - Use Git for version control, with clear and descriptive commit messages.
 - Conduct code reviews for all pull requests to maintain code quality and share knowledge among team members.
