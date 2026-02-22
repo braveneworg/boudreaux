@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
+import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 interface ReleasePlayerProps {
   /** Full release data with tracks, artist, and images */
@@ -108,6 +109,7 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
       <div className="space-y-2 mt-2">
         {hasTracks && currentTrack && primaryArtist && (
           <MediaPlayer.TrackListDrawer
+            artistName={getArtistDisplayName(primaryArtist)}
             artistRelease={{ release, artist: primaryArtist }}
             currentTrackId={currentTrack.id}
             onTrackSelect={handleTrackSelect}

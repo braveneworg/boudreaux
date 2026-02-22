@@ -989,8 +989,9 @@ describe('FeaturedArtistsPlayer', () => {
 
       fireEvent.click(screen.getByTestId('artist-featured-2'));
 
-      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
-      expect(releaseInfo?.innerHTML).toContain('<strong>Test Artist 2</strong>');
+      const artistHeading = container.querySelector('h2.font-bold');
+      expect(artistHeading).toBeInTheDocument();
+      expect(artistHeading?.textContent).toBe('Test Artist 2');
     });
 
     it('should show empty release title when no release', () => {
@@ -1002,7 +1003,8 @@ describe('FeaturedArtistsPlayer', () => {
       // First artist has no release
       const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
       expect(releaseInfo).toBeInTheDocument();
-      expect(releaseInfo?.innerHTML).toContain('<strong>Test Artist 1</strong>');
+      const artistHeading = releaseInfo?.querySelector('h2');
+      expect(artistHeading?.textContent).toBe('Test Artist 1');
     });
   });
 

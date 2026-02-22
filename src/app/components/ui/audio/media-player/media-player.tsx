@@ -978,10 +978,12 @@ const Description = ({ description }: { description: string }) => <p>{descriptio
  * ```
  */
 const TrackListDrawer = ({
+  artistName,
   artistRelease,
   currentTrackId,
   onTrackSelect,
 }: {
+  artistName: string;
   artistRelease: { release: Release; artist: Artist };
   currentTrackId?: string;
   onTrackSelect?: (trackId: string) => void;
@@ -1033,13 +1035,21 @@ const TrackListDrawer = ({
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader>
-          <DrawerTitle>Track List</DrawerTitle>
+          <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription>
-            {release.title} • {releaseTracks.length} track{releaseTracks.length !== 1 ? 's' : ''}
+            <article>
+              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <p className="text-sm text-shadow-none mb-0">
+                <em>{release.title}</em>
+              </p>
+              <p>
+                {releaseTracks.length} track{releaseTracks.length !== 1 ? 's' : ''}
+              </p>
+            </article>
           </DrawerDescription>
         </DrawerHeader>
-        <div className="px-4 pb-4 max-h-[60vh] overflow-y-auto">
-          <ol className="space-y-2">
+        <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
+          <ol className="px-0 -ml-2">
             {sortedTracks.map((releaseTrack, index) => {
               const { track } = releaseTrack;
               const isCurrentTrack = currentTrackId === track.id;
@@ -1048,7 +1058,7 @@ const TrackListDrawer = ({
               const trackItem = (
                 <li
                   key={track.id}
-                  className={`flex items-center justify-between gap-4 p-3 rounded-lg transition-colors ${
+                  className={`flex items-center justify-between gap-4 p-3 transition-colors ${
                     isCurrentTrack
                       ? 'bg-zinc-800 text-zinc-50'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
