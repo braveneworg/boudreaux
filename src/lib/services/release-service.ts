@@ -6,9 +6,15 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../prisma';
+import { withCache } from '../utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
-import type { Release } from '../types/media-models';
+import type {
+  PublishedReleaseDetail,
+  PublishedReleaseListing,
+  Release,
+  ReleaseCarouselItem,
+} from '../types/media-models';
 
 export class ReleaseService {
   /**
@@ -370,6 +376,171 @@ export class ReleaseService {
 
       console.error('Unexpected error:', error);
       return { success: false, error: 'Failed to restore release' };
+    }
+  }
+
+  // ===========================================================================
+  // Public release methods (for /releases pages)
+  // ===========================================================================
+
+  /**
+   * Get all published releases for the public listing page.
+   * Includes artist info with groups for display name fallback and search,
+   * images for cover art fallback, and URLs for Bandcamp links.
+   * Results are cached for 10 minutes in production.
+   */
+  static async getPublishedReleases(): Promise<ServiceResponse<PublishedReleaseListing[]>> {
+    return withCache(
+      'published-releases',
+      async () => {
+        try {
+          const releases = await prisma.release.findMany({
+            where: {
+              publishedAt: { not: null },
+              deletedOn: null,
+            },
+            orderBy: { releasedOn: 'desc' },
+            include: {
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
+              },
+              artistReleases: {
+                include: {
+                  artist: {
+                    include: {
+                      groups: {
+                        include: {
+                          group: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              releaseUrls: {
+                include: {
+                  url: true,
+                },
+              },
+            },
+          });
+
+          return {
+            success: true as const,
+            data: releases as unknown as PublishedReleaseListing[],
+          };
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientInitializationError) {
+            console.error('Database connection failed:', error);
+            return { success: false as const, error: 'Database unavailable' };
+          }
+
+          console.error('Unexpected error:', error);
+          return { success: false as const, error: 'Failed to fetch published releases' };
+        }
+      },
+      process.env.NODE_ENV === 'development' ? 0 : 600
+    );
+  }
+
+  /**
+   * Get a single published release with full track data for the media player page.
+   * Returns `{ success: false }` when the release is not found or not published.
+   */
+  static async getReleaseWithTracks(id: string): Promise<ServiceResponse<PublishedReleaseDetail>> {
+    try {
+      const release = await prisma.release.findFirst({
+        where: {
+          id,
+          publishedAt: { not: null },
+          deletedOn: null,
+        },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          artistReleases: {
+            include: {
+              artist: {
+                include: {
+                  images: true,
+                  labels: true,
+                  groups: true,
+                  releases: {
+                    include: {
+                      release: true,
+                    },
+                  },
+                  urls: true,
+                },
+              },
+            },
+          },
+          releaseTracks: {
+            orderBy: { position: 'asc' },
+            include: {
+              track: true,
+            },
+          },
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
+      });
+
+      if (!release) {
+        return { success: false, error: 'Release not found' };
+      }
+
+      return { success: true, data: release as unknown as PublishedReleaseDetail };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to retrieve release' };
+    }
+  }
+
+  /**
+   * Get other published releases by an artist, excluding the current release.
+   * Used for the "more by this artist" carousel on the media player page.
+   */
+  static async getArtistOtherReleases(
+    artistId: string,
+    excludeReleaseId: string
+  ): Promise<ServiceResponse<ReleaseCarouselItem[]>> {
+    try {
+      const releases = await prisma.release.findMany({
+        where: {
+          artistReleases: { some: { artistId } },
+          id: { not: excludeReleaseId },
+          publishedAt: { not: null },
+          deletedOn: null,
+        },
+        orderBy: { releasedOn: 'desc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+          },
+        },
+      });
+
+      return { success: true, data: releases as unknown as ReleaseCarouselItem[] };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to fetch artist releases' };
     }
   }
 }

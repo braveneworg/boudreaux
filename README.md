@@ -15,6 +15,13 @@
 [![AWS](https://img.shields.io/badge/AWS-EC2%20%2B%20S3-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com)
 [![Vitest](https://img.shields.io/badge/Vitest-Testing-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
 [![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/braveneworg/boudreaux/pulls)
+[![Contributors](https://img.shields.io/github/contributors/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/graphs/contributors)
+[![GitHub Stars](https://img.shields.io/github/stars/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/network/members)
+[![Last Commit](https://img.shields.io/github/last-commit/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/commits)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/pulse)
+[![Open Issues](https://img.shields.io/github/issues/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/issues)
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
