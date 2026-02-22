@@ -40,13 +40,9 @@ vi.mock('@/lib/utils/auth/get-action-state', () => ({
   getActionState: mockGetActionState,
 }));
 
-vi.mock('@/lib/utils/auth/auth-utils', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    setUnknownError: mockSetUnknownError,
-  };
-});
+vi.mock('@/lib/utils/auth/auth-utils', () => ({
+  setUnknownError: mockSetUnknownError,
+}));
 
 vi.mock('@/lib/validation/change-username-schema');
 
@@ -148,6 +144,10 @@ describe('changeUsernameAction', () => {
         success: false,
         error: {
           issues: [{ path: ['username'], message: 'Invalid username format' }],
+          flatten: () => ({
+            fieldErrors: { username: ['Invalid username format'] },
+            formErrors: [],
+          }),
         },
       };
 
@@ -173,6 +173,10 @@ describe('changeUsernameAction', () => {
         success: false,
         error: {
           issues: [{ path: ['confirmUsername'], message: 'Usernames do not match' }],
+          flatten: () => ({
+            fieldErrors: { confirmUsername: ['Usernames do not match'] },
+            formErrors: [],
+          }),
         },
       };
 
@@ -189,7 +193,7 @@ describe('changeUsernameAction', () => {
   });
 
   describe('authentication failures', () => {
-    it('should throw error when user is not authenticated', async () => {
+    it('should return error when user is not authenticated', async () => {
       const mockFormState: FormState = {
         fields: { username: 'newusername', confirmUsername: 'newusername' },
         success: false,
@@ -212,11 +216,11 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalled();
+      expect(result.errors?.general).toEqual(['You must be logged in to change your username']);
       expect(mockUpdateUser).not.toHaveBeenCalled();
     });
 
-    it('should throw error when session has no user id', async () => {
+    it('should return error when session has no user id', async () => {
       const mockFormState: FormState = {
         fields: { username: 'newusername', confirmUsername: 'newusername' },
         success: false,
@@ -241,7 +245,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalled();
+      expect(result.errors?.general).toEqual(['You must be logged in to change your username']);
       expect(mockUpdateUser).not.toHaveBeenCalled();
     });
   });
@@ -341,7 +345,9 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      expect(result.errors?.general).toEqual([
+        'This User_email_key is already in use. Please choose a different one.',
+      ]);
     });
 
     it('should handle other Prisma errors', async () => {
@@ -355,7 +361,9 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      expect(result.errors?.general).toEqual([
+        'Database error (P1000). Please try again or contact support.',
+      ]);
     });
 
     it('should handle general errors', async () => {
@@ -365,7 +373,7 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      expect(result.errors?.general).toEqual(['Something went wrong']);
     });
 
     it('should handle non-Error thrown values', async () => {
@@ -374,7 +382,9 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(mockSetUnknownError).toHaveBeenCalledWith(expect.any(Object));
+      expect(result.errors?.general).toEqual([
+        'An unexpected error occurred. Please try again or contact support.',
+      ]);
     });
 
     it('should initialize formState.errors when undefined on timeout error', async () => {
@@ -483,7 +493,13 @@ describe('changeUsernameAction', () => {
 
       const mockParsed = {
         success: false,
-        error: { issues: [] },
+        error: {
+          issues: [],
+          flatten: () => ({
+            fieldErrors: {},
+            formErrors: [],
+          }),
+        },
       };
 
       vi.mocked(mockGetActionState).mockReturnValue({
@@ -547,7 +563,13 @@ describe('changeUsernameAction', () => {
 
       const mockParsed = {
         success: false,
-        error: { issues: [] },
+        error: {
+          issues: [],
+          flatten: () => ({
+            fieldErrors: {},
+            formErrors: [],
+          }),
+        },
       };
 
       vi.mocked(mockGetActionState).mockReturnValue({
