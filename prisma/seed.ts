@@ -560,7 +560,7 @@ async function main() {
     // Create base entities first (these can be created in parallel)
     await createDefaultArtists();
 
-    // Link tracks to relea// ses
+    // Link tracks to releases
     // await createReleasesWithTracks();
 
     // Create featured artists after base entities exist
