@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.6.0] - 2026-02-22
+
+### Added
+
+- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n- 001 release search player (#245)\n
+
 ## [1.5.0] - 2026-02-19
 
 ### Added
