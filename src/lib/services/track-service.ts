@@ -104,7 +104,15 @@ export class TrackService {
    * Get all tracks with optional filters
    *
    * When artistIds are provided, ignores releaseId filter and returns all tracks
-   * from all releases of the specified artists (including unpublished releases).
+   * associated with the specified artists. Two join paths are used intentionally:
+   *   1. TrackArtist – direct artist credit on a track (indexed on artistId)
+   *   2. ReleaseTrack → Release → ArtistRelease – artist credited via a release (indexed on artistId)
+   * Both paths are required because an artist may be linked to a track either directly
+   * or solely through a release. Indexes on TrackArtist.artistId and ArtistRelease.artistId
+   * are defined in the schema to keep these nested-join queries performant.
+   *
+   * Note: unpublished releases are intentionally included here because this method
+   * is used in admin contexts where full visibility is required.
    * When only releaseId is provided, filters to that specific release.
    */
   static async getTracks(params?: {
@@ -206,8 +214,16 @@ export class TrackService {
   /**
    * Get total count of tracks with optional search filter
    *
-   * When artistIds are provided, ignores releaseId filter and returns count of all tracks
-   * from all releases of the specified artists (including unpublished releases).
+   * When artistIds are provided, ignores releaseId filter and counts all tracks
+   * associated with the specified artists. Two join paths are used intentionally:
+   *   1. TrackArtist – direct artist credit on a track (indexed on artistId)
+   *   2. ReleaseTrack → Release → ArtistRelease – artist credited via a release (indexed on artistId)
+   * Both paths are required because an artist may be linked to a track either directly
+   * or solely through a release. Indexes on TrackArtist.artistId and ArtistRelease.artistId
+   * are defined in the schema to keep these nested-join queries performant.
+   *
+   * Note: unpublished releases are intentionally included here because this method
+   * is used in admin contexts where full visibility is required.
    * When only releaseId is provided, counts tracks in that specific release.
    */
   static async getTracksCount(
