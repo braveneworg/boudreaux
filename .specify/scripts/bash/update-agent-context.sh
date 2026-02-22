@@ -52,9 +52,20 @@ set -o pipefail
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-# Get all paths and variables from common functions
-eval $(get_feature_paths)
+# Get all paths and variables from common functions in a safe way.
+# We parse KEY=VALUE lines from get_feature_paths and assign them without eval
+# so that untrusted data (e.g., branch names) cannot be executed as shell code.
+while IFS='=' read -r var value; do
+  # Skip empty lines and comments
+  if [[ -z "$var" || "$var" == '#'* ]]; then
+    continue
+  fi
 
+  # Only accept normal shell identifiers as variable names
+  if [[ "$var" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    printf -v "$var" '%s' "$value"
+  fi
+done < <(get_feature_paths)
 NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
 AGENT_TYPE="${1:-}"
 
