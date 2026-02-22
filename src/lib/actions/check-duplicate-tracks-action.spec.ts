@@ -57,7 +57,7 @@ describe('checkDuplicateTracksAction', () => {
     expect(mockFindMany).toHaveBeenCalledWith({
       where: {
         audioFileHash: { in: ['abc123', 'def456'] },
-        deletedOn: null,
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       },
       select: {
         id: true,

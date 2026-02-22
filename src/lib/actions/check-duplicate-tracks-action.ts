@@ -64,7 +64,7 @@ export async function checkDuplicateTracksAction(
     const existingTracks = await prisma.track.findMany({
       where: {
         audioFileHash: { in: validHashes },
-        deletedOn: null,
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       },
       select: {
         id: true,

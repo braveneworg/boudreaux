@@ -404,7 +404,9 @@ export class ReleaseService {
         const releases = await prisma.release.findMany({
           where: {
             publishedAt: { not: null },
-            deletedOn: null,
+            // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+            // set to null, not missing fields. Use OR to handle both cases.
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
           orderBy: { releasedOn: 'desc' },
           include: {
@@ -465,7 +467,7 @@ export class ReleaseService {
         where: {
           id,
           publishedAt: { not: null },
-          deletedOn: null,
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
         include: {
           images: {
@@ -532,7 +534,7 @@ export class ReleaseService {
           artistReleases: { some: { artistId } },
           id: { not: excludeReleaseId },
           publishedAt: { not: null },
-          deletedOn: null,
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
         orderBy: { releasedOn: 'desc' },
         include: {
