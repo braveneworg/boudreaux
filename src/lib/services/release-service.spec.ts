@@ -17,6 +17,7 @@ vi.mock('../prisma', () => ({
       create: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
@@ -25,6 +26,10 @@ vi.mock('../prisma', () => ({
     },
     $transaction: vi.fn(),
   },
+}));
+
+vi.mock('../utils/simple-cache', () => ({
+  withCache: vi.fn(async (_key: string, fn: () => Promise<unknown>, _ttl?: number) => fn()),
 }));
 
 describe('ReleaseService', () => {
@@ -742,6 +747,351 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.restoreRelease('release-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to restore release' });
+    });
+  });
+
+  // ===========================================================================
+  // Public release methods (for /releases pages)
+  // ===========================================================================
+
+  describe('getPublishedReleases', () => {
+    const mockPublishedRelease = {
+      ...mockRelease,
+      publishedAt: new Date('2024-01-10'),
+      images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
+      artistReleases: [
+        {
+          id: 'ar-1',
+          artistId: 'artist-1',
+          releaseId: 'release-123',
+          artist: {
+            id: 'artist-1',
+            firstName: 'John',
+            surname: 'Doe',
+            displayName: null,
+            groups: [
+              {
+                id: 'ag-1',
+                artistId: 'artist-1',
+                groupId: 'group-1',
+                group: { id: 'group-1', displayName: 'The Does' },
+              },
+            ],
+          },
+        },
+      ],
+      releaseUrls: [
+        {
+          id: 'ru-1',
+          releaseId: 'release-123',
+          urlId: 'url-1',
+          url: { id: 'url-1', platform: 'BANDCAMP', url: 'https://label.bandcamp.com/album/test' },
+        },
+      ],
+    };
+
+    it('should return published releases ordered by releasedOn desc', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result.success).toBe(true);
+      expect(result).toHaveProperty('data');
+      const { data } = result as unknown as { data: { id: string }[] };
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('release-123');
+    });
+
+    it('should filter by publishedAt not null and deletedOn null', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      await ReleaseService.getPublishedReleases();
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            publishedAt: { not: null },
+            deletedOn: null,
+          },
+          orderBy: { releasedOn: 'desc' },
+        })
+      );
+    });
+
+    it('should include images, artistReleases with artist+groups, and releaseUrls', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
+
+      await ReleaseService.getPublishedReleases();
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            images: expect.anything(),
+            artistReleases: expect.objectContaining({
+              include: expect.objectContaining({
+                artist: expect.objectContaining({
+                  include: expect.objectContaining({
+                    groups: expect.anything(),
+                  }),
+                }),
+              }),
+            }),
+            releaseUrls: expect.objectContaining({
+              include: expect.objectContaining({
+                url: true,
+              }),
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should return empty array when no published releases exist', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result).toMatchObject({ success: true, data: [] });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.release.findMany).mockRejectedValue(initError);
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.findMany).mockRejectedValue(Error('Unknown'));
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to fetch published releases' });
+    });
+  });
+
+  describe('getReleaseWithTracks', () => {
+    const mockReleaseWithTracks = {
+      ...mockRelease,
+      publishedAt: new Date('2024-01-10'),
+      images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
+      artistReleases: [
+        {
+          id: 'ar-1',
+          artistId: 'artist-1',
+          releaseId: 'release-123',
+          artist: {
+            id: 'artist-1',
+            firstName: 'John',
+            surname: 'Doe',
+            displayName: null,
+          },
+        },
+      ],
+      releaseTracks: [
+        {
+          id: 'rt-1',
+          releaseId: 'release-123',
+          trackId: 'track-1',
+          position: 1,
+          coverArt: null,
+          track: {
+            id: 'track-1',
+            title: 'Track One',
+            duration: 210,
+            audioUrl: 'https://example.com/track1.mp3',
+            position: 1,
+            coverArt: null,
+          },
+        },
+        {
+          id: 'rt-2',
+          releaseId: 'release-123',
+          trackId: 'track-2',
+          position: 2,
+          coverArt: null,
+          track: {
+            id: 'track-2',
+            title: 'Track Two',
+            duration: 185,
+            audioUrl: 'https://example.com/track2.mp3',
+            position: 2,
+            coverArt: null,
+          },
+        },
+      ],
+      releaseUrls: [
+        {
+          id: 'ru-1',
+          releaseId: 'release-123',
+          urlId: 'url-1',
+          url: { id: 'url-1', platform: 'BANDCAMP', url: 'https://label.bandcamp.com/album/test' },
+        },
+      ],
+    };
+
+    it('should return a published release with tracks', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
+
+      const result = await ReleaseService.getReleaseWithTracks('release-123');
+
+      expect(result.success).toBe(true);
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('data.id', 'release-123');
+      expect(result).toHaveProperty('data.releaseTracks');
+      const { data } = result as unknown as { data: { releaseTracks: unknown[] } };
+      expect(data.releaseTracks).toHaveLength(2);
+    });
+
+    it('should filter by id, publishedAt not null, and deletedOn null', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
+
+      await ReleaseService.getReleaseWithTracks('release-123');
+
+      expect(prisma.release.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'release-123',
+            publishedAt: { not: null },
+            deletedOn: null,
+          },
+        })
+      );
+    });
+
+    it('should order releaseTracks by position', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
+
+      await ReleaseService.getReleaseWithTracks('release-123');
+
+      expect(prisma.release.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            releaseTracks: expect.objectContaining({
+              orderBy: { position: 'asc' },
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should return error when release not found', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+
+      const result = await ReleaseService.getReleaseWithTracks('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.release.findFirst).mockRejectedValue(initError);
+
+      const result = await ReleaseService.getReleaseWithTracks('release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.findFirst).mockRejectedValue(Error('Unknown'));
+
+      const result = await ReleaseService.getReleaseWithTracks('release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve release' });
+    });
+  });
+
+  describe('getArtistOtherReleases', () => {
+    const mockOtherRelease = {
+      ...mockRelease,
+      id: 'release-456',
+      title: 'Other Album',
+      coverArt: 'https://example.com/other-cover.jpg',
+      releasedOn: new Date('2024-02-01'),
+      publishedAt: new Date('2024-01-20'),
+      deletedOn: null,
+      images: [
+        {
+          id: 'img-2',
+          src: 'https://example.com/other-img.jpg',
+          altText: 'Other cover',
+          sortOrder: 0,
+        },
+      ],
+    };
+
+    it('should return other published releases by the artist', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockOtherRelease]);
+
+      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(result.success).toBe(true);
+      expect(result).toHaveProperty('data');
+      const { data } = result as unknown as { data: { id: string }[] };
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('release-456');
+    });
+
+    it('should filter by artistId, exclude current release, and only include published', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            artistReleases: { some: { artistId: 'artist-1' } },
+            id: { not: 'release-123' },
+            publishedAt: { not: null },
+            deletedOn: null,
+          },
+          orderBy: { releasedOn: 'desc' },
+        })
+      );
+    });
+
+    it('should include images for cover art display', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            images: expect.anything(),
+          }),
+        })
+      );
+    });
+
+    it('should return empty array when no other releases exist', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([]);
+
+      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(result).toMatchObject({ success: true, data: [] });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.release.findMany).mockRejectedValue(initError);
+
+      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.findMany).mockRejectedValue(Error('Unknown'));
+
+      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Failed to fetch artist releases',
+      });
     });
   });
 });

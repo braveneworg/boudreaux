@@ -19,6 +19,8 @@ type BreadcrumbItemData = {
   anchorText: string;
   url: string;
   isActive: boolean;
+  /** Optional CSS classes to apply to the breadcrumb text */
+  className?: string;
 };
 
 type BreadcrumbMenuProps = {
@@ -45,7 +47,9 @@ export function BreadcrumbMenu({ items, className }: BreadcrumbMenuProps) {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 {item.isActive ? (
-                  <BreadcrumbPage>{item.anchorText}</BreadcrumbPage>
+                  <BreadcrumbPage>
+                    <span className={item.className}>{item.anchorText}</span>
+                  </BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
                     <Link href={item.url}>{item.anchorText}</Link>

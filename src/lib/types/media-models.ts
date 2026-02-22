@@ -310,3 +310,83 @@ export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
     url: true;
   };
 }>;
+
+// =============================================================================
+// Public Release Types (for /releases pages)
+// =============================================================================
+
+/**
+ * Published release listing for the public releases grid page.
+ * Includes artist info with groups (for display name fallback and search),
+ * first image (for cover art fallback), and URLs (for Bandcamp link).
+ */
+export type PublishedReleaseListing = Prisma.ReleaseGetPayload<{
+  include: {
+    images: true;
+    artistReleases: {
+      include: {
+        artist: {
+          include: {
+            groups: {
+              include: {
+                group: true;
+              };
+            };
+          };
+        };
+      };
+    };
+    releaseUrls: {
+      include: {
+        url: true;
+      };
+    };
+  };
+}>;
+
+/**
+ * Published release detail for the media player page at /releases/[releaseId].
+ * Includes full track data for audio playback, images, artist info, and URLs.
+ */
+export type PublishedReleaseDetail = Prisma.ReleaseGetPayload<{
+  include: {
+    images: true;
+    artistReleases: {
+      include: {
+        artist: {
+          include: {
+            images: true;
+            labels: true;
+            groups: true;
+            releases: {
+              include: {
+                release: true;
+              };
+            };
+            urls: true;
+          };
+        };
+      };
+    };
+    releaseTracks: {
+      include: {
+        track: true;
+      };
+    };
+    releaseUrls: {
+      include: {
+        url: true;
+      };
+    };
+  };
+}>;
+
+/**
+ * Lightweight release type for the "other releases by this artist" carousel.
+ * Only includes images for cover art display.
+ */
+export type ReleaseCarouselItem = Prisma.ReleaseGetPayload<{
+  include: {
+    images: true;
+  };
+}>;

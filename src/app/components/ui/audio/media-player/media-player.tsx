@@ -18,6 +18,13 @@ import {
 } from 'lucide-react';
 import videojs from 'video.js';
 
+import {
+  getAudioRewindButton,
+  getAudioFastForwardButton,
+  getSkipPreviousButton,
+  getSkipNextButton,
+  resetClasses,
+} from '@/app/components/ui/audio/audio-controls';
 import TextField from '@/components/forms/fields/text-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,13 +48,6 @@ import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
-import {
-  AudioFastForwardButton,
-  AudioRewindButton,
-  SkipNextButton,
-  SkipPreviousButton,
-} from '../audio-controls';
-
 import type { Control } from 'react-hook-form';
 import type Player from 'video.js/dist/types/player';
 
@@ -55,14 +55,38 @@ import 'video.js/dist/video-js.css';
 import './videojs-audio.css';
 
 // Register VideoJS components once at module level
-let componentsRegistered = false;
-const registerVideoJSComponents = () => {
-  if (componentsRegistered) return;
-  videojs.registerComponent('AudioRewindButton', AudioRewindButton);
-  videojs.registerComponent('AudioFastForwardButton', AudioFastForwardButton);
-  videojs.registerComponent('SkipPreviousButton', SkipPreviousButton);
-  videojs.registerComponent('SkipNextButton', SkipNextButton);
-  componentsRegistered = true;
+/**
+ * Registers custom VideoJS components if they haven't been registered yet.
+ * Must be called only when video.js is fully loaded (inside useEffect).
+ *
+ * Always verifies components are actually in Video.js's registry to handle
+ * state resets during Next.js client-side navigation.
+ *
+ * @returns true if all components were registered successfully
+ */
+const registerVideoJSComponents = (): boolean => {
+  // Always force a fresh rebuild and registration.
+  // After player.dispose(), Video.js may silently drop custom components
+  // from its registry while keeping the same Button base class reference,
+  // making cached-reference checks unreliable.
+  resetClasses();
+
+  const getters: [string, () => ReturnType<typeof videojs.getComponent> | null][] = [
+    ['AudioRewindButton', getAudioRewindButton],
+    ['AudioFastForwardButton', getAudioFastForwardButton],
+    ['SkipPreviousButton', getSkipPreviousButton],
+    ['SkipNextButton', getSkipNextButton],
+  ];
+
+  for (const [name, getComponent] of getters) {
+    const component = getComponent();
+    if (!component) {
+      return false;
+    }
+    videojs.registerComponent(name, component);
+  }
+
+  return true;
 };
 
 /**
@@ -641,11 +665,11 @@ const Controls = ({
   const playerRef = useRef<Player | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const isInitializedRef = useRef(false);
-  const initialSourceRef = useRef(audioSrc); // Track initial source to skip auto-play on mount
-  const lastPreviousClickRef = useRef<number>(0); // Track time of last previous click for double-click detection
-  const SKIP_TIME = 10; // seconds for rewind/fast-forward
-  const DOUBLE_CLICK_THRESHOLD = 1000; // ms - time window for considering a "double click" for previous track
-  const REWIND_THRESHOLD = 3; // seconds - if within this time from start, go to previous track on first click
+  const initialSourceRef = useRef(audioSrc);
+  const lastPreviousClickRef = useRef<number>(0);
+  const SKIP_TIME = 10;
+  const DOUBLE_CLICK_THRESHOLD = 1000;
+  const REWIND_THRESHOLD = 3;
 
   // Use refs for callbacks to avoid re-running the effect when they change
   const onPlayRef = useRef(onPlay);
@@ -667,146 +691,200 @@ const Controls = ({
 
   // Initialize player once
   useEffect(() => {
-    // Register components once
-    registerVideoJSComponents();
+    // Bail out if already initialized or no container
+    if (isInitializedRef.current || !containerRef.current) return;
 
-    if (!containerRef.current || isInitializedRef.current) return;
+    /**
+     * Attempts to register Video.js components and create the player.
+     * Returns true if successful, false if Video.js isn't ready yet.
+     */
+    const initPlayer = (): boolean => {
+      // Verify Video.js is fully loaded — Button must be available
+      if (!videojs.getComponent('Button')) {
+        return false;
+      }
 
-    // Create audio element dynamically
-    const audioEl = document.createElement('audio');
-    audioEl.className = 'video-js vjs-default-skin';
-    // iOS requires playsinline for inline media playback
-    audioEl.setAttribute('playsinline', '');
-    audioEl.setAttribute('webkit-playsinline', '');
-    containerRef.current.appendChild(audioEl);
-    audioElRef.current = audioEl;
+      // Register custom components (always force-rebuilds)
+      if (!registerVideoJSComponents()) {
+        return false;
+      }
 
-    const player = videojs(audioEl, {
-      controls: true,
-      autoplay: false,
-      preload: 'auto',
-      playsinline: true,
-      responsive: true,
-      inactivityTimeout: 0,
-      userActions: {
-        hotkeys: true,
-      },
-      sources: [{ src: audioSrc, type: getAudioMimeType(audioSrc) }],
-      fluid: false,
-      fill: false,
-      controlBar: {
-        children: [
-          'currentTimeDisplay',
-          'progressControl',
-          'durationDisplay',
-          'skipPreviousButton',
-          {
-            name: 'audioRewindButton',
-            seconds: SKIP_TIME,
-          },
-          'playToggle',
-          {
-            name: 'audioFastForwardButton',
-            seconds: SKIP_TIME,
-          },
-          'skipNextButton',
-          'volumePanel',
-        ],
-        volumePanel: {
-          inline: false,
-          vertical: false,
+      // Double-check registration actually stuck
+      const BaseButton = videojs.getComponent('Button');
+      const allRegistered = [
+        'AudioRewindButton',
+        'AudioFastForwardButton',
+        'SkipPreviousButton',
+        'SkipNextButton',
+      ].every((name) => {
+        const comp = videojs.getComponent(name);
+        return comp && comp !== BaseButton;
+      });
+
+      if (!allRegistered) {
+        return false;
+      }
+
+      if (!containerRef.current) return false;
+
+      // Create audio element dynamically
+      const audioEl = document.createElement('audio');
+      audioEl.className = 'video-js vjs-default-skin';
+      audioEl.setAttribute('playsinline', '');
+      audioEl.setAttribute('webkit-playsinline', '');
+      containerRef.current.appendChild(audioEl);
+      audioElRef.current = audioEl;
+
+      const player = videojs(audioEl, {
+        controls: true,
+        autoplay: false,
+        preload: 'auto',
+        playsinline: true,
+        responsive: true,
+        inactivityTimeout: 0,
+        userActions: {
+          hotkeys: true,
         },
-      },
-    });
-
-    playerRef.current = player;
-    isInitializedRef.current = true;
-
-    player.ready(() => {
-      player.addClass('vjs-audio');
-      player.addClass('vjs-has-started');
-      player.userActive(true);
-
-      // Expose player controls via controlsRef after player is ready
-      if (controlsRefCallback.current) {
-        const controls: MediaPlayerControls = {
-          play: () => {
-            const playPromise = player.play();
-            if (playPromise !== undefined) {
-              (playPromise as Promise<void>).catch(() => {
-                // iOS may reject play() if not initiated by a user gesture
-              });
-            }
+        sources: [{ src: audioSrc, type: getAudioMimeType(audioSrc) }],
+        fluid: false,
+        fill: false,
+        controlBar: {
+          children: [
+            'currentTimeDisplay',
+            'progressControl',
+            'durationDisplay',
+            'skipPreviousButton',
+            {
+              name: 'audioRewindButton',
+              seconds: SKIP_TIME,
+            },
+            'playToggle',
+            {
+              name: 'audioFastForwardButton',
+              seconds: SKIP_TIME,
+            },
+            'skipNextButton',
+            'volumePanel',
+          ],
+          volumePanel: {
+            inline: false,
+            vertical: false,
           },
-          pause: () => player.pause(),
-          toggle: () => {
-            if (player.paused()) {
+        },
+      });
+
+      playerRef.current = player;
+      isInitializedRef.current = true;
+
+      player.ready(() => {
+        player.addClass('vjs-audio');
+        player.addClass('vjs-has-started');
+        player.userActive(true);
+
+        if (controlsRefCallback.current) {
+          const controls: MediaPlayerControls = {
+            play: () => {
               const playPromise = player.play();
               if (playPromise !== undefined) {
                 (playPromise as Promise<void>).catch(() => {
                   // iOS may reject play() if not initiated by a user gesture
                 });
               }
-            } else {
-              player.pause();
-            }
-          },
-        };
-        controlsRefCallback.current(controls);
-      }
-    });
-
-    player.on('play', () => {
-      player.userActive(true);
-      onPlayRef.current?.();
-    });
-
-    player.on('pause', () => {
-      onPauseRef.current?.();
-    });
-
-    player.on('ended', () => {
-      onPauseRef.current?.();
-      onEndedRef.current?.();
-    });
-
-    player.on('userinactive', () => {
-      player.userActive(true);
-    });
-
-    // Handle skip previous button click
-    player.on('skipprevious', () => {
-      const currentTime = player.currentTime() || 0;
-      const wasPlaying = !player.paused();
-      const now = Date.now();
-      const timeSinceLastClick = now - lastPreviousClickRef.current;
-      lastPreviousClickRef.current = now;
-
-      // If within threshold from start OR clicked twice quickly, go to previous track
-      if (currentTime < REWIND_THRESHOLD || timeSinceLastClick < DOUBLE_CLICK_THRESHOLD) {
-        if (onPreviousTrackRef.current) {
-          onPreviousTrackRef.current(wasPlaying);
+            },
+            pause: () => player.pause(),
+            toggle: () => {
+              if (player.paused()) {
+                const playPromise = player.play();
+                if (playPromise !== undefined) {
+                  (playPromise as Promise<void>).catch(() => {
+                    // iOS may reject play() if not initiated by a user gesture
+                  });
+                }
+              } else {
+                player.pause();
+              }
+            },
+          };
+          controlsRefCallback.current(controls);
         }
-      } else {
-        // Rewind to beginning
-        player.currentTime(0);
-        // If was playing, continue playing
-        if (wasPlaying) {
-          const playPromise = player.play();
-          if (playPromise !== undefined) {
-            (playPromise as Promise<void>).catch(() => {
-              // iOS may reject play() after seeking
-            });
+      });
+
+      player.on('play', () => {
+        player.userActive(true);
+        onPlayRef.current?.();
+      });
+
+      player.on('pause', () => {
+        onPauseRef.current?.();
+      });
+
+      player.on('ended', () => {
+        onPauseRef.current?.();
+        onEndedRef.current?.();
+      });
+
+      player.on('userinactive', () => {
+        player.userActive(true);
+      });
+
+      player.on('skipprevious', () => {
+        const currentTime = player.currentTime() || 0;
+        const wasPlaying = !player.paused();
+        const now = Date.now();
+        const timeSinceLastClick = now - lastPreviousClickRef.current;
+        lastPreviousClickRef.current = now;
+
+        if (currentTime < REWIND_THRESHOLD || timeSinceLastClick < DOUBLE_CLICK_THRESHOLD) {
+          if (onPreviousTrackRef.current) {
+            onPreviousTrackRef.current(wasPlaying);
+          }
+        } else {
+          player.currentTime(0);
+          if (wasPlaying) {
+            const playPromise = player.play();
+            if (playPromise !== undefined) {
+              (playPromise as Promise<void>).catch(() => {
+                // iOS may reject play() after seeking
+              });
+            }
           }
         }
-      }
-    });
+      });
 
-    // Handle skip next button click
-    player.on('skipnext', () => {
-      const wasPlaying = !player.paused();
-      if (onNextTrackRef.current) {
-        onNextTrackRef.current(wasPlaying);
+      player.on('skipnext', () => {
+        const wasPlaying = !player.paused();
+        if (onNextTrackRef.current) {
+          onNextTrackRef.current(wasPlaying);
+        }
+      });
+
+      return true;
+    };
+
+    // Try to initialize immediately
+    if (initPlayer()) return;
+
+    // If Video.js wasn't ready, retry with increasing delays.
+    // This handles the case where client-side navigation causes
+    // Video.js to be in a transitional state when useEffect fires.
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryDelays = [0, 10, 25, 50, 100, 150, 200, 300, 500, 1000];
+
+    const retryInit = () => {
+      retryCount++;
+      if (retryCount > maxRetries || isInitializedRef.current) return;
+
+      if (!initPlayer()) {
+        const delay = retryDelays[Math.min(retryCount, retryDelays.length - 1)];
+        setTimeout(retryInit, delay);
+      }
+    };
+
+    // Start retry loop with requestAnimationFrame to wait for next paint
+    requestAnimationFrame(() => {
+      if (!isInitializedRef.current) {
+        retryInit();
       }
     });
 
@@ -818,10 +896,6 @@ const Controls = ({
         isInitializedRef.current = false;
       }
     };
-    // We intentionally initialize the Video.js player only once on mount.
-    // The event handlers registered here read from mutable refs (e.g. onNextTrackRef)
-    // that are updated by other hooks, so they always see the latest callbacks
-    // without needing to recreate the player when those refs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1124,20 +1198,17 @@ const DotNavMenuTrigger = ({ onClick }: { onClick: ({ isOpen }: { isOpen: boolea
  * const menuItems = [
  *   { label: 'Add to playlist', onClick: () => {} },
  *   { label: 'Share', onClick: () => {} },
- *   { label: 'Download', onClick: () => {} }
+ *   { label: 'Download', onClick: () => {} },
  * ];
- *
- * <MediaPlayer>
- *   <MediaPlayer.DotNavMenu navMenuItems={menuItems} />
- * </MediaPlayer>
+ * <MediaPlayer.DotNavMenu navMenuItems={menuItems} />
  * ```
  */
 const DotNavMenu = ({ navMenuItems }: { navMenuItems: NavMenuItem[] }) => {
   return (
     <>
       {navMenuItems.length > 0 && (
-        <div className="relative inline-block text-left">
-          <div>
+        <div className="relative" role="menu">
+          <div className="py-1">
             {navMenuItems.map((item) => (
               <DotNavMenuItem key={item.label} navMenuItem={item} />
             ))}
@@ -1203,91 +1274,17 @@ const DotNavMenuItem = ({ navMenuItem }: { navMenuItem: NavMenuItem }) => {
 const SocialSharer = () => <div>SocialSharer</div>;
 
 /**
- * Union type of all valid MediaPlayer sub-components.
- *
- * @remarks
- * Used for type-checking compound component children
- */
-type MediaPlayerComponent =
-  | typeof Search
-  | typeof CoverArtView
-  | typeof InteractiveCoverArt
-  | typeof CoverArtCarousel
-  | typeof Controls
-  | typeof Description
-  | typeof DotNavMenu
-  | typeof DotNavMenuItem
-  | typeof DotNavMenuTrigger
-  | typeof TrackListDrawer
-  | typeof InfoTickerTape
-  | typeof SocialSharer;
-
-/**
- * Type definition for valid MediaPlayer children elements.
- *
- * @remarks
- * Ensures that only MediaPlayer sub-components can be used as children
- */
-type MediaPlayerChildren = React.ReactElement<Record<string, never>, MediaPlayerComponent>;
-
-/**
  * Props interface for the main MediaPlayer component.
- *
  * @property children - One or more MediaPlayer sub-components
  * @property artists - Optional array of artist objects (currently unused, reserved for future use)
  * @property className - Optional CSS class names to apply to the container
  */
 interface MediaPlayerProps {
-  children: MediaPlayerChildren | MediaPlayerChildren[];
-  artists?: Artist[];
+  children: React.ReactNode;
   className?: string;
+  artists?: Artist[];
 }
 
-/**
- * MediaPlayer is a compound component that provides a complete audio player interface.
- *
- * @param props - The component props
- * @param props.children - MediaPlayer sub-components to render
- *
- * @returns A container div wrapping all MediaPlayer sub-components
- *
- * @remarks
- * This is a compound component pattern implementation. Use the sub-components to build
- * a custom media player interface:
- * - MediaPlayer.Search - Search input for filtering content
- * - MediaPlayer.CoverArtView - Display album/release cover art
- * - MediaPlayer.InteractiveCoverArt - Cover art with play/pause overlay
- * - MediaPlayer.ThumbCarousel - Carousel of artist thumbnails
- * - MediaPlayer.InfoTickerTape - Scrolling track information display
- * - MediaPlayer.Controls - Audio playback controls with video.js
- * - MediaPlayer.TrackListDrawer - Collapsible track list
- * - MediaPlayer.Description - Release/track description (stub)
- * - MediaPlayer.DotNavMenu - Navigation menu with actions
- * - MediaPlayer.DotNavMenuItem - Individual menu item
- * - MediaPlayer.DotNavMenuTrigger - Menu trigger button
- * - MediaPlayer.SocialSharer - Social media sharing (stub)
- *
- * @example
- * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.Search control={form.control} />
- *   <MediaPlayer.CoverArtView
- *     artistRelease={{ release, artist }}
- *     width={380}
- *     height={380}
- *   />
- *   <MediaPlayer.InfoTickerTape
- *     artistRelease={{ release, artist }}
- *     trackName="Current Track"
- *   />
- *   <MediaPlayer.Controls
- *     audioSrc="/audio/track.mp3"
- *     onPreviousTrack={handlePrevious}
- *     onNextTrack={handleNext}
- *   />
- * </MediaPlayer>
- * ```
- */
 export const MediaPlayer = ({ children, className }: MediaPlayerProps) => (
   <div className={className}>{children}</div>
 );
