@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.7.0] - 2026-02-24
+
+### Added
+
+- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n
+
 ## [1.6.0] - 2026-02-22
 
 ### Added
