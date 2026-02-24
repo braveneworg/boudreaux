@@ -15,7 +15,7 @@ import type { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 
 interface UsernameGeneratorProps<T extends FieldValues> {
   form: UseFormReturn<T>;
-  fieldsToPopulate: [Path<T>, Path<T>]; // [username, confirmUsername]
+  fieldsToPopulate: readonly [Path<T>, Path<T>]; // [username, confirmUsername]
   isLoading?: boolean;
   wasSuccessful?: boolean;
 }
