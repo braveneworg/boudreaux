@@ -102,28 +102,59 @@ export class TrackService {
 
   /**
    * Get all tracks with optional filters
+   *
+   * When artistIds are provided, ignores releaseId filter and returns all tracks
+   * from all releases of the specified artists (including unpublished releases).
+   * When only releaseId is provided, filters to that specific release.
    */
   static async getTracks(params?: {
     skip?: number;
     take?: number;
     search?: string;
     releaseId?: string;
+    artistIds?: string[];
   }): Promise<ServiceResponse<Track[]>> {
     try {
-      const { skip = 0, take = 50, search, releaseId } = params || {};
+      const { skip = 0, take = 50, search, releaseId, artistIds } = params || {};
 
-      const where: Prisma.TrackWhereInput = {
-        ...(search && {
-          OR: [{ title: { contains: search, mode: 'insensitive' } }],
-        }),
-        ...(releaseId && {
-          releaseTracks: {
-            some: {
-              releaseId,
+      const conditions: Prisma.TrackWhereInput[] = [];
+
+      if (search) {
+        conditions.push({ title: { contains: search, mode: 'insensitive' } });
+      }
+
+      // When artistIds are provided, ignore releaseId and get all tracks from all releases of those artists
+      if (artistIds && artistIds.length > 0) {
+        conditions.push({
+          OR: [
+            // Direct track-artist link via TrackArtist join table
+            {
+              artists: {
+                some: { artistId: { in: artistIds } },
+              },
             },
-          },
-        }),
-      };
+            // Indirect link via releases: Track → ReleaseTrack → Release → ArtistRelease
+            {
+              releaseTracks: {
+                some: {
+                  release: {
+                    artistReleases: {
+                      some: { artistId: { in: artistIds } },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        });
+      } else if (releaseId) {
+        // Only apply releaseId filter if no artistIds are provided
+        conditions.push({
+          releaseTracks: { some: { releaseId } },
+        });
+      }
+
+      const where: Prisma.TrackWhereInput = conditions.length > 0 ? { AND: conditions } : {};
 
       const tracks = await prisma.track.findMany({
         where,
@@ -141,6 +172,16 @@ export class TrackService {
                 select: {
                   id: true,
                   title: true,
+                  artistReleases: {
+                    include: {
+                      artist: {
+                        select: {
+                          id: true,
+                          displayName: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -174,24 +215,55 @@ export class TrackService {
 
   /**
    * Get total count of tracks with optional search filter
+   *
+   * When artistIds are provided, ignores releaseId filter and returns count of all tracks
+   * from all releases of the specified artists (including unpublished releases).
+   * When only releaseId is provided, counts tracks in that specific release.
    */
   static async getTracksCount(
     search?: string,
-    releaseId?: string
+    releaseId?: string,
+    artistIds?: string[]
   ): Promise<ServiceResponse<number>> {
     try {
-      const where: Prisma.TrackWhereInput = {
-        ...(search && {
-          OR: [{ title: { contains: search, mode: 'insensitive' } }],
-        }),
-        ...(releaseId && {
-          releaseTracks: {
-            some: {
-              releaseId,
+      const conditions: Prisma.TrackWhereInput[] = [];
+
+      if (search) {
+        conditions.push({ title: { contains: search, mode: 'insensitive' } });
+      }
+
+      // When artistIds are provided, ignore releaseId and get all tracks from all releases of those artists
+      if (artistIds && artistIds.length > 0) {
+        conditions.push({
+          OR: [
+            // Direct track-artist link via TrackArtist join table
+            {
+              artists: {
+                some: { artistId: { in: artistIds } },
+              },
             },
-          },
-        }),
-      };
+            // Indirect link via releases: Track → ReleaseTrack → Release → ArtistRelease
+            {
+              releaseTracks: {
+                some: {
+                  release: {
+                    artistReleases: {
+                      some: { artistId: { in: artistIds } },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        });
+      } else if (releaseId) {
+        // Only apply releaseId filter if no artistIds are provided
+        conditions.push({
+          releaseTracks: { some: { releaseId } },
+        });
+      }
+
+      const where: Prisma.TrackWhereInput = conditions.length > 0 ? { AND: conditions } : {};
 
       const count = await prisma.track.count({ where });
       return { success: true, data: count };

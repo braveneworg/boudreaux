@@ -166,8 +166,10 @@ async function deleteTracksWithoutCoverArt(dryRun: boolean): Promise<number> {
 
   const targets = await prisma.track.findMany({
     where: {
-      OR: [{ coverArt: null }, { coverArt: '' }],
-      deletedOn: null,
+      AND: [
+        { OR: [{ coverArt: null }, { coverArt: '' }] },
+        { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+      ],
     },
     select: {
       id: true,
@@ -398,7 +400,7 @@ async function deleteDuplicateTracks(dryRun: boolean): Promise<number> {
   console.info(`\n${PREFIX} Finding Track records with duplicate titles...`);
 
   const allTracks: DuplicateTrackRow[] = await prisma.track.findMany({
-    where: { deletedOn: null },
+    where: { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
     select: {
       id: true,
       title: true,

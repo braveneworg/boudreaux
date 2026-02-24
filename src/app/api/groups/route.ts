@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { GroupService } from '@/lib/services/group-service';
-import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+import { validateBody } from '@/lib/utils/validate-request';
+import { createGroupSchema } from '@/lib/validation/create-group-schema';
 
 import type { Prisma } from '@prisma/client';
 
@@ -55,13 +56,14 @@ export async function GET(request: NextRequest) {
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
-    const body = await extractFieldsWithValues(request.json());
+    const body = await request.json();
+    const validation = validateBody(createGroupSchema, body);
 
-    if (!body.name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const result = await GroupService.createGroup(body as Prisma.GroupCreateInput);
+    const result = await GroupService.createGroup(validation.data as Prisma.GroupCreateInput);
 
     if (!result.success) {
       return NextResponse.json(

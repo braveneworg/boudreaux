@@ -27,6 +27,12 @@ export interface ReleaseOption {
   id: string;
   title: string;
   releasedOn?: string | Date;
+  artistReleases?: {
+    artist: {
+      id: string;
+      displayName?: string;
+    };
+  }[];
 }
 
 interface ReleaseSelectProps<
@@ -44,6 +50,7 @@ interface ReleaseSelectProps<
   disabled?: boolean;
   showCreateLink?: boolean;
   onReleaseChange?: (release: ReleaseOption | null) => void;
+  artistIds?: string[];
 }
 
 export default function ReleaseSelect<
@@ -61,6 +68,7 @@ export default function ReleaseSelect<
   disabled = false,
   showCreateLink = true,
   onReleaseChange,
+  artistIds,
 }: ReleaseSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -68,32 +76,45 @@ export default function ReleaseSelect<
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Serialize artistIds for stable dependency comparison
+  const artistIdsKey = artistIds?.join(',') ?? '';
+
   // Fetch releases from API
-  const fetchReleases = useCallback(async (search?: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (search) {
-        params.set('search', search);
-      }
-      params.set('take', '50');
+  const fetchReleases = useCallback(
+    async (search?: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (search) {
+          params.set('search', search);
+        }
+        // Append each artistId as a separate query param
+        if (artistIdsKey) {
+          const ids = artistIdsKey.split(',');
+          for (const id of ids) {
+            params.append('artistIds', id);
+          }
+        }
+        params.set('take', '50');
 
-      const response = await fetch(`/api/releases?${params.toString()}`);
-      if (!response.ok) {
-        throw Error('Failed to fetch releases');
-      }
+        const response = await fetch(`/api/releases?${params.toString()}`);
+        if (!response.ok) {
+          throw Error('Failed to fetch releases');
+        }
 
-      const data: { releases: ReleaseOption[] } = await response.json();
-      setReleases(data.releases || []);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load releases';
-      setError(errorMessage);
-      setReleases([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        const data: { releases: ReleaseOption[] } = await response.json();
+        setReleases(data.releases || []);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load releases';
+        setError(errorMessage);
+        setReleases([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [artistIdsKey]
+  );
 
   // Initial fetch when popover opens
   useEffect(() => {
@@ -101,6 +122,14 @@ export default function ReleaseSelect<
       fetchReleases();
     }
   }, [open, releases.length, fetchReleases]);
+
+  // Re-fetch when artistIds changes
+  useEffect(() => {
+    setReleases([]);
+    if (open) {
+      fetchReleases();
+    }
+  }, [artistIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   useEffect(() => {
@@ -137,16 +166,21 @@ export default function ReleaseSelect<
         const selectedRelease = releases.find((r) => r.id === selectedId);
 
         const handleSelect = (releaseId: string) => {
-          const newValue = selectedId === releaseId ? '' : releaseId;
-          const newRelease = newValue ? releases.find((r) => r.id === newValue) || null : null;
+          // If already selected, just close — use the X button to clear
+          if (selectedId === releaseId) {
+            setOpen(false);
+            return;
+          }
+
+          const newRelease = releases.find((r) => r.id === releaseId) || null;
 
           if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
+            setValue(name, releaseId as TFieldValues[TName], {
               shouldDirty: true,
               shouldValidate: true,
             });
           }
-          field.onChange(newValue);
+          field.onChange(releaseId);
           onReleaseChange?.(newRelease);
           setOpen(false);
         };

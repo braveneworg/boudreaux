@@ -7,6 +7,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { ArtistService } from '@/lib/services/artist-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateArtistSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +49,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateArtistSchema, body);
 
-    const result = await ArtistService.updateArtist(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await ArtistService.updateArtist(
+      id,
+      validation.data as unknown as Prisma.ArtistUpdateInput
+    );
 
     if (!result.success) {
       const status =
@@ -75,8 +87,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateArtistSchema, body);
 
-    const result = await ArtistService.updateArtist(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await ArtistService.updateArtist(
+      id,
+      validation.data as unknown as Prisma.ArtistUpdateInput
+    );
 
     if (!result.success) {
       const status =

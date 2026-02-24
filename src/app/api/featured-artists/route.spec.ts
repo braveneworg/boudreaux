@@ -151,6 +151,14 @@ describe('Featured Artists API Routes', () => {
   });
 
   describe('POST /api/featured-artists', () => {
+    const validPostBody = {
+      displayName: 'Featured Artist Name',
+      position: 1,
+      artistIds: ['507f1f77bcf86cd799439011'],
+      trackId: '507f1f77bcf86cd799439012',
+      releaseId: '507f1f77bcf86cd799439013',
+    };
+
     it('should create a new featured artist', async () => {
       vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
         success: true,
@@ -159,11 +167,7 @@ describe('Featured Artists API Routes', () => {
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {
         method: 'POST',
-        body: JSON.stringify({
-          displayName: 'Featured Artist Name',
-          featuredOn: '2024-01-15',
-          position: 1,
-        }),
+        body: JSON.stringify(validPostBody),
       });
 
       const response = await POST(request, { params: Promise.resolve({}) });
@@ -171,6 +175,22 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(data).toEqual(mockFeaturedArtist);
+    });
+
+    it('should return 400 when required fields are missing', async () => {
+      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
+        method: 'POST',
+        body: JSON.stringify({
+          displayName: 'Featured Artist Name',
+        }),
+      });
+
+      const response = await POST(request, { params: Promise.resolve({}) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should return 503 when database is unavailable on create', async () => {
@@ -181,9 +201,7 @@ describe('Featured Artists API Routes', () => {
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {
         method: 'POST',
-        body: JSON.stringify({
-          displayName: 'Featured Artist Name',
-        }),
+        body: JSON.stringify(validPostBody),
       });
 
       const response = await POST(request, { params: Promise.resolve({}) });
@@ -201,9 +219,7 @@ describe('Featured Artists API Routes', () => {
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {
         method: 'POST',
-        body: JSON.stringify({
-          displayName: 'Featured Artist Name',
-        }),
+        body: JSON.stringify(validPostBody),
       });
 
       const response = await POST(request, { params: Promise.resolve({}) });
@@ -233,9 +249,7 @@ describe('Featured Artists API Routes', () => {
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists', {
         method: 'POST',
-        body: JSON.stringify({
-          displayName: 'Featured Artist Name',
-        }),
+        body: JSON.stringify(validPostBody),
       });
 
       const response = await POST(request, { params: Promise.resolve({}) });

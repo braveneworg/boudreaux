@@ -802,7 +802,7 @@ describe('ReleaseService', () => {
       expect(data[0].id).toBe('release-123');
     });
 
-    it('should filter by publishedAt not null and deletedOn null', async () => {
+    it('should filter by publishedAt not null and deletedOn null or unset', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([]);
 
       await ReleaseService.getPublishedReleases();
@@ -811,7 +811,7 @@ describe('ReleaseService', () => {
         expect.objectContaining({
           where: {
             publishedAt: { not: null },
-            deletedOn: null,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
           orderBy: { releasedOn: 'desc' },
         })
@@ -945,7 +945,7 @@ describe('ReleaseService', () => {
       expect(data.releaseTracks).toHaveLength(2);
     });
 
-    it('should filter by id, publishedAt not null, and deletedOn null', async () => {
+    it('should filter by id, publishedAt not null, and deletedOn null or unset', async () => {
       vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
 
       await ReleaseService.getReleaseWithTracks('release-123');
@@ -955,7 +955,7 @@ describe('ReleaseService', () => {
           where: {
             id: 'release-123',
             publishedAt: { not: null },
-            deletedOn: null,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
         })
       );
@@ -1045,7 +1045,7 @@ describe('ReleaseService', () => {
             artistReleases: { some: { artistId: 'artist-1' } },
             id: { not: 'release-123' },
             publishedAt: { not: null },
-            deletedOn: null,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
           orderBy: { releasedOn: 'desc' },
         })

@@ -229,6 +229,7 @@ describe('Release API Routes', () => {
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
           formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -242,6 +243,7 @@ describe('Release API Routes', () => {
         releasedOn: '2024-01-15',
         coverArt: 'https://example.com/cover.jpg',
         formats: ['DIGITAL'],
+        artistIds: ['507f1f77bcf86cd799439011'],
       });
     });
 
@@ -251,6 +253,8 @@ describe('Release API Routes', () => {
         body: JSON.stringify({
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -258,7 +262,8 @@ describe('Release API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Title is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ReleaseService.createRelease).not.toHaveBeenCalled();
     });
 
@@ -268,6 +273,8 @@ describe('Release API Routes', () => {
         body: JSON.stringify({
           title: 'Test Album',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -275,7 +282,8 @@ describe('Release API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Release date is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ReleaseService.createRelease).not.toHaveBeenCalled();
     });
 
@@ -285,6 +293,8 @@ describe('Release API Routes', () => {
         body: JSON.stringify({
           title: 'Test Album',
           releasedOn: '2024-01-15',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -292,7 +302,8 @@ describe('Release API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Cover art is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ReleaseService.createRelease).not.toHaveBeenCalled();
     });
 
@@ -308,6 +319,8 @@ describe('Release API Routes', () => {
           title: 'Test Album',
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -330,6 +343,8 @@ describe('Release API Routes', () => {
           title: 'Test Album',
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -352,6 +367,8 @@ describe('Release API Routes', () => {
           title: 'Test Album',
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -371,6 +388,8 @@ describe('Release API Routes', () => {
           title: 'Test Album',
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          artistIds: ['507f1f77bcf86cd799439011'],
         }),
       });
 
@@ -394,7 +413,8 @@ describe('Release API Routes', () => {
           releasedOn: '2024-01-15',
           coverArt: 'https://example.com/cover.jpg',
           formats: ['DIGITAL', 'VINYL'],
-          labels: ['Test Label'],
+          artistIds: ['507f1f77bcf86cd799439011'],
+          labels: 'Test Label',
           catalogNumber: 'TEST-001',
           description: 'A test album',
         }),
@@ -408,7 +428,8 @@ describe('Release API Routes', () => {
         releasedOn: '2024-01-15',
         coverArt: 'https://example.com/cover.jpg',
         formats: ['DIGITAL', 'VINYL'],
-        labels: ['Test Label'],
+        artistIds: ['507f1f77bcf86cd799439011'],
+        labels: 'Test Label',
         catalogNumber: 'TEST-001',
         description: 'A test album',
       });
@@ -424,7 +445,8 @@ describe('Release API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Title is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
   });
 });

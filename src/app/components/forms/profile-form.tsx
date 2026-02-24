@@ -328,13 +328,39 @@ export default function ProfileForm() {
       // Update session
       void update();
     }
+
+    // Show error toast when there are errors AND the submission has completed
+    // This ensures we capture all error types (validation, server, etc)
+    if (usernameFormState.errors && !isUsernamePending && !isTransitionPending) {
+      const generalErrors = usernameFormState.errors.general;
+      if (generalErrors && generalErrors.length > 0) {
+        // Create a unique key for each error message to avoid duplicate toasts
+        const errorKey = `username-error-${generalErrors[0]}`;
+        toast.error(generalErrors[0], {
+          id: errorKey, // Prevent duplicate toast notifications
+        });
+      }
+
+      const fieldErrors = usernameFormState.errors.username;
+      if (fieldErrors && fieldErrors.length > 0) {
+        // Show field-specific errors in the toast as well for visibility
+        fieldErrors.forEach((error) => {
+          toast.error(error, {
+            id: `username-field-error-${error}`,
+          });
+        });
+      }
+    }
   }, [
     usernameFormState.success,
+    usernameFormState.errors,
     isUsernamePending,
     isTransitionPending,
     update,
     changeUsernameForm,
   ]);
+
+  const usernameFieldsToPopulate = ['username', 'confirmUsername'] as const;
 
   const handleEditFieldButtonClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>): void => {
@@ -600,7 +626,7 @@ export default function ProfileForm() {
                   />
                   <GenerateUsernameButton
                     form={changeUsernameForm}
-                    fieldsToPopulate={['username', 'confirmUsername']}
+                    fieldsToPopulate={usernameFieldsToPopulate}
                     isLoading={isUsernamePending || isTransitionPending}
                     wasSuccessful={usernameFormState.success}
                   />

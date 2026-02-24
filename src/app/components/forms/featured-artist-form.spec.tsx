@@ -65,15 +65,6 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock react useActionState to provide a stable formState
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    useActionState: () => [{ fields: {}, success: false }, vi.fn(), false],
-  };
-});
-
 // Mock react-hook-form to capture setValue calls
 vi.mock('react-hook-form', async () => {
   const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
@@ -175,10 +166,9 @@ describe('FeaturedArtistForm', () => {
       expect(screen.getByTestId('group-select-groupId')).toBeInTheDocument();
     });
 
-    it('renders artist multi-select and cover art field', () => {
+    it('renders cover art field', () => {
       render(<FeaturedArtistForm />);
 
-      expect(screen.getByTestId('artist-multi-select-artistIds')).toBeInTheDocument();
       expect(screen.getByTestId('cover-art-field-coverArt')).toBeInTheDocument();
     });
 

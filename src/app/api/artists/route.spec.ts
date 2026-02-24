@@ -256,7 +256,8 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'firstName, surname, and slug are required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ArtistService.createArtist).not.toHaveBeenCalled();
     });
 
@@ -273,7 +274,8 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'firstName, surname, and slug are required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ArtistService.createArtist).not.toHaveBeenCalled();
     });
 
@@ -290,7 +292,8 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'firstName, surname, and slug are required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
       expect(ArtistService.createArtist).not.toHaveBeenCalled();
     });
 
@@ -393,8 +396,6 @@ describe('Artist API Routes', () => {
           slug: 'john-doe',
           displayName: 'John Doe',
           bio: 'A musician',
-          country: 'US',
-          isActive: true,
         }),
       });
 
@@ -407,8 +408,6 @@ describe('Artist API Routes', () => {
         slug: 'john-doe',
         displayName: 'John Doe',
         bio: 'A musician',
-        country: 'US',
-        isActive: true,
       });
     });
 
@@ -422,7 +421,8 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'firstName, surname, and slug are required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should handle empty string values as invalid', async () => {
@@ -439,7 +439,8 @@ describe('Artist API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'firstName, surname, and slug are required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
   });
 });

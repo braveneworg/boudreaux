@@ -560,6 +560,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -572,6 +573,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -586,6 +588,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -600,6 +603,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -615,6 +619,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -631,6 +636,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
             onTrackSelect={onTrackSelect}
           />
@@ -648,6 +654,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
             onTrackSelect={onTrackSelect}
           />
@@ -664,6 +671,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -676,6 +684,7 @@ describe('MediaPlayer', () => {
       const { container } = render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
             currentTrackId="track-2"
           />
@@ -706,6 +715,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -737,6 +747,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
           />
         </MediaPlayer>
@@ -765,6 +776,7 @@ describe('MediaPlayer', () => {
       render(
         <MediaPlayer>
           <MediaPlayer.TrackListDrawer
+            artistName="Test Artist"
             artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
           />
         </MediaPlayer>

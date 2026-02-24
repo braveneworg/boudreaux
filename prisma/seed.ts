@@ -1,4 +1,3 @@
-import { faker } from '@faker-js/faker';
 import { Platform, PrismaClient } from '@prisma/client';
 
 import { UserService } from '@/lib/services/user-service';
@@ -12,10 +11,14 @@ const createPrimaryAdminUser = async () => {
     !process.env.ADMIN_FIRST_NAME ||
     !process.env.ADMIN_LAST_NAME ||
     !process.env.ADMIN_EMAIL ||
-    !process.env.ADMIN_PHONE
+    !process.env.ADMIN_PHONE ||
+    !process.env.SECONDARY_ADMIN_EMAIL ||
+    !process.env.SECONDARY_ADMIN_PHONE ||
+    !process.env.SECONDARY_ADMIN_FIRST_NAME ||
+    !process.env.SECONDARY_ADMIN_LAST_NAME
   ) {
     console.error(
-      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE'
+      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE, SECONDARY_ADMIN_EMAIL, SECONDARY_ADMIN_PHONE, SECONDARY_ADMIN_FIRST_NAME, SECONDARY_ADMIN_LAST_NAME'
     );
     process.exit(1);
   }
@@ -25,6 +28,14 @@ const createPrimaryAdminUser = async () => {
     lastName: process.env.ADMIN_LAST_NAME,
     email: process.env.ADMIN_EMAIL,
     phone: process.env.ADMIN_PHONE,
+    role: 'admin',
+  });
+
+  await UserService.ensureAdminUser({
+    firstName: process.env.SECONDARY_ADMIN_FIRST_NAME,
+    lastName: process.env.SECONDARY_ADMIN_LAST_NAME,
+    email: process.env.SECONDARY_ADMIN_EMAIL,
+    phone: process.env.SECONDARY_ADMIN_PHONE,
     role: 'admin',
   });
 };
@@ -278,163 +289,6 @@ const createDefaultArtists = async () => {
   }
 
   console.info('✅ Created default artists with URLs.');
-};
-
-const createGroups = async (count: number) => {
-  const groupData = Array.from({ length: count }).map(() => ({
-    name: faker.music.genre() + ' ' + faker.word.noun(),
-    shortBio: faker.lorem.sentence(),
-    bio: faker.lorem.paragraph(),
-    formedOn: faker.date.past({ years: 10 }),
-  }));
-
-  await prisma.group.createMany({
-    data: groupData,
-  });
-};
-
-const createReleases = async (count: number) => {
-  const releaseData = Array.from({ length: count }).map(() => ({
-    title: faker.music.songName(),
-    description: faker.lorem.sentences(2),
-    releasedOn: faker.date.past({ years: 3 }),
-    coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
-  }));
-
-  await prisma.release.createMany({
-    data: releaseData,
-  });
-};
-
-// Sample audio URLs that actually work for testing
-const sampleAudioUrls = [
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
-];
-
-const createTracks = async (count: number) => {
-  const trackData = Array.from({ length: count }).map((_, index) => ({
-    title: faker.music.songName(),
-    coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
-    duration: faker.number.int({ min: 120, max: 420 }), // Duration in seconds
-    audioUrl: sampleAudioUrls[index % sampleAudioUrls.length],
-    position: index,
-  }));
-
-  await prisma.track.createMany({
-    data: trackData,
-  });
-};
-
-/**
- * Create releases with multiple tracks linked via ReleaseTrack
- * This creates albums with 4-8 tracks each
- */
-const createReleasesWithTracks = async () => {
-  // Clear existing release-track links first to avoid unique constraint errors on re-seed
-  await prisma.releaseTrack.deleteMany({});
-
-  const releases = await prisma.release.findMany();
-  const tracks = await prisma.track.findMany();
-
-  if (releases.length === 0 || tracks.length === 0) {
-    console.warn('⚠️ No releases or tracks found. Skipping release-track linking.');
-    return;
-  }
-
-  // Assign tracks to releases (each release gets 4-8 tracks)
-  let trackIndex = 0;
-  for (const release of releases) {
-    const trackCount = faker.number.int({ min: 4, max: 8 });
-    const releaseTracks = [];
-
-    for (let i = 0; i < trackCount && trackIndex < tracks.length; i++) {
-      releaseTracks.push({
-        releaseId: release.id,
-        trackId: tracks[trackIndex].id,
-      });
-      trackIndex++;
-    }
-
-    // Create ReleaseTrack entries for this release
-    if (releaseTracks.length > 0) {
-      await prisma.releaseTrack.createMany({
-        data: releaseTracks,
-      });
-    }
-
-    // Wrap around if we run out of tracks
-    if (trackIndex >= tracks.length) {
-      trackIndex = 0;
-    }
-  }
-
-  console.info('✅ Linked tracks to releases via ReleaseTrack.');
-};
-
-const createFeaturedArtists = async (count: number) => {
-  const artists = await prisma.artist.findMany();
-  const groups = await prisma.group.findMany();
-
-  // Get releases with their tracks
-  const releases = await prisma.release.findMany({
-    include: {
-      releaseTracks: {
-        include: {
-          track: true,
-        },
-      },
-    },
-  });
-
-  // Filter to only releases that have tracks
-  const releasesWithTracks = releases.filter((r) => r.releaseTracks.length > 0);
-
-  if (artists.length === 0) {
-    console.warn('⚠️ No artists found. Skipping featured artists creation.');
-    return;
-  }
-
-  if (releasesWithTracks.length === 0) {
-    console.warn('⚠️ No releases with tracks found. Skipping featured artists creation.');
-    return;
-  }
-
-  // Create featured artists one at a time to handle the Artist[] relation
-  for (let i = 0; i < count; i++) {
-    const randomArtist = faker.helpers.arrayElement(artists);
-    // Pick a release that has tracks, then pick one of its tracks as the featured track
-    const randomRelease = faker.helpers.arrayElement(releasesWithTracks);
-    const randomReleaseTrack = faker.helpers.arrayElement(randomRelease.releaseTracks);
-    // Group is optional
-    const randomGroup = groups.length > 0 ? faker.helpers.arrayElement(groups) : null;
-
-    await prisma.featuredArtist.create({
-      data: {
-        displayName: faker.helpers.maybe(() => faker.person.fullName(), { probability: 0.3 }),
-        featuredOn: faker.date.recent({ days: 30 }),
-        position: i + 1,
-        description: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.7 }),
-        coverArt: faker.image.urlPicsumPhotos({ width: 400, height: 400 }),
-        track: { connect: { id: randomReleaseTrack.track.id } },
-        release: { connect: { id: randomRelease.id } },
-        ...(randomGroup && { group: { connect: { id: randomGroup.id } } }),
-        artists: {
-          connect: [{ id: randomArtist.id }],
-        },
-      },
-    });
-  }
-
-  console.info(`✅ Created ${count} featured artists.`);
 };
 
 /**
@@ -704,18 +558,13 @@ async function main() {
     console.info('🌱 Seeding development database...');
 
     // Create base entities first (these can be created in parallel)
-    await Promise.all([
-      createDefaultArtists(),
-      createGroups(5),
-      createReleases(10),
-      createTracks(50),
-    ]);
+    await createDefaultArtists();
 
     // Link tracks to releases
-    await createReleasesWithTracks();
+    // await createReleasesWithTracks();
 
     // Create featured artists after base entities exist
-    await createFeaturedArtists(7);
+    // await createFeaturedArtists(7);
 
     // Create notification banners (requires admin user)
     if (adminUser) {

@@ -5,6 +5,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 /**
  * GET /api/featured-artists/[id]
@@ -41,8 +45,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateFeaturedArtistSchema, body);
 
-    const result = await FeaturedArtistsService.updateFeaturedArtist(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await FeaturedArtistsService.updateFeaturedArtist(
+      id,
+      validation.data as unknown as Prisma.FeaturedArtistUpdateInput
+    );
 
     if (!result.success) {
       const status =

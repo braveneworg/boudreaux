@@ -114,9 +114,10 @@ export class ReleaseService {
     skip?: number;
     take?: number;
     search?: string;
+    artistIds?: string[];
   }): Promise<ServiceResponse<Release[]>> {
     try {
-      const { skip = 0, take = 50, search } = params || {};
+      const { skip = 0, take = 50, search, artistIds } = params || {};
 
       const where: Prisma.ReleaseWhereInput = {
         ...(search && {
@@ -126,6 +127,14 @@ export class ReleaseService {
             { description: { contains: search, mode: 'insensitive' } },
           ],
         }),
+        ...(artistIds &&
+          artistIds.length > 0 && {
+            artistReleases: {
+              some: {
+                artistId: { in: artistIds },
+              },
+            },
+          }),
       };
 
       const releases = await prisma.release.findMany({
@@ -390,58 +399,62 @@ export class ReleaseService {
    * Results are cached for 10 minutes in production.
    */
   static async getPublishedReleases(): Promise<ServiceResponse<PublishedReleaseListing[]>> {
-    return withCache(
-      'published-releases',
-      async () => {
-        try {
-          const releases = await prisma.release.findMany({
-            where: {
-              publishedAt: { not: null },
-              deletedOn: null,
+    const fetchReleases = async (): Promise<ServiceResponse<PublishedReleaseListing[]>> => {
+      try {
+        const releases = await prisma.release.findMany({
+          where: {
+            publishedAt: { not: null },
+            // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+            // set to null, not missing fields. Use OR to handle both cases.
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          },
+          orderBy: { releasedOn: 'desc' },
+          include: {
+            images: {
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
             },
-            orderBy: { releasedOn: 'desc' },
-            include: {
-              images: {
-                orderBy: { sortOrder: 'asc' },
-                take: 1,
-              },
-              artistReleases: {
-                include: {
-                  artist: {
-                    include: {
-                      groups: {
-                        include: {
-                          group: true,
-                        },
+            artistReleases: {
+              include: {
+                artist: {
+                  include: {
+                    groups: {
+                      include: {
+                        group: true,
                       },
                     },
                   },
                 },
               },
-              releaseUrls: {
-                include: {
-                  url: true,
-                },
+            },
+            releaseUrls: {
+              include: {
+                url: true,
               },
             },
-          });
+          },
+        });
 
-          return {
-            success: true as const,
-            data: releases as unknown as PublishedReleaseListing[],
-          };
-        } catch (error) {
-          if (error instanceof Prisma.PrismaClientInitializationError) {
-            console.error('Database connection failed:', error);
-            return { success: false as const, error: 'Database unavailable' };
-          }
-
-          console.error('Unexpected error:', error);
-          return { success: false as const, error: 'Failed to fetch published releases' };
+        return {
+          success: true,
+          data: releases as unknown as PublishedReleaseListing[],
+        };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientInitializationError) {
+          console.error('Database connection failed:', error);
+          return { success: false, error: 'Database unavailable' };
         }
-      },
-      process.env.NODE_ENV === 'development' ? 0 : 600
-    );
+
+        console.error('Unexpected error:', error);
+        return { success: false, error: 'Failed to fetch published releases' };
+      }
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      return fetchReleases();
+    }
+
+    return withCache('published-releases', fetchReleases, 600);
   }
 
   /**
@@ -454,7 +467,7 @@ export class ReleaseService {
         where: {
           id,
           publishedAt: { not: null },
-          deletedOn: null,
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
         include: {
           images: {
@@ -521,7 +534,7 @@ export class ReleaseService {
           artistReleases: { some: { artistId } },
           id: { not: excludeReleaseId },
           publishedAt: { not: null },
-          deletedOn: null,
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
         orderBy: { releasedOn: 'desc' },
         include: {

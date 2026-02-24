@@ -41,6 +41,7 @@ const eslintConfig = [
       '**/*.md',
       '**/*.json',
       '**/*.d.ts',
+      'scripts/**/*.js',
       '*.pem',
       '*.crt',
       '*.key',

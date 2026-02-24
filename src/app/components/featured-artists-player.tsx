@@ -5,6 +5,8 @@
 
 import { useCallback, useState } from 'react';
 
+import { Separator } from '@radix-ui/react-separator';
+
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
 
@@ -218,19 +220,29 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
         {/* Featured Artists Carousel */}
-        <MediaPlayer.FeaturedArtistCarousel
-          featuredArtists={featuredArtists}
-          onSelect={handleSelectArtist}
-        />
+        {featuredArtists.length >= 3 && (
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={featuredArtists}
+            onSelect={handleSelectArtist}
+          />
+        )}
         {selectedArtist && (
-          <div className="flex justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-            <span>{selectedArtist.release?.title ?? ''} by </span>
-            <strong>{getDisplayName(selectedArtist)}</strong>
-          </div>
+          <>
+            <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
+              <h2 className="text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3">
+                {getDisplayName(selectedArtist)}
+              </h2>
+              <p>
+                <em>{selectedArtist.release?.title ?? ''}</em>
+              </p>
+            </article>
+            <Separator className="bg-zinc-300 mx-auto mt-3 mb-1 min-h-px max-h-px max-w-[calc(100%-2rem)]" />
+          </>
         )}
         {showTrackListDrawer && selectedArtist && (
           <MediaPlayer.TrackListDrawer
             artistRelease={selectedArtist as unknown as ArtistRelease}
+            artistName={getDisplayName(selectedArtist)}
             currentTrackId={currentTrackId ?? ''}
             onTrackSelect={handleTrackSelect}
           />

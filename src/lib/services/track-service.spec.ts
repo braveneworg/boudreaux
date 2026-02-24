@@ -252,7 +252,7 @@ describe('TrackService', () => {
       expect(prisma.track.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+            AND: [{ title: { contains: 'test', mode: 'insensitive' } }],
           },
         })
       );
@@ -266,11 +266,15 @@ describe('TrackService', () => {
       expect(prisma.track.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            releaseTracks: {
-              some: {
-                releaseId: 'release-456',
+            AND: [
+              {
+                releaseTracks: {
+                  some: {
+                    releaseId: 'release-456',
+                  },
+                },
               },
-            },
+            ],
           },
         })
       );
@@ -284,12 +288,92 @@ describe('TrackService', () => {
       expect(prisma.track.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
-            releaseTracks: {
-              some: {
-                releaseId: 'release-456',
+            AND: [
+              { title: { contains: 'test', mode: 'insensitive' } },
+              {
+                releaseTracks: {
+                  some: {
+                    releaseId: 'release-456',
+                  },
+                },
               },
-            },
+            ],
+          },
+        })
+      );
+    });
+
+    it('should apply artistIds filter through both TrackArtist and ArtistRelease paths', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({ artistIds: ['artist-1', 'artist-2'] });
+
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                OR: [
+                  {
+                    artists: {
+                      some: { artistId: { in: ['artist-1', 'artist-2'] } },
+                    },
+                  },
+                  {
+                    releaseTracks: {
+                      some: {
+                        release: {
+                          artistReleases: {
+                            some: { artistId: { in: ['artist-1', 'artist-2'] } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        })
+      );
+    });
+
+    it('should apply search and artistIds filters, ignoring releaseId when artistIds provided', async () => {
+      vi.mocked(prisma.track.findMany).mockResolvedValue(mockTracks as never);
+
+      await TrackService.getTracks({
+        search: 'test',
+        releaseId: 'release-456',
+        artistIds: ['artist-1'],
+      });
+
+      // When artistIds are provided, releaseId filter should be ignored
+      expect(prisma.track.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { title: { contains: 'test', mode: 'insensitive' } },
+              {
+                OR: [
+                  {
+                    artists: {
+                      some: { artistId: { in: ['artist-1'] } },
+                    },
+                  },
+                  {
+                    releaseTracks: {
+                      some: {
+                        release: {
+                          artistReleases: {
+                            some: { artistId: { in: ['artist-1'] } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
           },
         })
       );
@@ -345,7 +429,7 @@ describe('TrackService', () => {
       expect(result).toMatchObject({ success: true, data: 5 });
       expect(prisma.track.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
+          AND: [{ title: { contains: 'test', mode: 'insensitive' } }],
         },
       });
     });
@@ -358,11 +442,15 @@ describe('TrackService', () => {
       expect(result).toMatchObject({ success: true, data: 8 });
       expect(prisma.track.count).toHaveBeenCalledWith({
         where: {
-          releaseTracks: {
-            some: {
-              releaseId: 'release-456',
+          AND: [
+            {
+              releaseTracks: {
+                some: {
+                  releaseId: 'release-456',
+                },
+              },
             },
-          },
+          ],
         },
       });
     });
@@ -375,12 +463,53 @@ describe('TrackService', () => {
       expect(result).toMatchObject({ success: true, data: 3 });
       expect(prisma.track.count).toHaveBeenCalledWith({
         where: {
-          OR: [{ title: { contains: 'test', mode: 'insensitive' } }],
-          releaseTracks: {
-            some: {
-              releaseId: 'release-456',
+          AND: [
+            { title: { contains: 'test', mode: 'insensitive' } },
+            {
+              releaseTracks: {
+                some: {
+                  releaseId: 'release-456',
+                },
+              },
             },
-          },
+          ],
+        },
+      });
+    });
+
+    it('should return count with artistIds filter through both paths', async () => {
+      vi.mocked(prisma.track.count).mockResolvedValue(10);
+
+      const result = await TrackService.getTracksCount(undefined, undefined, [
+        'artist-1',
+        'artist-2',
+      ]);
+
+      expect(result).toMatchObject({ success: true, data: 10 });
+      expect(prisma.track.count).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            {
+              OR: [
+                {
+                  artists: {
+                    some: { artistId: { in: ['artist-1', 'artist-2'] } },
+                  },
+                },
+                {
+                  releaseTracks: {
+                    some: {
+                      release: {
+                        artistReleases: {
+                          some: { artistId: { in: ['artist-1', 'artist-2'] } },
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
         },
       });
     });

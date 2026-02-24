@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -13,10 +13,9 @@ import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
-import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
 import GroupSelect from '@/app/components/forms/fields/group-select';
-import ReleaseSelect from '@/app/components/forms/fields/release-select';
+import ReleaseSelect, { type ReleaseOption } from '@/app/components/forms/fields/release-select';
 import TrackSelect, { type TrackOption } from '@/app/components/forms/fields/track-select';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -70,10 +69,8 @@ const ToastContent = ({ displayName }: { displayName: string }) => (
 export default function FeaturedArtistForm({
   featuredArtistId: initialFeaturedArtistId,
 }: FeaturedArtistFormProps) {
-  const [formState, formAction, isPending] = useActionState<FormState, FormData>(
-    createFeaturedArtistAction,
-    initialFormState
-  );
+  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [isPending, setIsPending] = useState(false);
   const [isLoadingFeaturedArtist, setIsLoadingFeaturedArtist] = useState(!!initialFeaturedArtistId);
   const [featuredArtistId, setFeaturedArtistId] = useState<string | null>(
     initialFeaturedArtistId || null
@@ -83,6 +80,7 @@ export default function FeaturedArtistForm({
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
   const previousReleaseIdRef = useRef<string | undefined>(undefined);
+  const releaseSetByTrackRef = useRef(false);
 
   const form = useForm<FeaturedArtistFormData>({
     resolver: zodResolver(createFeaturedArtistSchema),
@@ -92,15 +90,15 @@ export default function FeaturedArtistForm({
       coverArt: '',
       position: 0,
       featuredOn: new Date().toISOString().split('T')[0],
-      artistIds: [],
       trackId: '',
       releaseId: '',
       groupId: '',
     },
   });
   const { control, setValue } = form;
-  const watchedArtistIds = useWatch({ control, name: 'artistIds' }) as string[] | undefined;
   const watchedReleaseId = useWatch({ control, name: 'releaseId' }) as string | undefined;
+  const [derivedArtistIds, setDerivedArtistIds] = useState<string[]>([]);
+  const [derivedArtistNames, setDerivedArtistNames] = useState<string[]>([]);
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -133,11 +131,19 @@ export default function FeaturedArtistForm({
           coverArt: featuredArtist.coverArt || '',
           position: featuredArtist.position ?? 0,
           featuredOn: formatDate(featuredArtist.featuredOn),
-          artistIds: featuredArtist.artists?.map((a: { id: string }) => a.id) || [],
           trackId: featuredArtist.trackId || '',
           releaseId: featuredArtist.releaseId || '',
           groupId: featuredArtist.groupId || '',
         });
+
+        // Populate derived artist data for display and CoverArtField
+        const ids = featuredArtist.artists?.map((a: { id: string }) => a.id) || [];
+        setDerivedArtistIds(ids);
+        const names =
+          featuredArtist.artists
+            ?.map((a: { displayName?: string }) => a.displayName)
+            .filter((n: string | undefined): n is string => !!n) ?? [];
+        setDerivedArtistNames(names);
       } catch (err) {
         error('Failed to fetch featured artist:', err);
         toast.error('Failed to load featured artist data');
@@ -149,25 +155,7 @@ export default function FeaturedArtistForm({
     fetchFeaturedArtist();
   }, [initialFeaturedArtistId, form]);
 
-  // Handle form submission success/failure
-  useEffect(() => {
-    if (formState.success && formState.data?.featuredArtistId) {
-      const displayName = form.getValues('displayName');
-      toast.success(<ToastContent displayName={displayName || ''} />);
-      const newId =
-        typeof formState.data.featuredArtistId === 'string'
-          ? formState.data.featuredArtistId
-          : null;
-      setFeaturedArtistId(newId);
-      router.push('/admin?entity=featuredArtist');
-    }
-
-    if (formState.errors?.general) {
-      toast.error(formState.errors.general[0]);
-    }
-  }, [formState, form, router]);
-
-  // Sync form errors with server-side validation
+  // Sync server-side field errors with React Hook Form for inline display
   useEffect(() => {
     if (formState.errors) {
       Object.entries(formState.errors).forEach(([field, messages]) => {
@@ -181,7 +169,9 @@ export default function FeaturedArtistForm({
     }
   }, [formState.errors, form]);
 
-  // Clear trackId when releaseId changes to prevent inconsistent associations
+  // Clear trackId when releaseId changes to prevent inconsistent associations.
+  // Skip if the releaseId change was triggered by selecting a track (handleTrackChange),
+  // since in that case we want to keep the track the user just chose.
   useEffect(() => {
     // Skip on initial render (when previousReleaseIdRef is undefined)
     if (previousReleaseIdRef.current === undefined) {
@@ -194,9 +184,14 @@ export default function FeaturedArtistForm({
       return;
     }
 
-    // If releaseId changed, clear trackId
+    // If releaseId changed, clear trackId only when the user changed the release directly
     if (previousReleaseIdRef.current !== watchedReleaseId) {
-      setValue('trackId', '');
+      if (releaseSetByTrackRef.current) {
+        // Release was set by handleTrackChange — keep the track
+        releaseSetByTrackRef.current = false;
+      } else {
+        setValue('trackId', '');
+      }
       previousReleaseIdRef.current = watchedReleaseId;
     }
   }, [watchedReleaseId, setValue, isLoadingFeaturedArtist]);
@@ -207,11 +202,52 @@ export default function FeaturedArtistForm({
   };
 
   const handleTrackChange = (track: TrackOption | null) => {
-    const releaseId = track?.releaseTracks?.[0]?.release?.id ?? '';
+    const release = track?.releaseTracks?.[0]?.release;
+    const releaseId = release?.id ?? '';
+    // Flag that this releaseId change originated from a track selection,
+    // so the useEffect above does not clear the trackId the user just chose.
+    releaseSetByTrackRef.current = true;
     setValue('releaseId', releaseId, {
       shouldDirty: true,
       shouldValidate: true,
     });
+
+    // Derive artistIds from track-level artists first, then fall back to
+    // release-level artists (tracks often lack TrackArtist entries).
+    if (track?.artists && track.artists.length > 0) {
+      const ids = track.artists.map((a) => a.artist.id);
+      const names = track.artists.map((a) => a.artist.displayName).filter((n): n is string => !!n);
+      setDerivedArtistIds(ids);
+      setDerivedArtistNames(names);
+    } else if (release?.artistReleases && release.artistReleases.length > 0) {
+      const ids = release.artistReleases.map((ar) => ar.artist.id);
+      const names = release.artistReleases
+        .map((ar) => ar.artist.displayName)
+        .filter((n): n is string => !!n);
+      setDerivedArtistIds(ids);
+      setDerivedArtistNames(names);
+    } else if (!track) {
+      setDerivedArtistIds([]);
+      setDerivedArtistNames([]);
+    }
+  };
+
+  const handleReleaseChange = (release: ReleaseOption | null) => {
+    // Only derive artists from release when it's a direct user selection
+    // (not triggered by track selection, which handles its own artist derivation)
+    if (releaseSetByTrackRef.current) return;
+
+    if (release?.artistReleases && release.artistReleases.length > 0) {
+      const ids = release.artistReleases.map((ar) => ar.artist.id);
+      const names = release.artistReleases
+        .map((ar) => ar.artist.displayName)
+        .filter((n): n is string => !!n);
+      setDerivedArtistIds(ids);
+      setDerivedArtistNames(names);
+    } else if (!release) {
+      setDerivedArtistIds([]);
+      setDerivedArtistNames([]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -220,6 +256,9 @@ export default function FeaturedArtistForm({
     // Trigger form validation
     const isValid = await form.trigger();
     if (!isValid) {
+      const errors = form.formState.errors;
+      const errorFields = Object.keys(errors);
+      toast.error(`Validation failed on: ${errorFields.join(', ')}`);
       return;
     }
 
@@ -231,18 +270,43 @@ export default function FeaturedArtistForm({
     const formData = new FormData();
 
     for (const [key, value] of Object.entries(values)) {
-      if (key === 'artistIds') continue; // handled separately below
       if (value !== undefined && value !== null && value !== '') {
         formData.append(key, String(value));
       }
     }
 
-    // Append artistIds individually (server action uses getAll('artistIds'))
-    values.artistIds.forEach((id) => {
+    // Append derived artistIds individually (server action uses getAll('artistIds'))
+    derivedArtistIds.forEach((id) => {
       formData.append('artistIds', id);
     });
 
-    formAction(formData);
+    setIsPending(true);
+    try {
+      const result = await createFeaturedArtistAction(formState, formData);
+      setFormState(result);
+
+      if (result.success && result.data?.featuredArtistId) {
+        const displayName = form.getValues('displayName');
+        toast.success(<ToastContent displayName={displayName || ''} />);
+        const newId =
+          typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
+        setFeaturedArtistId(newId);
+        router.push('/admin?entity=featuredArtist');
+      } else if (!result.success) {
+        const generalMsg = result.errors?.general?.[0];
+        const errorDetails = result.errors
+          ? Object.entries(result.errors)
+              .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
+              .join('; ')
+          : 'Unknown error';
+        toast.error(generalMsg || `Failed to create featured artist: ${errorDetails}`);
+      }
+    } catch (err) {
+      error('Featured artist submission failed:', err);
+      toast.error('An unexpected error occurred while saving.');
+    } finally {
+      setIsPending(false);
+    }
   };
 
   const handleCancel = () => {
@@ -268,7 +332,7 @@ export default function FeaturedArtistForm({
       />
 
       <Form {...form}>
-        <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-6">
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -281,64 +345,12 @@ export default function FeaturedArtistForm({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Artists Selection (Required) */}
-              <ArtistMultiSelect
-                control={control}
-                name="artistIds"
-                label={
-                  <>
-                    Artists <span className="text-destructive">*</span>
-                  </>
-                }
-                placeholder="Select artists..."
-                searchPlaceholder="Search for artists..."
-                emptyMessage="No artists found."
-                setValue={setValue}
-              />
-
-              <Separator />
-
-              {/* Display Name */}
-              <TextField
-                control={control}
-                name="displayName"
-                label="Display Name (Optional)"
-                placeholder="Override display name when featured"
-              />
-              <p className="text-sm text-muted-foreground -mt-4">
-                If not provided, the artist&apos;s default display name will be used.
-              </p>
-
-              {/* Description */}
-              <FormField
-                control={control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="A brief description for when this artist is featured..."
-                        className="min-h-[100px]"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Keep it brief. Markdown will be supported post-MVP.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Separator />
-
               {/* Media Associations */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Media Associations</h3>
                 <p className="text-sm text-muted-foreground">
                   Associate this featured artist with a track and release. Optionally associate with
-                  a group.
+                  a group. Artists are automatically derived from the selected track or release.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -358,8 +370,16 @@ export default function FeaturedArtistForm({
                     label="Release"
                     placeholder="Select a release..."
                     setValue={setValue}
+                    onReleaseChange={handleReleaseChange}
                   />
                 </div>
+
+                {/* Derived artists indicator */}
+                {derivedArtistNames.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Associated artists: {derivedArtistNames.join(', ')}
+                  </p>
+                )}
 
                 <GroupSelect
                   control={control}
@@ -367,6 +387,41 @@ export default function FeaturedArtistForm({
                   label="Group (Optional)"
                   placeholder="Select a group..."
                   setValue={setValue}
+                />
+
+                <Separator />
+
+                {/* Display Name */}
+                <TextField
+                  control={control}
+                  name="displayName"
+                  label="Display Name (Optional)"
+                  placeholder="Override display name when featured"
+                />
+                <p className="text-sm text-muted-foreground -mt-4">
+                  If not provided, the artist&apos;s default display name will be used.
+                </p>
+
+                {/* Description */}
+                <FormField
+                  control={control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="A brief description for when this artist is featured..."
+                          className="min-h-[100px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Keep it brief. Markdown will be supported post-MVP.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
 
@@ -412,7 +467,7 @@ export default function FeaturedArtistForm({
                   control={control}
                   name="coverArt"
                   setValue={setValue}
-                  artistIds={watchedArtistIds || []}
+                  artistIds={derivedArtistIds}
                   entityType="featured-artists"
                   disabled={isPending}
                 />

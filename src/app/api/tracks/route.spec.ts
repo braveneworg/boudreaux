@@ -24,10 +24,6 @@ vi.mock('@/lib/services/track-service', () => ({
   },
 }));
 
-vi.mock('@/lib/utils/data-utils', () => ({
-  extractFieldsWithValues: vi.fn((jsonPromise: Promise<unknown>) => jsonPromise),
-}));
-
 // Create POST reference after mocking
 const POST = postHandler;
 
@@ -118,7 +114,7 @@ describe('Tracks API Routes', () => {
       expect(TrackService.getTracks).toHaveBeenCalledWith({
         search: 'test',
       });
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', undefined);
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', undefined, undefined);
     });
 
     it('should handle releaseId parameter', async () => {
@@ -137,7 +133,7 @@ describe('Tracks API Routes', () => {
       expect(TrackService.getTracks).toHaveBeenCalledWith({
         releaseId: 'release-456',
       });
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, 'release-456');
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, 'release-456', undefined);
     });
 
     it('should handle both search and releaseId parameters', async () => {
@@ -159,7 +155,58 @@ describe('Tracks API Routes', () => {
         search: 'test',
         releaseId: 'release-456',
       });
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', 'release-456');
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', 'release-456', undefined);
+    });
+
+    it('should handle artistIds parameter with multiple artists', async () => {
+      vi.mocked(TrackService.getTracks).mockResolvedValue({
+        success: true,
+        data: [mockTrack] as never,
+      });
+      vi.mocked(TrackService.getTracksCount).mockResolvedValue({
+        success: true,
+        data: 1,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/tracks?artistIds=artist-1,artist-2,artist-3'
+      );
+      await GET(request);
+
+      expect(TrackService.getTracks).toHaveBeenCalledWith({
+        artistIds: ['artist-1', 'artist-2', 'artist-3'],
+      });
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, undefined, [
+        'artist-1',
+        'artist-2',
+        'artist-3',
+      ]);
+    });
+
+    it('should handle artistIds with search and releaseId parameters', async () => {
+      vi.mocked(TrackService.getTracks).mockResolvedValue({
+        success: true,
+        data: [mockTrack] as never,
+      });
+      vi.mocked(TrackService.getTracksCount).mockResolvedValue({
+        success: true,
+        data: 1,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/tracks?search=test&releaseId=release-456&artistIds=artist-1,artist-2'
+      );
+      await GET(request);
+
+      expect(TrackService.getTracks).toHaveBeenCalledWith({
+        search: 'test',
+        releaseId: 'release-456',
+        artistIds: ['artist-1', 'artist-2'],
+      });
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith('test', 'release-456', [
+        'artist-1',
+        'artist-2',
+      ]);
     });
 
     it('should return empty search when search param is empty', async () => {
@@ -179,7 +226,7 @@ describe('Tracks API Routes', () => {
       expect(response.status).toBe(200);
       expect(data.tracks).toEqual([]);
       expect(data.count).toBe(0);
-      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, undefined);
+      expect(TrackService.getTracksCount).toHaveBeenCalledWith(undefined, undefined, undefined);
     });
 
     it('should calculate hasMore correctly when more tracks exist', async () => {
@@ -325,6 +372,7 @@ describe('Tracks API Routes', () => {
         title: 'Minimal Track',
         duration: 100,
         audioUrl: 'https://example.com/audio.mp3',
+        position: 0,
       };
       vi.mocked(TrackService.createTrack).mockResolvedValue({
         success: true,
@@ -348,6 +396,7 @@ describe('Tracks API Routes', () => {
       const requestBody = {
         duration: 200,
         audioUrl: 'https://example.com/audio.mp3',
+        position: 1,
       };
 
       const request = createMockRequest(requestBody);
@@ -355,13 +404,15 @@ describe('Tracks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Title is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should return 400 when duration is missing', async () => {
       const requestBody = {
         title: 'Test Track',
         audioUrl: 'https://example.com/audio.mp3',
+        position: 1,
       };
 
       const request = createMockRequest(requestBody);
@@ -369,7 +420,8 @@ describe('Tracks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Duration is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should return 400 when duration is null', async () => {
@@ -377,6 +429,7 @@ describe('Tracks API Routes', () => {
         title: 'Test Track',
         duration: null,
         audioUrl: 'https://example.com/audio.mp3',
+        position: 1,
       };
 
       const request = createMockRequest(requestBody);
@@ -384,13 +437,15 @@ describe('Tracks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Duration is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should return 400 when audioUrl is missing', async () => {
       const requestBody = {
         title: 'Test Track',
         duration: 200,
+        position: 1,
       };
 
       const request = createMockRequest(requestBody);
@@ -398,7 +453,8 @@ describe('Tracks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Audio URL is required' });
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(expect.any(Array));
     });
 
     it('should return 503 when database is unavailable', async () => {
