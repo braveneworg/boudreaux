@@ -24,10 +24,6 @@ export const createFeaturedArtistSchema = z.object({
     .int({ message: 'Position must be a whole number' })
     .min(0, { message: 'Position must be 0 or greater' }),
   featuredOn: z.string().optional().or(z.literal('')),
-  // MongoDB ObjectId is a 24-character hex string
-  artistIds: z
-    .array(z.string().regex(/^[a-f0-9]{24}$/i, { message: 'Invalid artist ID format' }))
-    .min(1, { message: 'At least one artist is required' }),
   trackId: z
     .string()
     .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid track ID format' })

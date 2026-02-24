@@ -10,9 +10,9 @@ interface LogoProps {
   isMobile: boolean;
 }
 
-const Logo = ({ isMobile }: LogoProps) => {
+const Logo = ({ isMobile }: Readonly<LogoProps>) => {
   return (
-    <Link href="/">
+    <Link href="/" className="shrink-0">
       <Image
         alt="Fake Four Inc. Hand Logo"
         className="block ml-2 mt-1.5 size-12 md:size-36 rounded-full bg-white"

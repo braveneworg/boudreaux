@@ -220,7 +220,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
         {/* Featured Artists Carousel */}
-        {featuredArtists.length > 1 && (
+        {featuredArtists.length >= 3 && (
           <MediaPlayer.FeaturedArtistCarousel
             featuredArtists={featuredArtists}
             onSelect={handleSelectArtist}

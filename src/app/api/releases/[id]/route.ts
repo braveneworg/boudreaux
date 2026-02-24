@@ -7,6 +7,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { ReleaseService } from '@/lib/services/release-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateReleaseSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +49,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateReleaseSchema, body);
 
-    const result = await ReleaseService.updateRelease(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await ReleaseService.updateRelease(
+      id,
+      validation.data as unknown as Prisma.ReleaseUpdateInput
+    );
 
     if (!result.success) {
       const status =

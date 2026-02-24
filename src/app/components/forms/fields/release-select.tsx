@@ -27,6 +27,12 @@ export interface ReleaseOption {
   id: string;
   title: string;
   releasedOn?: string | Date;
+  artistReleases?: {
+    artist: {
+      id: string;
+      displayName?: string;
+    };
+  }[];
 }
 
 interface ReleaseSelectProps<
@@ -160,16 +166,21 @@ export default function ReleaseSelect<
         const selectedRelease = releases.find((r) => r.id === selectedId);
 
         const handleSelect = (releaseId: string) => {
-          const newValue = selectedId === releaseId ? '' : releaseId;
-          const newRelease = newValue ? releases.find((r) => r.id === newValue) || null : null;
+          // If already selected, just close — use the X button to clear
+          if (selectedId === releaseId) {
+            setOpen(false);
+            return;
+          }
+
+          const newRelease = releases.find((r) => r.id === releaseId) || null;
 
           if (setValue) {
-            setValue(name, newValue as TFieldValues[TName], {
+            setValue(name, releaseId as TFieldValues[TName], {
               shouldDirty: true,
               shouldValidate: true,
             });
           }
-          field.onChange(newValue);
+          field.onChange(releaseId);
           onReleaseChange?.(newRelease);
           setOpen(false);
         };

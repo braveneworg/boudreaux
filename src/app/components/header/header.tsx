@@ -105,7 +105,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
             <>
               <Image
                 alt="Fake Four Inc. Words"
-                className="relative -right-1.5 w-[222px] h-auto"
+                className="relative right-0.5 w-[222px] h-auto"
                 priority
                 src="/media/fake-four-inc-words.png"
                 width={222}

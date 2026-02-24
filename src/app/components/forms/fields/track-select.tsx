@@ -31,6 +31,18 @@ export interface TrackOption {
     release: {
       id: string;
       title: string;
+      artistReleases?: {
+        artist: {
+          id: string;
+          displayName?: string;
+        };
+      }[];
+    };
+  }[];
+  artists?: {
+    artist: {
+      id: string;
+      displayName?: string;
     };
   }[];
 }

@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
-import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+import { validateBody } from '@/lib/utils/validate-request';
+import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
 import type { Prisma } from '@prisma/client';
 
@@ -56,17 +57,14 @@ export async function GET(request: NextRequest) {
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
-    const body = await extractFieldsWithValues(request.json());
+    const body = await request.json();
+    const validation = validateBody(createArtistSchema, body);
 
-    // Basic validation
-    if (!body.firstName || !body.surname || !body.slug) {
-      return NextResponse.json(
-        { error: 'firstName, surname, and slug are required' },
-        { status: 400 }
-      );
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const result = await ArtistService.createArtist(body as Prisma.ArtistCreateInput);
+    const result = await ArtistService.createArtist(validation.data as Prisma.ArtistCreateInput);
 
     if (!result.success) {
       const status =

@@ -283,6 +283,23 @@ describe('FeaturedArtistsPlayer', () => {
       release: mockRelease,
       group: null,
     },
+    {
+      id: 'featured-3-filler',
+      displayName: 'Test Artist 3',
+      featuredOn: new Date('2024-01-13'),
+      position: 3,
+      description: null,
+      coverArt: 'https://example.com/cover3.jpg',
+      trackId: null,
+      releaseId: null,
+      groupId: null,
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      artists: [],
+      track: null,
+      release: null,
+      group: null,
+    },
   ] as unknown as FeaturedArtist[];
 
   // Artist with artist fallback display name (no displayName set)

@@ -11,7 +11,6 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import changeUsernameSchema from '@/lib/validation/change-username-schema';
 
@@ -155,8 +154,7 @@ export const changeUsernameAction = async (
         // Handle general JavaScript errors
         console.error('[changeUsernameAction] JavaScript error:', error.message);
         formState.errors.general = [
-          error.message ||
-            'Failed to update username. Please try again or contact support.',
+          error.message || 'Failed to update username. Please try again or contact support.',
         ];
       } else {
         // Unknown error type

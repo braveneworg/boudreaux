@@ -10,8 +10,11 @@ import { GET } from './route';
 vi.mock('next/server', async (importOriginal) => {
   const original = (await importOriginal()) as typeof NextServerModule;
   class MockNextResponse extends Response {
-    static json(body: unknown, init?: Record<string, unknown>) {
-      const headers = new Headers((init as Record<string, unknown>)?.headers);
+    static json(
+      body: unknown,
+      init?: { status?: number; statusText?: string; headers?: Record<string, string> }
+    ) {
+      const headers = new Headers(init?.headers);
       headers.set('content-type', 'application/json');
       return new MockNextResponse(JSON.stringify(body), {
         ...init,

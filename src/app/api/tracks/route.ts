@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { TrackService } from '@/lib/services/track-service';
-import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+import { validateBody } from '@/lib/utils/validate-request';
+import { createTrackSchema } from '@/lib/validation/create-track-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,26 +70,19 @@ export async function GET(request: NextRequest) {
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
-    const body = await extractFieldsWithValues(request.json());
+    const body = await request.json();
+    const validation = validateBody(createTrackSchema, body);
 
-    if (!body.title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
-    }
-
-    if (body.duration === undefined || body.duration === null) {
-      return NextResponse.json({ error: 'Duration is required' }, { status: 400 });
-    }
-
-    if (!body.audioUrl) {
-      return NextResponse.json({ error: 'Audio URL is required' }, { status: 400 });
+    if (!validation.success) {
+      return validation.response;
     }
 
     const result = await TrackService.createTrack({
-      title: body.title as string,
-      duration: body.duration as number,
-      audioUrl: body.audioUrl as string,
-      coverArt: (body.coverArt as string) || undefined,
-      position: (body.position as number) || 0,
+      title: validation.data.title,
+      duration: validation.data.duration,
+      audioUrl: validation.data.audioUrl,
+      coverArt: validation.data.coverArt || undefined,
+      position: validation.data.position,
     });
 
     if (!result.success) {
