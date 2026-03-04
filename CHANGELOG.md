@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.1.0] - 2026-03-04
+
+### Added
+
+- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n
+
 ## [2.0.0] - 2026-03-04
 
 ### Changed
