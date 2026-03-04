@@ -63,4 +63,13 @@ describe('ArtistReleaseInfo', () => {
     expect(heading).toHaveAttribute('aria-label', 'Now playing: Beyoncé - 4 (Deluxe)');
     expect(screen.getByText('4 (Deluxe)')).toBeInTheDocument();
   });
+
+  it('should render a visible heading when visibleHeading is true', () => {
+    render(<ArtistReleaseInfo artistName="Test Artist" title="Test Album" visibleHeading />);
+
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toHaveTextContent('Test Artist');
+    expect(heading).not.toHaveClass('sr-only');
+    expect(heading).toHaveClass('text-sm', 'font-bold', 'text-shadow-accent');
+  });
 });

@@ -631,35 +631,41 @@ export class ArtistService {
 
       const where: Prisma.ArtistWhereInput = {
         isActive: true,
-        deletedOn: { isSet: false },
+        // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+        // set to null, not missing fields. Use OR to handle both cases.
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         ...(search && {
-          OR: [
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { surname: { contains: search, mode: 'insensitive' as const } },
-            { displayName: { contains: search, mode: 'insensitive' as const } },
-            { slug: { contains: search, mode: 'insensitive' as const } },
+          AND: [
             {
-              groups: {
-                some: {
-                  group: {
-                    OR: [
-                      { displayName: { contains: search, mode: 'insensitive' as const } },
-                      { name: { contains: search, mode: 'insensitive' as const } },
-                    ],
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' as const } },
+                { surname: { contains: search, mode: 'insensitive' as const } },
+                { displayName: { contains: search, mode: 'insensitive' as const } },
+                { slug: { contains: search, mode: 'insensitive' as const } },
+                {
+                  groups: {
+                    some: {
+                      group: {
+                        OR: [
+                          { displayName: { contains: search, mode: 'insensitive' as const } },
+                          { name: { contains: search, mode: 'insensitive' as const } },
+                        ],
+                      },
+                    },
                   },
                 },
-              },
-            },
-            {
-              releases: {
-                some: {
-                  release: {
-                    title: { contains: search, mode: 'insensitive' as const },
-                    publishedAt: { isSet: true },
-                    deletedOn: { isSet: false },
+                {
+                  releases: {
+                    some: {
+                      release: {
+                        title: { contains: search, mode: 'insensitive' as const },
+                        publishedAt: { isSet: true },
+                        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                      },
+                    },
                   },
                 },
-              },
+              ],
             },
           ],
         }),
@@ -709,7 +715,9 @@ export class ArtistService {
         where: {
           slug,
           isActive: true,
-          deletedOn: null,
+          // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
+          // set to null, not missing fields. Use OR to handle both cases.
+          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
         include: {
           images: true,

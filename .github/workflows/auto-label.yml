@@ -20,5 +20,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
-              labels: ['version:major']
+              labels: ['version:minor']
             });

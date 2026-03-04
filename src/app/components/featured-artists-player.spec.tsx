@@ -1006,7 +1006,7 @@ describe('FeaturedArtistsPlayer', () => {
       expect(screen.getByText('Test Album')).toBeInTheDocument();
     });
 
-    it('should render artist name in a screen-reader-only heading', () => {
+    it('should render artist name in a visible heading', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
@@ -1015,7 +1015,7 @@ describe('FeaturedArtistsPlayer', () => {
 
       const artistHeading = screen.getByRole('heading', { level: 2 });
       expect(artistHeading).toBeInTheDocument();
-      expect(artistHeading).toHaveClass('sr-only');
+      expect(artistHeading).not.toHaveClass('sr-only');
       expect(artistHeading?.textContent).toBe('Test Artist 2');
     });
 

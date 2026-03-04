@@ -213,6 +213,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 - Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
+- Always put the tMPL license header in all source files from HEADER.txt
 
 ## Never Do
 
