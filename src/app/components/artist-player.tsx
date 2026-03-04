@@ -242,24 +242,12 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
       </Carousel>
 
       {/* Artist + release header */}
-      <div className="px-1">
-        <h2 className="text-lg font-semibold">{artistName}</h2>
-        {selectedRelease && (
-          <p className="text-sm text-muted-foreground">{selectedRelease.title}</p>
-        )}
-      </div>
-      <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
-      <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-        {selectedRelease && (
+      {selectedRelease && (
+        <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
           <MediaPlayer.CoverArtView artistRelease={{ release: selectedRelease, artist }} />
-        )}
-        <h2 className="text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3">
-          {artistName}
-        </h2>
-        {selectedRelease && (
-          <p className="text-sm text-muted-foreground">{selectedRelease.title}</p>
-        )}
-      </article>
+          <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
+        </article>
+      )}
 
       {/* Media player */}
       <MediaPlayer className="mb-2">
