@@ -1338,5 +1338,31 @@ describe('ArtistService', () => {
         .data;
       expect(data.releases).toHaveLength(0);
     });
+
+    it('should filter out releases with undefined publishedAt (missing MongoDB field)', async () => {
+      const artistWithMissingPublishedAt = {
+        ...mockArtist,
+        releases: [
+          {
+            id: 'ar-4',
+            release: {
+              id: 'release-4',
+              title: 'Missing publishedAt',
+              publishedAt: undefined,
+              deletedOn: null,
+            },
+          },
+        ],
+      };
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithMissingPublishedAt as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success).toBe(true);
+      const data = (
+        result as unknown as { success: true; data: typeof artistWithMissingPublishedAt }
+      ).data;
+      expect(data.releases).toHaveLength(0);
+    });
   });
 });

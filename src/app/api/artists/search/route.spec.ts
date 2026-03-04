@@ -313,4 +313,82 @@ describe('GET /api/artists/search', () => {
     expect(body.results[0].artistSlug).toBe('john-doe');
     expect(body.results[1].artistSlug).toBe('jane-smith');
   });
+
+  it('should exclude releases with undefined publishedAt (missing MongoDB field)', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        images: [],
+        releases: [
+          {
+            release: {
+              id: 'release-1',
+              title: 'Missing publishedAt',
+              publishedAt: undefined,
+              deletedOn: null,
+            },
+          },
+          {
+            release: {
+              id: 'release-2',
+              title: 'Published Album',
+              publishedAt: new Date('2024-01-01'),
+              deletedOn: null,
+            },
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const request = createRequest('john');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.results[0].releases).toHaveLength(1);
+    expect(body.results[0].releases[0].title).toBe('Published Album');
+  });
+
+  it('should include releases with undefined deletedOn (missing MongoDB field)', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        images: [],
+        releases: [
+          {
+            release: {
+              id: 'release-1',
+              title: 'Active Album',
+              publishedAt: new Date('2024-01-01'),
+              deletedOn: undefined,
+            },
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const request = createRequest('john');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.results[0].releases).toHaveLength(1);
+    expect(body.results[0].releases[0].title).toBe('Active Album');
+  });
 });
