@@ -655,6 +655,8 @@ export class ArtistService {
                 some: {
                   release: {
                     title: { contains: search, mode: 'insensitive' as const },
+                    publishedAt: { isSet: true },
+                    deletedOn: { isSet: false },
                   },
                 },
               },
