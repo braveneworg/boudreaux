@@ -29,6 +29,7 @@ vi.mock('../prisma', () => ({
   prisma: {
     artist: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -1237,14 +1238,14 @@ describe('ArtistService', () => {
     };
 
     it('should retrieve an artist with releases by slug', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(mockArtistWithReleases as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result.success).toBe(true);
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith(
+      expect(prisma.artist.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { slug: 'john-doe' },
+          where: { slug: 'john-doe', isActive: true, deletedOn: null },
           include: expect.objectContaining({
             images: true,
             labels: true,
@@ -1269,7 +1270,7 @@ describe('ArtistService', () => {
     });
 
     it('should filter to only published, non-deleted releases', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(mockArtistWithReleases as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1281,7 +1282,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
 
       const result = await ArtistService.getArtistBySlugWithReleases('non-existent');
 
@@ -1290,7 +1291,7 @@ describe('ArtistService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+      vi.mocked(prisma.artist.findFirst).mockRejectedValue(initError);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1298,7 +1299,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(new Error('Unknown error'));
+      vi.mocked(prisma.artist.findFirst).mockRejectedValue(new Error('Unknown error'));
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1320,7 +1321,7 @@ describe('ArtistService', () => {
           },
         ],
       };
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(artistWithOnlyUnpublished as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithOnlyUnpublished as never);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
