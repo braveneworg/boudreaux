@@ -70,6 +70,6 @@ describe('ArtistReleaseInfo', () => {
     const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveTextContent('Test Artist');
     expect(heading).not.toHaveClass('sr-only');
-    expect(heading).toHaveClass('text-lg', 'font-semibold');
+    expect(heading).toHaveClass('text-sm', 'font-bold', 'text-shadow-accent');
   });
 });
