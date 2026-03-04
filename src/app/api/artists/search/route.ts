@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
         ) ?? []
       ).filter(
         (r: { publishedAt: Date | null; deletedOn: Date | null }) =>
-          r.publishedAt !== null && r.deletedOn === null
+          r.publishedAt !== null &&
+          (r.deletedOn === null || r.deletedOn === undefined)
       );
 
       return {
