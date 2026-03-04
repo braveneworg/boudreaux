@@ -6,7 +6,7 @@ import 'server-only';
 import { PutObjectCommand, S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
-import type { Artist } from '@/lib/types/media-models';
+import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 
 import { prisma } from '../prisma';
 
@@ -614,6 +614,142 @@ export class ArtistService {
 
       console.error('Reorder images error:', error);
       return { success: false, error: 'Failed to reorder images' };
+    }
+  }
+
+  /**
+   * Search published (active, non-deleted) artists.
+   * Used by the public artist search feature.
+   */
+  static async searchPublishedArtists(params?: {
+    skip?: number;
+    take?: number;
+    search?: string;
+  }): Promise<ServiceResponse<Artist[]>> {
+    try {
+      const { skip = 0, take = 50, search } = params || {};
+
+      const where: Prisma.ArtistWhereInput = {
+        isActive: true,
+        deletedOn: { isSet: false },
+        ...(search && {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' as const } },
+            { surname: { contains: search, mode: 'insensitive' as const } },
+            { displayName: { contains: search, mode: 'insensitive' as const } },
+            { slug: { contains: search, mode: 'insensitive' as const } },
+            {
+              groups: {
+                some: {
+                  group: {
+                    OR: [
+                      { displayName: { contains: search, mode: 'insensitive' as const } },
+                      { name: { contains: search, mode: 'insensitive' as const } },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              releases: {
+                some: {
+                  release: {
+                    title: { contains: search, mode: 'insensitive' as const },
+                  },
+                },
+              },
+            },
+          ],
+        }),
+      };
+
+      const artists = (await prisma.artist.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { displayName: 'asc' },
+        include: {
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+          },
+          releases: {
+            include: {
+              release: {
+                select: { id: true, title: true, publishedAt: true, deletedOn: true },
+              },
+            },
+          },
+        },
+      })) as unknown as Artist[];
+
+      return { success: true, data: artists };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to search artists' };
+    }
+  }
+
+  /**
+   * Get an artist by slug with full release and track data.
+   * Post-query filters to only published, non-deleted releases.
+   */
+  static async getArtistBySlugWithReleases(
+    slug: string
+  ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
+    try {
+      const artist = (await prisma.artist.findUnique({
+        where: { slug },
+        include: {
+          images: true,
+          labels: true,
+          urls: true,
+          groups: { include: { group: true } },
+          releases: {
+            include: {
+              release: {
+                include: {
+                  images: true,
+                  artistReleases: { include: { artist: true } },
+                  releaseTracks: {
+                    include: { track: true },
+                    orderBy: { position: 'asc' },
+                  },
+                  releaseUrls: { include: { url: true } },
+                },
+              },
+            },
+          },
+        },
+      })) as unknown as ArtistWithPublishedReleases | null;
+
+      if (!artist) {
+        return { success: false, error: 'Artist not found' };
+      }
+
+      // Filter to only published, non-deleted releases (Prisma MongoDB
+      // doesn't support nested where on junction table includes)
+      const filteredArtist: ArtistWithPublishedReleases = {
+        ...artist,
+        releases: artist.releases.filter(
+          (ar) => ar.release.publishedAt !== null && ar.release.deletedOn === null
+        ),
+      };
+
+      return { success: true, data: filteredArtist };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error:', error);
+      return { success: false, error: 'Failed to retrieve artist' };
     }
   }
 }

@@ -237,3 +237,4 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't test implementation details (test behavior and output instead)
 - Don't rely solely on code coverage metrics (focus on meaningful tests)
 - Don't use relative imports that traverse up the directory tree (e.g., ../../../lib/utils). Use absolute imports from the project root instead (e.g., '@/lib/utils').
+- Don't attempt to write code until you know the database health check has passed. If connected to a database, always check the connection health before running code that interacts with the database, and handle connection errors gracefully.
