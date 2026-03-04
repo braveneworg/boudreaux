@@ -705,8 +705,12 @@ export class ArtistService {
     slug: string
   ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
     try {
-      const artist = (await prisma.artist.findUnique({
-        where: { slug },
+      const artist = (await prisma.artist.findFirst({
+        where: {
+          slug,
+          isActive: true,
+          deletedOn: null,
+        },
         include: {
           images: true,
           labels: true,
