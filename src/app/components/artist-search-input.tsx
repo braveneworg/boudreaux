@@ -47,6 +47,9 @@ export const ArtistSearchInput = () => {
 
   useEffect(() => {
     if (debouncedQuery.length < MIN_SEARCH_LENGTH) {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
       setResults([]);
       return;
     }
