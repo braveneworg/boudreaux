@@ -390,3 +390,28 @@ export type ReleaseCarouselItem = Prisma.ReleaseGetPayload<{
     images: true;
   };
 }>;
+
+/**
+ * Artist with full published release data including tracks.
+ * Used on the public artist detail page.
+ */
+export type ArtistWithPublishedReleases = Prisma.ArtistGetPayload<{
+  include: {
+    images: true;
+    labels: true;
+    urls: true;
+    groups: { include: { group: true } };
+    releases: {
+      include: {
+        release: {
+          include: {
+            images: true;
+            artistReleases: { include: { artist: true } };
+            releaseTracks: { include: { track: true } };
+            releaseUrls: { include: { url: true } };
+          };
+        };
+      };
+    };
+  };
+}>;

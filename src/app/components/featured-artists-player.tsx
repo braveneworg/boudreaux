@@ -5,10 +5,10 @@
 
 import { useCallback, useState } from 'react';
 
-import { Separator } from '@radix-ui/react-separator';
-
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
+
+import { ArtistReleaseInfo } from './artist-release-info';
 
 interface FeaturedArtistsPlayerProps {
   featuredArtists: FeaturedArtist[];
@@ -226,18 +226,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             onSelect={handleSelectArtist}
           />
         )}
-        {selectedArtist && (
-          <>
-            <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-              <h2 className="text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3">
-                {getDisplayName(selectedArtist)}
-              </h2>
-              <p>
-                <em>{selectedArtist.release?.title ?? ''}</em>
-              </p>
-            </article>
-            <Separator className="bg-zinc-300 mx-auto mt-3 mb-1 min-h-px max-h-px max-w-[calc(100%-2rem)]" />
-          </>
+        {selectedArtist?.release && (
+          <ArtistReleaseInfo
+            artistName={getDisplayName(selectedArtist)}
+            title={selectedArtist.release.title ?? ''}
+          />
         )}
         {showTrackListDrawer && selectedArtist && (
           <MediaPlayer.TrackListDrawer

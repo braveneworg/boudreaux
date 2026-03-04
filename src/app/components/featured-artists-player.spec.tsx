@@ -993,44 +993,41 @@ describe('FeaturedArtistsPlayer', () => {
 
   describe('release info display', () => {
     it('should show release title and artist name when artist is selected', () => {
-      const { container } = render(
-        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
-        { wrapper: createWrapper() }
-      );
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
 
       // Select artist with a release
       fireEvent.click(screen.getByTestId('artist-featured-2'));
 
-      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
-      expect(releaseInfo).toBeInTheDocument();
-      expect(releaseInfo?.innerHTML).toContain('Test Album');
-      expect(releaseInfo?.innerHTML).toContain('Test Artist 2');
+      const heading = screen.getByRole('heading', { level: 2 });
+      expect(heading).toHaveTextContent('Test Artist 2');
+      expect(heading).toHaveAttribute('aria-label', 'Now playing: Test Artist 2 - Test Album');
+      expect(screen.getByText('Test Album')).toBeInTheDocument();
     });
 
-    it('should render artist name in bold', () => {
-      const { container } = render(
-        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
-        { wrapper: createWrapper() }
-      );
+    it('should render artist name in a screen-reader-only heading', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
 
       fireEvent.click(screen.getByTestId('artist-featured-2'));
 
-      const artistHeading = container.querySelector('h2.font-bold');
+      const artistHeading = screen.getByRole('heading', { level: 2 });
       expect(artistHeading).toBeInTheDocument();
+      expect(artistHeading).toHaveClass('sr-only');
       expect(artistHeading?.textContent).toBe('Test Artist 2');
     });
 
     it('should show empty release title when no release', () => {
-      const { container } = render(
-        <FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />,
-        { wrapper: createWrapper() }
-      );
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
 
-      // First artist has no release
-      const releaseInfo = container.querySelector('.flex.justify-center.text-sm');
-      expect(releaseInfo).toBeInTheDocument();
-      const artistHeading = releaseInfo?.querySelector('h2');
-      expect(artistHeading?.textContent).toBe('Test Artist 1');
+      // First artist has no release — ArtistReleaseInfo is not rendered
+      // because selectedArtist?.release is null
+      const heading = screen.queryByRole('heading', { level: 2 });
+      expect(heading).not.toBeInTheDocument();
     });
   });
 
