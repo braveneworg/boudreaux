@@ -73,7 +73,7 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
         console.info(
           `[artist-detail] ${slug}: release "${ar.release.title}" — ` +
             `publishedAt=${ar.release.publishedAt}, deletedOn=${ar.release.deletedOn}, ` +
-            `releaseTracks=${ar.release.releaseTracks.length}`,
+            `releaseTracks=${ar.release.releaseTracks.length}`
         );
       }
     }
