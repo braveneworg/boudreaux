@@ -4,11 +4,22 @@
 
 import { Separator } from './ui/separator';
 
-export const ArtistReleaseInfo = ({ artistName, title }: { artistName: string; title: string }) => (
+interface ArtistReleaseInfoProps {
+  artistName: string;
+  title: string;
+  /** When true, the artist name heading is visible rather than screen-reader-only. */
+  visibleHeading?: boolean;
+}
+
+export const ArtistReleaseInfo = ({
+  artistName,
+  title,
+  visibleHeading = false,
+}: ArtistReleaseInfoProps) => (
   <>
     <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
       <h2
-        className="sr-only text-lg font-semibold"
+        className={visibleHeading ? 'text-lg font-semibold' : 'sr-only text-lg font-semibold'}
         aria-label={`Now playing: ${artistName} - ${title}`}
       >
         {artistName}

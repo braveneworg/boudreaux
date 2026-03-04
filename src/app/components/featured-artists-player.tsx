@@ -230,6 +230,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           <ArtistReleaseInfo
             artistName={getDisplayName(selectedArtist)}
             title={selectedArtist.release.title ?? ''}
+            visibleHeading
           />
         )}
         {showTrackListDrawer && selectedArtist && (
