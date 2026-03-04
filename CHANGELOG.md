@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.0.0] - 2026-03-04
+
+### Changed
+
+- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n
+
 ## [1.7.0] - 2026-02-24
 
 ### Added
