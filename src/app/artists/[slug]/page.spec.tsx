@@ -194,15 +194,14 @@ describe('ArtistDetailPage', () => {
     expect(player).toHaveAttribute('data-release-count', '2');
   });
 
-  it('should sort releases newest-first by releasedOn', async () => {
+  it('should pass the correct count of playable releases to ArtistPlayer', async () => {
     const Page = await ArtistDetailPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
     });
     render(Page);
 
-    // The ArtistPlayer mock doesn't expose individual release order,
-    // but we verify the count is correct (only playable releases)
+    // Verify that only playable releases (with at least one track) are passed to ArtistPlayer
     expect(screen.getByTestId('artist-player')).toHaveAttribute('data-release-count', '2');
   });
 
