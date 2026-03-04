@@ -204,8 +204,10 @@ vi.mock('@/app/components/ui/carousel', () => ({
       {children}
     </div>
   ),
-  CarouselContent: ({ children }: { children: ReactNode }) => (
-    <div data-testid="carousel-content">{children}</div>
+  CarouselContent: ({ children, className }: { children: ReactNode; className?: string }) => (
+    <div data-testid="carousel-content" className={className}>
+      {children}
+    </div>
   ),
   CarouselItem: ({ children }: { children: ReactNode }) => (
     <div data-testid="carousel-item">{children}</div>
@@ -316,7 +318,7 @@ describe('ArtistPlayer', () => {
     });
   });
 
-  describe('< 3 releases branch', () => {
+  describe('single release', () => {
     const release = createRelease('release-1', 'Test Album', [mockTrack1, mockTrack2, mockTrack3]);
     const artist = createArtistWithReleases([release]);
 
@@ -325,6 +327,12 @@ describe('ArtistPlayer', () => {
 
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
       expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
+    });
+
+    it('should not render CoverArtView for a single release', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.queryByTestId('cover-art-view')).not.toBeInTheDocument();
     });
 
     it('should render cover art with correct src', () => {
@@ -814,16 +822,22 @@ describe('ArtistPlayer', () => {
     });
   });
 
-  describe('two releases (< 3 branch)', () => {
+  describe('two releases', () => {
     const release1 = createRelease('release-1', 'Album One', [mockTrack1]);
     const release2 = createRelease('release-2', 'Album Two', [mockTrack2]);
     const artist = createArtistWithReleases([release1, release2]);
 
-    it('should render without carousel for 2 releases', () => {
+    it('should render carousel for 2 releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
+      expect(screen.getByTestId('carousel')).toBeInTheDocument();
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
+    });
+
+    it('should center the carousel items when there are 2 releases', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
     });
 
     it('should display the first release by default', () => {
@@ -833,6 +847,19 @@ describe('ArtistPlayer', () => {
         'data-audio-src',
         'https://example.com/audio1.mp3'
       );
+    });
+
+    it('should render CoverArtView for two releases', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByTestId('cover-art-view')).toBeInTheDocument();
+    });
+
+    it('should not render carousel navigation arrows for 2 releases', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     });
   });
 });

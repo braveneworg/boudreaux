@@ -751,7 +751,7 @@ export class ArtistService {
       const filteredArtist: ArtistWithPublishedReleases = {
         ...artist,
         releases: artist.releases.filter(
-          (ar) => ar.release.publishedAt !== null && ar.release.deletedOn == null
+          (ar) => ar.release.publishedAt != null && ar.release.deletedOn == null
         ),
       };
 

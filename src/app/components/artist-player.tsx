@@ -144,107 +144,61 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
     );
   }
 
-  if (releases.length < 3) {
-    // For artists with only a few releases, skip the carousel and just show the player for the first release
-    return (
-      <div className="flex flex-col gap-4">
-        <ArtistReleaseInfo artistName={artistName} title={selectedRelease?.title ?? ''} />
-        <MediaPlayer className="mb-2">
-          {hasTracks && currentTrack ? (
-            <>
-              <MediaPlayer.InteractiveCoverArt
-                src={coverArtSrc}
-                alt={coverArtAlt}
-                isPlaying={isPlaying}
-                onTogglePlay={handleTogglePlay}
-                className="shadow-lg"
-              />
-              <div className="w-full bg-zinc-900 mt-2">
-                <MediaPlayer.Controls
-                  key={`controls-${selectedRelease?.id}`}
-                  audioSrc={currentTrack.audioUrl}
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onEnded={handleTrackEnded}
-                  onPreviousTrack={handlePreviousTrack}
-                  onNextTrack={handleNextTrack}
-                  autoPlay={shouldAutoPlay}
-                  controlsRef={setPlayerControls}
-                />
-              </div>
-              <MediaPlayer.InfoTickerTape
-                artistRelease={{ release: selectedRelease!, artist }}
-                trackName={currentTrack.title}
-                isPlaying={isPlaying}
-              />
-              <MediaPlayer.TrackListDrawer
-                artistName={artistName}
-                artistRelease={{ release: selectedRelease!, artist }}
-                currentTrackId={currentTrack.id}
-                onTrackSelect={handleTrackSelect}
-              />
-            </>
-          ) : (
-            <div className="flex items-center justify-center py-8 text-zinc-500">
-              <p>No playable tracks available.</p>
-            </div>
-          )}
-        </MediaPlayer>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Release thumbnail carousel */}
-      <Carousel opts={{ align: 'start', loop: false }} aria-label={`Releases by ${artistName}`}>
-        <CarouselContent className="-ml-2">
-          {releases.map((ar, index) => {
-            const releaseCoverArt = getReleaseCoverArt(ar.release);
-            const isSelected = index === selectedReleaseIndex;
+      {/* Release thumbnail carousel — shown when 2+ releases */}
+      {releases.length >= 2 && (
+        <Carousel opts={{ align: 'start', loop: false }} aria-label={`Releases by ${artistName}`}>
+          <CarouselContent className={cn('-ml-2', releases.length === 2 && 'justify-center')}>
+            {releases.map((ar, index) => {
+              const releaseCoverArt = getReleaseCoverArt(ar.release);
+              const isSelected = index === selectedReleaseIndex;
 
-            return (
-              <CarouselItem key={ar.release.id} className="basis-auto pl-2">
-                <button
-                  type="button"
-                  onClick={() => handleReleaseSelect(index)}
-                  className={cn(
-                    'relative overflow-hidden rounded-md transition-all',
-                    isSelected && 'ring-2 ring-primary'
-                  )}
-                  aria-label={`Play ${ar.release.title}`}
-                  aria-pressed={isSelected}
-                >
-                  {releaseCoverArt ? (
-                    <Image
-                      src={releaseCoverArt.src}
-                      alt={releaseCoverArt.alt}
-                      width={80}
-                      height={80}
-                      className="size-20 object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-20 items-center justify-center bg-muted text-xs text-muted-foreground">
-                      {ar.release.title.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </button>
-              </CarouselItem>
-            );
-          })}
-        </CarouselContent>
-        {releases.length > 3 && (
-          <>
-            <CarouselPrevious />
-            <CarouselNext />
-          </>
-        )}
-      </Carousel>
+              return (
+                <CarouselItem key={ar.release.id} className="basis-auto pl-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReleaseSelect(index)}
+                    className={cn(
+                      'relative overflow-hidden rounded-md transition-all',
+                      isSelected && 'ring-2 ring-primary'
+                    )}
+                    aria-label={`Play ${ar.release.title}`}
+                    aria-pressed={isSelected}
+                  >
+                    {releaseCoverArt ? (
+                      <Image
+                        src={releaseCoverArt.src}
+                        alt={releaseCoverArt.alt}
+                        width={80}
+                        height={80}
+                        className="size-20 object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-20 items-center justify-center bg-muted text-xs text-muted-foreground">
+                        {ar.release.title.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                </CarouselItem>
+              );
+            })}
+          </CarouselContent>
+          {releases.length > 3 && (
+            <>
+              <CarouselPrevious />
+              <CarouselNext />
+            </>
+          )}
+        </Carousel>
+      )}
 
       {/* Artist + release header */}
       {selectedRelease && (
         <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-          <MediaPlayer.CoverArtView artistRelease={{ release: selectedRelease, artist }} />
+          {releases.length >= 2 && getReleaseCoverArt(selectedRelease) && (
+            <MediaPlayer.CoverArtView artistRelease={{ release: selectedRelease, artist }} />
+          )}
           <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
         </article>
       )}

@@ -64,6 +64,21 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
   const artist = result.data;
   const displayName = getArtistDisplayName(artist);
 
+  // DEBUG: Log releases pipeline for diagnosis (disabled in production)
+  if (process.env.NODE_ENV !== 'production') {
+    if (artist.releases.length === 0) {
+      console.warn(`[artist-detail] ${slug}: getArtistBySlugWithReleases returned 0 releases`);
+    } else {
+      for (const ar of artist.releases) {
+        console.info(
+          `[artist-detail] ${slug}: release "${ar.release.title}" — ` +
+            `publishedAt=${ar.release.publishedAt}, deletedOn=${ar.release.deletedOn}, ` +
+            `releaseTracks=${ar.release.releaseTracks.length}`
+        );
+      }
+    }
+  }
+
   // Filter to only releases with playable tracks, sorted newest-first
   const artistWithPlayableReleases = {
     ...artist,
