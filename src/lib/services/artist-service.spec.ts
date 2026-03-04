@@ -1058,7 +1058,7 @@ describe('ArtistService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             isActive: true,
-            deletedOn: { isSet: false },
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           }),
           skip: 0,
           take: 50,
@@ -1091,34 +1091,38 @@ describe('ArtistService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             isActive: true,
-            deletedOn: { isSet: false },
-            OR: expect.arrayContaining([
-              { firstName: { contains: 'john', mode: 'insensitive' } },
-              { surname: { contains: 'john', mode: 'insensitive' } },
-              { displayName: { contains: 'john', mode: 'insensitive' } },
-              { slug: { contains: 'john', mode: 'insensitive' } },
-              expect.objectContaining({
-                groups: expect.objectContaining({
-                  some: expect.objectContaining({
-                    group: expect.objectContaining({
-                      OR: expect.arrayContaining([
-                        { displayName: { contains: 'john', mode: 'insensitive' } },
-                        { name: { contains: 'john', mode: 'insensitive' } },
-                      ]),
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            AND: [
+              {
+                OR: expect.arrayContaining([
+                  { firstName: { contains: 'john', mode: 'insensitive' } },
+                  { surname: { contains: 'john', mode: 'insensitive' } },
+                  { displayName: { contains: 'john', mode: 'insensitive' } },
+                  { slug: { contains: 'john', mode: 'insensitive' } },
+                  expect.objectContaining({
+                    groups: expect.objectContaining({
+                      some: expect.objectContaining({
+                        group: expect.objectContaining({
+                          OR: expect.arrayContaining([
+                            { displayName: { contains: 'john', mode: 'insensitive' } },
+                            { name: { contains: 'john', mode: 'insensitive' } },
+                          ]),
+                        }),
+                      }),
                     }),
                   }),
-                }),
-              }),
-              expect.objectContaining({
-                releases: expect.objectContaining({
-                  some: expect.objectContaining({
-                    release: expect.objectContaining({
-                      title: { contains: 'john', mode: 'insensitive' },
+                  expect.objectContaining({
+                    releases: expect.objectContaining({
+                      some: expect.objectContaining({
+                        release: expect.objectContaining({
+                          title: { contains: 'john', mode: 'insensitive' },
+                        }),
+                      }),
                     }),
                   }),
-                }),
-              }),
-            ]),
+                ]),
+              },
+            ],
           }),
         })
       );
@@ -1182,7 +1186,7 @@ describe('ArtistService', () => {
         expect.objectContaining({
           where: {
             isActive: true,
-            deletedOn: { isSet: false },
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
         })
       );
@@ -1245,7 +1249,11 @@ describe('ArtistService', () => {
       expect(result.success).toBe(true);
       expect(prisma.artist.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { slug: 'john-doe', isActive: true, deletedOn: null },
+          where: {
+            slug: 'john-doe',
+            isActive: true,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          },
           include: expect.objectContaining({
             images: true,
             labels: true,
