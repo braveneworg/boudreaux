@@ -675,6 +675,46 @@ export default function BulkTrackUploader() {
           setTracks((prev) => prev.map((t) => (t.id === track.id ? updatedTrack : t)));
         }
 
+        // Ensure release/artist associations for duplicate tracks
+        const duplicatesWithMetadata = duplicateFilesToUpload.filter(
+          (t) => t.existingTrackInfo?.trackId && t.metadata?.album
+        );
+        if (duplicatesWithMetadata.length > 0) {
+          const dupeTrackData: BulkTrackData[] = duplicatesWithMetadata.map((track) => ({
+            existingTrackId: track.existingTrackInfo!.trackId,
+            title: track.title,
+            duration: track.metadata?.duration || 0,
+            position: track.position,
+            album: track.metadata?.album,
+            artist: track.metadata?.artist,
+            albumArtist: track.metadata?.albumArtist,
+            year: track.metadata?.year,
+            date: track.metadata?.date,
+            label: track.metadata?.label,
+            catalogNumber: track.metadata?.catalogNumber,
+            lossless: track.metadata?.lossless,
+            coverArt: track.metadata?.coverArt,
+          }));
+
+          const dupeResult = await bulkCreateTracksAction(dupeTrackData, {
+            autoCreateRelease,
+            publishTracks: false,
+          });
+
+          for (const result of dupeResult.results) {
+            const track = duplicatesWithMetadata[result.index];
+            if (track && result.releaseId) {
+              setTracks((prev) =>
+                prev.map((t) =>
+                  t.id === track.id
+                    ? { ...t, releaseId: result.releaseId, releaseTitle: result.releaseTitle }
+                    : t
+                )
+              );
+            }
+          }
+        }
+
         setShowResults(true);
 
         const newCreatedCount = tracksForBackgroundUpload.filter((t) => !t.isDuplicate).length;
@@ -914,6 +954,46 @@ export default function BulkTrackUploader() {
               : t
           )
         );
+      }
+
+      // Ensure release/artist associations for duplicate tracks
+      const duplicatesWithMetadata = duplicateUploadedTracks.filter(
+        (t) => t.existingTrackInfo?.trackId && t.metadata?.album
+      );
+      if (duplicatesWithMetadata.length > 0) {
+        const dupeTrackData: BulkTrackData[] = duplicatesWithMetadata.map((track) => ({
+          existingTrackId: track.existingTrackInfo!.trackId,
+          title: track.title,
+          duration: track.metadata?.duration || 0,
+          position: track.position,
+          album: track.metadata?.album,
+          artist: track.metadata?.artist,
+          albumArtist: track.metadata?.albumArtist,
+          year: track.metadata?.year,
+          date: track.metadata?.date,
+          label: track.metadata?.label,
+          catalogNumber: track.metadata?.catalogNumber,
+          lossless: track.metadata?.lossless,
+          coverArt: track.metadata?.coverArt,
+        }));
+
+        const dupeResult = await bulkCreateTracksAction(dupeTrackData, {
+          autoCreateRelease,
+          publishTracks: false,
+        });
+
+        for (const result of dupeResult.results) {
+          const track = duplicatesWithMetadata[result.index];
+          if (track && result.releaseId) {
+            setTracks((prev) =>
+              prev.map((t) =>
+                t.id === track.id
+                  ? { ...t, releaseId: result.releaseId, releaseTitle: result.releaseTitle }
+                  : t
+              )
+            );
+          }
+        }
       }
 
       setShowResults(true);

@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+import { validateBody } from '@/lib/utils/validate-request';
+import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
 import type { Prisma } from '@prisma/client';
 
@@ -56,10 +57,15 @@ export async function GET(request: NextRequest) {
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
-    const body = await extractFieldsWithValues(request.json());
+    const body = await request.json();
+    const validation = validateBody(createFeaturedArtistSchema, body);
+
+    if (!validation.success) {
+      return validation.response;
+    }
 
     const result = await FeaturedArtistsService.createFeaturedArtist(
-      body as Prisma.FeaturedArtistCreateInput
+      validation.data as Prisma.FeaturedArtistCreateInput
     );
 
     if (!result.success) {

@@ -5,6 +5,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { NotificationBannerService } from '@/lib/services/notification-banner-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateNotificationBannerSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 /**
  * GET /api/notifications/[id]
@@ -45,8 +49,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateNotificationBannerSchema, body);
 
-    const result = await NotificationBannerService.updateNotificationBanner(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await NotificationBannerService.updateNotificationBanner(
+      id,
+      validation.data as unknown as Prisma.NotificationUpdateInput
+    );
 
     if (!result.success) {
       const status =

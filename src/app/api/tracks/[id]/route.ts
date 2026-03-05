@@ -7,6 +7,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { TrackService } from '@/lib/services/track-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateTrackSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +49,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateTrackSchema, body);
 
-    const result = await TrackService.updateTrack(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await TrackService.updateTrack(
+      id,
+      validation.data as unknown as Prisma.TrackUpdateInput
+    );
 
     if (!result.success) {
       const status =

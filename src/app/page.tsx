@@ -4,6 +4,7 @@
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { NotificationBannerService } from '@/lib/services/notification-banner-service';
 
+import { ArtistSearchInput } from './components/artist-search-input';
 import { FeaturedArtistsPlayer } from './components/featured-artists-player';
 import { NotificationBanner } from './components/notification-banner';
 import { ContentContainer } from './components/ui/content-container';
@@ -30,6 +31,7 @@ export default async function Home() {
       {notificationBanners.length > 0 && <NotificationBanner notifications={notificationBanners} />}
 
       <ContentContainer>
+        <ArtistSearchInput />
         <Heading level={1}>Featured artists</Heading>
         <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
       </ContentContainer>

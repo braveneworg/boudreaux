@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
-import { extractFieldsWithValues } from '@/lib/utils/data-utils';
+import { validateBody } from '@/lib/utils/validate-request';
+import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
 import type { Prisma } from '@prisma/client';
 
@@ -59,21 +60,14 @@ export async function GET(request: NextRequest) {
  */
 export const POST = await withAdmin(async (request: NextRequest) => {
   try {
-    const body = await extractFieldsWithValues(request.json());
+    const body = await request.json();
+    const validation = validateBody(createReleaseSchema, body);
 
-    if (!body.title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    if (!validation.success) {
+      return validation.response;
     }
 
-    if (!body.releasedOn) {
-      return NextResponse.json({ error: 'Release date is required' }, { status: 400 });
-    }
-
-    if (!body.coverArt) {
-      return NextResponse.json({ error: 'Cover art is required' }, { status: 400 });
-    }
-
-    const result = await ReleaseService.createRelease(body as Prisma.ReleaseCreateInput);
+    const result = await ReleaseService.createRelease(validation.data as Prisma.ReleaseCreateInput);
 
     if (!result.success) {
       return NextResponse.json(

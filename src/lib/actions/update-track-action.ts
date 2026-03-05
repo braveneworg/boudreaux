@@ -157,6 +157,32 @@ export const updateTrackAction = async (
       }
 
       await Promise.all(syncPromises);
+
+      // Ensure ArtistRelease associations exist for each artist-release pair
+      if (artistIds && artistIds.length > 0 && releaseIds && releaseIds.length > 0) {
+        const existingLinks = await prisma.artistRelease.findMany({
+          where: {
+            artistId: { in: artistIds },
+            releaseId: { in: releaseIds },
+          },
+          select: { artistId: true, releaseId: true },
+        });
+
+        const existingSet = new Set(existingLinks.map((l) => `${l.artistId}:${l.releaseId}`));
+
+        const missingLinks: Array<{ artistId: string; releaseId: string }> = [];
+        for (const artistId of artistIds) {
+          for (const releaseId of releaseIds) {
+            if (!existingSet.has(`${artistId}:${releaseId}`)) {
+              missingLinks.push({ artistId, releaseId });
+            }
+          }
+        }
+
+        if (missingLinks.length > 0) {
+          await prisma.artistRelease.createMany({ data: missingLinks });
+        }
+      }
     }
 
     // Log track update for security audit

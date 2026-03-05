@@ -29,6 +29,7 @@ vi.mock('../prisma', () => ({
   prisma: {
     artist: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -1043,6 +1044,325 @@ describe('ArtistService', () => {
       const result = await ArtistService.reorderArtistImages('artist-123', ['image-2', 'image-1']);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to reorder images' });
+    });
+  });
+
+  describe('searchPublishedArtists', () => {
+    it('should search published artists with default parameters', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+
+      const result = await ArtistService.searchPublishedArtists();
+
+      expect(result).toMatchObject({ success: true, data: [mockArtist] });
+      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isActive: true,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          }),
+          skip: 0,
+          take: 50,
+          orderBy: { displayName: 'asc' },
+        })
+      );
+    });
+
+    it('should search with custom pagination', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+
+      const result = await ArtistService.searchPublishedArtists({ skip: 10, take: 5 });
+
+      expect(result.success).toBe(true);
+      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 5,
+        })
+      );
+    });
+
+    it('should search across name, group, and release title fields', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+
+      const result = await ArtistService.searchPublishedArtists({ search: 'john' });
+
+      expect(result.success).toBe(true);
+      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            isActive: true,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            AND: [
+              {
+                OR: expect.arrayContaining([
+                  { firstName: { contains: 'john', mode: 'insensitive' } },
+                  { surname: { contains: 'john', mode: 'insensitive' } },
+                  { displayName: { contains: 'john', mode: 'insensitive' } },
+                  { slug: { contains: 'john', mode: 'insensitive' } },
+                  expect.objectContaining({
+                    groups: expect.objectContaining({
+                      some: expect.objectContaining({
+                        group: expect.objectContaining({
+                          OR: expect.arrayContaining([
+                            { displayName: { contains: 'john', mode: 'insensitive' } },
+                            { name: { contains: 'john', mode: 'insensitive' } },
+                          ]),
+                        }),
+                      }),
+                    }),
+                  }),
+                  expect.objectContaining({
+                    releases: expect.objectContaining({
+                      some: expect.objectContaining({
+                        release: expect.objectContaining({
+                          title: { contains: 'john', mode: 'insensitive' },
+                        }),
+                      }),
+                    }),
+                  }),
+                ]),
+              },
+            ],
+          }),
+        })
+      );
+    });
+
+    it('should include images and releases in the query', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([mockArtist] as never);
+
+      await ArtistService.searchPublishedArtists({ search: 'test' });
+
+      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            images: expect.objectContaining({
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+            }),
+            releases: expect.objectContaining({
+              include: expect.objectContaining({
+                release: expect.objectContaining({
+                  select: { id: true, title: true, publishedAt: true, deletedOn: true },
+                }),
+              }),
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should return empty array when no artists found', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([]);
+
+      const result = await ArtistService.searchPublishedArtists({ search: 'nonexistent' });
+
+      expect(result).toMatchObject({ success: true, data: [] });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.artist.findMany).mockRejectedValue(initError);
+
+      const result = await ArtistService.searchPublishedArtists({ search: 'test' });
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.artist.findMany).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.searchPublishedArtists({ search: 'test' });
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to search artists' });
+    });
+
+    it('should not include search OR conditions when no search term', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([]);
+
+      await ArtistService.searchPublishedArtists();
+
+      expect(prisma.artist.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            isActive: true,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          },
+        })
+      );
+    });
+  });
+
+  describe('getArtistBySlugWithReleases', () => {
+    const mockArtistWithReleases = {
+      ...mockArtist,
+      releases: [
+        {
+          id: 'ar-1',
+          artistId: mockArtist.id,
+          releaseId: 'release-1',
+          release: {
+            id: 'release-1',
+            title: 'Published Album',
+            publishedAt: new Date('2024-01-01'),
+            deletedOn: null,
+            releaseTracks: [
+              {
+                id: 'rt-1',
+                track: { id: 'track-1', title: 'Track 1', audioUrl: 'audio.mp3' },
+              },
+            ],
+          },
+        },
+        {
+          id: 'ar-2',
+          artistId: mockArtist.id,
+          releaseId: 'release-2',
+          release: {
+            id: 'release-2',
+            title: 'Unpublished Album',
+            publishedAt: null,
+            deletedOn: null,
+            releaseTracks: [],
+          },
+        },
+        {
+          id: 'ar-3',
+          artistId: mockArtist.id,
+          releaseId: 'release-3',
+          release: {
+            id: 'release-3',
+            title: 'Deleted Album',
+            publishedAt: new Date('2024-01-01'),
+            deletedOn: new Date('2024-06-01'),
+            releaseTracks: [],
+          },
+        },
+      ],
+    };
+
+    it('should retrieve an artist with releases by slug', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success).toBe(true);
+      expect(prisma.artist.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            slug: 'john-doe',
+            isActive: true,
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          },
+          include: expect.objectContaining({
+            images: true,
+            labels: true,
+            urls: true,
+            groups: { include: { group: true } },
+            releases: expect.objectContaining({
+              include: expect.objectContaining({
+                release: expect.objectContaining({
+                  include: expect.objectContaining({
+                    images: true,
+                    releaseTracks: expect.objectContaining({
+                      include: { track: true },
+                      orderBy: { position: 'asc' },
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should filter to only published, non-deleted releases', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(mockArtistWithReleases as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success).toBe(true);
+      const data = (result as unknown as { success: true; data: typeof mockArtistWithReleases })
+        .data;
+      expect(data.releases).toHaveLength(1);
+      expect(data.releases[0].release.title).toBe('Published Album');
+    });
+
+    it('should return error when artist not found', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
+      vi.mocked(prisma.artist.findFirst).mockRejectedValue(initError);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should handle unknown errors', async () => {
+      vi.mocked(prisma.artist.findFirst).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
+    });
+
+    it('should return empty releases array when all releases are filtered out', async () => {
+      const artistWithOnlyUnpublished = {
+        ...mockArtist,
+        releases: [
+          {
+            id: 'ar-2',
+            release: {
+              id: 'release-2',
+              title: 'Unpublished',
+              publishedAt: null,
+              deletedOn: null,
+            },
+          },
+        ],
+      };
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithOnlyUnpublished as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success).toBe(true);
+      const data = (result as unknown as { success: true; data: typeof artistWithOnlyUnpublished })
+        .data;
+      expect(data.releases).toHaveLength(0);
+    });
+
+    it('should filter out releases with undefined publishedAt (missing MongoDB field)', async () => {
+      const artistWithMissingPublishedAt = {
+        ...mockArtist,
+        releases: [
+          {
+            id: 'ar-4',
+            release: {
+              id: 'release-4',
+              title: 'Missing publishedAt',
+              publishedAt: undefined,
+              deletedOn: null,
+            },
+          },
+        ],
+      };
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(artistWithMissingPublishedAt as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success).toBe(true);
+      const data = (
+        result as unknown as { success: true; data: typeof artistWithMissingPublishedAt }
+      ).data;
+      expect(data.releases).toHaveLength(0);
     });
   });
 });

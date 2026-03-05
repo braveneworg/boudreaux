@@ -213,9 +213,11 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 - Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
+- Always put the tMPL license header in all source files from HEADER.txt
 
 ## Never Do
 
+- Don't use conditional expects in tests (e.g., if (condition) { expect(...) }) — instead, write separate test cases for different conditions
 - Don't use localStorage/sessionStorage
 - Don't mix Server/Client Component patterns incorrectly
 - Don't skip Zod validation in Server Actions
@@ -237,3 +239,4 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Don't test implementation details (test behavior and output instead)
 - Don't rely solely on code coverage metrics (focus on meaningful tests)
 - Don't use relative imports that traverse up the directory tree (e.g., ../../../lib/utils). Use absolute imports from the project root instead (e.g., '@/lib/utils').
+- Don't attempt to write code until you know the database health check has passed. If connected to a database, always check the connection health before running code that interacts with the database, and handle connection errors gracefully.

@@ -180,6 +180,16 @@ export class TrackService {
                 select: {
                   id: true,
                   title: true,
+                  artistReleases: {
+                    include: {
+                      artist: {
+                        select: {
+                          id: true,
+                          displayName: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },

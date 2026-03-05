@@ -7,6 +7,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { GroupService } from '@/lib/services/group-service';
+import { validateBody } from '@/lib/utils/validate-request';
+import { updateGroupSchema } from '@/lib/validation/update-schemas';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +49,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params;
     const body = await request.json();
+    const validation = validateBody(updateGroupSchema, body);
 
-    const result = await GroupService.updateGroup(id, body);
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const result = await GroupService.updateGroup(
+      id,
+      validation.data as unknown as Prisma.GroupUpdateInput
+    );
 
     if (!result.success) {
       const status =

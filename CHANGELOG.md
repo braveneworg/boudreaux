@@ -13,6 +13,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
+
+
+
+## [2.4.0] - 2026-03-05
+
+### Added
+
+- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n- Update the associations made when uploading tracks (#257)\n
+
+## [2.3.0] - 2026-03-05
+
+### Added
+
+- Update admin create release track (#256)\n- Update admin create release track (#256)\n- Update admin create release track (#256)\n- Update admin create release track (#256)\n
+
+## [2.2.0] - 2026-03-04
+
+### Added
+
+- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n- Update artist search result page (#255)\n
+
+## [2.1.0] - 2026-03-04
+
+### Added
+
+- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n- Update search feature to find artists (#254)\n
+
+## [2.0.0] - 2026-03-04
+
+### Changed
+
+- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on 'Add search all artists feature' PR (#253)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- [WIP] Address feedback on search all artists feature PR (#252)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n- Add search all artists feature (#251)\n
+
+## [1.7.0] - 2026-02-24
+
+### Added
+
+- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n- Develop/bugfix/fix misc admin (#246)\n
+
 ## [1.6.0] - 2026-02-22
 
 ### Added

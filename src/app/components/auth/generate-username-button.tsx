@@ -15,7 +15,7 @@ import type { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 
 interface UsernameGeneratorProps<T extends FieldValues> {
   form: UseFormReturn<T>;
-  fieldsToPopulate: [Path<T>, Path<T>]; // [username, confirmUsername]
+  fieldsToPopulate: readonly [Path<T>, Path<T>]; // [username, confirmUsername]
   isLoading?: boolean;
   wasSuccessful?: boolean;
 }
@@ -56,16 +56,20 @@ export const GenerateUsernameButton = <T extends FieldValues>({
   const usernameValue = form.getValues(fieldsToPopulate[0]);
   const confirmUsernameValue = form.getValues(fieldsToPopulate[1]);
 
-  // Reset generating state when form succeeds
+  // Reset generating state and confirmed flag when form succeeds
   useEffect(() => {
     if (wasSuccessful) {
       // Use a microtask to avoid setState during render
-      Promise.resolve().then(() => setIsGenerating(false));
+      Promise.resolve().then(() => {
+        setIsGenerating(false);
+        setIsConfirmUsernameCleared(false);
+      });
     }
   }, [wasSuccessful]);
 
+  // Clear out confirm username from last generation if usernames don't match
+  // Only watch the actual field values, not the form object itself
   useEffect(() => {
-    // Clear out confirm username from last generation if usernames don't match
     if (!isConfirmUsernameCleared && usernameValue !== confirmUsernameValue) {
       // Use a microtask to avoid setState during render
       Promise.resolve().then(() => {
@@ -76,7 +80,7 @@ export const GenerateUsernameButton = <T extends FieldValues>({
         setIsConfirmUsernameCleared(true);
       });
     }
-  }, [form, fieldsToPopulate, isConfirmUsernameCleared, usernameValue, confirmUsernameValue]);
+  }, [isConfirmUsernameCleared, usernameValue, confirmUsernameValue, form, fieldsToPopulate]);
 
   return (
     <Button
