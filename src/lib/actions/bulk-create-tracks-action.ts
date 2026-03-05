@@ -50,6 +50,8 @@ export interface BulkTrackData {
   lossless?: boolean;
   /** SHA-256 hash of the audio file for duplicate detection */
   audioFileHash?: string;
+  /** Existing track ID — skip Track creation, only ensure associations */
+  existingTrackId?: string;
 }
 
 /**
@@ -205,36 +207,38 @@ export async function bulkCreateTracksAction(
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
 
-      // Validate required fields
-      if (!track.title || track.title.trim() === '') {
-        results.push({
-          index: i,
-          success: false,
-          title: track.title || `Track ${i + 1}`,
-          error: 'Title is required',
-        });
-        continue;
-      }
+      // Validate required fields (skip for existing tracks — they only need associations)
+      if (!track.existingTrackId) {
+        if (!track.title || track.title.trim() === '') {
+          results.push({
+            index: i,
+            success: false,
+            title: track.title || `Track ${i + 1}`,
+            error: 'Title is required',
+          });
+          continue;
+        }
 
-      // audioUrl is only required when not deferring upload
-      if (!deferUpload && (!track.audioUrl || track.audioUrl.trim() === '')) {
-        results.push({
-          index: i,
-          success: false,
-          title: track.title,
-          error: 'Audio URL is required',
-        });
-        continue;
-      }
+        // audioUrl is only required when not deferring upload
+        if (!deferUpload && (!track.audioUrl || track.audioUrl.trim() === '')) {
+          results.push({
+            index: i,
+            success: false,
+            title: track.title,
+            error: 'Audio URL is required',
+          });
+          continue;
+        }
 
-      if (track.duration === undefined || track.duration <= 0) {
-        results.push({
-          index: i,
-          success: false,
-          title: track.title,
-          error: 'Valid duration is required',
-        });
-        continue;
+        if (track.duration === undefined || track.duration <= 0) {
+          results.push({
+            index: i,
+            success: false,
+            title: track.title,
+            error: 'Valid duration is required',
+          });
+          continue;
+        }
       }
 
       try {
@@ -374,6 +378,37 @@ export async function bulkCreateTracksAction(
             }
           }
 
+          // Association-only mode for existing tracks
+          if (track.existingTrackId) {
+            const trackId = track.existingTrackId;
+
+            // Create ReleaseTrack if missing
+            if (releaseId) {
+              const existingRT = await tx.releaseTrack.findUnique({
+                where: { releaseId_trackId: { releaseId, trackId } },
+              });
+              if (!existingRT) {
+                await tx.releaseTrack.create({
+                  data: { releaseId, trackId, position: track.position ?? 0 },
+                });
+              }
+            }
+
+            // Create TrackArtist if missing
+            if (artistId) {
+              const existingTA = await tx.trackArtist.findUnique({
+                where: { trackId_artistId: { trackId, artistId } },
+              });
+              if (!existingTA) {
+                await tx.trackArtist.create({
+                  data: { trackId, artistId },
+                });
+              }
+            }
+
+            return { trackData: { id: trackId }, artistId, groupId };
+          }
+
           // Create the track with optional release and artist associations
           // When deferUpload is true, use placeholder URL and PENDING status
           const audioUrl = deferUpload
@@ -421,7 +456,7 @@ export async function bulkCreateTracksAction(
         results.push({
           index: i,
           success: true,
-          trackId: result.trackData.id,
+          trackId: track.existingTrackId ?? result.trackData.id,
           title: track.title,
           releaseId,
           releaseTitle,
