@@ -211,6 +211,101 @@ async function seedTestDatabase() {
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+    // Create an artist with published releases and tracks for artist page e2e tests
+    const e2eArtist = await prisma.artist.create({
+      data: {
+        firstName: 'E2E',
+        surname: 'Artist',
+        slug: 'e2e-artist',
+        displayName: 'E2E Artist',
+        publishedOn: new Date(),
+      },
+    });
+
+    const e2eRelease1 = await prisma.release.create({
+      data: {
+        title: 'E2E Album One',
+        releasedOn: new Date('2024-03-01'),
+        coverArt: 'https://picsum.photos/seed/e2e-release1/400/400',
+        publishedAt: new Date(),
+      },
+    });
+
+    const e2eRelease2 = await prisma.release.create({
+      data: {
+        title: 'E2E Album Two',
+        releasedOn: new Date('2024-06-01'),
+        coverArt: 'https://picsum.photos/seed/e2e-release2/400/400',
+        publishedAt: new Date(),
+      },
+    });
+
+    const e2eRelease3 = await prisma.release.create({
+      data: {
+        title: 'E2E Album Three',
+        releasedOn: new Date('2024-09-01'),
+        coverArt: 'https://picsum.photos/seed/e2e-release3/400/400',
+        publishedAt: new Date(),
+      },
+    });
+
+    // Create tracks for each release
+    const e2eTrack1 = await prisma.track.create({
+      data: {
+        title: 'E2E Track Alpha',
+        duration: 200,
+        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+        position: 1,
+        publishedOn: new Date(),
+      },
+    });
+
+    const e2eTrack2 = await prisma.track.create({
+      data: {
+        title: 'E2E Track Beta',
+        duration: 220,
+        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+        position: 1,
+        publishedOn: new Date(),
+      },
+    });
+
+    const e2eTrack3 = await prisma.track.create({
+      data: {
+        title: 'E2E Track Gamma',
+        duration: 190,
+        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+        position: 1,
+        publishedOn: new Date(),
+      },
+    });
+
+    // Link artist to releases
+    await Promise.all([
+      prisma.artistRelease.create({
+        data: { artistId: e2eArtist.id, releaseId: e2eRelease1.id },
+      }),
+      prisma.artistRelease.create({
+        data: { artistId: e2eArtist.id, releaseId: e2eRelease2.id },
+      }),
+      prisma.artistRelease.create({
+        data: { artistId: e2eArtist.id, releaseId: e2eRelease3.id },
+      }),
+    ]);
+
+    // Link tracks to releases
+    await Promise.all([
+      prisma.releaseTrack.create({
+        data: { releaseId: e2eRelease1.id, trackId: e2eTrack1.id, position: 1 },
+      }),
+      prisma.releaseTrack.create({
+        data: { releaseId: e2eRelease2.id, trackId: e2eTrack2.id, position: 1 },
+      }),
+      prisma.releaseTrack.create({
+        data: { releaseId: e2eRelease3.id, trackId: e2eTrack3.id, position: 1 },
+      }),
+    ]);
+
     await Promise.all([
       prisma.notification.create({
         data: {

@@ -322,11 +322,24 @@ describe('ArtistPlayer', () => {
     const release = createRelease('release-1', 'Test Album', [mockTrack1, mockTrack2, mockTrack3]);
     const artist = createArtistWithReleases([release]);
 
-    it('should render the media player without carousel', () => {
+    it('should render the media player with carousel for a single release', () => {
       render(<ArtistPlayer artist={artist} />);
 
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
-      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
+      expect(screen.getByTestId('carousel')).toBeInTheDocument();
+    });
+
+    it('should center carousel items for a single release', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
+    });
+
+    it('should not show carousel navigation for a single release', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     });
 
     it('should not render CoverArtView for a single release', () => {
@@ -548,6 +561,12 @@ describe('ArtistPlayer', () => {
       expect(screen.getByTestId('carousel')).toBeInTheDocument();
     });
 
+    it('should center carousel items for 3+ releases', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
+    });
+
     it('should render carousel with correct aria-label', () => {
       render(<ArtistPlayer artist={artist} />);
 
@@ -588,11 +607,11 @@ describe('ArtistPlayer', () => {
       expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
     });
 
-    it('should not show carousel navigation for exactly 3 releases', () => {
+    it('should show carousel navigation for exactly 3 releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+      expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
+      expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
     });
 
     it('should render the artist name heading', () => {

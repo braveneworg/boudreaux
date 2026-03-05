@@ -371,16 +371,19 @@ describe('bulkCreateTracksAction', () => {
 
       const result = await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
-      expect(mockFindOrCreateRelease).toHaveBeenCalledWith({
-        album: 'Test Album',
-        year: undefined,
-        date: undefined,
-        label: undefined,
-        catalogNumber: undefined,
-        albumArtist: undefined,
-        lossless: undefined,
-        coverArt: undefined,
-      });
+      expect(mockFindOrCreateRelease).toHaveBeenCalledWith(
+        {
+          album: 'Test Album',
+          year: undefined,
+          date: undefined,
+          label: undefined,
+          catalogNumber: undefined,
+          albumArtist: undefined,
+          lossless: undefined,
+          coverArt: undefined,
+        },
+        { publish: false }
+      );
 
       expect(result.results[0].releaseId).toBe('release-123');
       expect(result.results[0].releaseTitle).toBe('Test Album');
@@ -707,6 +710,101 @@ describe('bulkCreateTracksAction', () => {
     });
   });
 
+  describe('publish option propagation to findOrCreateReleaseAction', () => {
+    beforeEach(() => {
+      mockFindOrCreateRelease.mockResolvedValue({
+        success: true,
+        releaseId: 'release-123',
+        releaseTitle: 'Test Album',
+        created: true,
+      });
+
+      mockPrismaTransaction.mockImplementation(async (callback) => {
+        const mockTx = {
+          track: {
+            create: vi.fn().mockResolvedValue({
+              id: 'track-123',
+              title: 'Test Track',
+              duration: 180,
+              audioUrl: 'https://example.com/track.mp3',
+              position: 1,
+              coverArt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              deletedOn: null,
+              publishedOn: null,
+              audioUploadStatus: 'COMPLETED',
+              audioFileHash: null,
+            }),
+          },
+          artistRelease: { findUnique: vi.fn(), create: vi.fn() },
+          artistGroup: { findUnique: vi.fn(), create: vi.fn() },
+        };
+        return callback(mockTx as never);
+      });
+    });
+
+    it('should pass publish: true to findOrCreateReleaseAction when publishTracks is true', async () => {
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, {
+        autoCreateRelease: true,
+        publishTracks: true,
+      });
+
+      expect(mockFindOrCreateRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ album: 'Test Album' }),
+        { publish: true }
+      );
+    });
+
+    it('should pass publish: false to findOrCreateReleaseAction when publishTracks is false', async () => {
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, {
+        autoCreateRelease: true,
+        publishTracks: false,
+      });
+
+      expect(mockFindOrCreateRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ album: 'Test Album' }),
+        { publish: false }
+      );
+    });
+
+    it('should default publish to false when publishTracks is not specified', async () => {
+      const tracks: BulkTrackData[] = [
+        {
+          title: 'Test Track',
+          duration: 180,
+          audioUrl: 'https://example.com/track.mp3',
+          album: 'Test Album',
+        },
+      ];
+
+      await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
+
+      expect(mockFindOrCreateRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ album: 'Test Album' }),
+        { publish: false }
+      );
+    });
+  });
+
   describe('artist creation and association', () => {
     beforeEach(() => {
       mockFindOrCreateArtist.mockResolvedValue({
@@ -806,14 +904,20 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      // albumArtist without a distinct artist creates a Group, not an Artist
+      // albumArtist without a distinct artist still creates both a Group and an Artist
+      // (using albumArtist name) so the release surfaces on artist pages
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
         'Album Artist',
         expect.objectContaining({
           tx: expect.anything(),
         })
       );
-      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Album Artist',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
     });
 
     it('should cache artist lookups for same artist name', async () => {
@@ -1152,14 +1256,20 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      // When albumArtist matches artist, treat albumArtist as Group and skip individual Artist
+      // When albumArtist matches artist, treat albumArtist as Group AND create
+      // an individual Artist from albumArtist so the release surfaces on artist pages
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
         'The Beatles',
         expect.objectContaining({
           tx: expect.anything(),
         })
       );
-      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'The Beatles',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
     });
 
     it('should create group when albumArtist matches artist (case-insensitive)', async () => {
@@ -1206,14 +1316,20 @@ describe('bulkCreateTracksAction', () => {
 
       await bulkCreateTracksAction(tracks, { autoCreateRelease: false });
 
-      // Case-insensitive match: albumArtist treated as Group, no individual Artist created
+      // Case-insensitive match: albumArtist treated as Group, AND Artist created
+      // from albumArtist name so the release surfaces on artist pages
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith(
         'THE BEATLES',
         expect.objectContaining({
           tx: expect.anything(),
         })
       );
-      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'THE BEATLES',
+        expect.objectContaining({
+          tx: expect.anything(),
+        })
+      );
     });
 
     it('should cache group lookups for same group name', async () => {
@@ -1339,9 +1455,17 @@ describe('bulkCreateTracksAction', () => {
       await bulkCreateTracksAction(tracks, { autoCreateRelease: true });
 
       // albumArtist creates a Group in the first pass (outside transaction)
-      // when autoCreateRelease is true and album is present
+      // when autoCreateRelease is true and album is present.
+      // An Artist is also created from albumArtist name so the release
+      // surfaces on artist pages.
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith('Album Artist');
-      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Album Artist',
+        expect.objectContaining({
+          releaseId: 'release-123',
+          tx: expect.anything(),
+        })
+      );
     });
   });
 
@@ -1494,7 +1618,14 @@ describe('bulkCreateTracksAction', () => {
       // (outside transaction); the second track uses the cached group
       expect(mockFindOrCreateGroup).toHaveBeenCalledTimes(1);
       expect(mockFindOrCreateGroup).toHaveBeenCalledWith('Same Artist');
-      expect(mockFindOrCreateArtist).not.toHaveBeenCalled();
+      // An Artist is also created from albumArtist name so releases surface on artist pages
+      expect(mockFindOrCreateArtist).toHaveBeenCalledWith(
+        'Same Artist',
+        expect.objectContaining({
+          releaseId: 'release-1',
+          tx: expect.anything(),
+        })
+      );
     });
   });
 

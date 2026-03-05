@@ -698,7 +698,7 @@ export default function BulkTrackUploader() {
 
           const dupeResult = await bulkCreateTracksAction(dupeTrackData, {
             autoCreateRelease,
-            publishTracks: false,
+            publishTracks,
           });
 
           for (const result of dupeResult.results) {
@@ -979,7 +979,7 @@ export default function BulkTrackUploader() {
 
         const dupeResult = await bulkCreateTracksAction(dupeTrackData, {
           autoCreateRelease,
-          publishTracks: false,
+          publishTracks,
         });
 
         for (const result of dupeResult.results) {
