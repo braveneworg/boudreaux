@@ -41,6 +41,10 @@ vi.mock('../prisma', () => ({
       createMany: vi.fn(),
       deleteMany: vi.fn(),
     },
+    artistRelease: {
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+    },
   },
 }));
 vi.mock('@prisma/client', () => ({
@@ -1023,6 +1027,173 @@ describe('updateTrackAction', () => {
 
       expect(prisma.trackArtist.findMany).not.toHaveBeenCalled();
       expect(prisma.releaseTrack.findMany).not.toHaveBeenCalled();
+      expect(prisma.artistRelease.findMany).not.toHaveBeenCalled();
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should create ArtistRelease associations when both artistIds and releaseIds provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+            artistIds: ['artist-1', 'artist-2'],
+            releaseIds: ['release-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.findMany).toHaveBeenCalledWith({
+        where: {
+          artistId: { in: ['artist-1', 'artist-2'] },
+          releaseId: { in: ['release-1'] },
+        },
+        select: { artistId: true, releaseId: true },
+      });
+
+      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
+        data: [
+          { artistId: 'artist-1', releaseId: 'release-1' },
+          { artistId: 'artist-2', releaseId: 'release-1' },
+        ],
+      });
+    });
+
+    it('should skip existing ArtistRelease associations during update', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+            artistIds: ['artist-1', 'artist-2'],
+            releaseIds: ['release-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([
+        { artistId: 'artist-1', releaseId: 'release-1' },
+      ] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
+        data: [{ artistId: 'artist-2', releaseId: 'release-1' }],
+      });
+    });
+
+    it('should not create ArtistRelease when artistIds is missing during update', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+            releaseIds: ['release-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.findMany).not.toHaveBeenCalled();
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create ArtistRelease when releaseIds is missing during update', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+            artistIds: ['artist-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.findMany).not.toHaveBeenCalled();
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should not create ArtistRelease when all links already exist', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Track',
+            duration: 300,
+            audioUrl: 'https://example.com/updated-audio.mp3',
+            position: 2,
+            artistIds: ['artist-1'],
+            releaseIds: ['release-1'],
+          },
+        },
+      } as never);
+
+      vi.mocked(TrackService.updateTrack).mockResolvedValue({
+        success: true,
+        data: { id: mockTrackId },
+      } as never);
+
+      vi.mocked(prisma.trackArtist.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.releaseTrack.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([
+        { artistId: 'artist-1', releaseId: 'release-1' },
+      ] as never);
+
+      await updateTrackAction(mockTrackId, initialFormState, mockFormData);
+
+      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
     });
   });
 });
