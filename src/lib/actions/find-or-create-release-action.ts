@@ -81,14 +81,25 @@ function parseReleaseDate(year?: number, dateStr?: string): Date | undefined {
 }
 
 /**
+ * Options for find-or-create release behaviour
+ */
+export interface FindOrCreateReleaseOptions {
+  /** When true the release will be published (publishedAt set) if it is newly
+   *  created, or if an existing unpublished release is found. */
+  publish?: boolean;
+}
+
+/**
  * Find an existing release by title (case-insensitive) or create a new one
  * from audio metadata. This action requires admin role.
  *
  * @param metadata - The metadata extracted from the audio file
+ * @param options  - Optional behaviour flags
  * @returns Result indicating success/failure and the release ID
  */
 export async function findOrCreateReleaseAction(
-  metadata: ReleaseMetadata
+  metadata: ReleaseMetadata,
+  options: FindOrCreateReleaseOptions = {}
 ): Promise<FindOrCreateReleaseResult> {
   await requireRole('admin');
 
@@ -123,10 +134,32 @@ export async function findOrCreateReleaseAction(
       select: {
         id: true,
         title: true,
+        publishedAt: true,
+        deletedOn: true,
       },
     });
 
     if (existingRelease) {
+      // Build update payload: un-delete soft-deleted releases and publish if requested
+      const updateData: { deletedOn?: null; publishedAt?: Date } = {};
+
+      if (existingRelease.deletedOn) {
+        updateData.deletedOn = null;
+      }
+
+      if (options.publish && !existingRelease.publishedAt) {
+        updateData.publishedAt = new Date();
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.release.update({
+          where: { id: existingRelease.id },
+          data: updateData,
+        });
+
+        revalidatePath('/admin/releases');
+      }
+
       logSecurityEvent({
         event: 'media.release.found',
         userId: session.user.id,
@@ -157,6 +190,7 @@ export async function findOrCreateReleaseAction(
       labels,
       catalogNumber: metadata.catalogNumber?.trim() || undefined,
       coverArt: metadata.coverArt || '',
+      ...(options.publish ? { publishedAt: new Date() } : {}),
     });
 
     if (!createResponse.success) {

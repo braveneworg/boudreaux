@@ -1789,4 +1789,94 @@ describe('BulkTrackUploader', () => {
       });
     });
   });
+
+  describe('publishTracks propagation to bulkCreateTracksAction', () => {
+    const setupForPublishTest = async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            metadata: {
+              title: 'Test Track',
+              duration: 180,
+              album: 'Test Album',
+              artist: 'Test Artist',
+            },
+          }),
+      });
+
+      render(<BulkTrackUploader />);
+
+      const input = screen.getByLabelText(/select audio files/i);
+      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
+      });
+
+      mockGetPresignedUploadUrlsAction.mockResolvedValue({
+        success: true,
+        data: [
+          {
+            uploadUrl: 'https://s3.example.com/upload',
+            cdnUrl: 'https://cdn.example.com/track.mp3',
+            key: 'tracks/test.mp3',
+          },
+        ],
+      });
+
+      mockUploadFilesToS3.mockResolvedValue([{ success: true }]);
+
+      mockBulkCreateTracksAction.mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+        results: [
+          {
+            index: 0,
+            success: true,
+            title: 'Test Track',
+            trackId: 'track-123',
+          },
+        ],
+      });
+    };
+
+    it('should pass publishTracks: true when publish switch is on (default)', async () => {
+      await setupForPublishTest();
+
+      // Publish switch defaults to on
+      const switchEl = screen.getByLabelText(/published/i);
+      expect(switchEl).toBeChecked();
+
+      const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(mockBulkCreateTracksAction).toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ title: 'Test Track' })]),
+          expect.objectContaining({ publishTracks: true })
+        );
+      });
+    });
+
+    it('should pass publishTracks: false when publish switch is toggled off', async () => {
+      await setupForPublishTest();
+
+      // Toggle publish switch off
+      const switchEl = screen.getByLabelText(/published/i);
+      await userEvent.click(switchEl);
+      expect(switchEl).not.toBeChecked();
+
+      const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
+      await userEvent.click(uploadButton);
+
+      await waitFor(() => {
+        expect(mockBulkCreateTracksAction).toHaveBeenCalledWith(
+          expect.arrayContaining([expect.objectContaining({ title: 'Test Track' })]),
+          expect.objectContaining({ publishTracks: false })
+        );
+      });
+    });
+  });
 });

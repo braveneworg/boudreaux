@@ -171,7 +171,9 @@ export async function bulkCreateTracksAction(
             coverArt: track.coverArt,
           };
 
-          const releaseResult = await findOrCreateReleaseAction(releaseMetadata);
+          const releaseResult = await findOrCreateReleaseAction(releaseMetadata, {
+            publish: publishTracks,
+          });
 
           if (releaseResult.success && releaseResult.releaseId) {
             // If albumArtist is present, find/create a Group (not an Artist)
@@ -260,10 +262,14 @@ export async function bulkCreateTracksAction(
         const trimmedArtist = track.artist?.trim() || undefined;
         const trimmedAlbumArtist = track.albumArtist?.trim() || undefined;
 
-        // albumArtist always creates a Group (the band/ensemble).
-        // An individual Artist is only created when:
-        //   - artist differs from albumArtist (individual member on this track)
-        //   - OR no albumArtist exists (legacy behavior: artist field creates an Artist)
+        // When a resolvable artist name is present, an individual Artist
+        // (and ArtistRelease) is created so the release surfaces on artist
+        // pages. When albumArtist is present a Group is also created.
+        //
+        // Artist resolution:
+        //   - artist differs from albumArtist → use the distinct artist name
+        //   - artist matches albumArtist (or is absent) → use albumArtist
+        //   - no albumArtist → use artist field (if present)
         const hasAlbumArtist = !!trimmedAlbumArtist;
         const hasDistinctArtist =
           !!trimmedArtist &&
@@ -273,7 +279,7 @@ export async function bulkCreateTracksAction(
         const artistName = hasAlbumArtist
           ? hasDistinctArtist
             ? trimmedArtist
-            : undefined
+            : trimmedAlbumArtist
           : trimmedArtist;
 
         const groupName = hasAlbumArtist ? trimmedAlbumArtist : undefined;
