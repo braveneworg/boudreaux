@@ -156,6 +156,8 @@ export async function findOrCreateReleaseAction(
           where: { id: existingRelease.id },
           data: updateData,
         });
+
+        revalidatePath('/admin/releases');
       }
 
       logSecurityEvent({
