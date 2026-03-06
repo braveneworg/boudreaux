@@ -262,14 +262,14 @@ export async function bulkCreateTracksAction(
         const trimmedArtist = track.artist?.trim() || undefined;
         const trimmedAlbumArtist = track.albumArtist?.trim() || undefined;
 
-        // An individual Artist (and ArtistRelease) is always created so the
-        // release surfaces on artist pages.  When albumArtist is present a
-        // Group is also created.
+        // When a resolvable artist name is present, an individual Artist
+        // (and ArtistRelease) is created so the release surfaces on artist
+        // pages. When albumArtist is present a Group is also created.
         //
         // Artist resolution:
         //   - artist differs from albumArtist → use the distinct artist name
         //   - artist matches albumArtist (or is absent) → use albumArtist
-        //   - no albumArtist → use artist field
+        //   - no albumArtist → use artist field (if present)
         const hasAlbumArtist = !!trimmedAlbumArtist;
         const hasDistinctArtist =
           !!trimmedArtist &&
