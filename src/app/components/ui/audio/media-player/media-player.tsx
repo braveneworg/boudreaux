@@ -353,7 +353,7 @@ const FeaturedArtistCarousel = ({
           return (
             <CarouselItem
               key={featured.id}
-              className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
+              className="pl-2 pt-1 pb-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
             >
               <button
                 type="button"
