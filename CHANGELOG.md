@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.7.0] - 2026-03-07
+
+### Added
+
+- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n- Develop/feature/search artists (#261)\n
+
 ## [2.6.0] - 2026-03-07
 
 ### Added
