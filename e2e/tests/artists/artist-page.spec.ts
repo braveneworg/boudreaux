@@ -23,14 +23,14 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('button', { name: /play e2e album three/i })).toBeVisible();
     });
 
-    test('should show carousel navigation arrows for 3 releases', async ({ page }) => {
+    test('should hide carousel navigation arrows for 3 or fewer releases', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
       await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
 
-      // With 3 releases, navigation arrows should be visible (threshold changed to > 2)
-      await expect(page.getByRole('button', { name: /previous slide/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /next slide/i })).toBeVisible();
+      // With 3 releases, navigation arrows should be hidden (threshold is > 3)
+      await expect(page.getByRole('button', { name: /previous slide/i })).toBeHidden();
+      await expect(page.getByRole('button', { name: /next slide/i })).toBeHidden();
     });
 
     test('should select a different release when clicking its thumbnail', async ({ page }) => {

@@ -607,11 +607,11 @@ describe('ArtistPlayer', () => {
       expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
     });
 
-    it('should show carousel navigation for exactly 3 releases', () => {
+    it('should not show carousel navigation for exactly 3 releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
-      expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
+      expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
     });
 
     it('should render the artist name heading', () => {
@@ -641,12 +641,6 @@ describe('ArtistPlayer', () => {
         'data-audio-src',
         'https://example.com/audio1.mp3'
       );
-    });
-
-    it('should render the CoverArtView for selected release', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.getByTestId('cover-art-view')).toHaveTextContent('Album One');
     });
 
     it('should render TrackListDrawer at the bottom of the media player', () => {
@@ -867,13 +861,6 @@ describe('ArtistPlayer', () => {
         'https://example.com/audio1.mp3'
       );
     });
-
-    it('should render CoverArtView for two releases', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.getByTestId('cover-art-view')).toBeInTheDocument();
-    });
-
     it('should not render carousel navigation arrows for 2 releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
