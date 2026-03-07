@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [2.8.0] - 2026-03-07
+
+### Added
+
+- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n- Add some padding to featured artist (#262)\n
+
 ## [2.7.0] - 2026-03-07
 
 ### Added
