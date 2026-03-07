@@ -184,7 +184,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
               );
             })}
           </CarouselContent>
-          {releases.length > 2 && (
+          {releases.length > 3 && (
             <>
               <CarouselPrevious />
               <CarouselNext />
@@ -196,9 +196,6 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
       {/* Artist + release header */}
       {selectedRelease && (
         <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-          {releases.length >= 2 && getReleaseCoverArt(selectedRelease) && (
-            <MediaPlayer.CoverArtView artistRelease={{ release: selectedRelease, artist }} />
-          )}
           <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
         </article>
       )}
