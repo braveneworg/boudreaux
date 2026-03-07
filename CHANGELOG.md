@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [2.6.0] - 2026-03-07
+
+### Added
+
+- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n- Fix tests and update artist and release search (#260)\n
+
+## [2.5.0] - 2026-03-06
+
+### Added
+
+- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Address feedback on artist releases test fixes (#259)\n- Address feedback on artist releases test fixes (#259)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n- Fix tests for artist releases and related (#258)\n
+
 ## [2.4.0] - 2026-03-05
 
 ### Added
