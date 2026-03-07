@@ -322,17 +322,11 @@ describe('ArtistPlayer', () => {
     const release = createRelease('release-1', 'Test Album', [mockTrack1, mockTrack2, mockTrack3]);
     const artist = createArtistWithReleases([release]);
 
-    it('should render the media player with carousel for a single release', () => {
+    it('should not render the media player with carousel for a single release', () => {
       render(<ArtistPlayer artist={artist} />);
 
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
-    });
-
-    it('should center carousel items for a single release', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
+      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
     });
 
     it('should not show carousel navigation for a single release', () => {

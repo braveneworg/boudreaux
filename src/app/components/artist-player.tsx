@@ -147,7 +147,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
   return (
     <div className="flex flex-col gap-4">
       {/* Release thumbnail carousel — shown when 2+ releases */}
-      {releases.length >= 1 && (
+      {releases.length >= 2 && (
         <Carousel opts={{ align: 'start', loop: false }} aria-label={`Releases by ${artistName}`}>
           <CarouselContent className={cn('-ml-2', 'justify-center')}>
             {releases.map((ar, index) => {
