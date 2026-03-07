@@ -8,6 +8,8 @@
  * a searchable card grid with breadcrumb navigation.
  */
 
+import 'server-only';
+
 import Link from 'next/link';
 
 import { ReleaseCardGrid } from '@/app/components/release-card-grid';
