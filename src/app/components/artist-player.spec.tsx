@@ -326,13 +326,13 @@ describe('ArtistPlayer', () => {
       render(<ArtistPlayer artist={artist} />);
 
       expect(screen.getByTestId('media-player')).toBeInTheDocument();
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
+      expect(screen.queryByTestId('carousel')).not.toBeInTheDocument();
     });
 
     it('should center carousel items for a single release', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('carousel-content')).toHaveClass('justify-center');
+      expect(screen.queryByTestId('carousel-content')).not.toBeInTheDocument();
     });
 
     it('should not show carousel navigation for a single release', () => {
