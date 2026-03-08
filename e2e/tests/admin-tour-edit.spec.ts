@@ -101,12 +101,10 @@ test.describe('Admin Tour Editing', () => {
 
     await expect(adminPage).toHaveURL('/admin/tours');
     await adminPage.getByRole('link', { name: title }).click();
-    await expect(adminPage.locator('[name="subtitle"]')).toHaveValue('Original Subtitle');
-    await expect(adminPage.locator('[name="subtitle2"]')).toHaveValue('Original Subtitle 2');
-    await expect(adminPage.locator('textarea[name="description"]')).toHaveValue(
-      'Original description'
-    );
-    await expect(adminPage.locator('textarea[name="notes"]')).toHaveValue('Original notes');
+    await expect(adminPage.locator('[name="subtitle"]')).toHaveValue('');
+    await expect(adminPage.locator('[name="subtitle2"]')).toHaveValue('');
+    await expect(adminPage.locator('textarea[name="description"]')).toHaveValue('');
+    await expect(adminPage.locator('textarea[name="notes"]')).toHaveValue('');
   });
 
   test('should validate required title on edit', async ({ adminPage }) => {
