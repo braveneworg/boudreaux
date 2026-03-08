@@ -40,11 +40,6 @@ describe('Tour Actions', () => {
   describe('createTourAction', () => {
     const mockFormData = new FormData();
     mockFormData.append('title', 'Summer Tour 2026');
-    mockFormData.append('startDate', '2026-06-01');
-    mockFormData.append('endDate', '2026-08-31');
-    mockFormData.append('showStartTime', '2026-06-01T20:00:00');
-    mockFormData.append('venueId', 'venue-123');
-    mockFormData.append('headlinerIds', JSON.stringify(['artist-1', 'artist-2']));
 
     const initialFormState: FormState = {
       fields: {},
@@ -58,11 +53,6 @@ describe('Tour Actions', () => {
           success: true,
           data: {
             title: 'Summer Tour 2026',
-            startDate: new Date('2026-06-01'),
-            endDate: new Date('2026-08-31'),
-            showStartTime: new Date('2026-06-01T20:00:00'),
-            venueId: 'venue-123',
-            headlinerIds: ['artist-1', 'artist-2'],
           },
         },
       } as never);
@@ -70,7 +60,6 @@ describe('Tour Actions', () => {
       vi.mocked(TourService.create).mockResolvedValue({
         id: 'tour-123',
         title: 'Summer Tour 2026',
-        displayHeadliners: ['Artist One', 'Artist Two'],
       } as never);
     });
 
@@ -88,7 +77,6 @@ describe('Tour Actions', () => {
       expect(TourService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Summer Tour 2026',
-          headlinerIds: ['artist-1', 'artist-2'],
         })
       );
       expect(result.success).toBe(true);

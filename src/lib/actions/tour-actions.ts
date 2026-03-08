@@ -25,21 +25,7 @@ export const createTourAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
-  const permittedFieldNames = [
-    'title',
-    'subtitle',
-    'subtitle2',
-    'description',
-    'notes',
-    'startDate',
-    'endDate',
-    'showStartTime',
-    'showEndTime',
-    'venueId',
-    'ticketPrices',
-    'ticketsUrl',
-    'headlinerIds',
-  ];
+  const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourCreateSchema);
 
