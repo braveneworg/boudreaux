@@ -217,7 +217,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ## Never Do
 
-- Call `expect` inside conditional statements
+- Don't call `expect` inside conditional statements
 - Don't use conditional expects in tests (e.g., if (condition) { expect(...) }) — instead, write separate test cases for different conditions
 - Don't use localStorage/sessionStorage
 - Don't mix Server/Client Component patterns incorrectly
