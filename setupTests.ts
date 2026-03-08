@@ -10,6 +10,9 @@ import { afterEach, expect, vi } from 'vitest';
 // Next.js doesn't require this, but our test environment does
 globalThis.React = React;
 
+// Mock server-only module to allow testing server-side code
+vi.mock('server-only', () => ({}));
+
 // Mock Next.js server modules that cause ESM resolution issues
 vi.mock('next/server', async () => {
   const actual = await vi.importActual('next/dist/server/web/exports/index.js');

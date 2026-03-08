@@ -412,7 +412,7 @@ export default function FeaturedArtistForm({
                       <FormControl>
                         <Textarea
                           placeholder="A brief description for when this artist is featured..."
-                          className="min-h-[100px]"
+                          className="min-h-25"
                           {...field}
                         />
                       </FormControl>

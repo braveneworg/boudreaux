@@ -15,10 +15,7 @@ The Turnstile widget was implemented on the client side but **no server-side ver
 Created `/src/lib/utils/verify-turnstile.ts`:
 
 ```typescript
-export async function verifyTurnstile(
-  token: string,
-  ip?: string
-): Promise<TurnstileVerifyResult>;
+export async function verifyTurnstile(token: string, ip?: string): Promise<TurnstileVerifyResult>;
 ```
 
 This function:
