@@ -56,13 +56,20 @@ test.describe('Public Tours Search', () => {
   test('performs partial match search', async ({ page }) => {
     const searchInput = page.getByLabel('Search tours by artist name');
 
-    // Search with partial string
+    // First, search with full artist name to get baseline result count
+    await searchInput.fill('Beatles');
+    await page.waitForTimeout(500);
+    const fullResults = await page.locator('[data-testid="tour-card"]').count();
+
+    // Clear and search with partial string
+    await page.getByLabel('Clear search').click();
     await searchInput.fill('Beat');
     await page.waitForTimeout(500);
 
-    // Should find tours containing "Beat" (e.g., "Beatles")
+    // Should find tours containing "Beat" (e.g., "Beatles") and not fewer than exact search
     const partialResults = await page.locator('[data-testid="tour-card"]').count();
-    expect(partialResults).toBeGreaterThanOrEqual(0);
+    expect(partialResults).toBeGreaterThan(0);
+    expect(partialResults).toBeGreaterThanOrEqual(fullResults);
   });
 
   test('shows result count when searching', async ({ page }) => {
