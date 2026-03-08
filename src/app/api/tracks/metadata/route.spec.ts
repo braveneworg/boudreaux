@@ -123,6 +123,24 @@ describe('POST /api/tracks/metadata', () => {
     expect(data.error).toContain('Unsupported file type');
   });
 
+  it('should return 400 when request body cannot be parsed as FormData', async () => {
+    const request = {
+      headers: new Headers([['content-type', 'multipart/form-data; boundary=---']]),
+      formData: vi.fn().mockRejectedValue(new TypeError('Failed to parse body as FormData.')),
+    } as unknown as NextRequest;
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid multipart form data');
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it('should extract metadata from valid audio file', async () => {
     const mockMetadata = {
       title: 'Test Song',

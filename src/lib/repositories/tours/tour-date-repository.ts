@@ -5,6 +5,7 @@
 import 'server-only';
 
 import { prisma } from '../../prisma';
+import { OBJECT_ID_REGEX } from '../../utils/validation/object-id';
 
 import type { Prisma, TourDate } from '@prisma/client';
 
@@ -65,6 +66,10 @@ export class TourDateRepository {
    * Find all tour dates for a specific tour
    */
   static async findByTourId(tourId: string): Promise<TourDate[]> {
+    if (!OBJECT_ID_REGEX.test(tourId)) {
+      return [];
+    }
+
     return prisma.tourDate.findMany({
       where: { tourId },
       orderBy: { startDate: 'asc' },
@@ -76,6 +81,10 @@ export class TourDateRepository {
    * Find a single tour date by ID with all relations
    */
   static async findById(id: string): Promise<TourDate | null> {
+    if (!OBJECT_ID_REGEX.test(id)) {
+      return null;
+    }
+
     return prisma.tourDate.findUnique({
       where: { id },
       include: tourDateInclude,
@@ -204,6 +213,10 @@ export class TourDateRepository {
    * Count total tour dates for a specific tour
    */
   static async countByTourId(tourId: string): Promise<number> {
+    if (!OBJECT_ID_REGEX.test(tourId)) {
+      return 0;
+    }
+
     return prisma.tourDate.count({
       where: { tourId },
     });

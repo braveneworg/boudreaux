@@ -176,7 +176,7 @@
 - [ ] T079 [US4] Add "No tours found" empty state component in src/app/tours/components/tours-empty-state.tsx
 - [ ] T080 [US4] Add ARIA labels and keyboard navigation to search component for accessibility
 - [ ] T081 [US4] Run unit tests for US4 and verify all pass: `npm run test -- tour-search`
-- [ ] T082 [US4] Run E2E test for US4 and verify passes: `npm run test:e2e -- public-tours-search`
+- [x] T082 [US4] Run E2E test for US4 and verify passes: `npm run test:e2e -- public-tours-search`
 - [ ] T083 [US4] Manual testing: Search for various artist names, partial names, verify filtering, test case-insensitivity, verify empty state
 
 **Checkpoint**: Search functionality fully operational - visitors can filter tours by artist name independently

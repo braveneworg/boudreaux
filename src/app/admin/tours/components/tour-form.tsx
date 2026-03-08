@@ -141,13 +141,19 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
 
       // Add all form fields to FormData
       Object.entries(data).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          if (key === 'headlinerIds' && Array.isArray(value)) {
-            // Encode array as JSON string for FormData
-            formData.append(key, JSON.stringify(value));
-          } else {
-            formData.append(key, String(value));
-          }
+        if (value === null || value === undefined) {
+          return;
+        }
+
+        if (key === 'headlinerIds' && Array.isArray(value)) {
+          // Encode array as JSON string for FormData
+          formData.append(key, JSON.stringify(value));
+          return;
+        }
+
+        // In edit mode, preserve empty string values so optional fields can be cleared.
+        if (isEditMode || value !== '') {
+          formData.append(key, String(value));
         }
       });
 
