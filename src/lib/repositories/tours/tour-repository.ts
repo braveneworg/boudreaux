@@ -4,8 +4,8 @@
 
 import 'server-only';
 
-import { prisma } from '../../prisma';
-import { OBJECT_ID_REGEX } from '../../utils/validation/object-id';
+import { prisma } from '@/lib/prisma';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import type { Prisma, Tour } from '@prisma/client';
 
