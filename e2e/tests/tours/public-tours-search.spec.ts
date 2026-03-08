@@ -194,15 +194,14 @@ test.describe('Public Tours Search', () => {
   test('shows singular "1 tour found" for single result', async ({ page }) => {
     const searchInput = page.getByLabel('Search tours by artist name');
 
-    // Search for something specific
+    // Search for something specific that should return exactly 1 result
     await searchInput.fill('UniqueArtistName');
     await page.waitForTimeout(500);
 
+    // Assert count is exactly 1, then assert singular text unconditionally
     const count = await page.locator('[data-testid="tour-card"]').count();
-
-    if (count === 1) {
-      await expect(page.getByText('1 tour found')).toBeVisible();
-    }
+    expect(count).toBe(1);
+    await expect(page.getByText('1 tour found')).toBeVisible();
   });
 
   test('mobile: search works on small screens', async ({ page }) => {
