@@ -137,18 +137,6 @@ test.describe('Public Tours Search', () => {
     await expect(page.getByText(/Try adjusting your search/)).toBeVisible();
   });
 
-  test('maintains search query in URL (if implemented)', async ({ page }) => {
-    const searchInput = page.getByLabel('Search tours by artist name');
-
-    // Type search query
-    await searchInput.fill('Beatles');
-    await page.waitForTimeout(500);
-
-    // Note: This test assumes search query is added to URL
-    // If not implemented, this test can be removed or modified
-    // Expected URL: /tours?q=Beatles
-  });
-
   test('keyboard navigation works', async ({ page }) => {
     const searchInput = page.getByLabel('Search tours by artist name');
 
