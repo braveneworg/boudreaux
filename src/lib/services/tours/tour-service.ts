@@ -143,7 +143,7 @@ export class TourService {
 
   /**
    * Get display name for a tour headliner (artist or group)
-   * Priority: stageName > "firstName surname" > firstName > surname > group.name > "Unknown Artist"
+   * Priority: group.name > artist.displayName > "firstName surname" > firstName > surname > "Unknown Artist"
    * @private
    */
   private static getArtistDisplayName(headliner: {
