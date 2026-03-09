@@ -35,6 +35,7 @@ export const createTourDateAction = async (
     'venueId',
     'ticketPrices',
     'ticketsUrl',
+    'ticketIconUrl',
     'notes',
     'headlinerIds',
   ];
@@ -109,6 +110,7 @@ export const updateTourDateAction = async (
     'venueId',
     'ticketPrices',
     'ticketsUrl',
+    'ticketIconUrl',
     'notes',
     'headlinerIds',
   ];

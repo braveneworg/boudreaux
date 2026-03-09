@@ -23,6 +23,7 @@ export interface TourDateCreateData {
   doorsOpenAt?: Date | null;
   venueId: string;
   ticketsUrl?: string | null;
+  ticketIconUrl?: string | null;
   ticketPrices?: string | null;
   notes?: string | null;
   headlinerIds: string[];
@@ -36,6 +37,7 @@ export interface TourDateUpdateData {
   doorsOpenAt?: Date | null;
   venueId?: string;
   ticketsUrl?: string | null;
+  ticketIconUrl?: string | null;
   ticketPrices?: string | null;
   notes?: string | null;
   headlinerIds?: string[];

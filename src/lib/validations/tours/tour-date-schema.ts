@@ -32,6 +32,12 @@ export const tourDateCreateSchema = z
       .optional()
       .nullable(),
     ticketsUrl: z.string().url('Invalid URL format').or(z.literal('')).optional().nullable(),
+    ticketIconUrl: z
+      .string()
+      .url('Invalid icon URL format')
+      .or(z.literal(''))
+      .optional()
+      .nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required'),
   })
@@ -63,6 +69,12 @@ export const tourDateUpdateSchema = z
       .optional()
       .nullable(),
     ticketsUrl: z.string().url('Invalid URL format').or(z.literal('')).optional().nullable(),
+    ticketIconUrl: z
+      .string()
+      .url('Invalid icon URL format')
+      .or(z.literal(''))
+      .optional()
+      .nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required').optional(),
   })

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { format } from 'date-fns';
-import { Calendar, MapPin, Music, Pencil, Plus, Ticket, Trash2 } from 'lucide-react';
+import { Calendar, MapPin, Music, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import TourDateForm from '@/app/admin/tours/components/tour-date-form';
@@ -24,6 +24,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { TicketProviderIcon } from '@/app/components/ui/ticket-provider-icon';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
 
 import ArtistPillList from './artist-pill-list';
@@ -234,7 +235,12 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                       {/* Tickets */}
                       {tourDate.ticketsUrl && (
                         <div className="flex items-center gap-2 text-sm">
-                          <Ticket className="size-4 text-muted-foreground" />
+                          <TicketProviderIcon
+                            ticketsUrl={tourDate.ticketsUrl}
+                            ticketIconUrl={tourDate.ticketIconUrl}
+                            size={16}
+                            className="shrink-0"
+                          />
                           <a
                             href={tourDate.ticketsUrl}
                             target="_blank"

@@ -138,6 +138,7 @@ const createMockTourDate = (
     showEndTime: null,
     venueId: 'venue-1',
     ticketsUrl: 'https://example.com',
+    ticketIconUrl: null,
     ticketPrices: '$25',
     notes: null,
     createdAt: new Date(),

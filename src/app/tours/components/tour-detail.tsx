@@ -4,10 +4,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { ArrowLeft, Calendar, ExternalLink, MapPin, Music, Ticket } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Music, Ticket } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
 
 import type {
@@ -247,16 +248,13 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                             <div className="space-y-2">
                               {tourDate.ticketPrices && <div>{tourDate.ticketPrices}</div>}
                               {tourDate.ticketsUrl && (
-                                <Button asChild size="sm" variant="outline">
-                                  <a
-                                    href={tourDate.ticketsUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    Get Tickets
-                                    <ExternalLink className="ml-2 h-4 w-4" />
-                                  </a>
-                                </Button>
+                                <GetTicketsLink
+                                  ticketsUrl={tourDate.ticketsUrl}
+                                  ticketIconUrl={tourDate.ticketIconUrl}
+                                  size="sm"
+                                  showExternalIcon
+                                  className="py-0"
+                                />
                               )}
                             </div>
                           </div>

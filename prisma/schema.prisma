@@ -616,6 +616,7 @@ model TourDate {
   venueId       String              @db.ObjectId
   venue         Venue               @relation(fields: [venueId], references: [id], onDelete: Cascade)
   ticketsUrl    String?
+  ticketIconUrl String?
   ticketPrices  String?
   headliners    TourDateHeadliner[]
   images        TourDateImage[]

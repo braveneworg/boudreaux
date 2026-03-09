@@ -120,4 +120,46 @@ describe('ArtistReleasesCarousel', () => {
     const carousel = screen.getByTestId('carousel');
     expect(carousel).toHaveAttribute('aria-label', 'Other releases by John Doe');
   });
+
+  it('should not show arrows when there are fewer than 4 releases', () => {
+    render(<ArtistReleasesCarousel releases={mockReleases} artistName="John Doe" />);
+
+    expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+  });
+
+  it('should show arrows when there are 4 or more releases', () => {
+    const fourReleases = [
+      ...mockReleases,
+      {
+        id: 'release-4',
+        title: 'Fourth Album',
+        coverArt: 'https://cdn.example.com/cover4.jpg',
+        description: null,
+        publishedAt: new Date(),
+        releasedOn: new Date(),
+        deletedOn: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        images: [],
+      },
+      {
+        id: 'release-5',
+        title: 'Fifth Album',
+        coverArt: 'https://cdn.example.com/cover5.jpg',
+        description: null,
+        publishedAt: new Date(),
+        releasedOn: new Date(),
+        deletedOn: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        images: [],
+      },
+    ] as unknown as ReleaseCarouselItem[];
+
+    render(<ArtistReleasesCarousel releases={fourReleases} artistName="John Doe" />);
+
+    expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
+    expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
+  });
 });

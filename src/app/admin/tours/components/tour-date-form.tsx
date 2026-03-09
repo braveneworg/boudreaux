@@ -82,6 +82,7 @@ export default function TourDateForm({
       doorsOpenAt: '',
       venueId: '',
       ticketsUrl: '',
+      ticketIconUrl: '',
       ticketPrices: '',
       notes: '',
       headlinerIds: [],
@@ -114,6 +115,7 @@ export default function TourDateForm({
         doorsOpenAt: tourDate.doorsOpenAt ? formatDateTime(tourDate.doorsOpenAt) : '',
         venueId: tourDate.venueId || '',
         ticketsUrl: tourDate.ticketsUrl || '',
+        ticketIconUrl: tourDate.ticketIconUrl || '',
         ticketPrices: tourDate.ticketPrices || '',
         notes: tourDate.notes || '',
         headlinerIds:
@@ -131,6 +133,7 @@ export default function TourDateForm({
         doorsOpenAt: '',
         venueId: '',
         ticketsUrl: '',
+        ticketIconUrl: '',
         ticketPrices: '',
         notes: '',
         headlinerIds: [],
@@ -467,6 +470,31 @@ export default function TourDateForm({
                 name="ticketPrices"
                 label="Ticket Price"
                 placeholder="$25 - $100"
+              />
+
+              <FormField
+                control={control}
+                name="ticketIconUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ticket Icon URL</FormLabel>
+                    <FormControl>
+                      <input
+                        {...field}
+                        value={field.value || ''}
+                        type="text"
+                        placeholder="https://cdn.example.com/icons/provider-icon.png"
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Optional. Upload a custom icon to S3 and paste the URL here. If left blank,
+                      the icon is auto-detected from the ticket URL domain (Bandsintown, Eventbrite,
+                      StubHub, Ticketmaster).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </section>
 

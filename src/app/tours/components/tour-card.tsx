@@ -8,6 +8,7 @@ import { Calendar, MapPin, Music, Ticket } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 
 import type {
   Artist,
@@ -123,6 +124,9 @@ export const TourCard = ({ tour }: TourCardProps) => {
     )
   );
   const primaryTicketUrl = ticketLinks[0];
+  const primaryTicketDate = primaryTicketUrl
+    ? sortedTourDates.find((date) => date.ticketsUrl === primaryTicketUrl)
+    : undefined;
 
   return (
     <Card
@@ -201,11 +205,12 @@ export const TourCard = ({ tour }: TourCardProps) => {
           <Link href={`/tours/${tour.id}`}>View Details</Link>
         </Button>
         {primaryTicketUrl && (
-          <Button asChild variant="outline" className="flex-1">
-            <a href={primaryTicketUrl} target="_blank" rel="noopener noreferrer">
-              Get Tickets
-            </a>
-          </Button>
+          <GetTicketsLink
+            ticketsUrl={primaryTicketUrl}
+            ticketIconUrl={primaryTicketDate?.ticketIconUrl}
+            variant="outline"
+            className="flex-1 py-0"
+          />
         )}
       </CardFooter>
     </Card>

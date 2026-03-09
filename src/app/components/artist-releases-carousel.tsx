@@ -37,13 +37,13 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
   }
 
   return (
-    <Carousel aria-label={`Other releases by ${artistName}`}>
-      <CarouselContent>
+    <Carousel aria-label={`Other releases by ${artistName}`} opts={{ align: 'start' }}>
+      <CarouselContent className="-ml-2 justify-center">
         {releases.map((release) => {
           const coverArt = getReleaseCoverArt(release);
 
           return (
-            <CarouselItem key={release.id}>
+            <CarouselItem key={release.id} className="basis-1/3 pl-2 flex justify-center">
               <Link href={`/releases/${release.id}`}>
                 {coverArt ? (
                   <Image
@@ -63,8 +63,12 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
           );
         })}
       </CarouselContent>
-      <CarouselPrevious />
-      <CarouselNext />
+      {releases.length > 3 && (
+        <>
+          <CarouselPrevious />
+          <CarouselNext />
+        </>
+      )}
     </Carousel>
   );
 };
