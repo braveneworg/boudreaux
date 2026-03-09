@@ -33,7 +33,7 @@ export const createArtistAction = async (
 
   if (parsed.success) {
     try {
-      const { firstName, surname, slug, middleName, displayName } = parsed.data;
+      const { firstName, surname, slug, middleName, displayName, publishedOn } = parsed.data;
 
       // Create artist in database
       const response = await ArtistService.createArtist({
@@ -42,6 +42,7 @@ export const createArtistAction = async (
         slug,
         middleName,
         displayName,
+        publishedOn: publishedOn ? new Date(publishedOn) : undefined,
       });
 
       // Log artist creation for security audit
