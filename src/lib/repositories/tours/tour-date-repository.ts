@@ -9,12 +9,18 @@ import { OBJECT_ID_REGEX } from '../../utils/validation/object-id';
 
 import type { Prisma, TourDate } from '@prisma/client';
 
+export interface HeadlinerInput {
+  artistId: string;
+  setTime?: Date | null;
+}
+
 export interface TourDateCreateData {
   tourId: string;
   startDate: Date;
   endDate?: Date | null;
   showStartTime: Date;
   showEndTime?: Date | null;
+  doorsOpenAt?: Date | null;
   venueId: string;
   ticketsUrl?: string | null;
   ticketPrices?: string | null;
@@ -27,6 +33,7 @@ export interface TourDateUpdateData {
   endDate?: Date | null;
   showStartTime?: Date | null;
   showEndTime?: Date | null;
+  doorsOpenAt?: Date | null;
   venueId?: string;
   ticketsUrl?: string | null;
   ticketPrices?: string | null;
@@ -149,6 +156,9 @@ export class TourDateRepository {
       ...(tourDateData.showEndTime !== undefined && {
         showEndTime: tourDateData.showEndTime || undefined,
       }),
+      ...(tourDateData.doorsOpenAt !== undefined && {
+        doorsOpenAt: tourDateData.doorsOpenAt || undefined,
+      }),
       ...(tourDateData.ticketsUrl !== undefined && {
         ticketsUrl: tourDateData.ticketsUrl || undefined,
       }),
@@ -238,5 +248,39 @@ export class TourDateRepository {
       take: limit,
       include: tourDateInclude,
     });
+  }
+
+  /**
+   * Update the setTime for a specific headliner on a tour date
+   */
+  static async updateHeadlinerSetTime(headlinerId: string, setTime: Date | null): Promise<void> {
+    await prisma.tourDateHeadliner.update({
+      where: { id: headlinerId },
+      data: { setTime },
+    });
+  }
+
+  /**
+   * Remove a specific headliner from a tour date
+   * Only deletes the TourDateHeadliner junction record — does NOT delete the artist
+   */
+  static async removeHeadliner(headlinerId: string): Promise<void> {
+    await prisma.tourDateHeadliner.delete({
+      where: { id: headlinerId },
+    });
+  }
+
+  /**
+   * Reorder headliners for a tour date by updating sortOrder in batch
+   */
+  static async reorderHeadliners(tourDateId: string, headlinerIds: string[]): Promise<void> {
+    await prisma.$transaction(
+      headlinerIds.map((id, index) =>
+        prisma.tourDateHeadliner.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    );
   }
 }

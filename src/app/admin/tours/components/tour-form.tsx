@@ -30,7 +30,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createTourAction, updateTourAction, deleteTourAction } from '@/lib/actions/tour-actions';
 import type { FormState } from '@/lib/types/form-state';
-import { tourCreateSchema, type TourCreateInput } from '@/lib/validations/tours/tour-schema';
+import { tourCreateSchema, tourUpdateSchema } from '@/lib/validations/tours/tour-schema';
 
 import type { TourImage } from '@prisma/client';
 
@@ -56,12 +56,13 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
   const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [tourImages, setTourImages] = useState<TourImage[]>([]);
+  const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
   const isEditMode = !!tourId;
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm({
-    resolver: zodResolver(tourCreateSchema),
+    resolver: zodResolver(isEditMode ? tourUpdateSchema : tourCreateSchema),
     defaultValues: {
       title: '',
       subtitle: '',
@@ -71,7 +72,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
     },
   });
 
-  const { control, handleSubmit, reset } = form;
+  const { control, handleSubmit, reset, setError } = form;
 
   // Fetch tour data in edit mode
   useEffect(() => {
@@ -134,7 +135,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
     }
   }, [tourId, initialTour, reset]);
 
-  const onSubmit = async (data: TourCreateInput) => {
+  const onSubmit = async (data: Record<string, unknown>) => {
     setIsPending(true);
     try {
       const formData = new FormData();
@@ -170,9 +171,24 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
         toast.success(isEditMode ? 'Tour updated successfully' : 'Tour created successfully');
         router.push('/admin/tours');
         router.refresh();
-      } else if (result.errors) {
-        // Form validation errors are automatically handled by React Hook Form
-        toast.error('Please fix the form errors');
+      } else {
+        const errors = result.errors ?? {};
+        const fieldErrors: string[] = [];
+        for (const [field, messages] of Object.entries(errors)) {
+          const msg = Array.isArray(messages) ? messages[0] : String(messages);
+          if (!msg) continue;
+          if (field === 'general') {
+            toast.error(msg);
+          } else {
+            setError(field as 'title', { message: msg });
+            fieldErrors.push(field);
+          }
+        }
+        if (fieldErrors.length > 0) {
+          toast.error('Please fix the form errors');
+        } else if (!Object.keys(errors).includes('general')) {
+          toast.error('An unexpected error occurred. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Form submission error:', err);
@@ -323,7 +339,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
               {isEditMode && tourId && (
                 <>
                   <Separator />
-                  <TourDateList tourId={tourId} />
+                  <TourDateList tourId={tourId} onDialogOpenChange={setIsTourDateDialogOpen} />
                 </>
               )}
 
@@ -371,7 +387,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
                   </Button>
                 )}
               </div>
-              <Button type="submit" disabled={isPending || isDeleting}>
+              <Button type="submit" disabled={isPending || isDeleting || isTourDateDialogOpen}>
                 {isPending
                   ? isEditMode
                     ? 'Updating...'

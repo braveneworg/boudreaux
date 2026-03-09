@@ -87,6 +87,17 @@ export class VenueRepository {
   }
 
   /**
+   * Find the most recently created venues, ordered by createdAt descending.
+   * Used as the default list before the user types a search term.
+   */
+  static async findRecent(limit = 5): Promise<Venue[]> {
+    return prisma.venue.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  /**
    * Find a single venue by ID
    */
   static async findById(id: string): Promise<Venue | null> {

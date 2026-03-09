@@ -30,6 +30,14 @@ export const createTourAction = async (
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourCreateSchema);
 
   if (!parsed.success) {
+    // Populate field-level errors so the client can display them
+    for (const issue of parsed.error.issues) {
+      const field = issue.path.join('.');
+      if (!formState.errors![field]) {
+        formState.errors![field] = [];
+      }
+      (formState.errors![field] as string[]).push(issue.message);
+    }
     return formState;
   }
 
@@ -83,6 +91,14 @@ export const updateTourAction = async (
   const { formState, parsed } = getActionState(payload, permittedFieldNames, tourUpdateSchema);
 
   if (!parsed.success) {
+    // Populate field-level errors so the client can display them
+    for (const issue of parsed.error.issues) {
+      const field = issue.path.join('.');
+      if (!formState.errors![field]) {
+        formState.errors![field] = [];
+      }
+      (formState.errors![field] as string[]).push(issue.message);
+    }
     return formState;
   }
 

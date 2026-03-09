@@ -14,6 +14,7 @@ import {
   type ImageUploadRequest,
   type PresignedUrlResponse,
 } from '@/lib/validations/tours/image-schema';
+import type { TourDateImageUploadRequest } from '@/lib/validations/tours/tour-date-image-schema';
 
 /**
  * Get configured S3 client
@@ -50,6 +51,26 @@ export class ImageUploadService {
       .substring(0, 50); // Truncate to reasonable length
 
     return `media/tours/${tourId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
+  }
+
+  /**
+   * Generate a unique S3 key for a tour date image
+   */
+  static generateTourDateS3Key(tourDateId: string, fileName: string): string {
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const extension = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+
+    // Sanitize filename: lowercase, remove special chars, truncate
+    const sanitizedName = fileName
+      .replace(/\.[^/.]+$/, '') // Remove extension
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-') // Replace non-alphanumeric with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single
+      .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+      .substring(0, 50); // Truncate to reasonable length
+
+    return `media/tour-dates/${tourDateId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
   }
 
   /**
@@ -149,6 +170,61 @@ export class ImageUploadService {
       };
     } catch (error) {
       console.error('Error generating presigned URL:', error);
+      return { success: false, error: 'Failed to generate upload URL' };
+    }
+  }
+
+  /**
+   * Generate a presigned URL for uploading a tour date image to S3
+   * URL expires in 15 minutes (900 seconds)
+   */
+  static async generateTourDatePresignedUploadUrl(
+    request: TourDateImageUploadRequest
+  ): Promise<ServiceResponse<PresignedUrlResponse>> {
+    try {
+      const s3Bucket = process.env.S3_BUCKET;
+
+      if (!s3Bucket) {
+        return { success: false, error: 'S3 bucket not configured' };
+      }
+
+      // Validate file
+      const validation = this.validateImageFile(request.mimeType, request.fileSize);
+      if (!validation.valid) {
+        return { success: false, error: validation.error || 'Invalid file' };
+      }
+
+      // Generate S3 key for tour date
+      const s3Key = this.generateTourDateS3Key(request.tourDateId, request.fileName);
+
+      // Create Put command for presigned URL
+      const putCommand = new PutObjectCommand({
+        Bucket: s3Bucket,
+        Key: s3Key,
+        ContentType: request.mimeType,
+        CacheControl: 'public, max-age=31536000, immutable',
+        Metadata: {
+          tourDateId: request.tourDateId,
+          originalFileName: request.fileName,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+
+      // Generate presigned URL (expires in 15 minutes)
+      const s3Client = getS3Client();
+      const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
+
+      return {
+        success: true,
+        data: {
+          uploadUrl,
+          s3Key,
+          s3Bucket,
+          expiresIn: 900,
+        },
+      };
+    } catch (error) {
+      console.error('Error generating tour date presigned URL:', error);
       return { success: false, error: 'Failed to generate upload URL' };
     }
   }

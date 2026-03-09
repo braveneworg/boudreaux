@@ -5,17 +5,26 @@
 import { z } from 'zod';
 
 /**
+ * Optional date field that gracefully handles empty strings from form inputs.
+ * Converts '' to null so that z.coerce.date().nullable() skips coercion,
+ * while .optional() on the outside keeps the field optional in the parent object.
+ */
+const optionalDate = () =>
+  z.preprocess((val) => (val === '' ? null : val), z.coerce.date().nullable()).optional();
+
+/**
  * Validation schema for creating a new tour date entry
  */
 export const tourDateCreateSchema = z
   .object({
     tourId: z.string({ message: 'Tour ID is required' }).min(1, 'Tour ID is required'),
     startDate: z.coerce.date({ message: 'Start date is required' }),
-    endDate: z.coerce.date().optional().nullable(),
+    endDate: optionalDate(),
     showStartTime: z.coerce.date({
       message: 'Show start time is required',
     }),
-    showEndTime: z.coerce.date().optional().nullable(),
+    showEndTime: optionalDate(),
+    doorsOpenAt: optionalDate(),
     venueId: z.string({ message: 'Venue is required' }).min(1, 'Venue is required'),
     ticketPrices: z
       .string()
@@ -29,10 +38,6 @@ export const tourDateCreateSchema = z
   .refine((data) => !data.endDate || data.endDate >= data.startDate, {
     message: 'End date must be after start date',
     path: ['endDate'],
-  })
-  .refine((data) => !data.showEndTime || data.showEndTime > data.showStartTime, {
-    message: 'Show end time must be after show start time',
-    path: ['showEndTime'],
   });
 
 /**
@@ -46,10 +51,11 @@ export type TourDateCreateInput = z.infer<typeof tourDateCreateSchema>;
  */
 export const tourDateUpdateSchema = z
   .object({
-    startDate: z.coerce.date().optional().nullable(),
-    endDate: z.coerce.date().optional().nullable(),
-    showStartTime: z.coerce.date().optional().nullable(),
-    showEndTime: z.coerce.date().optional().nullable(),
+    startDate: optionalDate(),
+    endDate: optionalDate(),
+    showStartTime: optionalDate(),
+    showEndTime: optionalDate(),
+    doorsOpenAt: optionalDate(),
     venueId: z.string().min(1, 'Venue cannot be empty').optional(),
     ticketPrices: z
       .string()
@@ -71,19 +77,6 @@ export const tourDateUpdateSchema = z
     {
       message: 'End date must be after start date',
       path: ['endDate'],
-    }
-  )
-  .refine(
-    (data) => {
-      // If both times provided, showEndTime must be after showStartTime
-      if (data.showStartTime && data.showEndTime) {
-        return data.showEndTime > data.showStartTime;
-      }
-      return true;
-    },
-    {
-      message: 'Show end time must be after show start time',
-      path: ['showEndTime'],
     }
   );
 

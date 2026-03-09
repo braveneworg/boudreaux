@@ -108,9 +108,7 @@ describe('Tour Actions', () => {
         formState: {
           fields: {},
           success: false,
-          errors: {
-            title: ['Title is required'],
-          },
+          errors: {},
         },
         parsed: {
           success: false,
@@ -213,9 +211,7 @@ describe('Tour Actions', () => {
         formState: {
           fields: {},
           success: false,
-          errors: {
-            title: ['Title is too long'],
-          },
+          errors: {},
         },
         parsed: {
           success: false,

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
+import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,9 +18,11 @@ import { Input } from './input';
 interface DatePickerProps {
   onSelect?: (dateString: string, fieldName: string) => void;
   fieldName: string;
+  /** Controlled value: ISO date string or YYYY-MM-DD */
+  value?: string;
 }
 
-export const DatePicker = ({ onSelect, fieldName }: DatePickerProps) => {
+export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date>();
   const [month, setMonth] = useState<Date>(new Date());
@@ -28,6 +31,21 @@ export const DatePicker = ({ onSelect, fieldName }: DatePickerProps) => {
   const dateInputRef = useRef<HTMLInputElement>(null);
   const startDate = new Date(1900, 0, 1);
   const endDate = new Date(2099, 11, 31);
+
+  // Sync external controlled value → internal date state
+  useEffect(() => {
+    if (value) {
+      // Append time to avoid UTC midnight → local-previous-day shift
+      const normalized = value.includes('T') ? value : `${value}T00:00:00`;
+      const parsed = new Date(normalized);
+      if (!isNaN(parsed.getTime())) {
+        setDate(parsed);
+        setMonth(parsed);
+      }
+    } else {
+      setDate(undefined);
+    }
+  }, [value]);
 
   const handleChangeDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -122,6 +140,21 @@ export const DatePicker = ({ onSelect, fieldName }: DatePickerProps) => {
               }
             }}
           />
+          <div className="border-t p-2 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground h-7 px-2"
+              onClick={() => {
+                setDate(undefined);
+                onSelect?.('', fieldName);
+                setOpen(false);
+              }}
+            >
+              Clear
+            </Button>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

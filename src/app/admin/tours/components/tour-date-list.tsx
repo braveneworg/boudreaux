@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { format } from 'date-fns';
 import { Calendar, MapPin, Music, Pencil, Plus, Ticket, Trash2 } from 'lucide-react';
@@ -26,6 +26,8 @@ import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
 
+import ArtistPillList from './artist-pill-list';
+
 import type { Artist, Group, TourDate, TourDateHeadliner, Venue } from '@prisma/client';
 
 // Full tour date type with relations
@@ -41,9 +43,11 @@ type TourDateWithRelations = TourDate & {
 
 interface TourDateListProps {
   tourId: string;
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
-export default function TourDateList({ tourId }: TourDateListProps) {
+export default function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [tourDates, setTourDates] = useState<TourDateWithRelations[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTourDate, setSelectedTourDate] = useState<TourDateWithRelations | null>(null);
@@ -73,6 +77,12 @@ export default function TourDateList({ tourId }: TourDateListProps) {
   useEffect(() => {
     fetchTourDates();
   }, [fetchTourDates]);
+
+  // Notify the parent component when the dialog open state changes
+  // so it can disable its own submit button while the dialog is open.
+  useEffect(() => {
+    onDialogOpenChange?.(isFormOpen);
+  }, [isFormOpen, onDialogOpenChange]);
 
   const handleAddClick = () => {
     setSelectedTourDate(null);
@@ -115,20 +125,12 @@ export default function TourDateList({ tourId }: TourDateListProps) {
     await fetchTourDates();
     setIsFormOpen(false);
     setSelectedTourDate(null);
-  };
 
-  const getArtistDisplayName = (
-    headliner: TourDateHeadliner & { artist: Artist | null; group: Group | null }
-  ) => {
-    if (headliner.artist) {
-      return (
-        headliner.artist.displayName || `${headliner.artist.firstName} ${headliner.artist.surname}`
-      );
-    }
-    if (headliner.group) {
-      return headliner.group.name;
-    }
-    return 'Unknown Artist';
+    // Scroll the Tour Dates heading into view so the user can see the
+    // list of dates just added/updated.
+    requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   if (isLoading) {
@@ -149,7 +151,7 @@ export default function TourDateList({ tourId }: TourDateListProps) {
 
   return (
     <>
-      <section className="space-y-4">
+      <section ref={sectionRef} className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">Tour Dates</h3>
@@ -157,10 +159,12 @@ export default function TourDateList({ tourId }: TourDateListProps) {
               Manage individual show dates for this tour
             </p>
           </div>
-          <Button onClick={handleAddClick} size="sm">
-            <Plus className="mr-2 size-4" />
-            Add Date
-          </Button>
+          {tourDates.length > 0 && (
+            <Button type="button" onClick={handleAddClick} size="sm">
+              <Plus className="mr-2 size-4" />
+              Add Date
+            </Button>
+          )}
         </div>
 
         {tourDates.length === 0 ? (
@@ -171,7 +175,7 @@ export default function TourDateList({ tourId }: TourDateListProps) {
               <p className="mb-4 text-sm text-muted-foreground">
                 Get started by adding your first show date
               </p>
-              <Button onClick={handleAddClick} variant="outline">
+              <Button type="button" onClick={handleAddClick} variant="outline">
                 <Plus className="mr-2 size-4" />
                 Add Tour Date
               </Button>
@@ -193,9 +197,17 @@ export default function TourDateList({ tourId }: TourDateListProps) {
                         </span>
                         <Separator orientation="vertical" className="h-4" />
                         <span className="text-muted-foreground">
-                          {format(new Date(tourDate.showStartTime), 'p')}
-                          {tourDate.showEndTime &&
-                            ` - ${format(new Date(tourDate.showEndTime), 'p')}`}
+                          {format(new Date(tourDate.showStartTime), 'p')} &mdash;{' '}
+                          {tourDate.showEndTime ? format(new Date(tourDate.showEndTime), 'p') : '—'}
+                        </span>
+                      </div>
+
+                      {/* Doors Open */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="size-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Doors:{' '}
+                          {tourDate.doorsOpenAt ? format(new Date(tourDate.doorsOpenAt), 'p') : '—'}
                         </span>
                       </div>
 
@@ -210,13 +222,13 @@ export default function TourDateList({ tourId }: TourDateListProps) {
                       </div>
 
                       {/* Headliners */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <Music className="size-4 text-muted-foreground" />
-                        <span>
-                          {tourDate.headliners.length > 0
-                            ? tourDate.headliners.map(getArtistDisplayName).join(', ')
-                            : 'No headliners'}
-                        </span>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Music className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <ArtistPillList
+                          tourDateId={tourDate.id}
+                          headliners={tourDate.headliners}
+                          onHeadlinersChange={fetchTourDates}
+                        />
                       </div>
 
                       {/* Tickets */}
@@ -250,10 +262,16 @@ export default function TourDateList({ tourId }: TourDateListProps) {
 
                     {/* Actions */}
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditClick(tourDate)}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClick(tourDate)}
+                      >
                         <Pencil className="size-4" />
                       </Button>
                       <Button
+                        type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteClick(tourDate.id)}

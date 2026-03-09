@@ -84,6 +84,7 @@ export default function VenueSelect<
   const [newVenueCity, setNewVenueCity] = useState('');
   const [newVenueState, setNewVenueState] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchVenues = async (search?: string) => {
     setIsLoading(true);
@@ -118,6 +119,7 @@ export default function VenueSelect<
     if (!newVenueName.trim()) return;
 
     setIsCreating(true);
+    setCreateError(null);
     try {
       const formData = new FormData();
       formData.append('name', newVenueName.trim());
@@ -144,9 +146,16 @@ export default function VenueSelect<
         setNewVenueCity('');
         setNewVenueState('');
         setOpen(false);
+      } else {
+        // Surface validation or server errors
+        const errors = result.errors ?? {};
+        const firstError =
+          Object.values(errors).flat()[0] ?? 'Failed to create venue. Please try again.';
+        setCreateError(String(firstError));
       }
     } catch (err) {
       console.error('Failed to create venue:', err);
+      setCreateError('An unexpected error occurred. Please try again.');
     } finally {
       setIsCreating(false);
     }
@@ -188,14 +197,22 @@ export default function VenueSelect<
                     </Button>
                   </FormControl>
                 </PopoverTrigger>
-                <PopoverContent className="w-100 p-0">
+                <PopoverContent
+                  className="w-[calc(100vw-2rem)] p-0 sm:w-100"
+                  align="start"
+                  avoidCollisions
+                  collisionPadding={8}
+                  sideOffset={4}
+                >
                   <Command shouldFilter={false}>
                     <CommandInput
                       placeholder={searchPlaceholder}
                       value={searchValue}
                       onValueChange={setSearchValue}
                     />
-                    <CommandList>
+                    <CommandList
+                      style={{ maxHeight: 'var(--radix-popover-content-available-height)' }}
+                    >
                       <CommandEmpty>{isLoading ? 'Loading...' : emptyMessage}</CommandEmpty>
                       {venues.map((venue) => (
                         <CommandItem
@@ -235,7 +252,13 @@ export default function VenueSelect<
         }}
       />
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setCreateError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Venue</DialogTitle>
@@ -245,6 +268,11 @@ export default function VenueSelect<
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {createError && (
+              <p className="text-sm text-destructive" role="alert">
+                {createError}
+              </p>
+            )}
             <div className="space-y-2">
               <label htmlFor="venue-name" className="text-sm font-medium">
                 Venue Name *
@@ -294,6 +322,7 @@ export default function VenueSelect<
               name={name}
               render={({ field }) => (
                 <Button
+                  type="button"
                   onClick={() => handleCreateVenue(field)}
                   disabled={!newVenueName.trim() || isCreating}
                 >

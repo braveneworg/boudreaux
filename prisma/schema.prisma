@@ -612,11 +612,13 @@ model TourDate {
   endDate       DateTime?
   showStartTime DateTime
   showEndTime   DateTime?
+  doorsOpenAt   DateTime?
   venueId       String              @db.ObjectId
   venue         Venue               @relation(fields: [venueId], references: [id], onDelete: Cascade)
   ticketsUrl    String?
   ticketPrices  String?
   headliners    TourDateHeadliner[]
+  images        TourDateImage[]
   notes         String?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
@@ -647,15 +649,16 @@ model Venue {
 }
 
 model TourDateHeadliner {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  tourDateId String   @db.ObjectId
-  tourDate   TourDate @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
-  artistId   String?  @db.ObjectId
-  artist     Artist?  @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  groupId    String?  @db.ObjectId
-  group      Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  tourDateId String    @db.ObjectId
+  tourDate   TourDate  @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
+  artistId   String?   @db.ObjectId
+  artist     Artist?   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  groupId    String?   @db.ObjectId
+  group      Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sortOrder  Int       @default(0)
+  setTime    DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([tourDateId])
   @@index([artistId])
@@ -678,5 +681,24 @@ model TourImage {
   uploadedBy   String?  @db.ObjectId
 
   @@index([tourId])
+  @@index([displayOrder])
+}
+
+model TourDateImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  tourDateId   String   @db.ObjectId
+  tourDate     TourDate @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
+  s3Key        String
+  s3Url        String
+  s3Bucket     String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  displayOrder Int      @default(0)
+  altText      String?
+  createdAt    DateTime @default(now())
+  uploadedBy   String?  @db.ObjectId
+
+  @@index([tourDateId])
   @@index([displayOrder])
 }
