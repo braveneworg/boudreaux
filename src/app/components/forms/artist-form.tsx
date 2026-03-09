@@ -96,6 +96,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
   const [imagesReordered, setImagesReordered] = useState(false);
   // Track if we're in edit mode (after artist creation or when loading existing artist)
   const isEditMode = artistId !== null;
+  const hasNavigatedToEditRef = useRef(false);
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
@@ -204,6 +205,15 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
 
     fetchArtist();
   }, [initialArtistId, artistForm, user?.id]);
+
+  // Navigate to the edit URL after artist creation, outside of startTransition so the
+  // router navigation doesn't keep isTransitionPending true for the form submission.
+  useEffect(() => {
+    if (artistId && !initialArtistId && !hasNavigatedToEditRef.current) {
+      hasNavigatedToEditRef.current = true;
+      router.replace(`/admin/artists/${artistId}`, { scroll: false });
+    }
+  }, [artistId, initialArtistId, router]);
 
   const handleImagesChange = useCallback((newImages: ImageItem[]) => {
     setImages(newImages);
@@ -371,9 +381,6 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
               if (createdArtistId) {
                 setArtistId(createdArtistId);
 
-                // Update URL to include the artist ID (shallow update, no navigation)
-                router.replace(`/admin/artists/${createdArtistId}`, { scroll: false });
-
                 // Check if this was a publish action
                 if (data.publishedOn) {
                   setIsPublished(true);
@@ -498,7 +505,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
         }
       });
     },
-    [formState, images, artistId, isPublished, artistForm, router]
+    [formState, images, artistId, isPublished, artistForm]
   );
 
   const isSubmitting = isPending || isTransitionPending || isUploadingImages;
@@ -508,7 +515,11 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
   const firstName = useWatch({ control, name: 'firstName' });
   const middleName = useWatch({ control, name: 'middleName' });
   const surname = useWatch({ control, name: 'surname' });
+  const akaNames = useWatch({ control, name: 'akaNames' });
   const slug = useWatch({ control, name: 'slug' });
+
+  // firstName and surname are only required when both displayName and akaNames are empty
+  const isNameRequired = !displayName?.trim() && !akaNames?.trim();
 
   // Auto-generate slug from name fields
   useEffect(() => {
@@ -634,7 +645,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                   <TextField
                     control={control}
                     name="firstName"
-                    label="First Name *"
+                    label={`First Name${isNameRequired ? ' *' : ''}`}
                     placeholder="First name"
                   />
                 </div>
@@ -648,7 +659,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                   <TextField
                     control={control}
                     name="surname"
-                    label="Surname *"
+                    label={`Surname${isNameRequired ? ' *' : ''}`}
                     placeholder="Last name"
                   />
                 </div>

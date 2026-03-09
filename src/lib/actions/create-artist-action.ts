@@ -37,8 +37,8 @@ export const createArtistAction = async (
 
       // Create artist in database
       const response = await ArtistService.createArtist({
-        firstName,
-        surname,
+        firstName: firstName || '',
+        surname: surname || '',
         slug,
         middleName,
         displayName,

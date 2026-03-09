@@ -84,8 +84,8 @@ export const updateArtistAction = async (
 
     // Update artist in database
     const response = await ArtistService.updateArtist(artistId, {
-      firstName,
-      surname,
+      firstName: firstName || '',
+      surname: surname || '',
       slug,
       middleName: middleName || undefined,
       displayName: displayName || undefined,

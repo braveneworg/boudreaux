@@ -1,5 +1,24 @@
 #!/bin/sh
 
+branch_name=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
+  echo "🚫 You are on the '$branch_name' branch. Commits to this branch are not allowed."
+  echo "⏪ Staged changes are being reset to prevent accidental commits. Please switch to a feature branch and commit your changes there."
+  git reset
+  exit 1
+fi
+
+# if amending a commit, skip pre-commit checks to allow fixing up commits without running checks again
+if [ "$1" = "--amend" ]; then
+  echo "🔄 Amending commit, skipping pre-commit checks..."
+  exit 0
+fi
+
+if [ -z "$(git diff --cached --name-only)" ]; then
+  echo "🚫 No staged changes to commit. Please stage your changes before committing."
+  exit 1
+fi
+
 # Linting staged files
 echo "🔍 Running lint-staged..."
 npx lint-staged
