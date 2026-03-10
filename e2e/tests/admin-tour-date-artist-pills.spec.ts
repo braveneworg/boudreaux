@@ -2,11 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
 import { test, expect } from '../fixtures/base.fixture';
 
 import type { Page } from '@playwright/test';
+
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
+const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 /**
  * Helper to create a tour via the admin UI and return its ID.
@@ -47,12 +52,14 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
   const addButton = adminPage.getByRole('button', { name: /Add.*Date/i }).first();
   await addButton.click();
 
-  // Wait for the dialog to appear
-  const dialog = adminPage.locator('[role="dialog"]');
+  // Wait for the dialog to appear — scope to the named dialog to avoid matching
+  // Radix PopoverContent elements which also render with role="dialog"
+  const dialog = adminPage.getByRole('dialog', { name: 'Add Tour Date' });
   await expect(dialog).toBeVisible();
 
-  // Select venue
-  const venueButton = dialog.getByRole('combobox').first();
+  // Select venue — venue combobox is now in the Dates and Times section,
+  // after the Headliners section, so it is the second combobox (index 1).
+  const venueButton = dialog.getByRole('combobox').nth(1);
   await venueButton.click();
   await adminPage.getByPlaceholder('Search venues...').fill(venueName);
   await adminPage
@@ -60,31 +67,31 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
     .first()
     .click();
 
-  // Select headlining artists (use the seeded test artists)
-  const headlinerButton = dialog.locator('button[role="combobox"]').nth(1);
+  // Select headlining artists — headliner combobox is first (index 0) since
+  // the Artists section now appears before the Dates and Times section.
+  const headlinerButton = dialog.locator('button[role="combobox"]').first();
   await headlinerButton.click();
   await adminPage.getByRole('option', { name: 'Test Artist One' }).click();
   await adminPage.getByRole('option', { name: 'Test Artist Two' }).click();
-  // Close the popover by pressing Escape
-  await adminPage.keyboard.press('Escape');
+  // Close the popover by clicking the trigger button again (avoids Escape propagating to the Dialog)
+  await headlinerButton.click();
 
-  // Set start date: click the date picker and select today
-  const startDateButton = dialog
-    .locator('button')
-    .filter({ hasText: /pick a date/i })
-    .first();
-  await startDateButton.click();
+  // Set start date: click the date input to open the calendar and select today
+  // (selecting today auto-populates the required Show Start Time to 8 PM)
+  const startDateInput = dialog.getByPlaceholder('mm/dd/yyyy').first();
+  await startDateInput.click();
   // Click today's date in the calendar
   await adminPage.locator('[data-today="true"]').first().click();
 
   // Submit the form
   await dialog.getByRole('button', { name: /Add Tour Date/i }).click();
 
-  // Wait for the dialog to close and a toast to appear
-  await expect(dialog).not.toBeVisible({ timeout: 10000 });
+  // Wait for the dialog to close (allow extra time for dev-mode compilation on first run)
+  await expect(dialog).not.toBeVisible({ timeout: 60000 });
 };
 
 test.describe('Admin Tour Date Artist Pills', () => {
+  test.describe.configure({ timeout: 150000 });
   let tourId: string;
   let venueId: string;
   let venueName: string;
@@ -103,13 +110,13 @@ test.describe('Admin Tour Date Artist Pills', () => {
     await adminPage.goto(`/admin/tours/${tourId}`);
 
     // Wait for tour dates section to load
-    await expect(adminPage.getByText('Tour Dates')).toBeVisible();
+    await expect(adminPage.getByText('Tour Dates').first()).toBeVisible();
 
     // Add a tour date with artists
     await addTourDateViaUi(adminPage, venueName);
 
     // Wait for the page to refresh and show headliner pills
-    await expect(adminPage.getByText('Tour Dates')).toBeVisible();
+    await expect(adminPage.getByText('Tour Dates').first()).toBeVisible();
   });
 
   test.afterEach(async () => {
@@ -181,8 +188,9 @@ test.describe('Admin Tour Date Artist Pills', () => {
     // Check for success toast
     await expect(adminPage.getByText('Set time updated')).toBeVisible({ timeout: 5000 });
 
-    // The set time should appear below the pill
-    await expect(adminPage.getByText('8:30 PM')).toBeVisible();
+    // The set time should appear below the pill (scope to list to avoid matching
+    // the TimePicker trigger button in the still-open options popover)
+    await expect(pillList.getByText('8:30 PM')).toBeVisible();
   });
 
   test('should show confirmation dialog before removing an artist', async ({ adminPage }) => {

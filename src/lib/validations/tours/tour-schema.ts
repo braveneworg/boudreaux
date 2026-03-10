@@ -35,7 +35,7 @@ export type TourCreateInput = z.infer<typeof tourCreateSchema>;
 export const tourUpdateSchema = z.object({
   title: z
     .string()
-    .min(1, 'Title cannot be empty')
+    .min(1, 'Title is required')
     .max(200, 'Title must be 200 characters or less')
     .optional(),
   subtitle: z.string().max(150, 'Subtitle must be 150 characters or less').optional().nullable(),

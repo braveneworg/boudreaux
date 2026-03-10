@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       name: venue.name,
       city: venue.city ?? null,
       state: venue.state ?? null,
+      timeZone: venue.timeZone ?? null,
     }));
 
     return NextResponse.json({ venues });

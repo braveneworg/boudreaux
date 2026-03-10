@@ -173,6 +173,54 @@ describe('venue-schema', () => {
       const result = venueCreateSchema.safeParse(venue);
       expect(result.success).toBe(true);
     });
+
+    it('should accept a valid IANA timezone string', () => {
+      const venue = {
+        name: 'The Grand Theater',
+        city: 'Los Angeles',
+        timeZone: 'America/Los_Angeles',
+      };
+
+      const result = venueCreateSchema.safeParse(venue);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.timeZone).toBe('America/Los_Angeles');
+    });
+
+    it('should accept null timezone', () => {
+      const venue = {
+        name: 'The Grand Theater',
+        city: 'Los Angeles',
+        timeZone: null,
+      };
+
+      const result = venueCreateSchema.safeParse(venue);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject an empty string timezone (min length 1)', () => {
+      const venue = {
+        name: 'The Grand Theater',
+        city: 'Los Angeles',
+        timeZone: '',
+      };
+
+      const result = venueCreateSchema.safeParse(venue);
+      expect(result.success).toBe(false);
+      expectFailureIssuePath(result, 'timeZone');
+    });
+
+    it('should reject timezone exceeding 100 characters', () => {
+      const venue = {
+        name: 'The Grand Theater',
+        city: 'Los Angeles',
+        timeZone: 'T'.repeat(101),
+      };
+
+      const result = venueCreateSchema.safeParse(venue);
+      expect(result.success).toBe(false);
+      expectFailureIssuePath(result, 'timeZone');
+    });
   });
 
   describe('venueUpdateSchema', () => {
@@ -206,6 +254,22 @@ describe('venue-schema', () => {
 
     it('should allow empty update object', () => {
       const update = {};
+
+      const result = venueUpdateSchema.safeParse(update);
+      expect(result.success).toBe(true);
+    });
+
+    it('should allow updating timezone', () => {
+      const update = { timeZone: 'Europe/London' };
+
+      const result = venueUpdateSchema.safeParse(update);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.timeZone).toBe('Europe/London');
+    });
+
+    it('should allow clearing timezone with null', () => {
+      const update = { timeZone: null };
 
       const result = venueUpdateSchema.safeParse(update);
       expect(result.success).toBe(true);

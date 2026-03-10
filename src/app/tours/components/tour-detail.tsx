@@ -10,6 +10,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
+import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import type {
   Artist,
@@ -49,35 +50,6 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 
-  // Format dates
-  const formatDate = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatDateShort = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   const getHeadlinerDisplayName = (headliner: {
     artist: (Artist & { groups: Array<{ group: Group }> }) | null;
     group: Group | null;
@@ -112,20 +84,6 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
         </Button>
       </div>
 
-      {/* Hero Image */}
-      {sortedImages.length > 0 && (
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
-          <Image
-            src={sortedImages[0].s3Url}
-            alt={sortedImages[0].altText || tour.title}
-            fill
-            className="object-cover"
-            priority
-            sizes="(max-width: 1200px) 100vw, 1200px"
-          />
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left Column - Tour Info */}
@@ -139,6 +97,19 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                   </span>
                 )}
                 <CardTitle className="text-3xl">{tour.title}</CardTitle>
+                {/* Hero Image */}
+                {sortedImages.length > 0 && (
+                  <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
+                    <Image
+                      src={sortedImages[0].s3Url}
+                      alt={sortedImages[0].altText || tour.title}
+                      fill
+                      className="object-cover"
+                      priority
+                      sizes="(max-width: 1200px) 100vw, 1200px"
+                    />
+                  </div>
+                )}
                 {tour.subtitle && <p className="text-xl text-muted-foreground">{tour.subtitle}</p>}
                 {tour.subtitle2 && (
                   <p className="text-lg text-muted-foreground">{tour.subtitle2}</p>
@@ -209,16 +180,23 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                           <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                           <div>
                             <div className="font-medium">
-                              {formatDate(tourDate.startDate)}
+                              {formatTourDate(tourDate.startDate, tourDate.timeZone, {
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
                               {tourDate.endDate &&
                               new Date(tourDate.endDate).toISOString() !==
                                 new Date(tourDate.startDate).toISOString()
-                                ? ` - ${formatDateShort(tourDate.endDate)}`
+                                ? ` - ${formatTourDate(tourDate.endDate, tourDate.timeZone)}`
                                 : ''}
                             </div>
                             <div className="text-muted-foreground">
-                              {formatTime(tourDate.showStartTime)}
-                              {tourDate.showEndTime ? ` - ${formatTime(tourDate.showEndTime)}` : ''}
+                              {formatTourTime(tourDate.showStartTime, tourDate.timeZone)}
+                              {tourDate.showEndTime
+                                ? ` - ${formatTourTime(tourDate.showEndTime, tourDate.timeZone)}`
+                                : ''}
                             </div>
                           </div>
                         </div>

@@ -80,6 +80,16 @@ export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
         return true;
       }
 
+      // Search in tour subtitle2
+      if (tour.subtitle2?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in tour description
+      if (tour.description?.toLowerCase().includes(query)) {
+        return true;
+      }
+
       const hasHeadlinerMatch = tour.tourDates.some((tourDate) =>
         tourDate.headliners.some((headliner) => {
           const artistName = getHeadlinerDisplayName(headliner);

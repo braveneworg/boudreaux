@@ -33,17 +33,19 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { TimezoneSelect } from '@/app/components/ui/timezone-select';
 import { createVenueAction } from '@/lib/actions/venue-actions';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 
-interface VenueOption {
+export interface VenueOption {
   id: string;
   name: string;
   city?: string | null;
   state?: string | null;
+  timeZone?: string | null;
 }
 
 interface VenueSelectProps<
@@ -58,6 +60,7 @@ interface VenueSelectProps<
   searchPlaceholder?: string;
   emptyMessage?: string;
   disabled?: boolean;
+  onVenueSelect?: (venue: VenueOption) => void;
 }
 
 export default function VenueSelect<
@@ -72,6 +75,7 @@ export default function VenueSelect<
   searchPlaceholder = 'Search venues...',
   emptyMessage = 'No venues found.',
   disabled = false,
+  onVenueSelect,
 }: VenueSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [venues, setVenues] = useState<VenueOption[]>([]);
@@ -83,6 +87,7 @@ export default function VenueSelect<
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueCity, setNewVenueCity] = useState('');
   const [newVenueState, setNewVenueState] = useState('');
+  const [newVenueTimeZone, setNewVenueTimeZone] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -125,26 +130,29 @@ export default function VenueSelect<
       formData.append('name', newVenueName.trim());
       if (newVenueCity.trim()) formData.append('city', newVenueCity.trim());
       if (newVenueState.trim()) formData.append('state', newVenueState.trim());
+      if (newVenueTimeZone) formData.append('timeZone', newVenueTimeZone);
 
       const initialFormState: FormState = { fields: {}, success: false };
       const result = await createVenueAction(initialFormState, formData);
 
       if (result.success && result.data?.venueId) {
-        // Add new venue to list and select it
         const newVenue: VenueOption = {
           id: String(result.data.venueId),
           name: newVenueName.trim(),
           city: newVenueCity.trim() || null,
           state: newVenueState.trim() || null,
+          timeZone: newVenueTimeZone || null,
         };
         setVenues((prev) => [newVenue, ...prev]);
         field.onChange(newVenue.id);
+        onVenueSelect?.(newVenue);
 
         // Close dialog and reset form
         setDialogOpen(false);
         setNewVenueName('');
         setNewVenueCity('');
         setNewVenueState('');
+        setNewVenueTimeZone('');
         setOpen(false);
       } else {
         // Surface validation or server errors
@@ -172,6 +180,10 @@ export default function VenueSelect<
 
           const handleSelect = (venueId: string) => {
             field.onChange(venueId);
+            const venue = venues.find((v) => v.id === venueId);
+            if (venue) {
+              onVenueSelect?.(venue);
+            }
             setOpen(false);
           };
 
@@ -309,6 +321,16 @@ export default function VenueSelect<
                 onChange={(e) => setNewVenueState(e.target.value)}
                 placeholder="Enter state"
                 disabled={isCreating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Timezone</label>
+              <TimezoneSelect
+                value={newVenueTimeZone || null}
+                onChange={setNewVenueTimeZone}
+                disabled={isCreating}
+                placeholder="Select venue timezone..."
               />
             </div>
           </div>

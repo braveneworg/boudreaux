@@ -5,7 +5,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { format } from 'date-fns';
 import { Calendar, MapPin, Music, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,6 +25,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TicketProviderIcon } from '@/app/components/ui/ticket-provider-icon';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
+import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import ArtistPillList from './artist-pill-list';
 
@@ -193,13 +193,19 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="size-4 text-muted-foreground" />
                         <span className="font-medium">
-                          {format(new Date(tourDate.startDate), 'PPP')}
-                          {tourDate.endDate && ` - ${format(new Date(tourDate.endDate), 'PPP')}`}
+                          {formatTourDate(tourDate.startDate, tourDate.timeZone)}
+                          {tourDate.endDate &&
+                            ` - ${formatTourDate(tourDate.endDate, tourDate.timeZone)}`}
                         </span>
                         <Separator orientation="vertical" className="h-4" />
                         <span className="text-muted-foreground">
-                          {format(new Date(tourDate.showStartTime), 'p')} &mdash;{' '}
-                          {tourDate.showEndTime ? format(new Date(tourDate.showEndTime), 'p') : '—'}
+                          {formatTourTime(tourDate.showStartTime, tourDate.timeZone, {
+                            ...(tourDate.timeZone ? { timeZoneName: 'short' } : {}),
+                          })}{' '}
+                          &mdash;{' '}
+                          {tourDate.showEndTime
+                            ? formatTourTime(tourDate.showEndTime, tourDate.timeZone)
+                            : '—'}
                         </span>
                       </div>
 
@@ -208,7 +214,9 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                         <Calendar className="size-4 text-muted-foreground" />
                         <span className="text-muted-foreground">
                           Doors:{' '}
-                          {tourDate.doorsOpenAt ? format(new Date(tourDate.doorsOpenAt), 'p') : '—'}
+                          {tourDate.doorsOpenAt
+                            ? formatTourTime(tourDate.doorsOpenAt, tourDate.timeZone)
+                            : '—'}
                         </span>
                       </div>
 

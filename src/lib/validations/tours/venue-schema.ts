@@ -28,6 +28,7 @@ export const venueCreateSchema = z.object({
     .nullable(),
   notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
   createdBy: z.string().optional().nullable(),
+  timeZone: z.string().min(1).max(100).optional().nullable(),
 });
 
 /**
@@ -61,6 +62,7 @@ export const venueUpdateSchema = z.object({
     .optional()
     .nullable(),
   notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
+  timeZone: z.string().min(1).max(100).optional().nullable(),
 });
 
 /**

@@ -5,7 +5,6 @@
 
 import { forwardRef, useState } from 'react';
 
-import { format } from 'date-fns';
 import { Clock, GripVertical, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -90,7 +89,16 @@ const ArtistPill = forwardRef<HTMLDivElement, ArtistPillProps>(
         ? getDisplayName(headliner.group as unknown as Record<string, unknown>)
         : 'Unknown Artist';
 
-    const setTimeDisplay = headliner.setTime ? format(new Date(headliner.setTime), 'p') : null;
+    const setTimeDisplay = headliner.setTime
+      ? (() => {
+          const d = new Date(headliner.setTime);
+          const h = d.getUTCHours();
+          const m = d.getUTCMinutes();
+          const period = h >= 12 ? 'PM' : 'AM';
+          const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+          return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+        })()
+      : null;
 
     const handleSetTimeChange = async (time: string) => {
       if (!time) {
@@ -120,8 +128,13 @@ const ArtistPill = forwardRef<HTMLDivElement, ArtistPillProps>(
       }
     };
 
-    // Extract HH:mm from setTime for the TimePicker value
-    const timePickerValue = headliner.setTime ? format(new Date(headliner.setTime), 'HH:mm') : '';
+    // Extract HH:mm from setTime for the TimePicker value (read UTC to match stored Z-suffix format)
+    const timePickerValue = headliner.setTime
+      ? (() => {
+          const d = new Date(headliner.setTime);
+          return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+        })()
+      : '';
 
     return (
       <>

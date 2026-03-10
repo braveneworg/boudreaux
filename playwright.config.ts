@@ -4,7 +4,7 @@ import { CONSTANTS } from './src/lib/constants';
 
 const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
 const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?directConnection=true';
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 export default defineConfig({
   testDir: './e2e/tests',

@@ -157,6 +157,32 @@ describe('Venue Actions', () => {
       expect(result.errors?.name).toEqual(['Name is required']);
     });
 
+    it('should pass timeZone through to the service when provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            name: 'The Fillmore',
+            city: 'San Francisco',
+            state: 'CA',
+            address: '1805 Geary Blvd',
+            timeZone: 'America/Los_Angeles',
+          },
+        },
+      } as never);
+
+      vi.mocked(VenueService.checkDuplicateName).mockResolvedValue(false);
+
+      await createVenueAction(initialFormState, mockFormData);
+
+      expect(VenueService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeZone: 'America/Los_Angeles',
+        })
+      );
+    });
+
     it('should handle service errors', async () => {
       vi.mocked(VenueService.checkDuplicateName).mockResolvedValue(false);
       vi.mocked(VenueService.create).mockRejectedValue(new Error('Database error'));

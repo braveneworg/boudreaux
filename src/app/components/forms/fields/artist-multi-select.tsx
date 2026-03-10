@@ -204,6 +204,7 @@ export default function ArtistMultiSelect<
                   avoidCollisions
                   collisionPadding={8}
                   sideOffset={4}
+                  onEscapeKeyDown={(e) => e.stopPropagation()}
                 >
                   <Command shouldFilter={false}>
                     <CommandInput

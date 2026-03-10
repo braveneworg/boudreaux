@@ -32,6 +32,7 @@ describe('VenueRepository', () => {
     postalCode: '90001',
     capacity: 5000,
     notes: 'Historic venue',
+    timeZone: null,
     createdAt: new Date('2026-03-01'),
     updatedAt: new Date('2026-03-01'),
     createdBy: 'user-123',

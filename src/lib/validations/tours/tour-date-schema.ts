@@ -40,6 +40,8 @@ export const tourDateCreateSchema = z
       .nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required'),
+    timeZone: z.string().min(1).max(100).optional().nullable(),
+    utcOffset: z.coerce.number().int().min(-840).max(840).optional().nullable(),
   })
   .refine((data) => !data.endDate || data.endDate >= data.startDate, {
     message: 'End date must be after start date',
@@ -77,6 +79,8 @@ export const tourDateUpdateSchema = z
       .nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required').optional(),
+    timeZone: z.string().min(1).max(100).optional().nullable(),
+    utcOffset: z.coerce.number().int().min(-840).max(840).optional().nullable(),
   })
   .refine(
     (data) => {

@@ -33,6 +33,7 @@ export const createVenueAction = async (
     'postalCode',
     'capacity',
     'notes',
+    'timeZone',
   ];
 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, venueCreateSchema);

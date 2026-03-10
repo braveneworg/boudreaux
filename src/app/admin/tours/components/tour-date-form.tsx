@@ -35,8 +35,10 @@ import {
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { TimePicker } from '@/app/components/ui/timepicker';
+import { TimezoneSelect } from '@/app/components/ui/timezone-select';
 import { createTourDateAction, updateTourDateAction } from '@/lib/actions/tour-date-actions';
 import type { FormState } from '@/lib/types/form-state';
+import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/lib/utils/timezone';
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
@@ -86,18 +88,36 @@ export default function TourDateForm({
       ticketPrices: '',
       notes: '',
       headlinerIds: [],
+      timeZone: '',
+      utcOffset: '',
     },
   });
 
   const { control, handleSubmit, reset, setError } = form;
+  const _watchedValues = form.watch() as Record<string, unknown>;
+  const watchedTimeZone = String(_watchedValues.timeZone ?? '');
+  const watchedStartDate = String(_watchedValues.startDate ?? '');
 
   // Load tour date data in edit mode
   useEffect(() => {
     if (tourDate) {
+      const storedTimeZone = (tourDate as { timeZone?: string | null }).timeZone;
+      const storedUtcOffset = (tourDate as { utcOffset?: number | null }).utcOffset;
+
       const formatDateTime = (date: string | Date) => {
         if (!date) return '';
-        const d = new Date(date);
-        return d.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        const d = new Date(date as string);
+        // Prefer IANA timezone for exact DST-aware conversion.
+        if (storedTimeZone) {
+          return toLocalDateTimeString(d, storedTimeZone);
+        }
+        // Fall back to a raw UTC offset if no IANA timezone is stored.
+        if (storedUtcOffset != null) {
+          const localMs = d.getTime() + storedUtcOffset * 60_000;
+          return new Date(localMs).toISOString().slice(0, 16);
+        }
+        // No timezone info — display as UTC.
+        return d.toISOString().slice(0, 16);
       };
 
       const formatDate = (date: string | Date) => {
@@ -121,6 +141,11 @@ export default function TourDateForm({
         headlinerIds:
           tourDate.headliners?.map((h) => h.artistId).filter((id): id is string => id !== null) ||
           [],
+        timeZone: (tourDate as { timeZone?: string | null }).timeZone || '',
+        utcOffset:
+          (tourDate as { utcOffset?: number | null }).utcOffset != null
+            ? String((tourDate as { utcOffset?: number | null }).utcOffset)
+            : '',
       });
     } else {
       // Reset form for new tour date
@@ -137,6 +162,8 @@ export default function TourDateForm({
         ticketPrices: '',
         notes: '',
         headlinerIds: [],
+        timeZone: '',
+        utcOffset: '',
       });
     }
   }, [tourDate, tourId, reset]);
@@ -160,6 +187,23 @@ export default function TourDateForm({
       fetchTourDateImages();
     }
   }, [isEditMode, open, fetchTourDateImages]);
+
+  // Auto-compute utcOffset when timeZone or startDate changes
+  useEffect(() => {
+    if (!watchedTimeZone) return;
+    const refDate = watchedStartDate ? new Date(watchedStartDate) : new Date();
+    const offset = getTimezoneOffsetMinutes(watchedTimeZone, refDate);
+    form.setValue('utcOffset', String(offset), { shouldDirty: false });
+  }, [watchedTimeZone, watchedStartDate, form]);
+
+  const handleVenueSelect = useCallback(
+    (venue: { timeZone?: string | null }) => {
+      if (venue.timeZone) {
+        form.setValue('timeZone', venue.timeZone, { shouldDirty: true });
+      }
+    },
+    [form]
+  );
 
   const handleImageUploadComplete = useCallback(() => {
     fetchTourDateImages();
@@ -185,6 +229,22 @@ export default function TourDateForm({
           }
         }
       });
+
+      // If a timezone is set, override time entries with correctly-converted UTC values.
+      // The raw form strings are "YYYY-MM-DDTHH:mm" representing local venue time.
+      // localToUTC converts them to the true UTC equivalent for the given IANA zone.
+      const rawValues = form.getValues();
+      const tz = rawValues['timeZone'] as string | undefined;
+      if (tz) {
+        const timeKeys = ['showStartTime', 'showEndTime', 'doorsOpenAt'] as const;
+        for (const key of timeKeys) {
+          const raw = rawValues[key as keyof typeof rawValues] as string | undefined;
+          if (raw && typeof raw === 'string' && raw.includes('T')) {
+            const utcDate = localToUTC(raw.slice(0, 16), tz);
+            formData.set(key, utcDate.toISOString());
+          }
+        }
+      }
 
       let result: FormState;
       if (isEditMode && tourDate?.id) {
@@ -255,20 +315,6 @@ export default function TourDateForm({
             }}
             className="space-y-6"
           >
-            {/* Venue Section */}
-            <section className="space-y-4">
-              <h4 className="text-sm font-semibold">Venue</h4>
-              <VenueSelect
-                control={control}
-                name="venueId"
-                label="Venue"
-                placeholder="Select a venue"
-                description="Choose an existing venue or create a new one"
-              />
-            </section>
-
-            <Separator />
-
             {/* Artists Section */}
             <section className="space-y-4">
               <h4 className="text-sm font-semibold">Headliners</h4>
@@ -285,6 +331,15 @@ export default function TourDateForm({
             {/* Dates and Times Section */}
             <section className="space-y-4">
               <h4 className="text-sm font-semibold">Dates and Times</h4>
+
+              <VenueSelect
+                control={control}
+                name="venueId"
+                label="Venue"
+                placeholder="Select a venue"
+                description="Choose an existing venue or create a new one"
+                onVenueSelect={handleVenueSelect}
+              />
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
@@ -341,6 +396,51 @@ export default function TourDateForm({
                         />
                       </FormControl>
                       <FormDescription>Leave blank if single-day event</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Timezone */}
+                <FormField
+                  control={control}
+                  name={'timeZone' as never}
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Timezone</FormLabel>
+                      <FormControl>
+                        <TimezoneSelect
+                          value={(field.value as string) || null}
+                          onChange={field.onChange}
+                          disabled={isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* UTC Offset */}
+                <FormField
+                  control={control}
+                  name={'utcOffset' as never}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UTC Offset (minutes)</FormLabel>
+                      <FormControl>
+                        <input
+                          {...field}
+                          value={(field.value as string) || ''}
+                          type="number"
+                          placeholder="e.g. -300"
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        Minutes from UTC. Auto-filled when a timezone is selected.
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}

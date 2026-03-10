@@ -9,6 +9,7 @@ import { Calendar, MapPin, Music, Ticket } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
+import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import type {
   Artist,
@@ -44,25 +45,6 @@ export const TourCard = ({ tour }: TourCardProps) => {
   const primaryImage = tour.images.find((img) => img.displayOrder === 0) || tour.images[0];
   const hasTourDates = tour.tourDates.length > 0;
 
-  // Format dates
-  const formatDate = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (date: Date | string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   const getArtistDisplayName = (headliner: {
     artist: (Artist & { groups: Array<{ group: Group }> }) | null;
     group: Group | null;
@@ -91,8 +73,8 @@ export const TourCard = ({ tour }: TourCardProps) => {
   const dateRange = !firstTourDate
     ? 'No dates announced'
     : !lastTourDate || firstTourDate.id === lastTourDate.id
-      ? formatDate(firstTourDate.startDate)
-      : `${formatDate(firstTourDate.startDate)} - ${formatDate(lastTourDate.startDate)}`;
+      ? formatTourDate(firstTourDate.startDate, firstTourDate.timeZone)
+      : `${formatTourDate(firstTourDate.startDate, firstTourDate.timeZone)} - ${formatTourDate(lastTourDate.startDate, lastTourDate.timeZone)}`;
 
   const venueNames = Array.from(new Set(sortedTourDates.map((date) => date.venue.name)));
   const venueDisplay =
@@ -102,14 +84,25 @@ export const TourCard = ({ tour }: TourCardProps) => {
         ? venueNames[0]
         : `${venueNames.length} venues`;
 
-  const uniqueHeadliners = Array.from(
-    new Set(
-      sortedTourDates
-        .flatMap((date) => date.headliners)
-        .map((headliner) => getArtistDisplayName(headliner))
-        .filter(Boolean)
-    )
-  );
+  const uniqueHeadliners = (() => {
+    const seen = new Set<string>();
+    return sortedTourDates
+      .flatMap((date) => date.headliners)
+      .sort((a, b) => {
+        const aTime = a.setTime ? new Date(a.setTime).getTime() : null;
+        const bTime = b.setTime ? new Date(b.setTime).getTime() : null;
+        if (aTime !== null && bTime !== null) return bTime - aTime;
+        if (aTime !== null) return -1;
+        if (bTime !== null) return 1;
+        return b.sortOrder - a.sortOrder;
+      })
+      .map((h) => getArtistDisplayName(h))
+      .filter((name): name is string => {
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      });
+  })();
 
   const headlinerNames =
     uniqueHeadliners.length === 0
@@ -149,8 +142,11 @@ export const TourCard = ({ tour }: TourCardProps) => {
       )}
 
       <CardHeader>
-        <CardTitle className="line-clamp-2">
-          <Link href={`/tours/${tour.id}`} className="hover:text-primary transition-colors">
+        <CardTitle className="line-clamp-2 mt-4">
+          <Link
+            href={`/tours/${tour.id}`}
+            className="hover:text-primary transition-colors block pt-12"
+          >
             {tour.title}
           </Link>
         </CardTitle>
@@ -184,7 +180,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
             {hasTourDates && firstTourDate?.showStartTime && (
               <div className="text-muted-foreground">
                 {sortedTourDates.length === 1
-                  ? `${formatTime(firstTourDate.showStartTime)}${firstTourDate.showEndTime ? ` - ${formatTime(firstTourDate.showEndTime)}` : ''}`
+                  ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
                   : `${sortedTourDates.length} shows`}
               </div>
             )}

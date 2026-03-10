@@ -27,6 +27,8 @@ export interface TourDateCreateData {
   ticketPrices?: string | null;
   notes?: string | null;
   headlinerIds: string[];
+  timeZone?: string | null;
+  utcOffset?: number | null;
 }
 
 export interface TourDateUpdateData {
@@ -41,6 +43,8 @@ export interface TourDateUpdateData {
   ticketPrices?: string | null;
   notes?: string | null;
   headlinerIds?: string[];
+  timeZone?: string | null;
+  utcOffset?: number | null;
 }
 
 /**
@@ -101,41 +105,39 @@ export class TourDateRepository {
   }
 
   /**
-   * Create a new tour date with headliners in a transaction
+   * Create a new tour date with headliners
    * Headliners are linked via TourDateHeadliner junction table
    */
   static async create(data: TourDateCreateData): Promise<TourDate> {
     const { headlinerIds, venueId, tourId, ...tourDateData } = data;
 
-    return prisma.$transaction(async (tx) => {
-      // Create the tour date with proper Prisma types
-      const tourDate = await tx.tourDate.create({
-        data: {
-          ...tourDateData,
-          tour: {
-            connect: { id: tourId },
-          },
-          venue: {
-            connect: { id: venueId },
-          },
+    // Create the tour date with proper Prisma types
+    const tourDate = await prisma.tourDate.create({
+      data: {
+        ...tourDateData,
+        tour: {
+          connect: { id: tourId },
         },
-      });
-
-      // Create TourDateHeadliner records with sortOrder
-      if (headlinerIds && headlinerIds.length > 0) {
-        await tx.tourDateHeadliner.createMany({
-          data: headlinerIds.map((artistId, index) => ({
-            tourDateId: tourDate.id,
-            artistId,
-            sortOrder: index,
-          })),
-        });
-      }
-
-      // Return the created tour date
-      // Caller should refetch if full relations are needed
-      return tourDate;
+        venue: {
+          connect: { id: venueId },
+        },
+      },
     });
+
+    // Create TourDateHeadliner records with sortOrder
+    if (headlinerIds && headlinerIds.length > 0) {
+      await prisma.tourDateHeadliner.createMany({
+        data: headlinerIds.map((artistId, index) => ({
+          tourDateId: tourDate.id,
+          artistId,
+          sortOrder: index,
+        })),
+      });
+    }
+
+    // Return the created tour date
+    // Caller should refetch if full relations are needed
+    return tourDate;
   }
 
   /**
@@ -168,6 +170,8 @@ export class TourDateRepository {
         ticketPrices: tourDateData.ticketPrices || undefined,
       }),
       ...(tourDateData.notes !== undefined && { notes: tourDateData.notes || undefined }),
+      ...(tourDateData.timeZone !== undefined && { timeZone: tourDateData.timeZone }),
+      ...(tourDateData.utcOffset !== undefined && { utcOffset: tourDateData.utcOffset }),
       ...(venueId && {
         venue: {
           connect: { id: venueId },
@@ -175,31 +179,29 @@ export class TourDateRepository {
       }),
     };
 
-    // If headlinerIds are provided, use transaction to update headliners
+    // If headlinerIds are provided, replace all existing headliner associations
     if (headlinerIds !== undefined) {
-      return prisma.$transaction(async (tx) => {
-        // Delete existing headliners
-        await tx.tourDateHeadliner.deleteMany({
-          where: { tourDateId: id },
-        });
+      // Delete existing headliners
+      await prisma.tourDateHeadliner.deleteMany({
+        where: { tourDateId: id },
+      });
 
-        // Create new headliner records with sortOrder
-        if (headlinerIds.length > 0) {
-          await tx.tourDateHeadliner.createMany({
-            data: headlinerIds.map((artistId, index) => ({
-              tourDateId: id,
-              artistId,
-              sortOrder: index,
-            })),
-          });
-        }
-
-        // Update tour date fields
-        return tx.tourDate.update({
-          where: { id },
-          data: updateData,
-          include: tourDateInclude,
+      // Create new headliner records with sortOrder
+      if (headlinerIds.length > 0) {
+        await prisma.tourDateHeadliner.createMany({
+          data: headlinerIds.map((artistId, index) => ({
+            tourDateId: id,
+            artistId,
+            sortOrder: index,
+          })),
         });
+      }
+
+      // Update tour date fields
+      return prisma.tourDate.update({
+        where: { id },
+        data: updateData,
+        include: tourDateInclude,
       });
     }
 

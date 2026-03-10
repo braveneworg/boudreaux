@@ -10,7 +10,7 @@ describe('TourSearch', () => {
   it('renders search input with placeholder', () => {
     render(<TourSearch value="" onChange={() => {}} />);
 
-    const input = screen.getByPlaceholderText('Search by artist name...');
+    const input = screen.getByPlaceholderText('Search tours, artists, venues...');
     expect(input).toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe('TourSearch', () => {
 
     render(<TourSearch value="" onChange={onChange} debounceMs={100} />);
 
-    const input = screen.getByLabelText('Search tours by artist name');
+    const input = screen.getByLabelText('Search tours');
 
     // Type into input
     await user.type(input, 'Test');
@@ -80,7 +80,7 @@ describe('TourSearch', () => {
   it('respects disabled state', () => {
     render(<TourSearch value="" onChange={() => {}} disabled />);
 
-    const input = screen.getByLabelText('Search tours by artist name');
+    const input = screen.getByLabelText('Search tours');
     expect(input).toBeDisabled();
   });
 
@@ -110,7 +110,7 @@ describe('TourSearch', () => {
 
     render(<TourSearch value="" onChange={onChange} debounceMs={500} />);
 
-    const input = screen.getByLabelText('Search tours by artist name');
+    const input = screen.getByLabelText('Search tours');
     await user.type(input, 'T');
 
     // Should not be called after 200ms
@@ -129,7 +129,7 @@ describe('TourSearch', () => {
   it('has proper ARIA labels for accessibility', () => {
     render(<TourSearch value="Test" onChange={() => {}} />);
 
-    const input = screen.getByLabelText('Search tours by artist name');
+    const input = screen.getByLabelText('Search tours');
     expect(input).toBeInTheDocument();
 
     const clearButton = screen.getByLabelText('Clear search');
@@ -140,7 +140,7 @@ describe('TourSearch', () => {
     const user = userEvent.setup();
     render(<TourSearch value="" onChange={() => {}} />);
 
-    const input = screen.getByLabelText('Search tours by artist name');
+    const input = screen.getByLabelText('Search tours');
     await user.click(input);
     await user.type(input, 'Test');
 

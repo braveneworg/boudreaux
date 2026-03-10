@@ -379,4 +379,173 @@ describe('TourCard', () => {
     render(<TourCard tour={tour} />);
     expect(screen.getByText('The Supremes')).toBeInTheDocument();
   });
+
+  // ─── Timezone-aware display ───────────────────────────────────────────────────
+
+  it('formats date in venue timezone when timeZone crosses a midnight boundary', () => {
+    // 2026-01-16T05:00:00Z is Jan 15 23:00 CST (America/Chicago, UTC-6 in winter)
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          startDate: new Date('2026-01-16T05:00:00.000Z'),
+          timeZone: 'America/Chicago',
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Should display Jan 15 (Chicago local), not Jan 16 (UTC)
+    expect(screen.getByText(/Jan 15/)).toBeInTheDocument();
+  });
+
+  it('formats show time in venue timezone when timeZone is set', () => {
+    // 2026-06-01T23:00:00Z is 6:00 PM CDT in America/Chicago (UTC-5 in summer)
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          showStartTime: new Date('2026-06-01T23:00:00.000Z'),
+          timeZone: 'America/Chicago',
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText(/6:00 PM/)).toBeInTheDocument();
+  });
+
+  it("renders a date range using each date's own timezone", () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          timeZone: 'America/New_York',
+        } as never),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-07-01T00:00:00.000Z'),
+          timeZone: 'America/Los_Angeles',
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText(/-/)).toBeInTheDocument();
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
+  });
+
+  it('falls back gracefully when timeZone is null', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          startDate: new Date(Date.UTC(2026, 5, 15)),
+          showStartTime: new Date(Date.UTC(2026, 5, 15, 20, 0)),
+          timeZone: null,
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByTestId('tour-card')).toBeInTheDocument();
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
+  });
+
+  // ─── Headliner sort order ─────────────────────────────────────────────────────
+
+  it('displays headliners in descending sortOrder (headliner before opener)', () => {
+    const opener = createMockArtist({ id: 'artist-open', displayName: 'The Opener' });
+    const headliner = createMockArtist({ id: 'artist-head', displayName: 'The Headliner' });
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: opener,
+              artistId: opener.id,
+              sortOrder: 0,
+            }),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: headliner,
+              artistId: headliner.id,
+              sortOrder: 1,
+            }),
+          ],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Headliner (sortOrder 1, plays later) should appear before opener (sortOrder 0)
+    expect(screen.getByText('The Headliner, The Opener')).toBeInTheDocument();
+  });
+
+  it('sorts headliners by setTime descending when setTime is available', () => {
+    const early = createMockArtist({ id: 'artist-early', displayName: 'Early Act' });
+    const late = createMockArtist({ id: 'artist-late', displayName: 'Late Act' });
+    const earlyTime = new Date('1970-01-01T19:00:00.000Z');
+    const lateTime = new Date('1970-01-01T21:00:00.000Z');
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: early,
+              artistId: early.id,
+              sortOrder: 0,
+              setTime: earlyTime,
+            } as never),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: late,
+              artistId: late.id,
+              sortOrder: 1,
+              setTime: lateTime,
+            } as never),
+          ],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Late act (21:00) should appear before early act (19:00)
+    expect(screen.getByText('Late Act, Early Act')).toBeInTheDocument();
+  });
+
+  it('prioritises setTime over sortOrder when both are present', () => {
+    // Opener has a high sortOrder but an early setTime (a quirky data scenario)
+    const artistA = createMockArtist({ id: 'artist-a', displayName: 'Artist A' });
+    const artistB = createMockArtist({ id: 'artist-b', displayName: 'Artist B' });
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: artistA,
+              artistId: artistA.id,
+              sortOrder: 0,
+              setTime: new Date('1970-01-01T22:00:00.000Z'),
+            } as never),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: artistB,
+              artistId: artistB.id,
+              sortOrder: 1,
+              setTime: new Date('1970-01-01T20:00:00.000Z'),
+            } as never),
+          ],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Artist A has later setTime (22:00) so appears first despite lower sortOrder
+    expect(screen.getByText('Artist A, Artist B')).toBeInTheDocument();
+  });
 });
