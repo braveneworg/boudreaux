@@ -30,7 +30,7 @@ export interface TourSearchProps {
 export const TourSearch = ({
   value,
   onChange,
-  placeholder = 'Search tours, artists, venues...',
+  placeholder = 'Search by artist name...',
   debounceMs = 300,
   disabled = false,
 }: TourSearchProps) => {
@@ -72,7 +72,7 @@ export const TourSearch = ({
           placeholder={placeholder}
           disabled={disabled}
           className="pl-9 pr-9"
-          aria-label="Search tours"
+          aria-label="Search tours by artist name"
         />
         {localValue && (
           <Button

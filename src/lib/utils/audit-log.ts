@@ -47,6 +47,7 @@ export type AuditEvent =
   | 'tourDateHeadliner.removed'
   | 'tourDateHeadliner.reordered'
   | 'venue.created'
+  | 'venue.updated'
   | 'notification.banner.created'
   | 'notification.banner.updated'
   | 'notification.banner.deleted'

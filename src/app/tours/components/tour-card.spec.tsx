@@ -380,6 +380,58 @@ describe('TourCard', () => {
     expect(screen.getByText('The Supremes')).toBeInTheDocument();
   });
 
+  it('renders "Unknown Artist" when headliner has no artist and no group', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              artist: null,
+              artistId: null,
+              group: null,
+              groupId: null,
+            }),
+          ],
+        }),
+      ],
+    });
+
+    render(<TourCard tour={tour} />);
+    expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+  });
+
+  it('places headliner with setTime before one without setTime', () => {
+    const withTime = createMockArtist({ id: 'artist-a', displayName: 'Night Closer' });
+    const withoutTime = createMockArtist({ id: 'artist-b', displayName: 'Opener Act' });
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: withoutTime,
+              artistId: withoutTime.id,
+              sortOrder: 1,
+              setTime: null,
+            } as never),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: withTime,
+              artistId: withTime.id,
+              sortOrder: 0,
+              setTime: new Date('1970-01-01T21:00:00.000Z'),
+            } as never),
+          ],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Artist with setTime should appear first regardless of sortOrder
+    expect(screen.getByText('Night Closer, Opener Act')).toBeInTheDocument();
+  });
+
   // ─── Timezone-aware display ───────────────────────────────────────────────────
 
   it('formats date in venue timezone when timeZone crosses a midnight boundary', () => {
@@ -547,5 +599,162 @@ describe('TourCard', () => {
 
     // Artist A has later setTime (22:00) so appears first despite lower sortOrder
     expect(screen.getByText('Artist A, Artist B')).toBeInTheDocument();
+  });
+
+  it('places headliner at index 0 with setTime before one at index 1 without setTime', () => {
+    const withTime = createMockArtist({ id: 'artist-a', displayName: 'Headliner' });
+    const withoutTime = createMockArtist({ id: 'artist-b', displayName: 'Support Act' });
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            // withTime is first in the array so the sort comparator receives it as `a`
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: withTime,
+              artistId: withTime.id,
+              sortOrder: 0,
+              setTime: new Date('1970-01-01T22:00:00.000Z'),
+            } as never),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: withoutTime,
+              artistId: withoutTime.id,
+              sortOrder: 1,
+              setTime: null,
+            } as never),
+          ],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('Headliner, Support Act')).toBeInTheDocument();
+  });
+
+  it('deduplicates headliners who appear on multiple tour dates', () => {
+    const artist = createMockArtist({ id: 'artist-shared', displayName: 'Shared Artist' });
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          headliners: [createMockTourDateHeadliner({ id: 'th-1', artist, artistId: artist.id })],
+        }),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-06-02T00:00:00.000Z'),
+          headliners: [createMockTourDateHeadliner({ id: 'th-2', artist, artistId: artist.id })],
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // Should appear only once even though singer is on two tour dates
+    const headlinerText = screen.getByText('Shared Artist');
+    expect(headlinerText).toBeInTheDocument();
+    expect(screen.queryAllByText('Shared Artist')).toHaveLength(1);
+  });
+
+  it('truncates headliner list to 3 with "+N more" for 4+ headliners', () => {
+    const artists = [1, 2, 3, 4].map((n) =>
+      createMockArtist({ id: `artist-${n}`, displayName: `Artist ${n}` })
+    );
+
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: artists.map((a, i) =>
+            createMockTourDateHeadliner({
+              id: `th-${i}`,
+              artist: a,
+              artistId: a.id,
+              sortOrder: i,
+            })
+          ),
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText(/\+1 more/)).toBeInTheDocument();
+  });
+
+  it('shows "N shows" when there are multiple tour dates with show times', () => {
+    const showTime = new Date('2026-06-01T20:00:00.000Z');
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          showStartTime: showTime,
+        } as never),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-06-02T00:00:00.000Z'),
+          showStartTime: showTime,
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('2 shows')).toBeInTheDocument();
+  });
+
+  it('renders "No dates announced" when tour has no tour dates', () => {
+    const tour = createMockTour({ tourDates: [] });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('No dates announced')).toBeInTheDocument();
+  });
+
+  it('renders "X venues" when there are multiple unique venues', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-1', name: 'Madison Square Garden' }),
+        }),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-06-02T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-2', name: 'Ryman Auditorium' }),
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('2 venues')).toBeInTheDocument();
+  });
+
+  it('renders show end time when showEndTime is set for a single tour date', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          showStartTime: new Date('2026-06-01T20:00:00.000Z'),
+          showEndTime: new Date('2026-06-01T22:00:00.000Z'),
+          timeZone: 'UTC',
+        } as never),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    // The rendered time string should contain both start and end times
+    const timeText = screen.getByText(/8:00 PM.*10:00 PM/);
+    expect(timeText).toBeInTheDocument();
+  });
+
+  it('falls back to first image when no image has displayOrder 0', () => {
+    const image = createMockImage({
+      displayOrder: 5,
+      altText: 'Fallback image',
+    });
+    const tour = createMockTour({ images: [image] });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByAltText('Fallback image')).toBeInTheDocument();
   });
 });

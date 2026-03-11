@@ -10,6 +10,7 @@ import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
+import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import type {
@@ -203,14 +204,28 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
 
                         <div className="flex items-start gap-2 text-sm">
                           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">{tourDate.venue.name}</div>
-                            <div className="text-muted-foreground">
+                          <VenueDirectionsLink
+                            destination={[
+                              tourDate.venue.name,
+                              tourDate.venue.address,
+                              tourDate.venue.city,
+                              tourDate.venue.state,
+                              tourDate.venue.postalCode,
+                              tourDate.venue.country,
+                            ]
+                              .filter(Boolean)
+                              .join(', ')}
+                            className="group"
+                          >
+                            <div className="font-medium group-hover:underline">
+                              {tourDate.venue.name}
+                            </div>
+                            <div className="text-muted-foreground group-hover:underline">
                               {[tourDate.venue.city, tourDate.venue.state]
                                 .filter(Boolean)
                                 .join(', ')}
                             </div>
-                          </div>
+                          </VenueDirectionsLink>
                         </div>
 
                         {headlinerNames.length > 0 && (

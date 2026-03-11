@@ -175,7 +175,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Rock');
 
     await waitFor(() => {
@@ -193,7 +193,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Summer');
 
     await waitFor(() => {
@@ -227,7 +227,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Beatles');
 
     await waitFor(() => {
@@ -260,7 +260,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Lennon');
 
     await waitFor(() => {
@@ -278,7 +278,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'ROCK');
 
     await waitFor(() => {
@@ -296,7 +296,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Roc');
 
     await waitFor(() => {
@@ -315,7 +315,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Rock');
 
     await waitFor(() => {
@@ -332,7 +332,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Rock');
 
     await waitFor(() => {
@@ -349,7 +349,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Classical');
 
     await waitFor(() => {
@@ -367,7 +367,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Rock');
 
     await waitFor(() => {
@@ -407,7 +407,7 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     // Search for first headliner
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Beatles');
 
     await waitFor(() => {
@@ -447,7 +447,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Madison');
 
     await waitFor(() => {
@@ -481,7 +481,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Supremes');
 
     await waitFor(() => {
@@ -510,7 +510,7 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'Acoustic');
 
     await waitFor(() => {
@@ -532,12 +532,142 @@ describe('ToursPageClient', () => {
 
     render(<ToursPageClient tours={tours} />);
 
-    const searchInput = screen.getByLabelText('Search tours');
+    const searchInput = screen.getByLabelText('Search tours by artist name');
     await user.type(searchInput, 'farewell');
 
     await waitFor(() => {
       expect(screen.getByText('Tour 1')).toBeInTheDocument();
       expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters tours by artist first/last name when displayName is absent', async () => {
+    const user = userEvent.setup();
+    const artistNoDisplay = createMockArtist({
+      id: 'artist-nodisplay',
+      displayName: null,
+      firstName: 'Billie',
+      surname: 'Holiday',
+    });
+    const tours = [
+      createMockTour({
+        id: 'tour-1',
+        title: 'Jazz Tour',
+        tourDates: [
+          createMockTourDate({
+            headliners: [
+              createMockHeadliner({ artist: artistNoDisplay, artistId: artistNoDisplay.id }),
+            ],
+          }),
+        ],
+      }),
+      createMockTour({ id: 'tour-2', title: 'Rock Tour' }),
+    ];
+
+    render(<ToursPageClient tours={tours} />);
+
+    const searchInput = screen.getByLabelText('Search tours by artist name');
+    await user.type(searchInput, 'Holiday');
+
+    await waitFor(() => {
+      expect(screen.getByText('Jazz Tour')).toBeInTheDocument();
+      expect(screen.queryByText('Rock Tour')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters tours by venue city', async () => {
+    const user = userEvent.setup();
+    const tours = [
+      createMockTour({
+        id: 'tour-1',
+        title: 'Nashville Tour',
+        tourDates: [
+          createMockTourDate({ venue: createMockVenue({ city: 'Nashville', state: 'TN' }) }),
+        ],
+      }),
+      createMockTour({
+        id: 'tour-2',
+        title: 'Chicago Tour',
+        tourDates: [
+          createMockTourDate({
+            id: 'td-2',
+            venue: createMockVenue({ city: 'Chicago', state: 'IL' }),
+          }),
+        ],
+      }),
+    ];
+
+    render(<ToursPageClient tours={tours} />);
+
+    const searchInput = screen.getByLabelText('Search tours by artist name');
+    await user.type(searchInput, 'Nashville');
+
+    await waitFor(() => {
+      expect(screen.getByText('Nashville Tour')).toBeInTheDocument();
+      expect(screen.queryByText('Chicago Tour')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters tours by venue state', async () => {
+    const user = userEvent.setup();
+    const tours = [
+      createMockTour({
+        id: 'tour-1',
+        title: 'Texas Tour',
+        tourDates: [
+          createMockTourDate({ venue: createMockVenue({ city: 'Austin', state: 'TX' }) }),
+        ],
+      }),
+      createMockTour({
+        id: 'tour-2',
+        title: 'Florida Tour',
+        tourDates: [
+          createMockTourDate({
+            id: 'td-2',
+            venue: createMockVenue({ city: 'Miami', state: 'FL' }),
+          }),
+        ],
+      }),
+    ];
+
+    render(<ToursPageClient tours={tours} />);
+
+    const searchInput = screen.getByLabelText('Search tours by artist name');
+    await user.type(searchInput, 'TX');
+
+    await waitFor(() => {
+      expect(screen.getByText('Texas Tour')).toBeInTheDocument();
+      expect(screen.queryByText('Florida Tour')).not.toBeInTheDocument();
+    });
+  });
+
+  it('handles null venue city and state without crashing', async () => {
+    const user = userEvent.setup();
+    const tours = [
+      createMockTour({
+        id: 'tour-1',
+        title: 'Mystery Tour',
+        tourDates: [
+          createMockTourDate({
+            venue: createMockVenue({
+              name: 'Secret Venue',
+              // Intentionally testing defensive null handling even though city is
+              // non-nullable in the DB schema (runtime data may be inconsistent)
+              city: null as unknown as string,
+              state: null,
+            }),
+          }),
+        ],
+      }),
+    ];
+
+    render(<ToursPageClient tours={tours} />);
+
+    const searchInput = screen.getByLabelText('Search tours by artist name');
+    await user.type(searchInput, 'Secret');
+
+    await waitFor(() => {
+      expect(screen.getByText('Mystery Tour')).toBeInTheDocument();
     });
   });
 });

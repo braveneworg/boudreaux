@@ -19,7 +19,10 @@ export const venueCreateSchema = z.object({
     .max(100, 'City must be 100 characters or less'),
   state: z.string().max(100, 'State must be 100 characters or less').optional().nullable(),
   country: z.string().max(100, 'Country must be 100 characters or less').optional().nullable(),
-  postalCode: z.string().max(20, 'Postal code must be 20 characters or less').optional().nullable(),
+  postalCode: z.preprocess(
+    (val) => (typeof val === 'number' ? String(val) : val),
+    z.string().max(20, 'Postal code must be 20 characters or less').optional().nullable()
+  ),
   capacity: z
     .number({ message: 'Capacity must be a number' })
     .int('Capacity must be an integer')
@@ -54,7 +57,10 @@ export const venueUpdateSchema = z.object({
     .optional(),
   state: z.string().max(100, 'State must be 100 characters or less').optional().nullable(),
   country: z.string().max(100, 'Country must be 100 characters or less').optional().nullable(),
-  postalCode: z.string().max(20, 'Postal code must be 20 characters or less').optional().nullable(),
+  postalCode: z.preprocess(
+    (val) => (typeof val === 'number' ? String(val) : val),
+    z.string().max(20, 'Postal code must be 20 characters or less').optional().nullable()
+  ),
   capacity: z
     .number({ message: 'Capacity must be a number' })
     .int('Capacity must be an integer')

@@ -349,4 +349,171 @@ describe('ImageUploadService', () => {
       expect(key).toMatch(/\.jpg$/);
     });
   });
+
+  describe('generateTourDatePresignedUploadUrl', () => {
+    it('should generate a presigned URL for a valid tour date image upload', async () => {
+      const mockPresignedUrl = 'https://s3.amazonaws.com/test-bucket/path?signature=abc123';
+      (getSignedUrl as ReturnType<typeof vi.fn>).mockResolvedValue(mockPresignedUrl);
+
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'flyer.jpg',
+        fileSize: 1024 * 1024, // 1MB
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
+
+      expect(result.data.uploadUrl).toBe(mockPresignedUrl);
+      expect(result.data.s3Key).toContain('media/tour-dates/tourdate123/');
+      expect(result.data.s3Key).toContain('.jpg');
+      expect(result.data.expiresIn).toBe(900);
+    });
+
+    it('should return error when S3 bucket is not configured', async () => {
+      delete process.env.S3_BUCKET;
+
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'flyer.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('S3 bucket not configured');
+    });
+
+    it('should reject files that are too large', async () => {
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'large-flyer.jpg',
+        fileSize: 15 * 1024 * 1024, // 15MB
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('File size exceeds maximum');
+    });
+
+    it('should reject invalid file types', async () => {
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'document.pdf',
+        fileSize: 1024 * 1024,
+        mimeType: 'application/pdf' as unknown as 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('Invalid file type');
+    });
+
+    it('should return error when getSignedUrl throws', async () => {
+      (getSignedUrl as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('S3 connection error')
+      );
+
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'flyer.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('Failed to generate upload URL');
+    });
+
+    it('should include tourDateId in s3Key path', async () => {
+      const mockPresignedUrl = 'https://s3.amazonaws.com/test-bucket/path?signature=abc123';
+      (getSignedUrl as ReturnType<typeof vi.fn>).mockResolvedValue(mockPresignedUrl);
+
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'specific-date-id',
+        fileName: 'flyer.png',
+        fileSize: 512 * 1024,
+        mimeType: 'image/png',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
+      expect(result.data.s3Key).toContain('media/tour-dates/specific-date-id/');
+      expect(result.data.s3Key).toContain('.png');
+    });
+  });
+
+  describe('generateTourDateS3Key', () => {
+    it('should generate unique S3 keys for the same tour date and filename', () => {
+      const key1 = ImageUploadService.generateTourDateS3Key('tourdate123', 'flyer.jpg');
+      const key2 = ImageUploadService.generateTourDateS3Key('tourdate123', 'flyer.jpg');
+
+      expect(key1).not.toBe(key2);
+      expect(key1).toContain('media/tour-dates/tourdate123/');
+      expect(key2).toContain('media/tour-dates/tourdate123/');
+    });
+
+    it('should preserve file extensions', () => {
+      const extensions = ['jpg', 'png', 'gif', 'webp'];
+
+      extensions.forEach((ext) => {
+        const key = ImageUploadService.generateTourDateS3Key('tourdate123', `flyer.${ext}`);
+        expect(key).toMatch(new RegExp(`\\.${ext}$`));
+      });
+    });
+
+    it('should handle files without extensions', () => {
+      const key = ImageUploadService.generateTourDateS3Key('tourdate123', 'flyer');
+      expect(key).toContain('media/tour-dates/tourdate123/');
+      // No dot separator in filename means the whole name becomes the "extension"
+    });
+
+    it('should sanitize filenames with special characters', () => {
+      const unsafeFilename = 'Tour Date Flyer! @#$%^&*().jpg';
+      const key = ImageUploadService.generateTourDateS3Key('tourdate123', unsafeFilename);
+
+      expect(key).toMatch(/^media\/tour-dates\/tourdate123\/[a-z0-9-]+\.jpg$/);
+    });
+
+    it('should truncate long filenames', () => {
+      const longFilename = 'b'.repeat(200) + '.jpg';
+      const key = ImageUploadService.generateTourDateS3Key('tourdate123', longFilename);
+
+      expect(key.length).toBeLessThan(150);
+      expect(key).toContain('media/tour-dates/tourdate123/');
+      expect(key).toMatch(/\.jpg$/);
+    });
+
+    it('should use tour-dates path prefix instead of tours', () => {
+      const tourKey = ImageUploadService.generateS3Key('id123', 'file.jpg');
+      const tourDateKey = ImageUploadService.generateTourDateS3Key('id123', 'file.jpg');
+
+      expect(tourKey).toContain('media/tours/');
+      expect(tourDateKey).toContain('media/tour-dates/');
+      expect(tourDateKey).not.toContain('media/tours/');
+    });
+  });
+
+  describe('generatePresignedUploadUrl - error branch', () => {
+    it('should return error when getSignedUrl throws', async () => {
+      (getSignedUrl as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('AWS credentials invalid')
+      );
+
+      const result = await ImageUploadService.generatePresignedUploadUrl({
+        tourId: 'tour123',
+        fileName: 'poster.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('Failed to generate upload URL');
+    });
+  });
 });

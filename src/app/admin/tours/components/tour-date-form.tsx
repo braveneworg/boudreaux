@@ -88,8 +88,8 @@ export default function TourDateForm({
       ticketPrices: '',
       notes: '',
       headlinerIds: [],
-      timeZone: '',
-      utcOffset: '',
+      timeZone: null as string | null,
+      utcOffset: null as string | null,
     },
   });
 
@@ -141,11 +141,11 @@ export default function TourDateForm({
         headlinerIds:
           tourDate.headliners?.map((h) => h.artistId).filter((id): id is string => id !== null) ||
           [],
-        timeZone: (tourDate as { timeZone?: string | null }).timeZone || '',
+        timeZone: (tourDate as { timeZone?: string | null }).timeZone ?? null,
         utcOffset:
           (tourDate as { utcOffset?: number | null }).utcOffset != null
             ? String((tourDate as { utcOffset?: number | null }).utcOffset)
-            : '',
+            : null,
       });
     } else {
       // Reset form for new tour date
@@ -162,8 +162,8 @@ export default function TourDateForm({
         ticketPrices: '',
         notes: '',
         headlinerIds: [],
-        timeZone: '',
-        utcOffset: '',
+        timeZone: null,
+        utcOffset: null,
       });
     }
   }, [tourDate, tourId, reset]);

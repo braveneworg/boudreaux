@@ -231,6 +231,23 @@ describe('Tour Actions', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.title).toEqual(['Title is too long']);
     });
+
+    it('should throw when session is missing a user id', async () => {
+      vi.mocked(requireRole).mockResolvedValue({ user: { id: null } } as never);
+
+      await expect(updateTourAction(tourId, initialFormState, mockFormData)).rejects.toThrow(
+        'Invalid admin session: missing user id for audit logging.'
+      );
+    });
+
+    it('should handle service errors', async () => {
+      vi.mocked(TourService.update).mockRejectedValue(new Error('Database error'));
+
+      const result = await updateTourAction(tourId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(setUnknownError).toHaveBeenCalled();
+    });
   });
 
   describe('deleteTourAction', () => {

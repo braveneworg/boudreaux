@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
@@ -121,5 +121,102 @@ describe('ReleaseSearchCombobox', () => {
     render(<ReleaseSearchCombobox releases={[]} />);
 
     expect(screen.getByLabelText('Search releases')).toBeInTheDocument();
+  });
+
+  it('should navigate to release page when a result is selected', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseSearchCombobox releases={mockReleases} />);
+
+    await user.click(screen.getByLabelText('Search releases'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Midnight Serenade')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Midnight Serenade'));
+
+    expect(mockPush).toHaveBeenCalledWith('/releases/release-1');
+  });
+
+  it('should render cover art thumbnail when coverArt is present', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseSearchCombobox releases={mockReleases} />);
+
+    await user.click(screen.getByLabelText('Search releases'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('search-thumbnail').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should render placeholder icon when no cover art is available', async () => {
+    const user = userEvent.setup();
+    const releasesNoCoverArt = [
+      {
+        id: 'release-nc',
+        title: 'No Cover Album',
+        coverArt: null,
+        images: [],
+        artistReleases: [
+          {
+            id: 'ar-nc',
+            artistId: 'artist-1',
+            releaseId: 'release-nc',
+            artist: {
+              id: 'artist-1',
+              firstName: 'John',
+              surname: 'Doe',
+              displayName: null,
+              groups: [],
+            },
+          },
+        ],
+        releaseUrls: [],
+      },
+    ] as unknown as Parameters<typeof ReleaseSearchCombobox>[0]['releases'];
+
+    render(<ReleaseSearchCombobox releases={releasesNoCoverArt} />);
+    await user.click(screen.getByLabelText('Search releases'));
+
+    await waitFor(() => {
+      expect(screen.getByText('No Cover Album')).toBeInTheDocument();
+    });
+
+    // Placeholder ♫ should be shown instead of an image
+    expect(screen.getByText('♫')).toBeInTheDocument();
+    expect(screen.queryByTestId('search-thumbnail')).not.toBeInTheDocument();
+  });
+
+  it('should display "Unknown Artist" when artistReleases is empty', async () => {
+    const user = userEvent.setup();
+    const releasesNoArtist = [
+      {
+        id: 'release-na',
+        title: 'Mystery Album',
+        coverArt: 'https://example.com/cover.jpg',
+        images: [],
+        artistReleases: [],
+        releaseUrls: [],
+      },
+    ] as unknown as Parameters<typeof ReleaseSearchCombobox>[0]['releases'];
+
+    render(<ReleaseSearchCombobox releases={releasesNoArtist} />);
+    await user.click(screen.getByLabelText('Search releases'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+    });
+  });
+
+  it('should display the artist displayName when present', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseSearchCombobox releases={mockReleases} />);
+
+    await user.click(screen.getByLabelText('Search releases'));
+
+    await waitFor(() => {
+      // mockReleases[1] has displayName: 'J. Smith'
+      expect(screen.getByText('J. Smith')).toBeInTheDocument();
+    });
   });
 });

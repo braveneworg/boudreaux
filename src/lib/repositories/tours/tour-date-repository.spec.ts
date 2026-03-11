@@ -375,4 +375,151 @@ describe('TourDateRepository', () => {
       expect(prisma.tourDate.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }));
     });
   });
+
+  // ─── updateHeadlinerSetTime ──────────────────────────────────────────────────
+
+  describe('updateHeadlinerSetTime', () => {
+    it('calls prisma.tourDateHeadliner.update with the provided date', async () => {
+      vi.mocked(prisma.tourDateHeadliner.update).mockResolvedValue({} as never);
+      const setTime = new Date('2026-06-01T21:00:00.000Z');
+
+      await TourDateRepository.updateHeadlinerSetTime(validHeadliner1, setTime);
+
+      expect(prisma.tourDateHeadliner.update).toHaveBeenCalledWith({
+        where: { id: validHeadliner1 },
+        data: { setTime },
+      });
+    });
+
+    it('calls prisma.tourDateHeadliner.update with null to clear the time', async () => {
+      vi.mocked(prisma.tourDateHeadliner.update).mockResolvedValue({} as never);
+
+      await TourDateRepository.updateHeadlinerSetTime(validHeadliner1, null);
+
+      expect(prisma.tourDateHeadliner.update).toHaveBeenCalledWith({
+        where: { id: validHeadliner1 },
+        data: { setTime: null },
+      });
+    });
+  });
+
+  // ─── removeHeadliner ─────────────────────────────────────────────────────────
+
+  describe('removeHeadliner', () => {
+    it('calls prisma.tourDateHeadliner.delete with the headliner id', async () => {
+      vi.mocked(prisma.tourDateHeadliner.delete).mockResolvedValue({} as never);
+
+      await TourDateRepository.removeHeadliner(validHeadliner1);
+
+      expect(prisma.tourDateHeadliner.delete).toHaveBeenCalledWith({
+        where: { id: validHeadliner1 },
+      });
+    });
+
+    it('throws when prisma throws', async () => {
+      vi.mocked(prisma.tourDateHeadliner.delete).mockRejectedValue(new Error('Not found'));
+
+      await expect(TourDateRepository.removeHeadliner(validHeadliner1)).rejects.toThrow(
+        'Not found'
+      );
+    });
+  });
+
+  // ─── reorderHeadliners ───────────────────────────────────────────────────────
+
+  describe('reorderHeadliners', () => {
+    it('calls prisma.$transaction with an update operation for each headliner id', async () => {
+      vi.mocked(prisma.tourDateHeadliner.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+      await TourDateRepository.reorderHeadliners(validObjectId, [validHeadliner1, validHeadliner2]);
+
+      expect(prisma.tourDateHeadliner.update).toHaveBeenCalledTimes(2);
+      expect(prisma.tourDateHeadliner.update).toHaveBeenNthCalledWith(1, {
+        where: { id: validHeadliner1 },
+        data: { sortOrder: 0 },
+      });
+      expect(prisma.tourDateHeadliner.update).toHaveBeenNthCalledWith(2, {
+        where: { id: validHeadliner2 },
+        data: { sortOrder: 1 },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls prisma.$transaction with an empty array when headlinerIds is empty', async () => {
+      vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+      await TourDateRepository.reorderHeadliners(validObjectId, []);
+
+      expect(prisma.$transaction).toHaveBeenCalledWith([]);
+      expect(prisma.tourDateHeadliner.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── update - additional branch coverage ─────────────────────────────────────
+
+  describe('update - additional branch coverage', () => {
+    it('includes startDate in update when explicitly provided as a value', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      const newStartDate = new Date('2026-07-01T00:00:00.000Z');
+
+      await TourDateRepository.update(validObjectId, { startDate: newStartDate });
+
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ startDate: newStartDate }),
+        })
+      );
+    });
+
+    it('connects venue relation when venueId is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+
+      await TourDateRepository.update(validObjectId, { venueId: validVenueId });
+
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            venue: { connect: { id: validVenueId } },
+          }),
+        })
+      );
+    });
+
+    it('deletes all headliners and skips createMany when headlinerIds is empty array', async () => {
+      vi.mocked(prisma.tourDateHeadliner.deleteMany).mockResolvedValue({ count: 2 } as never);
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+
+      await TourDateRepository.update(validObjectId, { headlinerIds: [] });
+
+      expect(prisma.tourDateHeadliner.deleteMany).toHaveBeenCalledWith({
+        where: { tourDateId: validObjectId },
+      });
+      expect(prisma.tourDateHeadliner.createMany).not.toHaveBeenCalled();
+    });
+
+    it('includes ticketsUrl in update when explicitly provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+
+      await TourDateRepository.update(validObjectId, { ticketsUrl: 'https://tickets.example.com' });
+
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ ticketsUrl: 'https://tickets.example.com' }),
+        })
+      );
+    });
+
+    it('includes notes in update when explicitly provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+
+      await TourDateRepository.update(validObjectId, { notes: 'Special event notes' });
+
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ notes: 'Special event notes' }),
+        })
+      );
+    });
+  });
 });

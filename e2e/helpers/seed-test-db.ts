@@ -77,6 +77,12 @@ async function seedTestDatabase() {
 
   try {
     // Clear all collections in dependency-safe order
+    await prisma.tourDateImage.deleteMany({});
+    await prisma.tourDateHeadliner.deleteMany({});
+    await prisma.tourImage.deleteMany({});
+    await prisma.tourDate.deleteMany({});
+    await prisma.tour.deleteMany({});
+    await prisma.venue.deleteMany({});
     await prisma.releaseTrack.deleteMany({});
     await prisma.trackArtist.deleteMany({});
     await prisma.artistFeaturedArtist.deleteMany({});

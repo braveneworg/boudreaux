@@ -10,7 +10,7 @@ describe('TourSearch', () => {
   it('renders search input with placeholder', () => {
     render(<TourSearch value="" onChange={() => {}} />);
 
-    const input = screen.getByPlaceholderText('Search tours, artists, venues...');
+    const input = screen.getByPlaceholderText('Search by artist name...');
     expect(input).toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe('TourSearch', () => {
 
     render(<TourSearch value="" onChange={onChange} debounceMs={100} />);
 
-    const input = screen.getByLabelText('Search tours');
+    const input = screen.getByLabelText('Search tours by artist name');
 
     // Type into input
     await user.type(input, 'Test');
@@ -80,7 +80,7 @@ describe('TourSearch', () => {
   it('respects disabled state', () => {
     render(<TourSearch value="" onChange={() => {}} disabled />);
 
-    const input = screen.getByLabelText('Search tours');
+    const input = screen.getByLabelText('Search tours by artist name');
     expect(input).toBeDisabled();
   });
 
@@ -110,7 +110,7 @@ describe('TourSearch', () => {
 
     render(<TourSearch value="" onChange={onChange} debounceMs={500} />);
 
-    const input = screen.getByLabelText('Search tours');
+    const input = screen.getByLabelText('Search tours by artist name');
     await user.type(input, 'T');
 
     // Should not be called after 200ms
@@ -129,7 +129,7 @@ describe('TourSearch', () => {
   it('has proper ARIA labels for accessibility', () => {
     render(<TourSearch value="Test" onChange={() => {}} />);
 
-    const input = screen.getByLabelText('Search tours');
+    const input = screen.getByLabelText('Search tours by artist name');
     expect(input).toBeInTheDocument();
 
     const clearButton = screen.getByLabelText('Clear search');
@@ -140,10 +140,20 @@ describe('TourSearch', () => {
     const user = userEvent.setup();
     render(<TourSearch value="" onChange={() => {}} />);
 
-    const input = screen.getByLabelText('Search tours');
+    const input = screen.getByLabelText('Search tours by artist name');
     await user.click(input);
     await user.type(input, 'Test');
 
     expect(input).toHaveFocus();
+  });
+
+  it('does not call onChange when debounce fires but local value already matches prop value', async () => {
+    const onChange = vi.fn();
+    render(<TourSearch value="existing" onChange={onChange} debounceMs={50} />);
+
+    // No user interaction — the initial debounce fires with localValue === value === 'existing'
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

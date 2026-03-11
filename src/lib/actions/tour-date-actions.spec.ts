@@ -8,6 +8,7 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 
 import {
   createTourDateAction,
+  deleteTourDateAction,
   removeHeadlinerAction,
   reorderHeadlinersAction,
   updateHeadlinerSetTimeAction,
@@ -507,5 +508,71 @@ describe('updateTourDateAction', () => {
 
     expect(result.success).toBe(false);
     expect(setUnknownError).toHaveBeenCalled();
+  });
+});
+
+// ─── deleteTourDateAction ────────────────────────────────────────────────────
+
+describe('deleteTourDateAction', () => {
+  const mockSession = {
+    user: { id: 'user-123', role: 'admin', email: 'admin@example.com' },
+  };
+
+  const validTourDateId = '507f1f77bcf86cd799439011';
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(revalidatePath).mockImplementation(() => {});
+    vi.mocked(TourDateRepository.delete).mockResolvedValue(undefined as never);
+  });
+
+  it('returns unauthorized when role check fails', async () => {
+    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+
+    const result = await deleteTourDateAction(validTourDateId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Unauthorized');
+  });
+
+  it('returns error for invalid tour date ID format', async () => {
+    const result = await deleteTourDateAction('not-a-valid-object-id');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid tour date ID');
+  });
+
+  it('deletes the tour date and returns success', async () => {
+    const result = await deleteTourDateAction(validTourDateId);
+
+    expect(TourDateRepository.delete).toHaveBeenCalledWith(validTourDateId);
+    expect(result.success).toBe(true);
+  });
+
+  it('logs a security event on successful deletion', async () => {
+    await deleteTourDateAction(validTourDateId);
+
+    expect(logSecurityEvent).toHaveBeenCalledWith({
+      event: 'tourDate.deleted',
+      userId: 'user-123',
+      metadata: { tourDateId: validTourDateId },
+    });
+  });
+
+  it('revalidates relevant paths on success', async () => {
+    await deleteTourDateAction(validTourDateId);
+
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
+    expect(revalidatePath).toHaveBeenCalledWith('/tours');
+  });
+
+  it('handles repository errors gracefully', async () => {
+    vi.mocked(TourDateRepository.delete).mockRejectedValue(new Error('DB error'));
+
+    const result = await deleteTourDateAction(validTourDateId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Failed to delete tour date');
   });
 });

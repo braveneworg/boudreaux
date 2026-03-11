@@ -36,6 +36,7 @@ export interface VenueUpdateData {
   postalCode?: string | null;
   capacity?: number | null;
   notes?: string | null;
+  timeZone?: string | null;
 }
 
 /**
