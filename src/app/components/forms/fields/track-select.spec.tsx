@@ -321,7 +321,7 @@ describe('TrackSelect', () => {
 
   describe('popover behavior', () => {
     it('opens popover when trigger is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -338,7 +338,7 @@ describe('TrackSelect', () => {
     });
 
     it('fetches tracks when popover opens', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -360,7 +360,7 @@ describe('TrackSelect', () => {
 
   describe('track display', () => {
     it('displays track items when loaded', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -379,7 +379,7 @@ describe('TrackSelect', () => {
     });
 
     it('shows track title with duration', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -396,7 +396,7 @@ describe('TrackSelect', () => {
     });
 
     it('shows track title without duration when not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -415,7 +415,7 @@ describe('TrackSelect', () => {
 
   describe('selection behavior', () => {
     it('shows selected track name on trigger after selection', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -435,7 +435,7 @@ describe('TrackSelect', () => {
     });
 
     it('deselects track when clicking on already selected item', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       render(
         <TestWrapper>
@@ -471,7 +471,7 @@ describe('TrackSelect', () => {
     });
 
     it('calls onTrackChange when a track is selected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const _mockOnTrackChange = vi.fn();
       render(
         <TestWrapper>
@@ -509,7 +509,7 @@ describe('TrackSelect', () => {
 
   describe('onTrackChange callback', () => {
     it('calls onTrackChange with full track data including releaseTracks when a track is selected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
 
       render(
@@ -542,7 +542,7 @@ describe('TrackSelect', () => {
     });
 
     it('passes track with multiple releaseTracks when selected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
 
       render(
@@ -578,7 +578,7 @@ describe('TrackSelect', () => {
     });
 
     it('passes track with empty releaseTracks when track has no releases', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
 
       render(
@@ -610,7 +610,7 @@ describe('TrackSelect', () => {
     });
 
     it('calls onTrackChange with null when track is deselected', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
 
       render(
@@ -646,7 +646,7 @@ describe('TrackSelect', () => {
     });
 
     it('calls onTrackChange with null when clear button is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
 
       render(
@@ -682,7 +682,7 @@ describe('TrackSelect', () => {
 
   describe('search functionality', () => {
     it('renders search input with placeholder', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -709,7 +709,7 @@ describe('TrackSelect', () => {
 
     it('fetches with search parameter when searching', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -741,7 +741,7 @@ describe('TrackSelect', () => {
 
     it('fetches without search when search is cleared (empty string)', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -777,7 +777,7 @@ describe('TrackSelect', () => {
     });
 
     it('clears search value when popover closes', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -805,7 +805,7 @@ describe('TrackSelect', () => {
 
   describe('fetch error handling', () => {
     it('shows error message on non-ok response', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockFetch.mockResolvedValueOnce({
         ok: false,
         json: () => Promise.resolve({}),
@@ -835,7 +835,7 @@ describe('TrackSelect', () => {
     });
 
     it('handles non-Error thrown during fetch', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockFetch.mockRejectedValueOnce('string error');
 
       render(
@@ -862,7 +862,7 @@ describe('TrackSelect', () => {
     });
 
     it('handles API response with missing tracks array', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({}),
@@ -888,7 +888,7 @@ describe('TrackSelect', () => {
 
   describe('selection without setValue prop', () => {
     it('selects track without calling setValue when not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control }) => <TrackSelect control={control} name="trackId" label="Track" />}
@@ -907,7 +907,7 @@ describe('TrackSelect', () => {
     });
 
     it('clears track without calling setValue when not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const onTrackChange = vi.fn();
       render(
         <TestWrapper>
@@ -941,7 +941,7 @@ describe('TrackSelect', () => {
 
   describe('create track link', () => {
     it('shows create new track link by default', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -959,7 +959,7 @@ describe('TrackSelect', () => {
     });
 
     it('hides create link when showCreateLink is false', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -986,7 +986,7 @@ describe('TrackSelect', () => {
 
   describe('releaseId filtering', () => {
     it('includes releaseId as query parameter when fetching tracks', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -1012,7 +1012,7 @@ describe('TrackSelect', () => {
     });
 
     it('does not include releaseId when not provided', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -1032,7 +1032,7 @@ describe('TrackSelect', () => {
     });
 
     it('re-fetches tracks when releaseId changes and popover is open', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const { rerender } = render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -1083,7 +1083,7 @@ describe('TrackSelect', () => {
 
     it('includes both search and releaseId when filtering', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <TestWrapper>
@@ -1122,7 +1122,7 @@ describe('TrackSelect', () => {
 
   describe('abort controller / race condition prevention', () => {
     it('passes an AbortSignal to every fetch call', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (
@@ -1161,7 +1161,7 @@ describe('TrackSelect', () => {
         });
       });
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(
         <TestWrapper>
           {({ control, setValue }) => (

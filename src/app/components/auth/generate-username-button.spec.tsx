@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { createMockedForm } from '@/lib/types/test-utils';
@@ -80,6 +80,7 @@ describe('GenerateUsernameButton', () => {
   let mockForm: UseFormReturn<MockFormData>;
 
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.clearAllMocks();
 
     // Reset mockGenerateUsername to clear any mockReturnValueOnce calls
@@ -107,6 +108,10 @@ describe('GenerateUsernameButton', () => {
 
     // Set default mock return value
     mockGenerateUsername.mockReturnValue('generated-username-1234');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('rendering', () => {
@@ -188,7 +193,7 @@ describe('GenerateUsernameButton', () => {
 
   describe('username generation', () => {
     it('should generate a random username when clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <GenerateUsernameButton
@@ -204,7 +209,7 @@ describe('GenerateUsernameButton', () => {
     });
 
     it('should set both username and confirmUsername fields with generated value', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const generatedUsername = 'test-user-5678';
       mockGenerateUsername.mockReturnValue(generatedUsername);
 
@@ -218,20 +223,18 @@ describe('GenerateUsernameButton', () => {
       const button = screen.getByTestId('generate-button');
       await user.click(button);
 
-      await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith('username', generatedUsername, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-        expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', generatedUsername, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
+      expect(mockForm.setValue).toHaveBeenCalledWith('username', generatedUsername, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      expect(mockForm.setValue).toHaveBeenCalledWith('confirmUsername', generatedUsername, {
+        shouldValidate: true,
+        shouldDirty: true,
       });
     });
 
     it('should trigger validation after setting values', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <GenerateUsernameButton
@@ -243,13 +246,11 @@ describe('GenerateUsernameButton', () => {
       const button = screen.getByTestId('generate-button');
       await user.click(button);
 
-      await waitFor(() => {
-        expect(mockForm.trigger).toHaveBeenCalledWith(['username', 'confirmUsername']);
-      });
+      expect(mockForm.trigger).toHaveBeenCalledWith(['username', 'confirmUsername']);
     });
 
     it('should call setValue with correct options', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <GenerateUsernameButton
@@ -261,17 +262,15 @@ describe('GenerateUsernameButton', () => {
       const button = screen.getByTestId('generate-button');
       await user.click(button);
 
-      await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith(
-          'username',
-          'generated-username-1234',
-          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
-        );
-      });
+      expect(mockForm.setValue).toHaveBeenCalledWith(
+        'username',
+        'generated-username-1234',
+        expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
+      );
     });
 
     it('should generate different usernames on multiple clicks', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockGenerateUsername
         .mockReturnValueOnce('username-1111')
         .mockReturnValueOnce('username-2222')
@@ -287,37 +286,37 @@ describe('GenerateUsernameButton', () => {
       const button = screen.getByTestId('generate-button');
 
       await user.click(button);
-      await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith(
-          'username',
-          'username-1111',
-          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
-        );
-      });
+      expect(mockForm.setValue).toHaveBeenCalledWith(
+        'username',
+        'username-1111',
+        expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
+      );
 
       // Wait for isGenerating to clear (500ms timeout)
-      await waitFor(() => expect(button).not.toBeDisabled(), { timeout: 600 });
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
+      expect(button).not.toBeDisabled();
 
       await user.click(button);
-      await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith(
-          'username',
-          'username-2222',
-          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
-        );
-      });
+      expect(mockForm.setValue).toHaveBeenCalledWith(
+        'username',
+        'username-2222',
+        expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
+      );
 
       // Wait for isGenerating to clear again
-      await waitFor(() => expect(button).not.toBeDisabled(), { timeout: 600 });
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
+      expect(button).not.toBeDisabled();
 
       await user.click(button);
-      await waitFor(() => {
-        expect(mockForm.setValue).toHaveBeenCalledWith(
-          'username',
-          'username-3333',
-          expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
-        );
-      });
+      expect(mockForm.setValue).toHaveBeenCalledWith(
+        'username',
+        'username-3333',
+        expect.objectContaining(DEFAULT_SET_VALUE_OPTIONS)
+      );
 
       expect(mockGenerateUsername).toHaveBeenCalledTimes(3);
     });
@@ -394,7 +393,7 @@ describe('GenerateUsernameButton', () => {
 
   describe('accessibility', () => {
     it('should be keyboard accessible', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <GenerateUsernameButton
@@ -412,13 +411,11 @@ describe('GenerateUsernameButton', () => {
       // Press Enter
       await user.keyboard('{Enter}');
 
-      await waitFor(() => {
-        expect(mockGenerateUsername).toHaveBeenCalled();
-      });
+      expect(mockGenerateUsername).toHaveBeenCalled();
     });
 
     it('should be clickable with mouse', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
       render(
         <GenerateUsernameButton
@@ -486,7 +483,7 @@ describe('GenerateUsernameButton', () => {
     });
 
     it('should handle rapid clicks gracefully', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       mockGenerateUsername
         .mockReturnValueOnce('username-1')
         .mockReturnValueOnce('username-2')
@@ -521,7 +518,7 @@ describe('GenerateUsernameButton', () => {
       );
 
       // Trigger generating state
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const button = screen.getByTestId('generate-button');
       await user.click(button);
 

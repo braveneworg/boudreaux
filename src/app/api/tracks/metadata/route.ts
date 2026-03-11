@@ -80,6 +80,12 @@ export const POST = await withAdmin(async (request: NextRequest) => {
       metadata: result.data,
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '';
+
+    if (errorMessage.includes('Failed to parse body as FormData')) {
+      return NextResponse.json({ error: 'Invalid multipart form data' }, { status: 400 });
+    }
+
     console.error('Track metadata extraction error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

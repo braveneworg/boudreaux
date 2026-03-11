@@ -32,6 +32,11 @@ export default function AdminPage() {
       router.push('/admin/tracks/bulk');
       return;
     }
+    // Tours has its own dedicated page
+    if (selectedView === 'tours') {
+      router.push('/admin/tours');
+      return;
+    }
     setView(selectedView);
   };
 
@@ -44,6 +49,7 @@ export default function AdminPage() {
       'track',
       'featured artist',
       'notifications',
+      'tours',
     ];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),

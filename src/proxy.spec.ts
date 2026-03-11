@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { getToken } from 'next-auth/jwt';
 
-import { proxy, config } from './proxy';
+import middleware, { config } from './proxy';
 
 vi.mock('next/server', () => ({
   NextResponse: {
@@ -76,7 +76,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -86,7 +86,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/signin');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -96,7 +96,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/signin/callback');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -106,7 +106,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/signup');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -116,7 +116,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/signout');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -126,7 +126,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/success/registration');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -136,7 +136,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/api/auth/session');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -146,7 +146,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/api/health');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -158,7 +158,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/profile');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -171,7 +171,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/profile/settings');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -187,7 +187,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/profile');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -202,7 +202,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/some-page', '/dashboard');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -217,7 +217,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/dashboard', '/dashboard');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -227,7 +227,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/signin', '/dashboard');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -239,7 +239,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/admin');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -251,7 +251,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/admin/users');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -266,7 +266,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/admin');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.json).toHaveBeenCalledWith({ error: 'Forbidden' }, { status: 403 });
       expect(result).toMatchObject({ type: 'json', status: 403 });
@@ -282,7 +282,7 @@ describe('proxy middleware', () => {
         'x-forwarded-for': '192.168.1.1',
       });
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Unauthorized admin access attempt:',
@@ -305,7 +305,7 @@ describe('proxy middleware', () => {
         'x-real-ip': '10.0.0.1',
       });
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Unauthorized admin access attempt:',
@@ -323,7 +323,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/admin');
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Unauthorized admin access attempt:',
@@ -341,7 +341,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/admin');
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Unauthorized admin access attempt:',
@@ -358,7 +358,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/admin');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -371,7 +371,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/admin/users/edit');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -383,7 +383,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/dashboard');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.redirect).toHaveBeenCalled();
       const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
@@ -399,7 +399,7 @@ describe('proxy middleware', () => {
       });
       const request = createMockRequest('/dashboard');
 
-      const result = await proxy(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
@@ -413,7 +413,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/');
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(getToken).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -428,7 +428,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/');
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(getToken).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -444,7 +444,7 @@ describe('proxy middleware', () => {
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/');
 
-      await proxy(request as unknown as NextRequest);
+      await middleware(request as unknown as NextRequest);
 
       expect(getToken).toHaveBeenCalledWith(
         expect.objectContaining({

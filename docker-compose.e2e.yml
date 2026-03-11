@@ -3,19 +3,19 @@ services:
     image: mongo:7
     container_name: boudreaux-e2e-mongo
     ports:
-      - "27018:27017"
+      - "27018:27018"
     environment:
       MONGO_INITDB_DATABASE: boudreaux-e2e
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27018"]
     volumes:
       - e2e-mongo-data:/data/db
     healthcheck:
       test: >
-        mongosh --eval "
+        mongosh --port 27018 --eval "
           try {
             rs.status().ok
           } catch(e) {
-            rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27017'}]});
+            rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27018'}]});
             sleep(1000);
             rs.status().ok
           }

@@ -70,3 +70,4 @@ e2e/.auth/
 *.archive
 
 /public/media
+.claude

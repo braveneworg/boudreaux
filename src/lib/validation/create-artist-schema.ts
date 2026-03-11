@@ -4,11 +4,13 @@
 import { z } from 'zod';
 
 // TODO: extract out commonality with update-artist-schema.ts to an object that you can spread into both schemas
-export const createArtistSchema = z.object({
+// Base schema without refinements — use this for .partial() in update schemas
+export const artistBaseSchema = z.object({
   firstName: z
     .string()
-    .min(1, { message: 'First name is required' })
-    .max(100, { message: 'First name must be less than 100 characters' }),
+    .max(100, { message: 'First name must be less than 100 characters' })
+    .optional()
+    .or(z.literal('')),
   middleName: z
     .string()
     .max(100, { message: 'Middle name must be less than 100 characters' })
@@ -16,8 +18,9 @@ export const createArtistSchema = z.object({
     .or(z.literal('')),
   surname: z
     .string()
-    .min(1, { message: 'Surname is required' })
-    .max(100, { message: 'Surname must be less than 100 characters' }),
+    .max(100, { message: 'Surname must be less than 100 characters' })
+    .optional()
+    .or(z.literal('')),
   akaNames: z
     .string()
     .max(500, { message: 'AKA names must be less than 500 characters' })
@@ -78,6 +81,28 @@ export const createArtistSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid MongoDB ObjectId format' })
     .optional(),
+});
+
+export const createArtistSchema = artistBaseSchema.superRefine((data, ctx) => {
+  const hasDisplayName = !!data.displayName?.trim();
+  const hasAkaNames = !!data.akaNames?.trim();
+
+  if (!hasDisplayName && !hasAkaNames) {
+    if (!data.firstName?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'First name is required when display name and AKA names are empty',
+        path: ['firstName'],
+      });
+    }
+    if (!data.surname?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Surname is required when display name and AKA names are empty',
+        path: ['surname'],
+      });
+    }
+  }
 });
 
 type schemaType = typeof createArtistSchema & Partial<FormData>;

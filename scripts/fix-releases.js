@@ -9,9 +9,6 @@ db.Release.updateMany(
 );
 
 // 2. If releases have publishedOn but not publishedAt, copy the value:
-db.Release.find({ publishedOn: { $ne: null }, publishedAt: null }).forEach(function(doc) {
-  db.Release.updateOne(
-    { _id: doc._id },
-    { $set: { publishedAt: doc.publishedOn } }
-  );
+db.Release.find({ publishedOn: { $ne: null }, publishedAt: null }).forEach(function (doc) {
+  db.Release.updateOne({ _id: doc._id }, { $set: { publishedAt: doc.publishedOn } });
 });

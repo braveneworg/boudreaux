@@ -77,7 +77,7 @@ describe('Header', () => {
     const headerWrapper = container.firstChild as HTMLElement;
     expect(headerWrapper).toHaveClass('sticky');
     expect(headerWrapper).toHaveClass('top-0');
-    expect(headerWrapper).toHaveClass('z-100');
+    expect(headerWrapper).toHaveClass('z-40');
   });
 
   it('renders full-width wrapper', () => {

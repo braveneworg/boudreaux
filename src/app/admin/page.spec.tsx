@@ -101,6 +101,7 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('option-track')).toBeInTheDocument();
     expect(screen.getByTestId('option-featured artist')).toBeInTheDocument();
     expect(screen.getByTestId('option-notifications')).toBeInTheDocument();
+    expect(screen.getByTestId('option-tours')).toBeInTheDocument();
   });
 
   it('displays title cased options', () => {
@@ -113,6 +114,7 @@ describe('AdminPage', () => {
     expect(screen.getByText('Track')).toBeInTheDocument();
     expect(screen.getByText('Featured Artist')).toBeInTheDocument();
     expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.getByText('Tours')).toBeInTheDocument();
   });
 
   it('shows artist data view by default', () => {
@@ -177,6 +179,16 @@ describe('AdminPage', () => {
     await user.click(screen.getByTestId('option-upload bulk tracks'));
 
     expect(mockPush).toHaveBeenCalledWith('/admin/tracks/bulk');
+    // Should still show artist view since we navigated away
+    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
+  });
+
+  it('navigates to tours page when tours is selected', async () => {
+    render(<AdminPage />);
+
+    await user.click(screen.getByTestId('option-tours'));
+
+    expect(mockPush).toHaveBeenCalledWith('/admin/tours');
     // Should still show artist view since we navigated away
     expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
   });

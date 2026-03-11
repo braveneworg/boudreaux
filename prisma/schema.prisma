@@ -140,7 +140,7 @@ model Image {
 }
 
 model Group {
-  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  id              String              @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   displayName     String? // The primary name to display for the group; Will be derived from name if not provided
   formedOn        DateTime?
@@ -149,12 +149,13 @@ model Group {
   shortBio        String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
   publishedOn     DateTime? // Date when the group was published
   deletedOn       DateTime? // Soft delete date
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   images          Image[]
   artistGroups    ArtistGroup[]
   urls            Url[]
   featuredArtists FeaturedArtist[]
+  tourHeadliners  TourDateHeadliner[]
 
   @@index([name])
 }
@@ -177,10 +178,10 @@ enum Platform {
 }
 
 enum AudioUploadStatus {
-  PENDING   // Track created, upload not yet started
+  PENDING // Track created, upload not yet started
   UPLOADING // Upload in progress
   COMPLETED // Upload completed successfully
-  FAILED    // Upload failed
+  FAILED // Upload failed
 }
 
 enum Format {
@@ -308,6 +309,7 @@ model Artist {
   trackArtists          TrackArtist[]
   track                 Track?                 @relation(fields: [trackId], references: [id])
   trackId               String?                @db.ObjectId
+  tourHeadliners        TourDateHeadliner[] // Tours where this artist is a headliner
 
   @@index([isActive])
   @@index([firstName, surname])
@@ -581,4 +583,126 @@ model Notification {
   @@index([sortOrder])
   @@index([displayFrom])
   @@index([displayUntil])
+}
+
+// Tour Management Models
+
+model Tour {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  subtitle    String?
+  subtitle2   String?
+  description String?
+  notes       String?
+  images      TourImage[]
+  tourDates   TourDate[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdBy   String?     @db.ObjectId
+  updatedBy   String?     @db.ObjectId
+
+  @@index([createdAt])
+}
+
+model TourDate {
+  id            String              @id @default(auto()) @map("_id") @db.ObjectId
+  tourId        String              @db.ObjectId
+  tour          Tour                @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  startDate     DateTime
+  endDate       DateTime?
+  showStartTime DateTime
+  showEndTime   DateTime?
+  doorsOpenAt   DateTime?
+  venueId       String              @db.ObjectId
+  venue         Venue               @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  timeZone      String?
+  utcOffset     Int?
+  ticketsUrl    String?
+  ticketIconUrl String?
+  ticketPrices  String?
+  headliners    TourDateHeadliner[]
+  images        TourDateImage[]
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([tourId])
+  @@index([startDate(sort: Desc)])
+  @@index([venueId])
+}
+
+model Venue {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  address    String?
+  city       String
+  state      String?
+  postalCode String?
+  country    String?
+  capacity   Int?
+  notes      String?
+  timeZone   String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  createdBy  String?    @db.ObjectId
+  updatedBy  String?    @db.ObjectId
+  tourDates  TourDate[]
+
+  @@index([name])
+  @@index([city, state])
+}
+
+model TourDateHeadliner {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  tourDateId String    @db.ObjectId
+  tourDate   TourDate  @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
+  artistId   String?   @db.ObjectId
+  artist     Artist?   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  groupId    String?   @db.ObjectId
+  group      Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sortOrder  Int       @default(0)
+  setTime    DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tourDateId])
+  @@index([artistId])
+  @@index([groupId])
+}
+
+model TourImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  tourId       String   @db.ObjectId
+  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  s3Key        String
+  s3Url        String
+  s3Bucket     String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  displayOrder Int      @default(0)
+  altText      String?
+  createdAt    DateTime @default(now())
+  uploadedBy   String?  @db.ObjectId
+
+  @@index([tourId])
+  @@index([displayOrder])
+}
+
+model TourDateImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  tourDateId   String   @db.ObjectId
+  tourDate     TourDate @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
+  s3Key        String
+  s3Url        String
+  s3Bucket     String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  displayOrder Int      @default(0)
+  altText      String?
+  createdAt    DateTime @default(now())
+  uploadedBy   String?  @db.ObjectId
+
+  @@index([tourDateId])
+  @@index([displayOrder])
 }

@@ -8,7 +8,7 @@ import type { TestUser } from './auth-helpers';
  * wiping a remote Atlas database during test seeding.
  */
 const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?directConnection=true';
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 /**
  * Deterministic test users with stable ObjectIds. These IDs must match the
@@ -77,6 +77,12 @@ async function seedTestDatabase() {
 
   try {
     // Clear all collections in dependency-safe order
+    await prisma.tourDateImage.deleteMany({});
+    await prisma.tourDateHeadliner.deleteMany({});
+    await prisma.tourImage.deleteMany({});
+    await prisma.tourDate.deleteMany({});
+    await prisma.tour.deleteMany({});
+    await prisma.venue.deleteMany({});
     await prisma.releaseTrack.deleteMany({});
     await prisma.trackArtist.deleteMany({});
     await prisma.artistFeaturedArtist.deleteMany({});

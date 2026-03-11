@@ -57,7 +57,7 @@ export default function ArtistMultiSelect<
   placeholder = 'Select artists...',
   searchPlaceholder = 'Search artists...',
   emptyMessage = 'No artists found.',
-  popoverWidth = 'w-[400px]',
+  popoverWidth = 'w-[calc(100vw-2rem)] sm:w-[400px]',
   setValue,
   releaseId,
   disabled = false,
@@ -76,8 +76,11 @@ export default function ArtistMultiSelect<
       const params = new URLSearchParams();
       if (search) {
         params.set('search', search);
+        // No take limit when searching — return all matches
+      } else {
+        // No search term: show only the 5 most recently added artists
+        params.set('take', '5');
       }
-      params.set('take', '50');
 
       const response = await fetch(`/api/artists?${params.toString()}`);
       if (!response.ok) {
@@ -195,7 +198,14 @@ export default function ArtistMultiSelect<
                     </Button>
                   </FormControl>
                 </PopoverTrigger>
-                <PopoverContent className={`${popoverWidth} p-0`} align="start">
+                <PopoverContent
+                  className={`${popoverWidth} p-0`}
+                  align="start"
+                  avoidCollisions
+                  collisionPadding={8}
+                  sideOffset={4}
+                  onEscapeKeyDown={(e) => e.stopPropagation()}
+                >
                   <Command shouldFilter={false}>
                     <CommandInput
                       placeholder={searchPlaceholder}
@@ -220,7 +230,9 @@ export default function ArtistMultiSelect<
                         </div>
                       )}
                     </CommandEmpty>
-                    <CommandList>
+                    <CommandList
+                      style={{ maxHeight: 'var(--radix-popover-content-available-height)' }}
+                    >
                       <CommandGroup>
                         {artists.map((artist) => (
                           <CommandItem

@@ -1,0 +1,652 @@
+openapi: 3.1.0
+info:
+  title: Tour Management API
+  version: 1.0.0
+  description: API contracts for tour date management system
+
+servers:
+  - url: /api/tours
+    description: Tour management endpoints
+
+components:
+  schemas:
+    Venue:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: MongoDB ObjectId
+        name:
+          type: string
+          maxLength: 200
+        address:
+          type: string
+          maxLength: 500
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 100
+          nullable: true
+        zipCode:
+          type: string
+          maxLength: 20
+          nullable: true
+        country:
+          type: string
+          maxLength: 100
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TourImage:
+      type: object
+      required:
+        - id
+        - s3Url
+        - fileName
+      properties:
+        id:
+          type: string
+        s3Url:
+          type: string
+          format: uri
+        fileName:
+          type: string
+        displayOrder:
+          type: integer
+          minimum: 0
+        altText:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    Artist:
+      type: object
+      required:
+        - id
+        - displayName
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+          description: Computed display name with fallback logic
+
+    TourListItem:
+      type: object
+      required:
+        - id
+        - title
+        - startDate
+        - venue
+        - headliners
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+          nullable: true
+        subtitle2:
+          type: string
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        showStartTime:
+          type: string
+          format: date-time
+        showEndTime:
+          type: string
+          format: date-time
+          nullable: true
+        venue:
+          $ref: '#/components/schemas/Venue'
+        headliners:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artist'
+        primaryImage:
+          $ref: '#/components/schemas/TourImage'
+          nullable: true
+        ticketsUrl:
+          type: string
+          format: uri
+          nullable: true
+        ticketPrice:
+          type: string
+          nullable: true
+
+    TourDetail:
+      allOf:
+        - $ref: '#/components/schemas/TourListItem'
+        - type: object
+          properties:
+            description:
+              type: string
+              maxLength: 5000
+              nullable: true
+            notes:
+              type: string
+              maxLength: 2000
+              nullable: true
+            images:
+              type: array
+              items:
+                $ref: '#/components/schemas/TourImage'
+              maxItems: 10
+
+    TourCreateInput:
+      type: object
+      required:
+        - title
+        - startDate
+        - showStartTime
+        - venueId
+        - headlinerIds
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        subtitle:
+          type: string
+          maxLength: 150
+          nullable: true
+        subtitle2:
+          type: string
+          maxLength: 150
+          nullable: true
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+        ticketsUrl:
+          type: string
+          format: uri
+          nullable: true
+        ticketPrice:
+          type: string
+          maxLength: 100
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        showStartTime:
+          type: string
+          format: date-time
+        showEndTime:
+          type: string
+          format: date-time
+          nullable: true
+        venueId:
+          type: string
+        headlinerIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+
+    TourUpdateInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        subtitle:
+          type: string
+          maxLength: 150
+          nullable: true
+        subtitle2:
+          type: string
+          maxLength: 150
+          nullable: true
+        description:
+          type: string
+          maxLength: 5000
+          nullable: true
+        notes:
+          type: string
+          maxLength: 2000
+          nullable: true
+        ticketsUrl:
+          type: string
+          format: uri
+          nullable: true
+        ticketPrice:
+          type: string
+          maxLength: 100
+          nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        showStartTime:
+          type: string
+          format: date-time
+        showEndTime:
+          type: string
+          format: date-time
+          nullable: true
+        venueId:
+          type: string
+        headlinerIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+
+    VenueCreateInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          maxLength: 500
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 100
+          nullable: true
+        zipCode:
+          type: string
+          maxLength: 20
+          nullable: true
+        country:
+          type: string
+          maxLength: 100
+          nullable: true
+
+    ImageUploadRequest:
+      type: object
+      required:
+        - fileName
+        - fileSize
+        - mimeType
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+        fileSize:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+          description: File size in bytes (max 10MB)
+        mimeType:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/gif
+            - image/webp
+        altText:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    ImageUploadResponse:
+      type: object
+      required:
+        - uploadUrl
+        - imageId
+        - s3Key
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+          description: Presigned S3 URL for upload
+        imageId:
+          type: string
+          description: Image record ID to confirm after upload
+        s3Key:
+          type: string
+          description: S3 object key
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+
+paths:
+  /:
+    get:
+      summary: List all tours
+      description: Retrieve all tours sorted by start date (most recent first)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of tours
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TourListItem'
+                  total:
+                    type: integer
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create new tour
+      description: Create a new tour (admin only)
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TourCreateInput'
+      responses:
+        '201':
+          description: Tour created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TourDetail'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+
+  /{tourId}:
+    get:
+      summary: Get tour details
+      parameters:
+        - in: path
+          name: tourId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tour details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TourDetail'
+        '404':
+          description: Tour not found
+        '500':
+          description: Server error
+
+    patch:
+      summary: Update tour
+      description: Update an existing tour (admin only)
+      security:
+        - sessionAuth: []
+      parameters:
+        - in: path
+          name: tourId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TourUpdateInput'
+      responses:
+        '200':
+          description: Tour updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TourDetail'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '404':
+          description: Tour not found
+
+    delete:
+      summary: Delete tour
+      description: Delete a tour and all associated data (admin only)
+      security:
+        - sessionAuth: []
+      parameters:
+        - in: path
+          name: tourId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tour deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '404':
+          description: Tour not found
+
+  /{tourId}/images/upload:
+    post:
+      summary: Request image upload URL
+      description: Get presigned S3 URL for uploading tour image (admin only)
+      security:
+        - sessionAuth: []
+      parameters:
+        - in: path
+          name: tourId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageUploadRequest'
+      responses:
+        '200':
+          description: Presigned URL generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImageUploadResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Tour not found
+
+  /{tourId}/images/{imageId}:
+    delete:
+      summary: Delete tour image
+      description: Remove image from tour and delete from S3 (admin only)
+      security:
+        - sessionAuth: []
+      parameters:
+        - in: path
+          name: tourId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: imageId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Image deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Image not found
+
+  /venues:
+    get:
+      summary: List all venues
+      responses:
+        '200':
+          description: List of venues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Venue'
+
+    post:
+      summary: Create venue
+      description: Create a new venue (admin only)
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueCreateInput'
+      responses:
+        '201':
+          description: Venue created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Venue'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+securitySchemes:
+  sessionAuth:
+    type: apiKey
+    in: cookie
+    name: next-auth.session-token
