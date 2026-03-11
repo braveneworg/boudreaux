@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [3.0.0] - 2026-03-11
+
+### Changed
+
+- Start tour management feature (#263)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- fix: revert textarea min-height to valid Tailwind arbitrary value (#268)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Start tour management feature (#263)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- Fix misleading JSDoc priority comment in `getArtistDisplayName` (#267)\n- Start tour management feature (#263)\n- Remove non-existent fields from createTourAction permittedFieldNames (#266)\n- Start tour management feature (#263)\n- Fix conditional expect masking failures in public tours search e2e test (#265)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Start tour management feature (#263)\n- fix: use absolute imports in tour-repository.ts (#264)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n- Start tour management feature (#263)\n
+
 ## [2.8.0] - 2026-03-07
 
 ### Added
