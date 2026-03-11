@@ -9,6 +9,7 @@ import { Calendar, MapPin, Music, Ticket } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
+import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
@@ -103,12 +104,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
       });
   })();
 
-  const headlinerNames =
-    uniqueHeadliners.length === 0
-      ? ''
-      : uniqueHeadliners.length > 3
-        ? `${uniqueHeadliners.slice(0, 3).join(', ')} +${uniqueHeadliners.length - 3} more`
-        : uniqueHeadliners.join(', ');
+  const headlinerNames = uniqueHeadliners.length === 0 ? 'TBD' : uniqueHeadliners.join(', ');
 
   const ticketLinks = Array.from(
     new Set(
@@ -144,7 +140,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
         <CardTitle className="line-clamp-2 mt-4">
           <Link
             href={`/tours/${tour.id}`}
-            className="hover:text-primary transition-colors block pt-12"
+            className="hover:text-primary transition-colors block pt-4"
           >
             {tour.title}
           </Link>
@@ -168,21 +164,28 @@ export const TourCard = ({ tour }: TourCardProps) => {
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             {singleVenue ? (
-              <VenueDirectionsLink
-                destination={[
-                  singleVenue.name,
-                  singleVenue.address,
-                  singleVenue.city,
-                  singleVenue.state,
-                  singleVenue.postalCode,
-                  singleVenue.country,
-                ]
-                  .filter(Boolean)
-                  .join(', ')}
-                className="group/venue text-sm line-clamp-1"
-              >
-                <span className="group-hover/venue:underline">{venueDisplay}</span>
-              </VenueDirectionsLink>
+              <>
+                <VenueDirectionsLink
+                  destination={[
+                    singleVenue.name,
+                    singleVenue.address,
+                    singleVenue.city,
+                    singleVenue.state,
+                    singleVenue.postalCode,
+                    singleVenue.country,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                  className="group/venue text-sm"
+                >
+                  <span className="underline">{venueDisplay}</span>
+                  <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
+                  <span>&middot;</span>{' '}
+                </VenueDirectionsLink>
+                <span className="text-sm muted-foreground text-zinc-600">
+                  {singleVenue.city}, {singleVenue.state}
+                </span>
+              </>
             ) : (
               <span className="text-sm line-clamp-1">{venueDisplay}</span>
             )}
@@ -195,11 +198,19 @@ export const TourCard = ({ tour }: TourCardProps) => {
           <div className="text-sm">
             <div>{dateRange}</div>
             {hasTourDates && firstTourDate?.showStartTime && (
-              <div className="text-muted-foreground">
-                {sortedTourDates.length === 1
-                  ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
-                  : `${sortedTourDates.length} shows`}
-              </div>
+              <>
+                <div className="text-muted-foreground">
+                  {sortedTourDates.length === 1
+                    ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
+                    : `${sortedTourDates.length} shows`}
+                </div>
+                <div>
+                  <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
+                  {firstTourDate.doorsOpenAt
+                    ? formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)
+                    : ''}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -226,6 +237,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
           />
         )}
       </CardFooter>
+      <Separator className="my-4 opacity-100!" />
     </Card>
   );
 };

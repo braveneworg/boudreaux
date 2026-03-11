@@ -44,12 +44,12 @@ import {
   tourDateUpdateSchema,
 } from '@/lib/validations/tours/tour-date-schema';
 
-import type { TourDate, TourDateImage } from '@prisma/client';
+import type { Artist, TourDate, TourDateImage } from '@prisma/client';
 
 interface TourDateFormProps {
   tourId: string;
   tourDate?: TourDate & {
-    headliners: Array<{ artistId: string | null }>;
+    headliners: Array<{ artistId: string | null; artist?: Artist | null }>;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -323,6 +323,19 @@ export default function TourDateForm({
                 name="headlinerIds"
                 label="Headlining Artists"
                 placeholder="Select artists"
+                initialArtists={
+                  tourDate?.headliners
+                    ?.filter(
+                      (h): h is typeof h & { artist: Artist; artistId: string } =>
+                        h.artist != null && h.artistId != null
+                    )
+                    .map((h) => ({
+                      id: h.artistId,
+                      displayName: h.artist.displayName ?? '',
+                      firstName: h.artist.firstName,
+                      surname: h.artist.surname,
+                    })) ?? []
+                }
               />
             </section>
 

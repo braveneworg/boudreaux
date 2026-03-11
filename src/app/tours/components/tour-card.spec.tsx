@@ -209,7 +209,8 @@ describe('TourCard', () => {
     });
     render(<TourCard tour={tour} />);
 
-    expect(screen.getByText(/Madison Square Garden/)).toBeInTheDocument();
+    const matches = screen.getAllByText(/Madison Square Garden/);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders single venue as a directions link', () => {
@@ -701,7 +702,7 @@ describe('TourCard', () => {
     expect(screen.queryAllByText('Shared Artist')).toHaveLength(1);
   });
 
-  it('truncates headliner list to 3 with "+N more" for 4+ headliners', () => {
+  it('renders all headliners when there are 4+ headliners', () => {
     const artists = [1, 2, 3, 4].map((n) =>
       createMockArtist({ id: `artist-${n}`, displayName: `Artist ${n}` })
     );
@@ -722,7 +723,7 @@ describe('TourCard', () => {
     });
     render(<TourCard tour={tour} />);
 
-    expect(screen.getByText(/\+1 more/)).toBeInTheDocument();
+    expect(screen.getByText(/Artist 4.*Artist 3.*Artist 2.*Artist 1/)).toBeInTheDocument();
   });
 
   it('shows "N shows" when there are multiple tour dates with show times', () => {
@@ -799,5 +800,55 @@ describe('TourCard', () => {
     render(<TourCard tour={tour} />);
 
     expect(screen.getByAltText('Fallback image')).toBeInTheDocument();
+  });
+
+  // ─── New behavior: TBD headliners ──────────────────────────────────────────────
+
+  it('renders "TBD" when tour has no headliners', () => {
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ headliners: [] })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('TBD')).toBeInTheDocument();
+  });
+
+  // ─── New behavior: Venue directions link details ──────────────────────────────
+
+  it('renders city and state next to venue directions link', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      city: 'Nashville',
+      state: 'TN',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('Nashville, TN')).toBeInTheDocument();
+  });
+
+  it('renders accessible sr-only directions text for single venue', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      city: 'Nashville',
+      state: 'TN',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText(/Get directions to Ryman Auditorium/)).toBeInTheDocument();
+  });
+
+  // ─── New behavior: Separator ──────────────────────────────────────────────────
+
+  it('renders a separator at the bottom of the card', () => {
+    const tour = createMockTour();
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByRole('none')).toBeInTheDocument();
   });
 });
