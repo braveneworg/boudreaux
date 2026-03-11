@@ -212,6 +212,49 @@ describe('TourCard', () => {
     expect(screen.getByText(/Madison Square Garden/)).toBeInTheDocument();
   });
 
+  it('renders single venue as a directions link', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      address: '116 5th Ave N',
+      city: 'Nashville',
+      state: 'TN',
+      postalCode: '37219',
+      country: 'US',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    const link = screen.getByText('Ryman Auditorium').closest('a');
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link?.getAttribute('href')).toContain('Ryman%20Auditorium');
+  });
+
+  it('renders multiple venues as static text without a directions link', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-1', name: 'Madison Square Garden' }),
+        }),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-06-02T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-2', name: 'Ryman Auditorium' }),
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    const venueText = screen.getByText('2 venues');
+    expect(venueText).toBeInTheDocument();
+    expect(venueText.closest('a')).toBeNull();
+  });
+
   it('renders headliner names', () => {
     const artist = createMockArtist({ displayName: 'The Beatles' });
     const tour = createMockTour({

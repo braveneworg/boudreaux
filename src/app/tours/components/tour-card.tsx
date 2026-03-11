@@ -9,6 +9,7 @@ import { Calendar, MapPin, Music, Ticket } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
+import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import type {
@@ -77,12 +78,10 @@ export const TourCard = ({ tour }: TourCardProps) => {
       : `${formatTourDate(firstTourDate.startDate, firstTourDate.timeZone)} - ${formatTourDate(lastTourDate.startDate, lastTourDate.timeZone)}`;
 
   const venueNames = Array.from(new Set(sortedTourDates.map((date) => date.venue.name)));
+  const isSingleVenue = venueNames.length === 1;
+  const singleVenue = isSingleVenue ? sortedTourDates[0].venue : null;
   const venueDisplay =
-    venueNames.length === 0
-      ? ''
-      : venueNames.length === 1
-        ? venueNames[0]
-        : `${venueNames.length} venues`;
+    venueNames.length === 0 ? '' : isSingleVenue ? venueNames[0] : `${venueNames.length} venues`;
 
   const uniqueHeadliners = (() => {
     const seen = new Set<string>();
@@ -168,7 +167,25 @@ export const TourCard = ({ tour }: TourCardProps) => {
         {venueDisplay && (
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm line-clamp-1">{venueDisplay}</span>
+            {singleVenue ? (
+              <VenueDirectionsLink
+                destination={[
+                  singleVenue.name,
+                  singleVenue.address,
+                  singleVenue.city,
+                  singleVenue.state,
+                  singleVenue.postalCode,
+                  singleVenue.country,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+                className="group/venue text-sm line-clamp-1"
+              >
+                <span className="group-hover/venue:underline">{venueDisplay}</span>
+              </VenueDirectionsLink>
+            ) : (
+              <span className="text-sm line-clamp-1">{venueDisplay}</span>
+            )}
           </div>
         )}
 
