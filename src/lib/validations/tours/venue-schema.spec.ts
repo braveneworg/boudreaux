@@ -158,6 +158,19 @@ describe('venue-schema', () => {
       expectFailureIssuePath(result, 'capacity');
     });
 
+    it('should coerce numeric postalCode to string via preprocess', () => {
+      const venue = {
+        name: 'Ryman Auditorium',
+        city: 'Nashville',
+        postalCode: 37219,
+      };
+
+      const result = venueCreateSchema.safeParse(venue);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.postalCode).toBe('37219');
+    });
+
     it('should accept null or undefined for optional fields', () => {
       const venue = {
         name: 'The Grand Theater',
@@ -273,6 +286,15 @@ describe('venue-schema', () => {
 
       const result = venueUpdateSchema.safeParse(update);
       expect(result.success).toBe(true);
+    });
+
+    it('should coerce numeric postalCode to string via preprocess', () => {
+      const update = { postalCode: 70116 };
+
+      const result = venueUpdateSchema.safeParse(update);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.postalCode).toBe('70116');
     });
   });
 

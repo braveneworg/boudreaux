@@ -99,7 +99,10 @@ const createFileList = (files: File[]): FileList => {
 };
 
 describe('BulkTrackUploader', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
+    user = userEvent.setup({ delay: null });
     vi.clearAllMocks();
     mockFetch.mockReset();
     mockBulkCreateTracksAction.mockReset();
@@ -173,7 +176,7 @@ describe('BulkTrackUploader', () => {
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('test-track.mp3');
 
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -200,7 +203,7 @@ describe('BulkTrackUploader', () => {
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('my-song.mp3');
 
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         // Check that title input has extracted metadata
@@ -227,7 +230,7 @@ describe('BulkTrackUploader', () => {
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('fallback-title.mp3');
 
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         // Should fall back to filename without extension
@@ -245,7 +248,7 @@ describe('BulkTrackUploader', () => {
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('error-test.mp3');
 
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         // Should still add track with filename as title
@@ -336,7 +339,7 @@ describe('BulkTrackUploader', () => {
 
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('test.mp3');
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -349,8 +352,8 @@ describe('BulkTrackUploader', () => {
       const titleInputs = screen.getAllByDisplayValue('Test Track');
       const titleInput = titleInputs.find((input) => input.closest('td'));
       expect(titleInput).toBeDefined();
-      await userEvent.clear(titleInput!);
-      await userEvent.type(titleInput!, 'New Title');
+      await user.clear(titleInput!);
+      await user.type(titleInput!, 'New Title');
 
       const updatedInputs = screen.getAllByDisplayValue('New Title');
       const updatedInput = updatedInputs.find((input) => input.closest('td'));
@@ -365,8 +368,8 @@ describe('BulkTrackUploader', () => {
       const positionInput = positionInputs[0];
 
       // Clear and type new value
-      await userEvent.tripleClick(positionInput);
-      await userEvent.keyboard('5');
+      await user.tripleClick(positionInput);
+      await user.keyboard('5');
 
       await waitFor(() => {
         expect(positionInput).toHaveValue(5);
@@ -380,7 +383,7 @@ describe('BulkTrackUploader', () => {
       const tableRow = screen.getByRole('row', { name: /test track/i });
       const deleteBtn = within(tableRow).getByRole('button');
 
-      await userEvent.click(deleteBtn);
+      await user.click(deleteBtn);
 
       await waitFor(() => {
         expect(screen.queryByText('Tracks (1)')).not.toBeInTheDocument();
@@ -391,7 +394,7 @@ describe('BulkTrackUploader', () => {
       await setupWithTracks();
 
       const clearButton = screen.getByRole('button', { name: /clear all/i });
-      await userEvent.click(clearButton);
+      await user.click(clearButton);
 
       expect(screen.queryByText('Tracks (1)')).not.toBeInTheDocument();
     });
@@ -409,7 +412,7 @@ describe('BulkTrackUploader', () => {
       const checkbox = screen.getByLabelText(/automatically create or match releases/i);
       expect(checkbox).toBeChecked();
 
-      await userEvent.click(checkbox);
+      await user.click(checkbox);
 
       expect(checkbox).not.toBeChecked();
     });
@@ -421,7 +424,7 @@ describe('BulkTrackUploader', () => {
       // Default state is checked
       expect(switchEl).toBeChecked();
 
-      await userEvent.click(switchEl);
+      await user.click(switchEl);
 
       expect(switchEl).not.toBeChecked();
     });
@@ -446,7 +449,7 @@ describe('BulkTrackUploader', () => {
 
       const input = screen.getByLabelText(/select audio files/i);
       const file = createMockAudioFile('test.mp3');
-      await userEvent.upload(input, file);
+      await user.upload(input, file);
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -494,7 +497,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Successfully created 1 track(s)');
@@ -512,7 +515,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Failed to generate upload URL');
@@ -536,7 +539,7 @@ describe('BulkTrackUploader', () => {
       mockUploadFilesToS3.mockResolvedValue([{ success: false, error: 'Upload failed' }]);
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('All file uploads failed');
@@ -586,7 +589,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 2 tracks/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.warning).toHaveBeenCalledWith('Created 1 track(s), 1 failed');
@@ -612,7 +615,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Failed to create tracks: Database error');
@@ -622,22 +625,11 @@ describe('BulkTrackUploader', () => {
     it('should disable upload button during processing', async () => {
       await setupForUpload();
 
-      mockGetPresignedUploadUrlsAction.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  success: true,
-                  data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
-                }),
-              100
-            )
-          )
-      );
+      // Use a never-resolving promise to keep the component in processing state
+      mockGetPresignedUploadUrlsAction.mockImplementation(() => new Promise(() => {}));
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       expect(screen.getByRole('button', { name: /processing/i })).toBeDisabled();
     });
@@ -645,22 +637,11 @@ describe('BulkTrackUploader', () => {
     it('should show progress during upload', async () => {
       await setupForUpload();
 
-      mockGetPresignedUploadUrlsAction.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  success: true,
-                  data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
-                }),
-              100
-            )
-          )
-      );
+      // Use a never-resolving promise to keep the component in processing state
+      mockGetPresignedUploadUrlsAction.mockImplementation(() => new Promise(() => {}));
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       expect(screen.getByText(/processing tracks/i)).toBeInTheDocument();
     });
@@ -671,7 +652,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await userEvent.click(cancelButton);
+      await user.click(cancelButton);
 
       expect(mockPush).toHaveBeenCalledWith('/admin');
     });
@@ -688,7 +669,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -707,14 +688,14 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /view tracks/i })).toBeInTheDocument();
       });
 
       const viewButton = screen.getByRole('button', { name: /view tracks/i });
-      await userEvent.click(viewButton);
+      await user.click(viewButton);
 
       expect(mockPush).toHaveBeenCalledWith('/admin');
     });
@@ -735,7 +716,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('short.mp3'));
+      await user.upload(input, createMockAudioFile('short.mp3'));
 
       await waitFor(() => {
         expect(screen.getAllByText('1:05')[0]).toBeInTheDocument();
@@ -754,7 +735,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('long.mp3'));
+      await user.upload(input, createMockAudioFile('long.mp3'));
 
       await waitFor(() => {
         expect(screen.getAllByText('1:02:05')[0]).toBeInTheDocument();
@@ -773,7 +754,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('no-duration.mp3'));
+      await user.upload(input, createMockAudioFile('no-duration.mp3'));
 
       await waitFor(() => {
         expect(screen.getAllByText('--:--')[0]).toBeInTheDocument();
@@ -817,7 +798,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -836,7 +817,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 created')).toBeInTheDocument();
@@ -855,7 +836,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -874,7 +855,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 failed')).toBeInTheDocument();
@@ -895,7 +876,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -924,7 +905,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getAllByText(/release: test album/i)[0]).toBeInTheDocument();
@@ -944,7 +925,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -970,7 +951,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getAllByText('Duplicate track title')[0]).toBeInTheDocument();
@@ -987,7 +968,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3', 'audio/mpeg'));
+      await user.upload(input, createMockAudioFile('test.mp3', 'audio/mpeg'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1002,7 +983,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.wav', 'audio/wav'));
+      await user.upload(input, createMockAudioFile('test.wav', 'audio/wav'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1017,7 +998,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.flac', 'audio/flac'));
+      await user.upload(input, createMockAudioFile('test.flac', 'audio/flac'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1032,7 +1013,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.aac', 'audio/aac'));
+      await user.upload(input, createMockAudioFile('test.aac', 'audio/aac'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1047,7 +1028,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.m4a', 'audio/m4a'));
+      await user.upload(input, createMockAudioFile('test.m4a', 'audio/m4a'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1062,7 +1043,7 @@ describe('BulkTrackUploader', () => {
 
       render(<BulkTrackUploader />);
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.ogg', 'audio/ogg'));
+      await user.upload(input, createMockAudioFile('test.ogg', 'audio/ogg'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1083,28 +1064,17 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
       });
 
-      mockGetPresignedUploadUrlsAction.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  success: true,
-                  data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
-                }),
-              200
-            )
-          )
-      );
+      // Use a never-resolving promise to keep the component in processing state
+      mockGetPresignedUploadUrlsAction.mockImplementation(() => new Promise(() => {}));
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       // Check that inputs are disabled during processing
       expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
@@ -1112,23 +1082,8 @@ describe('BulkTrackUploader', () => {
     });
 
     it('should disable upload button when tracks are extracting', async () => {
-      // Create a slow metadata extraction
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  ok: true,
-                  json: () =>
-                    Promise.resolve({
-                      metadata: { title: 'Test', duration: 180 },
-                    }),
-                }),
-              200
-            )
-          )
-      );
+      // Create a never-resolving metadata extraction to keep the component extracting
+      mockFetch.mockImplementation(() => new Promise(() => {}));
 
       render(<BulkTrackUploader />);
 
@@ -1158,7 +1113,7 @@ describe('BulkTrackUploader', () => {
 
       const input = screen.getByLabelText(/select audio files/i);
       // Small file - 512 bytes
-      await userEvent.upload(input, createMockAudioFile('small.mp3', 'audio/mpeg', 512));
+      await user.upload(input, createMockAudioFile('small.mp3', 'audio/mpeg', 512));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1179,7 +1134,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('empty.mp3', 'audio/mpeg', 0));
+      await user.upload(input, createMockAudioFile('empty.mp3', 'audio/mpeg', 0));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1200,7 +1155,7 @@ describe('BulkTrackUploader', () => {
 
       const input = screen.getByLabelText(/select audio files/i);
       // 2KB file
-      await userEvent.upload(input, createMockAudioFile('kb.mp3', 'audio/mpeg', 2048));
+      await user.upload(input, createMockAudioFile('kb.mp3', 'audio/mpeg', 2048));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1221,7 +1176,7 @@ describe('BulkTrackUploader', () => {
 
       const input = screen.getByLabelText(/select audio files/i);
       // 5MB file
-      await userEvent.upload(input, createMockAudioFile('mb.mp3', 'audio/mpeg', 5 * 1024 * 1024));
+      await user.upload(input, createMockAudioFile('mb.mp3', 'audio/mpeg', 5 * 1024 * 1024));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1243,29 +1198,17 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
       });
 
-      // Mock slow presigned URL fetch to catch uploading state
-      mockGetPresignedUploadUrlsAction.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  success: true,
-                  data: [{ uploadUrl: 'url', cdnUrl: 'cdn', key: 'key' }],
-                }),
-              100
-            )
-          )
-      );
+      // Use a never-resolving promise to keep the component in uploading state
+      mockGetPresignedUploadUrlsAction.mockImplementation(() => new Promise(() => {}));
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       // During upload, the table row should be in uploading state
       expect(screen.getByText(/processing tracks/i)).toBeInTheDocument();
@@ -1283,7 +1226,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1302,7 +1245,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 created')).toBeInTheDocument();
@@ -1325,7 +1268,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1344,7 +1287,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 failed')).toBeInTheDocument();
@@ -1373,7 +1316,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('track.mp3'));
+      await user.upload(input, createMockAudioFile('track.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('My Album Name')).toBeInTheDocument();
@@ -1395,7 +1338,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('track.mp3'));
+      await user.upload(input, createMockAudioFile('track.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1443,7 +1386,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1462,7 +1405,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 created')).toBeInTheDocument();
@@ -1487,7 +1430,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1506,7 +1449,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 created')).toBeInTheDocument();
@@ -1532,7 +1475,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1542,7 +1485,7 @@ describe('BulkTrackUploader', () => {
       mockGetPresignedUploadUrlsAction.mockRejectedValue('String error');
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Bulk upload failed');
@@ -1561,7 +1504,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1590,7 +1533,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getAllByText(/release: existing album/i)[0]).toBeInTheDocument();
@@ -1617,7 +1560,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1629,7 +1572,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Failed to generate URLs');
@@ -1645,7 +1588,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1658,7 +1601,7 @@ describe('BulkTrackUploader', () => {
       mockUploadFilesToS3.mockResolvedValue([{ success: false }]);
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('All file uploads failed');
@@ -1674,7 +1617,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, [
+      await user.upload(input, [
         createMockAudioFile('track1.mp3'),
         createMockAudioFile('track2.mp3'),
       ]);
@@ -1699,7 +1642,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 2 tracks/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(screen.getByText('1 created')).toBeInTheDocument();
@@ -1715,7 +1658,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1735,7 +1678,7 @@ describe('BulkTrackUploader', () => {
       });
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Failed to create tracks: Database error');
@@ -1808,7 +1751,7 @@ describe('BulkTrackUploader', () => {
       render(<BulkTrackUploader />);
 
       const input = screen.getByLabelText(/select audio files/i);
-      await userEvent.upload(input, createMockAudioFile('test.mp3'));
+      await user.upload(input, createMockAudioFile('test.mp3'));
 
       await waitFor(() => {
         expect(screen.getByText('Tracks (1)')).toBeInTheDocument();
@@ -1850,7 +1793,7 @@ describe('BulkTrackUploader', () => {
       expect(switchEl).toBeChecked();
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(mockBulkCreateTracksAction).toHaveBeenCalledWith(
@@ -1865,11 +1808,11 @@ describe('BulkTrackUploader', () => {
 
       // Toggle publish switch off
       const switchEl = screen.getByLabelText(/published/i);
-      await userEvent.click(switchEl);
+      await user.click(switchEl);
       expect(switchEl).not.toBeChecked();
 
       const uploadButton = screen.getByRole('button', { name: /upload 1 track/i });
-      await userEvent.click(uploadButton);
+      await user.click(uploadButton);
 
       await waitFor(() => {
         expect(mockBulkCreateTracksAction).toHaveBeenCalledWith(

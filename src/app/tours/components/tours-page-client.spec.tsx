@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ToursPageClient } from './tours-page-client';
@@ -154,6 +154,28 @@ const createMockTour = (overrides?: Partial<TourWithRelations>): TourWithRelatio
   }) as TourWithRelations;
 
 describe('ToursPageClient', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Type into the search input and flush the 300ms debounce */
+  const typeAndFlush = async (
+    user: ReturnType<typeof userEvent.setup>,
+    input: HTMLElement,
+    text: string
+  ) => {
+    await user.type(input, text);
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+  };
+
+  const setupUser = () => userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
   it('renders all tours when no search query', () => {
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Tour 1' }),
@@ -167,7 +189,7 @@ describe('ToursPageClient', () => {
   });
 
   it('filters tours by title', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -176,16 +198,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Rock');
+    await typeAndFlush(user, searchInput, 'Rock');
 
-    await waitFor(() => {
-      expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-      expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
+    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
   });
 
   it('filters tours by subtitle', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Tour 1', subtitle: 'Summer Edition' }),
       createMockTour({ id: 'tour-2', title: 'Tour 2', subtitle: 'Winter Edition' }),
@@ -194,16 +214,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Summer');
+    await typeAndFlush(user, searchInput, 'Summer');
 
-    await waitFor(() => {
-      expect(screen.getByText('Tour 1')).toBeInTheDocument();
-      expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
   });
 
   it('filters tours by artist display name', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const artist1 = createMockArtist({ id: 'artist-1', displayName: 'The Beatles' });
     const artist2 = createMockArtist({ id: 'artist-2', displayName: 'Rolling Stones' });
 
@@ -228,16 +246,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Beatles');
+    await typeAndFlush(user, searchInput, 'Beatles');
 
-    await waitFor(() => {
-      expect(screen.getByText('Tour 1')).toBeInTheDocument();
-      expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
   });
 
   it('filters tours by artist first and last name when no display name', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const artist = createMockArtist({
       id: 'artist-1',
       firstName: 'John',
@@ -261,16 +277,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Lennon');
+    await typeAndFlush(user, searchInput, 'Lennon');
 
-    await waitFor(() => {
-      expect(screen.getByText('Tour 1')).toBeInTheDocument();
-      expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
   });
 
   it('performs case-insensitive search', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -279,16 +293,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'ROCK');
+    await typeAndFlush(user, searchInput, 'ROCK');
 
-    await waitFor(() => {
-      expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-      expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
+    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
   });
 
   it('performs partial match search', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -297,16 +309,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Roc');
+    await typeAndFlush(user, searchInput, 'Roc');
 
-    await waitFor(() => {
-      expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-      expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
+    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
   });
 
   it('shows count of filtered tours', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert 1' }),
       createMockTour({ id: 'tour-2', title: 'Rock Concert 2' }),
@@ -316,15 +326,13 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Rock');
+    await typeAndFlush(user, searchInput, 'Rock');
 
-    await waitFor(() => {
-      expect(screen.getByText('2 tours found')).toBeInTheDocument();
-    });
+    expect(screen.getByText('2 tours found')).toBeInTheDocument();
   });
 
   it('shows singular count for one tour', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -333,15 +341,13 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Rock');
+    await typeAndFlush(user, searchInput, 'Rock');
 
-    await waitFor(() => {
-      expect(screen.getByText('1 tour found')).toBeInTheDocument();
-    });
+    expect(screen.getByText('1 tour found')).toBeInTheDocument();
   });
 
   it('shows empty state when no tours match search', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -350,16 +356,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Classical');
+    await typeAndFlush(user, searchInput, 'Classical');
 
-    await waitFor(() => {
-      expect(screen.getByText('No tours found')).toBeInTheDocument();
-      expect(screen.getByText(/Try adjusting your search/)).toBeInTheDocument();
-    });
+    expect(screen.getByText('No tours found')).toBeInTheDocument();
+    expect(screen.getByText(/Try adjusting your search/)).toBeInTheDocument();
   });
 
   it('shows all tours when search is cleared', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Rock Concert' }),
       createMockTour({ id: 'tour-2', title: 'Jazz Night' }),
@@ -368,23 +372,19 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Rock');
+    await typeAndFlush(user, searchInput, 'Rock');
 
-    await waitFor(() => {
-      expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText('Jazz Night')).not.toBeInTheDocument();
 
     const clearButton = screen.getByLabelText('Clear search');
     await user.click(clearButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Rock Concert')).toBeInTheDocument();
-      expect(screen.getByText('Jazz Night')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Rock Concert')).toBeInTheDocument();
+    expect(screen.getByText('Jazz Night')).toBeInTheDocument();
   });
 
   it('handles tours with multiple headliners', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const artist1 = createMockArtist({ id: 'artist-1', displayName: 'The Beatles' });
     const artist2 = createMockArtist({ id: 'artist-2', displayName: 'Rolling Stones' });
 
@@ -408,26 +408,22 @@ describe('ToursPageClient', () => {
 
     // Search for first headliner
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Beatles');
+    await typeAndFlush(user, searchInput, 'Beatles');
 
-    await waitFor(() => {
-      expect(screen.getByText('Double Headline')).toBeInTheDocument();
-      expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Double Headline')).toBeInTheDocument();
+    expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
 
     // Clear and search for second headliner
     const clearButton = screen.getByLabelText('Clear search');
     await user.click(clearButton);
-    await user.type(searchInput, 'Stones');
+    await typeAndFlush(user, searchInput, 'Stones');
 
-    await waitFor(() => {
-      expect(screen.getByText('Double Headline')).toBeInTheDocument();
-      expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Double Headline')).toBeInTheDocument();
+    expect(screen.queryByText('Solo Show')).not.toBeInTheDocument();
   });
 
   it('filters tours by venue name in tour dates', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({
         id: 'tour-1',
@@ -448,16 +444,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Madison');
+    await typeAndFlush(user, searchInput, 'Madison');
 
-    await waitFor(() => {
-      expect(screen.getByText('West Coast Run')).toBeInTheDocument();
-      expect(screen.queryByText('South Run')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('West Coast Run')).toBeInTheDocument();
+    expect(screen.queryByText('South Run')).not.toBeInTheDocument();
   });
 
   it('filters tours by group headliner name', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const group = createMockGroup({ id: 'group-1', name: 'The Supremes' });
     const tours = [
       createMockTour({
@@ -482,12 +476,10 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Supremes');
+    await typeAndFlush(user, searchInput, 'Supremes');
 
-    await waitFor(() => {
-      expect(screen.getByText('Motown Night')).toBeInTheDocument();
-      expect(screen.queryByText('Rock Night')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Motown Night')).toBeInTheDocument();
+    expect(screen.queryByText('Rock Night')).not.toBeInTheDocument();
   });
 
   it('does not show count when no search query', () => {
@@ -502,7 +494,7 @@ describe('ToursPageClient', () => {
   });
 
   it('filters tours by subtitle2', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({ id: 'tour-1', title: 'Tour 1', subtitle2: 'An Acoustic Evening' }),
       createMockTour({ id: 'tour-2', title: 'Tour 2', subtitle2: null }),
@@ -511,16 +503,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Acoustic');
+    await typeAndFlush(user, searchInput, 'Acoustic');
 
-    await waitFor(() => {
-      expect(screen.getByText('Tour 1')).toBeInTheDocument();
-      expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
   });
 
   it('filters tours by description', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({
         id: 'tour-1',
@@ -533,16 +523,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'farewell');
+    await typeAndFlush(user, searchInput, 'farewell');
 
-    await waitFor(() => {
-      expect(screen.getByText('Tour 1')).toBeInTheDocument();
-      expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Tour 1')).toBeInTheDocument();
+    expect(screen.queryByText('Tour 2')).not.toBeInTheDocument();
   });
 
   it('filters tours by artist first/last name when displayName is absent', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const artistNoDisplay = createMockArtist({
       id: 'artist-nodisplay',
       displayName: null,
@@ -567,16 +555,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Holiday');
+    await typeAndFlush(user, searchInput, 'Holiday');
 
-    await waitFor(() => {
-      expect(screen.getByText('Jazz Tour')).toBeInTheDocument();
-      expect(screen.queryByText('Rock Tour')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Jazz Tour')).toBeInTheDocument();
+    expect(screen.queryByText('Rock Tour')).not.toBeInTheDocument();
   });
 
   it('filters tours by venue city', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({
         id: 'tour-1',
@@ -600,16 +586,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Nashville');
+    await typeAndFlush(user, searchInput, 'Nashville');
 
-    await waitFor(() => {
-      expect(screen.getByText('Nashville Tour')).toBeInTheDocument();
-      expect(screen.queryByText('Chicago Tour')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Nashville Tour')).toBeInTheDocument();
+    expect(screen.queryByText('Chicago Tour')).not.toBeInTheDocument();
   });
 
   it('filters tours by venue state', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({
         id: 'tour-1',
@@ -633,16 +617,14 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'TX');
+    await typeAndFlush(user, searchInput, 'TX');
 
-    await waitFor(() => {
-      expect(screen.getByText('Texas Tour')).toBeInTheDocument();
-      expect(screen.queryByText('Florida Tour')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Texas Tour')).toBeInTheDocument();
+    expect(screen.queryByText('Florida Tour')).not.toBeInTheDocument();
   });
 
   it('handles null venue city and state without crashing', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const tours = [
       createMockTour({
         id: 'tour-1',
@@ -664,10 +646,8 @@ describe('ToursPageClient', () => {
     render(<ToursPageClient tours={tours} />);
 
     const searchInput = screen.getByLabelText('Search tours by artist name');
-    await user.type(searchInput, 'Secret');
+    await typeAndFlush(user, searchInput, 'Secret');
 
-    await waitFor(() => {
-      expect(screen.getByText('Mystery Tour')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Mystery Tour')).toBeInTheDocument();
   });
 });

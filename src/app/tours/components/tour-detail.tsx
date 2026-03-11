@@ -170,9 +170,9 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                 <p className="text-sm text-muted-foreground">No tour dates announced yet.</p>
               ) : (
                 sortedTourDates.map((tourDate, index) => {
-                  const headlinerNames = tourDate.headliners.map((headliner) =>
-                    getHeadlinerDisplayName(headliner)
-                  );
+                  const headlinerNames = tourDate.headliners
+                    .sort((a, b) => b.sortOrder - a.sortOrder)
+                    .map((headliner) => getHeadlinerDisplayName(headliner));
 
                   return (
                     <div key={tourDate.id} className="space-y-4">

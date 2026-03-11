@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 
-import { createVenueAction } from './venue-actions';
+import { createVenueAction, updateVenueAction } from './venue-actions';
 import { VenueService } from '../services/tours/venue-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -188,6 +188,138 @@ describe('Venue Actions', () => {
       vi.mocked(VenueService.create).mockRejectedValue(new Error('Database error'));
 
       const result = await createVenueAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(setUnknownError).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateVenueAction', () => {
+    const venueId = '507f1f77bcf86cd799439011'; // Valid MongoDB ObjectId format
+    const mockFormData = new FormData();
+    mockFormData.append('name', 'Updated Venue');
+    mockFormData.append('city', 'Austin');
+    mockFormData.append('state', 'TX');
+
+    const initialFormState: FormState = {
+      fields: {},
+      success: false,
+    };
+
+    beforeEach(() => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            name: 'Updated Venue',
+            city: 'Austin',
+            state: 'TX',
+          },
+        },
+      } as never);
+
+      vi.mocked(VenueService.update).mockResolvedValue({
+        id: venueId,
+        name: 'Updated Venue',
+        city: 'Austin',
+        state: 'TX',
+        timeZone: 'America/Chicago',
+      } as never);
+    });
+
+    it('should require admin role', async () => {
+      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+
+      await expect(updateVenueAction(venueId, initialFormState, mockFormData)).rejects.toThrow(
+        'Unauthorized'
+      );
+    });
+
+    it('should throw when session is missing a user id', async () => {
+      vi.mocked(requireRole).mockResolvedValue({ user: { id: null } } as never);
+
+      await expect(updateVenueAction(venueId, initialFormState, mockFormData)).rejects.toThrow(
+        'Invalid admin session: missing user id for audit logging.'
+      );
+    });
+
+    it('should reject invalid venue ID format', async () => {
+      const result = await updateVenueAction('invalid-id', initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Invalid venue ID']);
+    });
+
+    it('should validate input and update venue', async () => {
+      const result = await updateVenueAction(venueId, initialFormState, mockFormData);
+
+      expect(VenueService.update).toHaveBeenCalledWith(
+        venueId,
+        expect.objectContaining({ name: 'Updated Venue', city: 'Austin', state: 'TX' }),
+        'user-123'
+      );
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({
+        venueId,
+        name: 'Updated Venue',
+        city: 'Austin',
+        state: 'TX',
+        timeZone: 'America/Chicago',
+      });
+    });
+
+    it('should log security event on successful update', async () => {
+      await updateVenueAction(venueId, initialFormState, mockFormData);
+
+      expect(logSecurityEvent).toHaveBeenCalledWith({
+        event: 'venue.updated',
+        userId: 'user-123',
+        metadata: expect.objectContaining({
+          venueId,
+          name: 'Updated Venue',
+          updatedFields: ['name', 'city', 'state'],
+        }),
+      });
+    });
+
+    it('should revalidate relevant paths after update', async () => {
+      await updateVenueAction(venueId, initialFormState, mockFormData);
+
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/tours/new');
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/tours');
+      expect(revalidatePath).toHaveBeenCalledWith('/tours');
+    });
+
+    it('should handle validation errors with field-level error messages', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: {
+          fields: {},
+          success: false,
+          errors: {},
+        },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['name'], message: 'Name cannot be empty' },
+              { path: ['city'], message: 'City cannot be empty' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await updateVenueAction(venueId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.name).toEqual(['Name cannot be empty']);
+      expect(result.errors?.city).toEqual(['City cannot be empty']);
+    });
+
+    it('should handle service errors', async () => {
+      vi.mocked(VenueService.update).mockRejectedValue(new Error('Database error'));
+
+      const result = await updateVenueAction(venueId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalled();
