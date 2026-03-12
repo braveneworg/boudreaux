@@ -220,6 +220,8 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ## Never Do
 
+- Never use the non-null assertion operator (!) in TypeScript code
+- Never disable ESLint rules globally or with eslint-disable comments without a very good reason
 - Don't call `expect` inside conditional statements
 - Don't use conditional expects in tests (e.g., if (condition) { expect(...) }) — instead, write separate test cases for different conditions
 - Don't use localStorage/sessionStorage

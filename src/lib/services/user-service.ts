@@ -11,7 +11,11 @@ export const UserService = {
     email,
     role = 'admin',
   }: {
-    [key: string]: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email: string;
+    role?: string;
   }) => {
     const adminUser = await prisma.user.findUnique({
       where: { email },
