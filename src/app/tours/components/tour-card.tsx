@@ -237,7 +237,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
           />
         )}
       </CardFooter>
-      <Separator className="my-4 opacity-100!" />
+      <Separator className="my-4 !opacity-100" />
     </Card>
   );
 };
