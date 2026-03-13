@@ -204,12 +204,12 @@ export const TourCard = ({ tour }: TourCardProps) => {
                     ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
                     : `${sortedTourDates.length} shows`}
                 </div>
-                <div>
-                  <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
-                  {firstTourDate.doorsOpenAt
-                    ? formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)
-                    : ''}
-                </div>
+                {sortedTourDates.length === 1 && firstTourDate?.doorsOpenAt && (
+                  <div>
+                    <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
+                    {formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)}
+                  </div>
+                )}
               </>
             )}
           </div>
