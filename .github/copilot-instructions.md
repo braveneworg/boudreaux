@@ -212,12 +212,20 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Docker for containerization and deployment
 - Always use meaningful commit messages that describe the changes made
 - Always run tests, lint, and format before committing code
-
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 - Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
 - Always put the tMPL license header in all source files from HEADER.txt
 - Always check if global styles are controlling the styles of a component before adding new styles to the component
+- Always use canonical tailwind v4 utility classes for styling and avoid adding custom CSS unless necessary
+- Always check for existing components in the codebase before creating new ones, and reuse them when possible to maintain consistency and reduce code duplication
+- Always use the cn() helper function for conditional class
+- Always use the 'use client' directive at the top of files that contain Client Components in Next.js
+- Always use the 'use server' directive at the top of files that contain Server Actions in
+  Next.js
+- Always use the 'server-only' package when importing server-side only code in Next.js Server Components to prevent accidental client-side imports
+- Always use Zod for runtime validation of external data, such as API responses and user input, to ensure data integrity and prevent potential security vulnerabilities
+- Always write tests for new features and bug fixes to ensure code quality and prevent regressions
 
 ## Never Do
 
