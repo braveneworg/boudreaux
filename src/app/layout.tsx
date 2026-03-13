@@ -85,6 +85,7 @@ export default async function RootLayout({
         </Providers>
         <Toaster position="bottom-center" />
         <Script
+          type="text/javascript"
           src="https://platform-api.sharethis.com/js/sharethis.js#property=69b37f0b19e17473e5c9afcb&product=sop"
           async
         />

@@ -28,6 +28,7 @@ export default async function Home() {
   return (
     <PageContainer>
       <div
+        className="relative top-[250px]"
         dangerouslySetInnerHTML={{
           __html: `
             <!-- ShareThis BEGIN -->
