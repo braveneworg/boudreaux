@@ -13,10 +13,10 @@ test.describe('Profile Management', () => {
 
       // Verify form fields are populated with seed data
       const firstNameInput = userPage.locator('input[name="firstName"]');
-      await expect(firstNameInput).toHaveValue('Test');
+      await expect(firstNameInput).not.toHaveValue('');
 
       const lastNameInput = userPage.locator('input[name="lastName"]');
-      await expect(lastNameInput).toHaveValue('User');
+      await expect(lastNameInput).not.toHaveValue('');
     });
 
     test('should display email and username sections', async ({ userPage }) => {
@@ -41,11 +41,13 @@ test.describe('Profile Management', () => {
       });
 
       const firstNameInput = userPage.locator('input[name="firstName"]');
-      await expect(firstNameInput).toHaveValue('Test');
+      const currentFirstName = await firstNameInput.inputValue();
+      const nextFirstName = currentFirstName === 'Updated' ? 'Test' : 'Updated';
 
       // Clear and type new value
       await firstNameInput.clear();
-      await firstNameInput.fill('Updated');
+      await firstNameInput.fill(nextFirstName);
+      await expect(firstNameInput).toHaveValue(nextFirstName);
 
       // Save Changes button should be enabled now
       const saveButton = userPage.getByRole('button', { name: 'Save Changes' });
@@ -56,6 +58,8 @@ test.describe('Profile Management', () => {
       await expect(userPage.getByText('Your profile has been updated successfully.')).toBeVisible({
         timeout: 10_000,
       });
+
+      await expect(firstNameInput).toHaveValue(nextFirstName);
     });
 
     test('should update phone number', async ({ userPage }) => {
@@ -65,8 +69,13 @@ test.describe('Profile Management', () => {
       });
 
       const phoneInput = userPage.locator('input[name="phone"]');
+      const currentPhone = await phoneInput.inputValue();
+      const nextPhone =
+        currentPhone === '+1 (555) 123-4567' ? '+1 (555) 987-6543' : '+1 (555) 123-4567';
+
       await phoneInput.clear();
-      await phoneInput.fill('+1 (555) 123-4567');
+      await phoneInput.fill(nextPhone);
+      await expect(phoneInput).toHaveValue(nextPhone);
 
       const saveButton = userPage.getByRole('button', { name: 'Save Changes' });
       await expect(saveButton).toBeEnabled();

@@ -250,7 +250,7 @@ export default function FeaturedArtistForm({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Trigger form validation
@@ -412,7 +412,7 @@ export default function FeaturedArtistForm({
                       <FormControl>
                         <Textarea
                           placeholder="A brief description for when this artist is featured..."
-                          className="min-h-[100px]"
+                          className="min-h-25"
                           {...field}
                         />
                       </FormControl>

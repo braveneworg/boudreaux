@@ -27,13 +27,24 @@ export default async function Home() {
 
   return (
     <PageContainer>
+      <div
+        dangerouslySetInnerHTML={{
+          __html: `
+            <!-- ShareThis BEGIN -->
+            <div className="sharethis-inline-share-buttons"></div>
+            <!-- ShareThis END -->`,
+        }}
+      />
       {/* Notification Banner - only shown on home page */}
       {notificationBanners.length > 0 && <NotificationBanner notifications={notificationBanners} />}
-
       <ContentContainer>
         <ArtistSearchInput />
-        <Heading level={1}>Featured artists</Heading>
-        <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+        <section>
+          <Heading level={1}>
+            <span className="text-xl">featured artists</span>
+          </Heading>
+          <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+        </section>
       </ContentContainer>
     </PageContainer>
   );

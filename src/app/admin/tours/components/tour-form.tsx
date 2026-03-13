@@ -270,7 +270,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
             <CardContent className="space-y-6">
               {/* Basic Information Section */}
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold">Basic Information</h3>
+                <h3>Basic Information</h3>
 
                 <TextField
                   control={control}
@@ -349,7 +349,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
                   <Separator />
                   <section className="space-y-4">
                     <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">Tour Images</h3>
+                      <h3>Tour Images</h3>
                       <p className="text-sm text-muted-foreground">
                         Upload images for this tour. You can add up to 10 images. Images can be
                         reordered by dragging and dropping.

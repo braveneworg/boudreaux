@@ -108,7 +108,7 @@ export const ArtistSearchInput = () => {
           <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <input
             type="search"
-            placeholder="Search artists & releases..."
+            placeholder="Search all artists & releases..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);

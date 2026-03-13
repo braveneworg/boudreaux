@@ -293,7 +293,7 @@ export default function TourDateForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-150">
+      <DialogContent className="max-h-[90vh] w-full max-w-[calc(100vw-1.236rem)] overflow-y-auto px-[0.618rem] py-5 sm:max-w-150 sm:px-[1.618rem]">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit Tour Date' : 'Add Tour Date'}</DialogTitle>
           <DialogDescription>
@@ -313,7 +313,7 @@ export default function TourDateForm({
               e.stopPropagation();
               handleSubmit(onSubmit)(e);
             }}
-            className="space-y-6"
+            className="min-w-0 space-y-6"
           >
             {/* Artists Section */}
             <section className="space-y-4">
