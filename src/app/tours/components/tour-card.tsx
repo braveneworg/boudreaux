@@ -182,7 +182,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
                   <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
                   <span>&middot;</span>{' '}
                 </VenueDirectionsLink>
-                <span className="text-sm muted-foreground text-zinc-600">
+                <span className="text-sm text-muted-foreground">
                   {singleVenue.city}, {singleVenue.state}
                 </span>
               </>
