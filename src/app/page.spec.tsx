@@ -110,7 +110,7 @@ describe('Home Page', () => {
     const HomeComponent = await Home();
     render(HomeComponent);
 
-    expect(screen.getByRole('heading', { name: 'Featured artists' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'featured artists' })).toBeInTheDocument();
   });
 
   it('should render featured artists player', async () => {
@@ -126,7 +126,7 @@ describe('Home Page', () => {
     const HomeComponent = await Home();
     render(HomeComponent);
 
-    const heading = screen.getByRole('heading', { name: 'Featured artists' });
+    const heading = screen.getByRole('heading', { name: 'featured artists' });
     expect(heading.tagName).toBe('H1');
   });
 

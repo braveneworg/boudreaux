@@ -70,7 +70,7 @@ describe('Footer', () => {
       render(<Footer />);
 
       const container = document.querySelector('footer > div');
-      expect(container).toHaveClass('max-w-[1920px]');
+      expect(container).toHaveClass('max-w-480');
     });
 
     it('renders navigation with flex-wrap for responsive layout', () => {

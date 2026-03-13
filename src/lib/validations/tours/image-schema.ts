@@ -45,7 +45,7 @@ export type ImageUploadRequest = z.infer<typeof imageUploadRequestSchema>;
  * Schema for presigned URL response
  */
 export const presignedUrlResponseSchema = z.object({
-  uploadUrl: z.string().url('Invalid upload URL'),
+  uploadUrl: z.url('Invalid upload URL'),
   s3Key: z.string().min(1, 'S3 key is required'),
   s3Bucket: z.string().min(1, 'S3 bucket is required'),
   expiresIn: z.number().positive('Expiration time must be positive'),
@@ -60,7 +60,7 @@ export const imageMetadataSchema = z.object({
   id: z.string().optional(),
   tourId: z.string().min(1, 'Tour ID is required'),
   s3Key: z.string().min(1, 'S3 key is required'),
-  s3Url: z.string().url('Invalid S3 URL'),
+  s3Url: z.url('Invalid S3 URL'),
   s3Bucket: z.string().min(1, 'S3 bucket is required'),
   fileName: z.string().min(1, 'File name is required'),
   fileSize: z.number().positive('File size must be positive'),

@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
  * POST /api/releases
  * Create a new release (admin only)
  */
-export const POST = await withAdmin(async (request: NextRequest) => {
+export const POST = withAdmin(async (request: NextRequest) => {
   try {
     const body = await request.json();
     const validation = validateBody(createReleaseSchema, body);

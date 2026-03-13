@@ -102,24 +102,30 @@
   select {
     @apply bg-zinc-50! text-zinc-900! placeholder:text-zinc-800!;
   }
-  h1 {
-    text-transform: lowercase;
-  }
+
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    font-family: system, sans-serif, var(--font-dawning-of-a-new-day);
-    @apply font-semibold relative -top-2 text-shadow-sm  text-shadow-zinc-400;
+    font-family:
+      Courier New,
+      Courier,
+      system,
+      serif;
+    text-transform: lowercase;
+    @apply relative -top-2;
+  }
+  h1,
+  h2 {
+    @apply tracking-[0.2rem] leading-tight font-semibold;
   }
   h1 {
-    font-family: var(--font-dawning-of-a-new-day), system, sans-serif;
-    @apply tracking-[0.2rem] text-4xl font-bold leading-tight mb-3.5 text-zinc-900;
+    @apply text-4xl text-zinc-900;
   }
   h2 {
-    @apply tracking-[0.2rem] text-3xl leading-tight mb-0 pb-0 mt-0 text-zinc-700;
+    @apply text-3xl mb-0 pb-0 mt-0 text-zinc-700;
   }
   h3 {
     @apply text-2xl leading-snug mb-3 mt-4;

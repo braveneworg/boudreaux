@@ -31,13 +31,8 @@ export const tourDateCreateSchema = z
       .max(100, 'Ticket prices must be 100 characters or less')
       .optional()
       .nullable(),
-    ticketsUrl: z.string().url('Invalid URL format').or(z.literal('')).optional().nullable(),
-    ticketIconUrl: z
-      .string()
-      .url('Invalid icon URL format')
-      .or(z.literal(''))
-      .optional()
-      .nullable(),
+    ticketsUrl: z.url('Invalid URL format').or(z.literal('')).optional().nullable(),
+    ticketIconUrl: z.url('Invalid icon URL format').or(z.literal('')).optional().nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required'),
     timeZone: z.string().min(1).max(100).optional().nullable(),
@@ -70,13 +65,8 @@ export const tourDateUpdateSchema = z
       .max(100, 'Ticket prices must be 100 characters or less')
       .optional()
       .nullable(),
-    ticketsUrl: z.string().url('Invalid URL format').or(z.literal('')).optional().nullable(),
-    ticketIconUrl: z
-      .string()
-      .url('Invalid icon URL format')
-      .or(z.literal(''))
-      .optional()
-      .nullable(),
+    ticketsUrl: z.url('Invalid URL format').or(z.literal('')).optional().nullable(),
+    ticketIconUrl: z.url('Invalid icon URL format').or(z.literal('')).optional().nullable(),
     notes: z.string().max(2000, 'Notes must be 2000 characters or less').optional().nullable(),
     headlinerIds: z.array(z.string()).min(1, 'At least one headliner is required').optional(),
     timeZone: z.string().min(1).max(100).optional().nullable(),

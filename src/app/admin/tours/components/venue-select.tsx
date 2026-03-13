@@ -292,13 +292,15 @@ export default function VenueSelect<
                         role="combobox"
                         disabled={disabled}
                         className={cn(
-                          'w-full justify-between',
+                          'w-full min-w-0 shrink justify-between',
                           !selectedId && 'text-muted-foreground'
                         )}
                       >
-                        {selectedVenue
-                          ? `${selectedVenue.name}${selectedVenue.city ? ` - ${selectedVenue.city}` : ''}${selectedVenue.state ? `, ${selectedVenue.state}` : ''}`
-                          : placeholder}
+                        <span className="truncate">
+                          {selectedVenue
+                            ? `${selectedVenue.name}${selectedVenue.city ? ` - ${selectedVenue.city}` : ''}${selectedVenue.state ? `, ${selectedVenue.state}` : ''}`
+                            : placeholder}
+                        </span>
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </FormControl>

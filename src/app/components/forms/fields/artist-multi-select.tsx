@@ -45,6 +45,7 @@ interface ArtistMultiSelectProps<
   setValue?: UseFormSetValue<TFieldValues>;
   releaseId?: string | null;
   disabled?: boolean;
+  initialArtists?: ArtistOption[];
 }
 
 export default function ArtistMultiSelect<
@@ -61,10 +62,14 @@ export default function ArtistMultiSelect<
   setValue,
   releaseId,
   disabled = false,
+  initialArtists = [],
 }: ArtistMultiSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const [selectedArtistCache, setSelectedArtistCache] = useState<Map<string, ArtistOption>>(
+    () => new Map(initialArtists.map((a) => [a.id, a]))
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +102,37 @@ export default function ArtistMultiSelect<
       setIsLoading(false);
     }
   }, []);
+
+  // Sync cache when initialArtists changes (e.g. dialog reused for a different tour date)
+  useEffect(() => {
+    if (initialArtists.length === 0) return;
+    setSelectedArtistCache((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const artist of initialArtists) {
+        if (!next.has(artist.id)) {
+          next.set(artist.id, artist);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [initialArtists]);
+
+  // Whenever fetched artists change, cache them so selected pills persist across searches
+  useEffect(() => {
+    setSelectedArtistCache((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const artist of artists) {
+        if (!next.has(artist.id)) {
+          next.set(artist.id, artist);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [artists]);
 
   // Initial fetch when popover opens
   useEffect(() => {
@@ -174,8 +210,10 @@ export default function ArtistMultiSelect<
           field.onChange(newValue);
         };
 
-        // Get selected artists for display
-        const selectedArtists = artists.filter((artist) => selectedIds.includes(artist.id));
+        // Get selected artists for display from cache (persists across searches)
+        const selectedArtists = selectedIds
+          .map((id) => selectedArtistCache.get(id))
+          .filter((a): a is ArtistOption => a !== undefined);
 
         return (
           <FormItem>

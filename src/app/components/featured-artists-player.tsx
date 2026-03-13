@@ -218,7 +218,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
   return (
     <MediaPlayer className="mb-2">
-      <div className="space-y-2 mt-2">
+      <div className="space-y-2 mt-0">
         {/* Featured Artists Carousel */}
         {featuredArtists.length >= 3 && (
           <MediaPlayer.FeaturedArtistCarousel

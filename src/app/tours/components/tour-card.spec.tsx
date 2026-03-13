@@ -209,7 +209,51 @@ describe('TourCard', () => {
     });
     render(<TourCard tour={tour} />);
 
-    expect(screen.getByText(/Madison Square Garden/)).toBeInTheDocument();
+    const matches = screen.getAllByText(/Madison Square Garden/);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders single venue as a directions link', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      address: '116 5th Ave N',
+      city: 'Nashville',
+      state: 'TN',
+      postalCode: '37219',
+      country: 'US',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    const link = screen.getByText('Ryman Auditorium').closest('a');
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link?.getAttribute('href')).toContain('Ryman%20Auditorium');
+  });
+
+  it('renders multiple venues as static text without a directions link', () => {
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          id: 'td-1',
+          startDate: new Date('2026-06-01T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-1', name: 'Madison Square Garden' }),
+        }),
+        createMockTourDate({
+          id: 'td-2',
+          startDate: new Date('2026-06-02T00:00:00.000Z'),
+          venue: createMockVenue({ id: 'venue-2', name: 'Ryman Auditorium' }),
+        }),
+      ],
+    });
+    render(<TourCard tour={tour} />);
+
+    const venueText = screen.getByText('2 venues');
+    expect(venueText).toBeInTheDocument();
+    expect(venueText.closest('a')).toBeNull();
   });
 
   it('renders headliner names', () => {
@@ -658,7 +702,7 @@ describe('TourCard', () => {
     expect(screen.queryAllByText('Shared Artist')).toHaveLength(1);
   });
 
-  it('truncates headliner list to 3 with "+N more" for 4+ headliners', () => {
+  it('renders all headliners when there are 4+ headliners', () => {
     const artists = [1, 2, 3, 4].map((n) =>
       createMockArtist({ id: `artist-${n}`, displayName: `Artist ${n}` })
     );
@@ -679,7 +723,7 @@ describe('TourCard', () => {
     });
     render(<TourCard tour={tour} />);
 
-    expect(screen.getByText(/\+1 more/)).toBeInTheDocument();
+    expect(screen.getByText(/Artist 4.*Artist 3.*Artist 2.*Artist 1/)).toBeInTheDocument();
   });
 
   it('shows "N shows" when there are multiple tour dates with show times', () => {
@@ -756,5 +800,55 @@ describe('TourCard', () => {
     render(<TourCard tour={tour} />);
 
     expect(screen.getByAltText('Fallback image')).toBeInTheDocument();
+  });
+
+  // ─── New behavior: TBD headliners ──────────────────────────────────────────────
+
+  it('renders "TBD" when tour has no headliners', () => {
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ headliners: [] })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('TBD')).toBeInTheDocument();
+  });
+
+  // ─── New behavior: Venue directions link details ──────────────────────────────
+
+  it('renders city and state next to venue directions link', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      city: 'Nashville',
+      state: 'TN',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText('Nashville, TN')).toBeInTheDocument();
+  });
+
+  it('renders accessible sr-only directions text for single venue', () => {
+    const venue = createMockVenue({
+      name: 'Ryman Auditorium',
+      city: 'Nashville',
+      state: 'TN',
+    });
+    const tour = createMockTour({
+      tourDates: [createMockTourDate({ venue })],
+    });
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByText(/Get directions to Ryman Auditorium/)).toBeInTheDocument();
+  });
+
+  // ─── New behavior: Separator ──────────────────────────────────────────────────
+
+  it('renders a separator at the bottom of the card', () => {
+    const tour = createMockTour();
+    render(<TourCard tour={tour} />);
+
+    expect(screen.getByRole('none')).toBeInTheDocument();
   });
 });

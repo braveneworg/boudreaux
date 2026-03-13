@@ -4,6 +4,7 @@
 import React from 'react';
 
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import videojs from 'video.js';
 
 import type {
   FeaturedArtist,
@@ -19,6 +20,7 @@ import { MediaPlayer } from './media-player';
 vi.mock('video.js', () => {
   const mockPlayer = {
     addClass: vi.fn(),
+    removeClass: vi.fn(),
     ready: vi.fn((callback: () => void) => callback()),
     on: vi.fn(),
     off: vi.fn(),
@@ -30,13 +32,23 @@ vi.mock('video.js', () => {
     load: vi.fn(),
     dispose: vi.fn(),
     userActive: vi.fn(),
+    error: vi.fn().mockReturnValue(null),
+    el: vi.fn().mockReturnValue(document.createElement('div')),
+  };
+
+  const componentRegistry: Record<string, unknown> = {
+    Button: function Button() {
+      return null;
+    },
   };
 
   const mockVideojs = Object.assign(
     vi.fn(() => mockPlayer),
     {
-      registerComponent: vi.fn(),
-      getComponent: vi.fn(),
+      registerComponent: vi.fn((name: string, component: unknown) => {
+        componentRegistry[name] = component;
+      }),
+      getComponent: vi.fn((name: string) => componentRegistry[name] ?? null),
     }
   );
 
@@ -49,6 +61,31 @@ vi.mock('../audio-controls', () => ({
   AudioFastForwardButton: vi.fn(),
   SkipPreviousButton: vi.fn(),
   SkipNextButton: vi.fn(),
+  getAudioRewindButton: vi.fn(
+    () =>
+      function MockAudioRewindButton() {
+        return null;
+      }
+  ),
+  getAudioFastForwardButton: vi.fn(
+    () =>
+      function MockAudioFastForwardButton() {
+        return null;
+      }
+  ),
+  getSkipPreviousButton: vi.fn(
+    () =>
+      function MockSkipPreviousButton() {
+        return null;
+      }
+  ),
+  getSkipNextButton: vi.fn(
+    () =>
+      function MockSkipNextButton() {
+        return null;
+      }
+  ),
+  resetClasses: vi.fn(),
 }));
 
 // Mock Drawer components from shadcn/ui
@@ -315,6 +352,78 @@ describe('MediaPlayer', () => {
       const controlsWrapper = container.querySelector('.audio-player-wrapper');
       expect(controlsWrapper).toBeInTheDocument();
       expect(controlsWrapper).toHaveAttribute('data-vjs-player');
+    });
+
+    it('should suppress transient corruption/decode errors', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+        </MediaPlayer>
+      );
+
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        on: ReturnType<typeof vi.fn>;
+        error: ReturnType<typeof vi.fn>;
+        removeClass: ReturnType<typeof vi.fn>;
+        el: ReturnType<typeof vi.fn>;
+        load: ReturnType<typeof vi.fn>;
+      };
+
+      const playerEl = document.createElement('div');
+      const errorDisplay = document.createElement('div');
+      errorDisplay.className = 'vjs-error-display';
+      playerEl.appendChild(errorDisplay);
+      player.el.mockReturnValue(playerEl);
+      player.error.mockReturnValue({
+        code: 3,
+        message:
+          'The media playback was aborted due to a corruption problem or because the media used features your browser did not support.',
+      });
+
+      const errorHandler = player.on.mock.calls.find(
+        ([eventName]) => eventName === 'error'
+      )?.[1] as (() => void) | undefined;
+      expect(errorHandler).toBeDefined();
+      player.load.mockClear();
+
+      errorHandler?.();
+
+      expect(player.error).toHaveBeenCalledWith(null);
+      expect(player.removeClass).toHaveBeenCalledWith('vjs-error');
+      expect(errorDisplay).toHaveClass('vjs-hidden');
+      expect(errorDisplay).toHaveAttribute('aria-hidden', 'true');
+      expect(player.load).toHaveBeenCalled();
+    });
+
+    it('should not suppress non-transient media errors', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.Controls audioSrc="https://example.com/audio.mp3" />
+        </MediaPlayer>
+      );
+
+      const player = vi.mocked(videojs).mock.results.at(-1)?.value as {
+        on: ReturnType<typeof vi.fn>;
+        error: ReturnType<typeof vi.fn>;
+        load: ReturnType<typeof vi.fn>;
+      };
+
+      player.error.mockReset();
+      player.load.mockClear();
+      player.error.mockReturnValue({
+        code: 4,
+        message: 'A fatal unsupported media type error occurred.',
+      });
+
+      const errorHandler = player.on.mock.calls.find(
+        ([eventName]) => eventName === 'error'
+      )?.[1] as (() => void) | undefined;
+      expect(errorHandler).toBeDefined();
+
+      errorHandler?.();
+
+      expect(player.error).not.toHaveBeenCalledWith(null);
+      expect(player.load).not.toHaveBeenCalled();
     });
   });
 

@@ -6,36 +6,62 @@ import type { Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const createPrimaryAdminUser = async () => {
-  if (
-    !process.env.ADMIN_FIRST_NAME ||
-    !process.env.ADMIN_LAST_NAME ||
-    !process.env.ADMIN_EMAIL ||
-    !process.env.ADMIN_PHONE ||
-    !process.env.SECONDARY_ADMIN_EMAIL ||
-    !process.env.SECONDARY_ADMIN_PHONE ||
-    !process.env.SECONDARY_ADMIN_FIRST_NAME ||
-    !process.env.SECONDARY_ADMIN_LAST_NAME
-  ) {
+const createAdminUsers = async () => {
+  const adminFirstName = process.env.ADMIN_FIRST_NAME;
+  const adminLastName = process.env.ADMIN_LAST_NAME;
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPhone = process.env.ADMIN_PHONE;
+  const secondaryFirstName = process.env.SECONDARY_ADMIN_FIRST_NAME;
+  const secondaryLastName = process.env.SECONDARY_ADMIN_LAST_NAME;
+  const secondaryEmail = process.env.SECONDARY_ADMIN_EMAIL;
+  const secondaryPhone = process.env.SECONDARY_ADMIN_PHONE;
+  const tertiaryFirstName = process.env.TERTIARY_ADMIN_FIRST_NAME;
+  const tertiaryLastName = process.env.TERTIARY_ADMIN_LAST_NAME;
+  const tertiaryEmail = process.env.TERTIARY_ADMIN_EMAIL;
+  const tertiaryPhone = process.env.TERTIARY_ADMIN_PHONE;
+
+  if (!adminFirstName || !adminLastName || !adminEmail || !adminPhone) {
     console.error(
-      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE, SECONDARY_ADMIN_EMAIL, SECONDARY_ADMIN_PHONE, SECONDARY_ADMIN_FIRST_NAME, SECONDARY_ADMIN_LAST_NAME'
+      '❌ Check that the following environment variables are set: ADMIN_FIRST_NAME, ADMIN_LAST_NAME, ADMIN_EMAIL, ADMIN_PHONE'
+    );
+    process.exit(1);
+  }
+
+  if (!secondaryFirstName || !secondaryLastName || !secondaryEmail || !secondaryPhone) {
+    console.error(
+      '❌ Check that the following environment variables are set: SECONDARY_ADMIN_FIRST_NAME, SECONDARY_ADMIN_LAST_NAME, SECONDARY_ADMIN_EMAIL, SECONDARY_ADMIN_PHONE'
+    );
+    process.exit(1);
+  }
+
+  if (!tertiaryFirstName || !tertiaryLastName || !tertiaryEmail || !tertiaryPhone) {
+    console.error(
+      '❌ Check that the following environment variables are set: TERTIARY_ADMIN_FIRST_NAME, TERTIARY_ADMIN_LAST_NAME, TERTIARY_ADMIN_EMAIL, TERTIARY_ADMIN_PHONE'
     );
     process.exit(1);
   }
 
   await UserService.ensureAdminUser({
-    firstName: process.env.ADMIN_FIRST_NAME,
-    lastName: process.env.ADMIN_LAST_NAME,
-    email: process.env.ADMIN_EMAIL,
-    phone: process.env.ADMIN_PHONE,
+    firstName: adminFirstName,
+    lastName: adminLastName,
+    email: adminEmail,
+    phone: adminPhone,
     role: 'admin',
   });
 
   await UserService.ensureAdminUser({
-    firstName: process.env.SECONDARY_ADMIN_FIRST_NAME,
-    lastName: process.env.SECONDARY_ADMIN_LAST_NAME,
-    email: process.env.SECONDARY_ADMIN_EMAIL,
-    phone: process.env.SECONDARY_ADMIN_PHONE,
+    firstName: secondaryFirstName,
+    lastName: secondaryLastName,
+    email: secondaryEmail,
+    phone: secondaryPhone,
+    role: 'admin',
+  });
+
+  await UserService.ensureAdminUser({
+    firstName: tertiaryFirstName,
+    lastName: tertiaryLastName,
+    email: tertiaryEmail,
+    phone: tertiaryPhone,
     role: 'admin',
   });
 };
@@ -543,7 +569,7 @@ async function main() {
     console.info('✅ Database dropped successfully.');
   }
 
-  await createPrimaryAdminUser();
+  await createAdminUsers();
 
   // Get the admin user for notifications
   const adminUser = await prisma.user.findFirst({

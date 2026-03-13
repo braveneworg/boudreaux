@@ -44,12 +44,12 @@ import {
   tourDateUpdateSchema,
 } from '@/lib/validations/tours/tour-date-schema';
 
-import type { TourDate, TourDateImage } from '@prisma/client';
+import type { Artist, TourDate, TourDateImage } from '@prisma/client';
 
 interface TourDateFormProps {
   tourId: string;
   tourDate?: TourDate & {
-    headliners: Array<{ artistId: string | null }>;
+    headliners: Array<{ artistId: string | null; artist?: Artist | null }>;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -293,7 +293,7 @@ export default function TourDateForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-150">
+      <DialogContent className="max-h-[90vh] w-full max-w-[calc(100vw-1.236rem)] overflow-y-auto px-[0.618rem] py-5 sm:max-w-150 sm:px-[1.618rem]">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit Tour Date' : 'Add Tour Date'}</DialogTitle>
           <DialogDescription>
@@ -313,7 +313,7 @@ export default function TourDateForm({
               e.stopPropagation();
               handleSubmit(onSubmit)(e);
             }}
-            className="space-y-6"
+            className="min-w-0 space-y-6"
           >
             {/* Artists Section */}
             <section className="space-y-4">
@@ -323,6 +323,19 @@ export default function TourDateForm({
                 name="headlinerIds"
                 label="Headlining Artists"
                 placeholder="Select artists"
+                initialArtists={
+                  tourDate?.headliners
+                    ?.filter(
+                      (h): h is typeof h & { artist: Artist; artistId: string } =>
+                        h.artist != null && h.artistId != null
+                    )
+                    .map((h) => ({
+                      id: h.artistId,
+                      displayName: h.artist.displayName ?? '',
+                      firstName: h.artist.firstName,
+                      surname: h.artist.surname,
+                    })) ?? []
+                }
               />
             </section>
 

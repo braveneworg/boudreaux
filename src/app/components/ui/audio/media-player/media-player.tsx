@@ -115,6 +115,46 @@ const getAudioMimeType = (url: string): string => {
 };
 
 /**
+ * Browser media stacks can emit transient decode/abort errors while switching
+ * sources quickly. These are often recoverable and should not show the Video.js
+ * error overlay to users.
+ */
+const isTransientSourceSwitchError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const mediaError = error as { message?: string };
+  const message = mediaError.message?.toLowerCase() ?? '';
+
+  return /aborted due to a corruption|corruption problem|media playback was aborted/.test(message);
+};
+
+const clearPlayerErrorState = (player: Player): void => {
+  const playerWithErrorApi = player as Player & {
+    error?: (value?: null) => unknown;
+    removeClass?: (className: string) => void;
+    el?: () => Element | null;
+  };
+
+  if (typeof playerWithErrorApi.error === 'function') {
+    playerWithErrorApi.error(null);
+  }
+
+  if (typeof playerWithErrorApi.removeClass === 'function') {
+    playerWithErrorApi.removeClass('vjs-error');
+  }
+
+  const playerElement =
+    typeof playerWithErrorApi.el === 'function' ? playerWithErrorApi.el() : null;
+  const errorDisplay = playerElement?.querySelector('.vjs-error-display');
+  if (errorDisplay instanceof HTMLElement) {
+    errorDisplay.classList.add('vjs-hidden');
+    errorDisplay.setAttribute('aria-hidden', 'true');
+  }
+};
+
+/**
  * Form values interface for the search component.
  *
  * @property search - The search query string
@@ -665,6 +705,9 @@ const Controls = ({
   const playerRef = useRef<Player | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const isInitializedRef = useRef(false);
+  const isSwitchingSourceRef = useRef(false);
+  const pendingResumePlaybackRef = useRef(false);
+  const transientErrorRecoveryAttemptedRef = useRef(false);
   const initialSourceRef = useRef(audioSrc);
   const lastPreviousClickRef = useRef<number>(0);
   const SKIP_TIME = 10;
@@ -810,6 +853,9 @@ const Controls = ({
       });
 
       player.on('play', () => {
+        isSwitchingSourceRef.current = false;
+        pendingResumePlaybackRef.current = false;
+        transientErrorRecoveryAttemptedRef.current = false;
         player.userActive(true);
         onPlayRef.current?.();
       });
@@ -819,8 +865,53 @@ const Controls = ({
       });
 
       player.on('ended', () => {
+        isSwitchingSourceRef.current = false;
+        pendingResumePlaybackRef.current = false;
+        transientErrorRecoveryAttemptedRef.current = false;
         onPauseRef.current?.();
         onEndedRef.current?.();
+      });
+
+      player.on('canplay', () => {
+        isSwitchingSourceRef.current = false;
+        transientErrorRecoveryAttemptedRef.current = false;
+      });
+
+      player.on('error', () => {
+        const mediaError = player.error();
+        if (
+          isTransientSourceSwitchError(mediaError) &&
+          !transientErrorRecoveryAttemptedRef.current
+        ) {
+          transientErrorRecoveryAttemptedRef.current = true;
+          const playerWithCurrentSrc = player as Player & {
+            currentSrc?: string | (() => string);
+          };
+          const currentSrcValue =
+            typeof playerWithCurrentSrc.currentSrc === 'function'
+              ? playerWithCurrentSrc.currentSrc()
+              : playerWithCurrentSrc.currentSrc;
+          const sourceToRetry = currentSrcValue || audioSrc;
+          const shouldResume = pendingResumePlaybackRef.current || !player.paused();
+
+          clearPlayerErrorState(player);
+          if (sourceToRetry) {
+            player.src({ src: sourceToRetry, type: getAudioMimeType(sourceToRetry) });
+            player.load();
+            if (shouldResume) {
+              const playPromise = player.play();
+              if (playPromise !== undefined) {
+                (playPromise as Promise<void>).catch(() => {
+                  // If retry fails, allow normal Video.js error handling on the next error event
+                });
+              }
+            }
+          }
+          return;
+        }
+
+        isSwitchingSourceRef.current = false;
+        pendingResumePlaybackRef.current = false;
       });
 
       player.on('userinactive', () => {
@@ -903,6 +994,12 @@ const Controls = ({
   useEffect(() => {
     if (playerRef.current && isInitializedRef.current) {
       const isInitialSource = audioSrc === initialSourceRef.current;
+      const wasPlayingBeforeSourceChange = !playerRef.current.paused();
+      isSwitchingSourceRef.current = true;
+      transientErrorRecoveryAttemptedRef.current = false;
+      pendingResumePlaybackRef.current =
+        wasPlayingBeforeSourceChange || (autoPlay && !isInitialSource);
+      clearPlayerErrorState(playerRef.current);
       playerRef.current.src({ src: audioSrc, type: getAudioMimeType(audioSrc) });
       playerRef.current.load();
       // Ensure controls remain visible after source change

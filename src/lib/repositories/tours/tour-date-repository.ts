@@ -277,7 +277,7 @@ export class TourDateRepository {
   /**
    * Reorder headliners for a tour date by updating sortOrder in batch
    */
-  static async reorderHeadliners(tourDateId: string, headlinerIds: string[]): Promise<void> {
+  static async reorderHeadliners(_tourDateId: string, headlinerIds: string[]): Promise<void> {
     await prisma.$transaction(
       headlinerIds.map((id, index) =>
         prisma.tourDateHeadliner.update({

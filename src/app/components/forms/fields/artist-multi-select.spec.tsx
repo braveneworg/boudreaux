@@ -12,6 +12,7 @@ import ArtistMultiSelect from './artist-multi-select';
 import type { Control, UseFormSetValue } from 'react-hook-form';
 
 // Mock the UI components
+let formFieldInitialValue: string[] = [];
 vi.mock('@/app/components/ui/form', () => ({
   FormField: ({
     name,
@@ -22,7 +23,7 @@ vi.mock('@/app/components/ui/form', () => ({
       field: { value: string[]; onChange: (value: string[]) => void };
     }) => React.ReactNode;
   }) => {
-    const [value, setValue] = React.useState<string[]>([]);
+    const [value, setValue] = React.useState<string[]>(formFieldInitialValue);
     const field = {
       value,
       onChange: (newValue: string[]) => setValue(newValue),
@@ -248,6 +249,7 @@ describe('ArtistMultiSelect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPopoverOpen = false;
+    formFieldInitialValue = [];
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
       ok: true,
@@ -860,6 +862,111 @@ describe('ArtistMultiSelect', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/artists'));
       });
+    });
+  });
+
+  describe('initialArtists and cache behavior', () => {
+    it('renders badges immediately from initialArtists without opening popover', () => {
+      formFieldInitialValue = ['artist-1'];
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              initialArtists={[
+                {
+                  id: 'artist-1',
+                  displayName: 'Pre-selected Artist',
+                  firstName: 'Pre',
+                  surname: 'Selected',
+                },
+              ]}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('badge')).toHaveTextContent('Pre-selected Artist');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('renders multiple badges from initialArtists', () => {
+      formFieldInitialValue = ['artist-1', 'artist-2'];
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              initialArtists={[
+                { id: 'artist-1', displayName: 'Artist One' },
+                { id: 'artist-2', displayName: 'Artist Two' },
+              ]}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      const badges = screen.getAllByTestId('badge');
+      expect(badges).toHaveLength(2);
+      expect(badges[0]).toHaveTextContent('Artist One');
+      expect(badges[1]).toHaveTextContent('Artist Two');
+    });
+
+    it('preserves badges after selecting an artist via the dropdown', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // Open popover and wait for artists to load
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-artist-1')).toBeInTheDocument();
+      });
+
+      // Select an artist
+      await user.click(screen.getByTestId('command-item-artist-1'));
+
+      // Badge should appear and persist
+      await waitFor(() => {
+        expect(screen.getByTestId('badge')).toHaveTextContent('Artist One');
+      });
+    });
+
+    it('does not render badges when initialArtists is empty and no selections made', () => {
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              initialArtists={[]}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      expect(screen.queryByTestId('badge')).not.toBeInTheDocument();
     });
   });
 });
