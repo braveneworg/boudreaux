@@ -166,6 +166,12 @@ vi.mock('lucide-react', () => ({
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
   ChevronUp: () => <span data-testid="chevron-up-icon" />,
   EllipsisVertical: () => <span data-testid="ellipsis-vertical-icon" />,
+  Pause: ({ className }: { className?: string }) => (
+    <span data-testid="pause-icon" className={className} />
+  ),
+  Play: ({ className }: { className?: string }) => (
+    <span data-testid="play-icon" className={className} />
+  ),
   Search: () => <span data-testid="search-icon" />,
 }));
 
@@ -195,6 +201,8 @@ vi.mock('@/components/ui/button', () => ({
     </button>
   ),
 }));
+
+// Mock DownloadDialog is no longer needed - download dialog lives at consumer level
 
 // Test data factory helpers using type assertions to unknown first
 const createMockTrack = (
@@ -907,6 +915,64 @@ describe('MediaPlayer', () => {
       );
 
       expect(screen.getByText('This is a test description')).toBeInTheDocument();
+    });
+  });
+
+  describe('InteractiveCoverArt component', () => {
+    const defaultProps = {
+      src: 'https://example.com/cover.jpg',
+      alt: 'Test Album cover art',
+      isPlaying: false,
+      onTogglePlay: vi.fn(),
+    };
+
+    beforeEach(() => {
+      defaultProps.onTogglePlay = vi.fn();
+    });
+
+    it('should render the cover art image', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const img = screen.getByTestId('next-image');
+      expect(img).toHaveAttribute('src', 'https://example.com/cover.jpg');
+      expect(img).toHaveAttribute('alt', 'Test Album cover art');
+    });
+
+    it('should call onTogglePlay when the cover art button is clicked', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const playButton = screen.getByRole('button', { name: 'Play' });
+      fireEvent.click(playButton);
+
+      expect(defaultProps.onTogglePlay).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show Play aria-label when not playing', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} isPlaying={false} />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    });
+
+    it('should show Pause aria-label when playing', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} isPlaying />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
     });
   });
 

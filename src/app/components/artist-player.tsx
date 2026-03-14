@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import Image from 'next/image';
 
+import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import {
@@ -205,13 +206,18 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
         <div className="mt-2 space-y-2">
           <div className="flex flex-col items-center">
             <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
-              <MediaPlayer.InteractiveCoverArt
-                src={coverArtSrc}
-                alt={coverArtAlt}
-                isPlaying={isPlaying}
-                onTogglePlay={handleTogglePlay}
-                className="shadow-lg"
-              />
+              <div className="relative">
+                <MediaPlayer.InteractiveCoverArt
+                  src={coverArtSrc}
+                  alt={coverArtAlt}
+                  isPlaying={isPlaying}
+                  onTogglePlay={handleTogglePlay}
+                  className="shadow-lg"
+                />
+                <DownloadDialog artistName={artistName}>
+                  <DownloadTriggerButton />
+                </DownloadDialog>
+              </div>
 
               {hasTracks && currentTrack && selectedRelease ? (
                 <>

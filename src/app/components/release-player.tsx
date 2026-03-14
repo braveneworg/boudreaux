@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
@@ -119,13 +120,20 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
         <div className="flex flex-col items-center">
           {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens */}
           <div className="w-full max-w-xl mx-auto md:max-w-3xl lg:max-w-4xl">
-            <MediaPlayer.InteractiveCoverArt
-              src={coverArtSrc}
-              alt={coverArtAlt}
-              isPlaying={isPlaying}
-              onTogglePlay={handleTogglePlay}
-              className="shadow-lg"
-            />
+            <div className="relative">
+              <MediaPlayer.InteractiveCoverArt
+                src={coverArtSrc}
+                alt={coverArtAlt}
+                isPlaying={isPlaying}
+                onTogglePlay={handleTogglePlay}
+                className="shadow-lg"
+              />
+              {primaryArtist && (
+                <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
+                  <DownloadTriggerButton />
+                </DownloadDialog>
+              )}
+            </div>
 
             {hasTracks && currentTrack && primaryArtist ? (
               <>
