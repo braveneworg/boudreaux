@@ -27,11 +27,12 @@ const downloadSchema = z.object({
     .optional()
     .refine(
       (val) => {
-        if (!val || val === '') return true;
-        const num = Number(val);
-        return !isNaN(num) && num >= 0;
+        const trimmed = val?.trim();
+        if (!trimmed) return true;
+        const num = Number(trimmed);
+        return Number.isFinite(num) && num >= 0;
       },
-      { message: 'Tip amount must be a positive number' }
+      { message: 'Tip amount must be a non-negative number' }
     ),
 });
 
