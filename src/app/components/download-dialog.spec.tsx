@@ -238,7 +238,7 @@ describe('DownloadDialog', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Tip amount must be a positive number')).toBeInTheDocument();
+      expect(screen.getByText('Tip amount must be a non-negative number')).toBeInTheDocument();
     });
   });
 });

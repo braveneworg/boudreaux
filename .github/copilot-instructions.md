@@ -226,6 +226,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use the 'server-only' package when importing server-side only code in Next.js Server Components to prevent accidental client-side imports
 - Always use Zod for runtime validation of external data, such as API responses and user input, to ensure data integrity and prevent potential security vulnerabilities
 - Always write tests for new features and bug fixes to ensure code quality and prevent regressions
+- Always use the zod version from package.json to ensure consistency across the codebase and avoid version conflicts
 
 ## Never Do
 

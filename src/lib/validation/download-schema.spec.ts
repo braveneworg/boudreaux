@@ -114,14 +114,14 @@ describe('download-schema', () => {
       const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '-5' });
       expect(result.success).toBe(false);
       const errors = result.error?.issues.filter((i) => i.path[0] === 'tipAmount');
-      expect(errors?.[0].message).toBe('Tip amount must be a positive number');
+      expect(errors?.[0].message).toBe('Tip amount must be a non-negative number');
     });
 
     it('should reject a non-numeric string', () => {
       const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: 'abc' });
       expect(result.success).toBe(false);
       const errors = result.error?.issues.filter((i) => i.path[0] === 'tipAmount');
-      expect(errors?.[0].message).toBe('Tip amount must be a positive number');
+      expect(errors?.[0].message).toBe('Tip amount must be a non-negative number');
     });
   });
 

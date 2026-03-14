@@ -14,14 +14,11 @@ export const DOWNLOAD_OPTIONS = [
 const downloadSchema = z.object({
   downloadOption: z
     .string({
-      required_error: 'Please select a download option',
+      error: 'Please select a download option',
     })
-    .refine(
-      (val) => DOWNLOAD_OPTIONS.some((option) => option.value === val),
-      {
-        message: 'Please select a download option',
-      }
-    ),
+    .refine((val) => DOWNLOAD_OPTIONS.some((option) => option.value === val), {
+      message: 'Please select a download option',
+    }),
   tipAmount: z
     .string()
     .optional()
