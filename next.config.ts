@@ -61,12 +61,11 @@ const config = {
     // Build Content-Security-Policy based on environment
     const cspParts = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://platform-api.sharethis.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com",
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
       // Allow S3 direct uploads - explicit bucket URL + wildcard for any *.amazonaws.com subdomain
-      "connect-src 'self' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://fakefourmedia.s3.us-east-1.amazonaws.com https://*.amazonaws.com https://*.sharethis.com",
       "frame-src 'self' https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       // Allow media from CDN and S3, plus blob: for local playback
