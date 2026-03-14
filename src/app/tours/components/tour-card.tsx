@@ -182,7 +182,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
                   <span className="sr-only">Get directions to {venueDisplay}</span>{' '}
                   <span>&middot;</span>{' '}
                 </VenueDirectionsLink>
-                <span className="text-sm muted-foreground text-zinc-600">
+                <span className="text-sm text-muted-foreground">
                   {singleVenue.city}, {singleVenue.state}
                 </span>
               </>
@@ -204,12 +204,12 @@ export const TourCard = ({ tour }: TourCardProps) => {
                     ? `${formatTourTime(firstTourDate.showStartTime, firstTourDate.timeZone)}${firstTourDate.showEndTime ? ` - ${formatTourTime(firstTourDate.showEndTime, firstTourDate.timeZone)}` : ''}`
                     : `${sortedTourDates.length} shows`}
                 </div>
-                <div>
-                  <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
-                  {firstTourDate.doorsOpenAt
-                    ? formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)
-                    : ''}
-                </div>
+                {sortedTourDates.length === 1 && firstTourDate?.doorsOpenAt && (
+                  <div>
+                    <strong style={{ fontWeight: 400 }}>Doors:</strong>{' '}
+                    {formatTourTime(firstTourDate.doorsOpenAt, firstTourDate.timeZone)}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -237,7 +237,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
           />
         )}
       </CardFooter>
-      <Separator className="my-4 opacity-100!" />
+      <Separator className="my-4 !opacity-100" />
     </Card>
   );
 };
