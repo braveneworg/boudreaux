@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [3.2.0] - 2026-03-14
+
+### Added
+
+- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n- feat: update Content-Security-Policy and add ShareThis script to layout (#270)\n
+
 ## [3.1.0] - 2026-03-13
 
 ### Added
