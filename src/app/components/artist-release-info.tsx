@@ -13,6 +13,15 @@ import { getDisplayName } from '@/lib/utils/get-display-name';
 import { SocialShareWidget } from './social-share-widget';
 import { Separator } from './ui/separator';
 
+const hasErrorName = (error: unknown): error is { name: string } => {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof (error as { name: unknown }).name === 'string'
+  );
+};
+
 interface ArtistReleaseInfoProps {
   artistName: string;
   title: string;
@@ -56,10 +65,11 @@ export const ArtistReleaseInfo = ({
       navigator
         .share(shareData)
         .then(() => toast.success('Content shared successfully!'))
-        .catch((error: Error) => {
-          if (error.name !== 'AbortError') {
-            toast.error('Error sharing content');
+        .catch((error: unknown) => {
+          if (hasErrorName(error) && error.name === 'AbortError') {
+            return;
           }
+          toast.error('Error sharing content');
         });
     } else {
       navigator.clipboard
