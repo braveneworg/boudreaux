@@ -27,15 +27,7 @@ export default async function Home() {
 
   return (
     <PageContainer>
-      <div
-        className="relative top-[250px]"
-        dangerouslySetInnerHTML={{
-          __html: `
-            <!-- ShareThis BEGIN -->
-            <div className="sharethis-inline-share-buttons"></div>
-            <!-- ShareThis END -->`,
-        }}
-      />
+      <div className="sharethis-inline-share-buttons" />
       {/* Notification Banner - only shown on home page */}
       {notificationBanners.length > 0 && <NotificationBanner notifications={notificationBanners} />}
       <ContentContainer>
