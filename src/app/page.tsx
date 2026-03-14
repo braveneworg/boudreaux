@@ -27,7 +27,6 @@ export default async function Home() {
 
   return (
     <PageContainer>
-      <div className="sharethis-inline-share-buttons" />
       {/* Notification Banner - only shown on home page */}
       {notificationBanners.length > 0 && <NotificationBanner notifications={notificationBanners} />}
       <ContentContainer>

@@ -106,14 +106,6 @@ describe('Home Page', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('should render the sharethis inline share buttons container', async () => {
-    const HomeComponent = await Home();
-    const { container } = render(HomeComponent);
-
-    const shareDiv = container.querySelector('.sharethis-inline-share-buttons');
-    expect(shareDiv).toBeInTheDocument();
-  });
-
   it('should render featured artists heading', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);
