@@ -11,6 +11,7 @@ import Image from 'next/image';
 import {
   ChevronDown,
   ChevronUp,
+  Download,
   EllipsisVertical,
   Pause,
   Play,
@@ -574,6 +575,17 @@ const InteractiveCoverArt = ({
           <OverlayIcon className="w-8 h-8 text-white/30 drop-shadow-md" />
         </div>
       </div>
+      {/* Download button overlay */}
+      <a
+        href={src}
+        download
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-sm border border-white bg-transparent px-2 py-1 text-white transition-opacity hover:bg-white/10 focus:outline-none"
+        aria-label="Download cover art"
+      >
+        <Download className="size-3.5" />
+        <span className="font-['Courier_New',monospace] text-sm leading-none">download</span>
+      </a>
     </button>
   );
 };
