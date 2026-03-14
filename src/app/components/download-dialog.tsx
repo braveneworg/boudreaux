@@ -53,6 +53,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
   });
 
   const selectedOption = form.watch('downloadOption');
+  const tipAmount = form.watch('tipAmount');
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     // TODO: Implement actual download logic
@@ -148,7 +149,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
             {/* Submit button */}
             <Button type="submit" className="w-full">
               {selectedOption === 'premium-digital'
-                ? `Download for $${premiumPrice}${form.watch('tipAmount') ? ` + $${form.watch('tipAmount')}` : ''}`
+                ? `Download for $${premiumPrice}${tipAmount ? ` + $${tipAmount}` : ''}`
                 : 'Download'}
             </Button>
           </form>
