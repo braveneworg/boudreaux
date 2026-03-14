@@ -56,7 +56,11 @@ export const ArtistReleaseInfo = ({
       navigator
         .share(shareData)
         .then(() => toast.success('Content shared successfully!'))
-        .catch(() => toast.error('Error sharing content'));
+        .catch((error: Error) => {
+          if (error.name !== 'AbortError') {
+            toast.error('Error sharing content');
+          }
+        });
     } else {
       navigator.clipboard
         .writeText(artistUrl)
@@ -83,7 +87,7 @@ export const ArtistReleaseInfo = ({
           <em>{title}</em>
         </p>
       </article>
-      <div className="mt-3 ml-2 -mb-3 overflow-hidden">
+      <div className="max-w-90 mx-auto mt-3 -mb-3 overflow-hidden flex justify-center items-center">
         <span className="inline-block size-10 -mb-3.25">
           <Share2Icon onClick={handleShare2IconClick} size={22} className="ml-2 opacity-60" />
         </span>

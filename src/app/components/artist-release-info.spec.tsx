@@ -246,7 +246,8 @@ describe('ArtistReleaseInfo', () => {
     });
 
     it('should show error toast when share fails', async () => {
-      const mockShare = vi.fn().mockRejectedValue(new Error('Share failed'));
+      const shareError = new Error('Share failed');
+      const mockShare = vi.fn().mockRejectedValue(shareError);
       Object.defineProperty(navigator, 'share', {
         value: mockShare,
         writable: true,
@@ -267,6 +268,34 @@ describe('ArtistReleaseInfo', () => {
       await vi.waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith('Error sharing content');
       });
+    });
+
+    it('should not show error toast when user cancels the share dialog', async () => {
+      const abortError = new DOMException('Share canceled', 'AbortError');
+      const mockShare = vi.fn().mockRejectedValue(abortError);
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      // Give the promise time to settle
+      await vi.waitFor(() => {
+        expect(mockShare).toHaveBeenCalled();
+      });
+
+      expect(mockToast.error).not.toHaveBeenCalled();
     });
   });
 });

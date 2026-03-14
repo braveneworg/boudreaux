@@ -45,7 +45,7 @@ export const SocialShareWidget = ({
       </FacebookShareButton>
 
       <FacebookMessengerShareButton
-        className="pointer-events-auto"
+        className="size-10 pointer-events-auto"
         url={artistUrl}
         appId={facebookMessengerAppId}
         htmlTitle="Share on Messenger"
@@ -55,7 +55,7 @@ export const SocialShareWidget = ({
       </FacebookMessengerShareButton>
 
       <WhatsappShareButton
-        className="size-10 ml-2 pointer-events-auto"
+        className="size-10 pointer-events-auto"
         url={artistUrl}
         title={shareTitle}
         htmlTitle="Share on WhatsApp"
@@ -67,7 +67,7 @@ export const SocialShareWidget = ({
       {/* SMS / Messages button */}
       <a
         href={`sms:?body=${encodeURIComponent(`${shareTitle} ${artistUrl}`)}`}
-        className="pointer-events-auto inline-flex items-center justify-center rounded-sm"
+        className="size-10 -mt-1.5 pointer-events-auto inline-flex items-center justify-center rounded-sm"
         aria-label="Share via SMS"
         title="Share via SMS"
         style={{ width: iconSize, height: iconSize }}
@@ -90,13 +90,12 @@ export const SocialShareWidget = ({
         href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(artistUrl)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex rounded-sm relative -top-3"
+        className="size-10 inline-flex rounded-sm relative -top-3"
         aria-label="Share on WeChat"
         title="Share on WeChat (scan QR code)"
-        style={{ width: iconSize, height: iconSize }}
       >
         <span
-          className="inline-flex items-center justify-center rounded-sm bg-zinc-700 text-white text-xs font-bold"
+          className="mt-3 inline-flex items-center justify-center rounded-sm bg-zinc-700 text-white text-xs font-bold"
           style={{ width: iconSize, height: iconSize }}
         >
           微信
@@ -104,7 +103,7 @@ export const SocialShareWidget = ({
       </a>
 
       <XShareButton
-        className="size-10 pointer-events-auto ml-2"
+        className="size-10 pointer-events-auto"
         title={shareTitle}
         htmlTitle="Share on X"
         url={artistUrl}
