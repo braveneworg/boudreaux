@@ -71,6 +71,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
 
   const handleSubscribe = () => {
     setOpen(false);
+    form.reset();
   };
 
   return (
