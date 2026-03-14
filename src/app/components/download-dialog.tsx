@@ -4,7 +4,7 @@
 'use client';
 
 import { forwardRef, useState } from 'react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Download } from 'lucide-react';
@@ -38,7 +38,7 @@ import downloadSchema, {
 interface DownloadDialogProps {
   artistName: string;
   premiumPrice?: number;
-  children: ReactNode;
+  children: ReactElement;
 }
 
 export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: DownloadDialogProps) => {
