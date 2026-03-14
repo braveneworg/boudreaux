@@ -12,9 +12,16 @@ export const DOWNLOAD_OPTIONS = [
 ] as const;
 
 const downloadSchema = z.object({
-  downloadOption: z.enum(['free-320kbps', 'premium-digital'], {
-    error: 'Please select a download option',
-  }),
+  downloadOption: z
+    .string({
+      required_error: 'Please select a download option',
+    })
+    .refine(
+      (val) => DOWNLOAD_OPTIONS.some((option) => option.value === val),
+      {
+        message: 'Please select a download option',
+      }
+    ),
   tipAmount: z
     .string()
     .optional()
