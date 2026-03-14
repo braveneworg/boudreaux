@@ -56,7 +56,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     // TODO: Implement actual download logic
-    console.log('Download submitted:', data);
+    console.info('Download submitted:', data);
     setOpen(false);
     form.reset();
   };
