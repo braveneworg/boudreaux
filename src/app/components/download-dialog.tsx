@@ -182,7 +182,7 @@ export const DownloadTriggerButton = forwardRef<HTMLButtonElement, ComponentProp
         e.stopPropagation();
         onClick?.(e);
       }}
-      className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-sm border border-white bg-transparent px-2 py-1 text-white transition-opacity hover:bg-white/10 focus:outline-none"
+      className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-sm border border-white bg-transparent px-2 py-1 text-white transition-opacity hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label="Download music"
       {...props}
     >
