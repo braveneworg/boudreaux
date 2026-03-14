@@ -164,6 +164,20 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
+// Mock DownloadDialog at consumer level
+vi.mock('@/app/components/download-dialog', () => ({
+  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
+    <div data-testid="download-dialog" data-artist-name={artistName}>
+      {children}
+    </div>
+  ),
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   default: ({
@@ -860,6 +874,33 @@ describe('ArtistPlayer', () => {
 
       expect(screen.queryByTestId('carousel-previous')).not.toBeInTheDocument();
       expect(screen.queryByTestId('carousel-next')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('download dialog', () => {
+    const release = createRelease('release-1', 'Test Album', [
+      {
+        id: 'track-1',
+        title: 'First Track',
+        audioUrl: 'https://example.com/audio1.mp3',
+        duration: 180,
+        position: 1,
+      },
+    ]);
+    const artist = createArtistWithReleases([release]);
+
+    it('should render the download dialog with the correct artist name', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      const downloadDialog = screen.getByTestId('download-dialog');
+      expect(downloadDialog).toBeInTheDocument();
+      expect(downloadDialog).toHaveAttribute('data-artist-name', 'John Doe');
+    });
+
+    it('should render the download trigger button', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByTestId('download-trigger-button')).toBeInTheDocument();
     });
   });
 });

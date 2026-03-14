@@ -165,9 +165,6 @@ vi.mock('next/image', () => ({
 vi.mock('lucide-react', () => ({
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
   ChevronUp: () => <span data-testid="chevron-up-icon" />,
-  Download: ({ className }: { className?: string }) => (
-    <span data-testid="download-icon" className={className} />
-  ),
   EllipsisVertical: () => <span data-testid="ellipsis-vertical-icon" />,
   Pause: ({ className }: { className?: string }) => (
     <span data-testid="pause-icon" className={className} />
@@ -204,6 +201,8 @@ vi.mock('@/components/ui/button', () => ({
     </button>
   ),
 }));
+
+// Mock DownloadDialog is no longer needed - download dialog lives at consumer level
 
 // Test data factory helpers using type assertions to unknown first
 const createMockTrack = (
@@ -941,89 +940,6 @@ describe('MediaPlayer', () => {
       const img = screen.getByTestId('next-image');
       expect(img).toHaveAttribute('src', 'https://example.com/cover.jpg');
       expect(img).toHaveAttribute('alt', 'Test Album cover art');
-    });
-
-    it('should render the download button', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      const downloadLink = screen.getByLabelText('Download cover art');
-      expect(downloadLink).toBeInTheDocument();
-      expect(downloadLink.tagName).toBe('A');
-    });
-
-    it('should set the download link href to the cover art src', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      const downloadLink = screen.getByLabelText('Download cover art');
-      expect(downloadLink).toHaveAttribute('href', 'https://example.com/cover.jpg');
-    });
-
-    it('should have the download attribute on the link', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      const downloadLink = screen.getByLabelText('Download cover art');
-      expect(downloadLink).toHaveAttribute('download');
-    });
-
-    it('should render the download icon', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByTestId('download-icon')).toBeInTheDocument();
-    });
-
-    it('should render the download label text', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByText('download')).toBeInTheDocument();
-    });
-
-    it('should stop propagation when download button is clicked', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      const downloadLink = screen.getByLabelText('Download cover art');
-      const clickEvent = new MouseEvent('click', { bubbles: true });
-      const stopPropagation = vi.spyOn(clickEvent, 'stopPropagation');
-
-      downloadLink.dispatchEvent(clickEvent);
-
-      expect(stopPropagation).toHaveBeenCalled();
-    });
-
-    it('should not trigger onTogglePlay when download button is clicked', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
-        </MediaPlayer>
-      );
-
-      const downloadLink = screen.getByLabelText('Download cover art');
-      fireEvent.click(downloadLink);
-
-      expect(defaultProps.onTogglePlay).not.toHaveBeenCalled();
     });
 
     it('should call onTogglePlay when the cover art button is clicked', () => {

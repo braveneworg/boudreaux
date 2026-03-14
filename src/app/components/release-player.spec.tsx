@@ -158,6 +158,20 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
+// Mock DownloadDialog at consumer level
+vi.mock('@/app/components/download-dialog', () => ({
+  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
+    <div data-testid="download-dialog" data-artist-name={artistName}>
+      {children}
+    </div>
+  ),
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
 describe('ReleasePlayer', () => {
   const mockTrack1 = {
     id: 'track-1',
@@ -343,5 +357,20 @@ describe('ReleasePlayer', () => {
 
     const coverArt = screen.getByTestId('interactive-cover-art');
     expect(coverArt).toHaveAttribute('data-is-playing', 'false');
+  });
+
+  it('should render the download dialog with the correct artist name', () => {
+    render(<ReleasePlayer release={mockRelease} />);
+
+    const downloadDialog = screen.getByTestId('download-dialog');
+    expect(downloadDialog).toBeInTheDocument();
+    expect(downloadDialog).toHaveAttribute('data-artist-name', 'John Doe');
+  });
+
+  it('should render the download trigger button', () => {
+    render(<ReleasePlayer release={mockRelease} />);
+
+    const triggerButton = screen.getByTestId('download-trigger-button');
+    expect(triggerButton).toBeInTheDocument();
   });
 });

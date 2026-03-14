@@ -5,6 +5,7 @@
 
 import { useCallback, useState } from 'react';
 
+import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
 
@@ -250,15 +251,24 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             {/* Cover Art with Audio Controls beneath it */}
             <div className="w-full max-w-xl mx-auto">
               {/* Interactive Cover Art - clickable with play/pause overlay */}
-              {getCoverArt(selectedArtist) && (
-                <MediaPlayer.InteractiveCoverArt
-                  src={getCoverArt(selectedArtist)!}
-                  alt={getDisplayName(selectedArtist)}
-                  isPlaying={isPlaying}
-                  onTogglePlay={handleTogglePlay}
-                  className="shadow-lg"
-                />
-              )}
+              {(() => {
+                const coverArt = getCoverArt(selectedArtist);
+                if (!coverArt) return null;
+                return (
+                  <div className="relative">
+                    <MediaPlayer.InteractiveCoverArt
+                      src={coverArt}
+                      alt={getDisplayName(selectedArtist)}
+                      isPlaying={isPlaying}
+                      onTogglePlay={handleTogglePlay}
+                      className="shadow-lg"
+                    />
+                    <DownloadDialog artistName={getDisplayName(selectedArtist)}>
+                      <DownloadTriggerButton />
+                    </DownloadDialog>
+                  </div>
+                );
+              })()}
 
               {/* Audio Controls - sits directly beneath the image */}
               {selectedArtist.track?.audioUrl && (

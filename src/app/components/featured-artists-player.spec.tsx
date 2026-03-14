@@ -173,6 +173,20 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
+// Mock DownloadDialog at consumer level
+vi.mock('@/app/components/download-dialog', () => ({
+  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
+    <div data-testid="download-dialog" data-artist-name={artistName}>
+      {children}
+    </div>
+  ),
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -1078,6 +1092,26 @@ describe('FeaturedArtistsPlayer', () => {
         'data-current-track-id',
         'track-2'
       );
+    });
+  });
+
+  describe('download dialog', () => {
+    it('should render the download dialog with the initial artist name', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      const downloadDialog = screen.getByTestId('download-dialog');
+      expect(downloadDialog).toBeInTheDocument();
+      expect(downloadDialog).toHaveAttribute('data-artist-name', 'Test Artist 1');
+    });
+
+    it('should render the download trigger button', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      expect(screen.getByTestId('download-trigger-button')).toBeInTheDocument();
     });
   });
 });
