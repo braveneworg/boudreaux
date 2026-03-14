@@ -360,3 +360,46 @@ nextjs-portal {
       100% 8px;
   }
 }
+
+.share-container {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+}
+
+.social-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+  padding: 10px;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+
+  /* Initial state: Hidden */
+  opacity: 0;
+  transform: translateX(100px);
+  transition: all 0.3s ease-in-out;
+  pointer-events: none;
+}
+
+.share-container.open .social-menu {
+  /* Active state: Visible */
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.share-toggle {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px 0 0 5px;
+  transform: translateX(10px); /* Adjusts position */
+}

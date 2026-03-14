@@ -1,9 +1,37 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+
+import type { FeaturedArtist } from '@/lib/types/media-models';
 
 import { ArtistReleaseInfo } from './artist-release-info';
+
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock('lucide-react', () => ({
+  Share2Icon: (props: React.HTMLAttributes<HTMLSpanElement>) => (
+    <span data-testid="share2-icon" onClick={props.onClick} />
+  ),
+}));
+
+vi.mock('sonner', () => ({
+  toast: mockToast,
+}));
+
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: () => <div data-testid="social-share-widget" />,
+}));
+
+vi.mock('@/lib/utils/get-display-name', () => ({
+  getDisplayName: (item: Record<string, unknown>) =>
+    (item.displayName as string) || 'Mock Display Name',
+}));
 
 describe('ArtistReleaseInfo', () => {
   it('should render the artist name in a screen-reader-only heading', () => {
@@ -71,5 +99,174 @@ describe('ArtistReleaseInfo', () => {
     expect(heading).toHaveTextContent('Test Artist');
     expect(heading).not.toHaveClass('sr-only');
     expect(heading).toHaveClass('text-sm', 'font-bold', 'text-shadow-accent');
+  });
+
+  describe('share functionality', () => {
+    const mockFeaturedArtists = [
+      { displayName: 'Artist One' },
+      { displayName: 'Artist Two', artists: [{ slug: 'artist-two' }] },
+    ] as unknown as FeaturedArtist[];
+
+    const mockSelectedArtist = {
+      displayName: 'Selected Artist',
+      artists: [{ slug: 'selected-artist' }],
+      release: { title: 'Selected Release' },
+    } as unknown as FeaturedArtist;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should render the Share2Icon', () => {
+      render(<ArtistReleaseInfo artistName="Test Artist" title="Test Album" />);
+
+      expect(screen.getByTestId('share2-icon')).toBeInTheDocument();
+    });
+
+    it('should render the SocialShareWidget', () => {
+      render(<ArtistReleaseInfo artistName="Test Artist" title="Test Album" />);
+
+      expect(screen.getByTestId('social-share-widget')).toBeInTheDocument();
+    });
+
+    it('should call setSelectedArtist with the second featured artist when no selectedArtist', () => {
+      const setSelectedArtist = vi.fn();
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          featuredArtists={mockFeaturedArtists}
+          setSelectedArtist={setSelectedArtist}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(setSelectedArtist).toHaveBeenCalledWith(mockFeaturedArtists[1]);
+    });
+
+    it('should not call setSelectedArtist when no selectedArtist and no featured artists', () => {
+      const setSelectedArtist = vi.fn();
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          featuredArtists={[]}
+          setSelectedArtist={setSelectedArtist}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(setSelectedArtist).not.toHaveBeenCalled();
+    });
+
+    it('should use navigator.share when available and selectedArtist has a slug', async () => {
+      const mockShare = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(mockShare).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Selected Release',
+          text: 'Check out Selected Artist on Fake Four Inc.!',
+          url: expect.stringContaining('/artists/selected-artist'),
+        })
+      );
+    });
+
+    it('should fall back to clipboard.writeText when navigator.share is not available', async () => {
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining('/artists/selected-artist')
+      );
+    });
+
+    it('should show success toast when share succeeds', async () => {
+      const mockShare = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      await vi.waitFor(() => {
+        expect(mockToast.success).toHaveBeenCalledWith('Content shared successfully!');
+      });
+    });
+
+    it('should show error toast when share fails', async () => {
+      const mockShare = vi.fn().mockRejectedValue(new Error('Share failed'));
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      await vi.waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('Error sharing content');
+      });
+    });
   });
 });

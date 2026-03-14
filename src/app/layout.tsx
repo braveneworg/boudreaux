@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Dawning_of_a_New_Day } from 'next/font/google';
 import { headers } from 'next/headers';
-import Script from 'next/script';
 import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
@@ -84,10 +83,6 @@ export default async function RootLayout({
           <Footer />
         </Providers>
         <Toaster position="bottom-center" />
-        <Script
-          src="https://platform-api.sharethis.com/js/sharethis.js#property=69b37f0b19e17473e5c9afcb&product=sop"
-          async
-        />
       </body>
     </html>
   );
