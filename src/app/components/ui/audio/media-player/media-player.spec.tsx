@@ -165,7 +165,16 @@ vi.mock('next/image', () => ({
 vi.mock('lucide-react', () => ({
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
   ChevronUp: () => <span data-testid="chevron-up-icon" />,
+  Download: ({ className }: { className?: string }) => (
+    <span data-testid="download-icon" className={className} />
+  ),
   EllipsisVertical: () => <span data-testid="ellipsis-vertical-icon" />,
+  Pause: ({ className }: { className?: string }) => (
+    <span data-testid="pause-icon" className={className} />
+  ),
+  Play: ({ className }: { className?: string }) => (
+    <span data-testid="play-icon" className={className} />
+  ),
   Search: () => <span data-testid="search-icon" />,
 }));
 
@@ -907,6 +916,147 @@ describe('MediaPlayer', () => {
       );
 
       expect(screen.getByText('This is a test description')).toBeInTheDocument();
+    });
+  });
+
+  describe('InteractiveCoverArt component', () => {
+    const defaultProps = {
+      src: 'https://example.com/cover.jpg',
+      alt: 'Test Album cover art',
+      isPlaying: false,
+      onTogglePlay: vi.fn(),
+    };
+
+    beforeEach(() => {
+      defaultProps.onTogglePlay = vi.fn();
+    });
+
+    it('should render the cover art image', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const img = screen.getByTestId('next-image');
+      expect(img).toHaveAttribute('src', 'https://example.com/cover.jpg');
+      expect(img).toHaveAttribute('alt', 'Test Album cover art');
+    });
+
+    it('should render the download button', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const downloadLink = screen.getByLabelText('Download cover art');
+      expect(downloadLink).toBeInTheDocument();
+      expect(downloadLink.tagName).toBe('A');
+    });
+
+    it('should set the download link href to the cover art src', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const downloadLink = screen.getByLabelText('Download cover art');
+      expect(downloadLink).toHaveAttribute('href', 'https://example.com/cover.jpg');
+    });
+
+    it('should have the download attribute on the link', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const downloadLink = screen.getByLabelText('Download cover art');
+      expect(downloadLink).toHaveAttribute('download');
+    });
+
+    it('should render the download icon', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByTestId('download-icon')).toBeInTheDocument();
+    });
+
+    it('should render the download label text', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByText('download')).toBeInTheDocument();
+    });
+
+    it('should stop propagation when download button is clicked', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const downloadLink = screen.getByLabelText('Download cover art');
+      const clickEvent = new MouseEvent('click', { bubbles: true });
+      const stopPropagation = vi.spyOn(clickEvent, 'stopPropagation');
+
+      downloadLink.dispatchEvent(clickEvent);
+
+      expect(stopPropagation).toHaveBeenCalled();
+    });
+
+    it('should not trigger onTogglePlay when download button is clicked', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const downloadLink = screen.getByLabelText('Download cover art');
+      fireEvent.click(downloadLink);
+
+      expect(defaultProps.onTogglePlay).not.toHaveBeenCalled();
+    });
+
+    it('should call onTogglePlay when the cover art button is clicked', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} />
+        </MediaPlayer>
+      );
+
+      const playButton = screen.getByRole('button', { name: 'Play' });
+      fireEvent.click(playButton);
+
+      expect(defaultProps.onTogglePlay).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show Play aria-label when not playing', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} isPlaying={false} />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    });
+
+    it('should show Pause aria-label when playing', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.InteractiveCoverArt {...defaultProps} isPlaying />
+        </MediaPlayer>
+      );
+
+      expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
     });
   });
 
