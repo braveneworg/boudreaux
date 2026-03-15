@@ -110,11 +110,9 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
       <div className="space-y-2 mt-2">
         {hasTracks && currentTrack && primaryArtist && (
           <>
-            {primaryArtist && (
-              <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
-                <DownloadTriggerButton />
-              </DownloadDialog>
-            )}
+            <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
+              <DownloadTriggerButton />
+            </DownloadDialog>
             <MediaPlayer.TrackListDrawer
               artistName={getArtistDisplayName(primaryArtist)}
               artistRelease={{ release, artist: primaryArtist }}
