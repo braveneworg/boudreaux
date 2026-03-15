@@ -11,12 +11,12 @@ import downloadSchema, {
 describe('download-schema', () => {
   const validFreeData: DownloadFormSchemaType = {
     downloadOption: 'free-320kbps',
-    tipAmount: '',
+    finalAmount: '',
   };
 
   const validPremiumData: DownloadFormSchemaType = {
     downloadOption: 'premium-digital',
-    tipAmount: '',
+    finalAmount: '',
   };
 
   describe('DOWNLOAD_OPTIONS', () => {
@@ -74,54 +74,50 @@ describe('download-schema', () => {
     });
 
     it('should return the correct error message when missing', () => {
-      const result = downloadSchema.safeParse({ tipAmount: '' });
+      const result = downloadSchema.safeParse({ finalAmount: '' });
       expect(result.success).toBe(false);
       const errors = result.error?.issues.filter((i) => i.path[0] === 'downloadOption');
       expect(errors?.[0].message).toBe('Please select a download option');
     });
   });
 
-  describe('tipAmount field', () => {
+  describe('finalAmount field', () => {
     it('should accept an empty string', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '' });
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '' });
       expect(result.success).toBe(true);
     });
 
     it('should accept undefined (field is optional)', () => {
       const result = downloadSchema.safeParse({
         downloadOption: 'premium-digital',
-        tipAmount: undefined,
+        finalAmount: undefined,
       });
       expect(result.success).toBe(true);
     });
 
     it('should accept a valid positive number string', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '5' });
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '5' });
       expect(result.success).toBe(true);
     });
 
     it('should accept a valid decimal number string', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '2.50' });
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '2.50' });
       expect(result.success).toBe(true);
     });
 
     it('should accept zero', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '0' });
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '0' });
       expect(result.success).toBe(true);
     });
 
-    it('should reject a negative number', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: '-5' });
-      expect(result.success).toBe(false);
-      const errors = result.error?.issues.filter((i) => i.path[0] === 'tipAmount');
-      expect(errors?.[0].message).toBe('Tip amount must be a non-negative number');
+    it('should accept a negative sign (stripped to positive number during sanitization)', () => {
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '-5' });
+      expect(result.success).toBe(true);
     });
 
-    it('should reject a non-numeric string', () => {
-      const result = downloadSchema.safeParse({ ...validPremiumData, tipAmount: 'abc' });
-      expect(result.success).toBe(false);
-      const errors = result.error?.issues.filter((i) => i.path[0] === 'tipAmount');
-      expect(errors?.[0].message).toBe('Tip amount must be a non-negative number');
+    it('should accept a non-numeric string (stripped to empty during sanitization)', () => {
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: 'abc' });
+      expect(result.success).toBe(true);
     });
   });
 
@@ -132,14 +128,14 @@ describe('download-schema', () => {
       expect(result.data?.downloadOption).toBe('free-320kbps');
     });
 
-    it('should accept premium data with a tip', () => {
+    it('should accept premium data with a custom amount', () => {
       const result = downloadSchema.safeParse({
         downloadOption: 'premium-digital',
-        tipAmount: '10',
+        finalAmount: '10',
       });
       expect(result.success).toBe(true);
       expect(result.data?.downloadOption).toBe('premium-digital');
-      expect(result.data?.tipAmount).toBe('10');
+      expect(result.data?.finalAmount).toBe('10');
     });
 
     it('should reject an empty object', () => {

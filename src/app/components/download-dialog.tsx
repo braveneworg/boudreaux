@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { forwardRef, useState } from 'react';
+import { useState } from 'react';
 import type { ComponentProps, ReactElement } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +30,7 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
+import { cn } from '@/lib/utils/tailwind-utils';
 import downloadSchema, {
   DOWNLOAD_OPTIONS,
   type DownloadFormSchemaType,
@@ -48,12 +49,18 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
     resolver: zodResolver(downloadSchema),
     defaultValues: {
       downloadOption: undefined,
-      tipAmount: '',
+      finalAmount: '',
     },
   });
 
   const selectedOption = form.watch('downloadOption');
-  const tipAmount = form.watch('tipAmount');
+  const rawAmount = form
+    .watch('finalAmount')
+    ?.replace(/[^\d.]/g, '')
+    .trim();
+  const displayAmount = rawAmount
+    ? `$${parseFloat(rawAmount).toFixed(2)}`
+    : `$${premiumPrice.toFixed(2)}`;
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     // TODO: Implement actual download logic
@@ -80,9 +87,8 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Download</DialogTitle>
-          <DialogDescription>Choose your preferred download format.</DialogDescription>
+          <DialogDescription>Choose your preferred download format:</DialogDescription>
         </DialogHeader>
-
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {/* Download option radio group */}
@@ -103,10 +109,18 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                             <RadioGroupItem value={option.value} />
                           </FormControl>
                           <FormLabel className="cursor-pointer font-normal">
-                            {option.label}
-                            {option.value === 'premium-digital' && (
-                              <span className="text-muted-foreground"> from ${premiumPrice}</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              <div
+                                className="leading-snug"
+                                dangerouslySetInnerHTML={{ __html: option.label }}
+                              />
+                              {option.value === 'premium-digital' && (
+                                <span className="text-muted-foreground">
+                                  {' '}
+                                  or <em>pay what you want</em>
+                                </span>
+                              )}
+                            </div>
                           </FormLabel>
                         </FormItem>
                       ))}
@@ -121,23 +135,54 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
             {selectedOption === 'premium-digital' && (
               <FormField
                 control={form.control}
-                name="tipAmount"
+                name="finalAmount"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span>Or pay</span>
+                    <div>
                       <FormControl>
-                        <Input
-                          {...field}
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className="w-20 text-center"
-                          aria-label="Tip amount"
-                        />
+                        <div className="flex items-center gap-2 text-sm">
+                          <span>Pay</span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              {...field}
+                              type="text"
+                              inputMode="decimal"
+                              placeholder={`$${premiumPrice.toFixed(2)}`}
+                              className="w-24 text-center"
+                              aria-label="Custom amount"
+                              onChange={(e) => {
+                                const raw = e.target.value
+                                  .replace(/[^\d.]/g, '')
+                                  .replace(/(\..*)\./g, '$1');
+                                // Limit to 2 decimal places while typing
+                                const [whole, decimal] = raw.split('.');
+                                const sanitized =
+                                  decimal !== undefined ? `${whole}.${decimal.slice(0, 2)}` : raw;
+                                field.onChange(sanitized ? `$${sanitized}` : '');
+                              }}
+                              onFocus={(e) => {
+                                // Strip formatting on focus for easier editing
+                                const raw = e.target.value.replace(/[^\d.]/g, '');
+                                field.onChange(raw ? `$${raw}` : '');
+                              }}
+                              onBlur={(e) => {
+                                field.onBlur();
+                                const raw = e.target.value.replace(/[^\d.]/g, '');
+                                if (!raw) return;
+                                const num = parseFloat(raw);
+                                if (Number.isFinite(num) && num >= 0) {
+                                  field.onChange(`$${num.toFixed(2)}`);
+                                }
+                              }}
+                              value={field.value ?? ''}
+                            />
+                            <em>(suggested ${premiumPrice})</em>
+                          </div>
+                        </div>
                       </FormControl>
-                      <span>
-                        on top of ${premiumPrice} to extend your support for{' '}
+
+                      <span className="text-sm">
+                        to extend your support for{' '}
                         <span className="font-semibold">{artistName}</span>
                       </span>
                     </div>
@@ -148,10 +193,8 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
             )}
 
             {/* Submit button */}
-            <Button type="submit" className="w-full">
-              {selectedOption === 'premium-digital'
-                ? `Download for $${premiumPrice}${tipAmount ? ` + $${tipAmount}` : ''}`
-                : 'Download'}
+            <Button type="submit">
+              {selectedOption === 'premium-digital' ? `Download for ${displayAmount}` : 'Download'}
             </Button>
           </form>
         </Form>
@@ -171,25 +214,28 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
 /**
  * Reusable trigger button for the DownloadDialog.
  * Positioned absolutely — must be placed inside a `relative` container.
- * Uses forwardRef so Radix UI's DialogTrigger (asChild/Slot) can inject
- * its onClick handler and ref onto the underlying button element.
  */
-export const DownloadTriggerButton = forwardRef<HTMLButtonElement, ComponentProps<'button'>>(
-  ({ onClick, ...props }, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
-      className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-sm border border-white bg-transparent px-2 py-1 text-white transition-opacity hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      aria-label="Download music"
-      {...props}
-    >
-      <Download className="size-3.5" />
-      <span className="font-['Courier_New',monospace] text-sm leading-none">download</span>
-    </button>
-  )
+export const DownloadTriggerButton = ({
+  className,
+  onClick,
+  ref,
+  ...props
+}: ComponentProps<'button'>) => (
+  <button
+    ref={ref}
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick?.(e);
+    }}
+    className={cn(
+      'flex items-center gap-1.5 rounded-sm border border-white bg-zinc-900 font-semibold opacity-90 px-2 py-1 text-white transition-opacity hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+      className
+    )}
+    aria-label="Download music"
+    {...props}
+  >
+    <Download className="size-3.5" />
+    <span className="font-['Courier_New',monospace] text-sm leading-none">download</span>
+  </button>
 );
-DownloadTriggerButton.displayName = 'DownloadTriggerButton';

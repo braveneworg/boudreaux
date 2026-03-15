@@ -1096,20 +1096,26 @@ describe('FeaturedArtistsPlayer', () => {
   });
 
   describe('download dialog', () => {
-    it('should render the download dialog with the initial artist name', () => {
+    it('should render the download dialog with the selected artist name', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
 
+      // Select artist with a release so download dialog renders
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
       const downloadDialog = screen.getByTestId('download-dialog');
       expect(downloadDialog).toBeInTheDocument();
-      expect(downloadDialog).toHaveAttribute('data-artist-name', 'Test Artist 1');
+      expect(downloadDialog).toHaveAttribute('data-artist-name', 'Test Artist 2');
     });
 
     it('should render the download trigger button', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
+
+      // Select artist with a release so download trigger renders
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
 
       expect(screen.getByTestId('download-trigger-button')).toBeInTheDocument();
     });

@@ -109,12 +109,19 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
         {hasTracks && currentTrack && primaryArtist && (
-          <MediaPlayer.TrackListDrawer
-            artistName={getArtistDisplayName(primaryArtist)}
-            artistRelease={{ release, artist: primaryArtist }}
-            currentTrackId={currentTrack.id}
-            onTrackSelect={handleTrackSelect}
-          />
+          <>
+            {primaryArtist && (
+              <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
+                <DownloadTriggerButton />
+              </DownloadDialog>
+            )}
+            <MediaPlayer.TrackListDrawer
+              artistName={getArtistDisplayName(primaryArtist)}
+              artistRelease={{ release, artist: primaryArtist }}
+              currentTrackId={currentTrack.id}
+              onTrackSelect={handleTrackSelect}
+            />
+          </>
         )}
 
         <div className="flex flex-col items-center">
@@ -128,11 +135,6 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
                 onTogglePlay={handleTogglePlay}
                 className="shadow-lg"
               />
-              {primaryArtist && (
-                <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
-                  <DownloadTriggerButton />
-                </DownloadDialog>
-              )}
             </div>
 
             {hasTracks && currentTrack && primaryArtist ? (

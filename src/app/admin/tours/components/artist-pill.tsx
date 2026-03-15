@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { forwardRef, useState } from 'react';
+import { type Ref, useState } from 'react';
 
 import { Clock, GripVertical, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -70,196 +70,202 @@ interface ArtistPillProps {
   dragHandleProps?: Record<string, unknown>;
   onSetTimeUpdate: (headlinerId: string, setTime: string | null) => Promise<void>;
   onRemove: (headlinerId: string) => Promise<void>;
+  ref?: Ref<HTMLDivElement>;
 }
 
-const ArtistPill = forwardRef<HTMLDivElement, ArtistPillProps>(
-  ({ headliner, index, isDragging, dragHandleProps, onSetTimeUpdate, onRemove }, ref) => {
-    const [menuOpen, setMenuOpen] = useState(false);
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [isRemoving, setIsRemoving] = useState(false);
+const ArtistPill = ({
+  headliner,
+  index,
+  isDragging,
+  dragHandleProps,
+  onSetTimeUpdate,
+  onRemove,
+  ref,
+}: ArtistPillProps) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
-    const colorIndex = index % PASTEL_COLORS.length;
-    const color = PASTEL_COLORS[colorIndex];
-    const useBlack = shouldUseBlackText(color.bg);
-    const textColor = useBlack ? '#000000' : '#ffffff';
+  const colorIndex = index % PASTEL_COLORS.length;
+  const color = PASTEL_COLORS[colorIndex];
+  const useBlack = shouldUseBlackText(color.bg);
+  const textColor = useBlack ? '#000000' : '#ffffff';
 
-    const displayName = headliner.artist
-      ? getDisplayName(headliner.artist as unknown as Record<string, unknown>)
-      : headliner.group
-        ? getDisplayName(headliner.group as unknown as Record<string, unknown>)
-        : 'Unknown Artist';
+  const displayName = headliner.artist
+    ? getDisplayName(headliner.artist as unknown as Record<string, unknown>)
+    : headliner.group
+      ? getDisplayName(headliner.group as unknown as Record<string, unknown>)
+      : 'Unknown Artist';
 
-    const setTimeDisplay = headliner.setTime
-      ? (() => {
-          const d = new Date(headliner.setTime);
-          const h = d.getUTCHours();
-          const m = d.getUTCMinutes();
-          const period = h >= 12 ? 'PM' : 'AM';
-          const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-          return `${h12}:${String(m).padStart(2, '0')} ${period}`;
-        })()
-      : null;
+  const setTimeDisplay = headliner.setTime
+    ? (() => {
+        const d = new Date(headliner.setTime);
+        const h = d.getUTCHours();
+        const m = d.getUTCMinutes();
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+      })()
+    : null;
 
-    const handleSetTimeChange = async (time: string) => {
-      if (!time) {
-        await onSetTimeUpdate(headliner.id, null);
-        return;
-      }
-      // Build a full ISO date string; the date portion doesn't matter for display,
-      // but we need a valid DateTime for Prisma storage.
-      const isoString = `1970-01-01T${time}:00.000Z`;
-      await onSetTimeUpdate(headliner.id, isoString);
-    };
+  const handleSetTimeChange = async (time: string) => {
+    if (!time) {
+      await onSetTimeUpdate(headliner.id, null);
+      return;
+    }
+    // Build a full ISO date string; the date portion doesn't matter for display,
+    // but we need a valid DateTime for Prisma storage.
+    const isoString = `1970-01-01T${time}:00.000Z`;
+    await onSetTimeUpdate(headliner.id, isoString);
+  };
 
-    const handleRemoveClick = () => {
-      setMenuOpen(false);
-      setDeleteDialogOpen(true);
-    };
+  const handleRemoveClick = () => {
+    setMenuOpen(false);
+    setDeleteDialogOpen(true);
+  };
 
-    const handleConfirmRemove = async () => {
-      setIsRemoving(true);
-      try {
-        await onRemove(headliner.id);
-        setDeleteDialogOpen(false);
-      } catch {
-        toast.error('Failed to remove artist');
-      } finally {
-        setIsRemoving(false);
-      }
-    };
+  const handleConfirmRemove = async () => {
+    setIsRemoving(true);
+    try {
+      await onRemove(headliner.id);
+      setDeleteDialogOpen(false);
+    } catch {
+      toast.error('Failed to remove artist');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
 
-    // Extract HH:mm from setTime for the TimePicker value (read UTC to match stored Z-suffix format)
-    const timePickerValue = headliner.setTime
-      ? (() => {
-          const d = new Date(headliner.setTime);
-          return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-        })()
-      : '';
+  // Extract HH:mm from setTime for the TimePicker value (read UTC to match stored Z-suffix format)
+  const timePickerValue = headliner.setTime
+    ? (() => {
+        const d = new Date(headliner.setTime);
+        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+      })()
+    : '';
 
-    return (
-      <>
-        <div ref={ref} className="inline-flex flex-col items-start">
-          <div
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1',
-              'transition-shadow',
-              isDragging && 'shadow-lg ring-2 ring-primary/30'
-            )}
-            style={{ backgroundColor: color.bg }}
-          >
-            {/* Drag handle */}
-            <button
-              type="button"
-              className="cursor-grab rounded-full p-0.5 opacity-50 hover:opacity-80 active:cursor-grabbing"
-              style={{ color: textColor }}
-              aria-label="Drag to reorder"
-              {...dragHandleProps}
-            >
-              <GripVertical className="size-3.5" />
-            </button>
-
-            {/* Order number circle */}
-            <span
-              className="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-              style={{
-                backgroundColor: useBlack ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)',
-                color: textColor,
-              }}
-            >
-              {index + 1}
-            </span>
-
-            {/* Artist name */}
-            <span className="px-1 text-sm font-medium" style={{ color: textColor }}>
-              {displayName}
-            </span>
-
-            {/* Three-dot menu */}
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'relative flex size-6 shrink-0 items-center justify-center rounded-full',
-                    'transition-colors hover:opacity-80',
-                    // Invisible 44x44 tap target for accessibility
-                    'before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
-                  )}
-                  style={{
-                    backgroundColor: useBlack ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)',
-                    color: textColor,
-                  }}
-                  aria-label={`Options for ${displayName}`}
-                >
-                  <MoreVertical className="size-3.5" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-3" align="end" sideOffset={4}>
-                <div className="space-y-3">
-                  {/* Set Time picker */}
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <Clock className="size-3" />
-                      Set Time (optional)
-                    </label>
-                    <TimePicker
-                      value={timePickerValue}
-                      placeholder="Select set time"
-                      onSelect={handleSetTimeChange}
-                    />
-                  </div>
-
-                  {/* Divider */}
-                  <div className="h-px bg-border" />
-
-                  {/* Remove button */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-destructive hover:text-destructive"
-                    onClick={handleRemoveClick}
-                  >
-                    <Trash2 className="mr-2 size-4" />
-                    Remove from tour date
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Set time display below the pill */}
-          {setTimeDisplay && (
-            <span className="mt-0.5 pl-8 text-xs text-muted-foreground">{setTimeDisplay}</span>
+  return (
+    <>
+      <div ref={ref} className="inline-flex flex-col items-start">
+        <div
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1',
+            'transition-shadow',
+            isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
+          style={{ backgroundColor: color.bg }}
+        >
+          {/* Drag handle */}
+          <button
+            type="button"
+            className="cursor-grab rounded-full p-0.5 opacity-50 hover:opacity-80 active:cursor-grabbing"
+            style={{ color: textColor }}
+            aria-label="Drag to reorder"
+            {...dragHandleProps}
+          >
+            <GripVertical className="size-3.5" />
+          </button>
+
+          {/* Order number circle */}
+          <span
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+            style={{
+              backgroundColor: useBlack ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)',
+              color: textColor,
+            }}
+          >
+            {index + 1}
+          </span>
+
+          {/* Artist name */}
+          <span className="px-1 text-sm font-medium" style={{ color: textColor }}>
+            {displayName}
+          </span>
+
+          {/* Three-dot menu */}
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full',
+                  'transition-colors hover:opacity-80',
+                  // Invisible 44x44 tap target for accessibility
+                  'before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
+                )}
+                style={{
+                  backgroundColor: useBlack ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)',
+                  color: textColor,
+                }}
+                aria-label={`Options for ${displayName}`}
+              >
+                <MoreVertical className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="end" sideOffset={4}>
+              <div className="space-y-3">
+                {/* Set Time picker */}
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Clock className="size-3" />
+                    Set Time (optional)
+                  </label>
+                  <TimePicker
+                    value={timePickerValue}
+                    placeholder="Select set time"
+                    onSelect={handleSetTimeChange}
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-border" />
+
+                {/* Remove button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={handleRemoveClick}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  Remove from tour date
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {/* Delete confirmation dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remove Artist</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to remove <strong>{displayName}</strong> from this tour date?
-                This will not delete the artist from the system.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleConfirmRemove}
-                disabled={isRemoving}
-                className="bg-destructive text-white hover:bg-destructive/90"
-              >
-                {isRemoving ? 'Removing...' : 'Remove'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    );
-  }
-);
+        {/* Set time display below the pill */}
+        {setTimeDisplay && (
+          <span className="mt-0.5 pl-8 text-xs text-muted-foreground">{setTimeDisplay}</span>
+        )}
+      </div>
 
-ArtistPill.displayName = 'ArtistPill';
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Artist</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{displayName}</strong> from this tour date?
+              This will not delete the artist from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRemove}
+              disabled={isRemoving}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isRemoving ? 'Removing...' : 'Remove'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 export { ArtistPill };

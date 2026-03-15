@@ -4,10 +4,10 @@
 import { z } from 'zod';
 
 export const DOWNLOAD_OPTIONS = [
-  { value: 'free-320kbps', label: 'Download free (320Kbps)' },
+  { value: 'free-320kbps', label: 'Free (320Kbps)' },
   {
     value: 'premium-digital',
-    label: 'Download premium digital formats (FLAC, WAV, etc.)',
+    label: 'Premium digital formats: <br />FLAC, AAC, WAV, and more',
   },
 ] as const;
 
@@ -19,17 +19,17 @@ const downloadSchema = z.object({
     .refine((val) => DOWNLOAD_OPTIONS.some((option) => option.value === val), {
       message: 'Please select a download option',
     }),
-  tipAmount: z
+  finalAmount: z
     .string()
     .optional()
     .refine(
       (val) => {
-        const trimmed = val?.trim();
-        if (!trimmed) return true;
-        const num = Number(trimmed);
+        const cleaned = val?.replace(/[^\d.]/g, '').trim();
+        if (!cleaned) return true;
+        const num = Number(cleaned);
         return Number.isFinite(num) && num >= 0;
       },
-      { message: 'Tip amount must be a non-negative number' }
+      { message: 'Final amount must be a non-negative number' }
     ),
 });
 

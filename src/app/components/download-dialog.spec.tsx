@@ -53,7 +53,7 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
     expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
-    expect(screen.getByText('Choose your preferred download format.')).toBeInTheDocument();
+    expect(screen.getByText('Choose your preferred download format:')).toBeInTheDocument();
   });
 
   it('should render the free download radio option', async () => {
@@ -67,7 +67,7 @@ describe('DownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    expect(screen.getByText('Download free (320Kbps)')).toBeInTheDocument();
+    expect(screen.getByText('Free (320Kbps)')).toBeInTheDocument();
   });
 
   it('should render the premium download radio option with price', async () => {
@@ -81,13 +81,11 @@ describe('DownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    expect(
-      screen.getByText('Download premium digital formats (FLAC, WAV, etc.)')
-    ).toBeInTheDocument();
-    expect(screen.getByText(/from \$8/)).toBeInTheDocument();
+    expect(screen.getByText(/Premium digital formats/)).toBeInTheDocument();
+    expect(screen.getByText(/pay what you want/)).toBeInTheDocument();
   });
 
-  it('should show tip amount input when premium is selected', async () => {
+  it('should show custom amount input when premium is selected', async () => {
     const user = userEvent.setup();
 
     render(
@@ -103,14 +101,14 @@ describe('DownloadDialog', () => {
     await user.click(premiumRadio);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Tip amount')).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
     });
 
     expect(screen.getByText(/to extend your support for/)).toBeInTheDocument();
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
   });
 
-  it('should not show tip amount input when free is selected', async () => {
+  it('should not show custom amount input when free is selected', async () => {
     const user = userEvent.setup();
 
     render(
@@ -125,7 +123,7 @@ describe('DownloadDialog', () => {
     const freeRadio = screen.getByRole('radio', { name: /free/i });
     await user.click(freeRadio);
 
-    expect(screen.queryByLabelText('Tip amount')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Custom amount')).not.toBeInTheDocument();
   });
 
   it('should show validation error when submitting without selecting an option', async () => {
@@ -192,8 +190,11 @@ describe('DownloadDialog', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    expect(screen.getByText(/from \$8/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/suggested \$8/)).toBeInTheDocument();
+    });
   });
 
   it('should show custom premium price when provided', async () => {
@@ -206,11 +207,14 @@ describe('DownloadDialog', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    expect(screen.getByText(/from \$12/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/suggested \$12/)).toBeInTheDocument();
+    });
   });
 
-  it('should show validation error for negative tip amount', async () => {
+  it('should strip non-numeric characters from custom amount input', async () => {
     const user = userEvent.setup();
 
     render(
@@ -226,20 +230,15 @@ describe('DownloadDialog', () => {
     await user.click(premiumRadio);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Tip amount')).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
     });
 
-    // Enter negative tip
-    const tipInput = screen.getByLabelText('Tip amount');
-    await user.type(tipInput, '-5');
+    // Enter value with non-numeric characters
+    const amountInput = screen.getByLabelText('Custom amount');
+    await user.type(amountInput, '-5abc');
 
-    // Submit the form
-    const submitButton = screen.getByRole('button', { name: /Download for/i });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Tip amount must be a non-negative number')).toBeInTheDocument();
-    });
+    // The input mask should strip everything except digits and decimal, then prefix with $
+    expect(amountInput).toHaveValue('$5');
   });
 });
 
@@ -301,7 +300,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
     // Open and select premium option
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => expect(screen.getByLabelText('Tip amount')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
 
     // Close via Escape
     await user.keyboard('{Escape}');
@@ -311,7 +310,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
 
     // Reopen — form should be reset
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    expect(screen.queryByLabelText('Tip amount')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Custom amount')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();
   });
 });
@@ -406,7 +405,7 @@ describe('DownloadDialog — submit button label', () => {
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();
   });
 
-  it('should show "Download for $8" when premium is selected without a tip', async () => {
+  it('should show "Download for $8.00" when premium is selected without a custom amount', async () => {
     const user = userEvent.setup();
 
     render(
@@ -419,11 +418,11 @@ describe('DownloadDialog — submit button label', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Download for $8' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download for $8.00' })).toBeInTheDocument();
     });
   });
 
-  it('should show "Download for $8 + $5" when premium is selected with a tip', async () => {
+  it('should show "Download for $5.00" when premium is selected with a custom amount', async () => {
     const user = userEvent.setup();
 
     render(
@@ -435,11 +434,11 @@ describe('DownloadDialog — submit button label', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    await waitFor(() => expect(screen.getByLabelText('Tip amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Tip amount'), '5');
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Custom amount'), '5');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Download for $8 + $5' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download for $5.00' })).toBeInTheDocument();
     });
   });
 });
