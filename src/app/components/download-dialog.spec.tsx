@@ -371,6 +371,127 @@ describe('DownloadTriggerButton', () => {
       'test-value'
     );
   });
+
+  it('should merge custom className with default styles', () => {
+    render(<DownloadTriggerButton className="extra-class" />);
+
+    const button = screen.getByRole('button', { name: 'Download music' });
+    expect(button).toHaveClass('extra-class');
+    // Should also retain base styles
+    expect(button).toHaveClass('flex');
+  });
+});
+
+describe('DownloadDialog — custom amount input behavior', () => {
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should show the placeholder with the premium price', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Custom amount')).toHaveAttribute('placeholder', '$8.00');
+    });
+  });
+
+  it('should limit to two decimal places while typing', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText('Custom amount');
+    await user.type(input, '12.999');
+
+    // Should truncate to 2 decimal places, prefixed with $
+    expect(input).toHaveValue('$12.99');
+  });
+
+  it('should strip multiple decimal points', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText('Custom amount');
+    await user.type(input, '1.2.3');
+
+    // Second decimal should be stripped; result is $1.23
+    expect(input).toHaveValue('$1.23');
+  });
+
+  it('should format the value on blur', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText('Custom amount');
+    await user.type(input, '5');
+    await user.tab(); // trigger blur
+
+    // On blur, should format to $5.00
+    expect(input).toHaveValue('$5.00');
+  });
+
+  it('should show "Pay" label and suggested price text', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pay')).toBeInTheDocument();
+    });
+  });
 });
 
 describe('DownloadDialog — submit button label', () => {

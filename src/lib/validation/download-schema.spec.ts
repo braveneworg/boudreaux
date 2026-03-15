@@ -119,6 +119,19 @@ describe('download-schema', () => {
       const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: 'abc' });
       expect(result.success).toBe(true);
     });
+
+    it('should accept a dollar-prefixed amount (non-digit chars stripped)', () => {
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '$10.00' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should return the correct error message for an invalid amount', () => {
+      // NaN after stripping — e.g. just a lone dot
+      const result = downloadSchema.safeParse({ ...validPremiumData, finalAmount: '....' });
+      expect(result.success).toBe(false);
+      const errors = result.error?.issues.filter((i) => i.path[0] === 'finalAmount');
+      expect(errors?.[0].message).toBe('Amount must be a valid number');
+    });
   });
 
   describe('full form validation', () => {
