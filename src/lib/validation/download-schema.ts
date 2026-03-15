@@ -29,7 +29,7 @@ const downloadSchema = z.object({
         const num = Number(cleaned);
         return Number.isFinite(num) && num >= 0;
       },
-      { message: 'Final amount must be a non-negative number' }
+      { message: 'Amount must be a valid number' }
     ),
 });
 
