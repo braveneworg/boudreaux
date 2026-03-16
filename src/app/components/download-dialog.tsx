@@ -7,7 +7,7 @@ import { useState } from 'react';
 import type { ComponentProps, ReactElement } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Download } from 'lucide-react';
+import { Download, DownloadIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 import { SubscribeButton } from '@/app/components/subscribe-button';
@@ -87,7 +87,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Download</DialogTitle>
-          <DialogDescription>Choose your preferred download format:</DialogDescription>
+          <DialogDescription>Choose download format(s):</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -193,7 +193,8 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
             )}
 
             {/* Submit button */}
-            <Button type="submit">
+            <Button className="w-full" type="submit">
+              <DownloadIcon className="size-4" />
               {selectedOption === 'premium-digital' ? `Download for ${displayAmount}` : 'Download'}
             </Button>
           </form>
@@ -202,9 +203,13 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
         {/* Subscribe CTA */}
         <div className="border-t pt-4">
           <p className="text-muted-foreground mb-3 text-sm">
-            Want ACCESS TO ALL music on the Fake Four Inc. record label?
+            Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
           </p>
-          <SubscribeButton subscribeMessage="Subscribe" onClick={handleSubscribe} />
+          <SubscribeButton
+            className="w-full"
+            subscribeMessage="Subscribe"
+            onClick={handleSubscribe}
+          />
         </div>
       </DialogContent>
     </Dialog>

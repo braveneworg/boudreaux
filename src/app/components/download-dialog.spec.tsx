@@ -53,7 +53,7 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
     expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
-    expect(screen.getByText('Choose your preferred download format:')).toBeInTheDocument();
+    expect(screen.getByText('Choose download format(s):')).toBeInTheDocument();
   });
 
   it('should render the free download radio option', async () => {
@@ -158,7 +158,14 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
     expect(
-      screen.getByText(/Want ACCESS TO ALL music on the Fake Four Inc. record label\?/)
+      screen.getByText((content, element) => {
+        return (
+          element?.tagName === 'P' &&
+          /Want\s+ACCESS TO ALL\s+music on the Fake Four Inc\. record label\?/.test(
+            element.textContent ?? ''
+          )
+        );
+      })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Subscribe' })).toBeInTheDocument();
   });
