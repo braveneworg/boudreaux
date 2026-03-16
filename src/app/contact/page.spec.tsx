@@ -48,12 +48,9 @@ vi.mock('@hookform/resolvers/zod', () => ({
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
   motion: {
-    div: React.forwardRef(function MockMotionDiv(
-      props: React.HTMLAttributes<HTMLDivElement>,
-      ref: React.Ref<HTMLDivElement>
-    ) {
+    div: function MockMotionDiv({ ref, ...props }: React.ComponentProps<'div'>) {
       return <div ref={ref} {...props} />;
-    }),
+    },
   },
 }));
 

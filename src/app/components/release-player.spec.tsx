@@ -373,4 +373,23 @@ describe('ReleasePlayer', () => {
     const triggerButton = screen.getByTestId('download-trigger-button');
     expect(triggerButton).toBeInTheDocument();
   });
+
+  it('should render DownloadDialog before TrackListDrawer in the DOM', () => {
+    render(<ReleasePlayer release={mockRelease} />);
+
+    const downloadDialog = screen.getByTestId('download-dialog');
+    const trackListDrawer = screen.getByTestId('track-list-drawer');
+
+    // DownloadDialog should come before TrackListDrawer in document order
+    const order = downloadDialog.compareDocumentPosition(trackListDrawer);
+    // Node.DOCUMENT_POSITION_FOLLOWING = 4
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('should not render download dialog when release has no tracks', () => {
+    render(<ReleasePlayer release={mockReleaseNoTracks} />);
+
+    expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('download-trigger-button')).not.toBeInTheDocument();
+  });
 });

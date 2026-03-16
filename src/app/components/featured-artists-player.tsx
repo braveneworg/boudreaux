@@ -5,11 +5,11 @@
 
 import { useCallback, useState } from 'react';
 
-import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
 
 import { ArtistReleaseInfo } from './artist-release-info';
+import { DownloadDialog, DownloadTriggerButton } from './download-dialog';
 
 interface FeaturedArtistsPlayerProps {
   featuredArtists: FeaturedArtist[];
@@ -238,13 +238,19 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           />
         )}
         {showTrackListDrawer && selectedArtist && (
-          <MediaPlayer.TrackListDrawer
-            artistRelease={selectedArtist as unknown as ArtistRelease}
-            artistName={getDisplayName(selectedArtist)}
-            currentTrackId={currentTrackId ?? ''}
-            onTrackSelect={handleTrackSelect}
-          />
+          <div className="flex flex-col items-center">
+            <MediaPlayer.TrackListDrawer
+              artistRelease={selectedArtist as unknown as ArtistRelease}
+              artistName={getDisplayName(selectedArtist)}
+              currentTrackId={currentTrackId ?? ''}
+              onTrackSelect={handleTrackSelect}
+            />
+            <DownloadDialog artistName={getDisplayName(selectedArtist)}>
+              <DownloadTriggerButton />
+            </DownloadDialog>
+          </div>
         )}
+
         {/* Selected Artist Details */}
         {selectedArtist && (
           <div className="flex flex-col items-center">
@@ -263,9 +269,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                       onTogglePlay={handleTogglePlay}
                       className="shadow-lg"
                     />
-                    <DownloadDialog artistName={getDisplayName(selectedArtist)}>
-                      <DownloadTriggerButton />
-                    </DownloadDialog>
                   </div>
                 );
               })()}

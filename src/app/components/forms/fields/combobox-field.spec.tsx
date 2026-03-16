@@ -86,14 +86,18 @@ vi.mock('@/app/components/ui/popover', () => ({
 }));
 
 vi.mock('@/app/components/ui/command', () => {
-  const CommandInputMock = React.forwardRef<
-    HTMLInputElement,
-    {
-      placeholder?: string;
-      value?: string;
-      onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    } & React.InputHTMLAttributes<HTMLInputElement>
-  >(function CommandInput({ placeholder, value, onChange, ...props }, ref) {
+  const CommandInputMock = function CommandInput({
+    ref,
+    placeholder,
+    value,
+    onChange,
+    ...props
+  }: {
+    ref?: React.Ref<HTMLInputElement>;
+    placeholder?: string;
+    value?: string;
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  } & React.InputHTMLAttributes<HTMLInputElement>) {
     return (
       <input
         ref={ref}
@@ -104,7 +108,7 @@ vi.mock('@/app/components/ui/command', () => {
         {...props}
       />
     );
-  });
+  };
 
   return {
     Command: ({

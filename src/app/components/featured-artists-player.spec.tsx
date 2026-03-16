@@ -1096,14 +1096,17 @@ describe('FeaturedArtistsPlayer', () => {
   });
 
   describe('download dialog', () => {
-    it('should render the download dialog with the initial artist name', () => {
+    it('should render the download dialog with the selected artist name', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
 
+      // Select artist with a release so download dialog renders
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
       const downloadDialog = screen.getByTestId('download-dialog');
       expect(downloadDialog).toBeInTheDocument();
-      expect(downloadDialog).toHaveAttribute('data-artist-name', 'Test Artist 1');
+      expect(downloadDialog).toHaveAttribute('data-artist-name', 'Test Artist 2');
     });
 
     it('should render the download trigger button', () => {
@@ -1111,7 +1114,37 @@ describe('FeaturedArtistsPlayer', () => {
         wrapper: createWrapper(),
       });
 
+      // Select artist with a release so download trigger renders
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
       expect(screen.getByTestId('download-trigger-button')).toBeInTheDocument();
+    });
+
+    it('should not render the download dialog when the selected artist has no release', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // First artist has no release — download should not appear
+      expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('download-trigger-button')).not.toBeInTheDocument();
+    });
+
+    it('should update the download dialog artist name when switching artists', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select first artist with a release
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+      expect(screen.getByTestId('download-dialog')).toHaveAttribute(
+        'data-artist-name',
+        'Test Artist 2'
+      );
+
+      // Switch back to artist without release
+      fireEvent.click(screen.getByTestId('artist-featured-1'));
+      expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
     });
   });
 });

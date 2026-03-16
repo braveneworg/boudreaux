@@ -15,12 +15,9 @@ import type { ContactFormSchemaType } from '@/lib/validation/contact-schema';
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
   motion: {
-    div: React.forwardRef(function MockMotionDiv(
-      props: React.HTMLAttributes<HTMLDivElement>,
-      ref: React.Ref<HTMLDivElement>
-    ) {
+    div: function MockMotionDiv({ ref, ...props }: React.ComponentProps<'div'>) {
       return <div ref={ref} {...props} />;
-    }),
+    },
   },
 }));
 

@@ -5,14 +5,17 @@
 
 import { useRouter } from 'next/navigation';
 
+import { UserPlus2Icon } from 'lucide-react';
+
 import { Button } from '@/app/components/ui/button';
 
 interface SubscribeButtonProps {
+  className?: string;
   subscribeMessage: string;
   onClick?: () => void;
 }
 
-export const SubscribeButton = ({ subscribeMessage, onClick }: SubscribeButtonProps) => {
+export const SubscribeButton = ({ className, subscribeMessage, onClick }: SubscribeButtonProps) => {
   const router = useRouter();
 
   const handleClick = () => {
@@ -21,7 +24,8 @@ export const SubscribeButton = ({ subscribeMessage, onClick }: SubscribeButtonPr
   };
 
   return (
-    <Button variant="outline" onClick={handleClick}>
+    <Button className={className} variant="outline" onClick={handleClick}>
+      <UserPlus2Icon className="size-4" />
       {subscribeMessage}
     </Button>
   );
