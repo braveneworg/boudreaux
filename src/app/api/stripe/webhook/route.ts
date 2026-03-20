@@ -158,7 +158,8 @@ async function sendConfirmationEmail(
 
     await sesClient.send(command);
   } catch (error) {
-    console.error('Failed to send subscription confirmation email:', error);
+    console.error(`Failed to send subscription confirmation email to ${customerEmail}:`, error);
+    await SubscriptionRepository.resetConfirmationEmailSent(customerEmail);
   }
 }
 
