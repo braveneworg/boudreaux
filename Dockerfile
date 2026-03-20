@@ -72,7 +72,7 @@ RUN if [ -f next-build.tar.gz ]; then \
       echo "Building Next.js from scratch"; \
       echo "Generating Prisma Client..."; \
       npx prisma generate; \
-      npx next build; \
+      npx next build --webpack; \
     fi
 
 # Stage 2: Create final image
