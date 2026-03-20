@@ -7,14 +7,7 @@ import SubscribeSuccessPage from './page';
 
 vi.mock('server-only', () => ({}));
 
-const mockAfter = vi.fn();
-
-vi.mock('next/server', () => ({
-  after: (...args: unknown[]) => mockAfter(...args),
-}));
-
 const mockSessionsRetrieve = vi.fn();
-const mockSubscriptionsRetrieve = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
   stripe: {
@@ -23,65 +16,12 @@ vi.mock('@/lib/stripe', () => ({
         retrieve: (...args: unknown[]) => mockSessionsRetrieve(...args),
       },
     },
-    subscriptions: {
-      retrieve: (...args: unknown[]) => mockSubscriptionsRetrieve(...args),
-    },
-  },
-}));
-
-const mockSesSend = vi.fn();
-
-vi.mock('@/lib/utils/ses-client', () => ({
-  sesClient: { send: (...args: unknown[]) => mockSesSend(...args) },
-}));
-
-vi.mock('@/lib/email/subscription-confirmation-email-html', () => ({
-  buildSubscriptionConfirmationEmailHtml: () => '<html>confirmation</html>',
-}));
-
-vi.mock('@/lib/email/subscription-confirmation-email-text', () => ({
-  buildSubscriptionConfirmationEmailText: () => 'confirmation text',
-}));
-
-vi.mock('@/lib/subscriber-rates', () => ({
-  getTierByPriceId: (priceId: string) => {
-    const map: Record<string, string> = {
-      price_minimum: 'minimum',
-      price_extra: 'extra',
-    };
-    return map[priceId] ?? null;
-  },
-  TIER_LABELS: {
-    minimum: 'Minimum',
-    extra: 'Extra',
-    extraExtra: 'Extra Extra',
-  },
-  getSubscriberRate: (tier: string) => {
-    const rates: Record<string, number> = {
-      minimum: 14.44,
-      extra: 24.44,
-      extraExtra: 44.44,
-    };
-    return rates[tier] ?? 0;
-  },
-}));
-
-const mockMarkConfirmationEmailSent = vi.fn();
-
-vi.mock('@/lib/repositories/subscription-repository', () => ({
-  SubscriptionRepository: {
-    markConfirmationEmailSent: (...args: unknown[]) => mockMarkConfirmationEmailSent(...args),
   },
 }));
 
 describe('SubscribeSuccessPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockMarkConfirmationEmailSent.mockResolvedValue(true);
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it('should show missing session message when no session_id is provided', async () => {
@@ -102,16 +42,7 @@ describe('SubscribeSuccessPage', () => {
       id: 'cs_test_123',
       payment_status: 'paid',
       customer_details: { email: 'subscriber@example.com' },
-      subscription: 'sub_test_123',
     });
-    mockSubscriptionsRetrieve.mockResolvedValue({
-      id: 'sub_test_123',
-      items: {
-        data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
-      },
-    });
-    mockSesSend.mockResolvedValue({});
-    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
 
     const page = await SubscribeSuccessPage({
       searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
@@ -131,7 +62,6 @@ describe('SubscribeSuccessPage', () => {
       id: 'cs_test_123',
       payment_status: 'paid',
       customer_details: { email: null },
-      subscription: null,
     });
 
     const page = await SubscribeSuccessPage({
@@ -174,128 +104,5 @@ describe('SubscribeSuccessPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Something Went Wrong' })).toBeInTheDocument();
     expect(screen.getByText(/We could not verify your subscription/)).toBeInTheDocument();
-  });
-
-  it('should not send email when EMAIL_FROM is not configured', async () => {
-    vi.stubEnv('EMAIL_FROM', '');
-    mockSessionsRetrieve.mockResolvedValue({
-      id: 'cs_test_123',
-      payment_status: 'paid',
-      customer_details: { email: 'subscriber@example.com' },
-      subscription: 'sub_test_123',
-    });
-    mockSubscriptionsRetrieve.mockResolvedValue({
-      id: 'sub_test_123',
-      items: {
-        data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
-      },
-    });
-
-    const page = await SubscribeSuccessPage({
-      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
-    });
-
-    render(page);
-
-    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    // after() is called with the promise, but sendConfirmationEmail bails early when EMAIL_FROM is empty
-    expect(mockAfter).toHaveBeenCalledTimes(1);
-  });
-
-  it('should still render success even if email sending fails', async () => {
-    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    mockSessionsRetrieve.mockResolvedValue({
-      id: 'cs_test_123',
-      payment_status: 'paid',
-      customer_details: { email: 'subscriber@example.com' },
-      subscription: 'sub_test_123',
-    });
-    mockSubscriptionsRetrieve.mockResolvedValue({
-      id: 'sub_test_123',
-      items: {
-        data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
-      },
-    });
-
-    const page = await SubscribeSuccessPage({
-      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
-    });
-
-    render(page);
-
-    // Page renders immediately; email is deferred via after()
-    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    expect(mockAfter).toHaveBeenCalledTimes(1);
-  });
-
-  it('should handle subscription as an object (not string)', async () => {
-    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    mockSessionsRetrieve.mockResolvedValue({
-      id: 'cs_test_123',
-      payment_status: 'paid',
-      customer_details: { email: 'subscriber@example.com' },
-      subscription: { id: 'sub_test_456' },
-    });
-    mockSubscriptionsRetrieve.mockResolvedValue({
-      id: 'sub_test_456',
-      items: {
-        data: [{ price: { id: 'price_extra', recurring: { interval: 'year' } } }],
-      },
-    });
-    mockSesSend.mockResolvedValue({});
-
-    const page = await SubscribeSuccessPage({
-      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
-    });
-
-    render(page);
-
-    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_test_456');
-  });
-
-  it('should handle no subscription (one-time payment)', async () => {
-    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    mockSessionsRetrieve.mockResolvedValue({
-      id: 'cs_test_123',
-      payment_status: 'paid',
-      customer_details: { email: 'subscriber@example.com' },
-      subscription: null,
-    });
-    mockSesSend.mockResolvedValue({});
-
-    const page = await SubscribeSuccessPage({
-      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
-    });
-
-    render(page);
-
-    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    // Email is deferred via after()
-    expect(mockAfter).toHaveBeenCalledTimes(1);
-  });
-
-  it('should not send email when confirmation was already sent', async () => {
-    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    mockMarkConfirmationEmailSent.mockResolvedValue(false);
-    mockSessionsRetrieve.mockResolvedValue({
-      id: 'cs_test_123',
-      payment_status: 'paid',
-      customer_details: { email: 'subscriber@example.com' },
-      subscription: 'sub_test_123',
-    });
-
-    const page = await SubscribeSuccessPage({
-      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
-    });
-
-    render(page);
-
-    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    expect(mockAfter).toHaveBeenCalledTimes(1);
-    // Wait for the deferred sendConfirmationEmail to settle
-    await new Promise(process.nextTick);
-    expect(mockSesSend).not.toHaveBeenCalled();
-    expect(mockSubscriptionsRetrieve).not.toHaveBeenCalled();
   });
 });

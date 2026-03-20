@@ -2,16 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { after } from 'next/server';
-
-import { SendEmailCommand } from '@aws-sdk/client-ses';
-
-import { buildSubscriptionConfirmationEmailHtml } from '@/lib/email/subscription-confirmation-email-html';
-import { buildSubscriptionConfirmationEmailText } from '@/lib/email/subscription-confirmation-email-text';
-import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
-import { getSubscriberRate, getTierByPriceId, TIER_LABELS } from '@/lib/subscriber-rates';
-import { sesClient } from '@/lib/utils/ses-client';
 
 import type { Metadata } from 'next';
 
@@ -43,10 +34,6 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
 
     if (checkoutSession.payment_status === 'paid') {
       const customerEmail = checkoutSession.customer_details?.email;
-
-      if (customerEmail) {
-        after(sendConfirmationEmail(checkoutSession, customerEmail));
-      }
 
       return (
         <div className="mx-auto max-w-2xl px-4 py-16 text-center">
@@ -84,72 +71,5 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
     );
   }
 };
-
-async function sendConfirmationEmail(
-  checkoutSession: Awaited<ReturnType<typeof stripe.checkout.sessions.retrieve>>,
-  customerEmail: string
-) {
-  const fromAddress = process.env.EMAIL_FROM;
-  if (!fromAddress) {
-    console.error('EMAIL_FROM is not configured; skipping subscription confirmation email');
-    return;
-  }
-
-  const shouldSend = await SubscriptionRepository.markConfirmationEmailSent(customerEmail);
-  if (!shouldSend) {
-    return;
-  }
-
-  try {
-    let tierLabel = 'Subscriber';
-    let amount = '';
-    let interval = 'month';
-
-    if (checkoutSession.subscription) {
-      const subscriptionId =
-        typeof checkoutSession.subscription === 'string'
-          ? checkoutSession.subscription
-          : checkoutSession.subscription.id;
-
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const priceId = subscription.items.data[0]?.price.id;
-      const tier = priceId ? getTierByPriceId(priceId) : null;
-
-      if (tier) {
-        tierLabel = TIER_LABELS[tier];
-        amount = `$${getSubscriberRate(tier).toFixed(2)}`;
-      }
-
-      interval = subscription.items.data[0]?.price.recurring?.interval ?? 'month';
-    }
-
-    const emailData = { email: customerEmail, tierLabel, amount, interval };
-
-    const command = new SendEmailCommand({
-      Source: fromAddress,
-      Destination: { ToAddresses: [customerEmail] },
-      Message: {
-        Subject: {
-          Data: 'Welcome to Fake Four Inc. — Subscription Confirmed',
-          Charset: 'UTF-8',
-        },
-        Body: {
-          Html: {
-            Data: buildSubscriptionConfirmationEmailHtml(emailData),
-            Charset: 'UTF-8',
-          },
-          Text: {
-            Data: buildSubscriptionConfirmationEmailText(emailData),
-            Charset: 'UTF-8',
-          },
-        },
-      },
-    });
-
-    await sesClient.send(command);
-  } catch (error) {
-    console.error('Failed to send subscription confirmation email:', error);
-  }
-}
 
 export default SubscribeSuccessPage;
