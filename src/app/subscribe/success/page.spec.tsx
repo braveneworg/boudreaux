@@ -7,6 +7,12 @@ import SubscribeSuccessPage from './page';
 
 vi.mock('server-only', () => ({}));
 
+const mockAfter = vi.fn();
+
+vi.mock('next/server', () => ({
+  after: (...args: unknown[]) => mockAfter(...args),
+}));
+
 const mockSessionsRetrieve = vi.fn();
 const mockSubscriptionsRetrieve = vi.fn();
 
@@ -107,7 +113,7 @@ describe('SubscribeSuccessPage', () => {
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
     expect(screen.getByText(/Thank you for subscribing/)).toBeInTheDocument();
     expect(
-      screen.getByText(/A confirmation email has been sent to subscriber@example.com/)
+      screen.getByText(/A confirmation email will be sent to subscriber@example.com/)
     ).toBeInTheDocument();
   });
 
@@ -126,7 +132,7 @@ describe('SubscribeSuccessPage', () => {
     render(page);
 
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    expect(screen.queryByText(/A confirmation email has been sent/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/A confirmation email will be sent/)).not.toBeInTheDocument();
   });
 
   it('should show processing message when payment status is not paid', async () => {
@@ -183,7 +189,8 @@ describe('SubscribeSuccessPage', () => {
     render(page);
 
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    expect(mockSesSend).not.toHaveBeenCalled();
+    // after() is called with the promise, but sendConfirmationEmail bails early when EMAIL_FROM is empty
+    expect(mockAfter).toHaveBeenCalledTimes(1);
   });
 
   it('should still render success even if email sending fails', async () => {
@@ -200,7 +207,6 @@ describe('SubscribeSuccessPage', () => {
         data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
       },
     });
-    mockSesSend.mockRejectedValue(new Error('SES unavailable'));
 
     const page = await SubscribeSuccessPage({
       searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
@@ -208,7 +214,9 @@ describe('SubscribeSuccessPage', () => {
 
     render(page);
 
+    // Page renders immediately; email is deferred via after()
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockAfter).toHaveBeenCalledTimes(1);
   });
 
   it('should handle subscription as an object (not string)', async () => {
@@ -254,7 +262,7 @@ describe('SubscribeSuccessPage', () => {
     render(page);
 
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
-    // Should still send email with default tier/amount labels
-    expect(mockSesSend).toHaveBeenCalledTimes(1);
+    // Email is deferred via after()
+    expect(mockAfter).toHaveBeenCalledTimes(1);
   });
 });

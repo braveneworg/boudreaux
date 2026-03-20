@@ -4,15 +4,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { SendEmailCommand } from '@aws-sdk/client-ses';
-
-import { buildSubscriptionConfirmationEmailHtml } from '@/lib/email/subscription-confirmation-email-html';
-import { buildSubscriptionConfirmationEmailText } from '@/lib/email/subscription-confirmation-email-text';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
-import { getSubscriberRate, getTierByPriceId, TIER_LABELS } from '@/lib/subscriber-rates';
-import type { SubscriberRateTier } from '@/lib/subscriber-rates';
-import { sesClient } from '@/lib/utils/ses-client';
+import { getTierByPriceId } from '@/lib/subscriber-rates';
 
 import type Stripe from 'stripe';
 
@@ -97,8 +91,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       subscriptionTier: tier,
       subscriptionCurrentPeriodEnd: new Date(subscription.items.data[0].current_period_end * 1000),
     });
-
-    await sendSubscriptionConfirmationEmail(customerEmail, tier, subscription);
   }
 }
 
@@ -134,49 +126,4 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   await SubscriptionRepository.updateSubscriptionStatus(stripeCustomerId, 'past_due');
-}
-
-async function sendSubscriptionConfirmationEmail(
-  email: string,
-  tier: SubscriberRateTier | null,
-  subscription: Stripe.Subscription
-) {
-  const fromAddress = process.env.EMAIL_FROM;
-  if (!fromAddress) {
-    console.error('EMAIL_FROM is not configured; skipping subscription confirmation email');
-    return;
-  }
-
-  try {
-    const interval = subscription.items.data[0]?.price.recurring?.interval ?? 'month';
-    const tierLabel = tier ? TIER_LABELS[tier] : 'Subscriber';
-    const amount = tier ? `$${getSubscriberRate(tier).toFixed(2)}` : '';
-
-    const emailData = { email, tierLabel, amount, interval };
-
-    const command = new SendEmailCommand({
-      Source: fromAddress,
-      Destination: { ToAddresses: [email] },
-      Message: {
-        Subject: {
-          Data: 'Welcome to Fake Four Inc. — Subscription Confirmed',
-          Charset: 'UTF-8',
-        },
-        Body: {
-          Html: {
-            Data: buildSubscriptionConfirmationEmailHtml(emailData),
-            Charset: 'UTF-8',
-          },
-          Text: {
-            Data: buildSubscriptionConfirmationEmailText(emailData),
-            Charset: 'UTF-8',
-          },
-        },
-      },
-    });
-
-    await sesClient.send(command);
-  } catch (error) {
-    console.error('Failed to send subscription confirmation email:', error);
-  }
 }

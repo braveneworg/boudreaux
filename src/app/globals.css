@@ -4,6 +4,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --fake-four-orange: oklch(0.6907 0.1173 50.77);
 }
 
 @theme {

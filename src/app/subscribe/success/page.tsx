@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { after } from 'next/server';
+
 import { SendEmailCommand } from '@aws-sdk/client-ses';
 
 import { buildSubscriptionConfirmationEmailHtml } from '@/lib/email/subscription-confirmation-email-html';
@@ -42,7 +44,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
       const customerEmail = checkoutSession.customer_details?.email;
 
       if (customerEmail) {
-        await sendConfirmationEmail(checkoutSession, customerEmail);
+        after(sendConfirmationEmail(checkoutSession, customerEmail));
       }
 
       return (
@@ -54,7 +56,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
           </p>
           {customerEmail && (
             <p className="text-muted-foreground mt-2 text-sm">
-              A confirmation email has been sent to {customerEmail}.
+              A confirmation email will be sent to {customerEmail}.
             </p>
           )}
         </div>

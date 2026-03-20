@@ -233,7 +233,12 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
               <p className="text-muted-foreground mb-3 text-sm">
                 Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
               </p>
-              <Button type="button" className="w-full" variant="outline" onClick={handleSubscribe}>
+              <Button
+                type="button"
+                className="w-full !bg-(--fake-four-orange) text-white hover:bg-(--fake-four-orange-hover) focus-visible:ring-(--fake-four-orange) data-[state=open]:bg-(--fake-four-orange-hover)"
+                variant="outline"
+                onClick={handleSubscribe}
+              >
                 <UserPlus2Icon className="size-4" />
                 Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
               </Button>
