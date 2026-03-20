@@ -38,7 +38,7 @@ model User {
   allowSmsNotifications Boolean? @default(false)
 
   // Stripe subscription fields
-  stripeCustomerId              String?   @unique
+  stripeCustomerId              String?
   subscriptionId                String?
   subscriptionStatus            String?
   subscriptionTier              String?
@@ -55,6 +55,7 @@ model User {
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
+  @@index([stripeCustomerId])
 }
 
 model Account {
