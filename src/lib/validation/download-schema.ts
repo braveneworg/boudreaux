@@ -7,7 +7,7 @@ export const DOWNLOAD_OPTIONS = [
   { value: 'free-320kbps', label: 'Free (320Kbps)' },
   {
     value: 'premium-digital',
-    label: 'Premium digital formats: <br />FLAC, AAC, WAV, and more',
+    label: 'Premium digital formats: FLAC, AAC, WAV, and more',
   },
 ] as const;
 

@@ -37,6 +37,18 @@ describe('SubscribeSuccessPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('should show error when session_id does not start with cs_', async () => {
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'invalid_abc123' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Something Went Wrong' })).toBeInTheDocument();
+    expect(screen.getByText(/We could not verify your subscription/)).toBeInTheDocument();
+    expect(mockSessionsRetrieve).not.toHaveBeenCalled();
+  });
+
   it('should show success page when payment is paid', async () => {
     mockSessionsRetrieve.mockResolvedValue({
       id: 'cs_test_123',
@@ -53,7 +65,7 @@ describe('SubscribeSuccessPage', () => {
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
     expect(screen.getByText(/Thank you for subscribing/)).toBeInTheDocument();
     expect(
-      screen.getByText(/A confirmation email will be sent to subscriber@example.com/)
+      screen.getByText(/A confirmation email will be sent to s\*\*\*@example\.com/)
     ).toBeInTheDocument();
   });
 

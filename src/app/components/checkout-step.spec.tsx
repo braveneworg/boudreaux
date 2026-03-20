@@ -107,25 +107,19 @@ describe('CheckoutStep', () => {
     });
   });
 
-  it('should pass customerEmail and stripeCustomerId to the action', async () => {
+  it('should pass customerEmail to the action', async () => {
     mockCreateCheckoutSessionAction.mockResolvedValue({
       clientSecret: 'cs_test_xyz',
     });
 
-    renderInDialog(
-      <CheckoutStep tier="extra" customerEmail="test@example.com" stripeCustomerId="cus_test123" />
-    );
+    renderInDialog(<CheckoutStep tier="extra" customerEmail="test@example.com" />);
 
     await waitFor(() => {
-      expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith(
-        'extra',
-        'test@example.com',
-        'cus_test123'
-      );
+      expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith('extra', 'test@example.com');
     });
   });
 
-  it('should omit undefined values when no email or customer ID provided', async () => {
+  it('should omit undefined values when no email is provided', async () => {
     mockCreateCheckoutSessionAction.mockResolvedValue({
       clientSecret: 'cs_test_xyz',
     });
@@ -133,7 +127,7 @@ describe('CheckoutStep', () => {
     renderInDialog(<CheckoutStep tier="minimum" />);
 
     await waitFor(() => {
-      expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith('minimum', undefined, undefined);
+      expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith('minimum', undefined);
     });
   });
 });

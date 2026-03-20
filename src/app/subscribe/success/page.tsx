@@ -15,6 +15,16 @@ interface SubscribeSuccessPageProps {
   searchParams: Promise<{ session_id?: string }>;
 }
 
+/**
+ * Masks a customer email to reduce PII exposure on the confirmation page.
+ * Example: "subscriber@example.com" → "s***@example.com"
+ */
+const maskEmail = (email: string): string => {
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0) return email;
+  return `${email[0]}***${email.slice(atIndex)}`;
+};
+
 const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps) => {
   const { session_id } = await searchParams;
 
@@ -24,6 +34,18 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
         <h1 className="text-3xl font-bold tracking-tight">Subscribe</h1>
         <p className="text-muted-foreground mt-4 text-lg">
           It looks like you arrived here without completing checkout.
+        </p>
+      </div>
+    );
+  }
+
+  if (!session_id.startsWith('cs_')) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 className="text-3xl font-bold tracking-tight">Something Went Wrong</h1>
+        <p className="text-muted-foreground mt-4 text-lg">
+          We could not verify your subscription. Please contact support if you believe this is an
+          error.
         </p>
       </div>
     );
@@ -44,7 +66,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
           </p>
           {customerEmail && (
             <p className="text-muted-foreground mt-2 text-sm">
-              A confirmation email will be sent to {customerEmail}.
+              A confirmation email will be sent to {maskEmail(customerEmail)}.
             </p>
           )}
         </div>

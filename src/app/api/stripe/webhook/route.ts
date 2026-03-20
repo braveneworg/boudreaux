@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error(`Error handling webhook event ${event.type}:`, error);
-    return NextResponse.json({ received: true, error: 'Handler failed' }, { status: 200 });
+    return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

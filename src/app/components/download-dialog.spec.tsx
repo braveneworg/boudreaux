@@ -31,21 +31,8 @@ vi.mock('next-auth/react', () => ({
 }));
 
 vi.mock('@/app/components/checkout-step', () => ({
-  CheckoutStep: ({
-    tier,
-    customerEmail,
-    stripeCustomerId,
-  }: {
-    tier: string;
-    customerEmail?: string | null;
-    stripeCustomerId?: string | null;
-  }) => (
-    <div
-      data-testid="checkout-step"
-      data-tier={tier}
-      data-email={customerEmail ?? ''}
-      data-stripe-customer-id={stripeCustomerId ?? ''}
-    >
+  CheckoutStep: ({ tier, customerEmail }: { tier: string; customerEmail?: string | null }) => (
+    <div data-testid="checkout-step" data-tier={tier} data-email={customerEmail ?? ''}>
       Mock Checkout Step
     </div>
   ),
@@ -815,7 +802,7 @@ describe('DownloadDialog — subscription multi-step flow', () => {
     expect(screen.getByTestId('checkout-step')).toHaveAttribute('data-tier', 'extraExtra');
   });
 
-  it('should pass stripeCustomerId to checkout step when user has one', async () => {
+  it('should pass the authenticated user email to checkout step and resolve stripeCustomerId server-side', async () => {
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -840,7 +827,8 @@ describe('DownloadDialog — subscription multi-step flow', () => {
     await user.click(screen.getByRole('button', { name: /Go for It/ }));
 
     const checkoutStep = screen.getByTestId('checkout-step');
-    expect(checkoutStep).toHaveAttribute('data-stripe-customer-id', 'cus_test123');
     expect(checkoutStep).toHaveAttribute('data-email', 'subscriber@example.com');
+    // stripeCustomerId is no longer passed as a prop; it is resolved server-side in the action
+    expect(checkoutStep).not.toHaveAttribute('data-stripe-customer-id');
   });
 });

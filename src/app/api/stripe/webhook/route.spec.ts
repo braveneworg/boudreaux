@@ -376,7 +376,7 @@ describe('POST /api/stripe/webhook', () => {
     });
   });
 
-  it('should return 200 even when handler throws', async () => {
+  it('should return 500 when a handler throws so Stripe retries delivery', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -394,7 +394,7 @@ describe('POST /api/stripe/webhook', () => {
     const request = createRequest('{}');
     const response = await POST(request);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(500);
     const json = await response.json();
     expect(json.error).toBe('Handler failed');
   });

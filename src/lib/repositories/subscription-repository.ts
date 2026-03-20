@@ -5,9 +5,11 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import type Stripe from 'stripe';
+
 interface UpdateSubscriptionData {
   subscriptionId: string;
-  subscriptionStatus: string;
+  subscriptionStatus: Stripe.Subscription.Status;
   subscriptionTier: string | null;
   subscriptionCurrentPeriodEnd: Date | null;
 }
@@ -56,7 +58,10 @@ export class SubscriptionRepository {
     });
   }
 
-  static async updateSubscriptionStatus(stripeCustomerId: string, status: string) {
+  static async updateSubscriptionStatus(
+    stripeCustomerId: string,
+    status: Stripe.Subscription.Status
+  ) {
     return prisma.user.update({
       where: { stripeCustomerId },
       data: { subscriptionStatus: status },

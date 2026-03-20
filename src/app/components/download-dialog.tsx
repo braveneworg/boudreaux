@@ -136,10 +136,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                               </FormControl>
                               <FormLabel className="cursor-pointer font-normal">
                                 <div className="flex flex-col gap-1">
-                                  <div
-                                    className="leading-snug"
-                                    dangerouslySetInnerHTML={{ __html: option.label }}
-                                  />
+                                  <span className="leading-snug">{option.label}</span>
                                   {option.value === 'premium-digital' && (
                                     <span className="text-muted-foreground">
                                       {' '}
@@ -276,11 +273,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
         )}
 
         {step === 'checkout' && selectedTier && (
-          <CheckoutStep
-            tier={selectedTier}
-            customerEmail={customerEmail}
-            stripeCustomerId={session?.user?.stripeCustomerId}
-          />
+          <CheckoutStep tier={selectedTier} customerEmail={customerEmail} />
         )}
       </DialogContent>
     </Dialog>
