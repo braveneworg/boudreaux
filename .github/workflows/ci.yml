@@ -136,7 +136,7 @@ jobs:
           NODE_ENV: "production"
           AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
           AUTH_URL: "http://localhost:3000"
-        run: npm run build
+        run: npx next build --webpack
 
       - name: Package Next.js output for deploy workflow (standalone + static only)
         run: |
