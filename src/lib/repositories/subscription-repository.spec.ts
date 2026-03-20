@@ -41,7 +41,7 @@ describe('SubscriptionRepository', () => {
     it('should update subscription fields by stripeCustomerId', async () => {
       const data = {
         subscriptionId: 'sub_123',
-        subscriptionStatus: 'active',
+        subscriptionStatus: 'active' as const,
         subscriptionTier: 'minimum',
         subscriptionCurrentPeriodEnd: new Date('2026-04-17'),
       };
