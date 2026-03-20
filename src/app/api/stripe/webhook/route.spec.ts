@@ -27,6 +27,7 @@ const mockLinkStripeCustomer = vi.fn();
 const mockUpdateSubscription = vi.fn();
 const mockCancelSubscription = vi.fn();
 const mockUpdateSubscriptionStatus = vi.fn();
+const mockMarkConfirmationEmailSent = vi.fn();
 
 vi.mock('@/lib/repositories/subscription-repository', () => ({
   SubscriptionRepository: {
@@ -34,6 +35,7 @@ vi.mock('@/lib/repositories/subscription-repository', () => ({
     updateSubscription: (...args: unknown[]) => mockUpdateSubscription(...args),
     cancelSubscription: (...args: unknown[]) => mockCancelSubscription(...args),
     updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
+    markConfirmationEmailSent: (...args: unknown[]) => mockMarkConfirmationEmailSent(...args),
   },
 }));
 
@@ -46,6 +48,33 @@ vi.mock('@/lib/subscriber-rates', () => ({
     };
     return map[priceId] ?? null;
   },
+  TIER_LABELS: {
+    minimum: 'Minimum',
+    extra: 'Extra',
+    extraExtra: 'Extra Extra',
+  },
+  getSubscriberRate: (tier: string) => {
+    const rates: Record<string, number> = {
+      minimum: 14.44,
+      extra: 24.44,
+      extraExtra: 44.44,
+    };
+    return rates[tier] ?? 0;
+  },
+}));
+
+const mockSesSend = vi.fn();
+
+vi.mock('@/lib/utils/ses-client', () => ({
+  sesClient: { send: (...args: unknown[]) => mockSesSend(...args) },
+}));
+
+vi.mock('@/lib/email/subscription-confirmation-email-html', () => ({
+  buildSubscriptionConfirmationEmailHtml: () => '<html>confirmation</html>',
+}));
+
+vi.mock('@/lib/email/subscription-confirmation-email-text', () => ({
+  buildSubscriptionConfirmationEmailText: () => 'confirmation text',
 }));
 
 const WEBHOOK_SECRET = 'whsec_test_secret';
@@ -66,6 +95,7 @@ describe('POST /api/stripe/webhook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    mockMarkConfirmationEmailSent.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -134,7 +164,12 @@ describe('POST /api/stripe/webhook', () => {
       status: 'active',
       customer: 'cus_test_123',
       items: {
-        data: [{ price: { id: 'price_minimum' }, current_period_end: 1713398400 }],
+        data: [
+          {
+            price: { id: 'price_minimum', recurring: { interval: 'month' } },
+            current_period_end: 1713398400,
+          },
+        ],
       } as unknown as Stripe.ApiList<Stripe.SubscriptionItem>,
     };
 
@@ -146,9 +181,11 @@ describe('POST /api/stripe/webhook', () => {
       mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
       mockLinkStripeCustomer.mockResolvedValue({});
       mockUpdateSubscription.mockResolvedValue({});
+      mockSesSend.mockResolvedValue({});
     });
 
     it('should link stripe customer and update subscription', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
       const request = createRequest('{}');
       const response = await POST(request);
 
@@ -161,6 +198,66 @@ describe('POST /api/stripe/webhook', () => {
         subscriptionTier: 'minimum',
         subscriptionCurrentPeriodEnd: new Date(1713398400 * 1000),
       });
+    });
+
+    it('should send confirmation email on checkout.session.completed', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockSesSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not send email when EMAIL_FROM is not configured', async () => {
+      vi.stubEnv('EMAIL_FROM', '');
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkConfirmationEmailSent).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
+    });
+
+    it('should not send email when confirmation was already sent', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockMarkConfirmationEmailSent.mockResolvedValue(false);
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockSesSend).not.toHaveBeenCalled();
+    });
+
+    it('should still return 200 even when email sending fails', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockSesSend.mockRejectedValue(new Error('SES error'));
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should send email with default tier label when no subscription', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            ...mockSession,
+            subscription: null,
+          },
+        },
+      });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockSesSend).toHaveBeenCalledTimes(1);
     });
 
     it('should skip if email or customer ID is missing', async () => {
@@ -181,6 +278,7 @@ describe('POST /api/stripe/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(mockLinkStripeCustomer).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
     });
   });
 
