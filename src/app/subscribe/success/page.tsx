@@ -8,6 +8,7 @@ import { SendEmailCommand } from '@aws-sdk/client-ses';
 
 import { buildSubscriptionConfirmationEmailHtml } from '@/lib/email/subscription-confirmation-email-html';
 import { buildSubscriptionConfirmationEmailText } from '@/lib/email/subscription-confirmation-email-text';
+import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getSubscriberRate, getTierByPriceId, TIER_LABELS } from '@/lib/subscriber-rates';
 import { sesClient } from '@/lib/utils/ses-client';
@@ -91,6 +92,11 @@ async function sendConfirmationEmail(
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     console.error('EMAIL_FROM is not configured; skipping subscription confirmation email');
+    return;
+  }
+
+  const shouldSend = await SubscriptionRepository.markConfirmationEmailSent(customerEmail);
+  if (!shouldSend) {
     return;
   }
 

@@ -20,6 +20,7 @@ const SUBSCRIPTION_SELECT = {
   subscriptionStatus: true,
   subscriptionTier: true,
   subscriptionCurrentPeriodEnd: true,
+  confirmationEmailSentAt: true,
 } as const;
 
 export class SubscriptionRepository {
@@ -50,6 +51,7 @@ export class SubscriptionRepository {
         subscriptionId: null,
         subscriptionTier: null,
         subscriptionCurrentPeriodEnd: null,
+        confirmationEmailSentAt: null,
       },
     });
   }
@@ -73,5 +75,22 @@ export class SubscriptionRepository {
       where: { email },
       select: SUBSCRIPTION_SELECT,
     });
+  }
+
+  /**
+   * Atomically marks the confirmation email as sent for a user.
+   * Uses updateMany with a null-check to prevent race conditions
+   * from concurrent page loads.
+   *
+   * @returns true if the flag was set (email should be sent),
+   *          false if it was already set (email already sent).
+   */
+  static async markConfirmationEmailSent(email: string): Promise<boolean> {
+    const result = await prisma.user.updateMany({
+      where: { email, confirmationEmailSentAt: null },
+      data: { confirmationEmailSentAt: new Date() },
+    });
+
+    return result.count > 0;
   }
 }

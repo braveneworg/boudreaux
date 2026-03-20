@@ -30,10 +30,22 @@ vi.mock('@/lib/subscriber-rates', () => ({
   },
 }));
 
+const mockFindByStripeCustomerId = vi.fn();
+const mockFindByEmail = vi.fn();
+
+vi.mock('@/lib/repositories/subscription-repository', () => ({
+  SubscriptionRepository: {
+    findByStripeCustomerId: (...args: unknown[]) => mockFindByStripeCustomerId(...args),
+    findByEmail: (...args: unknown[]) => mockFindByEmail(...args),
+  },
+}));
+
 describe('createCheckoutSessionAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('AUTH_URL', 'https://fakefourrecords.com');
+    mockFindByStripeCustomerId.mockResolvedValue(null);
+    mockFindByEmail.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -148,5 +160,90 @@ describe('createCheckoutSessionAction', () => {
         line_items: [{ price: 'price_extra_extra_test', quantity: 1 }],
       })
     );
+  });
+
+  describe('duplicate subscription prevention', () => {
+    it('should reject when user already has an active subscription at the same tier (by stripeCustomerId)', async () => {
+      mockFindByStripeCustomerId.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'minimum',
+      });
+
+      const result = await createCheckoutSessionAction(
+        'minimum',
+        'test@example.com',
+        'cus_test123'
+      );
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('should reject when user already has an active subscription at the same tier (by email)', async () => {
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'extra',
+      });
+
+      const result = await createCheckoutSessionAction('extra', 'test@example.com');
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('should allow checkout when user has an active subscription at a different tier', async () => {
+      mockFindByStripeCustomerId.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'minimum',
+      });
+      mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_upgrade' });
+
+      const result = await createCheckoutSessionAction('extra', 'test@example.com', 'cus_test123');
+
+      expect(result).toEqual({ clientSecret: 'cs_secret_upgrade' });
+      expect(mockSessionsCreate).toHaveBeenCalled();
+    });
+
+    it('should allow checkout when user has a canceled subscription at the same tier', async () => {
+      mockFindByStripeCustomerId.mockResolvedValue({
+        subscriptionStatus: 'canceled',
+        subscriptionTier: 'minimum',
+      });
+      mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_resub' });
+
+      const result = await createCheckoutSessionAction(
+        'minimum',
+        'test@example.com',
+        'cus_test123'
+      );
+
+      expect(result).toEqual({ clientSecret: 'cs_secret_resub' });
+      expect(mockSessionsCreate).toHaveBeenCalled();
+    });
+
+    it('should reject when user has a trialing subscription at the same tier', async () => {
+      mockFindByStripeCustomerId.mockResolvedValue({
+        subscriptionStatus: 'trialing',
+        subscriptionTier: 'minimum',
+      });
+
+      const result = await createCheckoutSessionAction(
+        'minimum',
+        'test@example.com',
+        'cus_test123'
+      );
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
   });
 });

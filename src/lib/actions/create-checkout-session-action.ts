@@ -5,8 +5,11 @@
 
 import 'server-only';
 
+import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getStripePriceId, type SubscriberRateTier } from '@/lib/subscriber-rates';
+
+const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 interface CreateCheckoutSessionResult {
   clientSecret: string | null;
@@ -19,6 +22,23 @@ export const createCheckoutSessionAction = async (
   stripeCustomerId?: string
 ): Promise<CreateCheckoutSessionResult> => {
   try {
+    const existing = stripeCustomerId
+      ? await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId)
+      : customerEmail
+        ? await SubscriptionRepository.findByEmail(customerEmail)
+        : null;
+
+    if (
+      existing?.subscriptionStatus &&
+      ACTIVE_STATUSES.has(existing.subscriptionStatus) &&
+      existing.subscriptionTier === tier
+    ) {
+      return {
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      };
+    }
+
     const priceId = getStripePriceId(tier);
 
     const session = await stripe.checkout.sessions.create({

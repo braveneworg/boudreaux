@@ -66,9 +66,18 @@ vi.mock('@/lib/subscriber-rates', () => ({
   },
 }));
 
+const mockMarkConfirmationEmailSent = vi.fn();
+
+vi.mock('@/lib/repositories/subscription-repository', () => ({
+  SubscriptionRepository: {
+    markConfirmationEmailSent: (...args: unknown[]) => mockMarkConfirmationEmailSent(...args),
+  },
+}));
+
 describe('SubscribeSuccessPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMarkConfirmationEmailSent.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -264,5 +273,29 @@ describe('SubscribeSuccessPage', () => {
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
     // Email is deferred via after()
     expect(mockAfter).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not send email when confirmation was already sent', async () => {
+    vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+    mockMarkConfirmationEmailSent.mockResolvedValue(false);
+    mockSessionsRetrieve.mockResolvedValue({
+      id: 'cs_test_123',
+      payment_status: 'paid',
+      customer_details: { email: 'subscriber@example.com' },
+      subscription: 'sub_test_123',
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockAfter).toHaveBeenCalledTimes(1);
+    // Wait for the deferred sendConfirmationEmail to settle
+    await new Promise(process.nextTick);
+    expect(mockSesSend).not.toHaveBeenCalled();
+    expect(mockSubscriptionsRetrieve).not.toHaveBeenCalled();
   });
 });
