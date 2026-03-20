@@ -30,6 +30,18 @@ ENV SKIP_ENV_VALIDATION=true
 ARG NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 ENV NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=$NEXT_PUBLIC_CLOUDFLARE_SITE_KEY
 
+ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
+ARG NEXT_PUBLIC_STRIPE_PRICE_MINIMUM
+ENV NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=$NEXT_PUBLIC_STRIPE_PRICE_MINIMUM
+
+ARG NEXT_PUBLIC_STRIPE_PRICE_EXTRA
+ENV NEXT_PUBLIC_STRIPE_PRICE_EXTRA=$NEXT_PUBLIC_STRIPE_PRICE_EXTRA
+
+ARG NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA
+ENV NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=$NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA
+
 # Build argument to bust cache when artifact changes (set to BUILD_ID or timestamp)
 ARG CACHE_BUST=unknown
 RUN echo "=== Docker Build Cache Info ===" && \
@@ -60,7 +72,7 @@ RUN if [ -f next-build.tar.gz ]; then \
       echo "Building Next.js from scratch"; \
       echo "Generating Prisma Client..."; \
       npx prisma generate; \
-      npx next build; \
+      npx next build --webpack; \
     fi
 
 # Stage 2: Create final image

@@ -37,6 +37,13 @@ model User {
   country               String?
   allowSmsNotifications Boolean? @default(false)
 
+  // Stripe subscription fields
+  stripeCustomerId              String?   @unique
+  subscriptionId                String?
+  subscriptionStatus            String?
+  subscriptionTier              String?
+  subscriptionCurrentPeriodEnd  DateTime?
+
   // Optional for WebAuthn support
   Authenticator Authenticator[]
 

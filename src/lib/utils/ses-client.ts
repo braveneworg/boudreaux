@@ -5,8 +5,22 @@ import 'server-only';
 
 import { SESClient } from '@aws-sdk/client-ses';
 
-const sesClient = new SESClient({
-  region: process.env.AWS_REGION || 'us-east-1',
-});
+function getSesClient(): SESClient {
+  return new SESClient({
+    region: process.env.AWS_REGION || 'us-east-1',
+  });
+}
 
-export { sesClient };
+/**
+ * Lazily initialized SES client.
+ * Uses a Proxy to defer instantiation until first use so that
+ * `next build` page-data collection does not trigger the AWS SDK
+ * credential resolver at build time.
+ */
+export const sesClient = new Proxy({} as SESClient, {
+  get(_target, prop, receiver) {
+    const client = getSesClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+});

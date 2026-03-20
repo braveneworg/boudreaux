@@ -16,10 +16,14 @@ vi.mock('@aws-sdk/client-ses', () => ({
 }));
 
 describe('ses-client', () => {
-  it('should create an SESClient with the configured region', async () => {
+  it('should create an SESClient with the configured region on first access', async () => {
     const { sesClient } = await import('@/lib/utils/ses-client');
 
     expect(sesClient).toBeDefined();
+
+    // The Proxy defers instantiation until the first property access
+    void sesClient.config;
+
     expect(constructorSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         region: expect.any(String),

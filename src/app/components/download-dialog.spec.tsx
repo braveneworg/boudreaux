@@ -21,6 +21,51 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+const mockUseSession =
+  vi.fn<
+    () => { data: { user?: { email?: string; stripeCustomerId?: string } } | null; status: string }
+  >();
+
+vi.mock('next-auth/react', () => ({
+  useSession: () => mockUseSession(),
+}));
+
+vi.mock('@/app/components/checkout-step', () => ({
+  CheckoutStep: ({
+    tier,
+    customerEmail,
+    stripeCustomerId,
+  }: {
+    tier: string;
+    customerEmail?: string | null;
+    stripeCustomerId?: string | null;
+  }) => (
+    <div
+      data-testid="checkout-step"
+      data-tier={tier}
+      data-email={customerEmail ?? ''}
+      data-stripe-customer-id={stripeCustomerId ?? ''}
+    >
+      Mock Checkout Step
+    </div>
+  ),
+}));
+
+vi.mock('@/app/components/email-step', () => ({
+  EmailStep: ({
+    onCancel,
+    onConfirm,
+  }: {
+    onCancel: () => void;
+    onConfirm: (email: string) => void;
+  }) => (
+    <div data-testid="email-step">
+      <button onClick={onCancel}>Back</button>
+      <button onClick={() => onConfirm('test@example.com')}>Continue to Checkout</button>
+    </div>
+  ),
+}));
+
 describe('DownloadDialog', () => {
   const defaultProps = {
     artistName: 'Test Artist',
@@ -29,6 +74,7 @@ describe('DownloadDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
   it('should render the trigger element', () => {
@@ -53,7 +99,7 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
     expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
-    expect(screen.getByText('Choose download format(s):')).toBeInTheDocument();
+    expect(screen.getByText('Choose download format(s)')).toBeInTheDocument();
   });
 
   it('should render the free download radio option', async () => {
@@ -167,10 +213,10 @@ describe('DownloadDialog', () => {
         );
       })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Subscribe' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Subscribe/ })).toBeInTheDocument();
   });
 
-  it('should navigate to /subscribe when subscribe button is clicked', async () => {
+  it('should show rate-select step when subscribe button is clicked', async () => {
     const user = userEvent.setup();
 
     render(
@@ -181,10 +227,10 @@ describe('DownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    const subscribeButton = screen.getByRole('button', { name: 'Subscribe' });
+    const subscribeButton = screen.getByRole('button', { name: /Subscribe/ });
     await user.click(subscribeButton);
 
-    expect(mockPush).toHaveBeenCalledWith('/subscribe');
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
   });
 
   it('should use default premium price of $8', async () => {
@@ -254,6 +300,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
   it('should close the dialog after a successful form submission', async () => {
@@ -276,7 +323,7 @@ describe('DownloadDialog — dialog lifecycle', () => {
     });
   });
 
-  it('should close the dialog when the subscribe button is clicked', async () => {
+  it('should stay open and show rate-select step when the subscribe button is clicked', async () => {
     const user = userEvent.setup();
 
     render(
@@ -288,11 +335,11 @@ describe('DownloadDialog — dialog lifecycle', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Subscribe' }));
+    await user.click(screen.getByRole('button', { name: /Subscribe/ }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Download' })).not.toBeInTheDocument();
-    });
+    // Dialog stays open, now showing rate-select step
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Download' })).not.toBeInTheDocument();
   });
 
   it('should reset the form when the dialog is closed and reopened', async () => {
@@ -568,5 +615,232 @@ describe('DownloadDialog — submit button label', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Download for $5.00' })).toBeInTheDocument();
     });
+  });
+});
+
+describe('DownloadDialog — subscription multi-step flow', () => {
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+  });
+
+  const openDialogAndClickSubscribe = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('button', { name: /Subscribe/ }));
+  };
+
+  it('should show rate-select step with all tier options after clicking subscribe', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Minimum/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Extra Extra/)).toBeInTheDocument();
+  });
+
+  it('should navigate back from rate-select to download step', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+  });
+
+  it('should show email step when unauthenticated user confirms rate selection', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    // Select a tier
+    await user.click(screen.getByLabelText(/Minimum/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    expect(screen.getByTestId('email-step')).toBeInTheDocument();
+  });
+
+  it('should skip email step and go straight to checkout when user is authenticated', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    // Select a tier and confirm
+    await user.click(screen.getByLabelText(/Minimum/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    // Should go straight to checkout, not email step
+    expect(screen.queryByTestId('email-step')).not.toBeInTheDocument();
+    const checkoutStep = screen.getByTestId('checkout-step');
+    expect(checkoutStep).toBeInTheDocument();
+    expect(checkoutStep).toHaveAttribute('data-email', 'authed@example.com');
+  });
+
+  it('should navigate from email step to checkout step on confirm', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    // Select a tier and confirm
+    await user.click(screen.getByLabelText(/Minimum/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    // Email step
+    expect(screen.getByTestId('email-step')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
+
+    // Should now be at checkout
+    const checkoutStep = screen.getByTestId('checkout-step');
+    expect(checkoutStep).toBeInTheDocument();
+    expect(checkoutStep).toHaveAttribute('data-email', 'test@example.com');
+  });
+
+  it('should navigate back from email step to rate-select step', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    // Select a tier and confirm
+    await user.click(screen.getByLabelText(/Minimum/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    // Email step — click Back
+    expect(screen.getByTestId('email-step')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
+  });
+
+  it('should reset to download step and clear state when dialog is closed from rate-select', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+    expect(screen.getByRole('heading', { name: 'Choose Your Plan' })).toBeInTheDocument();
+
+    // Close via Escape
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Choose Your Plan' })).not.toBeInTheDocument()
+    );
+
+    // Reopen — should be back at download step
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+  });
+
+  it('should disable Go for It button when no tier is selected', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    expect(screen.getByRole('button', { name: /Go for It/ })).toBeDisabled();
+  });
+
+  it('should pass the selected tier to the checkout step', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    await user.click(screen.getByLabelText(/Extra Extra/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    expect(screen.getByTestId('checkout-step')).toHaveAttribute('data-tier', 'extraExtra');
+  });
+
+  it('should pass stripeCustomerId to checkout step when user has one', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          email: 'subscriber@example.com',
+          stripeCustomerId: 'cus_test123',
+        },
+      },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await openDialogAndClickSubscribe(user);
+
+    await user.click(screen.getByLabelText(/Minimum/));
+    await user.click(screen.getByRole('button', { name: /Go for It/ }));
+
+    const checkoutStep = screen.getByTestId('checkout-step');
+    expect(checkoutStep).toHaveAttribute('data-stripe-customer-id', 'cus_test123');
+    expect(checkoutStep).toHaveAttribute('data-email', 'subscriber@example.com');
   });
 });

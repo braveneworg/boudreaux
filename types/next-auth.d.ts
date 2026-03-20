@@ -21,6 +21,11 @@ declare module '@auth/core/types' {
     zipCode?: string;
     country?: string;
     allowSmsNotifications?: boolean;
+
+    // Stripe subscription fields
+    stripeCustomerId?: string;
+    subscriptionStatus?: string;
+    subscriptionTier?: string;
   }
 }
 
@@ -44,6 +49,11 @@ declare module 'next-auth' {
       zipCode?: string;
       country?: string;
       allowSmsNotifications?: boolean;
+
+      // Stripe subscription fields
+      stripeCustomerId?: string;
+      subscriptionStatus?: string;
+      subscriptionTier?: string;
     } & DefaultSession['user'];
   }
 
@@ -65,6 +75,11 @@ declare module 'next-auth' {
     zipCode?: string;
     country?: string;
     allowSmsNotifications?: boolean;
+
+    // Stripe subscription fields
+    stripeCustomerId?: string;
+    subscriptionStatus?: string;
+    subscriptionTier?: string;
   }
 }
 
@@ -88,6 +103,11 @@ declare module 'next-auth/adapters' {
     zipCode?: string;
     country?: string;
     allowSmsNotifications?: boolean;
+
+    // Stripe subscription fields
+    stripeCustomerId?: string;
+    subscriptionStatus?: string;
+    subscriptionTier?: string;
   }
 }
 

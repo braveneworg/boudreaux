@@ -61,13 +61,15 @@ const config = {
     // Build Content-Security-Policy based on environment
     const cspParts = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://js.stripe.com",
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
       // Allow S3 direct uploads - explicit bucket URL + wildcard for any *.amazonaws.com subdomain
-      "frame-src 'self' https://challenges.cloudflare.com",
+      "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
       "worker-src 'self' blob:",
+      // Allow fetch to Stripe API (server actions use fetch; Stripe.js connects to api.stripe.com)
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com",
       // Allow media from CDN and S3, plus blob: for local playback
       "media-src 'self' https: blob:",
       "object-src 'none'",
