@@ -158,4 +158,17 @@ describe('SubscriptionRepository', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('resetConfirmationEmailSent', () => {
+    it('should clear confirmationEmailSentAt for the given email', async () => {
+      mockUpdateMany.mockResolvedValue({ count: 1 });
+
+      await SubscriptionRepository.resetConfirmationEmailSent('test@example.com');
+
+      expect(mockUpdateMany).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+        data: { confirmationEmailSentAt: null },
+      });
+    });
+  });
 });

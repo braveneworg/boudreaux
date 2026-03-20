@@ -93,4 +93,15 @@ export class SubscriptionRepository {
 
     return result.count > 0;
   }
+
+  /**
+   * Resets the confirmation email sent flag for a user so that a
+   * failed send attempt can be retried on the next webhook delivery.
+   */
+  static async resetConfirmationEmailSent(email: string): Promise<void> {
+    await prisma.user.updateMany({
+      where: { email },
+      data: { confirmationEmailSentAt: null },
+    });
+  }
 }

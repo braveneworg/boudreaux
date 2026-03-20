@@ -28,6 +28,7 @@ const mockUpdateSubscription = vi.fn();
 const mockCancelSubscription = vi.fn();
 const mockUpdateSubscriptionStatus = vi.fn();
 const mockMarkConfirmationEmailSent = vi.fn();
+const mockResetConfirmationEmailSent = vi.fn();
 
 vi.mock('@/lib/repositories/subscription-repository', () => ({
   SubscriptionRepository: {
@@ -36,6 +37,7 @@ vi.mock('@/lib/repositories/subscription-repository', () => ({
     cancelSubscription: (...args: unknown[]) => mockCancelSubscription(...args),
     updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
     markConfirmationEmailSent: (...args: unknown[]) => mockMarkConfirmationEmailSent(...args),
+    resetConfirmationEmailSent: (...args: unknown[]) => mockResetConfirmationEmailSent(...args),
   },
 }));
 
@@ -96,6 +98,7 @@ describe('POST /api/stripe/webhook', () => {
     vi.clearAllMocks();
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET);
     mockMarkConfirmationEmailSent.mockResolvedValue(true);
+    mockResetConfirmationEmailSent.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -238,6 +241,16 @@ describe('POST /api/stripe/webhook', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+    });
+
+    it('should reset confirmation email flag when SES send fails so retries can redeliver', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockSesSend.mockRejectedValue(new Error('SES error'));
+      const request = createRequest('{}');
+      await POST(request);
+
+      expect(mockMarkConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockResetConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
     });
 
     it('should send email with default tier label when no subscription', async () => {
