@@ -19,10 +19,9 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 interface CheckoutStepProps {
   tier: SubscriberRateTier;
   customerEmail?: string | null;
-  stripeCustomerId?: string | null;
 }
 
-export const CheckoutStep = ({ tier, customerEmail, stripeCustomerId }: CheckoutStepProps) => {
+export const CheckoutStep = ({ tier, customerEmail }: CheckoutStepProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,11 +30,7 @@ export const CheckoutStep = ({ tier, customerEmail, stripeCustomerId }: Checkout
 
     const createSession = async () => {
       try {
-        const result = await createCheckoutSessionAction(
-          tier,
-          customerEmail ?? undefined,
-          stripeCustomerId ?? undefined
-        );
+        const result = await createCheckoutSessionAction(tier, customerEmail ?? undefined);
 
         if (cancelled) return;
 
@@ -57,7 +52,7 @@ export const CheckoutStep = ({ tier, customerEmail, stripeCustomerId }: Checkout
     return () => {
       cancelled = true;
     };
-  }, [tier, customerEmail, stripeCustomerId]);
+  }, [tier, customerEmail]);
 
   if (error) {
     return (

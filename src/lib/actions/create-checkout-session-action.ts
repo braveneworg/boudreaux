@@ -5,8 +5,13 @@
 
 import 'server-only';
 
+import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getStripePriceId, type SubscriberRateTier } from '@/lib/subscriber-rates';
+
+import { auth } from '../../../auth';
+
+const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 interface CreateCheckoutSessionResult {
   clientSecret: string | null;
@@ -15,13 +20,34 @@ interface CreateCheckoutSessionResult {
 
 export const createCheckoutSessionAction = async (
   tier: SubscriberRateTier,
-  customerEmail?: string,
-  stripeCustomerId?: string
+  customerEmail?: string
 ): Promise<CreateCheckoutSessionResult> => {
   try {
+    const authSession = await auth();
+
+    // Use the server-verified email when the user is authenticated; fall back to
+    // the provided email for unauthenticated (guest) checkouts.
+    const verifiedEmail = authSession?.user?.email ?? customerEmail;
+
+    const existing = verifiedEmail ? await SubscriptionRepository.findByEmail(verifiedEmail) : null;
+
+    if (
+      existing?.subscriptionStatus &&
+      ACTIVE_STATUSES.has(existing.subscriptionStatus) &&
+      existing.subscriptionTier === tier
+    ) {
+      return {
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      };
+    }
+
     const priceId = getStripePriceId(tier);
 
-    const session = await stripe.checkout.sessions.create({
+    // Prefer the database-stored Stripe customer ID so we never trust client input.
+    const resolvedCustomerId = existing?.stripeCustomerId ?? undefined;
+
+    const stripeSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [
         {
@@ -30,20 +56,20 @@ export const createCheckoutSessionAction = async (
         },
       ],
       ui_mode: 'custom',
-      ...(stripeCustomerId
-        ? { customer: stripeCustomerId }
-        : customerEmail
-          ? { customer_email: customerEmail }
+      ...(resolvedCustomerId
+        ? { customer: resolvedCustomerId }
+        : verifiedEmail
+          ? { customer_email: verifiedEmail }
           : {}),
-      return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+      return_url: `${process.env.AUTH_URL || 'http://localhost:3000'}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
     });
 
-    return { clientSecret: session.client_secret };
+    return { clientSecret: stripeSession.client_secret };
   } catch (error: unknown) {
     console.error('Failed to create checkout session:', error);
     return {
       clientSecret: null,
-      error: error instanceof Error ? error.message : 'Failed to create checkout session',
+      error: 'Unable to start checkout. Please try again.',
     };
   }
 };

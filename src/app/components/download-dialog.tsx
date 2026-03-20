@@ -136,10 +136,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                               </FormControl>
                               <FormLabel className="cursor-pointer font-normal">
                                 <div className="flex flex-col gap-1">
-                                  <div
-                                    className="leading-snug"
-                                    dangerouslySetInnerHTML={{ __html: option.label }}
-                                  />
+                                  <span className="leading-snug">{option.label}</span>
                                   {option.value === 'premium-digital' && (
                                     <span className="text-muted-foreground">
                                       {' '}
@@ -233,7 +230,12 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
               <p className="text-muted-foreground mb-3 text-sm">
                 Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
               </p>
-              <Button type="button" className="w-full" variant="outline" onClick={handleSubscribe}>
+              <Button
+                type="button"
+                className="w-full !bg-(--fake-four-orange) text-white hover:bg-(--fake-four-orange-hover) focus-visible:ring-(--fake-four-orange) data-[state=open]:bg-(--fake-four-orange-hover)"
+                variant="outline"
+                onClick={handleSubscribe}
+              >
                 <UserPlus2Icon className="size-4" />
                 Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
               </Button>
@@ -271,11 +273,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
         )}
 
         {step === 'checkout' && selectedTier && (
-          <CheckoutStep
-            tier={selectedTier}
-            customerEmail={customerEmail}
-            stripeCustomerId={session?.user?.stripeCustomerId}
-          />
+          <CheckoutStep tier={selectedTier} customerEmail={customerEmail} />
         )}
       </DialogContent>
     </Dialog>

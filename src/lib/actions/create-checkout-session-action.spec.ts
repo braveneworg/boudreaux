@@ -5,6 +5,12 @@ import { createCheckoutSessionAction } from './create-checkout-session-action';
 
 vi.mock('server-only', () => ({}));
 
+const mockAuth = vi.fn();
+
+vi.mock('../../../auth', () => ({
+  auth: () => mockAuth(),
+}));
+
 const mockSessionsCreate = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
@@ -30,10 +36,20 @@ vi.mock('@/lib/subscriber-rates', () => ({
   },
 }));
 
+const mockFindByEmail = vi.fn();
+
+vi.mock('@/lib/repositories/subscription-repository', () => ({
+  SubscriptionRepository: {
+    findByEmail: (...args: unknown[]) => mockFindByEmail(...args),
+  },
+}));
+
 describe('createCheckoutSessionAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('AUTH_URL', 'https://fakefourrecords.com');
+    mockAuth.mockResolvedValue(null);
+    mockFindByEmail.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -56,29 +72,49 @@ describe('createCheckoutSessionAction', () => {
     );
   });
 
-  it('should pass customer_email when customerEmail is provided but no stripeCustomerId', async () => {
+  it('should pass customer_email for an unauthenticated guest with email', async () => {
     mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_xyz' });
 
-    await createCheckoutSessionAction('extra', 'test@example.com');
+    await createCheckoutSessionAction('extra', 'guest@example.com');
 
     expect(mockSessionsCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        customer_email: 'test@example.com',
+        customer_email: 'guest@example.com',
       })
     );
   });
 
-  it('should pass customer when stripeCustomerId is provided', async () => {
+  it('should use the database stripeCustomerId when the authenticated user has one', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'auth@example.com' } });
+    mockFindByEmail.mockResolvedValue({
+      email: 'auth@example.com',
+      stripeCustomerId: 'cus_fromdb123',
+      subscriptionStatus: null,
+      subscriptionTier: null,
+    });
     mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_xyz' });
 
-    await createCheckoutSessionAction('extra', 'test@example.com', 'cus_test123');
+    await createCheckoutSessionAction('extra', 'ignored@example.com');
 
     const callArgs = mockSessionsCreate.mock.calls[0][0];
-    expect(callArgs.customer).toBe('cus_test123');
+    expect(callArgs.customer).toBe('cus_fromdb123');
     expect(callArgs.customer_email).toBeUndefined();
+    expect(mockFindByEmail).toHaveBeenCalledWith('auth@example.com');
   });
 
-  it('should not pass customer or customer_email when neither is provided', async () => {
+  it('should pass customer_email from the auth session when user has no stripeCustomerId yet', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'newuser@example.com' } });
+    mockFindByEmail.mockResolvedValue(null);
+    mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_xyz' });
+
+    await createCheckoutSessionAction('minimum');
+
+    const callArgs = mockSessionsCreate.mock.calls[0][0];
+    expect(callArgs.customer_email).toBe('newuser@example.com');
+    expect(callArgs.customer).toBeUndefined();
+  });
+
+  it('should not pass customer or customer_email when neither auth nor email is available', async () => {
     mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_xyz' });
 
     await createCheckoutSessionAction('minimum');
@@ -88,14 +124,14 @@ describe('createCheckoutSessionAction', () => {
     expect(callArgs.customer_email).toBeUndefined();
   });
 
-  it('should return an error when stripe throws', async () => {
+  it('should return a generic error when stripe throws', async () => {
     mockSessionsCreate.mockRejectedValue(new Error('Stripe API key not set'));
 
     const result = await createCheckoutSessionAction('minimum');
 
     expect(result).toEqual({
       clientSecret: null,
-      error: 'Stripe API key not set',
+      error: 'Unable to start checkout. Please try again.',
     });
   });
 
@@ -106,7 +142,7 @@ describe('createCheckoutSessionAction', () => {
 
     expect(result).toEqual({
       clientSecret: null,
-      error: 'Failed to create checkout session',
+      error: 'Unable to start checkout. Please try again.',
     });
   });
 
@@ -123,9 +159,7 @@ describe('createCheckoutSessionAction', () => {
     );
   });
 
-  it('should fall back to localhost when AUTH_URL is not set', async () => {
-    // Empty string is truthy for `??` — the source uses `?? 'http://localhost:3000'`
-    // so only undefined/null triggers fallback. An empty AUTH_URL still results in empty prefix.
+  it('should fall back to localhost when AUTH_URL is empty', async () => {
     vi.stubEnv('AUTH_URL', '');
     mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret' });
 
@@ -133,7 +167,7 @@ describe('createCheckoutSessionAction', () => {
 
     expect(mockSessionsCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        return_url: '/subscribe/success?session_id={CHECKOUT_SESSION_ID}',
+        return_url: 'http://localhost:3000/subscribe/success?session_id={CHECKOUT_SESSION_ID}',
       })
     );
   });
@@ -148,5 +182,84 @@ describe('createCheckoutSessionAction', () => {
         line_items: [{ price: 'price_extra_extra_test', quantity: 1 }],
       })
     );
+  });
+
+  describe('duplicate subscription prevention', () => {
+    it('should reject when authenticated user already has an active subscription at the same tier', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'user@example.com' } });
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'minimum',
+      });
+
+      const result = await createCheckoutSessionAction('minimum');
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('should reject when unauthenticated user already has an active subscription at the same tier (by email)', async () => {
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'extra',
+      });
+
+      const result = await createCheckoutSessionAction('extra', 'test@example.com');
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('should allow checkout when user has an active subscription at a different tier', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'user@example.com' } });
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'active',
+        subscriptionTier: 'minimum',
+        stripeCustomerId: 'cus_test123',
+      });
+      mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_upgrade' });
+
+      const result = await createCheckoutSessionAction('extra');
+
+      expect(result).toEqual({ clientSecret: 'cs_secret_upgrade' });
+      expect(mockSessionsCreate).toHaveBeenCalled();
+    });
+
+    it('should allow checkout when user has a canceled subscription at the same tier', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'user@example.com' } });
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'canceled',
+        subscriptionTier: 'minimum',
+        stripeCustomerId: 'cus_test123',
+      });
+      mockSessionsCreate.mockResolvedValue({ client_secret: 'cs_secret_resub' });
+
+      const result = await createCheckoutSessionAction('minimum');
+
+      expect(result).toEqual({ clientSecret: 'cs_secret_resub' });
+      expect(mockSessionsCreate).toHaveBeenCalled();
+    });
+
+    it('should reject when user has a trialing subscription at the same tier', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'user@example.com' } });
+      mockFindByEmail.mockResolvedValue({
+        subscriptionStatus: 'trialing',
+        subscriptionTier: 'minimum',
+      });
+
+      const result = await createCheckoutSessionAction('minimum');
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
   });
 });

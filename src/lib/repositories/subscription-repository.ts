@@ -5,9 +5,11 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import type Stripe from 'stripe';
+
 interface UpdateSubscriptionData {
   subscriptionId: string;
-  subscriptionStatus: string;
+  subscriptionStatus: Stripe.Subscription.Status;
   subscriptionTier: string | null;
   subscriptionCurrentPeriodEnd: Date | null;
 }
@@ -20,6 +22,7 @@ const SUBSCRIPTION_SELECT = {
   subscriptionStatus: true,
   subscriptionTier: true,
   subscriptionCurrentPeriodEnd: true,
+  confirmationEmailSentAt: true,
 } as const;
 
 export class SubscriptionRepository {
@@ -50,11 +53,15 @@ export class SubscriptionRepository {
         subscriptionId: null,
         subscriptionTier: null,
         subscriptionCurrentPeriodEnd: null,
+        confirmationEmailSentAt: null,
       },
     });
   }
 
-  static async updateSubscriptionStatus(stripeCustomerId: string, status: string) {
+  static async updateSubscriptionStatus(
+    stripeCustomerId: string,
+    status: Stripe.Subscription.Status
+  ) {
     return prisma.user.update({
       where: { stripeCustomerId },
       data: { subscriptionStatus: status },
@@ -72,6 +79,34 @@ export class SubscriptionRepository {
     return prisma.user.findUnique({
       where: { email },
       select: SUBSCRIPTION_SELECT,
+    });
+  }
+
+  /**
+   * Atomically marks the confirmation email as sent for a user.
+   * Uses updateMany with a null-check to prevent race conditions
+   * from concurrent page loads.
+   *
+   * @returns true if the flag was set (email should be sent),
+   *          false if it was already set (email already sent).
+   */
+  static async markConfirmationEmailSent(email: string): Promise<boolean> {
+    const result = await prisma.user.updateMany({
+      where: { email, confirmationEmailSentAt: null },
+      data: { confirmationEmailSentAt: new Date() },
+    });
+
+    return result.count > 0;
+  }
+
+  /**
+   * Resets the confirmation email sent flag for a user so that a
+   * failed send attempt can be retried on the next webhook delivery.
+   */
+  static async resetConfirmationEmailSent(email: string): Promise<void> {
+    await prisma.user.updateMany({
+      where: { email },
+      data: { confirmationEmailSentAt: null },
     });
   }
 }

@@ -7,12 +7,14 @@ vi.mock('server-only', () => ({}));
 
 const mockUpdate = vi.fn();
 const mockFindUnique = vi.fn();
+const mockUpdateMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       update: (...args: unknown[]) => mockUpdate(...args),
       findUnique: (...args: unknown[]) => mockFindUnique(...args),
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
     },
   },
 }));
@@ -39,7 +41,7 @@ describe('SubscriptionRepository', () => {
     it('should update subscription fields by stripeCustomerId', async () => {
       const data = {
         subscriptionId: 'sub_123',
-        subscriptionStatus: 'active',
+        subscriptionStatus: 'active' as const,
         subscriptionTier: 'minimum',
         subscriptionCurrentPeriodEnd: new Date('2026-04-17'),
       };
@@ -72,6 +74,7 @@ describe('SubscriptionRepository', () => {
           subscriptionId: null,
           subscriptionTier: null,
           subscriptionCurrentPeriodEnd: null,
+          confirmationEmailSentAt: null,
         },
       });
     });
@@ -106,6 +109,7 @@ describe('SubscriptionRepository', () => {
           subscriptionStatus: true,
           subscriptionTier: true,
           subscriptionCurrentPeriodEnd: true,
+          confirmationEmailSentAt: true,
         }),
       });
     });
@@ -127,7 +131,43 @@ describe('SubscriptionRepository', () => {
           subscriptionStatus: true,
           subscriptionTier: true,
           subscriptionCurrentPeriodEnd: true,
+          confirmationEmailSentAt: true,
         }),
+      });
+    });
+  });
+
+  describe('markConfirmationEmailSent', () => {
+    it('should return true when email was not previously sent', async () => {
+      mockUpdateMany.mockResolvedValue({ count: 1 });
+
+      const result = await SubscriptionRepository.markConfirmationEmailSent('test@example.com');
+
+      expect(result).toBe(true);
+      expect(mockUpdateMany).toHaveBeenCalledWith({
+        where: { email: 'test@example.com', confirmationEmailSentAt: null },
+        data: { confirmationEmailSentAt: expect.any(Date) },
+      });
+    });
+
+    it('should return false when email was already sent', async () => {
+      mockUpdateMany.mockResolvedValue({ count: 0 });
+
+      const result = await SubscriptionRepository.markConfirmationEmailSent('test@example.com');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('resetConfirmationEmailSent', () => {
+    it('should clear confirmationEmailSentAt for the given email', async () => {
+      mockUpdateMany.mockResolvedValue({ count: 1 });
+
+      await SubscriptionRepository.resetConfirmationEmailSent('test@example.com');
+
+      expect(mockUpdateMany).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+        data: { confirmationEmailSentAt: null },
       });
     });
   });

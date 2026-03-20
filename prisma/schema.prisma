@@ -43,6 +43,7 @@ model User {
   subscriptionStatus            String?
   subscriptionTier              String?
   subscriptionCurrentPeriodEnd  DateTime?
+  confirmationEmailSentAt       DateTime?
 
   // Optional for WebAuthn support
   Authenticator Authenticator[]
