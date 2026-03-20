@@ -230,6 +230,8 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ## Never Do
 
+- Never user a checkbox in a mobile first scenario. Prefer using toggle switches or radio buttons for better usability on mobile devices.
+- Never use a checkbox for binary options in mobile interfaces, as they can be difficult to interact with on smaller screens. Instead, use toggle switches or radio buttons that are more touch-friendly and provide clearer visual feedback to users. Checkboxes can be easily missed or mis-tapped on mobile devices, leading to a frustrating user experience. Always prioritize usability and accessibility when designing forms for mobile users.
 - Never use the non-null assertion operator (!) in TypeScript code
 - Never disable ESLint rules globally or with eslint-disable comments without a very good reason
 - Don't call `expect` inside conditional statements

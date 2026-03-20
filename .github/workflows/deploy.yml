@@ -120,6 +120,10 @@ jobs:
       - name: Build website image (single-arch for speed)
         env:
           NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_STRIPE_PRICE_MINIMUM: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
         run: |
           set -e
           TOK='${{ secrets.GHCR_TOKEN }}'
@@ -144,6 +148,10 @@ jobs:
             if docker buildx build \
               --platform linux/amd64 \
               --build-arg NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY} \
+              --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY} \
+              --build-arg NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${NEXT_PUBLIC_STRIPE_PRICE_MINIMUM} \
+              --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA} \
+              --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA} \
               --build-arg CACHE_BUST=${CACHE_BUST} \
               --provenance=false \
               --sbom=false \
@@ -521,6 +529,12 @@ jobs:
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET=${{ secrets.S3_BUCKET }}
           CDN_DOMAIN=${{ secrets.CDN_DOMAIN }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
           EOF
 
       - name: Upload compose + env

@@ -7,10 +7,13 @@ import { useState } from 'react';
 import type { ComponentProps, ReactElement } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Download, DownloadIcon } from 'lucide-react';
+import { Download, DownloadIcon, UserPlus2Icon } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 
-import { SubscribeButton } from '@/app/components/subscribe-button';
+import { CheckoutStep } from '@/app/components/checkout-step';
+import { EmailStep } from '@/app/components/email-step';
+import { RateSelectStep } from '@/app/components/rate-select-step';
 import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
@@ -30,11 +33,15 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
+import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
+import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
 import downloadSchema, {
   DOWNLOAD_OPTIONS,
   type DownloadFormSchemaType,
 } from '@/lib/validation/download-schema';
+
+type DialogStep = 'download' | 'rate-select' | 'email-step' | 'checkout';
 
 interface DownloadDialogProps {
   artistName: string;
@@ -44,6 +51,10 @@ interface DownloadDialogProps {
 
 export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: DownloadDialogProps) => {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<DialogStep>('download');
+  const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const { data: session } = useSession();
 
   const form = useForm<DownloadFormSchemaType>({
     resolver: zodResolver(downloadSchema),
@@ -73,144 +84,199 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
     setOpen(nextOpen);
     if (!nextOpen) {
       form.reset();
+      setStep('download');
+      setSelectedTier(null);
+      setCustomerEmail(null);
     }
   };
 
   const handleSubscribe = () => {
-    setOpen(false);
-    form.reset();
+    setStep('rate-select');
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Download</DialogTitle>
-          <DialogDescription>Choose download format(s):</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Download option radio group */}
-            <FormField
-              control={form.control}
-              name="downloadOption"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value ?? ''}
-                      className="gap-4"
-                    >
-                      {DOWNLOAD_OPTIONS.map((option) => (
-                        <FormItem key={option.value} className="flex items-center gap-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value={option.value} />
-                          </FormControl>
-                          <FormLabel className="cursor-pointer font-normal">
-                            <div className="flex flex-col gap-1">
-                              <div
-                                className="leading-snug"
-                                dangerouslySetInnerHTML={{ __html: option.label }}
-                              />
-                              {option.value === 'premium-digital' && (
-                                <span className="text-muted-foreground">
-                                  {' '}
-                                  or <em>pay what you want</em>
-                                </span>
-                              )}
-                            </div>
-                          </FormLabel>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Tip amount section — visible when premium is selected */}
-            {selectedOption === 'premium-digital' && (
-              <FormField
-                control={form.control}
-                name="finalAmount"
-                render={({ field }) => (
-                  <FormItem>
-                    <div>
+      <DialogContent
+        className={cn(
+          'sm:max-w-md',
+          step === 'checkout' && 'max-h-[90vh] overflow-y-auto sm:max-w-lg'
+        )}
+        onOpenAutoFocus={(e) => {
+          if (step === 'checkout') e.preventDefault();
+        }}
+      >
+        {step === 'download' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Download</DialogTitle>
+              <DialogDescription>Choose download format(s)</DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                {/* Download option radio group */}
+                <FormField
+                  control={form.control}
+                  name="downloadOption"
+                  render={({ field }) => (
+                    <FormItem>
                       <FormControl>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span>Pay</span>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              {...field}
-                              type="text"
-                              inputMode="decimal"
-                              placeholder={`$${premiumPrice.toFixed(2)}`}
-                              className="w-24 text-center"
-                              aria-label="Custom amount"
-                              onChange={(e) => {
-                                const raw = e.target.value
-                                  .replace(/[^\d.]/g, '')
-                                  .replace(/(\..*)\./g, '$1');
-                                // Limit to 2 decimal places while typing
-                                const [whole, decimal] = raw.split('.');
-                                const sanitized =
-                                  decimal !== undefined ? `${whole}.${decimal.slice(0, 2)}` : raw;
-                                field.onChange(sanitized ? `$${sanitized}` : '');
-                              }}
-                              onFocus={(e) => {
-                                // Strip formatting on focus for easier editing
-                                const raw = e.target.value.replace(/[^\d.]/g, '');
-                                field.onChange(raw ? `$${raw}` : '');
-                              }}
-                              onBlur={(e) => {
-                                field.onBlur();
-                                const raw = e.target.value.replace(/[^\d.]/g, '');
-                                if (!raw) return;
-                                const num = parseFloat(raw);
-                                if (Number.isFinite(num) && num >= 0) {
-                                  field.onChange(`$${num.toFixed(2)}`);
-                                }
-                              }}
-                              value={field.value ?? ''}
-                            />
-                            <em>(suggested ${premiumPrice})</em>
-                          </div>
-                        </div>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value ?? ''}
+                          className="gap-4"
+                        >
+                          {DOWNLOAD_OPTIONS.map((option) => (
+                            <FormItem
+                              key={option.value}
+                              className="flex items-center gap-3 space-y-0"
+                            >
+                              <FormControl>
+                                <RadioGroupItem value={option.value} />
+                              </FormControl>
+                              <FormLabel className="cursor-pointer font-normal">
+                                <div className="flex flex-col gap-1">
+                                  <div
+                                    className="leading-snug"
+                                    dangerouslySetInnerHTML={{ __html: option.label }}
+                                  />
+                                  {option.value === 'premium-digital' && (
+                                    <span className="text-muted-foreground">
+                                      {' '}
+                                      or <em>pay what you want</em>
+                                    </span>
+                                  )}
+                                </div>
+                              </FormLabel>
+                            </FormItem>
+                          ))}
+                        </RadioGroup>
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                      <span className="text-sm">
-                        to extend your support for{' '}
-                        <span className="font-semibold">{artistName}</span>
-                      </span>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
+                {/* Custom amount section — visible when premium is selected */}
+                {selectedOption === 'premium-digital' && (
+                  <FormField
+                    control={form.control}
+                    name="finalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div>
+                          <FormControl>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span>Pay</span>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  {...field}
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder={`$${premiumPrice.toFixed(2)}`}
+                                  className="w-24 text-center"
+                                  aria-label="Custom amount"
+                                  onChange={(e) => {
+                                    const raw = e.target.value
+                                      .replace(/[^\d.]/g, '')
+                                      .replace(/(\..*)\./g, '$1');
+                                    const [whole, decimal] = raw.split('.');
+                                    const sanitized =
+                                      decimal !== undefined
+                                        ? `${whole}.${decimal.slice(0, 2)}`
+                                        : raw;
+                                    field.onChange(sanitized ? `$${sanitized}` : '');
+                                  }}
+                                  onFocus={(e) => {
+                                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                                    field.onChange(raw ? `$${raw}` : '');
+                                  }}
+                                  onBlur={(e) => {
+                                    field.onBlur();
+                                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                                    if (!raw) return;
+                                    const num = parseFloat(raw);
+                                    if (Number.isFinite(num) && num >= 0) {
+                                      field.onChange(`$${num.toFixed(2)}`);
+                                    }
+                                  }}
+                                  value={field.value ?? ''}
+                                />
+                                <em>(suggested ${premiumPrice})</em>
+                              </div>
+                            </div>
+                          </FormControl>
+
+                          <span className="text-sm">
+                            to extend your support for{' '}
+                            <span className="font-semibold">{artistName}</span>
+                          </span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
-            )}
 
-            {/* Submit button */}
-            <Button className="w-full" type="submit">
-              <DownloadIcon className="size-4" />
-              {selectedOption === 'premium-digital' ? `Download for ${displayAmount}` : 'Download'}
-            </Button>
-          </form>
-        </Form>
+                {/* Submit button */}
+                <Button className="w-full" type="submit">
+                  <DownloadIcon className="size-4" />
+                  {selectedOption === 'premium-digital'
+                    ? `Download for ${displayAmount}`
+                    : 'Download'}
+                </Button>
+              </form>
+            </Form>
 
-        {/* Subscribe CTA */}
-        <div className="border-t pt-4">
-          <p className="text-muted-foreground mb-3 text-sm">
-            Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
-          </p>
-          <SubscribeButton
-            className="w-full"
-            subscribeMessage="Subscribe"
-            onClick={handleSubscribe}
+            {/* Subscribe CTA */}
+            <div className="border-t pt-4">
+              <p className="text-muted-foreground mb-3 text-sm">
+                Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
+              </p>
+              <Button type="button" className="w-full" variant="outline" onClick={handleSubscribe}>
+                <UserPlus2Icon className="size-4" />
+                Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === 'rate-select' && (
+          <RateSelectStep
+            selectedTier={selectedTier}
+            onTierChange={setSelectedTier}
+            onCancel={() => {
+              setStep('download');
+              setSelectedTier(null);
+            }}
+            onConfirm={() => {
+              if (session?.user?.email) {
+                setCustomerEmail(session.user.email);
+                setStep('checkout');
+              } else {
+                setStep('email-step');
+              }
+            }}
           />
-        </div>
+        )}
+
+        {step === 'email-step' && (
+          <EmailStep
+            onCancel={() => setStep('rate-select')}
+            onConfirm={(email: string) => {
+              setCustomerEmail(email);
+              setStep('checkout');
+            }}
+          />
+        )}
+
+        {step === 'checkout' && selectedTier && (
+          <CheckoutStep
+            tier={selectedTier}
+            customerEmail={customerEmail}
+            stripeCustomerId={session?.user?.stripeCustomerId}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
