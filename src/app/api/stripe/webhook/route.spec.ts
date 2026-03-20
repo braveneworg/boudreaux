@@ -29,6 +29,7 @@ const mockCancelSubscription = vi.fn();
 const mockUpdateSubscriptionStatus = vi.fn();
 const mockMarkConfirmationEmailSent = vi.fn();
 const mockResetConfirmationEmailSent = vi.fn();
+const mockFindByStripeCustomerId = vi.fn();
 
 vi.mock('@/lib/repositories/subscription-repository', () => ({
   SubscriptionRepository: {
@@ -38,6 +39,7 @@ vi.mock('@/lib/repositories/subscription-repository', () => ({
     updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
     markConfirmationEmailSent: (...args: unknown[]) => mockMarkConfirmationEmailSent(...args),
     resetConfirmationEmailSent: (...args: unknown[]) => mockResetConfirmationEmailSent(...args),
+    findByStripeCustomerId: (...args: unknown[]) => mockFindByStripeCustomerId(...args),
   },
 }));
 
@@ -99,6 +101,7 @@ describe('POST /api/stripe/webhook', () => {
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET);
     mockMarkConfirmationEmailSent.mockResolvedValue(true);
     mockResetConfirmationEmailSent.mockResolvedValue(undefined);
+    mockFindByStripeCustomerId.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -301,17 +304,25 @@ describe('POST /api/stripe/webhook', () => {
       status: 'active',
       customer: 'cus_test_123',
       items: {
-        data: [{ price: { id: 'price_extra' }, current_period_end: 1713398400 }],
+        data: [
+          {
+            price: { id: 'price_extra', recurring: { interval: 'month' } },
+            current_period_end: 1713398400,
+          },
+        ],
       } as unknown as Stripe.ApiList<Stripe.SubscriptionItem>,
     };
 
-    it('should update subscription data', async () => {
+    beforeEach(() => {
       mockConstructEvent.mockReturnValue({
         type: 'customer.subscription.updated',
         data: { object: mockSubscription },
       });
       mockUpdateSubscription.mockResolvedValue({});
+      mockSesSend.mockResolvedValue({});
+    });
 
+    it('should update subscription data', async () => {
       const request = createRequest('{}');
       const response = await POST(request);
 
@@ -322,6 +333,70 @@ describe('POST /api/stripe/webhook', () => {
         subscriptionTier: 'extra',
         subscriptionCurrentPeriodEnd: new Date(1713398400 * 1000),
       });
+    });
+
+    it('should send confirmation email when tier changes', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockFindByStripeCustomerId.mockResolvedValue({
+        email: 'subscriber@example.com',
+        subscriptionTier: 'minimum',
+      });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockResetConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockMarkConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+      expect(mockSesSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not send confirmation email when tier is unchanged', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockFindByStripeCustomerId.mockResolvedValue({
+        email: 'subscriber@example.com',
+        subscriptionTier: 'extra',
+      });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockResetConfirmationEmailSent).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
+    });
+
+    it('should not send confirmation email when subscription is not active', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockConstructEvent.mockReturnValue({
+        type: 'customer.subscription.updated',
+        data: {
+          object: { ...mockSubscription, status: 'past_due' },
+        },
+      });
+      mockFindByStripeCustomerId.mockResolvedValue({
+        email: 'subscriber@example.com',
+        subscriptionTier: 'minimum',
+      });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockResetConfirmationEmailSent).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
+    });
+
+    it('should not send confirmation email when user is not found', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockFindByStripeCustomerId.mockResolvedValue(null);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockResetConfirmationEmailSent).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
     });
   });
 

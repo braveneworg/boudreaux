@@ -168,14 +168,26 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
 
   const priceId = subscription.items.data[0]?.price.id;
-  const tier = priceId ? getTierByPriceId(priceId) : null;
+  const newTier = priceId ? getTierByPriceId(priceId) : null;
+  const interval = subscription.items.data[0]?.price.recurring?.interval ?? 'month';
+
+  const existing = await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId);
 
   await SubscriptionRepository.updateSubscription(stripeCustomerId, {
     subscriptionId: subscription.id,
     subscriptionStatus: subscription.status,
-    subscriptionTier: tier,
+    subscriptionTier: newTier,
     subscriptionCurrentPeriodEnd: new Date(subscription.items.data[0].current_period_end * 1000),
   });
+
+  if (
+    existing?.email &&
+    subscription.status === 'active' &&
+    newTier !== existing.subscriptionTier
+  ) {
+    await SubscriptionRepository.resetConfirmationEmailSent(existing.email);
+    await sendConfirmationEmail(existing.email, newTier, interval);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
