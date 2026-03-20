@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [3.6.0] - 2026-03-20
+
+### Added
+
+- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n- Develop/feature/download freemium music (#274)\n
+
 ## [3.5.0] - 2026-03-16
 
 ### Added
