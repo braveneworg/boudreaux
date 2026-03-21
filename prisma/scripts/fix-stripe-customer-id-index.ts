@@ -22,24 +22,24 @@ const INDEX_NAME = 'User_stripeCustomerId_key';
 const COLLECTION = 'User';
 
 async function main(): Promise<void> {
-  console.log(`Dropping existing index "${INDEX_NAME}" on ${COLLECTION} if present...`);
+  console.info(`Dropping existing index "${INDEX_NAME}" on ${COLLECTION} if present...`);
 
   try {
     await prisma.$runCommandRaw({
       dropIndexes: COLLECTION,
       index: INDEX_NAME,
     });
-    console.log(`  Dropped index "${INDEX_NAME}".`);
+    console.info(`  Dropped index "${INDEX_NAME}".`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('index not found') || message.includes('IndexNotFound')) {
-      console.log(`  Index "${INDEX_NAME}" did not exist — nothing to drop.`);
+      console.info(`  Index "${INDEX_NAME}" did not exist — nothing to drop.`);
     } else {
       throw err;
     }
   }
 
-  console.log(`Creating sparse unique index "${INDEX_NAME}" on ${COLLECTION}.stripeCustomerId...`);
+  console.info(`Creating sparse unique index "${INDEX_NAME}" on ${COLLECTION}.stripeCustomerId...`);
 
   await prisma.$runCommandRaw({
     createIndexes: COLLECTION,
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     ],
   });
 
-  console.log(`  Done. Sparse unique index "${INDEX_NAME}" created successfully.`);
+  console.info(`  Done. Sparse unique index "${INDEX_NAME}" created successfully.`);
 }
 
 main()

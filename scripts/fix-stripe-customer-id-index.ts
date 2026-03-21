@@ -24,20 +24,20 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Dropping legacy User_stripeCustomerId_key index...');
+  console.info('Dropping legacy User_stripeCustomerId_key index...');
 
   try {
     await prisma.$runCommandRaw({
       dropIndexes: 'User',
       index: 'User_stripeCustomerId_key',
     });
-    console.log(
+    console.info(
       '✓ Index dropped. Run `npx prisma db push` to recreate it as a partial unique index.'
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('index not found') || message.includes('27')) {
-      console.log('Index does not exist — nothing to drop.');
+      console.info('Index does not exist — nothing to drop.');
     } else {
       throw err;
     }
