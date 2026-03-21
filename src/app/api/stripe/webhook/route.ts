@@ -4,23 +4,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { SendEmailCommand } from '@aws-sdk/client-ses';
-
-import { buildSubscriptionConfirmationEmailHtml } from '@/lib/email/subscription-confirmation-email-html';
-import { buildSubscriptionConfirmationEmailText } from '@/lib/email/subscription-confirmation-email-text';
+import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
-import {
-  getSubscriberRate,
-  getTierByPriceId,
-  TIER_LABELS,
-  type SubscriberRateTier,
-} from '@/lib/subscriber-rates';
-import { sesClient } from '@/lib/utils/ses-client';
+import { getTierByPriceId } from '@/lib/subscriber-rates';
 
 import type Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
+
+const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -87,7 +80,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   await SubscriptionRepository.linkStripeCustomer(customerEmail, stripeCustomerId);
 
-  let tier: SubscriberRateTier | null = null;
+  let tier = null;
   let interval = 'month';
 
   if (session.subscription) {
@@ -110,72 +103,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     });
   }
 
-  await sendConfirmationEmail(customerEmail, tier, interval);
-}
-
-async function sendConfirmationEmail(
-  customerEmail: string,
-  tier: SubscriberRateTier | null,
-  interval: string
-) {
-  const fromAddress = process.env.EMAIL_FROM;
-  if (!fromAddress) {
-    console.error('EMAIL_FROM is not configured; skipping subscription confirmation email');
-    return;
-  }
-
-  const shouldSend = await SubscriptionRepository.markConfirmationEmailSent(customerEmail);
-  if (!shouldSend) {
-    return;
-  }
-
-  try {
-    const tierLabel = tier ? TIER_LABELS[tier] : 'Subscriber';
-    const amount = tier ? `$${getSubscriberRate(tier).toFixed(2)}` : '';
-
-    const emailData = { email: customerEmail, tierLabel, amount, interval };
-
-    const command = new SendEmailCommand({
-      Source: fromAddress,
-      Destination: { ToAddresses: [customerEmail] },
-      Message: {
-        Subject: {
-          Data: 'Welcome to Fake Four Inc. — Subscription Confirmed',
-          Charset: 'UTF-8',
-        },
-        Body: {
-          Html: {
-            Data: buildSubscriptionConfirmationEmailHtml(emailData),
-            Charset: 'UTF-8',
-          },
-          Text: {
-            Data: buildSubscriptionConfirmationEmailText(emailData),
-            Charset: 'UTF-8',
-          },
-        },
-      },
-    });
-
-    await sesClient.send(command);
-  } catch (error) {
-    console.error(`Failed to send subscription confirmation email to ${customerEmail}:`, error);
-    await SubscriptionRepository.resetConfirmationEmailSent(customerEmail);
-  }
+  // Reset the flag so the email is sent even if this is a re-subscription or
+  // tier change that goes through Checkout instead of the customer portal.
+  await SubscriptionRepository.resetConfirmationEmailSent(customerEmail);
+  await sendSubscriptionConfirmationEmail(customerEmail, tier, interval);
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const stripeCustomerId =
     typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
 
-  const priceId = subscription.items.data[0]?.price.id;
-  const tier = priceId ? getTierByPriceId(priceId) : null;
+  const firstItem = subscription.items.data[0];
+  const priceId = firstItem?.price.id;
+  const newTier = priceId ? getTierByPriceId(priceId) : null;
+  const interval = firstItem?.price.recurring?.interval ?? 'month';
+
+  const existing = await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId);
 
   await SubscriptionRepository.updateSubscription(stripeCustomerId, {
     subscriptionId: subscription.id,
     subscriptionStatus: subscription.status,
-    subscriptionTier: tier,
-    subscriptionCurrentPeriodEnd: new Date(subscription.items.data[0].current_period_end * 1000),
+    subscriptionTier: newTier,
+    subscriptionCurrentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : null,
   });
+
+  if (
+    existing?.email &&
+    ACTIVE_STATUSES.has(subscription.status) &&
+    newTier !== existing.subscriptionTier
+  ) {
+    await SubscriptionRepository.resetConfirmationEmailSent(existing.email);
+    await sendSubscriptionConfirmationEmail(existing.email, newTier, interval);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {

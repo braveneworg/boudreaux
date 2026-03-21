@@ -23,12 +23,6 @@ vi.mock('@/lib/prisma-adapter', () => ({
   }),
 }));
 
-const mockSignIn = vi.fn();
-
-vi.mock('../../../auth', () => ({
-  signIn: (...args: unknown[]) => mockSignIn(...args),
-}));
-
 vi.mock('unique-username-generator', () => ({
   generateUsername: () => 'testuser1234',
 }));
@@ -77,9 +71,8 @@ describe('resolveSubscriberAction', () => {
     });
   });
 
-  it('should sign in and return "existing" status for existing users', async () => {
+  it('should return "existing" status for existing users without sending sign-in email', async () => {
     mockFindUnique.mockResolvedValue({ id: '1', email: 'existing@example.com' });
-    mockSignIn.mockResolvedValue(undefined);
 
     const result = await resolveSubscriberAction({
       email: 'existing@example.com',
@@ -87,11 +80,6 @@ describe('resolveSubscriberAction', () => {
     });
 
     expect(result).toEqual({ success: true, status: 'existing' });
-    expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-      email: 'existing@example.com',
-      redirect: false,
-      redirectTo: '/',
-    });
   });
 
   it('should return an error when terms are not accepted for new users', async () => {
@@ -109,10 +97,9 @@ describe('resolveSubscriberAction', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it('should create a new user and sign in when terms are accepted', async () => {
+  it('should create a new user without sending sign-in email when terms are accepted', async () => {
     mockFindUnique.mockResolvedValue(null);
     mockCreateUser.mockResolvedValue({ id: '2', email: 'new@example.com' });
-    mockSignIn.mockResolvedValue(undefined);
 
     const result = await resolveSubscriberAction({
       email: 'new@example.com',
@@ -129,11 +116,6 @@ describe('resolveSubscriberAction', () => {
         username: 'testuser1234',
       })
     );
-    expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
-      email: 'new@example.com',
-      redirect: false,
-      redirectTo: '/',
-    });
   });
 
   it('should catch and return errors when an exception is thrown', async () => {

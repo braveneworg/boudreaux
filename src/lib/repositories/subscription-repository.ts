@@ -34,8 +34,17 @@ export class SubscriptionRepository {
   }
 
   static async updateSubscription(stripeCustomerId: string, data: UpdateSubscriptionData) {
-    return prisma.user.update({
+    const user = await prisma.user.findFirst({
       where: { stripeCustomerId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new Error(`No user found with stripeCustomerId: ${stripeCustomerId}`);
+    }
+
+    return prisma.user.update({
+      where: { id: user.id },
       data: {
         subscriptionId: data.subscriptionId,
         subscriptionStatus: data.subscriptionStatus,
@@ -46,8 +55,17 @@ export class SubscriptionRepository {
   }
 
   static async cancelSubscription(stripeCustomerId: string) {
-    return prisma.user.update({
+    const user = await prisma.user.findFirst({
       where: { stripeCustomerId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new Error(`No user found with stripeCustomerId: ${stripeCustomerId}`);
+    }
+
+    return prisma.user.update({
+      where: { id: user.id },
       data: {
         subscriptionStatus: 'canceled',
         subscriptionId: null,
@@ -62,14 +80,23 @@ export class SubscriptionRepository {
     stripeCustomerId: string,
     status: Stripe.Subscription.Status
   ) {
-    return prisma.user.update({
+    const user = await prisma.user.findFirst({
       where: { stripeCustomerId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new Error(`No user found with stripeCustomerId: ${stripeCustomerId}`);
+    }
+
+    return prisma.user.update({
+      where: { id: user.id },
       data: { subscriptionStatus: status },
     });
   }
 
   static async findByStripeCustomerId(stripeCustomerId: string) {
-    return prisma.user.findUnique({
+    return prisma.user.findFirst({
       where: { stripeCustomerId },
       select: SUBSCRIPTION_SELECT,
     });

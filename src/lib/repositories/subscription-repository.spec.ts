@@ -6,6 +6,7 @@ import { SubscriptionRepository } from './subscription-repository';
 vi.mock('server-only', () => ({}));
 
 const mockUpdate = vi.fn();
+const mockFindFirst = vi.fn();
 const mockFindUnique = vi.fn();
 const mockUpdateMany = vi.fn();
 
@@ -13,6 +14,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       update: (...args: unknown[]) => mockUpdate(...args),
+      findFirst: (...args: unknown[]) => mockFindFirst(...args),
       findUnique: (...args: unknown[]) => mockFindUnique(...args),
       updateMany: (...args: unknown[]) => mockUpdateMany(...args),
     },
@@ -38,19 +40,24 @@ describe('SubscriptionRepository', () => {
   });
 
   describe('updateSubscription', () => {
-    it('should update subscription fields by stripeCustomerId', async () => {
+    it('should find user by stripeCustomerId then update by id', async () => {
       const data = {
         subscriptionId: 'sub_123',
         subscriptionStatus: 'active' as const,
         subscriptionTier: 'minimum',
         subscriptionCurrentPeriodEnd: new Date('2026-04-17'),
       };
+      mockFindFirst.mockResolvedValue({ id: '1' });
       mockUpdate.mockResolvedValue({ id: '1', ...data });
 
       await SubscriptionRepository.updateSubscription('cus_123', data);
 
-      expect(mockUpdate).toHaveBeenCalledWith({
+      expect(mockFindFirst).toHaveBeenCalledWith({
         where: { stripeCustomerId: 'cus_123' },
+        select: { id: true },
+      });
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { id: '1' },
         data: {
           subscriptionId: 'sub_123',
           subscriptionStatus: 'active',
@@ -59,16 +66,34 @@ describe('SubscriptionRepository', () => {
         },
       });
     });
+
+    it('should throw if no user found', async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      await expect(
+        SubscriptionRepository.updateSubscription('cus_missing', {
+          subscriptionId: 'sub_123',
+          subscriptionStatus: 'active' as const,
+          subscriptionTier: 'minimum',
+          subscriptionCurrentPeriodEnd: new Date(),
+        })
+      ).rejects.toThrow('No user found with stripeCustomerId: cus_missing');
+    });
   });
 
   describe('cancelSubscription', () => {
-    it('should set status to canceled and null other fields', async () => {
+    it('should find user then set status to canceled and null other fields', async () => {
+      mockFindFirst.mockResolvedValue({ id: '1' });
       mockUpdate.mockResolvedValue({ id: '1', subscriptionStatus: 'canceled' });
 
       await SubscriptionRepository.cancelSubscription('cus_123');
 
-      expect(mockUpdate).toHaveBeenCalledWith({
+      expect(mockFindFirst).toHaveBeenCalledWith({
         where: { stripeCustomerId: 'cus_123' },
+        select: { id: true },
+      });
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { id: '1' },
         data: {
           subscriptionStatus: 'canceled',
           subscriptionId: null,
@@ -78,28 +103,49 @@ describe('SubscriptionRepository', () => {
         },
       });
     });
+
+    it('should throw if no user found', async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      await expect(SubscriptionRepository.cancelSubscription('cus_missing')).rejects.toThrow(
+        'No user found with stripeCustomerId: cus_missing'
+      );
+    });
   });
 
   describe('updateSubscriptionStatus', () => {
-    it('should update only the subscription status', async () => {
+    it('should find user then update only the subscription status', async () => {
+      mockFindFirst.mockResolvedValue({ id: '1' });
       mockUpdate.mockResolvedValue({ id: '1', subscriptionStatus: 'past_due' });
 
       await SubscriptionRepository.updateSubscriptionStatus('cus_123', 'past_due');
 
-      expect(mockUpdate).toHaveBeenCalledWith({
+      expect(mockFindFirst).toHaveBeenCalledWith({
         where: { stripeCustomerId: 'cus_123' },
+        select: { id: true },
+      });
+      expect(mockUpdate).toHaveBeenCalledWith({
+        where: { id: '1' },
         data: { subscriptionStatus: 'past_due' },
       });
+    });
+
+    it('should throw if no user found', async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      await expect(
+        SubscriptionRepository.updateSubscriptionStatus('cus_missing', 'past_due')
+      ).rejects.toThrow('No user found with stripeCustomerId: cus_missing');
     });
   });
 
   describe('findByStripeCustomerId', () => {
     it('should find user by stripeCustomerId with subscription fields', async () => {
-      mockFindUnique.mockResolvedValue({ id: '1', email: 'test@example.com' });
+      mockFindFirst.mockResolvedValue({ id: '1', email: 'test@example.com' });
 
       await SubscriptionRepository.findByStripeCustomerId('cus_123');
 
-      expect(mockFindUnique).toHaveBeenCalledWith({
+      expect(mockFindFirst).toHaveBeenCalledWith({
         where: { stripeCustomerId: 'cus_123' },
         select: expect.objectContaining({
           id: true,

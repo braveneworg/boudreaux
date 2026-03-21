@@ -134,7 +134,7 @@ describe('EmailStep', () => {
     });
   });
 
-  it('should show magic link message for existing users, then call onConfirm after delay', async () => {
+  it('should call onConfirm immediately for existing users', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockResolveSubscriberAction.mockResolvedValue({ success: true, status: 'existing' });
 
@@ -145,17 +145,8 @@ describe('EmailStep', () => {
     await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Check Your Email' })).toBeInTheDocument();
-      expect(screen.getByText(/We sent a verification link/)).toBeInTheDocument();
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith('existing@example.com');
     });
-
-    // onConfirm should not be called immediately
-    expect(defaultProps.onConfirm).not.toHaveBeenCalled();
-
-    // Advance timers to trigger the setTimeout
-    vi.advanceTimersByTime(2000);
-
-    expect(defaultProps.onConfirm).toHaveBeenCalledWith('existing@example.com');
   });
 
   it('should display a server error when the action fails', async () => {
