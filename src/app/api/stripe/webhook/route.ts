@@ -167,9 +167,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const stripeCustomerId =
     typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
 
-  const priceId = subscription.items.data[0]?.price.id;
+  const firstItem = subscription.items.data[0];
+  const priceId = firstItem?.price.id;
   const newTier = priceId ? getTierByPriceId(priceId) : null;
-  const interval = subscription.items.data[0]?.price.recurring?.interval ?? 'month';
+  const interval = firstItem?.price.recurring?.interval ?? 'month';
 
   const existing = await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId);
 
@@ -177,7 +178,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     subscriptionId: subscription.id,
     subscriptionStatus: subscription.status,
     subscriptionTier: newTier,
-    subscriptionCurrentPeriodEnd: new Date(subscription.items.data[0].current_period_end * 1000),
+    subscriptionCurrentPeriodEnd: firstItem
+      ? new Date(firstItem.current_period_end * 1000)
+      : null,
   });
 
   if (
