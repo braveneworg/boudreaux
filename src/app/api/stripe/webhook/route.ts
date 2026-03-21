@@ -171,6 +171,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const newTier = priceId ? getTierByPriceId(priceId) : null;
   const interval = subscription.items.data[0]?.price.recurring?.interval ?? 'month';
 
+  if (priceId && newTier === null) {
+    console.warn('customer.subscription.updated: unknown price ID, skipping tier-change email', {
+      subscriptionId: subscription.id,
+      priceId,
+    });
+  }
+
   const existing = await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId);
 
   await SubscriptionRepository.updateSubscription(stripeCustomerId, {
@@ -183,6 +190,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   if (
     existing?.email &&
     subscription.status === 'active' &&
+    newTier !== null &&
     newTier !== existing.subscriptionTier
   ) {
     await SubscriptionRepository.resetConfirmationEmailSent(existing.email);

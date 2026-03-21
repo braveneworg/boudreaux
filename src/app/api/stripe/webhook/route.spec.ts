@@ -398,6 +398,45 @@ describe('POST /api/stripe/webhook', () => {
       expect(mockResetConfirmationEmailSent).not.toHaveBeenCalled();
       expect(mockSesSend).not.toHaveBeenCalled();
     });
+
+    it('should not send confirmation email when price ID is unknown (newTier is null)', async () => {
+      vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
+      mockConstructEvent.mockReturnValue({
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            ...mockSubscription,
+            items: {
+              data: [
+                {
+                  price: { id: 'price_unknown_xyz', recurring: { interval: 'month' } },
+                  current_period_end: 1713398400,
+                },
+              ],
+            },
+          },
+        },
+      });
+      mockFindByStripeCustomerId.mockResolvedValue({
+        email: 'subscriber@example.com',
+        subscriptionTier: 'minimum',
+      });
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'customer.subscription.updated: unknown price ID, skipping tier-change email',
+        expect.objectContaining({ priceId: 'price_unknown_xyz' })
+      );
+      expect(mockResetConfirmationEmailSent).not.toHaveBeenCalled();
+      expect(mockSesSend).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('customer.subscription.deleted', () => {
