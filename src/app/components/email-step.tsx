@@ -8,7 +8,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MailIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/app/components/ui/button';
@@ -40,7 +39,6 @@ interface EmailStepProps {
 export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
   const [isPending, setIsPending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const form = useForm<EmailStepFormSchemaType>({
     resolver: zodResolver(emailStepSchema),
@@ -66,33 +64,8 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
       return;
     }
 
-    if (result.status === 'existing') {
-      setMagicLinkSent(true);
-      setTimeout(() => {
-        onConfirm(data.email);
-      }, 2000);
-      return;
-    }
-
     onConfirm(data.email);
   };
-
-  if (magicLinkSent) {
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Check Your Email</DialogTitle>
-          <DialogDescription>
-            We sent a verification link to your email. You can verify anytime — proceeding to
-            checkout now...
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center justify-center py-6">
-          <MailIcon className="text-muted-foreground size-12" />
-        </div>
-      </>
-    );
-  }
 
   return (
     <>

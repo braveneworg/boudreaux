@@ -11,8 +11,6 @@ import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { validateEmailSecurity } from '@/lib/utils/email-security';
 
-import { signIn } from '../../../auth';
-
 interface ResolveSubscriberInput {
   email: string;
   termsAccepted: boolean;
@@ -43,7 +41,6 @@ export const resolveSubscriberAction = async (
     });
 
     if (existingUser) {
-      await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
       return { success: true, status: 'existing' };
     }
 
@@ -63,8 +60,6 @@ export const resolveSubscriberAction = async (
       image: null,
       username: generateUsername('', 4),
     });
-
-    await signIn('nodemailer', { email, redirect: false, redirectTo: '/' });
 
     return { success: true, status: 'created' };
   } catch (error: unknown) {

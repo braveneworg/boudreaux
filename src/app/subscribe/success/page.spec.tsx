@@ -8,6 +8,7 @@ import SubscribeSuccessPage from './page';
 vi.mock('server-only', () => ({}));
 
 const mockSessionsRetrieve = vi.fn();
+const mockSubscriptionsRetrieve = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
   stripe: {
@@ -16,12 +17,43 @@ vi.mock('@/lib/stripe', () => ({
         retrieve: (...args: unknown[]) => mockSessionsRetrieve(...args),
       },
     },
+    subscriptions: {
+      retrieve: (...args: unknown[]) => mockSubscriptionsRetrieve(...args),
+    },
   },
+}));
+
+const mockLinkStripeCustomer = vi.fn();
+const mockResetConfirmationEmailSent = vi.fn();
+
+vi.mock('@/lib/repositories/subscription-repository', () => ({
+  SubscriptionRepository: {
+    linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
+    resetConfirmationEmailSent: (...args: unknown[]) => mockResetConfirmationEmailSent(...args),
+  },
+}));
+
+vi.mock('@/lib/subscriber-rates', () => ({
+  getTierByPriceId: (priceId: string) => {
+    const map: Record<string, string> = {
+      price_minimum: 'minimum',
+    };
+    return map[priceId] ?? null;
+  },
+}));
+
+const mockSendConfirmationEmail = vi.fn();
+
+vi.mock('@/lib/email/send-subscription-confirmation', () => ({
+  sendSubscriptionConfirmationEmail: (...args: unknown[]) => mockSendConfirmationEmail(...args),
 }));
 
 describe('SubscribeSuccessPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLinkStripeCustomer.mockResolvedValue({});
+    mockResetConfirmationEmailSent.mockResolvedValue(undefined);
+    mockSendConfirmationEmail.mockResolvedValue(true);
   });
 
   it('should show missing session message when no session_id is provided', async () => {
@@ -53,7 +85,18 @@ describe('SubscribeSuccessPage', () => {
     mockSessionsRetrieve.mockResolvedValue({
       id: 'cs_test_123',
       payment_status: 'paid',
+      customer: 'cus_test_123',
       customer_details: { email: 'subscriber@example.com' },
+      subscription: 'sub_test_123',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [
+          {
+            price: { id: 'price_minimum', recurring: { interval: 'month' } },
+          },
+        ],
+      },
     });
 
     const page = await SubscribeSuccessPage({
@@ -69,10 +112,44 @@ describe('SubscribeSuccessPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should show success without confirmation email note when no customer email', async () => {
+  it('should send confirmation email when payment is paid', async () => {
     mockSessionsRetrieve.mockResolvedValue({
       id: 'cs_test_123',
       payment_status: 'paid',
+      customer: 'cus_test_123',
+      customer_details: { email: 'subscriber@example.com' },
+      subscription: 'sub_test_123',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [
+          {
+            price: { id: 'price_minimum', recurring: { interval: 'month' } },
+          },
+        ],
+      },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
+    });
+
+    render(page);
+
+    expect(mockLinkStripeCustomer).toHaveBeenCalledWith('subscriber@example.com', 'cus_test_123');
+    expect(mockResetConfirmationEmailSent).toHaveBeenCalledWith('subscriber@example.com');
+    expect(mockSendConfirmationEmail).toHaveBeenCalledWith(
+      'subscriber@example.com',
+      'minimum',
+      'month'
+    );
+  });
+
+  it('should not send email when customer email is null', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      id: 'cs_test_123',
+      payment_status: 'paid',
+      customer: 'cus_test_123',
       customer_details: { email: null },
     });
 
@@ -84,6 +161,35 @@ describe('SubscribeSuccessPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
     expect(screen.queryByText(/A confirmation email will be sent/)).not.toBeInTheDocument();
+    expect(mockSendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it('should still render success page when email sending fails', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      id: 'cs_test_123',
+      payment_status: 'paid',
+      customer: 'cus_test_123',
+      customer_details: { email: 'subscriber@example.com' },
+      subscription: 'sub_test_123',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [
+          {
+            price: { id: 'price_minimum', recurring: { interval: 'month' } },
+          },
+        ],
+      },
+    });
+    mockSendConfirmationEmail.mockRejectedValue(new Error('SES failure'));
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_123' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
   });
 
   it('should show processing message when payment status is not paid', async () => {
@@ -103,6 +209,7 @@ describe('SubscribeSuccessPage', () => {
       screen.getByRole('heading', { name: 'Processing Your Subscription' })
     ).toBeInTheDocument();
     expect(screen.getByText(/Your payment is being processed/)).toBeInTheDocument();
+    expect(mockSendConfirmationEmail).not.toHaveBeenCalled();
   });
 
   it('should show error message when stripe retrieval throws', async () => {
