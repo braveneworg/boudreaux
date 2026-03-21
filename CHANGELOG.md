@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [3.7.0] - 2026-03-21
+
+### Added
+
+- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- fix: safe access of subscription.items.data[0] in handleSubscriptionUpdated (#279)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Address feedback on freemium music download feature implementation (#277)\n- Address feedback on freemium music download feature implementation (#277)\n- Address feedback on freemium music download feature implementation (#277)\n- Develop/feature/download freemium music (#275)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Move confirmation email sending from success page to Stripe webhook handler (#276)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- Develop/feature/download freemium music (#275)\n- feat: Enhance subscription handling to send confirmation emails on tier changes (#278)\n
+
 ## [3.6.0] - 2026-03-20
 
 ### Added
