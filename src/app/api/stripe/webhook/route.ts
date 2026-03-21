@@ -124,9 +124,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     subscriptionId: subscription.id,
     subscriptionStatus: subscription.status,
     subscriptionTier: newTier,
-    subscriptionCurrentPeriodEnd: firstItem
-      ? new Date(firstItem.current_period_end * 1000)
-      : null,
+    subscriptionCurrentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : null,
   });
 
   if (
