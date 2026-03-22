@@ -83,7 +83,6 @@ export const DownloadDialog = ({
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [purchaseMode, setPurchaseMode] = useState(false);
   const [amountCents, setAmountCents] = useState<number>(0);
-  const [guestUserId, setGuestUserId] = useState<string | null>(null);
   const [guestAtCap, setGuestAtCap] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
@@ -134,7 +133,6 @@ export const DownloadDialog = ({
       setCustomerEmail(null);
       setPurchaseMode(false);
       setAmountCents(0);
-      setGuestUserId(null);
       setGuestAtCap(false);
       setPurchaseError(null);
     }
@@ -360,11 +358,9 @@ export const DownloadDialog = ({
               if (purchaseMode) {
                 const status = await checkGuestPurchaseAction(email, releaseId);
                 if (status.hasPurchase) {
-                  setGuestUserId(status.userId);
                   setGuestAtCap(status.atCap);
                   setStep('returning-download');
                 } else {
-                  setGuestUserId(status.userId);
                   setStep('purchase-checkout');
                 }
               } else {
@@ -383,7 +379,7 @@ export const DownloadDialog = ({
             releaseId={releaseId}
             releaseTitle={releaseTitle}
             amountCents={amountCents}
-            userId={(session?.user as { id?: string })?.id ?? guestUserId ?? ''}
+            customerEmail={session?.user?.email ?? customerEmail ?? ''}
             onConfirmed={() => setStep('purchase-success')}
             onError={(msg) => {
               setPurchaseError(msg);

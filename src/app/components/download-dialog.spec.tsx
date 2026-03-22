@@ -1084,7 +1084,6 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   it('should navigate to returning-download step when purchaseMode=true and guest has existing purchase', async () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
-      userId: 'guest-id',
       atCap: false,
     });
 
@@ -1110,7 +1109,6 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   it('should navigate to purchase-checkout step when purchaseMode=true and guest has no existing purchase', async () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: false,
-      userId: 'guest-id',
     });
 
     const user = userEvent.setup();
@@ -1258,7 +1256,6 @@ describe('DownloadDialog — returning-download step', () => {
   ) => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
-      userId: 'guest-id',
       atCap,
     });
 

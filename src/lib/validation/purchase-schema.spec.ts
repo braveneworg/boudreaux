@@ -10,7 +10,7 @@ describe('purchaseCheckoutSchema', () => {
     releaseId: 'release-123',
     releaseTitle: 'Test Album',
     amountCents: 500,
-    userId: 'user-123',
+    customerEmail: 'buyer@example.com',
   };
 
   it('should pass with a valid complete input', () => {
@@ -61,11 +61,21 @@ describe('purchaseCheckoutSchema', () => {
     });
   });
 
-  describe('userId field', () => {
-    it('should fail when userId is empty', () => {
-      const result = purchaseCheckoutSchema.safeParse({ ...validInput, userId: '' });
+  describe('customerEmail field', () => {
+    it('should fail when customerEmail is empty', () => {
+      const result = purchaseCheckoutSchema.safeParse({ ...validInput, customerEmail: '' });
       expect(result.success).toBe(false);
-      const errors = result.error?.issues.filter((i) => i.path[0] === 'userId');
+      const errors = result.error?.issues.filter((i) => i.path[0] === 'customerEmail');
+      expect(errors?.length).toBeGreaterThan(0);
+    });
+
+    it('should fail when customerEmail is not a valid email address', () => {
+      const result = purchaseCheckoutSchema.safeParse({
+        ...validInput,
+        customerEmail: 'not-an-email',
+      });
+      expect(result.success).toBe(false);
+      const errors = result.error?.issues.filter((i) => i.path[0] === 'customerEmail');
       expect(errors?.length).toBeGreaterThan(0);
     });
   });
