@@ -22,13 +22,27 @@ interface ReleasePlayerProps {
   release: PublishedReleaseDetail;
   /** Whether to auto-play the first track on mount (e.g. from Play button click) */
   autoPlay?: boolean;
+  // PWYW purchase props forwarded to DownloadDialog
+  releaseId: string;
+  releaseTitle?: string;
+  suggestedPrice?: number | null;
+  hasPurchase?: boolean;
+  downloadCount?: number;
 }
 
 /**
  * Release media player. Composes MediaPlayer sub-components with
  * release-specific state management for track playback.
  */
-export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps) => {
+export const ReleasePlayer = ({
+  release,
+  autoPlay = false,
+  releaseId,
+  releaseTitle,
+  suggestedPrice,
+  hasPurchase,
+  downloadCount,
+}: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(autoPlay);
@@ -110,7 +124,14 @@ export const ReleasePlayer = ({ release, autoPlay = false }: ReleasePlayerProps)
       <div className="space-y-2 mt-2">
         {hasTracks && currentTrack && primaryArtist && (
           <>
-            <DownloadDialog artistName={getArtistDisplayName(primaryArtist)}>
+            <DownloadDialog
+              artistName={getArtistDisplayName(primaryArtist)}
+              releaseId={releaseId}
+              releaseTitle={releaseTitle}
+              suggestedPrice={suggestedPrice}
+              hasPurchase={hasPurchase}
+              downloadCount={downloadCount}
+            >
               <DownloadTriggerButton />
             </DownloadDialog>
             <MediaPlayer.TrackListDrawer

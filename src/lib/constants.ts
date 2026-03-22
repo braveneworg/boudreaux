@@ -40,3 +40,7 @@ export const ENTITIES = {
   group: 'group',
   featuredArtist: 'featuredArtist',
 } as const;
+
+// PWYW purchase feature (003-stripe-pwyw-purchase)
+/** Maximum number of downloads allowed per user per release after purchase. */
+export const MAX_RELEASE_DOWNLOAD_COUNT = 5;

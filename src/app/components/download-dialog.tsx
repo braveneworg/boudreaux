@@ -6,6 +6,8 @@
 import { useState } from 'react';
 import type { ComponentProps, ReactElement } from 'react';
 
+import Link from 'next/link';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Download, DownloadIcon, UserPlus2Icon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -13,6 +15,8 @@ import { useForm } from 'react-hook-form';
 
 import { CheckoutStep } from '@/app/components/checkout-step';
 import { EmailStep } from '@/app/components/email-step';
+import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
+import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
 import { RateSelectStep } from '@/app/components/rate-select-step';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -33,6 +37,8 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
+import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
+import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -41,19 +47,45 @@ import downloadSchema, {
   type DownloadFormSchemaType,
 } from '@/lib/validation/download-schema';
 
-type DialogStep = 'download' | 'rate-select' | 'email-step' | 'checkout';
+type DialogStep =
+  | 'download'
+  | 'rate-select'
+  | 'email-step'
+  | 'checkout'
+  | 'purchase-checkout'
+  | 'purchase-success'
+  | 'returning-download';
 
 interface DownloadDialogProps {
   artistName: string;
   premiumPrice?: number;
+  releaseId: string;
+  releaseTitle?: string;
+  suggestedPrice?: number | null;
+  hasPurchase?: boolean;
+  downloadCount?: number;
   children: ReactElement;
 }
 
-export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: DownloadDialogProps) => {
+export const DownloadDialog = ({
+  artistName,
+  premiumPrice = 8,
+  releaseId,
+  releaseTitle = '',
+  suggestedPrice = null,
+  hasPurchase = false,
+  downloadCount = 0,
+  children,
+}: DownloadDialogProps) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<DialogStep>('download');
   const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const [purchaseMode, setPurchaseMode] = useState(false);
+  const [amountCents, setAmountCents] = useState<number>(0);
+  const [guestUserId, setGuestUserId] = useState<string | null>(null);
+  const [guestAtCap, setGuestAtCap] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
 
   const form = useForm<DownloadFormSchemaType>({
@@ -69,15 +101,28 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
     .watch('finalAmount')
     ?.replace(/[^\d.]/g, '')
     .trim();
+
+  const effectiveSuggestedPrice = suggestedPrice ?? premiumPrice ?? 5;
   const displayAmount = rawAmount
     ? `$${parseFloat(rawAmount).toFixed(2)}`
-    : `$${premiumPrice.toFixed(2)}`;
+    : `$${effectiveSuggestedPrice.toFixed(2)}`;
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
-    // TODO: Implement actual download logic
-    console.info('Download submitted:', data);
-    setOpen(false);
-    form.reset();
+    if (data.downloadOption === 'premium-digital') {
+      const cents = Math.round(parseFloat(rawAmount || String(effectiveSuggestedPrice)) * 100);
+      if (cents < 50) return;
+      setAmountCents(cents);
+      if (session?.user) {
+        setStep('purchase-checkout');
+      } else {
+        setPurchaseMode(true);
+        setStep('email-step');
+      }
+    } else {
+      console.info('Download submitted:', data);
+      setOpen(false);
+      form.reset();
+    }
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -87,6 +132,11 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
       setStep('download');
       setSelectedTier(null);
       setCustomerEmail(null);
+      setPurchaseMode(false);
+      setAmountCents(0);
+      setGuestUserId(null);
+      setGuestAtCap(false);
+      setPurchaseError(null);
     }
   };
 
@@ -100,10 +150,11 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
       <DialogContent
         className={cn(
           'sm:max-w-md',
-          step === 'checkout' && 'max-h-[90vh] overflow-y-auto sm:max-w-lg'
+          (step === 'checkout' || step === 'purchase-checkout') &&
+            'max-h-[90vh] overflow-y-auto sm:max-w-lg'
         )}
         onOpenAutoFocus={(e) => {
-          if (step === 'checkout') e.preventDefault();
+          if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
         }}
       >
         {step === 'download' && (
@@ -112,6 +163,9 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
               <DialogTitle>Download</DialogTitle>
               <DialogDescription>Choose download format(s)</DialogDescription>
             </DialogHeader>
+
+            {purchaseError && <p className="text-destructive text-sm">{purchaseError}</p>}
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 {/* Download option radio group */}
@@ -170,7 +224,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                                   {...field}
                                   type="text"
                                   inputMode="decimal"
-                                  placeholder={`$${premiumPrice.toFixed(2)}`}
+                                  placeholder={`$${effectiveSuggestedPrice.toFixed(2)}`}
                                   className="w-24 text-center"
                                   aria-label="Custom amount"
                                   onChange={(e) => {
@@ -199,7 +253,7 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                                   }}
                                   value={field.value ?? ''}
                                 />
-                                <em>(suggested ${premiumPrice})</em>
+                                <em>(suggested ${effectiveSuggestedPrice})</em>
                               </div>
                             </div>
                           </FormControl>
@@ -215,13 +269,42 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
                   />
                 )}
 
-                {/* Submit button */}
-                <Button className="w-full" type="submit">
-                  <DownloadIcon className="size-4" />
-                  {selectedOption === 'premium-digital'
-                    ? `Download for ${displayAmount}`
-                    : 'Download'}
-                </Button>
+                {/* Submit button — PWYW purchase-aware */}
+                {selectedOption === 'premium-digital' ? (
+                  hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? (
+                    <Link href={`/api/releases/${releaseId}/download`}>
+                      <Button className="w-full" type="button">
+                        <DownloadIcon className="size-4" />
+                        Download (already purchased, {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT}{' '}
+                        used)
+                      </Button>
+                    </Link>
+                  ) : hasPurchase && downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
+                    <>
+                      <Button className="w-full" type="button" disabled>
+                        <DownloadIcon className="size-4" />
+                        Download limit reached
+                      </Button>
+                      <p className="text-muted-foreground text-sm">
+                        You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
+                        <a href="mailto:support@fakefourinc.com" className="underline">
+                          support@fakefourinc.com
+                        </a>{' '}
+                        for assistance.
+                      </p>
+                    </>
+                  ) : (
+                    <Button className="w-full" type="submit">
+                      <DownloadIcon className="size-4" />
+                      Buy &amp; Download for {displayAmount}
+                    </Button>
+                  )
+                ) : (
+                  <Button className="w-full" type="submit">
+                    <DownloadIcon className="size-4" />
+                    Download
+                  </Button>
+                )}
               </form>
             </Form>
 
@@ -264,16 +347,86 @@ export const DownloadDialog = ({ artistName, premiumPrice = 8, children }: Downl
 
         {step === 'email-step' && (
           <EmailStep
-            onCancel={() => setStep('rate-select')}
-            onConfirm={(email: string) => {
+            onCancel={() => {
+              if (purchaseMode) {
+                setPurchaseMode(false);
+                setStep('download');
+              } else {
+                setStep('rate-select');
+              }
+            }}
+            onConfirm={async (email: string) => {
               setCustomerEmail(email);
-              setStep('checkout');
+              if (purchaseMode) {
+                const status = await checkGuestPurchaseAction(email, releaseId);
+                if (status.hasPurchase) {
+                  setGuestUserId(status.userId);
+                  setGuestAtCap(status.atCap);
+                  setStep('returning-download');
+                } else {
+                  setGuestUserId(status.userId);
+                  setStep('purchase-checkout');
+                }
+              } else {
+                setStep('checkout');
+              }
             }}
           />
         )}
 
         {step === 'checkout' && selectedTier && (
           <CheckoutStep tier={selectedTier} customerEmail={customerEmail} />
+        )}
+
+        {step === 'purchase-checkout' && (
+          <PurchaseCheckoutStep
+            releaseId={releaseId}
+            releaseTitle={releaseTitle}
+            amountCents={amountCents}
+            userId={(session?.user as { id?: string })?.id ?? guestUserId ?? ''}
+            onConfirmed={() => setStep('purchase-success')}
+            onError={(msg) => {
+              setPurchaseError(msg);
+              setStep('download');
+            }}
+          />
+        )}
+
+        {step === 'purchase-success' && (
+          <PurchaseSuccessStep releaseId={releaseId} releaseTitle={releaseTitle} />
+        )}
+
+        {step === 'returning-download' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Welcome Back!</DialogTitle>
+              <DialogDescription>
+                You&apos;ve already purchased <strong>{releaseTitle}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            {guestAtCap ? (
+              <>
+                <Button className="w-full" disabled>
+                  <DownloadIcon className="size-4" />
+                  Download limit reached
+                </Button>
+                <p className="text-muted-foreground text-sm">
+                  You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
+                  <a href="mailto:support@fakefourinc.com" className="underline">
+                    support@fakefourinc.com
+                  </a>{' '}
+                  for assistance.
+                </p>
+              </>
+            ) : (
+              <Link href={`/api/releases/${releaseId}/download`}>
+                <Button className="w-full" type="button">
+                  <DownloadIcon className="size-4" />
+                  Download Now
+                </Button>
+              </Link>
+            )}
+          </>
         )}
       </DialogContent>
     </Dialog>

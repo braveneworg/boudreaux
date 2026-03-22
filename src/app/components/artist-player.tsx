@@ -214,7 +214,11 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   onTogglePlay={handleTogglePlay}
                   className="shadow-lg"
                 />
-                <DownloadDialog artistName={artistName}>
+                <DownloadDialog
+                  artistName={artistName}
+                  releaseId={selectedRelease.id}
+                  releaseTitle={selectedRelease.title ?? ''}
+                >
                   <DownloadTriggerButton />
                 </DownloadDialog>
               </div>

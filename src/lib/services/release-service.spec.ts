@@ -70,6 +70,7 @@ describe('ReleaseService', () => {
     urls: [],
     featuredArtists: [],
     tagId: null,
+    suggestedPrice: null,
   };
 
   beforeEach(() => {

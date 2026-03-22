@@ -58,6 +58,34 @@ vi.mock('@/lib/email/send-subscription-confirmation', () => ({
   sendSubscriptionConfirmationEmail: (...args: unknown[]) => mockSendConfirmationEmail(...args),
 }));
 
+// === PWYW release purchase mock setup ===
+
+const mockFindByPaymentIntentId = vi.fn();
+const mockPurchaseCreate = vi.fn();
+
+vi.mock('@/lib/repositories/purchase-repository', () => ({
+  PurchaseRepository: {
+    findByPaymentIntentId: (...args: unknown[]) => mockFindByPaymentIntentId(...args),
+    create: (...args: unknown[]) => mockPurchaseCreate(...args),
+  },
+}));
+
+const mockSendPurchaseConfirmationEmail = vi.fn();
+
+vi.mock('@/lib/email/send-purchase-confirmation', () => ({
+  sendPurchaseConfirmationEmail: (...args: unknown[]) => mockSendPurchaseConfirmationEmail(...args),
+}));
+
+const mockPrismaReleaseFindFirst = vi.fn();
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    release: {
+      findFirst: (...args: unknown[]) => mockPrismaReleaseFindFirst(...args),
+    },
+  },
+}));
+
 const WEBHOOK_SECRET = 'whsec_test_secret';
 
 function createRequest(body: string, signature: string | null = 'sig_test'): NextRequest {
@@ -76,6 +104,7 @@ describe('POST /api/stripe/webhook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', 'true');
     mockResetConfirmationEmailSent.mockResolvedValue(undefined);
     mockSendConfirmationEmail.mockResolvedValue(true);
     mockFindByStripeCustomerId.mockResolvedValue(null);
@@ -450,5 +479,187 @@ describe('POST /api/stripe/webhook', () => {
     expect(response.status).toBe(500);
     const json = await response.json();
     expect(json.error).toBe('Handler failed');
+  });
+
+  describe('IP allowlist', () => {
+    // The outer beforeEach stubs STRIPE_WEBHOOK_SECRET.
+    // The outer afterEach calls vi.unstubAllEnvs() after every test.
+
+    it('returns 403 when the request IP is not in STRIPE_WEBHOOK_IP_RANGES', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-forwarded-for': '1.2.3.4',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Forbidden' });
+    });
+
+    it('passes through to signature verification when the request IP matches an allowed CIDR', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+      mockConstructEvent.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-forwarded-for': '3.18.12.63',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      // IP passes the allowlist check; signature verification then fails
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Invalid signature' });
+    });
+
+    it('bypasses the IP check when SKIP_STRIPE_IP_CHECK=true regardless of remote IP', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', 'true');
+      mockConstructEvent.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-forwarded-for': '9.9.9.9',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      // Skip flag active — IP gate skipped; signature check then fails
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Invalid signature' });
+    });
+  });
+
+  describe('checkout.session.completed — release_purchase (payment mode)', () => {
+    const mockPaymentSession: Partial<Stripe.Checkout.Session> = {
+      id: 'cs_pay_123',
+      mode: 'payment',
+      metadata: { type: 'release_purchase', releaseId: 'release-001', userId: 'user-001' },
+      payment_intent: 'pi_test_001',
+      amount_total: 1000,
+      currency: 'usd',
+      customer_details: {
+        email: 'buyer@example.com',
+      } as Stripe.Checkout.Session.CustomerDetails,
+      customer_email: null,
+    };
+
+    beforeEach(() => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: mockPaymentSession },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({
+        id: 'purchase-new',
+        stripePaymentIntentId: 'pi_test_001',
+      });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Test Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+    });
+
+    it('calls PurchaseRepository.create and sendPurchaseConfirmationEmail for a valid purchase', async () => {
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).toHaveBeenCalledWith({
+        userId: 'user-001',
+        releaseId: 'release-001',
+        amountPaid: 1000,
+        currency: 'usd',
+        stripePaymentIntentId: 'pi_test_001',
+        stripeSessionId: 'cs_pay_123',
+      });
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith({
+        purchaseId: 'purchase-new',
+        customerEmail: 'buyer@example.com',
+        releaseTitle: 'Test Release',
+        amountPaidCents: 1000,
+        releaseId: 'release-001',
+      });
+    });
+
+    it('does not call PurchaseRepository.create when paymentIntentId already exists (idempotency)', async () => {
+      mockFindByPaymentIntentId.mockResolvedValue({ id: 'purchase-existing' });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger the release purchase handler for a subscription mode session', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_sub_999',
+            mode: 'subscription',
+            customer: 'cus_sub_999',
+            customer_email: 'subscriber@example.com',
+            customer_details: { email: 'subscriber@example.com' },
+            subscription: 'sub_sub_999',
+          },
+        },
+      });
+      mockSubscriptionsRetrieve.mockResolvedValue({
+        id: 'sub_sub_999',
+        status: 'active',
+        customer: 'cus_sub_999',
+        items: {
+          data: [
+            {
+              price: { id: 'price_minimum', recurring: { interval: 'month' } },
+              current_period_end: 1713398400,
+            },
+          ],
+        },
+      });
+      mockLinkStripeCustomer.mockResolvedValue({});
+      mockUpdateSubscription.mockResolvedValue({});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      // PWYW purchase branch must NOT have fired
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+      // Subscription branch must have fired (no regression)
+      expect(mockLinkStripeCustomer).toHaveBeenCalledWith('subscriber@example.com', 'cus_sub_999');
+    });
   });
 });

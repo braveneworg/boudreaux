@@ -56,6 +56,10 @@ model User {
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
 
+  // PWYW purchase feature (003-stripe-pwyw-purchase)
+  releasePurchases ReleasePurchase[]
+  releaseDownloads ReleaseDownload[]
+
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
@@ -472,6 +476,11 @@ model Release {
   tag                 Tag?             @relation(fields: [tagId], references: [id])
   tagId               String?          @db.ObjectId
 
+  // PWYW purchase feature (003-stripe-pwyw-purchase)
+  suggestedPrice      Int?              // Suggested price in cents; null = no pre-fill
+  releasePurchases    ReleasePurchase[]
+  releaseDownloads    ReleaseDownload[]
+
   @@index([releasedOn])
   @@index([featuredOn])
   @@index([featuredUntil])
@@ -718,4 +727,38 @@ model TourDateImage {
 
   @@index([tourDateId])
   @@index([displayOrder])
+}
+
+// PWYW Purchase Feature (003-stripe-pwyw-purchase)
+
+model ReleasePurchase {
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                  String    @db.ObjectId
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releaseId               String    @db.ObjectId
+  release                 Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  amountPaid              Int       // Amount paid in cents
+  currency                String    @default("usd")
+  stripePaymentIntentId   String    @unique // Idempotency key for webhook deduplication
+  stripeSessionId         String?   // Stripe Checkout Session ID
+  confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
+  purchasedAt             DateTime  @default(now())
+
+  @@unique([userId, releaseId]) // One purchase per user per release
+  @@index([userId])
+  @@index([releaseId])
+}
+
+model ReleaseDownload {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releaseId         String    @db.ObjectId
+  release           Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  downloadCount     Int       @default(0)
+  lastDownloadedAt  DateTime?
+
+  @@unique([userId, releaseId]) // One record per user per release
+  @@index([userId])
+  @@index([releaseId])
 }

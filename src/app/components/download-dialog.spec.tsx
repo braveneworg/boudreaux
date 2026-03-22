@@ -57,6 +57,7 @@ describe('DownloadDialog', () => {
   const defaultProps = {
     artistName: 'Test Artist',
     premiumPrice: 8,
+    releaseId: 'release-123',
   };
 
   beforeEach(() => {
@@ -224,7 +225,7 @@ describe('DownloadDialog', () => {
     const user = userEvent.setup();
 
     render(
-      <DownloadDialog artistName="Some Artist">
+      <DownloadDialog artistName="Some Artist" releaseId="release-123">
         <button>Open Download</button>
       </DownloadDialog>
     );
@@ -241,7 +242,7 @@ describe('DownloadDialog', () => {
     const user = userEvent.setup();
 
     render(
-      <DownloadDialog artistName="Some Artist" premiumPrice={12}>
+      <DownloadDialog artistName="Some Artist" releaseId="release-123" premiumPrice={12}>
         <button>Open Download</button>
       </DownloadDialog>
     );
@@ -283,7 +284,7 @@ describe('DownloadDialog', () => {
 });
 
 describe('DownloadDialog — dialog lifecycle', () => {
-  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -424,7 +425,7 @@ describe('DownloadTriggerButton', () => {
 });
 
 describe('DownloadDialog — custom amount input behavior', () => {
-  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -536,7 +537,7 @@ describe('DownloadDialog — custom amount input behavior', () => {
 });
 
 describe('DownloadDialog — submit button label', () => {
-  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   it('should show "Download" when no option is selected', async () => {
     const user = userEvent.setup();
@@ -567,7 +568,7 @@ describe('DownloadDialog — submit button label', () => {
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();
   });
 
-  it('should show "Download for $8.00" when premium is selected without a custom amount', async () => {
+  it('should show "Buy & Download for $8.00" when premium is selected without a custom amount', async () => {
     const user = userEvent.setup();
 
     render(
@@ -580,11 +581,13 @@ describe('DownloadDialog — submit button label', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Download for $8.00' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Buy & Download for \$8\.00/i })
+      ).toBeInTheDocument();
     });
   });
 
-  it('should show "Download for $5.00" when premium is selected with a custom amount', async () => {
+  it('should show "Buy & Download for $5.00" when premium is selected with a custom amount', async () => {
     const user = userEvent.setup();
 
     render(
@@ -600,13 +603,15 @@ describe('DownloadDialog — submit button label', () => {
     await user.type(screen.getByLabelText('Custom amount'), '5');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Download for $5.00' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Buy & Download for \$5\.00/i })
+      ).toBeInTheDocument();
     });
   });
 });
 
 describe('DownloadDialog — subscription multi-step flow', () => {
-  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8 };
+  const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
     vi.clearAllMocks();
