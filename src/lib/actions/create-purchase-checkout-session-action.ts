@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { purchaseCheckoutSchema } from '@/lib/validation/purchase-schema';
@@ -18,6 +19,9 @@ type ActionResult =
  * Server Action: Creates a Stripe Checkout Session in payment mode
  * for a PWYW release purchase.
  *
+ * Accepts a customerEmail and resolves the userId server-side so that
+ * internal user IDs are never exposed to the client.
+ *
  * Returns the clientSecret for the embedded Stripe Payment Element
  * and the paymentIntentId used to poll for webhook confirmation.
  */
@@ -27,13 +31,24 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents, userId } = parsed.data;
+  const { releaseId, releaseTitle, amountCents, customerEmail } = parsed.data;
 
   try {
-    // Block re-purchase
-    const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
-    if (alreadyPurchased) {
-      return { success: false, error: 'already_purchased' };
+    // Minimum Stripe charge is $0.50
+    if (amountCents < 50) {
+      return { success: false, error: 'amount_below_minimum' };
+    }
+
+    // Resolve userId from email — keeps the internal ID server-side
+    const userRecord = await PurchaseRepository.findUserByEmail(customerEmail);
+    const userId = userRecord?.id ?? null;
+
+    // Block re-purchase for known users
+    if (userId) {
+      const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
+      if (alreadyPurchased) {
+        return { success: false, error: 'already_purchased' };
+      }
     }
 
     // Verify release exists and is published
@@ -62,13 +77,13 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
         metadata: {
           type: 'release_purchase',
           releaseId,
-          userId,
+          ...(userId ? { userId } : { customerEmail }),
         },
       },
       metadata: {
         type: 'release_purchase',
         releaseId,
-        userId,
+        ...(userId ? { userId } : { customerEmail }),
       },
       return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/releases/${releaseId}`,
     });
