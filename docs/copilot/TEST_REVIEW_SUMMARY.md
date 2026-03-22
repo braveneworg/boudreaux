@@ -232,17 +232,17 @@ A comprehensive review of the Boudreaux test suite was conducted, identifying an
 
 ```bash
 # Testing enhancements
-npm install --save-dev \
+pnpm install --save-dev \
   eslint-plugin-testing-library \
   eslint-plugin-vitest \
   @vitest/ui \
   @vitest/coverage-v8
 
 # Pre-commit hooks
-npm install --save-dev husky lint-staged
+pnpm install --save-dev husky lint-staged
 
 # Type checking
-npm install --save-dev @testing-library/jest-dom
+pnpm install --save-dev @testing-library/jest-dom
 ```
 
 ### Vitest Config Improvements
@@ -318,10 +318,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3

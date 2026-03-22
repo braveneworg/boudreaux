@@ -2,7 +2,7 @@
  * Interactive script to create ArtistRelease junction records.
  *
  * Usage:
- *   npx tsx prisma/scripts/link-artist-releases.ts <artist-slug>
+ *   pnpm exec tsx prisma/scripts/link-artist-releases.ts <artist-slug>
  *
  * Looks up the artist by slug, shows their current linked releases,
  * then lists all unlinked releases and lets you pick which to associate.
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const slug = process.argv[2];
 
   if (!slug) {
-    console.error('Usage: npx tsx prisma/scripts/link-artist-releases.ts <artist-slug>');
+    console.error('Usage: pnpm exec tsx prisma/scripts/link-artist-releases.ts <artist-slug>');
     process.exit(1);
   }
 

@@ -168,15 +168,15 @@ Each condition tested:
 
 ```bash
 # Run component tests
-npm test change-email-form.spec.tsx --run
+pnpm test change-email-form.spec.tsx --run
 ✅ 30/30 tests passing
 
 # Run full test suite
-npm test -- --run
+pnpm test -- --run
 ✅ 776/776 tests passing
 
 # TypeScript compilation
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 ✅ No errors
 ```
 

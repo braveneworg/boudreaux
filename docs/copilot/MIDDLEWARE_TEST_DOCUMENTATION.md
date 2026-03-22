@@ -156,7 +156,7 @@ Route: /admin/dashboard
 
 ```bash
 # Run tests with coverage
-npm test -- --coverage middleware.spec.ts
+pnpm test -- --coverage middleware.spec.ts
 
 # Expected Coverage Metrics:
 # - Statements: 95%+
@@ -374,10 +374,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run middleware tests
-        run: npm test -- middleware.spec.ts --coverage
+        run: pnpm test -- middleware.spec.ts --coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -400,8 +400,8 @@ jobs:
 {
   "husky": {
     "hooks": {
-      "pre-commit": "npm test -- middleware.spec.ts --run",
-      "pre-push": "npm test -- --coverage --run"
+      "pre-commit": "pnpm test -- middleware.spec.ts --run",
+      "pre-push": "pnpm test -- --coverage --run"
     }
   }
 }

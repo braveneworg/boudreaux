@@ -170,7 +170,7 @@ setTimeout(() => {
 1. **Run full test suite with coverage**:
 
    ```bash
-   npm test -- --coverage
+   pnpm test -- --coverage
    ```
 
 2. **Monitor test metrics**:
@@ -181,7 +181,7 @@ setTimeout(() => {
 
 3. **Review slow tests**:
    ```bash
-   npm test -- --reporter verbose
+   pnpm test -- --reporter verbose
    ```
 
 ### Test Performance Optimization
@@ -215,7 +215,7 @@ Implement automated reporting with:
 ```yaml
 # Example GitHub Actions integration
 - name: Run Tests with Coverage
-  run: npm test -- --coverage
+  run: pnpm test -- --coverage
 
 - name: Upload Coverage
   uses: codecov/codecov-action@v3
@@ -299,7 +299,7 @@ vi.mock('module', () => ({ ...mock1, ...mock2 }));
 
 **Identify Missing Branches:**
 
-1. Run tests with coverage: `npm test -- --coverage`
+1. Run tests with coverage: `pnpm test -- --coverage`
 2. Check coverage/lcov-report/index.html
 3. Look for lines marked as uncovered (red)
 4. Add tests for those specific branches
@@ -309,7 +309,7 @@ vi.mock('module', () => ({ ...mock1, ...mock2 }));
 Run this command to generate detailed coverage:
 
 ```bash
-npm test -- --coverage --reporter=verbose
+pnpm test -- --coverage --reporter=verbose
 ```
 
 This generates:
@@ -333,7 +333,7 @@ This generates:
 
 ### Daily
 
-- Run full test suite: `npm test`
+- Run full test suite: `pnpm test`
 - Check for any new failing tests
 
 ### Weekly

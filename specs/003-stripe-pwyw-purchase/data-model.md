@@ -194,7 +194,7 @@ Not logged in or no purchase             Has purchase
 ## Migration Notes
 
 - **No destructive migrations**: all changes are additive (new models, new nullable field).
-- **Prisma push**: `npx prisma db push` creates the new collections and indexes in MongoDB.
+- **Prisma push**: `pnpm exec prisma db push` creates the new collections and indexes in MongoDB.
 - **Existing Release documents**: `suggestedPrice` will be `null` for all existing records —
   this is valid and handled by the UI (no pre-fill = empty PWYW input).
 - **Index creation**: MongoDB creates the `@@unique` indexes automatically on `db push`.

@@ -589,16 +589,16 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run linter
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Run type checking
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Run tests
-        run: npm test -- --coverage
+        run: pnpm test -- --coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -627,7 +627,7 @@ jobs:
   "husky": {
     "hooks": {
       "pre-commit": "lint-staged",
-      "pre-push": "npm test"
+      "pre-push": "pnpm test"
     }
   }
 }
@@ -676,13 +676,13 @@ Run specific test types:
 
 ```bash
 # Fast unit tests only (default)
-npm test
+pnpm test
 
 # Include integration tests
-RUN_INTEGRATION=true npm test
+RUN_INTEGRATION=true pnpm test
 
 # Full test suite including E2E
-RUN_E2E=true RUN_INTEGRATION=true npm test
+RUN_E2E=true RUN_INTEGRATION=true pnpm test
 ```
 
 ### 5. **Parallel Test Execution**
@@ -708,16 +708,16 @@ export default defineConfig({
 
 ```bash
 # Generate HTML coverage report
-npm test -- --coverage --reporter=html
+pnpm test -- --coverage --reporter=html
 
 # Generate JUnit XML for CI
-npm test -- --reporter=junit --outputFile=test-results.xml
+pnpm test -- --reporter=junit --outputFile=test-results.xml
 
 # Generate verbose output
-npm test -- --reporter=verbose
+pnpm test -- --reporter=verbose
 
 # Generate GitHub Actions annotations
-npm test -- --reporter=github-actions
+pnpm test -- --reporter=github-actions
 ```
 
 ### 7. **Docker Integration**
@@ -730,13 +730,13 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN npm test -- --coverage
+RUN pnpm test -- --coverage
 
-CMD ["npm", "test"]
+CMD ["pnpm", "test"]
 ```
 
 Run tests in Docker:
@@ -758,7 +758,7 @@ deploy:
     - name: Deploy to production
       run: |
         # Only deploy if tests pass
-        npm run deploy
+        pnpm run deploy
 ```
 
 ---
@@ -794,15 +794,15 @@ Total Duration: ~665ms
 
 ```bash
 # Only test changed files
-npm test -- --changed
+pnpm test -- --changed
 
 # Test files related to specific file
-npm test -- --related src/app/components/ui/button.tsx
+pnpm test -- --related src/app/components/ui/button.tsx
 ```
 
 4. **Watch Mode for Development**
    ```bash
-   npm test -- --watch
+   pnpm test -- --watch
    ```
 
 ---
@@ -880,7 +880,7 @@ Add integration tests for:
 ### 2. **Visual Regression Testing**
 
 ```bash
-npm install -D @storybook/test-runner chromatic
+pnpm install -D @storybook/test-runner chromatic
 ```
 
 - Create Storybook stories for all components
@@ -917,7 +917,7 @@ it('should match snapshot', () => {
 ### 5. **Mutation Testing**
 
 ```bash
-npm install -D stryker
+pnpm install -D stryker
 ```
 
 - Tests the tests by introducing mutations
@@ -927,7 +927,7 @@ npm install -D stryker
 ### 6. **Test Documentation Generation**
 
 ```bash
-npm install -D vitest-html-reporter
+pnpm install -D vitest-html-reporter
 ```
 
 Generates interactive HTML report with:
@@ -970,26 +970,26 @@ This comprehensive test suite provides:
 
 ```bash
 # Run all new tests
-npm test -- src/app/components/auth/admin-link.spec.tsx \
+pnpm test -- src/app/components/auth/admin-link.spec.tsx \
             src/app/components/ui/loading-spinner.spec.tsx \
             src/app/components/ui/spinners/spinner-ring-circle.spec.tsx \
             src/app/lib/constants.spec.ts \
             src/app/lib/utils/console-logger.spec.ts
 
 # Run with coverage
-npm test -- --coverage
+pnpm test -- --coverage
 
 # Run in watch mode
-npm test -- --watch
+pnpm test -- --watch
 
 # Run verbose output
-npm test -- --reporter=verbose
+pnpm test -- --reporter=verbose
 
 # Run only specific test file
-npm test -- src/app/lib/constants.spec.ts
+pnpm test -- src/app/lib/constants.spec.ts
 
 # Run tests matching pattern
-npm test -- --grep="accessibility"
+pnpm test -- --grep="accessibility"
 ```
 
 ---

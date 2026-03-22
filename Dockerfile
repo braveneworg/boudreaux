@@ -1,20 +1,21 @@
 ARG NODE=node:24.14.0-alpine
 FROM ${NODE} AS dependencies
 RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
 
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml* .npmrc ./
 # Install ALL dependencies (including dev) for building
-# Use cache mount for npm cache to speed up installs
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+# Use cache mount for pnpm store to speed up installs
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 FROM ${NODE} AS builder
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 
 # Copy package files first for Prisma generation
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml* .npmrc ./
 COPY prisma ./prisma
 
 # Now copy source code (changes most frequently)
@@ -71,8 +72,8 @@ RUN if [ -f next-build.tar.gz ]; then \
     else \
       echo "Building Next.js from scratch"; \
       echo "Generating Prisma Client..."; \
-      npx prisma generate; \
-      npx next build --webpack; \
+      pnpm exec prisma generate; \
+      pnpm exec next build --webpack; \
     fi
 
 # Stage 2: Create final image

@@ -525,7 +525,7 @@ export default defineConfig({
 **Install:**
 
 ```bash
-npm install --save-dev \
+pnpm install --save-dev \
   eslint-plugin-testing-library \
   eslint-plugin-vitest \
   @vitest/eslint-plugin
@@ -572,10 +572,10 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -601,8 +601,8 @@ jobs:
 **Install Husky:**
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky init
+pnpm install --save-dev husky lint-staged
+pnpm exec husky init
 ```
 
 **Configure:**
@@ -618,7 +618,7 @@ npx husky init
 
 ```bash
 # .husky/pre-commit
-npm run lint-staged
+pnpm run lint-staged
 ```
 
 ### 5. Test Coverage Visualization

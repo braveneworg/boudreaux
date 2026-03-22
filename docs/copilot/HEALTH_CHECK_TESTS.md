@@ -131,13 +131,13 @@ Tests user interface state transitions:
 
 ```bash
 # Run only health check tests
-npx vitest run src/app/page.spec.tsx
+pnpm exec vitest run src/app/page.spec.tsx
 
 # Run all tests
-npx vitest run
+pnpm exec vitest run
 
 # Run with coverage
-npx vitest run --coverage
+pnpm exec vitest run --coverage
 ```
 
 ### Expected Results

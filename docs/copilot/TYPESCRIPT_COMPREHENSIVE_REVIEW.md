@@ -8,11 +8,11 @@
 
 ## Executive Summary
 
-Performed a comprehensive TypeScript audit of the entire codebase to identify and resolve all type errors, eliminate unsafe type patterns, and ensure adherence to TypeScript best practices. The codebase successfully passes `npx tsc --noEmit` with **zero errors**.
+Performed a comprehensive TypeScript audit of the entire codebase to identify and resolve all type errors, eliminate unsafe type patterns, and ensure adherence to TypeScript best practices. The codebase successfully passes `pnpm exec tsc --noEmit` with **zero errors**.
 
 ### Key Achievements
 
-✅ **Zero TypeScript errors** - `npx tsc --noEmit` passes
+✅ **Zero TypeScript errors** - `pnpm exec tsc --noEmit` passes
 ✅ **Zero `any` types in production code** - 100% type safety
 ✅ **Eliminated remaining test `any` types** - 2 test files improved
 ✅ **All 1,102 tests passing** - No regressions
@@ -289,7 +289,7 @@ type Event = `${EventPrefix}.${EventSuffix}`;
 ### Full Test Suite
 
 ```bash
-npm run test:run
+pnpm run test:run
 
 ✅ Test Files: 61 passed
 ✅ Total Tests: 1,102 passed | 18 skipped
@@ -300,7 +300,7 @@ npm run test:run
 ### TypeScript Compilation
 
 ```bash
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 
 ✅ Exits with code 0 (success)
 ✅ No errors reported
@@ -310,7 +310,7 @@ npx tsc --noEmit
 ### ESLint Check
 
 ```bash
-npm run lint
+pnpm run lint
 
 ✅ No errors
 ✅ No warnings
@@ -494,7 +494,7 @@ function process(value: unknown) {
 {
   "husky": {
     "hooks": {
-      "pre-commit": "npx tsc --noEmit && npm run lint"
+      "pre-commit": "pnpm exec tsc --noEmit && pnpm run lint"
     }
   }
 }
@@ -521,9 +521,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm run lint
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm run lint
 ```
 
 ---
@@ -550,10 +550,10 @@ Consider enabling additional strict options:
 **Tool:** [type-coverage](https://github.com/plantain-00/type-coverage)
 
 ```bash
-npm install -D type-coverage
+pnpm install -D type-coverage
 
 # Check type coverage
-npx type-coverage --at-least 100
+pnpm exec type-coverage --at-least 100
 ```
 
 **Target:** Maintain 100% type coverage
@@ -758,7 +758,7 @@ export interface HealthStatus {
 
 The codebase demonstrates exceptional TypeScript practices:
 
-1. ✅ **Zero type errors** - Passes `npx tsc --noEmit`
+1. ✅ **Zero type errors** - Passes `pnpm exec tsc --noEmit`
 2. ✅ **Zero unsafe patterns** - No `any`, no type suppressions
 3. ✅ **Advanced features** - Generics, mapped types, conditionals
 4. ✅ **Comprehensive testing** - 1,102 tests passing

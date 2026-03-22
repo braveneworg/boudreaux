@@ -6,19 +6,19 @@
  *
  * Usage:
  *   # Dump database to file
- *   npm run mongo:dump [output-file]
+ *   pnpm run mongo:dump [output-file]
  *   # or
  *   ts-node scripts/mongo-backup.ts dump [output-file]
  *
  *   # Restore database from file
- *   npm run mongo:restore <input-file>
+ *   pnpm run mongo:restore <input-file>
  *   # or
  *   ts-node scripts/mongo-backup.ts restore <input-file>
  *
  * Examples:
- *   npm run mongo:dump
- *   npm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
- *   npm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
+ *   pnpm run mongo:dump
+ *   pnpm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
+ *   pnpm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
  */
 
 import { dirname, resolve, join } from 'path';
@@ -173,7 +173,7 @@ export function dumpDatabase(outputFile?: string, dbUrl?: string): void {
     cleanupOldBackups(backupDir, 5);
 
     console.info(`To restore this backup, run:`);
-    console.info(`  npm run mongo:restore ${backupPath}`);
+    console.info(`  pnpm run mongo:restore ${backupPath}`);
   } catch (error) {
     console.error('');
     console.error('❌ Backup failed!');
@@ -247,13 +247,13 @@ export function showUsage(): void {
   console.info('MongoDB Backup and Restore Script');
   console.info('');
   console.info('Usage:');
-  console.info('  npm run mongo:dump [output-file]    - Create a database backup');
-  console.info('  npm run mongo:restore <input-file>  - Restore a database backup');
+  console.info('  pnpm run mongo:dump [output-file]    - Create a database backup');
+  console.info('  pnpm run mongo:restore <input-file>  - Restore a database backup');
   console.info('');
   console.info('Examples:');
-  console.info('  npm run mongo:dump');
-  console.info('  npm run mongo:dump backups/my-backup.archive');
-  console.info('  npm run mongo:restore backups/my-backup.archive');
+  console.info('  pnpm run mongo:dump');
+  console.info('  pnpm run mongo:dump backups/my-backup.archive');
+  console.info('  pnpm run mongo:restore backups/my-backup.archive');
   console.info('');
 }
 

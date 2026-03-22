@@ -6,22 +6,22 @@
  *
  * Usage:
  *   # Upload single image
- *   npm run images:upload path/to/image.jpg
+ *   pnpm run images:upload path/to/image.jpg
  *
  *   # Upload multiple images (comma-separated)
- *   npm run images:upload path/to/image1.jpg,path/to/image2.png
+ *   pnpm run images:upload path/to/image1.jpg,path/to/image2.png
  *
  *   # Upload all images in a directory (recursive)
- *   npm run images:upload --dir path/to/images/
+ *   pnpm run images:upload --dir path/to/images/
  *
  *   # Upload with custom S3 prefix (default: media/)
- *   npm run images:upload path/to/image.jpg --prefix media/photos/
+ *   pnpm run images:upload path/to/image.jpg --prefix media/photos/
  *
  * Examples:
- *   npm run images:upload public/media/profile.jpg
- *   npm run images:upload ./images/photo1.jpg,./images/photo2.png
- *   npm run images:upload --dir public/media/gallery
- *   npm run images:upload --dir ./uploads --prefix user-content/
+ *   pnpm run images:upload public/media/profile.jpg
+ *   pnpm run images:upload ./images/photo1.jpg,./images/photo2.png
+ *   pnpm run images:upload --dir public/media/gallery
+ *   pnpm run images:upload --dir ./uploads --prefix user-content/
  *
  * Environment Variables:
  *   S3_BUCKET - S3 bucket name (required)
@@ -459,10 +459,10 @@ ${colors.cyan}Image Upload Utility${colors.reset}
 Upload images to S3 bucket with support for single files, multiple files, or entire directories.
 
 ${colors.yellow}Usage:${colors.reset}
-  npm run images:upload <paths>                    Upload single or multiple images (comma-separated)
-  npm run images:upload --dir <directory>          Upload all images from a directory (recursive)
-  npm run images:upload <paths> --prefix <prefix>  Upload with custom S3 prefix
-  npm run images:upload --help                     Show this help message
+  pnpm run images:upload <paths>                    Upload single or multiple images (comma-separated)
+  pnpm run images:upload --dir <directory>          Upload all images from a directory (recursive)
+  pnpm run images:upload <paths> --prefix <prefix>  Upload with custom S3 prefix
+  pnpm run images:upload --help                     Show this help message
 
 ${colors.yellow}Options:${colors.reset}
   --dir, -d <directory>     Upload all images from directory (recursive)
@@ -470,10 +470,10 @@ ${colors.yellow}Options:${colors.reset}
   --no-invalidate           Skip CloudFront cache invalidation
 
 ${colors.yellow}Examples:${colors.reset}
-  npm run images:upload public/media/profile.jpg
-  npm run images:upload ./images/photo1.jpg,./images/photo2.png
-  npm run images:upload --dir public/media/gallery
-  npm run images:upload --dir ./uploads --prefix user-content/
+  pnpm run images:upload public/media/profile.jpg
+  pnpm run images:upload ./images/photo1.jpg,./images/photo2.png
+  pnpm run images:upload --dir public/media/gallery
+  pnpm run images:upload --dir ./uploads --prefix user-content/
 
 ${colors.yellow}Supported image formats:${colors.reset}
   jpg, jpeg, png, gif, webp, svg, ico, bmp, tiff, tif, avif

@@ -22,7 +22,7 @@ export const TIER_LABELS: Record<SubscriberRateTier, string> = {
 
 /**
  * Maps each subscriber rate tier to its Stripe Price ID.
- * Populated from environment variables set after running `npm run stripe:seed`.
+ * Populated from environment variables set after running `pnpm run stripe:seed`.
  */
 export const SUBSCRIBER_RATE_STRIPE_PRICE_IDS: Record<SubscriberRateTier, string> = {
   minimum: process.env.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM ?? '',

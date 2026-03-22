@@ -361,7 +361,7 @@ expect(screen.queryByTestId('signout-toolbar')).not.toBeInTheDocument();
 {
   "husky": {
     "hooks": {
-      "pre-commit": "npm run test:coverage -- --changed"
+      "pre-commit": "pnpm run test:coverage -- --changed"
     }
   }
 }
@@ -372,7 +372,7 @@ expect(screen.queryByTestId('signout-toolbar')).not.toBeInTheDocument();
 ```yaml
 # .github/workflows/test.yml
 - name: Run Tests with Coverage
-  run: npm run test:coverage
+  run: pnpm run test:coverage
 
 - name: Upload Coverage to Codecov
   uses: codecov/codecov-action@v3
@@ -380,7 +380,7 @@ expect(screen.queryByTestId('signout-toolbar')).not.toBeInTheDocument();
     files: ./coverage/lcov.info
 
 - name: Enforce Coverage Threshold
-  run: npm run test:coverage -- --coverage.thresholds.lines=100
+  run: pnpm run test:coverage -- --coverage.thresholds.lines=100
 ```
 
 ### 3. Required Status Checks
@@ -405,7 +405,7 @@ Make coverage reports a required check before merging:
 Run coverage locally before committing:
 
 ```bash
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 View detailed HTML report:

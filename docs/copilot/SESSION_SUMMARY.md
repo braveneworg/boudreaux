@@ -483,7 +483,7 @@ Lines: 76/76 (100%)
 ### Coverage Report
 
 ```bash
-$ npm run test:coverage -- button.spec.tsx
+$ pnpm run test:coverage -- button.spec.tsx
 
  ✓ src/app/components/ui/button.spec.tsx (52 tests) 2045ms
 
@@ -576,19 +576,19 @@ All files                                   |     100 |      100 |     100 |    
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run button tests only
-npm test button.spec.tsx
+pnpm test button.spec.tsx
 
 # Run tests with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run tests with UI
-npm run test:ui
+pnpm run test:ui
 
 # View HTML coverage report
 open coverage/lcov-report/index.html
@@ -598,19 +598,19 @@ open coverage/lcov-report/index.html
 
 ```bash
 # Start development server
-npm run dev
+pnpm run dev
 
 # Build for production
-npm run build
+pnpm run build
 
 # Run linter
-npm run lint
+pnpm run lint
 
 # Fix linting errors
-npm run lint -- --fix
+pnpm run lint -- --fix
 
 # Format code
-npm run format
+pnpm run format
 ```
 
 ### Git Commands for This Session

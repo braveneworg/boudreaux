@@ -267,16 +267,16 @@ describe('module-name', () => {
 
 ```bash
 # Run both test suites
-npm test -- --run src/app/lib/utils/account-lockout.spec.ts src/app/lib/utils/rate-limit.spec.ts
+pnpm test -- --run src/app/lib/utils/account-lockout.spec.ts src/app/lib/utils/rate-limit.spec.ts
 
 # Run only account lockout tests
-npm test -- --run src/app/lib/utils/account-lockout.spec.ts
+pnpm test -- --run src/app/lib/utils/account-lockout.spec.ts
 
 # Run only rate limit tests
-npm test -- --run src/app/lib/utils/rate-limit.spec.ts
+pnpm test -- --run src/app/lib/utils/rate-limit.spec.ts
 
 # Watch mode for development
-npm test -- src/app/lib/utils/account-lockout.spec.ts
+pnpm test -- src/app/lib/utils/account-lockout.spec.ts
 ```
 
 ## Test Results

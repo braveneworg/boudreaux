@@ -6,7 +6,7 @@
  * Performs various cleanup operations on the database.
  *
  * Usage:
- *   npx tsx scripts/db-cleanup.ts [--dry-run]
+ *   pnpm exec tsx scripts/db-cleanup.ts [--dry-run]
  *
  * Options:
  *   --dry-run  Preview what would be deleted without making changes

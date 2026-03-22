@@ -33,15 +33,15 @@ prisma/
 ## Commands
 
 ```bash
-npm run dev          # Start development server
-npm run build        # Production build
-npm run test:run     # Run all tests once
-npm run test:coverage # Coverage report (target 90–95%)
-npm run lint         # ESLint check
-npm run lint:fix     # Auto-fix lint issues
-npm run format       # Prettier format
-npx prisma db push   # Push schema changes to MongoDB
-npx prisma studio    # Browse database
+pnpm run dev          # Start development server
+pnpm run build        # Production build
+pnpm run test:run     # Run all tests once
+pnpm run test:coverage # Coverage report (target 90–95%)
+pnpm run lint         # ESLint check
+pnpm run lint:fix     # Auto-fix lint issues
+pnpm run format       # Prettier format
+pnpm exec prisma db push   # Push schema changes to MongoDB
+pnpm exec prisma studio    # Browse database
 stripe listen --forward-to http://localhost:3000/api/stripe/webhook  # Local webhook forwarding
 ```
 

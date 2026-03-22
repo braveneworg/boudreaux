@@ -101,7 +101,7 @@ The test suite cannot realistically run in under 5 seconds with current architec
 2. **Run Tests in Parallel** (may already be happening):
 
    ```bash
-   npx vitest run --pool=threads --poolOptions.threads.maxThreads=4
+   pnpm exec vitest run --pool=threads --poolOptions.threads.maxThreads=4
    ```
 
 3. **Reduce Test Count**:

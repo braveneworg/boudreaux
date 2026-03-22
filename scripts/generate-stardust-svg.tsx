@@ -4,7 +4,7 @@
  * Stardust SVG Generator
  * A parameterized TypeScript CLI utility for generating stardust texture SVGs
  *
- * Usage: npx tsx generate-stardust.ts [options]
+ * Usage: pnpm exec tsx generate-stardust.ts [options]
  * Or: node --loader ts-node/esm generate-stardust.ts [options]
  * Or compile and run: tsc generate-stardust.ts && node generate-stardust.js [options]
  */
@@ -215,7 +215,7 @@ function printHelp(): void {
   console.info(`
 Stardust SVG Generator
 
-Usage: npx tsx generate-stardust.ts [options]
+Usage: pnpm exec tsx generate-stardust.ts [options]
 
 Options:
   --width N              Canvas width (default: 1000)
@@ -238,9 +238,9 @@ Ranges:
   --scale-max N          Max scale factor (default: 2.0)
 
 Examples:
-  npx tsx generate-stardust.ts
-  npx tsx generate-stardust.ts --dots 10 --diamonds 8 --bg-color "#1a1a1a"
-  npx tsx generate-stardust.ts --output custom-stardust.svg --wedges 15
+  pnpm exec tsx generate-stardust.ts
+  pnpm exec tsx generate-stardust.ts --dots 10 --diamonds 8 --bg-color "#1a1a1a"
+  pnpm exec tsx generate-stardust.ts --output custom-stardust.svg --wedges 15
   `);
 }
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document outlines all TypeScript improvements made to enhance type safety, code clarity, and maintainability of the codebase. All changes follow TypeScript best practices and ensure the code passes `npx tsc --noEmit` without errors.
+This document outlines all TypeScript improvements made to enhance type safety, code clarity, and maintainability of the codebase. All changes follow TypeScript best practices and ensure the code passes `pnpm exec tsc --noEmit` without errors.
 
 ## Files Modified
 
@@ -159,8 +159,8 @@ const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 All tests pass successfully:
 
 ✅ **732 tests passing**
-✅ **0 TypeScript errors** (`npx tsc --noEmit`)
-✅ **0 ESLint errors** (`npx eslint src --ext .ts,.tsx`)
+✅ **0 TypeScript errors** (`pnpm exec tsc --noEmit`)
+✅ **0 ESLint errors** (`pnpm exec eslint src --ext .ts,.tsx`)
 
 ## Performance Impact
 

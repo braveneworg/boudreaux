@@ -24,8 +24,8 @@ This document provides actionable strategies and tool recommendations for mainta
 Install Husky and lint-staged:
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky install
+pnpm install --save-dev husky lint-staged
+pnpm exec husky install
 npm pkg set scripts.prepare="husky install"
 ```
 
@@ -37,7 +37,7 @@ Create `.husky/pre-commit`:
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npx lint-staged
+pnpm exec lint-staged
 ```
 
 ### Configure lint-staged
@@ -99,16 +99,16 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run linter
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Run type check
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -154,8 +154,8 @@ jobs:
         with:
           node-version: 20.x
           cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
 ```
 
 ### GitLab CI/CD
@@ -179,7 +179,7 @@ cache:
 install_dependencies:
   stage: install
   script:
-    - npm ci --cache .npm --prefer-offline
+    - pnpm install --frozen-lockfile
   artifacts:
     paths:
       - node_modules/
@@ -189,8 +189,8 @@ test:
   stage: test
   coverage: '/All files\s+\|\s+[\d.]+\s+\|\s+([\d.]+)/'
   script:
-    - npm run lint
-    - npm run test:coverage
+    - pnpm run lint
+    - pnpm run test:coverage
   artifacts:
     when: always
     paths:
@@ -207,7 +207,7 @@ test:
 build:
   stage: build
   script:
-    - npm run build
+    - pnpm run build
   artifacts:
     paths:
       - .next/
@@ -239,7 +239,7 @@ pages:
 
 ```bash
 # Install Codecov
-npm install --save-dev @codecov/codecov-action
+pnpm install --save-dev @codecov/codecov-action
 
 # Add codecov.yml configuration
 ```
@@ -290,7 +290,7 @@ ignore:
 **Setup:**
 
 ```bash
-npm install --save-dev coveralls
+pnpm install --save-dev coveralls
 ```
 
 Add to `.github/workflows/test.yml`:
@@ -308,7 +308,7 @@ Add to `.github/workflows/test.yml`:
 **Setup:**
 
 ```bash
-npm install --save-dev sonarqube-scanner
+pnpm install --save-dev sonarqube-scanner
 ```
 
 Create `sonar-project.properties`:
@@ -344,7 +344,7 @@ Add to GitHub Actions:
   env:
     CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
   with:
-    coverageCommand: npm run test:coverage
+    coverageCommand: pnpm run test:coverage
     coverageLocations: |
       ${{github.workspace}}/coverage/lcov.info:lcov
 ```
@@ -358,8 +358,8 @@ Add to GitHub Actions:
 **Setup:**
 
 ```bash
-npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
-npx stryker init
+pnpm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
+pnpm exec stryker init
 ```
 
 Configure `stryker.conf.json`:
@@ -403,7 +403,7 @@ Add to `package.json`:
 Install complexity reporters:
 
 ```bash
-npm install --save-dev vitest-sonar-reporter
+pnpm install --save-dev vitest-sonar-reporter
 ```
 
 Update `vitest.config.ts`:
@@ -449,7 +449,7 @@ Create `.vscode/settings.json`:
 ```json
 {
   "vitest.enable": true,
-  "vitest.commandLine": "npm run test",
+  "vitest.commandLine": "pnpm run test",
   "coverage-gutters.coverageFileNames": ["coverage/lcov.info"],
   "coverage-gutters.showLineCoverage": true,
   "coverage-gutters.showRulerCoverage": true,
@@ -474,7 +474,7 @@ Add to `package.json`:
     "test:mutation": "stryker run",
     "test:changed": "vitest related --run",
     "test:debug": "vitest --inspect-brk --inspect --single-thread",
-    "test:all": "npm run lint && npm run test:coverage && npm run test:mutation"
+    "test:all": "pnpm run lint && pnpm run test:coverage && pnpm run test:mutation"
   }
 }
 ```
@@ -488,7 +488,7 @@ Create `.husky/pre-push`:
 . "$(dirname -- "$0")/_/husky.sh"
 
 echo "🧪 Running tests with coverage before push..."
-npm run test:coverage
+pnpm run test:coverage
 
 if [ $? -ne 0 ]; then
   echo "❌ Tests failed. Push aborted."
@@ -571,7 +571,7 @@ const formatUserName = (user) => `${user.firstName} ${user.lastName}`;
 // 4. Test passes - refactor if needed
 
 // 5. Verify coverage
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ### 4. Documentation Standards
@@ -666,7 +666,7 @@ fs.writeFileSync('public/coverage-report.html', html);
 
 ```bash
 # Find uncovered lines
-npm run test:coverage
+pnpm run test:coverage
 open coverage/lcov-report/index.html
 
 # Check which files need tests

@@ -59,7 +59,7 @@ This policy allows for minor coverage decreases due to new code additions while 
 Run the following command to generate a new coverage report:
 
 ```bash
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 The coverage report will be generated in the `coverage/` directory. Update this file with the new metrics from the summary output.

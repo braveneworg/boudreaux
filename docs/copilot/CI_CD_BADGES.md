@@ -167,10 +167,10 @@ quality-gates:
   name: Quality Gates (Tests, Lint, Type Check)
   runs-on: ubuntu-latest
   steps:
-    - TypeScript type checking: npx tsc --noEmit
-    - ESLint: npm run lint
-    - Unit tests: npm test -- --run --reporter=verbose
-    - Coverage: npm test -- --run --coverage
+    - TypeScript type checking: pnpm exec tsc --noEmit
+    - ESLint: pnpm run lint
+    - Unit tests: pnpm test -- --run --reporter=verbose
+    - Coverage: pnpm test -- --run --coverage
     - Upload to Codecov
 ```
 
@@ -263,8 +263,8 @@ For contributors:
 ### CI Failing on PRs
 
 - Ensure all tests pass locally first
-- Run `npm run lint -- --fix` to auto-fix lint issues
-- Run `npx tsc --noEmit` to check types
+- Run `pnpm run lint -- --fix` to auto-fix lint issues
+- Run `pnpm exec tsc --noEmit` to check types
 - Check for environment-specific issues
 
 ## Summary

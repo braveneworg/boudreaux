@@ -25,13 +25,13 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Run ESLint
-        run: npm run lint -- --max-warnings 0
+        run: pnpm run lint -- --max-warnings 0
 
       - name: Run TypeScript type check
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Run tests with coverage
-        run: npm run test:coverage:check
+        run: pnpm run test:coverage:check
         env:
           CI: true
 
@@ -120,7 +120,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .next/cache
-          key: ${{ runner.os }}-next-cache-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
+          key: ${{ runner.os }}-next-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
           restore-keys: |
             ${{ runner.os }}-next-cache-
 
@@ -136,7 +136,7 @@ jobs:
           NODE_ENV: "production"
           AUTH_SECRET: "test-secret-key-for-testing-purposes-only"
           AUTH_URL: "http://localhost:3000"
-        run: npx next build --webpack
+        run: pnpm exec next build --webpack
 
       - name: Package Next.js output for deploy workflow (standalone + static only)
         run: |
@@ -175,11 +175,11 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml up -d --wait
 
       - name: Generate Prisma Client
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Get Playwright version
         id: pw-version
-        run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+        run: echo "version=$(pnpm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
         id: pw-cache
@@ -190,14 +190,14 @@ jobs:
 
       - name: Install Playwright Browsers
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       - name: Install Playwright system deps only (browsers cached)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium
 
       - name: Run E2E Tests
-        run: npm run e2e
+        run: pnpm run e2e
         env:
           CI: true
           DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e?directConnection=true"

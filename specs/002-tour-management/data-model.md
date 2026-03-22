@@ -1,7 +1,7 @@
 # Phase 1: Data Model Design
 
-**Feature**: Tour Date Management System  
-**Date**: March 7, 2026  
+**Feature**: Tour Date Management System
+**Date**: March 7, 2026
 **Status**: ✅ Complete
 
 ## Entity Relationship Overview
@@ -660,9 +660,9 @@ model Artist {
 
 ### Migration Steps
 
-1. **Create migration**: `npx prisma migrate dev --name add-tour-management`
+1. **Create migration**: `pnpm exec prisma migrate dev --name add-tour-management`
 2. **Apply to database**: Migration runs automatically in dev
-3. **Generate Prisma client**: `npx prisma generate`
+3. **Generate Prisma client**: `pnpm exec prisma generate`
 4. **Seed test data** (optional): Create sample tours in seed.ts
 5. **Verify indexes**: Check MongoDB indexes were created
 
@@ -764,21 +764,21 @@ export interface TourListItem {
 
 ### Soft Delete Consideration
 
-**Decision**: NOT implementing soft delete initially  
-**Rationale**: Tours are historical records; genuine deletes are rare  
+**Decision**: NOT implementing soft delete initially
+**Rationale**: Tours are historical records; genuine deletes are rare
 **Future**: Can add `deletedAt?: DateTime?` and `isDeleted: Boolean` if needed
 
 ---
 
 ## Data Model Summary
 
-**New Models**: 4 (Tour, Venue, TourHeadliner, TourImage)  
-**Modified Models**: 1 (Artist - add relationship)  
-**No Changes**: 2 (Group, ArtistGroup)  
-**Total Fields**: 45+ across all tour-related entities  
-**Relationships**: 6 (tour-venue, tour-headliners, tour-images, headliner-artist, artist-groups, group-artists)  
-**Indexes**: 10+ for query optimization  
-**Validation Schemas**: 3 (Tour, Venue, TourImage)  
+**New Models**: 4 (Tour, Venue, TourHeadliner, TourImage)
+**Modified Models**: 1 (Artist - add relationship)
+**No Changes**: 2 (Group, ArtistGroup)
+**Total Fields**: 45+ across all tour-related entities
+**Relationships**: 6 (tour-venue, tour-headliners, tour-images, headliner-artist, artist-groups, group-artists)
+**Indexes**: 10+ for query optimization
+**Validation Schemas**: 3 (Tour, Venue, TourImage)
 **Type Safety**: Full Prisma-generated types + custom DTOs
 
 **Status**: ✅ Data model complete and ready for implementation

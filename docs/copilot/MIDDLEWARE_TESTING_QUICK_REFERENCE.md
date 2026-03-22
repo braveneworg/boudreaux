@@ -11,13 +11,13 @@
 
 ```bash
 # Run middleware tests
-npx vitest run middleware.spec.ts
+pnpm exec vitest run middleware.spec.ts
 
 # Run with coverage
-npx vitest run middleware.spec.ts --coverage
+pnpm exec vitest run middleware.spec.ts --coverage
 
 # Watch mode
-npx vitest middleware.spec.ts
+pnpm exec vitest middleware.spec.ts
 ```
 
 ## Middleware Behavior Reference
@@ -115,7 +115,7 @@ npx vitest middleware.spec.ts
 Run with coverage to see detailed metrics:
 
 ```bash
-npx vitest run middleware.spec.ts --coverage
+pnpm exec vitest run middleware.spec.ts --coverage
 ```
 
 **Expected Coverage:**

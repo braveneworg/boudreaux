@@ -236,7 +236,7 @@ class CDNSync {
   private validateBuildDirectory(): void {
     if (!existsSync(this.config.buildDir)) {
       this.log(
-        `Build directory '${this.config.buildDir}' not found. Make sure to run 'npm run build' first.`,
+        `Build directory '${this.config.buildDir}' not found. Make sure to run 'pnpm run build' first.`,
         'error'
       );
       process.exit(1);

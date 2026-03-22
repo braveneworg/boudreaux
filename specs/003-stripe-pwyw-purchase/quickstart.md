@@ -52,10 +52,10 @@ EMAIL_FROM=noreply@fakefourrecords.com
 
 ```bash
 # Push the updated schema (adds ReleasePurchase, ReleaseDownload, Release.suggestedPrice)
-npx prisma db push
+pnpm exec prisma db push
 
 # Verify new collections exist
-npx prisma studio
+pnpm exec prisma studio
 # → Check for ReleasePurchase and ReleaseDownload collections
 ```
 
@@ -78,7 +78,7 @@ A release with `suggestedPrice: null` will show the PWYW input with no pre-fill.
 
 ```bash
 # Terminal 1: Start the dev server
-npm run dev
+pnpm run dev
 
 # Terminal 2: Forward Stripe webhooks to your local server
 stripe listen \
@@ -165,13 +165,13 @@ directly via admin tools.
 
 ```bash
 # Run all tests once
-npm run test:run
+pnpm run test:run
 
 # Run tests for this feature only
-npm run test:run -- --grep "purchase"
+pnpm run test:run -- --grep "purchase"
 
 # Coverage report (target: 90–95%+ on all new files)
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ---

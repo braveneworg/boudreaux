@@ -375,9 +375,9 @@ describe('mongo-backup', () => {
       showUsage();
 
       expect(mockConsoleInfo).toHaveBeenCalledWith('MongoDB Backup and Restore Script');
-      expect(mockConsoleInfo).toHaveBeenCalledWith(expect.stringContaining('npm run mongo:dump'));
+      expect(mockConsoleInfo).toHaveBeenCalledWith(expect.stringContaining('pnpm run mongo:dump'));
       expect(mockConsoleInfo).toHaveBeenCalledWith(
-        expect.stringContaining('npm run mongo:restore')
+        expect.stringContaining('pnpm run mongo:restore')
       );
     });
 
@@ -385,12 +385,12 @@ describe('mongo-backup', () => {
       showUsage();
 
       expect(mockConsoleInfo).toHaveBeenCalledWith('Examples:');
-      expect(mockConsoleInfo).toHaveBeenCalledWith('  npm run mongo:dump');
+      expect(mockConsoleInfo).toHaveBeenCalledWith('  pnpm run mongo:dump');
       expect(mockConsoleInfo).toHaveBeenCalledWith(
-        '  npm run mongo:dump backups/my-backup.archive'
+        '  pnpm run mongo:dump backups/my-backup.archive'
       );
       expect(mockConsoleInfo).toHaveBeenCalledWith(
-        '  npm run mongo:restore backups/my-backup.archive'
+        '  pnpm run mongo:restore backups/my-backup.archive'
       );
     });
   });

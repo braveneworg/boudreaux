@@ -108,7 +108,7 @@ if aws s3 ls "s3://$S3_BUCKET/media/_next/static/chunks/518-eb8c432ce8c4b34b.js"
 else
   echo "   ❌ File does NOT exist in S3"
   echo "   This chunk is from a build that wasn't synced to S3"
-  echo "   Run: npm run sync:cdn"
+  echo "   Run: pnpm run sync:cdn"
 fi
 echo ""
 

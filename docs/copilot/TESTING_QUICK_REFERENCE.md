@@ -10,22 +10,22 @@
 
 ```bash
 # Run all tests
-npm run test:run
+pnpm run test:run
 
 # Run tests in watch mode
-npm run test
+pnpm run test
 
 # Run tests with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run specific test file
-npm run test -- message-spinner.spec.tsx
+pnpm run test -- message-spinner.spec.tsx
 
 # Run tests matching pattern
-npm run test -- --grep="should render"
+pnpm run test -- --grep="should render"
 
 # Update snapshots
-npm run test -- -u
+pnpm run test -- -u
 ```
 
 ---
@@ -575,7 +575,7 @@ expect(screen.getByText('Loading')).toHaveClass('sr-only');
 ```yaml
 # GitHub Actions example
 - name: Run tests
-  run: npm run test:run
+  run: pnpm run test:run
 
 - name: Upload coverage
   uses: codecov/codecov-action@v3

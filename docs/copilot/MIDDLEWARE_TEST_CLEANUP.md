@@ -187,7 +187,7 @@ docs/copilot/
 Run tests to confirm:
 
 ```bash
-npx vitest run middleware.spec.ts
+pnpm exec vitest run middleware.spec.ts
 ```
 
 **Expected output:**

@@ -38,7 +38,7 @@ See `.env.example` for required variables.
 First, run the development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -47,72 +47,72 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## NPM Scripts
+## pnpm Scripts
 
 ### Development
 
-| Script          | Command                | Description                                 |
-| --------------- | ---------------------- | ------------------------------------------- |
-| `npm run dev`   | `next dev --turbopack` | Start the development server with Turbopack |
-| `npm run build` | `next build`           | Create a production build                   |
-| `npm run start` | `next start`           | Start the production server                 |
+| Script           | Command                | Description                                 |
+| ---------------- | ---------------------- | ------------------------------------------- |
+| `pnpm run dev`   | `next dev --turbopack` | Start the development server with Turbopack |
+| `pnpm run build` | `next build`           | Create a production build                   |
+| `pnpm run start` | `next start`           | Start the production server                 |
 
 ### Linting & Formatting
 
-| Script                 | Command                                               | Description                              |
-| ---------------------- | ----------------------------------------------------- | ---------------------------------------- |
-| `npm run lint`         | `eslint . --ext .ts,.tsx,.js,.jsx`                    | Run ESLint on the project                |
-| `npm run lint:fix`     | `eslint . --ext .ts,.tsx,.js,.jsx --fix`              | Run ESLint and auto-fix issues           |
-| `npm run format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files with Prettier           |
-| `npm run format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting without writing changes |
-| `npm run lint:format`  | `npm run lint:fix && npm run format`                  | Run both lint fix and format in sequence |
+| Script                  | Command                                               | Description                              |
+| ----------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| `pnpm run lint`         | `eslint . --ext .ts,.tsx,.js,.jsx`                    | Run ESLint on the project                |
+| `pnpm run lint:fix`     | `eslint . --ext .ts,.tsx,.js,.jsx --fix`              | Run ESLint and auto-fix issues           |
+| `pnpm run format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files with Prettier           |
+| `pnpm run format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting without writing changes |
+| `pnpm run lint:format`  | `pnpm run lint:fix && pnpm run format`                | Run both lint fix and format in sequence |
 
 ### Testing
 
-| Script                        | Command                                                                 | Description                            |
-| ----------------------------- | ----------------------------------------------------------------------- | -------------------------------------- |
-| `npm test`                    | `vitest`                                                                | Run tests in watch mode (default)      |
-| `npm run test:run`            | `vitest run`                                                            | Run all tests once and exit            |
-| `npm run test:watch`          | `vitest --watch`                                                        | Run tests in watch mode                |
-| `npm run test:ui`             | `vitest --ui`                                                           | Open the Vitest UI in a browser        |
-| `npm run test:coverage`       | `vitest run --coverage`                                                 | Run tests with coverage report         |
-| `npm run test:coverage:check` | `vitest run --coverage && npx tsx scripts/check-coverage-regression.ts` | Run coverage and check for regressions |
-| `npm run test:no-css`         | Temporarily disables PostCSS, runs tests, then restores it              | Run tests without CSS processing       |
+| Script                         | Command                                                                       | Description                            |
+| ------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------- |
+| `pnpm test`                    | `vitest`                                                                      | Run tests in watch mode (default)      |
+| `pnpm run test:run`            | `vitest run`                                                                  | Run all tests once and exit            |
+| `pnpm run test:watch`          | `vitest --watch`                                                              | Run tests in watch mode                |
+| `pnpm run test:ui`             | `vitest --ui`                                                                 | Open the Vitest UI in a browser        |
+| `pnpm run test:coverage`       | `vitest run --coverage`                                                       | Run tests with coverage report         |
+| `pnpm run test:coverage:check` | `vitest run --coverage && pnpm exec tsx scripts/check-coverage-regression.ts` | Run coverage and check for regressions |
+| `pnpm run test:no-css`         | Temporarily disables PostCSS, runs tests, then restores it                    | Run tests without CSS processing       |
 
 ### Database
 
-| Script                  | Command                                   | Description                                |
-| ----------------------- | ----------------------------------------- | ------------------------------------------ |
-| `npm run seed`          | `tsx prisma/seed.ts`                      | Seed the database with initial data        |
-| `npm run mongo:dump`    | `npx tsx scripts/mongo-backup.ts dump`    | Create a MongoDB backup archive            |
-| `npm run mongo:restore` | `npx tsx scripts/mongo-backup.ts restore` | Restore the database from a backup archive |
+| Script                   | Command                                         | Description                                |
+| ------------------------ | ----------------------------------------------- | ------------------------------------------ |
+| `pnpm run seed`          | `tsx prisma/seed.ts`                            | Seed the database with initial data        |
+| `pnpm run mongo:dump`    | `pnpm exec tsx scripts/mongo-backup.ts dump`    | Create a MongoDB backup archive            |
+| `pnpm run mongo:restore` | `pnpm exec tsx scripts/mongo-backup.ts restore` | Restore the database from a backup archive |
 
 ### S3
 
-| Script                  | Command                                | Description                        |
-| ----------------------- | -------------------------------------- | ---------------------------------- |
-| `npm run s3:backup`     | `npx tsx scripts/s3-backup.ts backup`  | Back up S3 bucket contents locally |
-| `npm run s3:restore`    | `npx tsx scripts/s3-backup.ts restore` | Restore local backup to S3 bucket  |
-| `npm run s3:list`       | `npx tsx scripts/s3-backup.ts list`    | List objects in the S3 bucket      |
-| `npm run s3:upload`     | `npx tsx scripts/s3-backup.ts upload`  | Upload files to the S3 bucket      |
-| `npm run images:upload` | `npx tsx scripts/upload-images.ts`     | Upload images to S3 bucket         |
+| Script                   | Command                                      | Description                        |
+| ------------------------ | -------------------------------------------- | ---------------------------------- |
+| `pnpm run s3:backup`     | `pnpm exec tsx scripts/s3-backup.ts backup`  | Back up S3 bucket contents locally |
+| `pnpm run s3:restore`    | `pnpm exec tsx scripts/s3-backup.ts restore` | Restore local backup to S3 bucket  |
+| `pnpm run s3:list`       | `pnpm exec tsx scripts/s3-backup.ts list`    | List objects in the S3 bucket      |
+| `pnpm run s3:upload`     | `pnpm exec tsx scripts/s3-backup.ts upload`  | Upload files to the S3 bucket      |
+| `pnpm run images:upload` | `pnpm exec tsx scripts/upload-images.ts`     | Upload images to S3 bucket         |
 
 ### Docker
 
-| Script                           | Command                                                   | Description                      |
-| -------------------------------- | --------------------------------------------------------- | -------------------------------- |
-| `npm run docker:build:website`   | `docker build -t ghcr.io/braveneworg/boudreaux/website .` | Build the website Docker image   |
-| `npm run docker:push:website`    | `docker push ghcr.io/braveneworg/boudreaux/website`       | Push the website image to GHCR   |
-| `npm run docker:build:nginx`     | `docker build -t ghcr.io/braveneworg/boudreaux/nginx .`   | Build the nginx Docker image     |
-| `npm run docker:push:nginx`      | `docker push ghcr.io/braveneworg/boudreaux/nginx`         | Push the nginx image to GHCR     |
-| `npm run docker:publish:website` | `docker:build:website && docker:push:website`             | Build and push the website image |
-| `npm run docker:publish:nginx`   | `docker:build:nginx && docker:push:nginx`                 | Build and push the nginx image   |
+| Script                            | Command                                                   | Description                      |
+| --------------------------------- | --------------------------------------------------------- | -------------------------------- |
+| `pnpm run docker:build:website`   | `docker build -t ghcr.io/braveneworg/boudreaux/website .` | Build the website Docker image   |
+| `pnpm run docker:push:website`    | `docker push ghcr.io/braveneworg/boudreaux/website`       | Push the website image to GHCR   |
+| `pnpm run docker:build:nginx`     | `docker build -t ghcr.io/braveneworg/boudreaux/nginx .`   | Build the nginx Docker image     |
+| `pnpm run docker:push:nginx`      | `docker push ghcr.io/braveneworg/boudreaux/nginx`         | Push the nginx image to GHCR     |
+| `pnpm run docker:publish:website` | `docker:build:website && docker:push:website`             | Build and push the website image |
+| `pnpm run docker:publish:nginx`   | `docker:build:nginx && docker:push:nginx`                 | Build and push the nginx image   |
 
 ### Other
 
-| Script            | Command | Description                                                   |
-| ----------------- | ------- | ------------------------------------------------------------- |
-| `npm run prepare` | `husky` | Install Husky git hooks (runs automatically on `npm install`) |
+| Script             | Command | Description                                                    |
+| ------------------ | ------- | -------------------------------------------------------------- |
+| `pnpm run prepare` | `husky` | Install Husky git hooks (runs automatically on `pnpm install`) |
 
 ## Database Backups
 
@@ -137,10 +137,10 @@ sudo apt-get install mongodb-database-tools
 
 ```bash
 # Create a backup with auto-generated timestamp filename
-npm run mongo:dump
+pnpm run mongo:dump
 
 # Create a backup with custom filename
-npm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
+pnpm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
 ```
 
 Backups are automatically:
@@ -153,7 +153,7 @@ Backups are automatically:
 
 ```bash
 # Restore from a backup file
-npm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
+pnpm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
 ```
 
 **⚠️ Warning:** Restoring will drop existing collections and replace them with the backup data.
@@ -177,22 +177,22 @@ Upload images to the S3 bucket (and CDN) using the `images:upload` script. Files
 
 ```bash
 # Upload a single image
-npm run images:upload -- ./path/to/image.jpg
+pnpm run images:upload -- ./path/to/image.jpg
 
 # Upload multiple images (comma-separated)
-npm run images:upload -- ./photo1.jpg,./photo2.png
+pnpm run images:upload -- ./photo1.jpg,./photo2.png
 
 # Upload all images in a directory (recursive)
-npm run images:upload -- --dir ./path/to/images/
+pnpm run images:upload -- --dir ./path/to/images/
 
 # Upload with a custom S3 prefix (overrides default media/)
-npm run images:upload -- ./image.jpg --prefix custom-folder
+pnpm run images:upload -- ./image.jpg --prefix custom-folder
 
 # Skip CloudFront cache invalidation
-npm run images:upload -- ./image.jpg --no-invalidate
+pnpm run images:upload -- ./image.jpg --no-invalidate
 ```
 
-> **Note:** The `--` after `images:upload` is required for npm to forward arguments to the script.
+> **Note:** The `--` after `images:upload` is required for pnpm to forward arguments to the script.
 
 ### Options
 
@@ -238,7 +238,7 @@ Remove all version labels to skip the version bump entirely.
 3. Deploy workflow builds Docker images and deploys to EC2
 4. **Version bump job** (after successful deploy):
    - Reads the merged PR's label to determine bump type
-   - Runs `npm version <patch|minor|major>`
+   - Runs `pnpm version <patch|minor|major>`
    - Generates a CHANGELOG.md entry from the titles of pull requests associated with commits since the last tag
    - Commits with `chore(release): v<version> [skip ci]`
    - Creates a git tag and GitHub Release

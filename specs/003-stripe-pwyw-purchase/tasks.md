@@ -20,7 +20,7 @@
 **Purpose**: Schema changes, constants, and environment configuration that block all user stories
 
 - [x] T001 Update `prisma/schema.prisma` — add `ReleasePurchase` model (id, userId, releaseId, amountPaid, currency, stripePaymentIntentId @unique, stripeSessionId, confirmationEmailSentAt, purchasedAt, @@unique([userId,releaseId])); add `ReleaseDownload` model (id, userId, releaseId, downloadCount, lastDownloadedAt, @@unique([userId,releaseId])); add `suggestedPrice Int?` to `Release`; add `releasePurchases ReleasePurchase[]` and `releaseDownloads ReleaseDownload[]` back-relations to `User`; add `releasePurchases ReleasePurchase[]` and `releaseDownloads ReleaseDownload[]` back-relations to `Release` — per `specs/003-stripe-pwyw-purchase/data-model.md`
-- [ ] T002 Run `npx prisma db push` to apply schema changes and create MongoDB indexes; verify `ReleasePurchase` and `ReleaseDownload` collections appear in Prisma Studio (depends on T001)
+- [ ] T002 Run `pnpm exec prisma db push` to apply schema changes and create MongoDB indexes; verify `ReleasePurchase` and `ReleaseDownload` collections appear in Prisma Studio (depends on T001)
 - [x] T003 [P] Add `export const MAX_RELEASE_DOWNLOAD_COUNT = 5;` to `src/lib/constants.ts` (create file if it does not exist)
 - [x] T004 [P] Add `STRIPE_WEBHOOK_IP_RANGES` env var (Stripe webhook CIDR ranges, comma-separated) to `.env.local` and `.env.example`; add `SKIP_STRIPE_IP_CHECK=true` to `.env.local` only with a comment that it must never be set in production — per `specs/003-stripe-pwyw-purchase/quickstart.md`
 
@@ -116,10 +116,10 @@
 
 **Purpose**: Code quality, build verification, and end-to-end validation
 
-- [x] T026 [P] Run `npm run lint:fix` across all new and modified files; fix any ESLint errors in: `src/lib/validation/purchase-schema.ts`, `src/lib/repositories/purchase-repository.ts`, `src/lib/services/purchase-service.ts`, `src/lib/actions/create-purchase-checkout-session-action.ts`, `src/lib/email/send-purchase-confirmation.ts`, `src/lib/email/purchase-confirmation-email-html.ts`, `src/lib/email/purchase-confirmation-email-text.ts`, `src/app/api/releases/[releaseId]/download/route.ts`, `src/app/api/releases/[releaseId]/purchase-status/route.ts`, `src/app/api/stripe/webhook/route.ts`, `src/app/components/download-dialog.tsx`, `src/app/components/purchase-checkout-step.tsx`, `src/app/components/purchase-success-step.tsx`, `src/app/releases/[releaseId]/page.tsx`
-- [x] T027 [P] Run `npm run format` (Prettier) across all new and modified files listed in T026
-- [x] T028 Run `npm run build` and resolve any TypeScript strict-mode errors across all new files; ensure no `any` types remain; verify return types are explicit on all exported functions (depends on T026, T027)
-- [x] T029 Run `npm run test:run` — verify all pre-existing tests pass and all new Phase 8 tests (T031–T040) pass; run `npm run test:coverage` and verify 90–95%+ coverage on all new files listed in T026; investigate and fix regressions in webhook route or page-level prop changes; Phase 8 tests MUST be complete (depends on T028, T040)
+- [x] T026 [P] Run `pnpm run lint:fix` across all new and modified files; fix any ESLint errors in: `src/lib/validation/purchase-schema.ts`, `src/lib/repositories/purchase-repository.ts`, `src/lib/services/purchase-service.ts`, `src/lib/actions/create-purchase-checkout-session-action.ts`, `src/lib/email/send-purchase-confirmation.ts`, `src/lib/email/purchase-confirmation-email-html.ts`, `src/lib/email/purchase-confirmation-email-text.ts`, `src/app/api/releases/[releaseId]/download/route.ts`, `src/app/api/releases/[releaseId]/purchase-status/route.ts`, `src/app/api/stripe/webhook/route.ts`, `src/app/components/download-dialog.tsx`, `src/app/components/purchase-checkout-step.tsx`, `src/app/components/purchase-success-step.tsx`, `src/app/releases/[releaseId]/page.tsx`
+- [x] T027 [P] Run `pnpm run format` (Prettier) across all new and modified files listed in T026
+- [x] T028 Run `pnpm run build` and resolve any TypeScript strict-mode errors across all new files; ensure no `any` types remain; verify return types are explicit on all exported functions (depends on T026, T027)
+- [x] T029 Run `pnpm run test:run` — verify all pre-existing tests pass and all new Phase 8 tests (T031–T040) pass; run `pnpm run test:coverage` and verify 90–95%+ coverage on all new files listed in T026; investigate and fix regressions in webhook route or page-level prop changes; Phase 8 tests MUST be complete (depends on T028, T040)
 - [ ] T030 Validate the full purchase flow end-to-end using the step-by-step walkthrough in `specs/003-stripe-pwyw-purchase/quickstart.md`
 
 ---
@@ -139,7 +139,7 @@
 - [x] T039 [P] Create `src/app/components/purchase-checkout-step.spec.tsx` — mock `useCheckout` from `@stripe/react-stripe-js`; mock Tanstack Query `useQuery`; test: `checkout.confirm()` returns `{type:'complete'}` → spinner displayed; `useQuery` returns `{confirmed:false}` → spinner persists; `useQuery` returns `{confirmed:true}` → `onConfirmed` called; after 90 s (mock timer) without `confirmed:true` → timeout message rendered; `checkout.confirm()` returns error type → `onError` called with message; include MPL 2.0 license header (depends on T008)
 - [x] T040 [P] Create `src/app/components/purchase-success-step.spec.tsx` — test: success heading rendered; download link href = `/api/releases/${releaseId}/download`; "A confirmation email is on its way" text present; `releaseTitle` prop displayed in success copy; include MPL 2.0 license header (depends on T009)
 
-**Checkpoint**: 90–95%+ coverage on all new files verified via `npm run test:coverage`
+**Checkpoint**: 90–95%+ coverage on all new files verified via `pnpm run test:coverage`
 
 ---
 

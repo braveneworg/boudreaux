@@ -7,31 +7,31 @@
  *
  * Usage:
  *   # Backup S3 bucket to local directory
- *   npm run s3:backup [local-directory]
+ *   pnpm run s3:backup [local-directory]
  *   # or
  *   ts-node scripts/s3-backup.ts backup [local-directory]
  *
  *   # Restore local backup to S3 bucket
- *   npm run s3:restore <local-directory>
+ *   pnpm run s3:restore <local-directory>
  *   # or
  *   ts-node scripts/s3-backup.ts restore <local-directory>
  *
  *   # List available backups
- *   npm run s3:list
+ *   pnpm run s3:list
  *   # or
  *   ts-node scripts/s3-backup.ts list
  *
  *   # Upload local directory to S3 bucket (without backup metadata)
- *   npm run s3:upload <local-directory>
+ *   pnpm run s3:upload <local-directory>
  *   # or
  * ts-node scripts/s3-backup.ts upload <local-directory>
  *
  * Examples:
- *   npm run s3:backup
- *   npm run s3:backup backups/s3-2026-02-07
- *   npm run s3:restore backups/s3-2026-02-07
- *   npm run s3:restore backups/s3-2026-02-07 --skip-invalidation
- *   npm run s3:list
+ *   pnpm run s3:backup
+ *   pnpm run s3:backup backups/s3-2026-02-07
+ *   pnpm run s3:restore backups/s3-2026-02-07
+ *   pnpm run s3:restore backups/s3-2026-02-07 --skip-invalidation
+ *   pnpm run s3:list
  *
  * Environment Variables:
  *   S3_BUCKET - S3 bucket name (required)
@@ -870,7 +870,7 @@ async function main(): Promise<void> {
         const localDir = args[1];
         if (!localDir) {
           console.error('Error: Local directory path is required for restore');
-          console.error('Usage: npm run s3:restore <local-directory>');
+          console.error('Usage: pnpm run s3:restore <local-directory>');
           process.exit(1);
         }
         const overwrite = args.includes('--overwrite') || args.includes('-f');
@@ -897,7 +897,7 @@ async function main(): Promise<void> {
         const localDir = args[1];
         if (!localDir) {
           console.error('Error: Local directory path is required for upload');
-          console.error('Usage: npm run s3:upload <local-directory>');
+          console.error('Usage: pnpm run s3:upload <local-directory>');
           process.exit(1);
         }
         const skipInvalidation = args.includes('--skip-invalidation') || SKIP_INVALIDATION;
@@ -910,10 +910,12 @@ async function main(): Promise<void> {
 
       default:
         console.error('Usage:');
-        console.error('  npm run s3:backup [local-directory]');
-        console.error('  npm run s3:restore <local-directory> [--overwrite] [--skip-invalidation]');
-        console.error('  npm run s3:list [backups-directory]');
-        console.error('  npm run s3:upload <local-directory> [--skip-invalidation]');
+        console.error('  pnpm run s3:backup [local-directory]');
+        console.error(
+          '  pnpm run s3:restore <local-directory> [--overwrite] [--skip-invalidation]'
+        );
+        console.error('  pnpm run s3:list [backups-directory]');
+        console.error('  pnpm run s3:upload <local-directory> [--skip-invalidation]');
         console.error('');
         console.error('Commands:');
         console.error('  backup   - Download S3 bucket contents to local directory');

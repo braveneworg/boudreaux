@@ -192,7 +192,7 @@ Parallel test execution can cause issues:
 All optimizations validated with:
 
 ```bash
-npm run test:run
+pnpm run test:run
 ```
 
 **Results**:
