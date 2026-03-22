@@ -8,7 +8,6 @@ import { amountInputSchema, purchaseCheckoutSchema } from './purchase-schema';
 describe('purchaseCheckoutSchema', () => {
   const validInput = {
     releaseId: 'release-123',
-    releaseTitle: 'Test Album',
     amountCents: 500,
     customerEmail: 'buyer@example.com',
   };
@@ -24,15 +23,6 @@ describe('purchaseCheckoutSchema', () => {
       const result = purchaseCheckoutSchema.safeParse({ ...validInput, releaseId: '' });
       expect(result.success).toBe(false);
       const errors = result.error?.issues.filter((i) => i.path[0] === 'releaseId');
-      expect(errors?.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('releaseTitle field', () => {
-    it('should fail when releaseTitle is empty', () => {
-      const result = purchaseCheckoutSchema.safeParse({ ...validInput, releaseTitle: '' });
-      expect(result.success).toBe(false);
-      const errors = result.error?.issues.filter((i) => i.path[0] === 'releaseTitle');
       expect(errors?.length).toBeGreaterThan(0);
     });
   });

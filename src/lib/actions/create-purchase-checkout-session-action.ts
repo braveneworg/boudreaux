@@ -31,7 +31,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents, customerEmail } = parsed.data;
+  const { releaseId, releaseTitle, amountCents, userId, customerEmail } = parsed.data;
 
   try {
     // Minimum Stripe charge is $0.50
@@ -54,7 +54,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     // Verify release exists and is published
     const release = await prisma.release.findFirst({
       where: { id: releaseId, publishedAt: { not: null } },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!release) {
       return { success: false, error: 'release_unavailable' };
@@ -68,7 +68,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
           price_data: {
             currency: 'usd',
             unit_amount: amountCents,
-            product_data: { name: releaseTitle },
+            product_data: { name: release.title },
           },
           quantity: 1,
         },
