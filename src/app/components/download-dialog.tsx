@@ -109,8 +109,15 @@ export const DownloadDialog = ({
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     if (data.downloadOption === 'premium-digital') {
-      const cents = Math.round(parseFloat(rawAmount || String(effectiveSuggestedPrice)) * 100);
-      if (cents < 50) return;
+      const parsed = parseFloat(rawAmount || String(effectiveSuggestedPrice));
+      const cents = Math.round(parsed * 100);
+      if (isNaN(cents) || cents < 50) {
+        form.setError('finalAmount', {
+          type: 'manual',
+          message: 'Minimum amount is $0.50',
+        });
+        return;
+      }
       setAmountCents(cents);
       if (session?.user) {
         setStep('purchase-checkout');
