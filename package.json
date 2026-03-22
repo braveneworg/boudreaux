@@ -6,12 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --webpack 2>&1 | grep -v 'SyntaxError: Expected property name'",
     "start": "next start",
-    "lint": "eslint .",
-    "lint:strict": "eslint . --max-warnings 0",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "lint": "eslint . --max-warnings 0 --ext .ts,.tsx,.js,.jsx --fix",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "lint:format": "pnpm run lint:fix && pnpm run format",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "seed": "tsx prisma/seed.ts",
     "stripe:seed": "tsx scripts/stripe-seed.ts",
     "test": "vitest",
@@ -42,8 +39,7 @@
     "e2e:install": "playwright install chromium",
     "e2e:docker:up": "docker compose -f docker-compose.e2e.yml up -d --wait",
     "e2e:docker:down": "docker compose -f docker-compose.e2e.yml down -v",
-    "prepare": "husky",
-    "postinstall": "prisma generate"
+    "prepare": "husky"
   },
   "prisma": {
     "seed": "pnpm exec tsx prisma/seed.ts"
