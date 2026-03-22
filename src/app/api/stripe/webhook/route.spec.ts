@@ -558,6 +558,142 @@ describe('POST /api/stripe/webhook', () => {
       const json = await response.json();
       expect(json).toEqual({ error: 'Invalid signature' });
     });
+
+    describe('IP allowlist — malformed inputs', () => {
+      const makeRequest = (forwardedFor: string) => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': forwardedFor,
+        });
+        return new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+      };
+
+      it('returns 403 when x-forwarded-for is an empty string', async () => {
+        const request = makeRequest('');
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when x-forwarded-for has too few octets', async () => {
+        const request = makeRequest('3.18.12');
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when x-forwarded-for has too many octets', async () => {
+        const request = makeRequest('3.18.12.63.99');
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when x-forwarded-for contains non-numeric octets', async () => {
+        const request = makeRequest('3.abc.12.63');
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when x-forwarded-for contains an octet above 255', async () => {
+        const request = makeRequest('3.18.12.256');
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when STRIPE_WEBHOOK_IP_RANGES has a prefix length above 32', async () => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/33');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': '3.18.12.63',
+        });
+        const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when STRIPE_WEBHOOK_IP_RANGES has a negative prefix length', async () => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/-1');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': '3.18.12.63',
+        });
+        const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('returns 403 when STRIPE_WEBHOOK_IP_RANGES has a decimal prefix length (e.g. /32.5)', async () => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32.5');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': '3.18.12.63',
+        });
+        const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+
+      it('correctly matches an IP within a /24 subnet', async () => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.0/24');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        mockConstructEvent.mockImplementation(() => {
+          throw new Error('Invalid signature');
+        });
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': '3.18.12.200',
+        });
+        const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+        const response = await POST(request);
+        // IP is in the /24 range — passes allowlist, fails signature check
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 403 for an IP outside a /24 subnet', async () => {
+        vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.0/24');
+        vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+        const headers = new Headers({
+          'content-type': 'application/json',
+          'stripe-signature': 'sig_test',
+          'x-forwarded-for': '3.18.13.1',
+        });
+        const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+          method: 'POST',
+          body: '{}',
+          headers,
+        });
+        const response = await POST(request);
+        expect(response.status).toBe(403);
+      });
+    });
   });
 
   describe('checkout.session.completed — release_purchase (payment mode)', () => {

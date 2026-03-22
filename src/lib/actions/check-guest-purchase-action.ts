@@ -4,41 +4,58 @@
 'use server';
 
 import 'server-only';
+import { headers } from 'next/headers';
 
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
+import { rateLimit } from '@/lib/utils/rate-limit';
 
 interface GuestPurchaseStatus {
-  userId: string | null;
   hasPurchase: boolean;
   downloadCount: number;
   atCap: boolean;
 }
+
+// Rate limiter: 10 requests per minute per IP to prevent purchase/account enumeration
+const limiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
 
 /**
  * Server Action: Checks whether a guest user (identified by email)
  * has already purchased a given release, and if so, how many downloads
  * they have used. Used in the email-step callback to route returning
  * purchasers to the correct dialog step.
+ *
+ * Does not return userId to prevent account enumeration.
  */
 export async function checkGuestPurchaseAction(
   email: string,
   releaseId: string
 ): Promise<GuestPurchaseStatus> {
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'anonymous';
+
+  try {
+    await limiter.check(10, ip);
+  } catch {
+    return { hasPurchase: false, downloadCount: 0, atCap: false };
+  }
+
   const user = await PurchaseRepository.findUserByEmail(email);
   if (!user) {
-    return { userId: null, hasPurchase: false, downloadCount: 0, atCap: false };
+    return { hasPurchase: false, downloadCount: 0, atCap: false };
   }
 
   const hasPurchase = await PurchaseService.checkExistingPurchase(user.id, releaseId);
   if (!hasPurchase) {
-    return { userId: user.id, hasPurchase: false, downloadCount: 0, atCap: false };
+    return { hasPurchase: false, downloadCount: 0, atCap: false };
   }
 
   const access = await PurchaseService.getDownloadAccess(user.id, releaseId);
   return {
-    userId: user.id,
     hasPurchase: true,
     downloadCount: access.downloadCount,
     atCap: access.downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT,

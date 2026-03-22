@@ -21,14 +21,11 @@ import type { FormState } from '@/lib/types/form-state';
 import signinSchema, {
   type FormSchemaType as SigninSchemaType,
 } from '@/lib/validation/signin-schema';
-import signupSchema, {
-  type FormSchemaType as SignupSchemaType,
-} from '@/lib/validation/signup-schema';
+import signupSchema from '@/lib/validation/signup-schema';
+
+type CombinedFormSchema = SigninSchemaType & { termsAndConditions?: boolean };
 
 const SignupPage = () => {
-  type SigninOrSignupSchema<T> = T extends { termsAndConditions: true }
-    ? SignupSchemaType
-    : SigninSchemaType;
   const path = usePathname();
   const isSignupPath = path === '/signup';
 
@@ -44,7 +41,7 @@ const SignupPage = () => {
     hasTimeout: false,
   });
 
-  const form = useForm<SigninOrSignupSchema<FormState>>({
+  const form = useForm<CombinedFormSchema>({
     defaultValues: {
       email: '',
       ...state?.fields,
@@ -53,7 +50,7 @@ const SignupPage = () => {
   });
 
   const handleSubmit = useCallback(
-    async (data: SigninOrSignupSchema<FormState>) => {
+    async (data: CombinedFormSchema) => {
       if (!isVerified) {
         form.setError('general', {
           message: 'Please verify you are human using the widget above.',

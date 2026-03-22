@@ -237,14 +237,23 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 /**
  * Checks whether an IPv4 address falls within a given CIDR range.
- * Supports /8 through /32 prefix lengths.
+ * Supports /0 through /32 prefix lengths. Returns false for any malformed
+ * IP or CIDR input (invalid octets, out-of-range prefix length, etc.).
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
   try {
     const [range, bitsStr] = cidr.split('/');
     const bits = parseInt(bitsStr ?? '32', 10);
+    if (
+      isNaN(bits) ||
+      bits < 0 ||
+      bits > 32 ||
+      (bitsStr !== undefined && bitsStr !== bits.toString())
+    )
+      return false;
     const ipNum = ipToNum(ip);
     const rangeNum = ipToNum(range ?? '');
+    if (ipNum === null || rangeNum === null) return false;
     const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
     return (ipNum & mask) === (rangeNum & mask);
   } catch {
@@ -252,6 +261,20 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   }
 }
 
-function ipToNum(ip: string): number {
-  return ip.split('.').reduce((acc, octet) => (acc << 8) | parseInt(octet, 10), 0) >>> 0;
+/**
+ * Converts a dotted-decimal IPv4 string to a 32-bit unsigned integer.
+ * Returns null for any malformed input (wrong number of octets, non-numeric
+ * parts, or octet values outside the 0–255 range).
+ */
+function ipToNum(ip: string): number | null {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let result = 0;
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) return null;
+    const octet = parseInt(part, 10);
+    if (octet < 0 || octet > 255) return null;
+    result = ((result << 8) | octet) >>> 0;
+  }
+  return result;
 }

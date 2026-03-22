@@ -562,6 +562,31 @@ describe('DownloadDialog — custom amount input behavior', () => {
       expect(screen.getByText('Pay')).toBeInTheDocument();
     });
   });
+
+  it('should show suggested price (not $NaN) in button when only a lone dot is typed', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+
+    await user.type(screen.getByLabelText('Custom amount'), '.');
+
+    // Should fall back to the suggested/premium price, never display "$NaN"
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /\$NaN/ })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Buy & Download for \$8\.00/i })
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 describe('DownloadDialog — submit button label', () => {
@@ -1064,6 +1089,32 @@ describe('DownloadDialog — premium-digital submit paths', () => {
       expect(screen.queryByRole('dialog')).toBeTruthy();
     });
   });
+
+  it('should show a validation error and not advance when a non-numeric amount (lone dot) is submitted', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+
+    // Type a lone dot — produces a NaN-parsing amount
+    await user.type(screen.getByLabelText('Custom amount'), '.');
+    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
+
+    // Zod (or the isFinite guard) should surface an error and block the flow
+    await waitFor(() => {
+      expect(screen.getByText('Amount must be a valid number')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('email-step')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('purchase-checkout-step')).not.toBeInTheDocument();
+  });
 });
 
 describe('DownloadDialog — email step purchase-mode callbacks', () => {
@@ -1115,7 +1166,6 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   it('should navigate to returning-download step when purchaseMode=true and guest has existing purchase', async () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
-      userId: 'guest-id',
       atCap: false,
     });
 
@@ -1141,7 +1191,6 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   it('should navigate to purchase-checkout step when purchaseMode=true and guest has no existing purchase', async () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: false,
-      userId: 'guest-id',
     });
 
     const user = userEvent.setup();
@@ -1289,7 +1338,6 @@ describe('DownloadDialog — returning-download step', () => {
   ) => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
-      userId: 'guest-id',
       atCap,
     });
 

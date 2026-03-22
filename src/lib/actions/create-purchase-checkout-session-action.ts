@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { purchaseCheckoutSchema } from '@/lib/validation/purchase-schema';
@@ -18,6 +19,9 @@ type ActionResult =
  * Server Action: Creates a Stripe Checkout Session in payment mode
  * for a PWYW release purchase.
  *
+ * Accepts a customerEmail and resolves the userId server-side so that
+ * internal user IDs are never exposed to the client.
+ *
  * Returns the clientSecret for the embedded Stripe Payment Element
  * and the paymentIntentId used to poll for webhook confirmation.
  */
@@ -27,7 +31,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents, userId } = parsed.data;
+  const { releaseId, releaseTitle, amountCents, userId, customerEmail } = parsed.data;
 
   try {
     // Minimum Stripe charge is $0.50
@@ -35,16 +39,22 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       return { success: false, error: 'amount_below_minimum' };
     }
 
-    // Block re-purchase
-    const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
-    if (alreadyPurchased) {
-      return { success: false, error: 'already_purchased' };
+    // Resolve userId from email — keeps the internal ID server-side
+    const userRecord = await PurchaseRepository.findUserByEmail(customerEmail);
+    const userId = userRecord?.id ?? null;
+
+    // Block re-purchase for known users
+    if (userId) {
+      const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
+      if (alreadyPurchased) {
+        return { success: false, error: 'already_purchased' };
+      }
     }
 
     // Verify release exists and is published
     const release = await prisma.release.findFirst({
       where: { id: releaseId, publishedAt: { not: null } },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!release) {
       return { success: false, error: 'release_unavailable' };
@@ -58,7 +68,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
           price_data: {
             currency: 'usd',
             unit_amount: amountCents,
-            product_data: { name: releaseTitle },
+            product_data: { name: release.title },
           },
           quantity: 1,
         },
@@ -67,13 +77,13 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
         metadata: {
           type: 'release_purchase',
           releaseId,
-          userId,
+          ...(userId ? { userId } : { customerEmail }),
         },
       },
       metadata: {
         type: 'release_purchase',
         releaseId,
-        userId,
+        ...(userId ? { userId } : { customerEmail }),
       },
       return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/releases/${releaseId}`,
     });

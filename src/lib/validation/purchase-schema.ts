@@ -6,12 +6,11 @@ import { z } from 'zod';
 /** Validates the input to createPurchaseCheckoutSessionAction. */
 export const purchaseCheckoutSchema = z.object({
   releaseId: z.string().min(1, 'Release ID is required'),
-  releaseTitle: z.string().min(1, 'Release title is required'),
   amountCents: z
     .number()
     .int('Amount must be a whole number of cents')
     .min(50, 'Minimum amount is $0.50'),
-  userId: z.string().min(1, 'User ID is required'),
+  customerEmail: z.string().email('A valid customer email is required'),
 });
 
 export type PurchaseCheckoutSchemaType = z.infer<typeof purchaseCheckoutSchema>;
