@@ -56,7 +56,7 @@ echo ""
 echo "🔎 Running ESLint before push..."
 
 # Run ESLint with max-warnings 0 to fail on any warnings
-pnpm run lint -- --max-warnings 0
+pnpm run lint:strict
 
 if [ $? -ne 0 ]; then
   echo ""
