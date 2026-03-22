@@ -533,6 +533,78 @@ describe('POST /api/stripe/webhook', () => {
       expect(json).toEqual({ error: 'Invalid signature' });
     });
 
+    it('uses x-real-ip as fallback when x-forwarded-for is absent and IP is allowed', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+      mockConstructEvent.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-real-ip': '3.18.12.63',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      // IP passes the allowlist check via x-real-ip; signature verification then fails
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Invalid signature' });
+    });
+
+    it('returns 403 when x-forwarded-for is absent and x-real-ip is not in the allowed range', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-real-ip': '9.9.9.9',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Forbidden' });
+    });
+
+    it('prefers x-forwarded-for over x-real-ip when both headers are present', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-forwarded-for': '1.2.3.4',
+        'x-real-ip': '3.18.12.63',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+
+      // x-forwarded-for (1.2.3.4) takes precedence over x-real-ip (3.18.12.63), so it's rejected
+      expect(response.status).toBe(403);
+      const json = await response.json();
+      expect(json).toEqual({ error: 'Forbidden' });
+    });
+
     it('bypasses the IP check when SKIP_STRIPE_IP_CHECK=true regardless of remote IP', async () => {
       vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
       vi.stubEnv('SKIP_STRIPE_IP_CHECK', 'true');
