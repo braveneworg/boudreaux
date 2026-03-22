@@ -30,11 +30,6 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
   const { releaseId, releaseTitle, amountCents, userId } = parsed.data;
 
   try {
-    // Minimum Stripe charge is $0.50
-    if (amountCents < 50) {
-      return { success: false, error: 'amount_below_minimum' };
-    }
-
     // Block re-purchase
     const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
     if (alreadyPurchased) {
