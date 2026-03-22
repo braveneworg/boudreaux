@@ -20,8 +20,8 @@ import { Skeleton } from '../ui/skeleton';
 
 import type { Control } from 'react-hook-form';
 
-// Common type for both signin and signup schemas
-type BaseFormSchema = {
+// Common type for both signin and signup schemas — exported for reuse in signup/page.tsx
+export type BaseFormSchema = {
   email: string;
   general?: string;
   termsAndConditions?: boolean;
