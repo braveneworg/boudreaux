@@ -141,7 +141,6 @@ export const PurchaseCheckoutStep = ({
       try {
         const result = await createPurchaseCheckoutSessionAction({
           releaseId,
-          releaseTitle,
           amountCents,
           userId,
         });
@@ -171,7 +170,7 @@ export const PurchaseCheckoutStep = ({
     return () => {
       cancelled = true;
     };
-  }, [releaseId, releaseTitle, amountCents, userId, onError]);
+  }, [releaseId, amountCents, userId, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
     queryKey: ['purchase-status', releaseId, paymentIntentId],
