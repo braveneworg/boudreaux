@@ -21,10 +21,12 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-const mockUseSession =
-  vi.fn<
-    () => { data: { user?: { email?: string; stripeCustomerId?: string } } | null; status: string }
-  >();
+const mockUseSession = vi.fn<
+  () => {
+    data: { user?: { email?: string; stripeCustomerId?: string; id?: string } } | null;
+    status: string;
+  }
+>();
 
 vi.mock('next-auth/react', () => ({
   useSession: () => mockUseSession(),

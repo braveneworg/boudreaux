@@ -60,4 +60,16 @@ describe('ses-client', () => {
     expect(constructorSpy).toHaveBeenCalledWith({ region: 'eu-west-1' });
     vi.unstubAllEnvs();
   });
+
+  it('should fall back to us-east-1 when AWS_REGION is not set', async () => {
+    vi.unstubAllEnvs();
+    delete process.env.AWS_REGION;
+    constructorSpy.mockClear();
+
+    const { sesClient } = await import('@/lib/utils/ses-client');
+
+    void sesClient.config;
+
+    expect(constructorSpy).toHaveBeenCalledWith({ region: 'us-east-1' });
+  });
 });

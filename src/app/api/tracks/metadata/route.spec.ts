@@ -232,4 +232,22 @@ describe('POST /api/tracks/metadata', () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe('Internal server error');
   });
+
+  it('should return 500 when formData throws a non-Error value', async () => {
+    const request = {
+      headers: new Headers([['content-type', 'multipart/form-data; boundary=---']]),
+      formData: vi.fn().mockRejectedValue('plain string rejection'),
+    } as unknown as NextRequest;
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Internal server error');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
 });

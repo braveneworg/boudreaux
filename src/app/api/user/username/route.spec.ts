@@ -139,6 +139,36 @@ describe('POST /api/user/username', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('should log full error in development mode', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    mockPrismaUpdate.mockRejectedValue(new Error('Dev debug error'));
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const request = createRequest({ username: 'validuser', confirmUsername: 'validuser' });
+    const response = await POST(request, { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(500);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating username:', expect.any(Error));
+
+    consoleErrorSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it('should log "Unknown error" when thrown value is not an Error instance', async () => {
+    mockPrismaUpdate.mockRejectedValue('a plain string error');
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const request = createRequest({ username: 'validuser', confirmUsername: 'validuser' });
+    const response = await POST(request, { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(500);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating username:', 'Unknown error');
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it('should accept a valid username with underscores and dashes', async () => {
     mockPrismaUpdate.mockResolvedValue({
       id: 'user-123',
