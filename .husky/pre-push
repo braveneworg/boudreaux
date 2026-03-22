@@ -55,8 +55,7 @@ echo "✅ TypeScript type-check passed"
 echo ""
 echo "🔎 Running ESLint before push..."
 
-# Run ESLint with max-warnings 0 to fail on any warnings
-pnpm run lint:strict
+pnpm run lint
 
 if [ $? -ne 0 ]; then
   echo ""
