@@ -22,6 +22,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     user: {
       findUnique: vi.fn(),
+      upsert: vi.fn(),
     },
   },
 }));
@@ -193,6 +194,30 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.findUserByEmail('unknown@example.com');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findOrCreateGuestUser', () => {
+    it('should upsert the user by email and return the id', async () => {
+      vi.mocked(prisma.user.upsert).mockResolvedValue({ id: 'guest-id-1' } as never);
+
+      const result = await PurchaseRepository.findOrCreateGuestUser('guest@example.com');
+
+      expect(prisma.user.upsert).toHaveBeenCalledWith({
+        where: { email: 'guest@example.com' },
+        create: { email: 'guest@example.com' },
+        update: {},
+        select: { id: true },
+      });
+      expect(result).toEqual({ id: 'guest-id-1' });
+    });
+
+    it('should return the existing user id when the user already exists', async () => {
+      vi.mocked(prisma.user.upsert).mockResolvedValue({ id: 'existing-user-id' } as never);
+
+      const result = await PurchaseRepository.findOrCreateGuestUser('existing@example.com');
+
+      expect(result).toEqual({ id: 'existing-user-id' });
     });
   });
 });

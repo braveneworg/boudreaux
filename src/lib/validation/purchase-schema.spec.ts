@@ -10,13 +10,20 @@ describe('purchaseCheckoutSchema', () => {
     releaseId: 'release-123',
     releaseTitle: 'Test Album',
     amountCents: 500,
-    userId: 'user-123',
   };
 
-  it('should pass with a valid complete input', () => {
+  it('should pass with a valid complete input (no guestEmail)', () => {
     const result = purchaseCheckoutSchema.safeParse(validInput);
     expect(result.success).toBe(true);
     expect((result as { success: true; data: typeof validInput }).data).toMatchObject(validInput);
+  });
+
+  it('should pass with a valid input including a guestEmail', () => {
+    const result = purchaseCheckoutSchema.safeParse({
+      ...validInput,
+      guestEmail: 'guest@example.com',
+    });
+    expect(result.success).toBe(true);
   });
 
   describe('releaseId field', () => {
@@ -61,12 +68,20 @@ describe('purchaseCheckoutSchema', () => {
     });
   });
 
-  describe('userId field', () => {
-    it('should fail when userId is empty', () => {
-      const result = purchaseCheckoutSchema.safeParse({ ...validInput, userId: '' });
+  describe('guestEmail field', () => {
+    it('should fail when guestEmail is provided but not a valid email', () => {
+      const result = purchaseCheckoutSchema.safeParse({
+        ...validInput,
+        guestEmail: 'not-an-email',
+      });
       expect(result.success).toBe(false);
-      const errors = result.error?.issues.filter((i) => i.path[0] === 'userId');
+      const errors = result.error?.issues.filter((i) => i.path[0] === 'guestEmail');
       expect(errors?.length).toBeGreaterThan(0);
+    });
+
+    it('should pass when guestEmail is omitted entirely', () => {
+      const result = purchaseCheckoutSchema.safeParse(validInput);
+      expect(result.success).toBe(true);
     });
   });
 });

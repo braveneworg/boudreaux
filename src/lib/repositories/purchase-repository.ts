@@ -90,4 +90,18 @@ export class PurchaseRepository {
       select: { id: true },
     });
   }
+
+  /**
+   * Find an existing user by email or create a minimal guest record.
+   * Used by the server action to resolve a stable userId for guests
+   * without relying on client-supplied values.
+   */
+  static async findOrCreateGuestUser(email: string): Promise<{ id: string }> {
+    return prisma.user.upsert({
+      where: { email },
+      create: { email },
+      update: {},
+      select: { id: true },
+    });
+  }
 }

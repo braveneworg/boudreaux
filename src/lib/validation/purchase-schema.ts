@@ -11,7 +11,8 @@ export const purchaseCheckoutSchema = z.object({
     .number()
     .int('Amount must be a whole number of cents')
     .min(50, 'Minimum amount is $0.50'),
-  userId: z.string().min(1, 'User ID is required'),
+  /** Guest-user email — omit when the caller is an authenticated session user. */
+  guestEmail: z.string().email('Invalid guest email').optional(),
 });
 
 export type PurchaseCheckoutSchemaType = z.infer<typeof purchaseCheckoutSchema>;
