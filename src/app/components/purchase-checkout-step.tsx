@@ -35,7 +35,7 @@ interface PurchaseCheckoutStepProps {
   releaseId: string;
   releaseTitle: string;
   amountCents: number;
-  userId: string;
+  customerEmail: string;
   onConfirmed: () => void;
   onError: (message: string) => void;
 }
@@ -124,7 +124,7 @@ export const PurchaseCheckoutStep = ({
   releaseId,
   releaseTitle,
   amountCents,
-  userId,
+  customerEmail,
   onConfirmed,
   onError,
 }: PurchaseCheckoutStepProps) => {
@@ -142,7 +142,7 @@ export const PurchaseCheckoutStep = ({
         const result = await createPurchaseCheckoutSessionAction({
           releaseId,
           amountCents,
-          userId,
+          customerEmail,
         });
 
         if (cancelled) return;
@@ -170,7 +170,7 @@ export const PurchaseCheckoutStep = ({
     return () => {
       cancelled = true;
     };
-  }, [releaseId, amountCents, userId, onError]);
+  }, [releaseId, releaseTitle, customerEmail, amountCents, userId, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
     queryKey: ['purchase-status', releaseId, paymentIntentId],
