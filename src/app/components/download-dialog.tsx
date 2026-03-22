@@ -103,13 +103,20 @@ export const DownloadDialog = ({
     .trim();
 
   const effectiveSuggestedPrice = suggestedPrice ?? premiumPrice ?? 5;
-  const displayAmount = rawAmount
-    ? `$${parseFloat(rawAmount).toFixed(2)}`
-    : `$${effectiveSuggestedPrice.toFixed(2)}`;
+  const parsedDisplayAmount = rawAmount ? parseFloat(rawAmount) : null;
+  const displayAmount =
+    parsedDisplayAmount !== null && Number.isFinite(parsedDisplayAmount)
+      ? `$${parsedDisplayAmount.toFixed(2)}`
+      : `$${effectiveSuggestedPrice.toFixed(2)}`;
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     if (data.downloadOption === 'premium-digital') {
-      const cents = Math.round(parseFloat(rawAmount || String(effectiveSuggestedPrice)) * 100);
+      const parsed = parseFloat(rawAmount || String(effectiveSuggestedPrice));
+      if (!Number.isFinite(parsed)) {
+        form.setError('finalAmount', { message: 'Amount must be a valid number' });
+        return;
+      }
+      const cents = Math.round(parsed * 100);
       if (cents < 50) return;
       setAmountCents(cents);
       if (session?.user) {
