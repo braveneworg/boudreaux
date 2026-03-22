@@ -284,7 +284,8 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
       <CarouselContent className="flex justify-center gap-2">
         {numberUpSliced.map((artist) => {
           const latestRelease = artist.releases.sort(
-            (a, b) => b.release.releasedOn.getTime() - a.release.releasedOn.getTime()
+            (a: Artist['releases'][number], b: Artist['releases'][number]) =>
+              b.release.releasedOn.getTime() - a.release.releasedOn.getTime()
           )[0];
           const latestCoverArt = latestRelease?.release.coverArt;
 
@@ -644,7 +645,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
     releaseTitle = featuredArtist.release?.title ?? null;
     trackTitle = featuredArtist.track?.title ?? '';
   } else {
-    const { artistRelease, trackName } = props;
+    const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
     displayName = getArtistDisplayName(artistRelease.artist);
     releaseTitle = artistRelease.release.title;
     trackTitle = trackName;
@@ -1216,7 +1217,12 @@ const TrackListDrawer = ({
           <div className="flex justify-between text-sm text-zinc-600">
             <span>Total time</span>
             <span className="font-mono">
-              {formatDuration(releaseTracks.reduce((total, rt) => total + rt.track.duration, 0))}
+              {formatDuration(
+                releaseTracks.reduce(
+                  (total: number, rt: { track: { duration: number } }) => total + rt.track.duration,
+                  0
+                )
+              )}
             </span>
           </div>
         </div>

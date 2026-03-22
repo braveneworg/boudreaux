@@ -24,7 +24,34 @@ import { TimePicker } from '@/app/components/ui/timepicker';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 
-import type { Artist, Group, TourDateHeadliner } from '@prisma/client';
+/**
+ * Local interfaces matching Prisma model shapes.
+ * Client components should not import directly from @prisma/client.
+ */
+interface TourDateHeadlinerFields {
+  id: string;
+  tourDateId: string;
+  artistId: string | null;
+  groupId: string | null;
+  sortOrder: number;
+  setTime: Date | null;
+  createdAt: Date;
+}
+
+interface ArtistFields {
+  id: string;
+  firstName: string;
+  surname: string;
+  displayName: string | null;
+  [key: string]: unknown;
+}
+
+interface GroupFields {
+  id: string;
+  name: string;
+  displayName: string | null;
+  [key: string]: unknown;
+}
 
 /** Predefined set of pastel background colors for artist pills */
 const PASTEL_COLORS = [
@@ -58,9 +85,9 @@ function shouldUseBlackText(hexColor: string): boolean {
   return (luminance + 0.05) / 0.05 >= 4.5;
 }
 
-export interface HeadlinerWithRelations extends TourDateHeadliner {
-  artist: Artist | null;
-  group: Group | null;
+export interface HeadlinerWithRelations extends TourDateHeadlinerFields {
+  artist: ArtistFields | null;
+  group: GroupFields | null;
 }
 
 interface ArtistPillProps {

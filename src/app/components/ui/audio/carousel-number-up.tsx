@@ -32,7 +32,7 @@ export function CarouselNumberUp({
               className="border-radius-[0.5rem]"
               src={
                 artist.releases.sort(
-                  (a, b) =>
+                  (a: Artist['releases'][number], b: Artist['releases'][number]) =>
                     (b.release.releasedOn?.getTime() ?? 0) - (a.release.releasedOn?.getTime() ?? 0)
                 )[0].release.coverArt
               }

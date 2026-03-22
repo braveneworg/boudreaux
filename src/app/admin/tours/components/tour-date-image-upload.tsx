@@ -15,13 +15,30 @@ import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploade
 import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from '@/lib/validations/tours/image-schema';
 import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validations/tours/tour-date-image-schema';
 
-import type { TourDateImage } from '@prisma/client';
+/**
+ * Local interface matching Prisma TourDateImage model.
+ * Client components should not import directly from @prisma/client.
+ */
+interface TourDateImageFields {
+  id: string;
+  tourDateId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+}
 
 export interface TourDateImageUploadProps {
   /** Tour date ID to associate images with */
   tourDateId: string;
   /** Initial images from database */
-  initialImages?: TourDateImage[];
+  initialImages?: TourDateImageFields[];
   /** Called when images are successfully uploaded */
   onUploadComplete?: () => void;
   /** Whether the component is disabled */

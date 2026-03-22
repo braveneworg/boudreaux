@@ -14,13 +14,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
-import { TourService } from '@/lib/services/tours/tour-service';
+import { TourService, type TourWithDisplayNames } from '@/lib/services/tours/tour-service';
 
 export const dynamic = 'force-dynamic';
 
-interface TourListItem {
-  id: string;
-  title: string;
+/**
+ * Display type for tour list items.
+ * Extends TourWithDisplayNames with optional tourDates for display purposes.
+ */
+interface TourListItem extends TourWithDisplayNames {
   tourDates?: Array<{
     startDate: Date;
     venue?: {

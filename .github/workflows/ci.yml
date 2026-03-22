@@ -174,9 +174,6 @@ jobs:
       - name: Start MongoDB replica set
         run: docker compose -f docker-compose.e2e.yml up -d --wait
 
-      - name: Generate Prisma Client
-        run: pnpm exec prisma generate
-
       - name: Get Playwright version
         id: pw-version
         run: echo "version=$(pnpm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT

@@ -46,7 +46,9 @@ async function main() {
       console.info('Track:', track.id, track.title);
       console.info(
         '  Artists:',
-        track.artists.map((a) => a.artist?.displayName || 'NULL')
+        track.artists.map(
+          (a: { artist?: { displayName?: string | null } }) => a.artist?.displayName || 'NULL'
+        )
       );
     }
   } catch (error) {

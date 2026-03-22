@@ -147,18 +147,22 @@ export const updateReleaseAction = async (
         select: { id: true, artistId: true },
       });
 
-      const existingArtistIds = new Set(existingArtistReleases.map((ar) => ar.artistId));
+      const existingArtistIds = new Set(
+        existingArtistReleases.map((ar: { id: string; artistId: string }) => ar.artistId)
+      );
       const newArtistIds = new Set(artistIds);
 
       // Delete removed and create new associations in parallel
-      const toDelete = existingArtistReleases.filter((ar) => !newArtistIds.has(ar.artistId));
+      const toDelete = existingArtistReleases.filter(
+        (ar: { id: string; artistId: string }) => !newArtistIds.has(ar.artistId)
+      );
       const toCreate = artistIds.filter((id) => !existingArtistIds.has(id));
 
       const ops: Promise<unknown>[] = [];
       if (toDelete.length > 0) {
         ops.push(
           prisma.artistRelease.deleteMany({
-            where: { id: { in: toDelete.map((ar) => ar.id) } },
+            where: { id: { in: toDelete.map((ar: { id: string; artistId: string }) => ar.id) } },
           })
         );
       }

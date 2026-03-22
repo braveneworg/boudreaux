@@ -146,13 +146,21 @@ export const getReleaseImagesAction = async (
 
     return {
       success: true,
-      data: images.map((img) => ({
-        id: img.id,
-        src: img.src || '',
-        caption: img.caption || undefined,
-        altText: img.altText || undefined,
-        sortOrder: img.sortOrder ?? 0,
-      })),
+      data: images.map(
+        (img: {
+          id: string;
+          src: string | null;
+          caption: string | null;
+          altText: string | null;
+          sortOrder: number | null;
+        }) => ({
+          id: img.id,
+          src: img.src || '',
+          caption: img.caption || undefined,
+          altText: img.altText || undefined,
+          sortOrder: img.sortOrder ?? 0,
+        })
+      ),
     };
   } catch (error) {
     console.error('Get release images action error:', error);
@@ -255,13 +263,21 @@ export const reorderReleaseImagesAction = async (
 
     return {
       success: true,
-      data: images.map((img) => ({
-        id: img.id,
-        src: img.src || '',
-        caption: img.caption || undefined,
-        altText: img.altText || undefined,
-        sortOrder: img.sortOrder ?? 0,
-      })),
+      data: images.map(
+        (img: {
+          id: string;
+          src: string | null;
+          caption: string | null;
+          altText: string | null;
+          sortOrder: number | null;
+        }) => ({
+          id: img.id,
+          src: img.src || '',
+          caption: img.caption || undefined,
+          altText: img.altText || undefined,
+          sortOrder: img.sortOrder ?? 0,
+        })
+      ),
     };
   } catch (error) {
     console.error('Reorder release images action error:', error);

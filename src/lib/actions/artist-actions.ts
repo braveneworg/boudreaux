@@ -24,7 +24,7 @@ export async function createArtistAction(artist: Artist): Promise<ServiceRespons
       ...artistData,
       images: images
         ? {
-            connectOrCreate: images.map((image) => ({
+            connectOrCreate: images.map((image: Artist['images'][number]) => ({
               where: { id: image.id },
               create: { ...image },
             })),
@@ -32,7 +32,7 @@ export async function createArtistAction(artist: Artist): Promise<ServiceRespons
         : undefined,
       urls: urls
         ? {
-            connectOrCreate: urls.map((url) => ({
+            connectOrCreate: urls.map((url: Artist['urls'][number]) => ({
               where: { id: url.id },
               create: { ...url },
             })),

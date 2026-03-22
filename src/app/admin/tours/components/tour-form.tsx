@@ -32,7 +32,24 @@ import { createTourAction, updateTourAction, deleteTourAction } from '@/lib/acti
 import type { FormState } from '@/lib/types/form-state';
 import { tourCreateSchema, tourUpdateSchema } from '@/lib/validations/tours/tour-schema';
 
-import type { TourImage } from '@prisma/client';
+/**
+ * Local interface matching Prisma TourImage model.
+ * Client components should not import directly from @prisma/client.
+ */
+interface TourImageFields {
+  id: string;
+  tourId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+}
 
 interface TourFormProps {
   tourId?: string;
@@ -55,7 +72,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
   const [isPending, setIsPending] = useState(false);
   const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [tourImages, setTourImages] = useState<TourImage[]>([]);
+  const [tourImages, setTourImages] = useState<TourImageFields[]>([]);
   const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
   const isEditMode = !!tourId;
   const router = useRouter();

@@ -16,6 +16,7 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { ArtistService } from '@/lib/services/artist-service';
+import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 import type { Metadata } from 'next';
@@ -83,12 +84,19 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
   const artistWithPlayableReleases = {
     ...artist,
     releases: artist.releases
-      .filter((ar) => ar.release.releaseTracks.length > 0)
-      .sort((a, b) => {
-        const dateA = a.release.releasedOn ? new Date(a.release.releasedOn).getTime() : 0;
-        const dateB = b.release.releasedOn ? new Date(b.release.releasedOn).getTime() : 0;
-        return dateB - dateA;
-      }),
+      .filter(
+        (ar: ArtistWithPublishedReleases['releases'][number]) => ar.release.releaseTracks.length > 0
+      )
+      .sort(
+        (
+          a: ArtistWithPublishedReleases['releases'][number],
+          b: ArtistWithPublishedReleases['releases'][number]
+        ) => {
+          const dateA = a.release.releasedOn ? new Date(a.release.releasedOn).getTime() : 0;
+          const dateB = b.release.releasedOn ? new Date(b.release.releasedOn).getTime() : 0;
+          return dateB - dateA;
+        }
+      ),
   };
 
   const breadcrumbItems = [

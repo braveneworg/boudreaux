@@ -83,7 +83,7 @@ export const ReleasePlayer = ({
 
   const handleTrackSelect = useCallback(
     (trackId: string) => {
-      const index = tracks.findIndex((rt) => rt.track.id === trackId);
+      const index = tracks.findIndex((rt: { track: { id: string } }) => rt.track.id === trackId);
       if (index >= 0) {
         setCurrentTrackIndex(index);
         setShouldAutoPlay(true);

@@ -48,7 +48,9 @@ async function main(): Promise<void> {
   console.info(`Slug:   ${artist.slug}\n`);
 
   // 2. Show currently linked releases
-  const linkedReleaseIds = new Set(artist.releases.map((ar) => ar.releaseId));
+  const linkedReleaseIds = new Set(
+    artist.releases.map((ar: { releaseId: string }) => ar.releaseId)
+  );
 
   if (artist.releases.length > 0) {
     console.info(`Currently linked releases (${artist.releases.length}):`);
@@ -131,7 +133,7 @@ async function main(): Promise<void> {
 
     // 6. Create ArtistRelease records in a transaction
     const created = await prisma.$transaction(
-      selectedReleases.map((r) =>
+      selectedReleases.map((r: { id: string }) =>
         prisma.artistRelease.create({
           data: {
             artistId: artist.id,
@@ -143,7 +145,7 @@ async function main(): Promise<void> {
 
     console.info(`\nCreated ${created.length} ArtistRelease record(s).`);
     for (const ar of created) {
-      const release = selectedReleases.find((r) => r.id === ar.releaseId);
+      const release = selectedReleases.find((r: { id: string }) => r.id === ar.releaseId);
       console.info(`  - ${release?.title ?? ar.releaseId}  (ArtistRelease ID: ${ar.id})`);
     }
   } finally {

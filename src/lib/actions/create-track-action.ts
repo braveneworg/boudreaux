@@ -83,7 +83,11 @@ export const createTrackAction = async (
           select: { artistId: true, releaseId: true },
         });
 
-        const existingSet = new Set(existingLinks.map((l) => `${l.artistId}:${l.releaseId}`));
+        const existingSet = new Set(
+          existingLinks.map(
+            (l: { artistId: string; releaseId: string }) => `${l.artistId}:${l.releaseId}`
+          )
+        );
 
         const missingLinks: Array<{ artistId: string; releaseId: string }> = [];
         for (const artistId of artistIds) {

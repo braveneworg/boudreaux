@@ -29,17 +29,52 @@ import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
 import ArtistPillList from './artist-pill-list';
 
-import type { Artist, Group, TourDate, TourDateHeadliner, Venue } from '@prisma/client';
+import type { HeadlinerWithRelations } from './artist-pill';
+
+/**
+ * Local interfaces matching Prisma model shapes.
+ * Client components should not import directly from @prisma/client.
+ */
+interface VenueFields {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  capacity: number | null;
+  notes: string | null;
+  timeZone: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+}
+
+interface TourDateFields {
+  id: string;
+  tourId: string;
+  startDate: Date;
+  endDate: Date | null;
+  showStartTime: Date;
+  showEndTime: Date | null;
+  doorsOpenAt: Date | null;
+  venueId: string;
+  timeZone: string | null;
+  utcOffset: number | null;
+  ticketsUrl: string | null;
+  ticketIconUrl: string | null;
+  ticketPrices: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // Full tour date type with relations
-type TourDateWithRelations = TourDate & {
-  venue: Venue;
-  headliners: Array<
-    TourDateHeadliner & {
-      artist: Artist | null;
-      group: Group | null;
-    }
-  >;
+type TourDateWithRelations = TourDateFields & {
+  venue: VenueFields;
+  headliners: HeadlinerWithRelations[];
 };
 
 interface TourDateListProps {

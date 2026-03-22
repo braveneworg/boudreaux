@@ -21,7 +21,7 @@ const getAlbumArtist = (release: Release): string => {
   }
 
   return release.artistReleases
-    .map((ar) => getDisplayName(ar.artist))
+    .map((ar: Release['artistReleases'][number]) => getDisplayName(ar.artist))
     .filter(Boolean)
     .join(', ');
 };
