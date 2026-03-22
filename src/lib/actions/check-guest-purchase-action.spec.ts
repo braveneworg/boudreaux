@@ -148,4 +148,15 @@ describe('checkGuestPurchaseAction', () => {
 
     expect(result).toEqual({ hasPurchase: false, downloadCount: 0, atCap: false });
   });
+
+  it('should fall back to "anonymous" when neither IP header is set', async () => {
+    mockHeaders.mockReturnValue({
+      get: () => null,
+    });
+    mockFindUserByEmail.mockResolvedValue(null);
+
+    const result = await checkGuestPurchaseAction('anon@example.com', 'release-1');
+
+    expect(result).toEqual({ hasPurchase: false, downloadCount: 0, atCap: false });
+  });
 });

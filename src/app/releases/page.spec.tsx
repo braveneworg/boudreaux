@@ -180,4 +180,26 @@ describe('ReleasesPage', () => {
     const grid = screen.getByTestId('release-card-grid');
     expect(grid).toHaveAttribute('data-count', '0');
   });
+
+  it('should handle release with empty artistReleases', async () => {
+    mockGetPublishedReleases.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'release-no-artist',
+          title: 'Orphan Album',
+          coverArt: '',
+          images: [],
+          artistReleases: [],
+          releaseUrls: [],
+        },
+      ],
+    });
+
+    const Page = await ReleasesPage();
+    render(Page);
+
+    const grid = screen.getByTestId('release-card-grid');
+    expect(grid).toHaveAttribute('data-count', '1');
+  });
 });

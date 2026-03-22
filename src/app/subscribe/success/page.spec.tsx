@@ -224,4 +224,117 @@ describe('SubscribeSuccessPage', () => {
     expect(screen.getByRole('heading', { name: 'Something Went Wrong' })).toBeInTheDocument();
     expect(screen.getByText(/We could not verify your subscription/)).toBeInTheDocument();
   });
+
+  it('should handle paid session with no subscription field', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: 'cus_test_123',
+      customer_details: { email: 'nosub@example.com' },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_nosub' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockSendConfirmationEmail).toHaveBeenCalledWith('nosub@example.com', null, 'month');
+    expect(mockLinkStripeCustomer).toHaveBeenCalledWith('nosub@example.com', 'cus_test_123');
+  });
+
+  it('should handle subscription as object with id property', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: 'cus_test_123',
+      customer_details: { email: 'objsub@example.com' },
+      subscription: { id: 'sub_obj_456' },
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ price: { id: 'price_minimum', recurring: { interval: 'year' } } }],
+      },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_objsub' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_obj_456');
+  });
+
+  it('should handle subscription with empty items array', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: 'cus_test_123',
+      customer_details: { email: 'empty@example.com' },
+      subscription: 'sub_test_empty',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: { data: [] },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_empty' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockSendConfirmationEmail).toHaveBeenCalledWith('empty@example.com', null, 'month');
+  });
+
+  it('should handle customer as object with id property', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: { id: 'cus_obj_789' },
+      customer_details: { email: 'objcus@example.com' },
+      subscription: 'sub_test_objcus',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
+      },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_objcus' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockLinkStripeCustomer).toHaveBeenCalledWith('objcus@example.com', 'cus_obj_789');
+  });
+
+  it('should skip linkStripeCustomer when customer is null', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: null,
+      customer_details: { email: 'nullcus@example.com' },
+      subscription: 'sub_test_nullcus',
+    });
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ price: { id: 'price_minimum', recurring: { interval: 'month' } } }],
+      },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_nullcus' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    expect(mockLinkStripeCustomer).not.toHaveBeenCalled();
+    expect(mockSendConfirmationEmail).toHaveBeenCalledWith(
+      'nullcus@example.com',
+      'minimum',
+      'month'
+    );
+  });
 });

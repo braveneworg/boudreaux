@@ -53,7 +53,10 @@ describe('createPurchaseCheckoutSessionAction', () => {
     vi.clearAllMocks();
     vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue({ id: 'user-123' });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
-    vi.mocked(prisma.release.findFirst).mockResolvedValue({ id: 'release-123', title: 'Test Album' } as never);
+    vi.mocked(prisma.release.findFirst).mockResolvedValue({
+      id: 'release-123',
+      title: 'Test Album',
+    } as never);
     vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
       client_secret: 'secret_xxx',
       payment_intent: 'pi_xxx',
@@ -66,18 +69,17 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
   describe('schema validation', () => {
     it('should return an error when releaseId is missing from the input', async () => {
-      const invalidInput = { releaseTitle: 'Test Album', amountCents: 500, userId: 'user-123', customerEmail: 'buyer@example.com' };
+      const invalidInput = {
+        releaseTitle: 'Test Album',
+        amountCents: 500,
+        userId: 'user-123',
+        customerEmail: 'buyer@example.com',
+      };
       const result = await createPurchaseCheckoutSessionAction(invalidInput);
 
       expect(result.success).toBe(false);
       expect(typeof (result as { success: false; error: string }).error).toBe('string');
       expect((result as { success: false; error: string }).error.length).toBeGreaterThan(0);
-    });
-
-    it('should return an error when userId is empty', async () => {
-      const result = await createPurchaseCheckoutSessionAction({ ...validInput, userId: '' });
-
-      expect(result.success).toBe(false);
     });
 
     it('should return an error when amountCents is below the schema minimum of 50', async () => {

@@ -31,7 +31,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents, userId, customerEmail } = parsed.data;
+  const { releaseId, amountCents, customerEmail } = parsed.data;
 
   try {
     // Minimum Stripe charge is $0.50

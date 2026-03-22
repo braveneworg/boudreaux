@@ -870,4 +870,445 @@ describe('POST /api/stripe/webhook', () => {
       expect(mockLinkStripeCustomer).toHaveBeenCalledWith('subscriber@example.com', 'cus_sub_999');
     });
   });
+
+  // ─── Branch coverage: non-Error throw in signature verification ───
+  it('should handle non-Error throw in constructEvent', async () => {
+    mockConstructEvent.mockImplementation(() => {
+      throw 'raw string error';
+    });
+    const request = createRequest('{}');
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    const json = await response.json();
+    expect(json.error).toBe('Invalid signature');
+  });
+
+  // ─── Branch coverage: CIDR without slash (defaults to /32) ───
+  it('treats CIDR without slash as /32', async () => {
+    vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63');
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('Invalid signature');
+    });
+    const headers = new Headers({
+      'content-type': 'application/json',
+      'stripe-signature': 'sig_test',
+      'x-forwarded-for': '3.18.12.63',
+    });
+    const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+      method: 'POST',
+      body: '{}',
+      headers,
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+
+  // ─── Branch coverage: /0 CIDR mask matches all IPs ───
+  it('matches all IPs with a /0 CIDR', async () => {
+    vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '0.0.0.0/0');
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('Invalid signature');
+    });
+    const headers = new Headers({
+      'content-type': 'application/json',
+      'stripe-signature': 'sig_test',
+      'x-forwarded-for': '123.45.67.89',
+    });
+    const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+      method: 'POST',
+      body: '{}',
+      headers,
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+
+  // ─── Branch coverage: object-form customer in checkout.session.completed ───
+  describe('checkout.session.completed — object-form fields', () => {
+    it('extracts customer ID from object form', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_obj_cust',
+            customer: { id: 'cus_obj_123' },
+            customer_email: null,
+            customer_details: { email: 'obj@example.com' },
+            subscription: null,
+          },
+        },
+      });
+      mockLinkStripeCustomer.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockLinkStripeCustomer).toHaveBeenCalledWith('obj@example.com', 'cus_obj_123');
+    });
+
+    it('falls back to customer_email when customer_details.email is null', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_fb_email',
+            customer: 'cus_fb_123',
+            customer_email: 'fallback@example.com',
+            customer_details: { email: null },
+            subscription: null,
+          },
+        },
+      });
+      mockLinkStripeCustomer.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockLinkStripeCustomer).toHaveBeenCalledWith('fallback@example.com', 'cus_fb_123');
+    });
+
+    it('extracts subscription ID from object form', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_subobj',
+            customer: 'cus_subobj',
+            customer_email: 'subobj@example.com',
+            customer_details: { email: 'subobj@example.com' },
+            subscription: { id: 'sub_obj_123' },
+          },
+        },
+      });
+      mockSubscriptionsRetrieve.mockResolvedValue({
+        id: 'sub_obj_123',
+        status: 'active',
+        items: {
+          data: [
+            {
+              price: { id: 'price_extra', recurring: { interval: 'year' } },
+              current_period_end: 1713398400,
+            },
+          ],
+        },
+      });
+      mockLinkStripeCustomer.mockResolvedValue({});
+      mockUpdateSubscription.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_obj_123');
+    });
+
+    it('handles subscription with empty items.data', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_empty_items',
+            customer: 'cus_empty',
+            customer_email: 'empty@example.com',
+            customer_details: { email: 'empty@example.com' },
+            subscription: 'sub_empty',
+          },
+        },
+      });
+      mockSubscriptionsRetrieve.mockResolvedValue({
+        id: 'sub_empty',
+        status: 'active',
+        items: { data: [] },
+      });
+      mockLinkStripeCustomer.mockResolvedValue({});
+      mockUpdateSubscription.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockUpdateSubscription).toHaveBeenCalledWith('cus_empty', {
+        subscriptionId: 'sub_empty',
+        subscriptionStatus: 'active',
+        subscriptionTier: null,
+        subscriptionCurrentPeriodEnd: null,
+      });
+      expect(mockSendConfirmationEmail).toHaveBeenCalledWith('empty@example.com', null, 'month');
+    });
+  });
+
+  // ─── Branch coverage: subscription.updated — object customer & empty items ───
+  describe('customer.subscription.updated — object customer and empty items', () => {
+    it('extracts customer ID from object form', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_obj_upd',
+            status: 'active',
+            customer: { id: 'cus_obj_upd' },
+            items: {
+              data: [
+                {
+                  price: { id: 'price_minimum', recurring: { interval: 'month' } },
+                  current_period_end: 1713398400,
+                },
+              ],
+            },
+          },
+        },
+      });
+      mockUpdateSubscription.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockUpdateSubscription).toHaveBeenCalledWith(
+        'cus_obj_upd',
+        expect.objectContaining({ subscriptionId: 'sub_obj_upd' })
+      );
+    });
+
+    it('handles empty items.data', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_empty_upd',
+            status: 'active',
+            customer: 'cus_empty_upd',
+            items: { data: [] },
+          },
+        },
+      });
+      mockUpdateSubscription.mockResolvedValue({});
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockUpdateSubscription).toHaveBeenCalledWith('cus_empty_upd', {
+        subscriptionId: 'sub_empty_upd',
+        subscriptionStatus: 'active',
+        subscriptionTier: null,
+        subscriptionCurrentPeriodEnd: null,
+      });
+    });
+  });
+
+  // ─── Branch coverage: subscription.deleted — object customer ───
+  it('subscription.deleted extracts customer ID from object form', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.deleted',
+      data: { object: { id: 'sub_del_obj', customer: { id: 'cus_del_obj' } } },
+    });
+    mockCancelSubscription.mockResolvedValue({});
+    const request = createRequest('{}');
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(mockCancelSubscription).toHaveBeenCalledWith('cus_del_obj');
+  });
+
+  // ─── Branch coverage: invoice.payment_failed — object customer ───
+  it('invoice.payment_failed extracts customer ID from object form', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_failed',
+      data: { object: { id: 'in_obj_123', customer: { id: 'cus_inv_obj' } } },
+    });
+    mockUpdateSubscriptionStatus.mockResolvedValue({});
+    const request = createRequest('{}');
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('cus_inv_obj', 'past_due');
+  });
+
+  // ─── Branch coverage: release purchase edge cases ───
+  describe('release purchase — missing fields and fallbacks', () => {
+    it('extracts paymentIntentId from object form', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_piobj',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-piobj', userId: 'u-piobj' },
+            payment_intent: { id: 'pi_obj_001' },
+            amount_total: 500,
+            currency: 'eur',
+            customer_details: { email: 'piobj@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-piobj' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'PI Obj Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockFindByPaymentIntentId).toHaveBeenCalledWith('pi_obj_001');
+    });
+
+    it('returns early when releaseId is missing from metadata', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_no_rid',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', userId: 'u-no-rid' },
+            payment_intent: 'pi_no_rid',
+            amount_total: 500,
+            currency: 'usd',
+            customer_details: { email: 'norid@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+    });
+
+    it('defaults amount_total to 0 when null', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_null_amt',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-amt', userId: 'u-amt' },
+            payment_intent: 'pi_amt',
+            amount_total: null,
+            currency: 'usd',
+            customer_details: { email: 'amt@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-amt' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Amt Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(expect.objectContaining({ amountPaid: 0 }));
+    });
+
+    it('defaults currency to "usd" when null', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_null_cur',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-cur', userId: 'u-cur' },
+            payment_intent: 'pi_cur',
+            amount_total: 200,
+            currency: null,
+            customer_details: { email: 'cur@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-cur' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Cur Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(expect.objectContaining({ currency: 'usd' }));
+    });
+
+    it('uses "Unknown Release" when release is not found in DB', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_no_rel',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-gone', userId: 'u-gone' },
+            payment_intent: 'pi_gone',
+            amount_total: 100,
+            currency: 'usd',
+            customer_details: { email: 'gone@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-gone' });
+      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseTitle: 'Unknown Release' })
+      );
+    });
+
+    it('does not send email when no customer email is available', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_no_email',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-noem', userId: 'u-noem' },
+            payment_intent: 'pi_noem',
+            amount_total: 100,
+            currency: 'usd',
+            customer_details: { email: null },
+            customer_email: null,
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-noem' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release' });
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).toHaveBeenCalled();
+      expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+    });
+
+    it('falls back to customer_email for purchase when customer_details.email is null', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_fb_buy',
+            mode: 'payment',
+            metadata: { type: 'release_purchase', releaseId: 'r-fb', userId: 'u-fb' },
+            payment_intent: 'pi_fb',
+            amount_total: 100,
+            currency: 'usd',
+            customer_details: { email: null },
+            customer_email: 'fallback-buyer@example.com',
+          },
+        },
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-fb' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Fallback Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ customerEmail: 'fallback-buyer@example.com' })
+      );
+    });
+  });
+
+  // ─── Branch coverage: unset STRIPE_WEBHOOK_IP_RANGES ───
+  it('skips IP block when STRIPE_WEBHOOK_IP_RANGES is undefined', async () => {
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+    delete process.env.STRIPE_WEBHOOK_IP_RANGES;
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('Invalid signature');
+    });
+    const request = createRequest('{}');
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
 });

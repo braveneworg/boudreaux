@@ -170,7 +170,7 @@ export const PurchaseCheckoutStep = ({
     return () => {
       cancelled = true;
     };
-  }, [releaseId, releaseTitle, customerEmail, amountCents, userId, onError]);
+  }, [releaseId, releaseTitle, customerEmail, amountCents, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
     queryKey: ['purchase-status', releaseId, paymentIntentId],

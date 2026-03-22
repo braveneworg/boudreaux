@@ -546,4 +546,67 @@ describe('createArtistAction', () => {
       ]);
     });
   });
+
+  describe('field fallback branches', () => {
+    it('should pass empty string for firstName when it is falsy', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: '',
+            surname: 'Doe',
+            slug: 'falsy-first',
+          },
+        },
+      } as never);
+
+      await createArtistAction(initialFormState, mockFormData);
+
+      expect(ArtistService.createArtist).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: '', surname: 'Doe' })
+      );
+    });
+
+    it('should pass empty string for surname when it is falsy', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: '',
+            slug: 'falsy-surname',
+          },
+        },
+      } as never);
+
+      await createArtistAction(initialFormState, mockFormData);
+
+      expect(ArtistService.createArtist).toHaveBeenCalledWith(
+        expect.objectContaining({ firstName: 'John', surname: '' })
+      );
+    });
+
+    it('should convert publishedOn string to Date when provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe-pub',
+            publishedOn: '2024-06-01',
+          },
+        },
+      } as never);
+
+      await createArtistAction(initialFormState, mockFormData);
+
+      expect(ArtistService.createArtist).toHaveBeenCalledWith(
+        expect.objectContaining({ publishedOn: new Date('2024-06-01') })
+      );
+    });
+  });
 });

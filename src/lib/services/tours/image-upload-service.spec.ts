@@ -516,4 +516,100 @@ describe('ImageUploadService', () => {
       expect(result.error).toContain('Failed to generate upload URL');
     });
   });
+
+  describe('getS3Client fallback branches', () => {
+    it('should use fallback values when AWS env vars are missing', async () => {
+      delete process.env.AWS_REGION;
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+
+      const mockPresignedUrl = 'https://s3.amazonaws.com/test-bucket/path?signature=abc123';
+      (getSignedUrl as ReturnType<typeof vi.fn>).mockResolvedValue(mockPresignedUrl);
+
+      await ImageUploadService.generatePresignedUploadUrl({
+        tourId: 'tour123',
+        fileName: 'poster.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(S3Client).toHaveBeenCalledWith({
+        region: 'us-east-1',
+        credentials: {
+          accessKeyId: '',
+          secretAccessKey: '',
+        },
+      });
+    });
+  });
+
+  describe('generateS3Key - empty extension fallback', () => {
+    it('should fall back to .jpg when extension is empty', () => {
+      const key = ImageUploadService.generateS3Key('tour123', '.');
+
+      expect(key).toMatch(/\.jpg$/);
+    });
+  });
+
+  describe('generateTourDateS3Key - empty extension fallback', () => {
+    it('should fall back to .jpg when extension is empty', () => {
+      const key = ImageUploadService.generateTourDateS3Key('tourdate123', '.');
+
+      expect(key).toMatch(/\.jpg$/);
+    });
+  });
+
+  describe('generateCdnUrl - env var fallbacks', () => {
+    it('should use fallback values when env vars are missing', () => {
+      delete process.env.CDN_DOMAIN;
+      delete process.env.S3_BUCKET;
+      delete process.env.AWS_REGION;
+
+      const result = ImageUploadService.generateCdnUrl('media/tours/tour123/poster.jpg');
+
+      expect(result).toBe('https://.s3.us-east-1.amazonaws.com/media/tours/tour123/poster.jpg');
+    });
+  });
+
+  describe('generatePresignedUploadUrl - validation.error fallback', () => {
+    it('should return "Invalid file" when validation.error is undefined', async () => {
+      const spy = vi
+        .spyOn(ImageUploadService, 'validateImageFile')
+        .mockReturnValueOnce({ valid: false });
+
+      const result = await ImageUploadService.generatePresignedUploadUrl({
+        tourId: 'tour123',
+        fileName: 'poster.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toBe('Invalid file');
+
+      spy.mockRestore();
+    });
+  });
+
+  describe('generateTourDatePresignedUploadUrl - validation.error fallback', () => {
+    it('should return "Invalid file" when validation.error is undefined', async () => {
+      const spy = vi
+        .spyOn(ImageUploadService, 'validateImageFile')
+        .mockReturnValueOnce({ valid: false });
+
+      const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
+        tourDateId: 'tourdate123',
+        fileName: 'flyer.jpg',
+        fileSize: 1024 * 1024,
+        mimeType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toBe('Invalid file');
+
+      spy.mockRestore();
+    });
+  });
 });
