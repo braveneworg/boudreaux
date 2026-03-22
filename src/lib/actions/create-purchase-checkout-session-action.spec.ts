@@ -159,6 +159,30 @@ describe('createPurchaseCheckoutSessionAction', () => {
       });
     });
 
+    it('should use AUTH_URL in the return_url when configured', async () => {
+      vi.stubEnv('AUTH_URL', 'https://mysite.com');
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          return_url: 'https://mysite.com/releases/release-123',
+        })
+      );
+    });
+
+    it('should fall back to localhost when AUTH_URL is not set', async () => {
+      delete process.env.AUTH_URL;
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          return_url: 'http://localhost:3000/releases/release-123',
+        })
+      );
+    });
+
     it('should return "stripe_error" when stripe.checkout.sessions.create throws', async () => {
       vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(
         new Error('Stripe network error')

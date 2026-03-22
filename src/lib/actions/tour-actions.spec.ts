@@ -137,6 +137,33 @@ describe('Tour Actions', () => {
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalled();
     });
+
+    it('should append multiple errors to the same field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: {
+          fields: {},
+          success: false,
+          errors: {},
+        },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['title'], message: 'Title is required' },
+              { path: ['title'], message: 'Title must be at least 3 characters' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await createTourAction(initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.title).toEqual([
+        'Title is required',
+        'Title must be at least 3 characters',
+      ]);
+    });
   });
 
   describe('updateTourAction', () => {
@@ -247,6 +274,33 @@ describe('Tour Actions', () => {
 
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalled();
+    });
+
+    it('should append multiple errors to the same field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: {
+          fields: {},
+          success: false,
+          errors: {},
+        },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['title'], message: 'Title is too long' },
+              { path: ['title'], message: 'Title contains invalid characters' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await updateTourAction(tourId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.title).toEqual([
+        'Title is too long',
+        'Title contains invalid characters',
+      ]);
     });
   });
 

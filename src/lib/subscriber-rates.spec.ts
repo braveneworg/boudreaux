@@ -47,6 +47,17 @@ describe('subscriber-rates', () => {
   });
 
   describe('getStripePriceId', () => {
+    it('should return the price ID when it is set', () => {
+      const original = SUBSCRIBER_RATE_STRIPE_PRICE_IDS.extra;
+      SUBSCRIBER_RATE_STRIPE_PRICE_IDS.extra = 'price_extra_123';
+
+      try {
+        expect(getStripePriceId('extra')).toBe('price_extra_123');
+      } finally {
+        SUBSCRIBER_RATE_STRIPE_PRICE_IDS.extra = original;
+      }
+    });
+
     it('should throw when price ID is missing', () => {
       const original = SUBSCRIBER_RATE_STRIPE_PRICE_IDS.minimum;
       SUBSCRIBER_RATE_STRIPE_PRICE_IDS.minimum = '';
