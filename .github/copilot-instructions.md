@@ -95,7 +95,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Run `pnpm run dev` to start the development server
 - Run `pnpm run build` to create a production build
 - Run `pnpm run lint` to check code quality
-- Run `pnpm run lint:fix` to auto-fix linting issues
+- Run `pnpm run lint` to check and auto-fix linting issues
 - Run `pnpm run format` to format code with Prettier
 - Run `pnpm run test` to run tests in watch mode
 - Run `pnpm run test:run` to run all tests once

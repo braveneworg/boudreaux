@@ -37,8 +37,7 @@ pnpm run dev          # Start development server
 pnpm run build        # Production build
 pnpm run test:run     # Run all tests once
 pnpm run test:coverage # Coverage report (target 90–95%)
-pnpm run lint         # ESLint check
-pnpm run lint:fix     # Auto-fix lint issues
+pnpm run lint         # ESLint check and auto-fix
 pnpm run format       # Prettier format
 pnpm exec prisma db push   # Push schema changes to MongoDB
 pnpm exec prisma studio    # Browse database

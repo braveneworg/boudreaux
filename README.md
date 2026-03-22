@@ -59,13 +59,11 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ### Linting & Formatting
 
-| Script                  | Command                                               | Description                              |
-| ----------------------- | ----------------------------------------------------- | ---------------------------------------- |
-| `pnpm run lint`         | `eslint . --ext .ts,.tsx,.js,.jsx`                    | Run ESLint on the project                |
-| `pnpm run lint:fix`     | `eslint . --ext .ts,.tsx,.js,.jsx --fix`              | Run ESLint and auto-fix issues           |
-| `pnpm run format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files with Prettier           |
-| `pnpm run format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting without writing changes |
-| `pnpm run lint:format`  | `pnpm run lint:fix && pnpm run format`                | Run both lint fix and format in sequence |
+| Script                  | Command                                                   | Description                              |
+| ----------------------- | --------------------------------------------------------- | ---------------------------------------- |
+| `pnpm run lint`         | `eslint . --max-warnings 0 --ext .ts,.tsx,.js,.jsx --fix` | Run ESLint and auto-fix issues           |
+| `pnpm run format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"`     | Format all files with Prettier           |
+| `pnpm run format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"`     | Check formatting without writing changes |
 
 ### Testing
 

@@ -178,7 +178,7 @@ Accessibility is mandatory—ensure proper ARIA labels, semantic HTML elements, 
 - All PRs require code review before merging; use collaborative reviews with constructive feedback
 - Code reviews MUST verify constitution compliance and adherence to coding standards
 - Use GitHub Actions for automated testing (Vitest) and E2E testing (Playwright)
-- Run `npm run lint:fix` and `npm run format` before committing code
+- Run `pnpm run lint` and `pnpm run format` before committing code
 - Maintain descriptive, clear commit messages that explain changes and intent
 - Use feature branches for development; merge to main only after tests pass and review approval
 

@@ -17,17 +17,11 @@ This project uses Prettier and ESLint together to ensure consistent code formatt
 # Lint code with ESLint
 pnpm run lint
 
-# Lint and auto-fix issues
-pnpm run lint:fix
-
 # Format code with Prettier
 pnpm run format
 
 # Check formatting without changing files
 pnpm run format:check
-
-# Lint and format in one command
-pnpm run lint:format
 ```
 
 ## How It Works
@@ -73,7 +67,7 @@ You can add these to your CI pipeline:
 - pnpm run lint
 
 # Or combine both
-- pnpm run lint:format
+- pnpm run lint && pnpm run format
 ```
 
 ## Pre-commit Hooks (Optional)
@@ -111,4 +105,4 @@ If you see conflicts, ensure `eslint-config-prettier` is loaded last in your ESL
 
 ### ESLint errors after formatting
 
-Run `pnpm run lint:fix` to auto-fix most issues, then manually fix any remaining problems.
+Run `pnpm run lint` to auto-fix most issues, then manually fix any remaining problems.

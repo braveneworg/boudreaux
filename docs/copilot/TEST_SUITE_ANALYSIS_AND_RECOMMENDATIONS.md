@@ -79,7 +79,7 @@ pnpm exec husky init
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-pnpm run lint:fix
+pnpm run lint
 pnpm test -- --run --changed
 ```
 

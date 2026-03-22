@@ -240,5 +240,5 @@ const ReleasePlayer = ({ release, tracks }: ReleasePlayerProps) => {
 | `pnpm run test -- release` | Run release-related tests |
 | `pnpm run test:coverage`   | Generate coverage report  |
 | `pnpm run lint`            | Check code quality        |
-| `pnpm run lint:fix`        | Auto-fix lint issues      |
+| `pnpm run lint`            | Check and fix lint issues |
 | `pnpm run format`          | Format code with Prettier |

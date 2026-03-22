@@ -188,7 +188,7 @@
 **Purpose**: Improvements that affect multiple user stories and final quality checks
 
 - [ ] T084 [P] Add JSDoc comments to complex business logic functions in services and repositories
-- [ ] T085 [P] Run ESLint and fix all warnings: `pnpm run lint:fix`
+- [ ] T085 [P] Run ESLint and fix all warnings: `pnpm run lint`
 - [ ] T086 [P] Run Prettier to format all code: `pnpm run format`
 - [ ] T087 [P] Verify MPL 2.0 license headers are present in all new source files
 - [ ] T088 Add error boundaries for tour components in src/app/tours/error.tsx and src/app/admin/tours/error.tsx

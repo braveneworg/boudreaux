@@ -399,7 +399,7 @@ Before committing code:
 pnpm run lint
 
 # Fix linting issues
-pnpm run lint:fix
+pnpm run lint
 
 # Format code
 pnpm run format
