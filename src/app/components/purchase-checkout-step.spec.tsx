@@ -111,7 +111,9 @@ describe('PurchaseCheckoutStep', () => {
     render(<PurchaseCheckoutStep {...props} />);
 
     await waitFor(() => {
-      expect(screen.getByText('stripe_error')).toBeDefined();
+      expect(
+        screen.getByText('Something went wrong with the payment provider. Please try again.')
+      ).toBeDefined();
     });
     expect(screen.getByText('Something went wrong')).toBeDefined();
   });

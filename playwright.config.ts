@@ -14,7 +14,7 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI
     ? [['html', { outputFolder: 'e2e/playwright-report' }], ['github']]
-    : [['html', { outputFolder: 'e2e/playwright-report', open: 'never' }]],
+    : [['list'], ['html', { outputFolder: 'e2e/playwright-report', open: 'never' }]],
 
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',

@@ -19,6 +19,18 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_COUNT = 45;
 
+/** Maps server-action error codes to user-friendly messages. */
+const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
+  stripe_error: 'Something went wrong with the payment provider. Please try again.',
+  already_purchased: 'You have already purchased this release.',
+  amount_below_minimum: 'The minimum purchase amount is $0.50.',
+  release_unavailable: 'This release is no longer available for purchase.',
+};
+
+function getPurchaseErrorMessage(code: string): string {
+  return PURCHASE_ERROR_MESSAGES[code] ?? code;
+}
+
 interface PurchaseCheckoutStepProps {
   releaseId: string;
   releaseTitle: string;
@@ -137,8 +149,9 @@ export const PurchaseCheckoutStep = ({
         if (cancelled) return;
 
         if (!result.success) {
-          setSessionError(result.error);
-          onError(result.error);
+          const friendly = getPurchaseErrorMessage(result.error);
+          setSessionError(friendly);
+          onError(friendly);
           return;
         }
 
