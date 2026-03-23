@@ -10,6 +10,8 @@ import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
 
+import { auth } from '../../../auth';
+
 type ActionResult =
   | { success: true; clientSecret: string; paymentIntentId: string }
   | { success: false; error: string };
@@ -27,7 +29,11 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents, userId } = parsed.data;
+  const { releaseId, releaseTitle, amountCents } = parsed.data;
+
+  // Resolve user identity server-side; never trust a client-supplied userId.
+  const authSession = await auth();
+  const userId = authSession?.user?.id ?? null;
 
   try {
     // Minimum Stripe charge is $0.50
@@ -35,10 +41,12 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       return { success: false, error: 'amount_below_minimum' };
     }
 
-    // Block re-purchase
-    const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
-    if (alreadyPurchased) {
-      return { success: false, error: 'already_purchased' };
+    // Block re-purchase for authenticated users
+    if (userId) {
+      const alreadyPurchased = await PurchaseService.checkExistingPurchase(userId, releaseId);
+      if (alreadyPurchased) {
+        return { success: false, error: 'already_purchased' };
+      }
     }
 
     // Verify release exists and is published
@@ -67,13 +75,13 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
         metadata: {
           type: 'release_purchase',
           releaseId,
-          userId,
+          ...(userId ? { userId } : {}),
         },
       },
       metadata: {
         type: 'release_purchase',
         releaseId,
-        userId,
+        ...(userId ? { userId } : {}),
       },
       return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/releases/${releaseId}`,
     });

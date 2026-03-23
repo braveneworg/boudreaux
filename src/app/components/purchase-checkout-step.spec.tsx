@@ -73,7 +73,6 @@ interface DefaultProps {
   releaseId: string;
   releaseTitle: string;
   amountCents: number;
-  userId: string;
   onConfirmed: () => void;
   onError: (message: string) => void;
 }
@@ -82,7 +81,6 @@ const buildProps = (overrides: Partial<DefaultProps> = {}): DefaultProps => ({
   releaseId: 'release-123',
   releaseTitle: 'Test Release',
   amountCents: 1000,
-  userId: 'user-abc',
   onConfirmed: vi.fn(),
   onError: vi.fn(),
   ...overrides,

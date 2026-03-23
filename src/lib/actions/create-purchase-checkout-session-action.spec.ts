@@ -11,6 +11,11 @@ import { createPurchaseCheckoutSessionAction } from './create-purchase-checkout-
 
 vi.mock('server-only', () => ({}));
 
+const mockAuth = vi.fn();
+vi.mock('../../../auth', () => ({
+  auth: () => mockAuth(),
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     release: {
@@ -40,11 +45,12 @@ describe('createPurchaseCheckoutSessionAction', () => {
     releaseId: 'release-123',
     releaseTitle: 'Test Album',
     amountCents: 500,
-    userId: 'user-123',
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: authenticated user
+    mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
     vi.mocked(prisma.release.findFirst).mockResolvedValue({ id: 'release-123' } as never);
     vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
@@ -59,7 +65,7 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
   describe('schema validation', () => {
     it('should return an error when releaseId is missing from the input', async () => {
-      const invalidInput = { releaseTitle: 'Test Album', amountCents: 500, userId: 'user-123' };
+      const invalidInput = { releaseTitle: 'Test Album', amountCents: 500 };
 
       const result = await createPurchaseCheckoutSessionAction(invalidInput);
 
@@ -77,12 +83,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should return an error when userId is empty', async () => {
-      const result = await createPurchaseCheckoutSessionAction({ ...validInput, userId: '' });
-
-      expect(result.success).toBe(false);
-    });
-
     it('should return an error when amountCents is below the schema minimum of 50', async () => {
       const result = await createPurchaseCheckoutSessionAction({ ...validInput, amountCents: 49 });
 
@@ -91,8 +91,49 @@ describe('createPurchaseCheckoutSessionAction', () => {
     });
   });
 
+  describe('user identity resolution', () => {
+    it('should resolve userId from the server-side auth session, not from client input', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'server-resolved-user' } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(vi.mocked(PurchaseService.checkExistingPurchase)).toHaveBeenCalledWith(
+        'server-resolved-user',
+        'release-123'
+      );
+    });
+
+    it('should skip the duplicate purchase check when no authenticated session exists', async () => {
+      mockAuth.mockResolvedValue(null);
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(vi.mocked(PurchaseService.checkExistingPurchase)).not.toHaveBeenCalled();
+    });
+
+    it('should not include userId in Stripe metadata for unauthenticated (guest) users', async () => {
+      mockAuth.mockResolvedValue(null);
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
+      expect(createCall?.metadata).not.toHaveProperty('userId');
+      expect(createCall?.payment_intent_data?.metadata).not.toHaveProperty('userId');
+    });
+
+    it('should include userId in Stripe metadata for authenticated users', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'auth-user-456' } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
+      expect(createCall?.metadata?.userId).toBe('auth-user-456');
+      expect(createCall?.payment_intent_data?.metadata?.userId).toBe('auth-user-456');
+    });
+  });
+
   describe('duplicate purchase check', () => {
-    it('should return "already_purchased" when the user already has a purchase for the release', async () => {
+    it('should return "already_purchased" when the authenticated user already has a purchase for the release', async () => {
       vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(true);
 
       const result = await createPurchaseCheckoutSessionAction(validInput);
