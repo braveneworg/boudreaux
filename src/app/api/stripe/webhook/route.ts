@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       const forwarded = request.headers.get('x-forwarded-for');
       const remoteIp = forwarded
         ? forwarded.split(',')[0].trim()
-        : (request.headers.get('x-real-ip') ?? '');
+        : (request.headers.get('x-real-ip') ?? '').trim();
       const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
       const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
       if (!isAllowed) {
