@@ -116,9 +116,14 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
       await createPurchaseCheckoutSessionAction(validInput);
 
-      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
-      expect(createCall?.metadata).not.toHaveProperty('userId');
-      expect(createCall?.payment_intent_data?.metadata).not.toHaveProperty('userId');
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.not.objectContaining({ userId: expect.anything() }),
+          payment_intent_data: expect.objectContaining({
+            metadata: expect.not.objectContaining({ userId: expect.anything() }),
+          }),
+        })
+      );
     });
 
     it('should include userId in Stripe metadata for authenticated users', async () => {
@@ -126,9 +131,14 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
       await createPurchaseCheckoutSessionAction(validInput);
 
-      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0]?.[0];
-      expect(createCall?.metadata?.userId).toBe('auth-user-456');
-      expect(createCall?.payment_intent_data?.metadata?.userId).toBe('auth-user-456');
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ userId: 'auth-user-456' }),
+          payment_intent_data: expect.objectContaining({
+            metadata: expect.objectContaining({ userId: 'auth-user-456' }),
+          }),
+        })
+      );
     });
   });
 
