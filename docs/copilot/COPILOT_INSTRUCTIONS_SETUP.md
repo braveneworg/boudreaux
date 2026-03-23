@@ -26,10 +26,10 @@ GitHub Copilot instructions provide context and guidelines to GitHub Copilot whe
 
 **Content:**
 
-- Development server commands (`npm run dev`)
-- Build commands (`npm run build`)
-- Linting and formatting commands (`npm run lint`, `npm run format`)
-- Testing commands (`npm run test`, `npm run test:coverage`)
+- Development server commands (`pnpm run dev`)
+- Build commands (`pnpm run build`)
+- Linting and formatting commands (`pnpm run lint`, `pnpm run format`)
+- Testing commands (`pnpm run test`, `pnpm run test:coverage`)
 - Best practices reminders
 
 **Reason:** This section provides Copilot with context about the development workflow, enabling it to:
@@ -47,13 +47,13 @@ GitHub Copilot instructions provide context and guidelines to GitHub Copilot whe
 **Before:**
 
 ```bash
-npm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx
+pnpm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx
 ```
 
 **After:**
 
 ```bash
-SUPPRESS_CONSOLE=1 npm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx --reporter=dot --silent
+SUPPRESS_CONSOLE=1 pnpm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx --reporter=dot --silent
 ```
 
 **Reason:** The verbose test output from some tests (particularly those simulating large file uploads) was overwhelming the git push process, causing push failures with "exit code null". The dot reporter provides minimal, clean output while still running all tests and reporting failures appropriately.
@@ -80,11 +80,11 @@ The `.github/copilot-instructions.md` file now contains the following sections:
 
 ## Best Practices Applied
 
-✅ **Location:** Instructions are in the standard location (`.github/copilot-instructions.md`)  
-✅ **Accuracy:** Version numbers and project details are current  
-✅ **Completeness:** All major aspects of development are covered  
-✅ **Specificity:** Instructions are specific to this project's tech stack and conventions  
-✅ **Actionable:** Includes concrete commands and examples  
+✅ **Location:** Instructions are in the standard location (`.github/copilot-instructions.md`)
+✅ **Accuracy:** Version numbers and project details are current
+✅ **Completeness:** All major aspects of development are covered
+✅ **Specificity:** Instructions are specific to this project's tech stack and conventions
+✅ **Actionable:** Includes concrete commands and examples
 ✅ **Maintainable:** Clear structure makes it easy to update as the project evolves
 
 ## Verification

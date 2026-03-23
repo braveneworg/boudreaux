@@ -275,25 +275,25 @@ Coverage reports are generated in multiple formats:
 ### Run Specific Test File
 
 ```bash
-npx vitest run src/path/to/file.spec.ts
+pnpm exec vitest run src/path/to/file.spec.ts
 ```
 
 ### Run Tests in Watch Mode
 
 ```bash
-npx vitest src/path/to/file.spec.ts
+pnpm exec vitest src/path/to/file.spec.ts
 ```
 
 ### Run with Verbose Output
 
 ```bash
-npx vitest run --reporter=verbose
+pnpm exec vitest run --reporter=verbose
 ```
 
 ### Debug with UI
 
 ```bash
-npx vitest --ui
+pnpm exec vitest --ui
 ```
 
 ## Common Issues and Solutions

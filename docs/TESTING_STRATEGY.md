@@ -257,7 +257,7 @@ The CI pipeline runs on every push and pull request:
 Local pre-push hook runs:
 
 ```bash
-npm run type-check && npm run lint -- --max-warnings 0 && npm test -- --run
+pnpm run type-check && pnpm run lint -- --max-warnings 0 && pnpm test -- --run
 ```
 
 ### Coverage Reporting
@@ -272,38 +272,38 @@ npm run type-check && npm run lint -- --max-warnings 0 && npm test -- --run
 
 ```bash
 # Run all tests once
-npm test -- --run
+pnpm test -- --run
 
 # Run tests in watch mode
-npm test -- --watch
+pnpm test -- --watch
 
 # Run with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run with coverage and regression check
-npm run test:coverage:check
+pnpm run test:coverage:check
 
 # Run specific test file
-npm test -- src/lib/utils/sanitization.spec.ts
+pnpm test -- src/lib/utils/sanitization.spec.ts
 
 # Run tests matching pattern
-npm test -- --grep "sanitize"
+pnpm test -- --grep "sanitize"
 
 # Run with UI
-npm run test:ui
+pnpm run test:ui
 ```
 
 ### Debugging Tests
 
 ```bash
 # Run single test with verbose output
-npm test -- --reporter=verbose src/path/to/test.spec.ts
+pnpm test -- --reporter=verbose src/path/to/test.spec.ts
 
 # Run with specific seed for reproducibility
-VITEST_SEED=12345 npm test -- --run
+VITEST_SEED=12345 pnpm test -- --run
 
 # Show config
-npx vitest --show-config
+pnpm exec vitest --show-config
 ```
 
 ## Future Improvements

@@ -247,7 +247,7 @@ describe('ReleasePlayer', () => {
   } as unknown as PublishedReleaseDetail;
 
   it('should render MediaPlayer with sub-components', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     expect(screen.getByTestId('media-player')).toBeInTheDocument();
     expect(screen.getByTestId('interactive-cover-art')).toBeInTheDocument();
@@ -257,7 +257,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should handle play/pause state', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const coverArt = screen.getByTestId('interactive-cover-art');
     expect(coverArt).toHaveAttribute('data-is-playing', 'false');
@@ -270,7 +270,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should handle track selection', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     // Select second track
     fireEvent.click(screen.getByTestId('track-select-track-2'));
@@ -280,7 +280,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should auto-advance to next track when current track ends', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     // Playing first track
     const controls = screen.getByTestId('media-controls');
@@ -292,7 +292,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should handle previous/next track navigation', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const controls = screen.getByTestId('media-controls');
     expect(controls).toHaveAttribute('data-audio-src', mockTrack1.audioUrl);
@@ -307,20 +307,20 @@ describe('ReleasePlayer', () => {
   });
 
   it('should show no-tracks message when release has no tracks', () => {
-    render(<ReleasePlayer release={mockReleaseNoTracks} />);
+    render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
 
     expect(screen.getByText(/no playable tracks available/i)).toBeInTheDocument();
     expect(screen.queryByTestId('media-controls')).not.toBeInTheDocument();
   });
 
   it('should render cover art even when no tracks available', () => {
-    render(<ReleasePlayer release={mockReleaseNoTracks} />);
+    render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
 
     expect(screen.getByTestId('interactive-cover-art')).toBeInTheDocument();
   });
 
   it('should set first track as current by default', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const controls = screen.getByTestId('media-controls');
     expect(controls).toHaveAttribute('data-audio-src', mockTrack1.audioUrl);
@@ -330,7 +330,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should not advance past the last track', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     // Select last track
     fireEvent.click(screen.getByTestId('track-select-track-2'));
@@ -344,7 +344,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should auto-play first track when autoPlay prop is true', () => {
-    render(<ReleasePlayer release={mockRelease} autoPlay />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" autoPlay />);
 
     // autoPlay triggers playerControls.play() via effect, which calls onPlay,
     // setting isPlaying to true — verified via the cover art's data attribute
@@ -353,14 +353,14 @@ describe('ReleasePlayer', () => {
   });
 
   it('should not auto-play first track by default', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const coverArt = screen.getByTestId('interactive-cover-art');
     expect(coverArt).toHaveAttribute('data-is-playing', 'false');
   });
 
   it('should render the download dialog with the correct artist name', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const downloadDialog = screen.getByTestId('download-dialog');
     expect(downloadDialog).toBeInTheDocument();
@@ -368,14 +368,14 @@ describe('ReleasePlayer', () => {
   });
 
   it('should render the download trigger button', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const triggerButton = screen.getByTestId('download-trigger-button');
     expect(triggerButton).toBeInTheDocument();
   });
 
   it('should render DownloadDialog before TrackListDrawer in the DOM', () => {
-    render(<ReleasePlayer release={mockRelease} />);
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const downloadDialog = screen.getByTestId('download-dialog');
     const trackListDrawer = screen.getByTestId('track-list-drawer');
@@ -387,7 +387,7 @@ describe('ReleasePlayer', () => {
   });
 
   it('should not render download dialog when release has no tracks', () => {
-    render(<ReleasePlayer release={mockReleaseNoTracks} />);
+    render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
 
     expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('download-trigger-button')).not.toBeInTheDocument();

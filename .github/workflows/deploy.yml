@@ -322,13 +322,16 @@ jobs:
           fi
           echo "✓ Build artifact extracted and verified"
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.0"
 
       - name: Install minimal dependencies for sync script
-        run: npm install --no-save @aws-sdk/client-s3 @aws-sdk/client-cloudfront @aws-sdk/lib-storage dotenv mime tsx
+        run: pnpm add --save-false @aws-sdk/client-s3 @aws-sdk/client-cloudfront @aws-sdk/lib-storage dotenv mime tsx
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -346,7 +349,7 @@ jobs:
           SKIP_INVALIDATION: "true"
         run: |
           echo "Syncing Next.js static assets to S3..."
-          npx tsx scripts/sync-cdn.ts
+          pnpm exec tsx scripts/sync-cdn.ts
 
       - name: Invalidate CloudFront distribution
         env:
@@ -1229,18 +1232,22 @@ jobs:
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
+      - name: Install pnpm
+        if: steps.bump-type.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         if: steps.bump-type.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22.12.0"
+          node-version: "24.14.0"
 
       - name: Bump version
         if: steps.bump-type.outputs.skip != 'true'
         id: version
         run: |
           OLD_VERSION=$(jq -r '.version' package.json)
-          npm version ${{ steps.bump-type.outputs.bump }} --no-git-tag-version
+          pnpm version ${{ steps.bump-type.outputs.bump }} --no-git-tag-version
           NEW_VERSION=$(jq -r '.version' package.json)
           echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
           echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"

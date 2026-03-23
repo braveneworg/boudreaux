@@ -252,7 +252,7 @@ Verified all type definition files have active imports and usages:
 1. **ts-prune** - Finds unused exports
 
    ```bash
-   npx ts-prune
+   pnpm exec ts-prune
    ```
 
    **Benefit:** Identifies exports that are never imported
@@ -260,14 +260,14 @@ Verified all type definition files have active imports and usages:
 2. **depcheck** - Finds unused dependencies
 
    ```bash
-   npx depcheck
+   pnpm exec depcheck
    ```
 
    **Benefit:** Removes unnecessary package.json entries
 
 3. **knip** - Comprehensive dead code detection
    ```bash
-   npx knip
+   pnpm exec knip
    ```
    **Benefit:** Finds unused files, exports, types, and dependencies
 
@@ -278,7 +278,7 @@ Verified all type definition files have active imports and usages:
 ```json
 {
   "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix", "prettier --write", "npx tsc --noEmit"]
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write", "pnpm exec tsc --noEmit"]
   }
 }
 ```
@@ -288,13 +288,13 @@ Verified all type definition files have active imports and usages:
 ```yaml
 # GitHub Actions example
 - name: Check for unused exports
-  run: npx ts-prune --error
+  run: pnpm exec ts-prune --error
 
 - name: TypeScript strict check
-  run: npx tsc --noEmit --strict
+  run: pnpm exec tsc --noEmit --strict
 
 - name: Dead code detection
-  run: npx knip --production
+  run: pnpm exec knip --production
 ```
 
 ### 3. Code Review Guidelines
@@ -380,14 +380,14 @@ Verified all type definition files have active imports and usages:
 ### TypeScript Compilation
 
 ```bash
-$ npx tsc --noEmit
+$ pnpm exec tsc --noEmit
 # No output - Success! ✅
 ```
 
 ### Test Suite
 
 ```bash
-$ npm test
+$ pnpm test
 Test Files  47 passed (47)
 Tests  746 passed (746)
 Type Errors  no errors

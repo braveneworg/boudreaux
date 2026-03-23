@@ -109,7 +109,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
       // Find the track in the release
       const releaseTrack = selectedArtist.release.releaseTracks.find(
-        (rt) => rt.track.id === trackId
+        (rt: { track: { id: string } }) => rt.track.id === trackId
       );
 
       if (releaseTrack) {
@@ -237,7 +237,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             visibleHeading
           />
         )}
-        {showTrackListDrawer && selectedArtist && (
+        {showTrackListDrawer && selectedArtist?.release && (
           <div className="flex flex-col items-center">
             <MediaPlayer.TrackListDrawer
               artistRelease={selectedArtist as unknown as ArtistRelease}
@@ -245,7 +245,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               currentTrackId={currentTrackId ?? ''}
               onTrackSelect={handleTrackSelect}
             />
-            <DownloadDialog artistName={getDisplayName(selectedArtist)}>
+            <DownloadDialog
+              artistName={getDisplayName(selectedArtist)}
+              releaseId={selectedArtist.release.id}
+              releaseTitle={selectedArtist.release.title ?? ''}
+            >
               <DownloadTriggerButton />
             </DownloadDialog>
           </div>

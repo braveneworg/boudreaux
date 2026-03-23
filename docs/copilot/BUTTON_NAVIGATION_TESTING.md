@@ -347,9 +347,9 @@ Add to `package.json`:
 Install husky and lint-staged:
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky install
-npx husky add .husky/pre-commit "npx lint-staged"
+pnpm install --save-dev husky lint-staged
+pnpm exec husky install
+pnpm exec husky add .husky/pre-commit "pnpm exec lint-staged"
 ```
 
 **Why pre-commit hooks**:
@@ -385,10 +385,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -461,23 +461,23 @@ Configure in GitHub repository settings:
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run button tests only
-npm test button.spec.tsx
+pnpm test button.spec.tsx
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run tests with UI
-npm run test:ui
+pnpm run test:ui
 ```
 
 ### Coverage Reports
 
 ```bash
 # Generate coverage report
-npm run test:coverage
+pnpm run test:coverage
 
 # View HTML coverage report
 open coverage/lcov-report/index.html
@@ -487,7 +487,7 @@ open coverage/lcov-report/index.html
 
 ```bash
 # Run specific test with verbose output
-npm test -- button.spec.tsx --reporter=verbose
+pnpm test -- button.spec.tsx --reporter=verbose
 
 # Debug in VS Code
 # Add breakpoint in test file, then F5 (Debug Test)

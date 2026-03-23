@@ -103,3 +103,4 @@ e2e/.auth/
 .vibe/
 .windsurf/
 .zencoder/
+package-lock.json

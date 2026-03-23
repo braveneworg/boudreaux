@@ -44,12 +44,56 @@ import {
   tourDateUpdateSchema,
 } from '@/lib/validations/tours/tour-date-schema';
 
-import type { Artist, TourDate, TourDateImage } from '@prisma/client';
+/**
+ * Local interfaces matching Prisma model shapes.
+ * Client components should not import directly from @prisma/client.
+ */
+interface ArtistFields {
+  id: string;
+  firstName: string;
+  surname: string;
+  displayName: string | null;
+  [key: string]: unknown;
+}
+
+interface TourDateFields {
+  id: string;
+  tourId: string;
+  startDate: Date;
+  endDate: Date | null;
+  showStartTime: Date;
+  showEndTime: Date | null;
+  doorsOpenAt: Date | null;
+  venueId: string;
+  timeZone?: string | null;
+  utcOffset?: number | null;
+  ticketsUrl: string | null;
+  ticketIconUrl: string | null;
+  ticketPrices: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface TourDateImageFields {
+  id: string;
+  tourDateId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+}
 
 interface TourDateFormProps {
   tourId: string;
-  tourDate?: TourDate & {
-    headliners: Array<{ artistId: string | null; artist?: Artist | null }>;
+  tourDate?: TourDateFields & {
+    headliners: Array<{ artistId: string | null; artist?: ArtistFields | null }>;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -70,7 +114,7 @@ export default function TourDateForm({
 }: TourDateFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
-  const [tourDateImages, setTourDateImages] = useState<TourDateImage[]>([]);
+  const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
   const isEditMode = !!tourDate;
 
   const form = useForm({
@@ -101,8 +145,8 @@ export default function TourDateForm({
   // Load tour date data in edit mode
   useEffect(() => {
     if (tourDate) {
-      const storedTimeZone = (tourDate as { timeZone?: string | null }).timeZone;
-      const storedUtcOffset = (tourDate as { utcOffset?: number | null }).utcOffset;
+      const storedTimeZone = tourDate.timeZone;
+      const storedUtcOffset = tourDate.utcOffset;
 
       const formatDateTime = (date: string | Date) => {
         if (!date) return '';
@@ -141,11 +185,8 @@ export default function TourDateForm({
         headlinerIds:
           tourDate.headliners?.map((h) => h.artistId).filter((id): id is string => id !== null) ||
           [],
-        timeZone: (tourDate as { timeZone?: string | null }).timeZone ?? null,
-        utcOffset:
-          (tourDate as { utcOffset?: number | null }).utcOffset != null
-            ? String((tourDate as { utcOffset?: number | null }).utcOffset)
-            : null,
+        timeZone: tourDate.timeZone ?? null,
+        utcOffset: tourDate.utcOffset != null ? String(tourDate.utcOffset) : null,
       });
     } else {
       // Reset form for new tour date
@@ -326,7 +367,7 @@ export default function TourDateForm({
                 initialArtists={
                   tourDate?.headliners
                     ?.filter(
-                      (h): h is typeof h & { artist: Artist; artistId: string } =>
+                      (h): h is typeof h & { artist: ArtistFields; artistId: string } =>
                         h.artist != null && h.artistId != null
                     )
                     .map((h) => ({

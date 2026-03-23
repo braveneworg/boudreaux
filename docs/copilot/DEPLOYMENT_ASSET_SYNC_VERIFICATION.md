@@ -292,7 +292,7 @@ git push origin main
 
 ```bash
 # Sync current build to CDN
-npm run sync:cdn
+pnpm run sync:cdn
 ```
 
 ### Option 3: Rollback

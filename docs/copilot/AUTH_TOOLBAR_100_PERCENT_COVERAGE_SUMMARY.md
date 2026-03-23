@@ -222,13 +222,13 @@ get role() {
 ### Pre-commit Checks
 
 ```bash
-npm run test:changed
+pnpm run test:changed
 ```
 
 ### Pull Request Checks
 
 ```bash
-npm run test:coverage -- --coverage.thresholds.lines=100
+pnpm run test:coverage -- --coverage.thresholds.lines=100
 ```
 
 ### Continuous Integration

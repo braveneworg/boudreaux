@@ -131,7 +131,7 @@ The ClientFetchError was actually caused by a **corrupted session cookie** from 
 ### Automated Tests
 
 ```bash
-npm test -- --run src/app/lib/prisma-adapter.spec.ts
+pnpm test -- --run src/app/lib/prisma-adapter.spec.ts
 ```
 
 Result: ✅ 26/26 tests passing
@@ -228,10 +228,10 @@ console.log('[JWT] User fetched:', freshUser ? 'SUCCESS' : 'NULL');
 
 ```bash
 # Verify Prisma schema is in sync
-npx prisma generate
+pnpm exec prisma generate
 
 # Check database connection
-npx prisma db push
+pnpm exec prisma db push
 ```
 
 ### 3. Environment Variables

@@ -161,4 +161,19 @@ describe('GET /api/proxy-image', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
   });
+
+  it('should allow requests from CDN_DOMAIN when set', async () => {
+    vi.stubEnv('CDN_DOMAIN', 'https://cdn.mysite.com');
+    mockFetch.mockResolvedValue(
+      new Response(new ArrayBuffer(4), {
+        headers: { 'content-type': 'image/png' },
+      })
+    );
+
+    const request = createRequest('https://cdn.mysite.com/photo.png');
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    vi.unstubAllEnvs();
+  });
 });

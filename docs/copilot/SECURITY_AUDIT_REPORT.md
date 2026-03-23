@@ -909,7 +909,7 @@ None currently, but monitor these:
 **ESLint Security Plugins:**
 
 ```bash
-npm install --save-dev \
+pnpm install --save-dev \
   eslint-plugin-security \
   eslint-plugin-no-secrets \
   @microsoft/eslint-plugin-sdl
@@ -943,7 +943,7 @@ npm install --save-dev \
 **Snyk:**
 
 ```bash
-npm install -g snyk
+pnpm install -g snyk
 snyk auth
 snyk test
 snyk monitor
@@ -1004,8 +1004,8 @@ trufflehog --regex --entropy=False .
 **Sentry Setup:**
 
 ```bash
-npm install @sentry/nextjs
-npx @sentry/wizard@latest -i nextjs
+pnpm install @sentry/nextjs
+pnpm exec @sentry/wizard@latest -i nextjs
 ```
 
 ---

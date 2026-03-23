@@ -160,6 +160,13 @@ describe('tourDateCreateSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts empty string for endDate and treats it as null', () => {
+    const result = tourDateCreateSchema.safeParse({ ...validBase, endDate: '' });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.endDate).toBeNull();
+  });
+
   it('accepts optional text fields', () => {
     const result = tourDateCreateSchema.safeParse({
       ...validBase,

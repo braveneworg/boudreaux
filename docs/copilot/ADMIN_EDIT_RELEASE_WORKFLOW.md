@@ -139,7 +139,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 All existing tests pass with the new Edit button:
 
 ```bash
-npm test -- src/app/admin/data-views/release-data-view.spec.tsx --run
+pnpm test -- src/app/admin/data-views/release-data-view.spec.tsx --run
 ✓ 12 tests passing
 ```
 

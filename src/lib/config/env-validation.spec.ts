@@ -260,5 +260,22 @@ describe('Environment Validation', () => {
         '   Variables will be validated at runtime when container starts'
       );
     });
+
+    it('should automatically call validateEnvironment when NODE_ENV is production', async () => {
+      vi.resetModules();
+      process.env = {
+        ...originalEnv,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'mongodb://localhost:27017/test',
+        AUTH_SECRET: 'a'.repeat(32),
+        EMAIL_SERVER_HOST: 'smtp.example.com',
+        EMAIL_SERVER_USER: 'user@example.com',
+        EMAIL_SERVER_PASSWORD: 'password',
+        EMAIL_FROM: 'noreply@example.com',
+      };
+
+      // Dynamic import forces module-level code to run with NODE_ENV='production'
+      await expect(import('./env-validation')).resolves.toBeDefined();
+    });
   });
 });

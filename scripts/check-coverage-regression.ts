@@ -16,7 +16,7 @@
  * - Statement coverage: 97% → 94.5% ❌ (within 2% tolerance, but below 95% threshold)
  * - Statement coverage: 97% → 94% ❌ (exceeds 2% tolerance)
  *
- * Usage: npx tsx scripts/check-coverage-regression.ts
+ * Usage: pnpm exec tsx scripts/check-coverage-regression.ts
  */
 
 import * as fs from 'node:fs';
@@ -148,7 +148,7 @@ function parseBaselineMetrics(): CoverageMetrics {
 function parseCurrentCoverage(): CoverageMetrics {
   if (!fs.existsSync(COVERAGE_SUMMARY_FILE)) {
     console.error('❌ coverage/coverage-summary.json not found.');
-    console.error('Please run: npm run test:coverage');
+    console.error('Please run: pnpm run test:coverage');
     process.exit(1);
   }
 

@@ -85,6 +85,19 @@ vi.mock('@/app/components/release-description', () => ({
     description ? <div data-testid="release-description">{description}</div> : null,
 }));
 
+// Mock auth (added for PWYW purchase feature)
+vi.mock('../../../../auth', () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
+// Mock PurchaseRepository (added for PWYW purchase feature)
+vi.mock('@/lib/repositories/purchase-repository', () => ({
+  PurchaseRepository: {
+    findByUserAndRelease: vi.fn().mockResolvedValue(null),
+    getDownloadRecord: vi.fn().mockResolvedValue(null),
+  },
+}));
+
 describe('ReleasePlayerPage', () => {
   const mockReleaseData = {
     id: 'release-1',

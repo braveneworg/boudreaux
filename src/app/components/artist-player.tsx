@@ -47,7 +47,10 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
   const initialIndex = initialReleaseId
     ? Math.max(
         0,
-        releases.findIndex((ar) => ar.release.id === initialReleaseId)
+        releases.findIndex(
+          (ar: ArtistWithPublishedReleases['releases'][number]) =>
+            ar.release.id === initialReleaseId
+        )
       )
     : 0;
 
@@ -101,7 +104,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   const handleTrackSelect = useCallback(
     (trackId: string) => {
-      const index = tracks.findIndex((rt) => rt.track.id === trackId);
+      const index = tracks.findIndex((rt: { track: { id: string } }) => rt.track.id === trackId);
       if (index >= 0) {
         setCurrentTrackIndex(index);
         setShouldAutoPlay(true);
@@ -151,7 +154,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
       {releases.length >= 2 && (
         <Carousel opts={{ align: 'start', loop: false }} aria-label={`Releases by ${artistName}`}>
           <CarouselContent className={cn('-ml-2', 'justify-center')}>
-            {releases.map((ar, index) => {
+            {releases.map((ar: ArtistWithPublishedReleases['releases'][number], index: number) => {
               const releaseCoverArt = getReleaseCoverArt(ar.release);
               const isSelected = index === selectedReleaseIndex;
 
@@ -214,7 +217,11 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   onTogglePlay={handleTogglePlay}
                   className="shadow-lg"
                 />
-                <DownloadDialog artistName={artistName}>
+                <DownloadDialog
+                  artistName={artistName}
+                  releaseId={selectedRelease.id}
+                  releaseTitle={selectedRelease.title ?? ''}
+                >
                   <DownloadTriggerButton />
                 </DownloadDialog>
               </div>

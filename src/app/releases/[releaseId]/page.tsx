@@ -17,8 +17,11 @@ import { ReleasePlayer } from '@/app/components/release-player';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseService } from '@/lib/services/release-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+
+import { auth } from '../../../../auth';
 
 interface ReleasePlayerPageProps {
   params: Promise<{ releaseId: string }>;
@@ -42,6 +45,20 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   }
 
   const release = releaseResult.data;
+
+  // Fetch auth session and purchase status for this user/release
+  const session = await auth();
+  const authUserId = (session?.user as { id?: string })?.id ?? null;
+
+  const [hasPurchase, downloadRecord] = await Promise.all([
+    authUserId
+      ? PurchaseRepository.findByUserAndRelease(authUserId, releaseId).then((r) => r !== null)
+      : Promise.resolve(false),
+    authUserId
+      ? PurchaseRepository.getDownloadRecord(authUserId, releaseId)
+      : Promise.resolve(null),
+  ]);
+  const downloadCount = downloadRecord?.downloadCount ?? 0;
 
   const primaryArtist = release.artistReleases[0]?.artist;
   const primaryArtistId = primaryArtist?.id;
@@ -71,7 +88,17 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
         {otherReleases.length > 0 && (
           <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
         )}
-        <ReleasePlayer release={release} autoPlay={autoPlay} />
+        <ReleasePlayer
+          release={release}
+          autoPlay={autoPlay}
+          releaseId={release.id}
+          releaseTitle={release.title}
+          suggestedPrice={
+            (release as unknown as { suggestedPrice?: number | null }).suggestedPrice ?? null
+          }
+          hasPurchase={hasPurchase}
+          downloadCount={downloadCount}
+        />
         <ReleaseDescription description={release.description ?? null} />
       </ContentContainer>
     </PageContainer>

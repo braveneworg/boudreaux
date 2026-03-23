@@ -176,14 +176,14 @@ className = '... px-4 sm:px-6 [.border-t]:pt-4 sm:[.border-t]:pt-6';
 1. **TypeScript Compilation:** No errors
 
    ```bash
-   npx tsc --noEmit
+   pnpm exec tsc --noEmit
    ✅ TypeScript compilation successful
    ```
 
 2. **Unit Tests:** All passing
 
    ```bash
-   npm test profile-form.spec.tsx
+   pnpm test profile-form.spec.tsx
    ✓ 24 tests passed (24)
    ```
 

@@ -2,7 +2,7 @@
  * Interactive script to create ArtistRelease junction records.
  *
  * Usage:
- *   npx tsx prisma/scripts/link-artist-releases.ts <artist-slug>
+ *   pnpm exec tsx prisma/scripts/link-artist-releases.ts <artist-slug>
  *
  * Looks up the artist by slug, shows their current linked releases,
  * then lists all unlinked releases and lets you pick which to associate.
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const slug = process.argv[2];
 
   if (!slug) {
-    console.error('Usage: npx tsx prisma/scripts/link-artist-releases.ts <artist-slug>');
+    console.error('Usage: pnpm exec tsx prisma/scripts/link-artist-releases.ts <artist-slug>');
     process.exit(1);
   }
 
@@ -48,7 +48,9 @@ async function main(): Promise<void> {
   console.info(`Slug:   ${artist.slug}\n`);
 
   // 2. Show currently linked releases
-  const linkedReleaseIds = new Set(artist.releases.map((ar) => ar.releaseId));
+  const linkedReleaseIds = new Set(
+    artist.releases.map((ar: { releaseId: string }) => ar.releaseId)
+  );
 
   if (artist.releases.length > 0) {
     console.info(`Currently linked releases (${artist.releases.length}):`);
@@ -131,7 +133,7 @@ async function main(): Promise<void> {
 
     // 6. Create ArtistRelease records in a transaction
     const created = await prisma.$transaction(
-      selectedReleases.map((r) =>
+      selectedReleases.map((r: { id: string }) =>
         prisma.artistRelease.create({
           data: {
             artistId: artist.id,
@@ -143,7 +145,7 @@ async function main(): Promise<void> {
 
     console.info(`\nCreated ${created.length} ArtistRelease record(s).`);
     for (const ar of created) {
-      const release = selectedReleases.find((r) => r.id === ar.releaseId);
+      const release = selectedReleases.find((r: { id: string }) => r.id === ar.releaseId);
       console.info(`  - ${release?.title ?? ar.releaseId}  (ArtistRelease ID: ${ar.id})`);
     }
   } finally {

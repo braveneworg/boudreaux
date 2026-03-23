@@ -12,7 +12,25 @@ import {
   type TourUpdateInput,
 } from '@/lib/validations/tours/tour-schema';
 
-import type { Tour, Artist, Group } from '@prisma/client';
+import type { Tour } from '@prisma/client';
+
+/**
+ * Explicit base fields matching the Prisma Tour model.
+ * Ensures TourWithDisplayNames always has the correct shape
+ * even if generated Prisma types are stale.
+ */
+interface TourBaseFields {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  subtitle2: string | null;
+  description: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+}
 
 export interface TourQueryParams {
   search?: string;
@@ -20,7 +38,7 @@ export interface TourQueryParams {
   limit?: number;
 }
 
-export interface TourWithDisplayNames extends Tour {
+export interface TourWithDisplayNames extends TourBaseFields {
   displayHeadliners: string[];
 }
 
@@ -138,7 +156,7 @@ export class TourService {
     return {
       ...tour,
       displayHeadliners,
-    };
+    } as TourWithDisplayNames;
   }
 
   /**
@@ -147,8 +165,8 @@ export class TourService {
    * @private
    */
   private static getArtistDisplayName(headliner: {
-    artist?: Artist | null;
-    group?: Group | null;
+    artist?: { displayName?: string | null; firstName?: string; surname?: string } | null;
+    group?: { name?: string } | null;
   }): string {
     // Handle group headliners
     if (headliner.group?.name) {

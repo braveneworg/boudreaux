@@ -4,16 +4,16 @@
 
 ```bash
 # Run all tests
-npm test src/app/components/auth/auth-toolbar.spec.tsx
+pnpm test src/app/components/auth/auth-toolbar.spec.tsx
 
 # Run with coverage
-npm run test:coverage -- src/app/components/auth/auth-toolbar.spec.tsx
+pnpm run test:coverage -- src/app/components/auth/auth-toolbar.spec.tsx
 
 # Run in watch mode
-npm test -- --watch src/app/components/auth/auth-toolbar.spec.tsx
+pnpm test -- --watch src/app/components/auth/auth-toolbar.spec.tsx
 
 # Run specific test
-npm test -- -t "renders sign in and sign up links"
+pnpm test -- -t "renders sign in and sign up links"
 ```
 
 ## Test Statistics
@@ -275,19 +275,19 @@ Examples:
 ### Pre-commit
 
 ```bash
-npm run test:changed
+pnpm run test:changed
 ```
 
 ### Pre-push
 
 ```bash
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ### Pull Request
 
 ```bash
-npm run test:coverage -- --coverage.thresholds.lines=90
+pnpm run test:coverage -- --coverage.thresholds.lines=90
 ```
 
 ## Useful Vitest Commands

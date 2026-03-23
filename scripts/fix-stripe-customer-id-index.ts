@@ -15,8 +15,8 @@
  *   be dropped first.
  *
  * Usage:
- *   npx tsx scripts/fix-stripe-customer-id-index.ts
- *   npx prisma db push
+ *   pnpm exec tsx scripts/fix-stripe-customer-id-index.ts
+ *   pnpm exec prisma db push
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -32,7 +32,7 @@ async function main() {
       index: 'User_stripeCustomerId_key',
     });
     console.info(
-      '✓ Index dropped. Run `npx prisma db push` to recreate it as a partial unique index.'
+      '✓ Index dropped. Run `pnpm exec prisma db push` to recreate it as a partial unique index.'
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

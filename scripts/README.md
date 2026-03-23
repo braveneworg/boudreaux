@@ -27,23 +27,23 @@ sudo apt-get install mongodb-database-tools
 
 ```bash
 # Create backup with auto-generated filename (saved to /backups)
-npm run mongo:dump
+pnpm run mongo:dump
 
 # Create backup with custom filename
-npm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
+pnpm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
 
 # Or run directly
-npx tsx scripts/mongo-backup.ts dump [output-file]
+pnpm exec tsx scripts/mongo-backup.ts dump [output-file]
 ```
 
 #### Restore from Backup
 
 ```bash
 # Restore from backup file
-npm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
+pnpm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
 
 # Or run directly
-npx tsx scripts/mongo-backup.ts restore <input-file>
+pnpm exec tsx scripts/mongo-backup.ts restore <input-file>
 ```
 
 ### Features
@@ -104,36 +104,36 @@ export AWS_PROFILE="your-profile-name"
 
 ```bash
 # Create backup with auto-generated directory name (e.g., backups/s3-2026-02-07T10-00-00)
-npm run s3:backup
+pnpm run s3:backup
 
 # Create backup with custom directory
-npm run s3:backup -- backups/my-s3-backup
+pnpm run s3:backup -- backups/my-s3-backup
 
 # Or run directly
-npx tsx scripts/s3-backup.ts backup [local-directory]
+pnpm exec tsx scripts/s3-backup.ts backup [local-directory]
 ```
 
 #### Restore from Backup
 
 ```bash
 # Restore from backup directory
-npm run s3:restore -- backups/s3-2026-02-07T10-00-00
+pnpm run s3:restore -- backups/s3-2026-02-07T10-00-00
 
 # Restore with overwrite flag (replaces existing files in S3)
-npm run s3:restore -- backups/s3-2026-02-07T10-00-00 --overwrite
+pnpm run s3:restore -- backups/s3-2026-02-07T10-00-00 --overwrite
 
 # Or run directly
-npx tsx scripts/s3-backup.ts restore <local-directory> [--overwrite]
+pnpm exec tsx scripts/s3-backup.ts restore <local-directory> [--overwrite]
 ```
 
 #### List Available Backups
 
 ```bash
 # List all S3 backups in the backups directory
-npm run s3:list
+pnpm run s3:list
 
 # List backups in a custom directory
-npx tsx scripts/s3-backup.ts list <custom-backups-directory>
+pnpm exec tsx scripts/s3-backup.ts list <custom-backups-directory>
 ```
 
 ### Features
@@ -193,25 +193,25 @@ These are automatically read from `.env.local` or `.env` files.
 #### Backup entire bucket
 
 ```bash
-npm run s3:backup
+pnpm run s3:backup
 ```
 
 #### Backup only media files
 
 ```bash
-S3_BACKUP_PREFIX="media/" npm run s3:backup backups/media-only
+S3_BACKUP_PREFIX="media/" pnpm run s3:backup backups/media-only
 ```
 
 #### Restore and overwrite existing files
 
 ```bash
-npm run s3:restore backups/s3-2026-02-07T10-00-00 --overwrite
+pnpm run s3:restore backups/s3-2026-02-07T10-00-00 --overwrite
 ```
 
 #### View all backups
 
 ```bash
-npm run s3:list
+pnpm run s3:list
 ```
 
 ---
@@ -238,42 +238,42 @@ export CLOUDFRONT_DISTRIBUTION_ID="your-cloudfront-distribution-id"  # For cache
 ### Upload Single Image
 
 ```bash
-npm run images:upload public/media/profile.jpg
+pnpm run images:upload public/media/profile.jpg
 ```
 
 ### Upload Multiple Images (Comma-Separated)
 
 ```bash
-npm run images:upload ./images/photo1.jpg,./images/photo2.png,./images/photo3.webp
+pnpm run images:upload ./images/photo1.jpg,./images/photo2.png,./images/photo3.webp
 ```
 
 ### Upload All Images from a Directory (Recursive)
 
 ```bash
-npm run images:upload --dir public/media/gallery
+pnpm run images:upload --dir public/media/gallery
 ```
 
 ### Upload with Custom S3 Prefix
 
 ```bash
 # Single file with prefix
-npm run images:upload public/avatar.jpg --prefix user-content/
+pnpm run images:upload public/avatar.jpg --prefix user-content/
 
 # Directory with prefix
-npm run images:upload --dir ./uploads --prefix user-uploads/2026/
+pnpm run images:upload --dir ./uploads --prefix user-uploads/2026/
 ```
 
 ### Skip CloudFront Cache Invalidation
 
 ```bash
-npm run images:upload public/photo.jpg --no-invalidate
+pnpm run images:upload public/photo.jpg --no-invalidate
 ```
 
 ### Direct Usage
 
 ```bash
 # With tsx
-npx tsx scripts/upload-images.ts public/media/photo.jpg
+pnpm exec tsx scripts/upload-images.ts public/media/photo.jpg
 
 # Or run with Node
 chmod +x scripts/upload-images.ts
@@ -315,16 +315,16 @@ The script intelligently handles different path formats:
 
 ```bash
 # Current directory
-npm run images:upload ./photo.jpg
+pnpm run images:upload ./photo.jpg
 
 # Subdirectories
-npm run images:upload images/gallery/photo.jpg
+pnpm run images:upload images/gallery/photo.jpg
 ```
 
 ### Absolute Paths
 
 ```bash
-npm run images:upload /Users/username/projects/app/public/media/photo.jpg
+pnpm run images:upload /Users/username/projects/app/public/media/photo.jpg
 ```
 
 ### Public Directory
@@ -333,7 +333,7 @@ Files in the `public/` directory are automatically mapped correctly:
 
 ```bash
 # Uploads to S3 as: media/photo.jpg (not public/media/photo.jpg)
-npm run images:upload public/media/photo.jpg
+pnpm run images:upload public/media/photo.jpg
 ```
 
 ## S3 Key Generation
@@ -372,19 +372,19 @@ The script generates S3 keys with smart path handling:
 ### Upload Profile Picture
 
 ```bash
-npm run images:upload public/media/profiles/user-123.jpg --prefix users/profiles/
+pnpm run images:upload public/media/profiles/user-123.jpg --prefix users/profiles/
 ```
 
 ### Upload Gallery Images
 
 ```bash
-npm run images:upload --dir public/media/gallery --prefix gallery/2026/
+pnpm run images:upload --dir public/media/gallery --prefix gallery/2026/
 ```
 
 ### Upload Multiple Event Photos
 
 ```bash
-npm run images:upload \
+pnpm run images:upload \
   ./events/photo1.jpg,./events/photo2.jpg,./events/photo3.jpg \
   --prefix events/conference-2026/
 ```
@@ -392,7 +392,7 @@ npm run images:upload \
 ### Upload Without Cache Invalidation
 
 ```bash
-npm run images:upload --dir ./temp-images --no-invalidate
+pnpm run images:upload --dir ./temp-images --no-invalidate
 ```
 
 ## Output Example
@@ -432,7 +432,7 @@ Errors are collected and displayed in a summary at the end.
     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   run: |
-    npm run images:upload --dir public/media
+    pnpm run images:upload --dir public/media
 ```
 
 ---
@@ -458,24 +458,24 @@ export SKIP_BUILD="false"
 export SKIP_INVALIDATION="false"
 ```
 
-### NPM Scripts
+### pnpm Scripts
 
 ```bash
 # Build Next.js and sync to CDN
-npm run build:cdn
+pnpm run build:cdn
 
 # Just sync (skip build)
-npm run sync:cdn:no-build
+pnpm run sync:cdn:no-build
 
 # Run sync manually
-npm run sync:cdn
+pnpm run sync:cdn
 ```
 
 ### Direct Usage
 
 ```bash
 # With tsx (recommended)
-npx tsx scripts/sync-cdn.ts
+pnpm exec tsx scripts/sync-cdn.ts
 
 # Make executable and run directly
 chmod +x scripts/sync-cdn.ts
@@ -515,7 +515,7 @@ This script is designed to integrate into your CI/CD pipeline:
 ```yaml
 # GitHub Actions example
 - name: Install dependencies
-  run: npm ci
+  run: pnpm install --frozen-lockfile
 
 - name: Build and sync to CDN
   env:
@@ -523,5 +523,5 @@ This script is designed to integrate into your CI/CD pipeline:
     CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  run: npm run build:cdn
+  run: pnpm run build:cdn
 ```

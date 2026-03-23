@@ -18,8 +18,8 @@ This document reviews the existing workflows (`deploy.yml` and `deploy-2.yml`) a
 Strengths:
 
 - Uses modern action versions for checkout and setup-node.
-- Builds Next.js with deterministic `npm ci` and uses a placeholder `DATABASE_URL`.
-- Syncs CDN artifacts via `npm run sync:cdn:no-build` with AWS creds and invalidates CloudFront.
+- Builds Next.js with deterministic `pnpm install --frozen-lockfile` and uses a placeholder `DATABASE_URL`.
+- Syncs CDN artifacts via `pnpm run sync:cdn:no-build` with AWS creds and invalidates CloudFront.
 - Builds/pushes Docker images to GHCR with docker compose.
 - Copies `.env` and `docker-compose.prod.yml` to EC2 and runs Compose there.
 
@@ -41,7 +41,7 @@ Strengths:
 
 Issues / Risks:
 
-- Assumes non-containerized deployment (`git pull`, `npm install`, `pm2 restart`), which does not match our container-based deployment strategy.
+- Assumes non-containerized deployment (`git pull`, `pnpm install`, `pm2 restart`), which does not match our container-based deployment strategy.
 - Rebuilds on the EC2 host rather than pulling prebuilt images from GHCR.
 - No CDN sync, no Docker usage, and no health check.
 

@@ -33,7 +33,7 @@
 - [x] T003 [P] Add `getReleaseWithTracks(id: string)` static method to `src/lib/services/release-service.ts` — fetches single published release with full track data, returns `{ success: false }` when not found
 - [x] T004 [P] Add `getArtistOtherReleases(artistId: string, excludeReleaseId: string)` static method to `src/lib/services/release-service.ts` — fetches other published releases by artist with images
 
-**Checkpoint**: `npm run test -- release-service` — all new service method tests pass. No UI yet.
+**Checkpoint**: `pnpm run test -- release-service` — all new service method tests pass. No UI yet.
 
 ---
 
@@ -154,8 +154,8 @@
 - [x] T039 [P] Add no-tracks empty state to `ReleasePlayer` in `src/app/components/release-player.tsx` — when release has zero tracks or all tracks lack audio URLs, display "No playable tracks available" message and hide audio controls
 - [x] T040 [P] Verify accessibility: ARIA labels on combobox (`aria-label="Search releases"`), carousel (`aria-label="Other releases by {artistName}"`), breadcrumbs (`aria-current="page"`), Play buttons (`aria-label="Play {title}"`), and all images have alt text. Run Lighthouse accessibility audit on both pages — target 90+ score (SC-006)
 - [x] T041 [P] Responsive testing and performance: verify layout at 320px, 640px, 768px, 1024px, 1280px, 1920px — card grid columns adjust, combobox is full-width on mobile, player controls are touch-friendly, no horizontal overflow. Run Lighthouse performance audit on `/releases` page — target load < 3s on mobile 3G/4G (SC-003) and search results < 500ms (SC-008)
-- [x] T042 Run `npm run lint` and `npm run format` across all new/modified files and fix any issues
-- [x] T043 Run `npm run test:run` to verify all tests pass with no failures
+- [x] T042 Run `pnpm run lint` and `pnpm run format` across all new/modified files and fix any issues
+- [x] T043 Run `pnpm run test:run` to verify all tests pass with no failures
 - [x] T044 Run quickstart.md validation — walk through each step and verify checkpoints
 
 ---

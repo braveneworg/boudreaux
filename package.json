@@ -6,11 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --webpack 2>&1 | grep -v 'SyntaxError: Expected property name'",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "lint": "eslint . --max-warnings 0 --ext .ts,.tsx,.js,.jsx --fix",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "lint:format": "npm run lint:fix && npm run format",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "seed": "tsx prisma/seed.ts",
     "stripe:seed": "tsx scripts/stripe-seed.ts",
     "test": "vitest",
@@ -18,21 +16,21 @@
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:coverage:check": "vitest run --coverage && npx tsx scripts/check-coverage-regression.ts",
+    "test:coverage:check": "vitest run --coverage && pnpm exec tsx scripts/check-coverage-regression.ts",
     "test:no-css": "mv postcss.config.mjs postcss.config.mjs.bak && vitest run && mv postcss.config.mjs.bak postcss.config.mjs",
-    "mongo:dump": "npx tsx scripts/mongo-backup.ts dump",
-    "mongo:restore": "npx tsx scripts/mongo-backup.ts restore",
-    "s3:backup": "npx tsx scripts/s3-backup.ts backup",
-    "s3:restore": "npx tsx scripts/s3-backup.ts restore",
-    "s3:list": "npx tsx scripts/s3-backup.ts list",
-    "s3:upload": "npx tsx scripts/s3-backup.ts upload",
-    "images:upload": "npx tsx scripts/upload-images.ts",
+    "mongo:dump": "pnpm exec tsx scripts/mongo-backup.ts dump",
+    "mongo:restore": "pnpm exec tsx scripts/mongo-backup.ts restore",
+    "s3:backup": "pnpm exec tsx scripts/s3-backup.ts backup",
+    "s3:restore": "pnpm exec tsx scripts/s3-backup.ts restore",
+    "s3:list": "pnpm exec tsx scripts/s3-backup.ts list",
+    "s3:upload": "pnpm exec tsx scripts/s3-backup.ts upload",
+    "images:upload": "pnpm exec tsx scripts/upload-images.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
     "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx .",
     "docker:push:nginx": "docker push ghcr.io/braveneworg/boudreaux/nginx",
-    "docker:publish:website": "npm run docker:build:website && npm run docker:push:website",
-    "docker:publish:nginx": "npm run docker:build:nginx && npm run docker:push:nginx",
+    "docker:publish:website": "pnpm run docker:build:website && pnpm run docker:push:website",
+    "docker:publish:nginx": "pnpm run docker:build:nginx && pnpm run docker:push:nginx",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
@@ -44,7 +42,7 @@
     "prepare": "husky"
   },
   "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "pnpm exec tsx prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
@@ -143,7 +141,7 @@
     "@types/eslint-plugin-tailwindcss": "~3.17.0",
     "@types/jsdom": "~27.0.0",
     "@types/mime": "^4.0.0",
-    "@types/node": "^20.19.25",
+    "@types/node": "^24.0.0",
     "@types/nodemailer": "^6.4.21",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
@@ -193,13 +191,24 @@
       "prettier --write"
     ]
   },
+  "packageManager": "pnpm@10.12.1",
   "engines": {
-    "node": ">=22.12.0",
-    "npm": ">=10.0.0"
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
   },
-  "overrides": {
-    "c12": {
-      "magicast": "^0.3.5"
-    }
+  "pnpm": {
+    "overrides": {
+      "c12>magicast": "^0.3.5"
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "esbuild",
+      "msw",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

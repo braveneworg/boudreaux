@@ -18,13 +18,30 @@ import {
   SUPPORTED_IMAGE_TYPES,
 } from '@/lib/validations/tours/image-schema';
 
-import type { TourImage } from '@prisma/client';
+/**
+ * Local interface matching Prisma TourImage model.
+ * Client components should not import directly from @prisma/client.
+ */
+interface TourImageFields {
+  id: string;
+  tourId: string;
+  s3Key: string;
+  s3Url: string;
+  s3Bucket: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  displayOrder: number;
+  altText: string | null;
+  createdAt: Date;
+  uploadedBy: string | null;
+}
 
 export interface TourImageUploadProps {
   /** Tour ID to associate images with */
   tourId: string;
   /** Initial images from database */
-  initialImages?: TourImage[];
+  initialImages?: TourImageFields[];
   /** Called when images are successfully uploaded */
   onUploadComplete?: () => void;
   /** Whether the component is disabled */

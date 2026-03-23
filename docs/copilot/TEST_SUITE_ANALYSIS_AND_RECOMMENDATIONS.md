@@ -69,8 +69,8 @@ coverage: {
 Install and configure Husky for automated test running:
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky init
+pnpm install --save-dev husky lint-staged
+pnpm exec husky init
 ```
 
 `.husky/pre-commit`:
@@ -79,8 +79,8 @@ npx husky init
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npm run lint:fix
-npm test -- --run --changed
+pnpm run lint
+pnpm test -- --run --changed
 ```
 
 `package.json`:
@@ -135,7 +135,7 @@ slowTests.forEach((t) => {
 For components with complex UI, add visual regression testing:
 
 ```bash
-npm install --save-dev @vitest/ui playwright
+pnpm install --save-dev @vitest/ui playwright
 ```
 
 ```typescript
@@ -200,7 +200,7 @@ describe('Authentication Flow', () => {
 Add mutation testing to verify test effectiveness:
 
 ```bash
-npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
+pnpm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
 ```
 
 ```javascript
@@ -225,7 +225,7 @@ test:
     matrix:
       shard: [1, 2, 3, 4]
   steps:
-    - run: npm test -- --run --shard=${{ matrix.shard }}/4
+    - run: pnpm test -- --run --shard=${{ matrix.shard }}/4
 ```
 
 **Rationale**: Reduces CI time by running tests in parallel across multiple workers.

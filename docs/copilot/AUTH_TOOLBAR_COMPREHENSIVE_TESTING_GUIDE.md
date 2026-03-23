@@ -457,7 +457,7 @@ Use Husky to run tests before commits:
 {
   "husky": {
     "hooks": {
-      "pre-commit": "npm run test:coverage && npm run lint"
+      "pre-commit": "pnpm run test:coverage && pnpm run lint"
     }
   }
 }
@@ -480,8 +480,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - run: npm ci
-      - run: npm run test:coverage
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:coverage
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
@@ -548,7 +548,7 @@ If coverage drops below 100%:
 
 ```bash
 # Generate detailed coverage report
-npm run test:coverage
+pnpm run test:coverage
 
 # Open HTML report
 open coverage/index.html
@@ -671,10 +671,10 @@ describe('in production mode', () => {
 Install and run mutation testing to verify test quality:
 
 ```bash
-npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
+pnpm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
 
 # Run mutation tests
-npx stryker run
+pnpm exec stryker run
 ```
 
 Mutation testing introduces small changes (mutations) to your code to verify that tests catch the changes.
@@ -709,8 +709,8 @@ it('has no accessibility violations', async () => {
 Consider adding visual regression tests:
 
 ```bash
-npm install --save-dev @storybook/testing-library
-npm install --save-dev chromatic
+pnpm install --save-dev @storybook/testing-library
+pnpm install --save-dev chromatic
 ```
 
 ### 5. Performance Testing

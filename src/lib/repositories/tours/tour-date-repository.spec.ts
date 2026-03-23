@@ -522,4 +522,123 @@ describe('TourDateRepository', () => {
       );
     });
   });
+
+  describe('update - null/falsy branch coverage for conditional fields', () => {
+    it('converts startDate null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { startDate: null });
+
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('startDate', undefined);
+    });
+
+    it('includes endDate when a truthy value is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      const endDate = new Date('2026-07-02T00:00:00.000Z');
+      await TourDateRepository.update(validObjectId, { endDate });
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ endDate }) })
+      );
+    });
+
+    it('converts endDate null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { endDate: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('endDate', undefined);
+    });
+
+    it('includes showStartTime when a truthy value is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      const showStartTime = new Date('2026-07-01T19:00:00.000Z');
+      await TourDateRepository.update(validObjectId, { showStartTime });
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ showStartTime }) })
+      );
+    });
+
+    it('converts showStartTime null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { showStartTime: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('showStartTime', undefined);
+    });
+
+    it('includes showEndTime when a truthy value is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      const showEndTime = new Date('2026-07-01T23:00:00.000Z');
+      await TourDateRepository.update(validObjectId, { showEndTime });
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ showEndTime }) })
+      );
+    });
+
+    it('converts showEndTime null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { showEndTime: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('showEndTime', undefined);
+    });
+
+    it('includes doorsOpenAt when a truthy value is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      const doorsOpenAt = new Date('2026-07-01T18:00:00.000Z');
+      await TourDateRepository.update(validObjectId, { doorsOpenAt });
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ doorsOpenAt }) })
+      );
+    });
+
+    it('converts doorsOpenAt null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { doorsOpenAt: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('doorsOpenAt', undefined);
+    });
+
+    it('converts ticketsUrl null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { ticketsUrl: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('ticketsUrl', undefined);
+    });
+
+    it('includes ticketPrices when a truthy value is provided', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { ticketPrices: '$25 - $50' });
+      expect(prisma.tourDate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ ticketPrices: '$25 - $50' }) })
+      );
+    });
+
+    it('converts ticketPrices null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { ticketPrices: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('ticketPrices', undefined);
+    });
+
+    it('converts notes null to undefined via || fallback', async () => {
+      vi.mocked(prisma.tourDate.update).mockResolvedValue(mockTourDate as never);
+      await TourDateRepository.update(validObjectId, { notes: null });
+      const callArg = vi.mocked(prisma.tourDate.update).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(callArg.data).toHaveProperty('notes', undefined);
+    });
+  });
 });

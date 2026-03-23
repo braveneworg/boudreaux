@@ -4,7 +4,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
+import { prisma } from '@/lib/prisma';
+import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getTierByPriceId } from '@/lib/subscriber-rates';
@@ -16,6 +19,23 @@ export const dynamic = 'force-dynamic';
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 export async function POST(request: NextRequest) {
+  // --- IP Allowlist ---
+  const skipIpCheck = process.env.SKIP_STRIPE_IP_CHECK === 'true';
+  if (!skipIpCheck) {
+    const ipRangesEnv = process.env.STRIPE_WEBHOOK_IP_RANGES ?? '';
+    if (ipRangesEnv) {
+      const forwarded = request.headers.get('x-forwarded-for');
+      const realIp = request.headers.get('x-real-ip');
+      const remoteIp = forwarded ? forwarded.split(',')[0].trim() : (realIp?.trim() ?? '');
+      const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
+      const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
+      if (!isAllowed) {
+        console.warn(`Stripe webhook rejected: IP ${remoteIp} not in allowlist`);
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+  }
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
@@ -67,6 +87,12 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+  // Payment mode — PWYW release purchase
+  if (session.mode === 'payment' && session.metadata?.type === 'release_purchase') {
+    await handleReleasePurchaseCompleted(session);
+    return;
+  }
+
   const customerEmail = session.customer_details?.email ?? session.customer_email;
   const stripeCustomerId =
     typeof session.customer === 'string' ? session.customer : session.customer?.id;
@@ -107,6 +133,60 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   // tier change that goes through Checkout instead of the customer portal.
   await SubscriptionRepository.resetConfirmationEmailSent(customerEmail);
   await sendSubscriptionConfirmationEmail(customerEmail, tier, interval);
+}
+
+async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) {
+  const { releaseId, userId } = session.metadata ?? {};
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+  if (!releaseId || !userId || !paymentIntentId) {
+    console.error('release_purchase webhook missing required metadata', {
+      sessionId: session.id,
+      releaseId,
+      userId,
+      paymentIntentId,
+    });
+    return;
+  }
+
+  // Idempotency: skip if already processed
+  const existing = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+  if (existing) {
+    console.warn('Duplicate webhook event for paymentIntentId:', paymentIntentId);
+    return;
+  }
+
+  const amountTotal = session.amount_total ?? 0;
+
+  // Fetch release title for the confirmation email
+  const release = await prisma.release.findFirst({
+    where: { id: releaseId },
+    select: { title: true },
+  });
+  const releaseTitle = release?.title ?? 'Unknown Release';
+
+  const purchase = await PurchaseRepository.create({
+    userId,
+    releaseId,
+    amountPaid: amountTotal,
+    currency: session.currency ?? 'usd',
+    stripePaymentIntentId: paymentIntentId,
+    stripeSessionId: session.id,
+  });
+
+  const customerEmail = session.customer_details?.email ?? session.customer_email ?? null;
+  if (customerEmail) {
+    await sendPurchaseConfirmationEmail({
+      purchaseId: purchase.id,
+      customerEmail,
+      releaseTitle,
+      amountPaidCents: amountTotal,
+      releaseId,
+    });
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -154,4 +234,48 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   await SubscriptionRepository.updateSubscriptionStatus(stripeCustomerId, 'past_due');
+}
+
+/**
+ * Checks whether an IPv4 address falls within a given CIDR range.
+ * Supports /0 through /32 prefix lengths. Returns false for any malformed
+ * IP or CIDR input (invalid octets, out-of-range prefix length, etc.).
+ */
+function isIpInCidr(ip: string, cidr: string): boolean {
+  try {
+    const [range, bitsStr] = cidr.split('/');
+    const bits = parseInt(bitsStr ?? '32', 10);
+    if (
+      isNaN(bits) ||
+      bits < 0 ||
+      bits > 32 ||
+      (bitsStr !== undefined && bitsStr !== bits.toString())
+    )
+      return false;
+    const ipNum = ipToNum(ip);
+    const rangeNum = ipToNum(range ?? '');
+    if (ipNum === null || rangeNum === null) return false;
+    const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+    return (ipNum & mask) === (rangeNum & mask);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Converts a dotted-decimal IPv4 string to a 32-bit unsigned integer.
+ * Returns null for any malformed input (wrong number of octets, non-numeric
+ * parts, or octet values outside the 0–255 range).
+ */
+function ipToNum(ip: string): number | null {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let result = 0;
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) return null;
+    const octet = parseInt(part, 10);
+    if (octet < 0 || octet > 255) return null;
+    result = ((result << 8) | octet) >>> 0;
+  }
+  return result;
 }

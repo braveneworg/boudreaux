@@ -11,8 +11,8 @@
 - Node.js 18+
 - MongoDB running locally (via Docker: `docker compose up -d`)
 - `.env` configured with `DATABASE_URL` and other required env vars
-- `npm install` completed
-- Seed data loaded: `npx prisma db seed`
+- `pnpm install` completed
+- Seed data loaded: `pnpm exec prisma db seed`
 
 ---
 
@@ -35,7 +35,7 @@ Follow this sequence to build incrementally with testable checkpoints.
 4. Add `getArtistOtherReleases(artistId, excludeReleaseId)` to `ReleaseService` — fetches other published releases by an artist
 5. Write tests for all 3 methods in the existing `release-service.spec.ts`
 
-**Verification:** `npm run test -- release-service` — all tests pass
+**Verification:** `pnpm run test -- release-service` — all tests pass
 
 ---
 
@@ -234,11 +234,11 @@ const ReleasePlayer = ({ release, tracks }: ReleasePlayerProps) => {
 
 ## Useful Commands
 
-| Command                   | Purpose                   |
-| ------------------------- | ------------------------- |
-| `npm run dev`             | Start dev server          |
-| `npm run test -- release` | Run release-related tests |
-| `npm run test:coverage`   | Generate coverage report  |
-| `npm run lint`            | Check code quality        |
-| `npm run lint:fix`        | Auto-fix lint issues      |
-| `npm run format`          | Format code with Prettier |
+| Command                    | Purpose                   |
+| -------------------------- | ------------------------- |
+| `pnpm run dev`             | Start dev server          |
+| `pnpm run test -- release` | Run release-related tests |
+| `pnpm run test:coverage`   | Generate coverage report  |
+| `pnpm run lint`            | Check code quality        |
+| `pnpm run lint`            | Check and fix lint issues |
+| `pnpm run format`          | Format code with Prettier |

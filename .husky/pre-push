@@ -41,12 +41,12 @@ fi
 echo "🔍 Running TypeScript type-check before push..."
 
 # Run TypeScript type-check on the entire project
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 
 if [ $? -ne 0 ]; then
   echo ""
   echo "❌ TypeScript type-check failed. Please fix type errors before pushing."
-  echo "   Run 'npx tsc --noEmit' to see all errors."
+  echo "   Run 'pnpm exec tsc --noEmit' to see all errors."
   exit 1
 fi
 
@@ -55,13 +55,12 @@ echo "✅ TypeScript type-check passed"
 echo ""
 echo "🔎 Running ESLint before push..."
 
-# Run ESLint with max-warnings 0 to fail on any warnings
-npm run lint -- --max-warnings 0
+pnpm run lint
 
 if [ $? -ne 0 ]; then
   echo ""
   echo "❌ ESLint found errors or warnings. Please fix them before pushing."
-  echo "   Run 'npm run lint' to see all issues."
+  echo "   Run 'pnpm run lint' to see all issues."
   exit 1
 fi
 
@@ -72,12 +71,12 @@ echo "🧪 Running tests before push..."
 
 # Run tests excluding the unrelated failing SSR test
 # Suppress console output during tests to reduce verbosity
-SUPPRESS_CONSOLE=1 npm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx --reporter=dot --silent
+SUPPRESS_CONSOLE=1 pnpm run test:run -- --exclude src/app/components/ui/sticky-breadcrumb-wrapper.spec.tsx --reporter=dot --silent
 
 if [ $? -ne 0 ]; then
   echo ""
   echo "❌ Tests failed. Please fix failing tests before pushing."
-  echo "   Run 'npm run test' to see all failures."
+  echo "   Run 'pnpm run test' to see all failures."
   exit 1
 fi
 

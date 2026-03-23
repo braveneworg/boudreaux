@@ -289,7 +289,7 @@ expect(username).toBeTruthy(); // Too permissive
 {
   "husky": {
     "hooks": {
-      "pre-commit": "npm run test:run && npm run lint"
+      "pre-commit": "pnpm run test:run && pnpm run lint"
     }
   }
 }
@@ -314,9 +314,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-      - run: npm ci
-      - run: npm run test:run
-      - run: npm run test:coverage
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:run
+      - run: pnpm run test:coverage
       - uses: codecov/codecov-action@v3
 ```
 
@@ -378,8 +378,8 @@ export default defineConfig({
 **Integration:**
 
 ```bash
-npm run test:coverage
-npx codecov --token=YOUR_TOKEN
+pnpm run test:coverage
+pnpm exec codecov --token=YOUR_TOKEN
 ```
 
 **Benefits:**

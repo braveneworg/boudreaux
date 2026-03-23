@@ -13,7 +13,7 @@ Conducted a comprehensive TypeScript review of the codebase to eliminate unsafe 
 ✅ **Created reusable type utilities** - Shared across the codebase
 ✅ **Removed `@ts-expect-error` comments** - Replaced with type-safe alternatives
 ✅ **All tests passing** - 732+ tests, 0 failures
-✅ **TypeScript compilation successful** - `npx tsc --noEmit` passes
+✅ **TypeScript compilation successful** - `pnpm exec tsc --noEmit` passes
 
 ---
 
@@ -241,7 +241,7 @@ import type { MockPrismaClient } from '@/app/lib/types/test-utils';
 ### TypeScript Compilation
 
 ```bash
-npx tsc --noEmit  # ✅ Passes with 0 errors
+pnpm exec tsc --noEmit  # ✅ Passes with 0 errors
 ```
 
 ---
@@ -377,7 +377,7 @@ type APIEndpoint = `${HTTPMethod} ${APIRoute}`;
 1. **Check type compatibility** with existing utilities
 2. **Update utility types** if library types change
 3. **Run full test suite** after type utility changes
-4. **Verify `npx tsc --noEmit`** passes
+4. **Verify `pnpm exec tsc --noEmit`** passes
 
 ### Code Review Checklist
 

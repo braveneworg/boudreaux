@@ -12,6 +12,9 @@ vi.mock('@aws-sdk/client-ses', () => ({
     constructor(config: Record<string, string>) {
       constructorSpy(config);
     }
+    send() {
+      return 'mock-send';
+    }
   },
 }));
 
@@ -36,5 +39,37 @@ describe('ses-client', () => {
 
     expect(sesClient).toBeDefined();
     expect(sesClient).toBeInstanceOf(Object);
+  });
+
+  it('should bind function properties to the client instance', async () => {
+    const { sesClient } = await import('@/lib/utils/ses-client');
+
+    // Accessing a method on the proxy should return a bound function
+    expect(typeof sesClient.send).toBe('function');
+  });
+
+  it('should use AWS_REGION from environment when set', async () => {
+    vi.stubEnv('AWS_REGION', 'eu-west-1');
+    constructorSpy.mockClear();
+
+    const { sesClient } = await import('@/lib/utils/ses-client');
+
+    // Force a fresh client creation through the proxy
+    void sesClient.config;
+
+    expect(constructorSpy).toHaveBeenCalledWith({ region: 'eu-west-1' });
+    vi.unstubAllEnvs();
+  });
+
+  it('should fall back to us-east-1 when AWS_REGION is not set', async () => {
+    vi.unstubAllEnvs();
+    delete process.env.AWS_REGION;
+    constructorSpy.mockClear();
+
+    const { sesClient } = await import('@/lib/utils/ses-client');
+
+    void sesClient.config;
+
+    expect(constructorSpy).toHaveBeenCalledWith({ region: 'us-east-1' });
   });
 });

@@ -6,7 +6,7 @@
  * Performs various cleanup operations on the database.
  *
  * Usage:
- *   npx tsx scripts/db-cleanup.ts [--dry-run]
+ *   pnpm exec tsx scripts/db-cleanup.ts [--dry-run]
  *
  * Options:
  *   --dry-run  Preview what would be deleted without making changes
@@ -53,8 +53,10 @@ async function deleteOrphanedReleaseTracks(dryRun: boolean): Promise<number> {
   });
 
   // Collect all unique referenced IDs
-  const releaseIds = [...new Set(allReleaseTracks.map((rt) => rt.releaseId))];
-  const trackIds = [...new Set(allReleaseTracks.map((rt) => rt.trackId))];
+  const releaseIds = [
+    ...new Set(allReleaseTracks.map((rt: { releaseId: string }) => rt.releaseId)),
+  ];
+  const trackIds = [...new Set(allReleaseTracks.map((rt: { trackId: string }) => rt.trackId))];
 
   // Query which IDs actually exist
   const [existingReleases, existingTracks] = await Promise.all([
@@ -68,12 +70,13 @@ async function deleteOrphanedReleaseTracks(dryRun: boolean): Promise<number> {
     }),
   ]);
 
-  const existingReleaseIds = new Set(existingReleases.map((r) => r.id));
-  const existingTrackIds = new Set(existingTracks.map((t) => t.id));
+  const existingReleaseIds = new Set(existingReleases.map((r: { id: string }) => r.id));
+  const existingTrackIds = new Set(existingTracks.map((t: { id: string }) => t.id));
 
   // Find ReleaseTrack records with broken references
   const orphaned = allReleaseTracks.filter(
-    (rt) => !existingReleaseIds.has(rt.releaseId) || !existingTrackIds.has(rt.trackId)
+    (rt: { releaseId: string; trackId: string }) =>
+      !existingReleaseIds.has(rt.releaseId) || !existingTrackIds.has(rt.trackId)
   );
 
   if (orphaned.length === 0) {
@@ -104,7 +107,7 @@ async function deleteOrphanedReleaseTracks(dryRun: boolean): Promise<number> {
     return 0;
   }
 
-  const ids = orphaned.map((rt) => rt.id);
+  const ids = orphaned.map((rt: { id: string }) => rt.id);
   const { count } = await prisma.releaseTrack.deleteMany({
     where: { id: { in: ids } },
   });
@@ -148,7 +151,7 @@ async function deleteReleaseTracksWithoutCoverArt(dryRun: boolean): Promise<numb
     return 0;
   }
 
-  const ids = targets.map((rt) => rt.id);
+  const ids = targets.map((rt: { id: string }) => rt.id);
   const { count } = await prisma.releaseTrack.deleteMany({
     where: { id: { in: ids } },
   });
@@ -197,7 +200,12 @@ async function deleteTracksWithoutCoverArt(dryRun: boolean): Promise<number> {
   for (const track of targets) {
     const releases =
       track.releaseTracks.length > 0
-        ? track.releaseTracks.map((rt) => `"${rt.release.title}" (${rt.releaseId})`).join(', ')
+        ? track.releaseTracks
+            .map(
+              (rt: { release: { title: string }; releaseId: string }) =>
+                `"${rt.release.title}" (${rt.releaseId})`
+            )
+            .join(', ')
         : 'none';
     console.info(
       `  - Track ${track.id} | "${track.title}" | status: ${track.audioUploadStatus} | releases: ${releases} | created: ${track.createdAt.toISOString()}`
@@ -209,7 +217,7 @@ async function deleteTracksWithoutCoverArt(dryRun: boolean): Promise<number> {
     return 0;
   }
 
-  const ids = targets.map((t) => t.id);
+  const ids = targets.map((t: { id: string }) => t.id);
 
   // Delete related ReleaseTrack records first to avoid foreign key issues
   const { count: releaseTrackCount } = await prisma.releaseTrack.deleteMany({
@@ -266,7 +274,7 @@ async function deleteTrackArtistsWithoutCoverArt(dryRun: boolean): Promise<numbe
     return 0;
   }
 
-  const ids = targets.map((ta) => ta.id);
+  const ids = targets.map((ta: { id: string }) => ta.id);
   const { count } = await prisma.trackArtist.deleteMany({
     where: { id: { in: ids } },
   });
@@ -345,8 +353,10 @@ async function deleteDuplicateReleaseTracks(dryRun: boolean): Promise<number> {
     }),
   ]);
 
-  const releaseTitleMap = new Map(releases.map((r) => [r.id, r.title]));
-  const trackTitleMap = new Map(tracks.map((t) => [t.id, t.title]));
+  const releaseTitleMap = new Map(
+    releases.map((r: { id: string; title: string }) => [r.id, r.title])
+  );
+  const trackTitleMap = new Map(tracks.map((t: { id: string; title: string }) => [t.id, t.title]));
 
   console.info(
     `${PREFIX} Found ${idsToDelete.length} duplicate ReleaseTrack record(s) across ${duplicateGroups.length} group(s):\n`
@@ -523,7 +533,7 @@ async function deleteTracksByDarkTimeSunshine(dryRun: boolean): Promise<number> 
     return 0;
   }
 
-  const trackIds = [...new Set(trackArtists.map((ta) => ta.trackId))];
+  const trackIds = [...new Set(trackArtists.map((ta: { trackId: string }) => ta.trackId))];
 
   // Look up track details for display
   const tracks = await prisma.track.findMany({

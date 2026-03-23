@@ -162,4 +162,26 @@ describe('ArtistReleasesCarousel', () => {
     expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
     expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
   });
+
+  it('should render fallback div when release has no cover art and no images', () => {
+    const noCoverRelease = [
+      {
+        id: 'release-no-art',
+        title: 'No Art Album',
+        coverArt: '',
+        description: null,
+        publishedAt: new Date(),
+        releasedOn: new Date(),
+        deletedOn: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        images: [],
+      },
+    ] as unknown as ReleaseCarouselItem[];
+
+    render(<ArtistReleasesCarousel releases={noCoverRelease} artistName="John Doe" />);
+
+    expect(screen.getByText('No Art Album')).toBeInTheDocument();
+    expect(screen.queryByTestId('carousel-image')).not.toBeInTheDocument();
+  });
 });

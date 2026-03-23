@@ -37,8 +37,8 @@
 
 - [ ] T005 Add Tour, Venue, TourHeadliner, TourImage models to prisma/schema.prisma per data-model.md
 - [ ] T006 Add tourHeadliners relationship to Artist model in prisma/schema.prisma
-- [ ] T007 Generate Prisma client after schema updates: `npx prisma generate`
-- [ ] T008 Sync database schema with Prisma (MongoDB): `npx prisma db push` (Note: MongoDB does not support migrations, use db push instead)
+- [ ] T007 Generate Prisma client after schema updates: `pnpm exec prisma generate`
+- [ ] T008 Sync database schema with Prisma (MongoDB): `pnpm exec prisma db push` (Note: MongoDB does not support migrations, use db push instead)
 - [ ] T009 [P] Create shared TypeScript types file at src/lib/types/tours.ts from contracts/tour-types.ts
 - [ ] T010 [P] Create artist display name utility function in src/lib/utils/artist-display-name.ts with fallback logic (displayName → group.displayName → firstName + surname → "Unknown Artist")
 - [ ] T011 [P] Create date formatting utilities in src/lib/utils/date-utils.ts for tour date display
@@ -83,8 +83,8 @@
 - [ ] T034 [US1] Create new tour page at src/app/admin/tours/new/page.tsx (render TourForm in create mode)
 - [ ] T035 [US1] Create edit tour page at src/app/admin/tours/[tourId]/edit/page.tsx (fetch tour data, render TourForm in edit mode)
 - [ ] T036 [US1] Add auth protection to admin tour routes using Auth.js middleware
-- [ ] T037 [US1] Run unit tests for US1 components and verify all pass: `npm run test -- tours`
-- [x] T038 [US1] Run E2E tests for US1 and verify all pass: `npm run test:e2e -- admin-tour`
+- [ ] T037 [US1] Run unit tests for US1 components and verify all pass: `pnpm run test -- tours`
+- [x] T038 [US1] Run E2E tests for US1 and verify all pass: `pnpm run test:e2e -- admin-tour`
 - [ ] T039 [US1] Manual testing: Create, edit, delete tours through admin UI, verify database persistence
 
 **Checkpoint**: Admin tour CRUD fully functional - can create, edit, view, delete tours independently
@@ -115,8 +115,8 @@
 - [ ] T050 [US2] Integrate tour-image-upload component into tour-form.tsx (add image upload section)
 - [ ] T051 [US2] Add cascade delete for images in tour repository delete method (cleanup orphaned S3 files)
 - [ ] T052 [US2] Add environment variable validation for AWS credentials in image-upload-service.ts
-- [ ] T053 [US2] Run unit tests for US2 and verify all pass: `npm run test -- image`
-- [ ] T054 [US2] Run E2E test for US2 and verify passes: `npm run test:e2e -- admin-tour-image`
+- [ ] T053 [US2] Run unit tests for US2 and verify all pass: `pnpm run test -- image`
+- [ ] T054 [US2] Run E2E test for US2 and verify passes: `pnpm run test:e2e -- admin-tour-image`
 - [ ] T055 [US2] Manual testing: Upload various image types/sizes, verify S3 storage, test max limit, verify cleanup on delete
 
 **Checkpoint**: Image upload fully functional - can upload, view, delete images for tours independently
@@ -147,8 +147,8 @@
 - [ ] T066 [US3] Apply artist display name utility to tour headliners in tour service getTourById and listTours methods
 - [ ] T067 [US3] Add responsive styling with Tailwind CSS to tour-card and tour-list components (mobile-first)
 - [ ] T068 [US3] Add skeleton loaders for tours page in src/app/tours/loading.tsx
-- [ ] T069 [US3] Run unit tests for US3 components and verify all pass: `npm run test -- tours/components`
-- [ ] T070 [US3] Run E2E test for US3 and verify passes: `npm run test:e2e -- public-tours`
+- [ ] T069 [US3] Run unit tests for US3 components and verify all pass: `pnpm run test -- tours/components`
+- [ ] T070 [US3] Run E2E test for US3 and verify passes: `pnpm run test:e2e -- public-tours`
 - [ ] T071 [US3] Manual testing: View tours page on desktop/tablet/mobile, verify sorting, click through to details, verify all data displays correctly
 
 **Checkpoint**: Public tour display fully functional - visitors can browse and view tour details independently
@@ -175,8 +175,8 @@
 - [ ] T078 [US4] Implement case-insensitive partial match search logic in tours-page-client.tsx (filter tours where any headliner displayName includes search term)
 - [ ] T079 [US4] Add "No tours found" empty state component in src/app/tours/components/tours-empty-state.tsx
 - [ ] T080 [US4] Add ARIA labels and keyboard navigation to search component for accessibility
-- [ ] T081 [US4] Run unit tests for US4 and verify all pass: `npm run test -- tour-search`
-- [x] T082 [US4] Run E2E test for US4 and verify passes: `npm run test:e2e -- public-tours-search`
+- [ ] T081 [US4] Run unit tests for US4 and verify all pass: `pnpm run test -- tour-search`
+- [x] T082 [US4] Run E2E test for US4 and verify passes: `pnpm run test:e2e -- public-tours-search`
 - [ ] T083 [US4] Manual testing: Search for various artist names, partial names, verify filtering, test case-insensitivity, verify empty state
 
 **Checkpoint**: Search functionality fully operational - visitors can filter tours by artist name independently
@@ -188,8 +188,8 @@
 **Purpose**: Improvements that affect multiple user stories and final quality checks
 
 - [ ] T084 [P] Add JSDoc comments to complex business logic functions in services and repositories
-- [ ] T085 [P] Run ESLint and fix all warnings: `npm run lint:fix`
-- [ ] T086 [P] Run Prettier to format all code: `npm run format`
+- [ ] T085 [P] Run ESLint and fix all warnings: `pnpm run lint`
+- [ ] T086 [P] Run Prettier to format all code: `pnpm run format`
 - [ ] T087 [P] Verify MPL 2.0 license headers are present in all new source files
 - [ ] T088 Add error boundaries for tour components in src/app/tours/error.tsx and src/app/admin/tours/error.tsx
 - [ ] T089 [P] Add loading states and skeleton screens for all async operations
@@ -203,8 +203,8 @@
 - [ ] T096 Performance testing: Verify tours page loads in <3s with 200 tours
 - [ ] T097 Performance testing: Verify image uploads complete in <10s for 10MB files
 - [ ] T098 Performance testing: Verify search response <500ms
-- [ ] T099 Run full test suite and verify 90-95%+ coverage: `npm run test:coverage`
-- [x] T100 Run all E2E tests and verify all pass: `npm run test:e2e`
+- [ ] T099 Run full test suite and verify 90-95%+ coverage: `pnpm run test:coverage`
+- [x] T100 Run all E2E tests and verify all pass: `pnpm run test:e2e`
 - [ ] T101 Follow quickstart.md validation steps to verify complete feature functionality
 - [ ] T102 [P] Update README.md with tour management feature documentation
 - [ ] T103 Security review: Verify all admin routes protected, input sanitization, S3 presigned URL expiry
@@ -332,8 +332,8 @@ Team Member B: Start Phase 5 (User Story 3 - Public Display)
 2. Complete **Phase 2**: Foundational (T005-T012) - **CRITICAL BLOCKER**
 3. Complete **Phase 3**: User Story 1 (T013-T039)
 4. **STOP and VALIDATE**:
-   - Run `npm run test -- tours` (unit tests)
-   - Run `npm run test:e2e -- admin-tour` (E2E tests)
+   - Run `pnpm run test -- tours` (unit tests)
+   - Run `pnpm run test:e2e -- admin-tour` (E2E tests)
    - Manual QA: Create/edit/delete tours via admin UI
 5. **MVP Ready**: Admin can fully manage tours (no images, no public display yet)
 
@@ -375,7 +375,7 @@ Per Principle III (TDD - Non-negotiable):
 - **Components**: 85%+ (T042, T056, T057, T072, etc.)
 - **E2E critical flows**: 100% coverage of happy paths (T019-T021, T043, T058, T073, etc.)
 
-Run coverage check: `npm run test:coverage`
+Run coverage check: `pnpm run test:coverage`
 
 Exclude from coverage:
 

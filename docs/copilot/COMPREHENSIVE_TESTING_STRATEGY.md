@@ -210,19 +210,19 @@ The following shadcn/ui components have 0% coverage but are not critical as they
 
 ```bash
 # Run all tests
-npm run test
+pnpm run test
 
 # Run tests with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Run specific test file
-npm run test -- path/to/file.spec.ts
+pnpm run test -- path/to/file.spec.ts
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run tests with UI
-npm run test:ui
+pnpm run test:ui
 ```
 
 ## CI/CD Integration Strategy
@@ -252,14 +252,14 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Enforce coverage thresholds
         run: |
-          npm run test:coverage -- \
+          pnpm run test:coverage -- \
             --coverage.thresholds.statements=90 \
             --coverage.thresholds.branches=80 \
             --coverage.thresholds.functions=90 \
@@ -283,7 +283,7 @@ jobs:
 
 ```bash
 # Install Husky
-npm install --save-dev husky
+pnpm install --save-dev husky
 
 # Configure pre-commit hook
 cat > .husky/pre-commit << 'EOF'
@@ -291,10 +291,10 @@ cat > .husky/pre-commit << 'EOF'
 . "$(dirname "$0")/_/husky.sh"
 
 # Run tests on staged files
-npm run test:changed
+pnpm run test:changed
 
 # Check coverage for changed files
-npm run test:coverage -- --changed
+pnpm run test:coverage -- --changed
 EOF
 
 chmod +x .husky/pre-commit
@@ -349,13 +349,13 @@ Configure branch protection rules:
 
 ```bash
 # Run tests for changed files
-npm run test:changed
+pnpm run test:changed
 
 # Check coverage for your changes
-npm run test:coverage -- --changed
+pnpm run test:coverage -- --changed
 
 # Fix any failing tests
-npm run test:watch
+pnpm run test:watch
 ```
 
 #### Code Review Checklist

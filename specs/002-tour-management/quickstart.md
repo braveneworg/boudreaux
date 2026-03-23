@@ -21,7 +21,7 @@ This guide helps developers set up, run, and test the tour management feature in
 cd /path/to/boudreaux
 
 # Install dependencies
-npm install
+pnpm install
 ```
 
 ### 2. Environment Configuration
@@ -72,13 +72,13 @@ Run Prisma migrations to create the tour management schema:
 
 ```bash
 # Generate Prisma client
-npx prisma generate
+pnpm exec prisma generate
 
 # Push schema to database (development)
-npx prisma db push
+pnpm exec prisma db push
 
 # Or run migrations (production-like)
-npx prisma migrate dev --name add-tour-management
+pnpm exec prisma migrate dev --name add-tour-management
 ```
 
 ### 5. Seed Database (Optional)
@@ -86,7 +86,7 @@ npx prisma migrate dev --name add-tour-management
 Seed the database with sample data:
 
 ```bash
-npx prisma db seed
+pnpm exec prisma db seed
 ```
 
 This will create:
@@ -102,7 +102,7 @@ This will create:
 
 ```bash
 # Start Next.js development server
-npm run dev
+pnpm run dev
 ```
 
 The application will be available at `http://localhost:3000`
@@ -122,26 +122,26 @@ Run all unit tests:
 
 ```bash
 # Run tests in watch mode
-npm run test
+pnpm run test
 
 # Run tests once
-npm run test:run
+pnpm run test:run
 
 # Run with coverage
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 Run specific test suites:
 
 ```bash
 # Test tour repository
-npm run test -- tour-repository
+pnpm run test -- tour-repository
 
 # Test tour service
-npm run test -- tour-service
+pnpm run test -- tour-service
 
 # Test tour form validation
-npm run test -- tour-validation
+pnpm run test -- tour-validation
 ```
 
 ### E2E Tests
@@ -150,13 +150,13 @@ Run end-to-end tests with Playwright:
 
 ```bash
 # Run all E2E tests
-npm run test:e2e
+pnpm run test:e2e
 
 # Run in UI mode for debugging
-npm run test:e2e:ui
+pnpm run test:e2e:ui
 
 # Run specific test
-npm run test:e2e -- tours
+pnpm run test:e2e -- tours
 ```
 
 ### Test Coverage Goals
@@ -184,7 +184,7 @@ model Tour {
 2. **Run migration**:
 
 ```bash
-npx prisma migrate dev --name add-tour-new-field
+pnpm exec prisma migrate dev --name add-tour-new-field
 ```
 
 3. **Update Zod schema** (`lib/validations/tour.ts`):
@@ -249,10 +249,10 @@ POST /api/tours/[tourId]/images/upload
 
 ```bash
 # Drop and recreate database
-npx prisma migrate reset
+pnpm exec prisma migrate reset
 
 # Reseed with sample data
-npx prisma db seed
+pnpm exec prisma db seed
 ```
 
 ## Project Structure
@@ -362,7 +362,7 @@ docker-compose restart mongo
 **Solution**:
 
 ```bash
-npx prisma generate
+pnpm exec prisma generate
 ```
 
 ### Authentication Issues
@@ -384,10 +384,10 @@ npx prisma generate
 ```bash
 # Clear node_modules and reinstall
 rm -rf node_modules package-lock.json
-npm install
+pnpm install
 
 # Clear Vitest cache
-npx vitest --clear-cache
+pnpm exec vitest --clear-cache
 ```
 
 ## Code Quality Checks
@@ -396,19 +396,19 @@ Before committing code:
 
 ```bash
 # Run linter
-npm run lint
+pnpm run lint
 
 # Fix linting issues
-npm run lint:fix
+pnpm run lint
 
 # Format code
-npm run format
+pnpm run format
 
 # Run all tests
-npm run test:run
+pnpm run test:run
 
 # Check test coverage
-npm run test:coverage
+pnpm run test:coverage
 ```
 
 ## Performance Monitoring
@@ -419,7 +419,7 @@ Monitor slow database queries:
 
 ```bash
 # Enable Prisma query logging
-DEBUG="prisma:query" npm run dev
+DEBUG="prisma:query" pnpm run dev
 ```
 
 ### Image Upload Performance

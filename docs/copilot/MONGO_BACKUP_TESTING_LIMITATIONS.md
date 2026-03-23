@@ -51,13 +51,13 @@ For critical backup/restore operations, perform manual testing:
 
 ```bash
 # Create a test backup
-npm run mongo:dump
+pnpm run mongo:dump
 
 # Verify backup file exists
 ls -l backups/
 
 # Test restore (use test database!)
-npm run mongo:restore backups/YYYY-MM-DDTHH-MM-SS-mongo-backup.archive
+pnpm run mongo:restore backups/YYYY-MM-DDTHH-MM-SS-mongo-backup.archive
 ```
 
 ### Option 2: Dependency Injection Refactor

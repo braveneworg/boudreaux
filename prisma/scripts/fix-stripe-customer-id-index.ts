@@ -11,7 +11,7 @@
  * documents where the field is present and non-null, so duplicates of null are allowed.
  *
  * Run once per environment before or after `prisma db push`:
- *   npx tsx prisma/scripts/fix-stripe-customer-id-index.ts
+ *   pnpm exec tsx prisma/scripts/fix-stripe-customer-id-index.ts
  */
 
 import { PrismaClient } from '@prisma/client';

@@ -182,14 +182,14 @@ All files                    |     100 |      100 |     100 |     100 |
 
 ```bash
 # Run all artist tests
-npm test -- artist --run
+pnpm test -- artist --run
 
 # Run with coverage
-npm test -- artist --coverage --run
+pnpm test -- artist --coverage --run
 
 # Run specific test file
-npm test -- artist-service.spec.ts --run
-npm test -- route.spec.ts --run
+pnpm test -- artist-service.spec.ts --run
+pnpm test -- route.spec.ts --run
 ```
 
 ## Test Results

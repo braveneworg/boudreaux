@@ -1,5 +1,5 @@
 name: 'Setup Node.js Environment'
-description: 'Checkout, setup Node.js, and install dependencies'
+description: 'Checkout, setup Node.js with pnpm, and install dependencies'
 
 runs:
   using: 'composite'
@@ -7,12 +7,19 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.12.0'
-        cache: 'npm'
+        node-version: '24.14.0'
+        cache: 'pnpm'
 
     - name: Install dependencies
       shell: bash
-      run: npm ci
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma Client
+      shell: bash
+      run: pnpm exec prisma generate

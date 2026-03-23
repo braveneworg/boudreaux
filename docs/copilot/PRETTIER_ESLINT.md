@@ -15,19 +15,13 @@ This project uses Prettier and ESLint together to ensure consistent code formatt
 
 ```bash
 # Lint code with ESLint
-npm run lint
-
-# Lint and auto-fix issues
-npm run lint:fix
+pnpm run lint
 
 # Format code with Prettier
-npm run format
+pnpm run format
 
 # Check formatting without changing files
-npm run format:check
-
-# Lint and format in one command
-npm run lint:format
+pnpm run format:check
 ```
 
 ## How It Works
@@ -67,13 +61,13 @@ You can add these to your CI pipeline:
 
 ```yaml
 # Check formatting
-- npm run format:check
+- pnpm run format:check
 
 # Check linting
-- npm run lint
+- pnpm run lint
 
 # Or combine both
-- npm run lint:format
+- pnpm run lint && pnpm run format
 ```
 
 ## Pre-commit Hooks (Optional)
@@ -81,8 +75,8 @@ You can add these to your CI pipeline:
 To automatically format and lint before committing, you can install husky and lint-staged:
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky init
+pnpm install --save-dev husky lint-staged
+pnpm exec husky init
 ```
 
 Add to `package.json`:
@@ -111,4 +105,4 @@ If you see conflicts, ensure `eslint-config-prettier` is loaded last in your ESL
 
 ### ESLint errors after formatting
 
-Run `npm run lint:fix` to auto-fix most issues, then manually fix any remaining problems.
+Run `pnpm run lint` to auto-fix most issues, then manually fix any remaining problems.

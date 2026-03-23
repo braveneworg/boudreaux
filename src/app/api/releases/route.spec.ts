@@ -213,6 +213,23 @@ describe('Release API Routes', () => {
         take: NaN,
       });
     });
+
+    it('should handle artistIds filter parameter', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases?artistIds=artist-1&artistIds=artist-2'
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith(
+        expect.objectContaining({ artistIds: ['artist-1', 'artist-2'] })
+      );
+    });
   });
 
   describe('POST /api/releases', () => {

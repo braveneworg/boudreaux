@@ -43,14 +43,22 @@ test.describe('Notification Banner Carousel', () => {
     await page.goto('/');
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
+    const tabs = page.getByRole('tab');
+
+    // Focus the carousel — this pauses auto-cycling via onFocus
     await carousel.focus();
 
-    // Press right arrow to go to next banner
+    // Determine which tab is currently selected after focus stabilises
+    const selectedBefore = await tabs.evaluateAll((tabList) =>
+      tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+    );
+
+    // Press right arrow to advance one slide
     await carousel.press('ArrowRight');
 
-    // Second dot should now be selected
-    const tabs = page.getByRole('tab');
-    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    // The next dot (wrapping around) should now be selected
+    const expectedIndex = (selectedBefore + 1) % (await tabs.count());
+    await expect(tabs.nth(expectedIndex)).toHaveAttribute('aria-selected', 'true');
   });
 
   test('should auto-cycle to next banner after interval', async ({ page }) => {
@@ -104,16 +112,24 @@ test.describe('Notification Banner Carousel', () => {
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
+    const totalTabs = await tabs.count();
 
+    // Focus pauses auto-cycling; capture the current index
     await carousel.focus();
 
-    // Navigate to last banner (3 banners, start at 0, go right twice)
-    await carousel.press('ArrowRight');
-    await carousel.press('ArrowRight');
-    await expect(tabs.nth(2)).toHaveAttribute('aria-selected', 'true');
+    const getSelectedIndex = async () =>
+      tabs.evaluateAll((tabList) =>
+        tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+      );
 
-    // Navigate one more time to wrap around to first
-    await carousel.press('ArrowRight');
-    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    const startIndex = await getSelectedIndex();
+
+    // Press ArrowRight (totalTabs) times to cycle through all and wrap back to start
+    for (let i = 0; i < totalTabs; i++) {
+      await carousel.press('ArrowRight');
+    }
+
+    // Should be back at the starting index after a full cycle
+    await expect(tabs.nth(startIndex)).toHaveAttribute('aria-selected', 'true');
   });
 });

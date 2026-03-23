@@ -350,7 +350,7 @@ if (formState.success) {
 **Installation:**
 
 ```bash
-npm install --save-dev type-coverage
+pnpm install --save-dev type-coverage
 ```
 
 **Add to package.json:**
@@ -367,7 +367,7 @@ npm install --save-dev type-coverage
 **Usage:**
 
 ```bash
-npm run type-coverage
+pnpm run type-coverage
 # Reports % of code with proper types
 # Goal: Maintain 95%+ coverage
 ```
@@ -422,13 +422,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: TypeScript Check
-        run: npm run type-check
+        run: pnpm run type-check
 
       - name: Type Coverage
-        run: npm run type-coverage
+        run: pnpm run type-coverage
         continue-on-error: true # Don't fail build, just warn
 
       - name: Upload Type Coverage
@@ -451,10 +451,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Application
-        run: npm run build
+        run: pnpm run build
         env:
           NODE_ENV: production
 ```
@@ -471,8 +471,8 @@ jobs:
 **Installation:**
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky init
+pnpm install --save-dev husky lint-staged
+pnpm exec husky init
 ```
 
 **Create:** `.husky/pre-commit`
@@ -481,7 +481,7 @@ npx husky init
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npx lint-staged
+pnpm exec lint-staged
 ```
 
 **Add to package.json:**
@@ -527,19 +527,19 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check type coverage diff
         run: |
           # Get coverage on base branch
           git checkout ${{ github.base_ref }}
-          npm ci
-          npm run type-coverage > base-coverage.txt || true
+          pnpm install --frozen-lockfile
+          pnpm run type-coverage > base-coverage.txt || true
 
           # Get coverage on PR branch
           git checkout ${{ github.head_ref }}
-          npm ci
-          npm run type-coverage > pr-coverage.txt || true
+          pnpm install --frozen-lockfile
+          pnpm run type-coverage > pr-coverage.txt || true
 
           # Compare and comment on PR
           echo "## Type Coverage Comparison" >> $GITHUB_STEP_SUMMARY
@@ -548,7 +548,7 @@ jobs:
 
       - name: TypeScript Error Count
         run: |
-          ERROR_COUNT=$(npx tsc --noEmit 2>&1 | grep -c "error TS" || echo "0")
+          ERROR_COUNT=$(pnpm exec tsc --noEmit 2>&1 | grep -c "error TS" || echo "0")
           echo "TypeScript Errors: $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
 
           if [ "$ERROR_COUNT" -gt 0 ]; then
@@ -836,19 +836,19 @@ async function collectMetrics(): Promise<TypeMetrics> {
 
   // Run type check
   try {
-    await execAsync('npx tsc --noEmit');
+    await execAsync('pnpm exec tsc --noEmit');
   } catch (error) {
     // Errors expected, we'll parse them
   }
 
   // Run type coverage
-  const { stdout: coverageOutput } = await execAsync('npx type-coverage --detail');
+  const { stdout: coverageOutput } = await execAsync('pnpm exec type-coverage --detail');
   const coverageMatch = coverageOutput.match(/(\d+\.\d+)%/);
   const coverage = coverageMatch ? parseFloat(coverageMatch[1]) : 0;
 
   // Count errors
   const { stdout: errorsOutput } = await execAsync(
-    'npx tsc --noEmit 2>&1 | grep -c "error TS" || echo "0"'
+    'pnpm exec tsc --noEmit 2>&1 | grep -c "error TS" || echo "0"'
   );
   const errors = parseInt(errorsOutput.trim());
 
@@ -920,8 +920,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm ci
-      - run: npm run metrics
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run metrics
       - uses: actions/upload-artifact@v3
         with:
           name: type-metrics
