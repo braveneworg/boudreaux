@@ -29,7 +29,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, releaseTitle, amountCents } = parsed.data;
+  const { releaseId, amountCents } = parsed.data;
 
   // Resolve user identity server-side; never trust a client-supplied userId.
   const authSession = await auth();

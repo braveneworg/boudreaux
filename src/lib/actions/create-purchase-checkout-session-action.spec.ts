@@ -193,7 +193,8 @@ describe('createPurchaseCheckoutSessionAction', () => {
       await createPurchaseCheckoutSessionAction(validInput);
 
       type LineItemsParam = { line_items: { price_data: { product_data: { name: string } } }[] };
-      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0][0] as LineItemsParam;
+      const createCall = vi.mocked(stripe.checkout.sessions.create).mock
+        .calls[0][0] as LineItemsParam;
       expect(createCall.line_items[0].price_data.product_data.name).toBe('Test Album');
     });
 
