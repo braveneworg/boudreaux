@@ -363,11 +363,9 @@ export const DownloadDialog = ({
               if (purchaseMode) {
                 const status = await checkGuestPurchaseAction(email, releaseId);
                 if (status.hasPurchase) {
-                  setGuestUserId(status.userId);
                   setGuestAtCap(status.atCap);
                   setStep('returning-download');
                 } else {
-                  setGuestUserId(status.userId);
                   setStep('purchase-checkout');
                 }
               } else {
