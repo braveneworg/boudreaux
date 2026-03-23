@@ -1063,7 +1063,12 @@ describe('DownloadDialog — premium-digital submit paths', () => {
     expect(screen.getByText('Minimum amount is $0.50')).toBeInTheDocument();
   });
 
-  it('should show a form error when the amount is NaN (invalid input)', async () => {
+  it('should use effectiveSuggestedPrice and advance when no custom amount is entered', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1079,16 +1084,14 @@ describe('DownloadDialog — premium-digital submit paths', () => {
       expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
     });
 
-    // Clear the field so rawAmount is empty string, which makes effectiveSuggestedPrice used — but simulate a NaN scenario by directly typing nothing and checking default works
-    // The NaN path is covered when rawAmount resolves to a non-numeric string; the input sanitizer prevents most cases,
-    // but we verify the guard handles it gracefully by leaving the field blank (0 cents < 50 cents)
+    // Submit with no custom amount — handleSubmit falls back to effectiveSuggestedPrice ($8),
+    // which is finite and >= $0.50, so no NaN error and the flow advances.
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
-    // With no amount entered and effectiveSuggestedPrice >= 0.50, this should succeed (no error)
-    // The NaN guard is an internal safety net; test the < 50 path instead as it is observable
     await waitFor(() => {
-      // Should either advance or stay; either way, no unhandled error thrown
-      expect(screen.queryByRole('dialog')).toBeTruthy();
+      expect(screen.queryByText('Amount must be a valid number')).not.toBeInTheDocument();
+      expect(screen.queryByText('Minimum amount is $0.50')).not.toBeInTheDocument();
+      expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument();
     });
   });
 
