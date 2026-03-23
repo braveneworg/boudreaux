@@ -261,7 +261,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 /**
  * Checks whether an IPv4 address falls within a given CIDR range.
- * Supports /8 through /32 prefix lengths.
+ * Supports /0 through /32 prefix lengths.
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
   try {
