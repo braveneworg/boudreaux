@@ -129,7 +129,6 @@ export const PurchaseCheckoutStep = ({
       try {
         const result = await createPurchaseCheckoutSessionAction({
           releaseId,
-          releaseTitle,
           amountCents,
           userId,
         });
