@@ -111,9 +111,41 @@ describe('PurchaseCheckoutStep', () => {
     render(<PurchaseCheckoutStep {...props} />);
 
     await waitFor(() => {
-      expect(screen.getByText('stripe_error')).toBeDefined();
+      expect(
+        screen.getByText('A payment error occurred. Please try again or contact support.')
+      ).toBeDefined();
     });
     expect(screen.getByText('Something went wrong')).toBeDefined();
+  });
+
+  it('shows a user-friendly message for already_purchased error', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: false,
+      error: 'already_purchased',
+    });
+
+    const onError = vi.fn();
+    const props = buildProps({ onError });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('You have already purchased this release.')).toBeDefined();
+    });
+    expect(onError).toHaveBeenCalledWith('You have already purchased this release.');
+  });
+
+  it('shows a fallback message for unknown error codes', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: false,
+      error: 'unknown_error_code',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeDefined();
+    });
   });
 
   it('shows a loading spinner while the session is being created', () => {
