@@ -83,6 +83,7 @@ export const DownloadDialog = ({
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [purchaseMode, setPurchaseMode] = useState(false);
   const [amountCents, setAmountCents] = useState<number>(0);
+  const [guestUserId, setGuestUserId] = useState<string | null>(null);
   const [guestAtCap, setGuestAtCap] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
@@ -102,21 +103,16 @@ export const DownloadDialog = ({
     .trim();
 
   const effectiveSuggestedPrice = suggestedPrice ?? premiumPrice ?? 5;
-  const parsedDisplayAmount = rawAmount ? parseFloat(rawAmount) : null;
-  const displayAmount =
-    parsedDisplayAmount !== null && Number.isFinite(parsedDisplayAmount)
-      ? `$${parsedDisplayAmount.toFixed(2)}`
-      : `$${effectiveSuggestedPrice.toFixed(2)}`;
+  const parsedRaw = rawAmount ? parseFloat(rawAmount) : NaN;
+  const displayAmount = Number.isFinite(parsedRaw)
+    ? `$${parsedRaw.toFixed(2)}`
+    : `$${effectiveSuggestedPrice.toFixed(2)}`;
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     if (data.downloadOption === 'premium-digital') {
-      const parsed = parseFloat(rawAmount || String(effectiveSuggestedPrice));
-      const cents = Math.round(parsed * 100);
-      if (isNaN(cents) || cents < 50) {
-        form.setError('finalAmount', {
-          type: 'manual',
-          message: 'Minimum amount is $0.50',
-        });
+      const cents = Math.round(parseFloat(rawAmount || String(effectiveSuggestedPrice)) * 100);
+      if (cents < 50) {
+        form.setError('finalAmount', { message: 'Minimum amount is $0.50' });
         return;
       }
       setAmountCents(cents);
@@ -142,6 +138,7 @@ export const DownloadDialog = ({
       setCustomerEmail(null);
       setPurchaseMode(false);
       setAmountCents(0);
+      setGuestUserId(null);
       setGuestAtCap(false);
       setPurchaseError(null);
     }
@@ -342,8 +339,7 @@ export const DownloadDialog = ({
               setSelectedTier(null);
             }}
             onConfirm={() => {
-              if (session?.user?.email) {
-                setCustomerEmail(session.user.email);
+              if (session?.user) {
                 setStep('checkout');
               } else {
                 setStep('email-step');
@@ -367,9 +363,11 @@ export const DownloadDialog = ({
               if (purchaseMode) {
                 const status = await checkGuestPurchaseAction(email, releaseId);
                 if (status.hasPurchase) {
+                  setGuestUserId(status.userId);
                   setGuestAtCap(status.atCap);
                   setStep('returning-download');
                 } else {
+                  setGuestUserId(status.userId);
                   setStep('purchase-checkout');
                 }
               } else {
@@ -388,7 +386,7 @@ export const DownloadDialog = ({
             releaseId={releaseId}
             releaseTitle={releaseTitle}
             amountCents={amountCents}
-            customerEmail={session?.user?.email ?? customerEmail ?? ''}
+            userId={(session?.user as { id?: string })?.id ?? guestUserId ?? ''}
             onConfirmed={() => setStep('purchase-success')}
             onError={(msg) => {
               setPurchaseError(msg);

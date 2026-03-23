@@ -751,7 +751,8 @@ describe('DownloadDialog — subscription multi-step flow', () => {
     expect(screen.queryByTestId('email-step')).not.toBeInTheDocument();
     const checkoutStep = screen.getByTestId('checkout-step');
     expect(checkoutStep).toBeInTheDocument();
-    expect(checkoutStep).toHaveAttribute('data-email', 'authed@example.com');
+    // Authenticated users skip email — customerEmail is not set, resolved server-side
+    expect(checkoutStep).toHaveAttribute('data-email', '');
   });
 
   it('should navigate from email step to checkout step on confirm', async () => {
@@ -860,7 +861,7 @@ describe('DownloadDialog — subscription multi-step flow', () => {
     expect(screen.getByTestId('checkout-step')).toHaveAttribute('data-tier', 'extraExtra');
   });
 
-  it('should pass the authenticated user email to checkout step and resolve stripeCustomerId server-side', async () => {
+  it('should skip email step for authenticated user and resolve email server-side', async () => {
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -885,7 +886,8 @@ describe('DownloadDialog — subscription multi-step flow', () => {
     await user.click(screen.getByRole('button', { name: /Go for It/ }));
 
     const checkoutStep = screen.getByTestId('checkout-step');
-    expect(checkoutStep).toHaveAttribute('data-email', 'subscriber@example.com');
+    // Authenticated users skip email — customerEmail resolved server-side
+    expect(checkoutStep).toHaveAttribute('data-email', '');
     // stripeCustomerId is no longer passed as a prop; it is resolved server-side in the action
     expect(checkoutStep).not.toHaveAttribute('data-stripe-customer-id');
   });

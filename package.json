@@ -10,6 +10,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "seed": "tsx prisma/seed.ts",
+    "stripe": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook",
     "stripe:seed": "tsx scripts/stripe-seed.ts",
     "test": "vitest",
     "test:run": "vitest run",

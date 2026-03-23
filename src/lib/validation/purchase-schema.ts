@@ -3,17 +3,33 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-/** Validates the input to createPurchaseCheckoutSessionAction. */
+/** Validates the purchase checkout session payload (webhook/checkout flow). */
 export const purchaseCheckoutSchema = z.object({
   releaseId: z.string().min(1, 'Release ID is required'),
   amountCents: z
     .number()
     .int('Amount must be a whole number of cents')
     .min(50, 'Minimum amount is $0.50'),
-  customerEmail: z.string().email('A valid customer email is required'),
+  customerEmail: z
+    .string()
+    .min(1, 'Customer email is required')
+    .email('Customer email must be a valid email address'),
 });
 
 export type PurchaseCheckoutSchemaType = z.infer<typeof purchaseCheckoutSchema>;
+
+/** Validates the input to createPurchaseCheckoutSessionAction. */
+export const purchaseCheckoutActionSchema = z.object({
+  releaseId: z.string().min(1, 'Release ID is required'),
+  releaseTitle: z.string().min(1, 'Release title is required'),
+  amountCents: z
+    .number()
+    .int('Amount must be a whole number of cents')
+    .min(50, 'Minimum amount is $0.50'),
+  userId: z.string().min(1, 'User ID is required'),
+});
+
+export type PurchaseCheckoutActionSchemaType = z.infer<typeof purchaseCheckoutActionSchema>;
 
 /** Validates the raw dollar-amount string input from the PWYW field. */
 export const amountInputSchema = z.object({

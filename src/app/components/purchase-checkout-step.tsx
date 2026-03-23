@@ -19,23 +19,11 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_COUNT = 45;
 
-/** Maps server-action error codes to user-friendly messages. */
-const PURCHASE_ERROR_MESSAGES: Record<string, string> = {
-  stripe_error: 'Something went wrong with the payment provider. Please try again.',
-  already_purchased: 'You have already purchased this release.',
-  amount_below_minimum: 'The minimum purchase amount is $0.50.',
-  release_unavailable: 'This release is no longer available for purchase.',
-};
-
-function getPurchaseErrorMessage(code: string): string {
-  return PURCHASE_ERROR_MESSAGES[code] ?? code;
-}
-
 interface PurchaseCheckoutStepProps {
   releaseId: string;
   releaseTitle: string;
   amountCents: number;
-  customerEmail: string;
+  userId: string;
   onConfirmed: () => void;
   onError: (message: string) => void;
 }
@@ -124,7 +112,7 @@ export const PurchaseCheckoutStep = ({
   releaseId,
   releaseTitle,
   amountCents,
-  customerEmail,
+  userId,
   onConfirmed,
   onError,
 }: PurchaseCheckoutStepProps) => {
@@ -141,16 +129,16 @@ export const PurchaseCheckoutStep = ({
       try {
         const result = await createPurchaseCheckoutSessionAction({
           releaseId,
+          releaseTitle,
           amountCents,
-          customerEmail,
+          userId,
         });
 
         if (cancelled) return;
 
         if (!result.success) {
-          const friendly = getPurchaseErrorMessage(result.error);
-          setSessionError(friendly);
-          onError(friendly);
+          setSessionError(result.error);
+          onError(result.error);
           return;
         }
 
@@ -170,7 +158,7 @@ export const PurchaseCheckoutStep = ({
     return () => {
       cancelled = true;
     };
-  }, [releaseId, releaseTitle, customerEmail, amountCents, onError]);
+  }, [releaseId, releaseTitle, amountCents, userId, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
     queryKey: ['purchase-status', releaseId, paymentIntentId],

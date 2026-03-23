@@ -4,7 +4,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 
@@ -17,12 +16,6 @@ vi.mock('@/lib/prisma', () => ({
     release: {
       findFirst: vi.fn(),
     },
-  },
-}));
-
-vi.mock('@/lib/repositories/purchase-repository', () => ({
-  PurchaseRepository: {
-    findUserByEmail: vi.fn(),
   },
 }));
 
@@ -45,18 +38,15 @@ vi.mock('@/lib/stripe', () => ({
 describe('createPurchaseCheckoutSessionAction', () => {
   const validInput = {
     releaseId: 'release-123',
+    releaseTitle: 'Test Album',
     amountCents: 500,
-    customerEmail: 'buyer@example.com',
+    userId: 'user-123',
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue({ id: 'user-123' });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
-    vi.mocked(prisma.release.findFirst).mockResolvedValue({
-      id: 'release-123',
-      title: 'Test Album',
-    } as never);
+    vi.mocked(prisma.release.findFirst).mockResolvedValue({ id: 'release-123' } as never);
     vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
       client_secret: 'secret_xxx',
       payment_intent: 'pi_xxx',
@@ -69,17 +59,28 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
   describe('schema validation', () => {
     it('should return an error when releaseId is missing from the input', async () => {
-      const invalidInput = {
-        releaseTitle: 'Test Album',
-        amountCents: 500,
-        userId: 'user-123',
-        customerEmail: 'buyer@example.com',
-      };
+      const invalidInput = { releaseTitle: 'Test Album', amountCents: 500, userId: 'user-123' };
+
       const result = await createPurchaseCheckoutSessionAction(invalidInput);
 
       expect(result.success).toBe(false);
       expect(typeof (result as { success: false; error: string }).error).toBe('string');
       expect((result as { success: false; error: string }).error.length).toBeGreaterThan(0);
+    });
+
+    it('should return an error when releaseTitle is empty', async () => {
+      const result = await createPurchaseCheckoutSessionAction({
+        ...validInput,
+        releaseTitle: '',
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('should return an error when userId is empty', async () => {
+      const result = await createPurchaseCheckoutSessionAction({ ...validInput, userId: '' });
+
+      expect(result.success).toBe(false);
     });
 
     it('should return an error when amountCents is below the schema minimum of 50', async () => {
@@ -90,38 +91,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
     });
   });
 
-  describe('user resolution', () => {
-    it('should look up user by email to resolve userId server-side', async () => {
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(PurchaseRepository.findUserByEmail).toHaveBeenCalledWith('buyer@example.com');
-    });
-
-    it('should include userId in Stripe metadata when user exists', async () => {
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue({ id: 'user-abc' });
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ userId: 'user-abc' }),
-        })
-      );
-    });
-
-    it('should include customerEmail in Stripe metadata when user does not exist', async () => {
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ customerEmail: 'buyer@example.com' }),
-        })
-      );
-    });
-  });
-
   describe('duplicate purchase check', () => {
     it('should return "already_purchased" when the user already has a purchase for the release', async () => {
       vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(true);
@@ -129,14 +98,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({ success: false, error: 'already_purchased' });
-    });
-
-    it('should skip duplicate check when user is not found by email', async () => {
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(PurchaseService.checkExistingPurchase).not.toHaveBeenCalled();
     });
   });
 
@@ -173,27 +134,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(result).toEqual({ success: false, error: 'stripe_error' });
     });
 
-    it('should use the release title from the database for product_data.name', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue({
-        id: 'release-123',
-        title: 'DB Album Title',
-      } as never);
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          line_items: [
-            expect.objectContaining({
-              price_data: expect.objectContaining({
-                product_data: { name: 'DB Album Title' },
-              }),
-            }),
-          ],
-        })
-      );
-    });
-
     it('should return success with clientSecret and paymentIntentId when session is valid', async () => {
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
@@ -217,30 +157,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
         clientSecret: 'secret_yyy',
         paymentIntentId: 'pi_yyy',
       });
-    });
-
-    it('should use AUTH_URL in the return_url when configured', async () => {
-      vi.stubEnv('AUTH_URL', 'https://mysite.com');
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          return_url: 'https://mysite.com/releases/release-123',
-        })
-      );
-    });
-
-    it('should fall back to localhost when AUTH_URL is not set', async () => {
-      delete process.env.AUTH_URL;
-
-      await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          return_url: 'http://localhost:3000/releases/release-123',
-        })
-      );
     });
 
     it('should return "stripe_error" when stripe.checkout.sessions.create throws', async () => {

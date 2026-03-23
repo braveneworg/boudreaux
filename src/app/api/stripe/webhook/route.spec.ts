@@ -11,6 +11,7 @@ vi.mock('server-only', () => ({}));
 
 const mockConstructEvent = vi.fn();
 const mockSubscriptionsRetrieve = vi.fn();
+const mockCheckoutSessionsRetrieve = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
   stripe: {
@@ -19,6 +20,11 @@ vi.mock('@/lib/stripe', () => ({
     },
     subscriptions: {
       retrieve: (...args: unknown[]) => mockSubscriptionsRetrieve(...args),
+    },
+    checkout: {
+      sessions: {
+        retrieve: (...args: unknown[]) => mockCheckoutSessionsRetrieve(...args),
+      },
     },
   },
 }));
@@ -62,11 +68,13 @@ vi.mock('@/lib/email/send-subscription-confirmation', () => ({
 
 const mockFindByPaymentIntentId = vi.fn();
 const mockPurchaseCreate = vi.fn();
+const mockFindUserByEmail = vi.fn();
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
     findByPaymentIntentId: (...args: unknown[]) => mockFindByPaymentIntentId(...args),
     create: (...args: unknown[]) => mockPurchaseCreate(...args),
+    findUserByEmail: (...args: unknown[]) => mockFindUserByEmail(...args),
   },
 }));
 
@@ -787,6 +795,7 @@ describe('POST /api/stripe/webhook', () => {
         type: 'checkout.session.completed',
         data: { object: mockPaymentSession },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(mockPaymentSession);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({
         id: 'purchase-new',
@@ -801,6 +810,7 @@ describe('POST /api/stripe/webhook', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+      expect(mockCheckoutSessionsRetrieve).toHaveBeenCalledWith('cs_pay_123');
       expect(mockPurchaseCreate).toHaveBeenCalledWith({
         userId: 'user-001',
         releaseId: 'release-001',
@@ -827,6 +837,52 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).not.toHaveBeenCalled();
       expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+    });
+
+    it('retrieves payment_intent from the Stripe API when webhook payload has null payment_intent', async () => {
+      const payloadSession = {
+        id: 'cs_null_pi',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-null-pi', userId: 'u-null-pi' },
+        payment_intent: null,
+        amount_total: 999,
+        currency: 'usd',
+        customer_details: { email: 'nullpi@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: payloadSession },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue({
+        ...payloadSession,
+        payment_intent: 'pi_retrieved_from_api',
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-null-pi' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Null PI Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockCheckoutSessionsRetrieve).toHaveBeenCalledWith('cs_null_pi');
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ stripePaymentIntentId: 'pi_retrieved_from_api' })
+      );
+    });
+
+    it('returns 500 when stripe.checkout.sessions.retrieve fails', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockCheckoutSessionsRetrieve.mockRejectedValue(new Error('Stripe API error'));
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      vi.mocked(console.error).mockRestore();
     });
 
     it('does not trigger the release purchase handler for a subscription mode session', async () => {
@@ -1118,21 +1174,21 @@ describe('POST /api/stripe/webhook', () => {
   // ─── Branch coverage: release purchase edge cases ───
   describe('release purchase — missing fields and fallbacks', () => {
     it('extracts paymentIntentId from object form', async () => {
+      const session = {
+        id: 'cs_piobj',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-piobj', userId: 'u-piobj' },
+        payment_intent: { id: 'pi_obj_001' },
+        amount_total: 500,
+        currency: 'eur',
+        customer_details: { email: 'piobj@example.com' },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_piobj',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-piobj', userId: 'u-piobj' },
-            payment_intent: { id: 'pi_obj_001' },
-            amount_total: 500,
-            currency: 'eur',
-            customer_details: { email: 'piobj@example.com' },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-piobj' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'PI Obj Release' });
@@ -1144,21 +1200,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('returns early when releaseId is missing from metadata', async () => {
+      const session = {
+        id: 'cs_no_rid',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', userId: 'u-no-rid' },
+        payment_intent: 'pi_no_rid',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'norid@example.com' },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_no_rid',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', userId: 'u-no-rid' },
-            payment_intent: 'pi_no_rid',
-            amount_total: 500,
-            currency: 'usd',
-            customer_details: { email: 'norid@example.com' },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1166,21 +1222,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('defaults amount_total to 0 when null', async () => {
+      const session = {
+        id: 'cs_null_amt',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-amt', userId: 'u-amt' },
+        payment_intent: 'pi_amt',
+        amount_total: null,
+        currency: 'usd',
+        customer_details: { email: 'amt@example.com' },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_null_amt',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-amt', userId: 'u-amt' },
-            payment_intent: 'pi_amt',
-            amount_total: null,
-            currency: 'usd',
-            customer_details: { email: 'amt@example.com' },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-amt' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Amt Release' });
@@ -1192,21 +1248,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('defaults currency to "usd" when null', async () => {
+      const session = {
+        id: 'cs_null_cur',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-cur', userId: 'u-cur' },
+        payment_intent: 'pi_cur',
+        amount_total: 200,
+        currency: null,
+        customer_details: { email: 'cur@example.com' },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_null_cur',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-cur', userId: 'u-cur' },
-            payment_intent: 'pi_cur',
-            amount_total: 200,
-            currency: null,
-            customer_details: { email: 'cur@example.com' },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-cur' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Cur Release' });
@@ -1218,21 +1274,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('uses "Unknown Release" when release is not found in DB', async () => {
+      const session = {
+        id: 'cs_no_rel',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-gone', userId: 'u-gone' },
+        payment_intent: 'pi_gone',
+        amount_total: 100,
+        currency: 'usd',
+        customer_details: { email: 'gone@example.com' },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_no_rel',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-gone', userId: 'u-gone' },
-            payment_intent: 'pi_gone',
-            amount_total: 100,
-            currency: 'usd',
-            customer_details: { email: 'gone@example.com' },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-gone' });
       mockPrismaReleaseFindFirst.mockResolvedValue(null);
@@ -1246,21 +1302,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('does not send email when no customer email is available', async () => {
+      const session = {
+        id: 'cs_no_email',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-noem', userId: 'u-noem' },
+        payment_intent: 'pi_noem',
+        amount_total: 100,
+        currency: 'usd',
+        customer_details: { email: null },
+        customer_email: null,
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_no_email',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-noem', userId: 'u-noem' },
-            payment_intent: 'pi_noem',
-            amount_total: 100,
-            currency: 'usd',
-            customer_details: { email: null },
-            customer_email: null,
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-noem' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release' });
@@ -1272,21 +1328,21 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     it('falls back to customer_email for purchase when customer_details.email is null', async () => {
+      const session = {
+        id: 'cs_fb_buy',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-fb', userId: 'u-fb' },
+        payment_intent: 'pi_fb',
+        amount_total: 100,
+        currency: 'usd',
+        customer_details: { email: null },
+        customer_email: 'fallback-buyer@example.com',
+      };
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
-        data: {
-          object: {
-            id: 'cs_fb_buy',
-            mode: 'payment',
-            metadata: { type: 'release_purchase', releaseId: 'r-fb', userId: 'u-fb' },
-            payment_intent: 'pi_fb',
-            amount_total: 100,
-            currency: 'usd',
-            customer_details: { email: null },
-            customer_email: 'fallback-buyer@example.com',
-          },
-        },
+        data: { object: session },
       });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-fb' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Fallback Release' });
@@ -1297,6 +1353,61 @@ describe('POST /api/stripe/webhook', () => {
       expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
         expect.objectContaining({ customerEmail: 'fallback-buyer@example.com' })
       );
+    });
+
+    it('resolves userId from customer email when userId is missing from metadata', async () => {
+      const session = {
+        id: 'cs_no_uid',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-nouid' },
+        payment_intent: 'pi_nouid',
+        amount_total: 700,
+        currency: 'usd',
+        customer_details: { email: 'resolved@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindUserByEmail.mockResolvedValue({ id: 'u-resolved' });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-nouid' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Resolved Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockFindUserByEmail).toHaveBeenCalledWith('resolved@example.com');
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u-resolved', releaseId: 'r-nouid' })
+      );
+    });
+
+    it('returns early when userId cannot be resolved from metadata or email', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_no_resolve',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-nores' },
+        payment_intent: 'pi_nores',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'unknown@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindUserByEmail.mockResolvedValue(null);
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      vi.mocked(console.error).mockRestore();
     });
   });
 
