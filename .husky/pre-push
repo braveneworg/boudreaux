@@ -69,7 +69,6 @@ echo "✅ ESLint passed"
 echo ""
 echo "🧪 Running tests before push..."
 
-# Run tests excluding the unrelated failing SSR test
 # Suppress console output during tests to reduce verbosity
 SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
 
