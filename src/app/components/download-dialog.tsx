@@ -109,7 +109,13 @@ export const DownloadDialog = ({
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     if (data.downloadOption === 'premium-digital') {
-      const cents = Math.round(parseFloat(rawAmount || String(effectiveSuggestedPrice)) * 100);
+      const cleanedAmount = data.finalAmount?.replace(/[^\d.]/g, '').trim();
+      const dollars = cleanedAmount ? Number(cleanedAmount) : effectiveSuggestedPrice;
+      if (!Number.isFinite(dollars)) {
+        form.setError('finalAmount', { message: 'Amount must be a valid number' });
+        return;
+      }
+      const cents = Math.round(dollars * 100);
       if (cents < 50) {
         form.setError('finalAmount', { message: 'Minimum amount is $0.50' });
         return;

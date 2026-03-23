@@ -43,7 +43,6 @@ vi.mock('@/lib/stripe', () => ({
 describe('createPurchaseCheckoutSessionAction', () => {
   const validInput = {
     releaseId: 'release-123',
-    releaseTitle: 'Test Album',
     amountCents: 500,
   };
 
@@ -52,7 +51,10 @@ describe('createPurchaseCheckoutSessionAction', () => {
     // Default: authenticated user
     mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
-    vi.mocked(prisma.release.findFirst).mockResolvedValue({ id: 'release-123' } as never);
+    vi.mocked(prisma.release.findFirst).mockResolvedValue({
+      id: 'release-123',
+      title: 'Test Album',
+    } as never);
     vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
       client_secret: 'secret_xxx',
       payment_intent: 'pi_xxx',
@@ -68,19 +70,11 @@ describe('createPurchaseCheckoutSessionAction', () => {
       const invalidInput = { releaseTitle: 'Test Album', amountCents: 500 };
 
       const result = await createPurchaseCheckoutSessionAction(invalidInput);
+      const failure = result as { success: false; error: string };
 
       expect(result.success).toBe(false);
-      expect(typeof (result as { success: false; error: string }).error).toBe('string');
-      expect((result as { success: false; error: string }).error.length).toBeGreaterThan(0);
-    });
-
-    it('should return an error when releaseTitle is empty', async () => {
-      const result = await createPurchaseCheckoutSessionAction({
-        ...validInput,
-        releaseTitle: '',
-      });
-
-      expect(result.success).toBe(false);
+      expect(typeof failure.error).toBe('string');
+      expect(failure.error.length).toBeGreaterThan(0);
     });
 
     it('should return an error when amountCents is below the schema minimum of 50', async () => {
@@ -193,6 +187,14 @@ describe('createPurchaseCheckoutSessionAction', () => {
         clientSecret: 'secret_xxx',
         paymentIntentId: 'pi_xxx',
       });
+    });
+
+    it('should use the database title as the Stripe product name, not a client-provided value', async () => {
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      type LineItemsParam = { line_items: { price_data: { product_data: { name: string } } }[] };
+      const createCall = vi.mocked(stripe.checkout.sessions.create).mock.calls[0][0] as LineItemsParam;
+      expect(createCall.line_items[0].price_data.product_data.name).toBe('Test Album');
     });
 
     it('should extract the id when payment_intent is an object rather than a string', async () => {

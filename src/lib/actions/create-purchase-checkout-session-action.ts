@@ -49,10 +49,10 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       }
     }
 
-    // Verify release exists and is published
+    // Verify release exists and is published; fetch title for Stripe product data
     const release = await prisma.release.findFirst({
       where: { id: releaseId, publishedAt: { not: null } },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!release) {
       return { success: false, error: 'release_unavailable' };
@@ -66,7 +66,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
           price_data: {
             currency: 'usd',
             unit_amount: amountCents,
-            product_data: { name: releaseTitle },
+            product_data: { name: release.title },
           },
           quantity: 1,
         },

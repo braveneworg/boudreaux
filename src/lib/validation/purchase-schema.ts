@@ -21,7 +21,6 @@ export type PurchaseCheckoutSchemaType = z.infer<typeof purchaseCheckoutSchema>;
 /** Validates the input to createPurchaseCheckoutSessionAction. */
 export const purchaseCheckoutActionSchema = z.object({
   releaseId: z.string().min(1, 'Release ID is required'),
-  releaseTitle: z.string().min(1, 'Release title is required'),
   amountCents: z
     .number()
     .int('Amount must be a whole number of cents')
