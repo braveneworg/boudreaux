@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       const forwarded = request.headers.get('x-forwarded-for');
       const remoteIp = forwarded
         ? forwarded.split(',')[0].trim()
-        : (request.headers.get('x-real-ip') ?? '');
+        : (request.headers.get('x-real-ip')?.trim() ?? '');
       const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
       const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
       if (!isAllowed) {
@@ -261,7 +261,8 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 /**
  * Checks whether an IPv4 address falls within a given CIDR range.
- * Supports /8 through /32 prefix lengths.
+ * Supports /0 through /32 prefix lengths.
+ * Returns false for any malformed IP or CIDR input.
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
   try {
@@ -269,9 +270,10 @@ function isIpInCidr(ip: string, cidr: string): boolean {
     const normalizedBitsStr = bitsStr ?? '32';
     if (!/^\d+$/.test(normalizedBitsStr)) return false;
     const bits = parseInt(normalizedBitsStr, 10);
-    if (bits > 32) return false;
+    if (bits < 0 || bits > 32) return false;
     const ipNum = ipToNum(ip);
     const rangeNum = ipToNum(range ?? '');
+    if (ipNum === null || rangeNum === null) return false;
     const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
     return (ipNum & mask) === (rangeNum & mask);
   } catch {
@@ -279,6 +281,21 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   }
 }
 
-function ipToNum(ip: string): number {
-  return ip.split('.').reduce((acc, octet) => (acc << 8) | parseInt(octet, 10), 0) >>> 0;
+/**
+ * Converts a dotted-decimal IPv4 string to a 32-bit unsigned integer.
+ * Returns null if the input is not a valid IPv4 address (must have exactly
+ * 4 decimal octets, each in the range 0–255).
+ */
+function ipToNum(ip: string): number | null {
+  const octets = ip.split('.');
+  if (octets.length !== 4) return null;
+  let result = 0;
+  for (const octet of octets) {
+    if (!/^\d+$/.test(octet)) return null;
+    if (octet.length > 1 && octet[0] === '0') return null;
+    const n = parseInt(octet, 10);
+    if (n > 255) return null;
+    result = ((result << 8) | n) >>> 0;
+  }
+  return result;
 }
