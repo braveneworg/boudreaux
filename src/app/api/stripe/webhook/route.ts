@@ -25,8 +25,9 @@ export async function POST(request: NextRequest) {
     const ipRangesEnv = process.env.STRIPE_WEBHOOK_IP_RANGES ?? '';
     if (ipRangesEnv) {
       const forwarded = request.headers.get('x-forwarded-for');
-      const realIp = request.headers.get('x-real-ip');
-      const remoteIp = forwarded ? forwarded.split(',')[0].trim() : (realIp?.trim() ?? '');
+      const remoteIp = forwarded
+        ? forwarded.split(',')[0].trim()
+        : (request.headers.get('x-real-ip')?.trim() ?? '');
       const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
       const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
       if (!isAllowed) {
@@ -136,18 +137,41 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 }
 
 async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) {
-  const { releaseId, userId } = session.metadata ?? {};
-  const paymentIntentId =
-    typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : session.payment_intent?.id;
+  // Always retrieve the full session — webhook payload may have payment_intent: null.
+  // If retrieve throws, the outer try-catch in POST() returns 500.
+  const retrievedSession = await stripe.checkout.sessions.retrieve(session.id);
 
-  if (!releaseId || !userId || !paymentIntentId) {
+  const { releaseId, userId: metadataUserId } = retrievedSession.metadata ?? {};
+
+  // Derive customerEmail early — needed for userId fallback lookup below.
+  const customerEmail =
+    retrievedSession.customer_details?.email ?? retrievedSession.customer_email ?? null;
+
+  const paymentIntentId =
+    typeof retrievedSession.payment_intent === 'string'
+      ? retrievedSession.payment_intent
+      : retrievedSession.payment_intent?.id;
+
+  if (!releaseId || !paymentIntentId) {
     console.error('release_purchase webhook missing required metadata', {
-      sessionId: session.id,
+      sessionId: retrievedSession.id,
       releaseId,
-      userId,
       paymentIntentId,
+    });
+    return;
+  }
+
+  // Resolve userId: prefer metadata, fall back to email lookup for guest purchases.
+  let userId: string | undefined = metadataUserId;
+  if (!userId && customerEmail) {
+    const user = await PurchaseRepository.findUserByEmail(customerEmail);
+    userId = user?.id;
+  }
+
+  if (!userId) {
+    console.error('release_purchase webhook: could not resolve userId', {
+      sessionId: retrievedSession.id,
+      releaseId,
     });
     return;
   }
@@ -159,7 +183,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  const amountTotal = session.amount_total ?? 0;
+  const amountTotal = retrievedSession.amount_total ?? 0;
 
   // Fetch release title for the confirmation email
   const release = await prisma.release.findFirst({
@@ -172,12 +196,11 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     userId,
     releaseId,
     amountPaid: amountTotal,
-    currency: session.currency ?? 'usd',
+    currency: retrievedSession.currency ?? 'usd',
     stripePaymentIntentId: paymentIntentId,
-    stripeSessionId: session.id,
+    stripeSessionId: retrievedSession.id,
   });
 
-  const customerEmail = session.customer_details?.email ?? session.customer_email ?? null;
   if (customerEmail) {
     await sendPurchaseConfirmationEmail({
       purchaseId: purchase.id,
@@ -238,20 +261,16 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 /**
  * Checks whether an IPv4 address falls within a given CIDR range.
- * Supports /0 through /32 prefix lengths. Returns false for any malformed
- * IP or CIDR input (invalid octets, out-of-range prefix length, etc.).
+ * Supports /0 through /32 prefix lengths.
+ * Returns false for any malformed IP or CIDR input.
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
   try {
     const [range, bitsStr] = cidr.split('/');
-    const bits = parseInt(bitsStr ?? '32', 10);
-    if (
-      isNaN(bits) ||
-      bits < 0 ||
-      bits > 32 ||
-      (bitsStr !== undefined && bitsStr !== bits.toString())
-    )
-      return false;
+    const normalizedBitsStr = bitsStr ?? '32';
+    if (!/^\d+$/.test(normalizedBitsStr)) return false;
+    const bits = parseInt(normalizedBitsStr, 10);
+    if (bits < 0 || bits > 32) return false;
     const ipNum = ipToNum(ip);
     const rangeNum = ipToNum(range ?? '');
     if (ipNum === null || rangeNum === null) return false;
@@ -264,18 +283,19 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 
 /**
  * Converts a dotted-decimal IPv4 string to a 32-bit unsigned integer.
- * Returns null for any malformed input (wrong number of octets, non-numeric
- * parts, or octet values outside the 0–255 range).
+ * Returns null if the input is not a valid IPv4 address (must have exactly
+ * 4 decimal octets, each in the range 0–255).
  */
 function ipToNum(ip: string): number | null {
-  const parts = ip.split('.');
-  if (parts.length !== 4) return null;
+  const octets = ip.split('.');
+  if (octets.length !== 4) return null;
   let result = 0;
-  for (const part of parts) {
-    if (!/^\d+$/.test(part)) return null;
-    const octet = parseInt(part, 10);
-    if (octet < 0 || octet > 255) return null;
-    result = ((result << 8) | octet) >>> 0;
+  for (const octet of octets) {
+    if (!/^\d+$/.test(octet)) return null;
+    if (octet.length > 1 && octet[0] === '0') return null;
+    const n = parseInt(octet, 10);
+    if (n > 255) return null;
+    result = ((result << 8) | n) >>> 0;
   }
   return result;
 }

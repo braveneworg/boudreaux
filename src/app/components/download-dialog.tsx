@@ -102,21 +102,22 @@ export const DownloadDialog = ({
     .trim();
 
   const effectiveSuggestedPrice = suggestedPrice ?? premiumPrice ?? 5;
-  const parsedDisplayAmount = rawAmount ? parseFloat(rawAmount) : null;
-  const displayAmount =
-    parsedDisplayAmount !== null && Number.isFinite(parsedDisplayAmount)
-      ? `$${parsedDisplayAmount.toFixed(2)}`
-      : `$${effectiveSuggestedPrice.toFixed(2)}`;
+  const parsedRaw = rawAmount ? parseFloat(rawAmount) : NaN;
+  const displayAmount = Number.isFinite(parsedRaw)
+    ? `$${parsedRaw.toFixed(2)}`
+    : `$${effectiveSuggestedPrice.toFixed(2)}`;
 
   const handleSubmit = (data: DownloadFormSchemaType) => {
     if (data.downloadOption === 'premium-digital') {
-      const parsed = parseFloat(rawAmount || String(effectiveSuggestedPrice));
-      const cents = Math.round(parsed * 100);
-      if (isNaN(cents) || cents < 50) {
-        form.setError('finalAmount', {
-          type: 'manual',
-          message: 'Minimum amount is $0.50',
-        });
+      const cleanedAmount = data.finalAmount?.replace(/[^\d.]/g, '').trim();
+      const dollars = cleanedAmount ? Number(cleanedAmount) : effectiveSuggestedPrice;
+      if (!Number.isFinite(dollars)) {
+        form.setError('finalAmount', { message: 'Amount must be a valid number' });
+        return;
+      }
+      const cents = Math.round(dollars * 100);
+      if (cents < 50) {
+        form.setError('finalAmount', { message: 'Minimum amount is $0.50' });
         return;
       }
       setAmountCents(cents);
@@ -342,8 +343,7 @@ export const DownloadDialog = ({
               setSelectedTier(null);
             }}
             onConfirm={() => {
-              if (session?.user?.email) {
-                setCustomerEmail(session.user.email);
+              if (session?.user) {
                 setStep('checkout');
               } else {
                 setStep('email-step');
@@ -388,7 +388,6 @@ export const DownloadDialog = ({
             releaseId={releaseId}
             releaseTitle={releaseTitle}
             amountCents={amountCents}
-            customerEmail={session?.user?.email ?? customerEmail ?? ''}
             onConfirmed={() => setStep('purchase-success')}
             onError={(msg) => {
               setPurchaseError(msg);
