@@ -20,6 +20,9 @@ importers:
       '@aws-sdk/client-ses':
         specifier: ^3.1013.0
         version: 3.1014.0
+      '@aws-sdk/lib-storage':
+        specifier: ^3.658.1
+        version: 3.1014.0(@aws-sdk/client-s3@3.1014.0)
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.966.0
         version: 3.1014.0
@@ -246,9 +249,6 @@ importers:
       '@aws-sdk/client-cloudfront':
         specifier: ^3.658.1
         version: 3.1014.0
-      '@aws-sdk/lib-storage':
-        specifier: ^3.658.1
-        version: 3.1014.0(@aws-sdk/client-s3@3.1014.0)
       '@eslint/eslintrc':
         specifier: ^3.3.3
         version: 3.3.5
