@@ -12,6 +12,8 @@ import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { DownloadAnalyticsDashboard } from '@/app/components/download-analytics-dashboard';
+import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-accordion';
 import { TextField } from '@/app/components/forms/fields';
 import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
@@ -37,9 +39,14 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+import { Input } from '@/app/components/ui/input';
 import { Separator } from '@/app/components/ui/separator';
 import { Switch } from '@/app/components/ui/switch';
 import { Textarea } from '@/app/components/ui/textarea';
+import {
+  confirmDigitalFormatUploadAction,
+  confirmMultiTrackUploadAction,
+} from '@/lib/actions/confirm-upload-action';
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
@@ -48,10 +55,13 @@ import {
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
+import { VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import type { FormState } from '@/lib/types/form-state';
 import { FORMATS, type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
@@ -69,9 +79,8 @@ const initialFormState: FormState = {
   success: false,
 };
 
-// Common formats grouped for easier selection
+// Common formats grouped for easier selection (digital formats managed via accordion)
 const FORMAT_GROUPS = {
-  Digital: ['DIGITAL', 'MP3_320KBPS', 'FLAC', 'WAV', 'AAC'] as Format[],
   Vinyl: [
     'VINYL',
     'VINYL_7_INCH',
@@ -127,6 +136,24 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   const [imagesReordered, setImagesReordered] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<GroupOption[]>([]);
   const isEditMode = releaseId !== null;
+
+  // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
+  // is saved. In edit mode this equals initialReleaseId; in create mode it enables immediate
+  // uploads whose DB confirms are flushed after createReleaseAction succeeds.
+  const [preGeneratedId] = useState<string>(() => initialReleaseId ?? generateObjectId());
+
+  // Pending digital format confirms: S3 upload succeeded but DB record creation is deferred
+  // until createReleaseAction succeeds (release must exist in DB before connecting).
+  const [pendingConfirms, setPendingConfirms] = useState<
+    {
+      releaseId: string;
+      formatType: DigitalFormatType;
+      s3Key: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+    }[]
+  >([]);
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
@@ -158,6 +185,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       featuredOn: '',
       featuredUntil: '',
       featuredDescription: '',
+      suggestedPrice: '',
       createdBy: user?.id,
     },
   });
@@ -216,6 +244,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           featuredOn: formatDate(release.featuredOn),
           featuredUntil: formatDate(release.featuredUntil),
           featuredDescription: release.featuredDescription || '',
+          suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
           createdBy: release.createdBy || user?.id,
         });
 
@@ -289,6 +318,24 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     []
   );
 
+  const handlePendingConfirm = useCallback(
+    (params: {
+      releaseId: string;
+      formatType: DigitalFormatType;
+      s3Key: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+    }) => {
+      setPendingConfirms((prev) => [...prev, params]);
+    },
+    []
+  );
+
+  const handlePendingConfirmRemove = useCallback((formatType: DigitalFormatType) => {
+    setPendingConfirms((prev) => prev.filter((p) => p.formatType !== formatType));
+  }, []);
+
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData) => {
       const formData = new FormData();
@@ -301,6 +348,9 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           }
         }
       });
+
+      // Always include the pre-generated ID so the server can use it as the MongoDB _id
+      formData.append('preGeneratedId', preGeneratedId);
 
       startTransition(async () => {
         if (formRef.current) {
@@ -336,6 +386,52 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
               if (createdReleaseId) {
                 setReleaseId(createdReleaseId);
+
+                // Flush deferred digital format confirms now that the release exists in DB
+                if (pendingConfirms.length > 0) {
+                  // Group pending confirms by format type — multi-file formats use multi-track action
+                  const byFormat = new Map<string, typeof pendingConfirms>();
+                  for (const pc of pendingConfirms) {
+                    const existing = byFormat.get(pc.formatType) ?? [];
+                    existing.push(pc);
+                    byFormat.set(pc.formatType, existing);
+                  }
+
+                  const confirmPromises: Promise<{ success: boolean; error?: string }>[] = [];
+                  for (const [formatType, files] of byFormat) {
+                    if (files.length === 1) {
+                      // Single file — use simple confirm
+                      confirmPromises.push(confirmDigitalFormatUploadAction(files[0]));
+                    } else {
+                      // Multiple files — use multi-track confirm
+                      confirmPromises.push(
+                        confirmMultiTrackUploadAction({
+                          releaseId: files[0].releaseId,
+                          formatType: formatType as DigitalFormatType,
+                          files: files.map((f, idx) => ({
+                            trackNumber: idx + 1,
+                            s3Key: f.s3Key,
+                            fileName: f.fileName,
+                            fileSize: f.fileSize,
+                            mimeType: f.mimeType,
+                          })),
+                        })
+                      );
+                    }
+                  }
+
+                  const results = await Promise.allSettled(confirmPromises);
+                  const failedCount = results.filter(
+                    (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)
+                  ).length;
+                  if (failedCount > 0) {
+                    toast.warning(
+                      `${failedCount} digital format upload(s) could not be linked. Re-upload from the edit page.`
+                    );
+                  }
+                  setPendingConfirms([]);
+                }
+
                 router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
 
                 if (data.publishedAt) {
@@ -365,7 +461,16 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
         }
       });
     },
-    [formState, images, releaseId, isPublished, releaseForm, router]
+    [
+      formState,
+      images,
+      releaseId,
+      isPublished,
+      releaseForm,
+      router,
+      pendingConfirms,
+      preGeneratedId,
+    ]
   );
 
   const uploadImages = async (
@@ -579,6 +684,31 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <FormField
                     control={control}
+                    name="suggestedPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Suggested Price (USD)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="e.g., 7.99"
+                            className="w-32"
+                            aria-label="Suggested price in dollars"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Optional pay-what-you-want suggested price
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={control}
                     name="releasedOn"
                     render={({ field }) => (
                       <FormItem>
@@ -728,7 +858,10 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     {Object.values(FORMATS)
                       .filter(
                         (format) =>
-                          !FORMAT_GROUPS.Digital.includes(format as Format) &&
+                          !VALID_FORMAT_TYPES.includes(
+                            format as (typeof VALID_FORMAT_TYPES)[number]
+                          ) &&
+                          format !== 'DIGITAL' &&
                           !FORMAT_GROUPS.Vinyl.includes(format as Format) &&
                           !FORMAT_GROUPS.Physical.includes(format as Format)
                       )
@@ -874,8 +1007,26 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 />
               </section>
 
+              <Separator />
+
+              {/* Digital Formats Section - Always visible */}
+              <section className="space-y-4">
+                <DigitalFormatsAccordion
+                  releaseId={preGeneratedId}
+                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
+                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
+                />
+              </section>
+
               {isEditMode && (
                 <>
+                  <Separator />
+
+                  {/* Download Analytics Section - Edit mode only */}
+                  <section className="space-y-4">
+                    <DownloadAnalyticsDashboard releaseId={initialReleaseId!} />
+                  </section>
+
                   <Separator />
 
                   {/* Featured Section - Edit mode only */}

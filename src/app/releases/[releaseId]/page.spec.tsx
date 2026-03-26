@@ -98,6 +98,13 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
+// Mock ReleaseDigitalFormatRepository (added for digital formats feature)
+vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
+  ReleaseDigitalFormatRepository: class {
+    findAllByRelease = vi.fn().mockResolvedValue([]);
+  },
+}));
+
 describe('ReleasePlayerPage', () => {
   const mockReleaseData = {
     id: 'release-1',

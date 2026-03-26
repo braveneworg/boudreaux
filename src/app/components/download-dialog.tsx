@@ -15,6 +15,7 @@ import { useForm } from 'react-hook-form';
 
 import { CheckoutStep } from '@/app/components/checkout-step';
 import { EmailStep } from '@/app/components/email-step';
+import { FormatDownloadList } from '@/app/components/format-download-list';
 import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
 import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
 import { RateSelectStep } from '@/app/components/rate-select-step';
@@ -56,6 +57,11 @@ type DialogStep =
   | 'purchase-success'
   | 'returning-download';
 
+interface AvailableFormat {
+  formatType: string;
+  fileName: string;
+}
+
 interface DownloadDialogProps {
   artistName: string;
   premiumPrice?: number;
@@ -64,6 +70,7 @@ interface DownloadDialogProps {
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
   downloadCount?: number;
+  availableFormats?: AvailableFormat[];
   children: ReactElement;
 }
 
@@ -75,6 +82,7 @@ export const DownloadDialog = ({
   suggestedPrice = null,
   hasPurchase = false,
   downloadCount = 0,
+  availableFormats = [],
   children,
 }: DownloadDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -280,13 +288,21 @@ export const DownloadDialog = ({
                 {/* Submit button — PWYW purchase-aware */}
                 {selectedOption === 'premium-digital' ? (
                   hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? (
-                    <Link href={`/api/releases/${releaseId}/download`}>
-                      <Button className="w-full" type="button">
-                        <DownloadIcon className="size-4" />
-                        Download (already purchased, {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT}{' '}
-                        used)
-                      </Button>
-                    </Link>
+                    availableFormats.length > 0 ? (
+                      <FormatDownloadList
+                        releaseId={releaseId}
+                        formats={availableFormats}
+                        hasPurchased
+                      />
+                    ) : (
+                      <Link href={`/api/releases/${releaseId}/download`}>
+                        <Button className="w-full" type="button">
+                          <DownloadIcon className="size-4" />
+                          Download (already purchased, {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT}{' '}
+                          used)
+                        </Button>
+                      </Link>
+                    )
                   ) : hasPurchase && downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
                     <>
                       <Button className="w-full" type="button" disabled>

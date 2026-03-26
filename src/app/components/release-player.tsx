@@ -17,6 +17,11 @@ import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
+interface AvailableFormat {
+  formatType: string;
+  fileName: string;
+}
+
 interface ReleasePlayerProps {
   /** Full release data with tracks, artist, and images */
   release: PublishedReleaseDetail;
@@ -28,6 +33,7 @@ interface ReleasePlayerProps {
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
   downloadCount?: number;
+  availableFormats?: AvailableFormat[];
 }
 
 /**
@@ -42,6 +48,7 @@ export const ReleasePlayer = ({
   suggestedPrice,
   hasPurchase,
   downloadCount,
+  availableFormats,
 }: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -131,6 +138,7 @@ export const ReleasePlayer = ({
               suggestedPrice={suggestedPrice}
               hasPurchase={hasPurchase}
               downloadCount={downloadCount}
+              availableFormats={availableFormats}
             >
               <DownloadTriggerButton />
             </DownloadDialog>

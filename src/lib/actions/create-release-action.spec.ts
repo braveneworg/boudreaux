@@ -133,6 +133,7 @@ describe('createReleaseAction', () => {
           'catalogNumber',
           'description',
           'publishedAt',
+          'suggestedPrice',
         ],
         expect.anything()
       );

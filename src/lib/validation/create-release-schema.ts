@@ -102,6 +102,25 @@ export const releaseBaseSchema = z.object({
     .max(500, { message: 'Featured description must be less than 500 characters' })
     .optional()
     .or(z.literal('')),
+  suggestedPrice: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .refine(
+      (val) => {
+        if (!val || val === '') return true;
+        const num = parseFloat(val);
+        return Number.isFinite(num) && num > 0;
+      },
+      { message: 'Suggested price must be a positive number' }
+    )
+    .refine(
+      (val) => {
+        if (!val || val === '') return true;
+        return /^\d+(\.\d{1,2})?$/.test(val);
+      },
+      { message: 'Suggested price must have at most 2 decimal places' }
+    ),
   // MongoDB ObjectId is a 24-character hex string
   createdBy: z
     .string()

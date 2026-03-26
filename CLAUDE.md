@@ -1,13 +1,15 @@
 # boudreaux Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-21
+Auto-generated from all feature plans. Last updated: 2026-03-23
 
 ## Active Technologies
 
 - TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Stripe 20, Prisma 5 (MongoDB), Auth.js, AWS SES, shadcn/ui, Zod, React Hook Form (001-release-search-player)
 - TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Prisma 5 (MongoDB), Auth.js, shadcn/ui, Zod, React Hook Form (002-tour-management)
 - TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Stripe 20 (payment mode), Prisma 5 (MongoDB), Auth.js, AWS SES, shadcn/ui, Zod, React Hook Form (003-stripe-pwyw-purchase)
-- MongoDB via Prisma (003-stripe-pwyw-purchase)
+- TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Prisma 5 (MongoDB), AWS SDK S3 v3 (presigned URLs), Auth.js, shadcn/ui (Accordion), Zod, React Hook Form (004-release-digital-formats)
+- MongoDB via Prisma (003-stripe-pwyw-purchase, 004-release-digital-formats)
+- AWS S3 (presigned URLs for upload/download, 24hr expiration for downloads, 15min for uploads) (004-release-digital-formats)
 
 ## Project Structure
 
@@ -54,6 +56,7 @@ Testing: Vitest + `@testing-library/react`; `.spec.ts` files adjacent to source;
 
 ## Recent Changes
 
+- 004-release-digital-formats: Added digital format management (ReleaseDigitalFormat, UserDownloadQuota, DownloadEvent models), S3 presigned URL upload/download (24hr download expiration, 15min upload), freemium 5-download quota with unique release tracking, soft delete with 90-day grace period, admin accordion UI with checkmark indicators, download authorization API with purchase/quota checks, format-specific file validation (MP3/AAC 100MB, FLAC 250MB, WAV 500MB)
 - 003-stripe-pwyw-purchase: Added Stripe payment-mode checkout, PWYW purchase dialog, download gate API, purchase/download tracking models, SES purchase confirmation email
 - 002-tour-management: Added tour management (Tour, TourDate, Venue models), admin CRUD, public tour listings
 - 001-release-search-player: Added release search combobox, release media player page, artist carousel, breadcrumb navigation

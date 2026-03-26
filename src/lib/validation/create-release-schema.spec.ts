@@ -551,4 +551,65 @@ describe('create-release-schema', () => {
       ).toBe('At least one Artist or one Group is required');
     });
   });
+
+  describe('suggestedPrice validation', () => {
+    it('should accept valid dollar amounts', () => {
+      const validPrices = ['5.99', '10', '0.50', '100.00', '1'];
+      validPrices.forEach((suggestedPrice) => {
+        const result = createReleaseSchema.safeParse({
+          ...validData,
+          suggestedPrice,
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    it('should accept empty string (optional field)', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept undefined (optional field)', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: undefined,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject negative values', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '-5.00',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject zero', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '0',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject more than 2 decimal places', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '5.999',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject non-numeric strings', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: 'abc',
+      });
+      expect(result.success).toBe(false);
+    });
+  });
 });

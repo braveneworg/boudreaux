@@ -330,8 +330,8 @@ jobs:
         with:
           node-version: "24.14.0"
 
-      - name: Install minimal dependencies for sync script
-        run: pnpm add --save-false @aws-sdk/client-s3 @aws-sdk/client-cloudfront @aws-sdk/lib-storage dotenv mime tsx
+      - name: Install dependencies for sync script
+        run: pnpm install --frozen-lockfile
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

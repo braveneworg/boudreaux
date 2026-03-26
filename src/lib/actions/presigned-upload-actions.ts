@@ -177,18 +177,12 @@ export const getPresignedUploadUrlsAction = async (
     hasCdnDomain: !!process.env.CDN_DOMAIN,
   });
 
-  await requireRole('admin');
-
   try {
+    await requireRole('admin');
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      logger.warn('Unauthorized access attempt', {
-        hasSession: !!session,
-        hasUserId: !!session?.user?.id,
-        role: session?.user?.role,
-      });
-      return { success: false, error: 'Unauthorized' };
+    if (!session) {
+      return { success: false, error: 'Authentication required' };
     }
 
     if (files.length === 0) {

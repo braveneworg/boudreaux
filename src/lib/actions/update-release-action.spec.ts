@@ -160,6 +160,7 @@ describe('updateReleaseAction', () => {
           'featuredOn',
           'featuredUntil',
           'featuredDescription',
+          'suggestedPrice',
         ],
         expect.anything()
       );
@@ -282,6 +283,7 @@ describe('updateReleaseAction', () => {
         featuredOn: undefined,
         featuredUntil: undefined,
         featuredDescription: undefined,
+        suggestedPrice: null,
       });
 
       expect(result.success).toBe(true);

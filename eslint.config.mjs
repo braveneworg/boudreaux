@@ -81,6 +81,10 @@ const eslintConfig = [
         FormDataEntryValue: 'readonly',
         CanvasTextAlign: 'readonly',
         CanvasTextBaseline: 'readonly',
+        FileSystemEntry: 'readonly',
+        FileSystemFileEntry: 'readonly',
+        FileSystemDirectoryEntry: 'readonly',
+        FileSystemDirectoryReader: 'readonly',
       },
     },
     settings: {
