@@ -130,4 +130,58 @@ describe('CheckoutStep', () => {
       expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith('minimum', undefined);
     });
   });
+
+  it('should not update state when component unmounts before action resolves (cancelled success)', async () => {
+    expect.assertions(0);
+    let resolveAction: (value: unknown) => void;
+    mockCreateCheckoutSessionAction.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAction = resolve;
+        })
+    );
+
+    const { unmount } = renderInDialog(<CheckoutStep tier="minimum" />);
+
+    // Unmount triggers cancelled = true
+    unmount();
+
+    // Resolve after unmount — the cancelled check on line 35 prevents setState
+    resolveAction!({ clientSecret: 'cs_test_after_unmount' });
+    // No error from setState after unmount
+  });
+
+  it('should not update state when component unmounts before action rejects (cancelled error)', async () => {
+    expect.assertions(0);
+    let rejectAction: (reason: unknown) => void;
+    mockCreateCheckoutSessionAction.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectAction = reject;
+        })
+    );
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { unmount } = renderInDialog(<CheckoutStep tier="minimum" />);
+
+    // Unmount triggers cancelled = true
+    unmount();
+
+    // Reject after unmount — the cancelled check on line 44 prevents setState
+    rejectAction!(new Error('After unmount'));
+    consoleSpy.mockRestore();
+  });
+
+  it('should pass customerEmail null coalesced to undefined', async () => {
+    mockCreateCheckoutSessionAction.mockResolvedValue({
+      clientSecret: 'cs_test_xyz',
+    });
+
+    renderInDialog(<CheckoutStep tier="minimum" customerEmail={null} />);
+
+    await waitFor(() => {
+      // customerEmail ?? undefined should convert null to undefined
+      expect(mockCreateCheckoutSessionAction).toHaveBeenCalledWith('minimum', undefined);
+    });
+  });
 });

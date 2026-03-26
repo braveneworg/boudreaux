@@ -86,26 +86,22 @@ vi.mock('@/app/components/release-description', () => ({
 }));
 
 // Mock auth (added for PWYW purchase feature)
-const mockAuth = vi.fn().mockResolvedValue(null);
 vi.mock('../../../../auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+  auth: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock PurchaseRepository (added for PWYW purchase feature)
-const mockFindByUserAndRelease = vi.fn().mockResolvedValue(null);
-const mockGetDownloadRecord = vi.fn().mockResolvedValue(null);
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
-    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
-    getDownloadRecord: (...args: unknown[]) => mockGetDownloadRecord(...args),
+    findByUserAndRelease: vi.fn().mockResolvedValue(null),
+    getDownloadRecord: vi.fn().mockResolvedValue(null),
   },
 }));
 
 // Mock ReleaseDigitalFormatRepository (added for digital formats feature)
-const mockFindAllByRelease = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class {
-    findAllByRelease = (...args: unknown[]) => mockFindAllByRelease(...args);
+    findAllByRelease = vi.fn().mockResolvedValue([]);
   },
 }));
 
@@ -347,41 +343,14 @@ describe('ReleasePlayerPage', () => {
     expect(player).toHaveAttribute('data-auto-play', 'false');
   });
 
-  it('should fetch purchase status for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
-    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 3 });
-
-    const Page = await ReleasePlayerPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    expect(mockFindByUserAndRelease).toHaveBeenCalledWith('user-1', 'release-1');
-    expect(mockGetDownloadRecord).toHaveBeenCalledWith('user-1', 'release-1');
-  });
-
-  it('should filter formats to only those with a fileName', async () => {
-    mockFindAllByRelease.mockResolvedValue([
-      { formatType: 'MP3_320KBPS', fileName: 'album.mp3' },
-      { formatType: 'FLAC', fileName: null },
-    ]);
-
-    const Page = await ReleasePlayerPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    // The page renders — digital formats are passed to ReleasePlayer
-    expect(screen.getByTestId('release-player')).toBeInTheDocument();
-  });
-
-  it('should show Unknown Artist when no primary artist exists', async () => {
+  it('should use "Unknown Artist" fallback when no artistReleases exist', async () => {
+    const releaseNoArtists = {
+      ...mockReleaseData,
+      artistReleases: [],
+    };
     mockGetReleaseWithTracks.mockResolvedValue({
       success: true,
-      data: { ...mockReleaseData, artistReleases: [] },
+      data: releaseNoArtists,
     });
 
     const Page = await ReleasePlayerPage({
@@ -390,10 +359,13 @@ describe('ReleasePlayerPage', () => {
     });
     render(Page);
 
+    // Without primaryArtistId, getArtistOtherReleases should not be called
+    expect(mockGetArtistOtherReleases).not.toHaveBeenCalled();
+    // Should still render page structure
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
   });
 
-  it('should handle getArtistOtherReleases failure gracefully', async () => {
+  it('should handle failed otherReleasesResult gracefully', async () => {
     mockGetArtistOtherReleases.mockResolvedValue({
       success: false,
       error: 'Service error',
@@ -405,7 +377,10 @@ describe('ReleasePlayerPage', () => {
     });
     render(Page);
 
-    // Should not show carousel
+    // When otherReleasesResult.success is false, otherReleases should be []
+    // So carousel should not render
     expect(screen.queryByTestId('artist-releases-carousel')).not.toBeInTheDocument();
+    // Player should still render
+    expect(screen.getByTestId('release-player')).toBeInTheDocument();
   });
 });

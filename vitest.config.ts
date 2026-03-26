@@ -205,6 +205,7 @@ export default defineConfig({
       '**/*.config.{ts,js,mjs,cjs}',
       '**/setupTests.ts',
       '**/e2e/**',
+      '**/.claude/**',
     ],
   },
 

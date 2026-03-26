@@ -45,6 +45,7 @@ const eslintConfig = [
       '*.pem',
       '*.crt',
       '*.key',
+      '**/.claude/**',
     ],
   },
   // Base JavaScript rules

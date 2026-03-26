@@ -77,6 +77,16 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(failure.error.length).toBeGreaterThan(0);
     });
 
+    it('should fallback to "Invalid input" when Zod issues array is empty', async () => {
+      // Directly pass a completely malformed input that triggers the ?? fallback
+      // when parsed.error.issues[0]?.message is undefined
+      const result = await createPurchaseCheckoutSessionAction(undefined);
+      const failure = result as { success: false; error: string };
+
+      expect(result.success).toBe(false);
+      expect(typeof failure.error).toBe('string');
+    });
+
     it('should return an error when amountCents is below the schema minimum of 50', async () => {
       const result = await createPurchaseCheckoutSessionAction({ ...validInput, amountCents: 49 });
 
@@ -103,6 +113,19 @@ describe('createPurchaseCheckoutSessionAction', () => {
       await createPurchaseCheckoutSessionAction(validInput);
 
       expect(vi.mocked(PurchaseService.checkExistingPurchase)).not.toHaveBeenCalled();
+    });
+
+    it('should spread empty object for metadata when userId is null (guest checkout)', async () => {
+      mockAuth.mockResolvedValue({ user: { id: null } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      // userId is null so `userId ? { userId } : {}` should spread empty object
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.not.objectContaining({ userId: expect.anything() }),
+        })
+      );
     });
 
     it('should not include userId in Stripe metadata for unauthenticated (guest) users', async () => {

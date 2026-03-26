@@ -421,6 +421,14 @@ describe('updateTourDateAction', () => {
     ).rejects.toThrow();
   });
 
+  it('throws when session has no user id', async () => {
+    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+
+    await expect(updateTourDateAction(tourDateId, initialFormState, mockFormData)).rejects.toThrow(
+      'Invalid admin session: missing user id for audit logging.'
+    );
+  });
+
   it('returns validation errors when parsed fails', async () => {
     vi.mocked(getActionState).mockReturnValue({
       formState: { fields: {}, success: false, errors: {} },

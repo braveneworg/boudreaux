@@ -11,6 +11,9 @@ import ComboboxField from './combobox-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 
+// Allow tests to control the initial field value
+let comboboxFieldInitialValue = '';
+
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({
   FormField: ({
@@ -21,7 +24,7 @@ vi.mock('@/app/components/ui/form', () => ({
     render: (context: Record<string, unknown>) => React.ReactNode;
   }) => {
     const field = {
-      value: '',
+      value: comboboxFieldInitialValue,
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
@@ -221,6 +224,7 @@ describe('ComboboxField', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    comboboxFieldInitialValue = '';
   });
 
   it('renders with correct label and placeholder', () => {
@@ -887,5 +891,21 @@ describe('ComboboxField', () => {
         expect(commandInput).toHaveValue('-');
       });
     });
+  });
+
+  it('shows nothing for label when field.value is set but option is not found', () => {
+    // Set field value to something that does not match any option
+    comboboxFieldInitialValue = 'nonexistent-value';
+
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} />
+      </TestWrapper>
+    );
+
+    const trigger = screen.getByTestId('combobox-trigger');
+    // field.value is truthy but options.find() returns undefined,
+    // so ?.label evaluates to undefined (rendered as nothing)
+    expect(trigger).not.toHaveTextContent('Select an option...');
   });
 });

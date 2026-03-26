@@ -392,4 +392,17 @@ describe('ReleasePlayer', () => {
     expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('download-trigger-button')).not.toBeInTheDocument();
   });
+
+  it('should handle toggle play when playerControls is null (no tracks)', () => {
+    render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
+
+    const coverArt = screen.getByTestId('interactive-cover-art');
+    // playerControls is null because Controls never mounted (no tracks)
+    // clicking cover art calls handleTogglePlay which does playerControls?.toggle()
+    // the ?. should safely no-op when playerControls is null
+    fireEvent.click(coverArt);
+
+    // No error thrown — the optional chaining handled the null case
+    expect(coverArt).toBeInTheDocument();
+  });
 });
