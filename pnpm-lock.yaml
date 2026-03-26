@@ -14,6 +14,9 @@ importers:
       '@auth/prisma-adapter':
         specifier: ^2.10.0
         version: 2.11.1(@prisma/client@6.19.2(prisma@6.19.2(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3))(nodemailer@7.0.13)
+      '@aws-sdk/client-s3':
+        specifier: ^3.658.1
+        version: 3.1014.0
       '@aws-sdk/client-ses':
         specifier: ^3.1013.0
         version: 3.1014.0
@@ -241,9 +244,6 @@ importers:
         version: 4.3.6
     devDependencies:
       '@aws-sdk/client-cloudfront':
-        specifier: ^3.658.1
-        version: 3.1014.0
-      '@aws-sdk/client-s3':
         specifier: ^3.658.1
         version: 3.1014.0
       '@aws-sdk/lib-storage':
