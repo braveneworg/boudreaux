@@ -657,8 +657,12 @@ describe('DigitalFormatsAccordion', () => {
         dataTransfer: { types: ['Files'] },
       });
 
+      expect(dropTarget.className).toContain('border-primary');
+
       // Simulate dragleave
       fireEvent.dragLeave(dropTarget);
+
+      expect(dropTarget.className).not.toContain('bg-primary/5');
     });
   });
 
