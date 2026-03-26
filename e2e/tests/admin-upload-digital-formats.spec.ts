@@ -201,9 +201,7 @@ test.describe('Admin Upload Digital Formats', () => {
 
     // Upload MP3
     await adminPage.getByText('MP3 320kbps').click();
-    await adminPage
-      .getByLabel(/upload mp3/i)
-      .setInputFiles('e2e/fixtures/audio/sample-album.mp3');
+    await adminPage.getByLabel(/upload mp3/i).setInputFiles('e2e/fixtures/audio/sample-album.mp3');
     await expect(adminPage.getByText(/uploading/i)).toBeHidden({ timeout: 15000 });
 
     // Upload FLAC
@@ -215,9 +213,7 @@ test.describe('Admin Upload Digital Formats', () => {
 
     // Upload WAV
     await adminPage.getByText('WAV').click();
-    await adminPage
-      .getByLabel(/upload wav/i)
-      .setInputFiles('e2e/fixtures/audio/sample-album.wav');
+    await adminPage.getByLabel(/upload wav/i).setInputFiles('e2e/fixtures/audio/sample-album.wav');
     await expect(adminPage.getByText(/uploading/i)).toBeHidden({ timeout: 20000 });
 
     // Verify all three checkmarks appear
