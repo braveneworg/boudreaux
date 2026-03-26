@@ -190,4 +190,206 @@ describe('PurchaseCheckoutStep', () => {
       expect(onConfirmed).toHaveBeenCalled();
     });
   });
+
+  it('renders the PurchaseCheckoutForm error state from useCheckout', async () => {
+    mockCheckoutState.mockReturnValue({
+      type: 'error',
+      error: { message: 'Card processing error' },
+    });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Card processing error')).toBeDefined();
+    });
+  });
+
+  it('renders the Pay button when useCheckout is in success state', async () => {
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: { canConfirm: true, confirm: vi.fn() },
+    });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps({ amountCents: 500 });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pay $5.00')).toBeDefined();
+    });
+  });
+
+  it('shows Processing... state and then error when confirm fails', async () => {
+    const mockConfirm = vi.fn().mockResolvedValue({
+      type: 'error',
+      error: { message: 'Your card was declined.' },
+    });
+
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: { canConfirm: true, confirm: mockConfirm },
+    });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay/)).toBeDefined();
+    });
+
+    // Click Pay button
+    const payButton = screen.getByRole('button');
+    payButton.click();
+
+    await waitFor(() => {
+      expect(screen.getByText('Your card was declined.')).toBeDefined();
+    });
+  });
+
+  it('calls onPaymentComplete after successful confirm', async () => {
+    const mockConfirm = vi.fn().mockResolvedValue({ type: 'success' });
+
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: { canConfirm: true, confirm: mockConfirm },
+    });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    // We need to simulate the paymentComplete state to show the "Payment received!" UI.
+    // The render flow: successful confirm → onPaymentComplete() → setPaymentComplete(true)
+    // We can detect this transition by checking the rendered UI changes.
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay/)).toBeDefined();
+    });
+
+    const payButton = screen.getByRole('button');
+    payButton.click();
+
+    // After confirm succeeds, the component should show "Payment received!"
+    await waitFor(() => {
+      expect(screen.getByText('Payment received!')).toBeDefined();
+    });
+
+    // Should show "Confirming your purchase..." (not timed out)
+    expect(screen.getByText('Confirming your purchase...')).toBeDefined();
+  });
+
+  it('shows error when createSession throws an unexpected Error', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockRejectedValue(new Error('Network failure'));
+
+    const onError = vi.fn();
+    const props = buildProps({ onError });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Network failure')).toBeDefined();
+    });
+    expect(onError).toHaveBeenCalledWith('Network failure');
+    consoleSpy.mockRestore();
+  });
+
+  it('shows fallback message when createSession throws a non-Error', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockRejectedValue('string error');
+
+    const onError = vi.fn();
+    const props = buildProps({ onError });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to initialize checkout')).toBeDefined();
+    });
+    expect(onError).toHaveBeenCalledWith('Failed to initialize checkout');
+    consoleSpy.mockRestore();
+  });
+
+  it('disables the Pay button when canConfirm is false', async () => {
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: { canConfirm: false, confirm: vi.fn() },
+    });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button')).toBeDefined();
+    });
+
+    expect(screen.getByRole('button')).toHaveProperty('disabled', true);
+  });
+
+  it('does not call confirm when checkoutState is not success', async () => {
+    // Loading state — handleConfirm's early return should trigger
+    mockCheckoutState.mockReturnValue({ type: 'loading' });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    // The loading state shows a spinner inside the form, no button to click
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeDefined();
+    });
+  });
+
+  it('displays amount_below_minimum error message', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: false,
+      error: 'amount_below_minimum',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('The minimum purchase amount is $0.50.')).toBeDefined();
+    });
+  });
+
+  it('displays release_unavailable error message', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: false,
+      error: 'release_unavailable',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('This release is no longer available for purchase.')).toBeDefined();
+    });
+  });
 });

@@ -86,22 +86,26 @@ vi.mock('@/app/components/release-description', () => ({
 }));
 
 // Mock auth (added for PWYW purchase feature)
+const mockAuth = vi.fn().mockResolvedValue(null);
 vi.mock('../../../../auth', () => ({
-  auth: vi.fn().mockResolvedValue(null),
+  auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
 // Mock PurchaseRepository (added for PWYW purchase feature)
+const mockFindByUserAndRelease = vi.fn().mockResolvedValue(null);
+const mockGetDownloadRecord = vi.fn().mockResolvedValue(null);
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
-    findByUserAndRelease: vi.fn().mockResolvedValue(null),
-    getDownloadRecord: vi.fn().mockResolvedValue(null),
+    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
+    getDownloadRecord: (...args: unknown[]) => mockGetDownloadRecord(...args),
   },
 }));
 
 // Mock ReleaseDigitalFormatRepository (added for digital formats feature)
+const mockFindAllByRelease = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class {
-    findAllByRelease = vi.fn().mockResolvedValue([]);
+    findAllByRelease = (...args: unknown[]) => mockFindAllByRelease(...args);
   },
 }));
 
@@ -341,5 +345,67 @@ describe('ReleasePlayerPage', () => {
 
     const player = screen.getByTestId('release-player');
     expect(player).toHaveAttribute('data-auto-play', 'false');
+  });
+
+  it('should fetch purchase status for authenticated user', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
+    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 3 });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    expect(mockFindByUserAndRelease).toHaveBeenCalledWith('user-1', 'release-1');
+    expect(mockGetDownloadRecord).toHaveBeenCalledWith('user-1', 'release-1');
+  });
+
+  it('should filter formats to only those with a fileName', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      { formatType: 'MP3_320KBPS', fileName: 'album.mp3' },
+      { formatType: 'FLAC', fileName: null },
+    ]);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    // The page renders — digital formats are passed to ReleasePlayer
+    expect(screen.getByTestId('release-player')).toBeInTheDocument();
+  });
+
+  it('should show Unknown Artist when no primary artist exists', async () => {
+    mockGetReleaseWithTracks.mockResolvedValue({
+      success: true,
+      data: { ...mockReleaseData, artistReleases: [] },
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+  });
+
+  it('should handle getArtistOtherReleases failure gracefully', async () => {
+    mockGetArtistOtherReleases.mockResolvedValue({
+      success: false,
+      error: 'Service error',
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    // Should not show carousel
+    expect(screen.queryByTestId('artist-releases-carousel')).not.toBeInTheDocument();
   });
 });

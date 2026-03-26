@@ -215,6 +215,45 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     );
   });
 
+  it('should return 500 when format has no s3Key', async () => {
+    const incompleteFormat = { ...mockFormat, s3Key: null };
+    mockCheckFormatExists.mockResolvedValue(incompleteFormat);
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+    expect(body.message).toBe('Format file data is incomplete.');
+  });
+
+  it('should return 500 when format has no fileName', async () => {
+    const incompleteFormat = { ...mockFormat, fileName: null };
+    mockCheckFormatExists.mockResolvedValue(incompleteFormat);
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+    expect(body.message).toBe('Format file data is incomplete.');
+  });
+
+  it('should use fallback values when headers are missing', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+    );
+
+    await GET(req, makeParams());
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipAddress: 'unknown',
+        userAgent: 'unknown',
+      })
+    );
+  });
+
   it('should return 500 on unexpected error', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockCheckFormatExists.mockRejectedValue(new Error('DB error'));
