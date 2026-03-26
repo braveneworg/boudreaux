@@ -2,128 +2,123 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-// @ts-nocheck — test scaffold; helpers and Prisma models referenced below are not yet implemented
 import { test, expect } from '@playwright/test';
+import { PrismaClient } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-
-import { createTestUser, loginAsUser } from '../helpers/auth-helpers';
+import { createAuthCookie } from '../helpers/auth-helpers';
 import { uploadTestAudioFile } from '../helpers/upload-helpers';
 
+import type { TestUser } from '../helpers/auth-helpers';
+import type { Page } from '@playwright/test';
+
+/**
+ * Use the E2E database directly (same URL as the test server) so that
+ * beforeAll/afterAll run against the correct isolated database.
+ */
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
+/**
+ * Must match playwright.config.ts webServer.env.AUTH_SECRET so that cookies
+ * generated here are accepted by the running Next.js app.
+ */
+const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
+
+const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+
+async function loginAs(page: Page, user: TestUser): Promise<void> {
+  const cookie = await createAuthCookie(user, AUTH_SECRET);
+  await page.context().addCookies([cookie]);
+}
+
 test.describe('User Downloads Purchased Release', () => {
-  let testUser: { id: string; email: string; password: string };
-  let testRelease: { id: string; title: string; slug: string };
-  let testPurchase: { id: string };
-  let testFormat: { id: string; formatType: string; s3Key: string };
+  let testUser: TestUser;
+  let testReleaseId: string;
+  let testPurchaseId: string;
 
   test.beforeAll(async () => {
-    // Create test user
-    testUser = await createTestUser({
-      email: 'download-test@example.com',
-      name: 'Download Tester',
-      password: 'SecurePass123!',
-    });
-
-    // Create test release
-    const artist = await prisma.artist.create({
+    const user = await prisma.user.create({
       data: {
-        name: 'Download Test Artist',
-        slug: 'download-test-artist',
-        bio: 'Artist for E2E download tests',
+        email: 'download-test@example.com',
+        name: 'Download Tester',
+        username: 'download-tester-e2e',
+        role: 'user',
+        emailVerified: new Date(),
+        termsAndConditions: true,
       },
     });
 
-    testRelease = await prisma.release.create({
+    testUser = {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? 'Download Tester',
+      username: user.username ?? 'download-tester-e2e',
+      role: 'user',
+    };
+
+    const release = await prisma.release.create({
       data: {
         title: 'Test Release with Downloads',
-        slug: 'test-release-downloads',
-        releaseType: 'Album',
-        releaseDate: new Date('2026-01-15'),
-        artistId: artist.id,
-        suggestedPrice: 1000n, // $10.00
+        releasedOn: new Date('2026-01-15'),
+        coverArt: 'https://picsum.photos/seed/download-test/400/400',
+        suggestedPrice: 1000,
       },
     });
 
-    // Upload test digital format (MP3)
-    testFormat = await uploadTestAudioFile({
-      releaseId: testRelease.id,
+    testReleaseId = release.id;
+
+    await uploadTestAudioFile({
+      releaseId: testReleaseId,
       formatType: 'MP3_320KBPS',
       fileName: 'test-album.mp3',
-      fileSize: 50_000_000, // 50 MB
+      fileSize: 50_000_000,
       mimeType: 'audio/mpeg',
     });
 
-    // Create successful purchase for test user
-    testPurchase = await prisma.purchase.create({
+    const purchase = await prisma.releasePurchase.create({
       data: {
         userId: testUser.id,
-        releaseId: testRelease.id,
-        amount: 1000n,
+        releaseId: testReleaseId,
+        amountPaid: 1000,
         stripePaymentIntentId: 'pi_test_download_e2e',
-        status: 'succeeded',
       },
     });
+
+    testPurchaseId = purchase.id;
   });
 
   test.afterAll(async () => {
-    // Cleanup test data
-    await prisma.downloadEvent.deleteMany({
-      where: { userId: testUser.id },
-    });
-    await prisma.purchase.deleteMany({
-      where: { id: testPurchase.id },
-    });
-    await prisma.releaseDigitalFormat.deleteMany({
-      where: { id: testFormat.id },
-    });
-    await prisma.release.deleteMany({
-      where: { id: testRelease.id },
-    });
-    await prisma.user.deleteMany({
-      where: { id: testUser.id },
-    });
+    await prisma.downloadEvent.deleteMany({ where: { userId: testUser.id } });
+    await prisma.releasePurchase.deleteMany({ where: { id: testPurchaseId } });
+    await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: testReleaseId } });
+    await prisma.release.deleteMany({ where: { id: testReleaseId } });
+    await prisma.user.deleteMany({ where: { id: testUser.id } });
+    await prisma.$disconnect();
   });
 
   test('user can download purchased release in MP3 format', async ({ page }) => {
-    // Login as test user
-    await loginAsUser(page, testUser.email, testUser.password);
+    await loginAs(page, testUser);
+    await page.goto(`/releases/${testReleaseId}`);
 
-    // Navigate to release page
-    await page.goto(`/releases/${testRelease.slug}`);
+    await expect(page.locator('h1')).toContainText('Test Release with Downloads');
 
-    // Verify release title is displayed
-    await expect(page.locator('h1')).toContainText(testRelease.title);
-
-    // Locate download button for MP3 format
-    const downloadButton = page.locator('button', {
-      hasText: /download.*mp3/i,
-    });
-
+    const downloadButton = page.locator('button', { hasText: /download.*mp3/i });
     await expect(downloadButton).toBeVisible();
 
-    // Setup download listener
     const downloadPromise = page.waitForEvent('download');
-
-    // Click download button
     await downloadButton.click();
-
-    // Wait for download to start
     const download = await downloadPromise;
 
-    // Verify download filename
     expect(download.suggestedFilename()).toContain('.mp3');
 
-    // Verify download event was logged
     const downloadEvent = await prisma.downloadEvent.findFirst({
       where: {
         userId: testUser.id,
-        releaseId: testRelease.id,
+        releaseId: testReleaseId,
         formatType: 'MP3_320KBPS',
         success: true,
       },
-      orderBy: {
-        downloadedAt: 'desc',
-      },
+      orderBy: { downloadedAt: 'desc' },
     });
 
     expect(downloadEvent).toBeTruthy();
@@ -131,22 +126,18 @@ test.describe('User Downloads Purchased Release', () => {
   });
 
   test('user can download purchased release in FLAC format', async ({ page }) => {
-    // Upload FLAC format
     const flacFormat = await uploadTestAudioFile({
-      releaseId: testRelease.id,
+      releaseId: testReleaseId,
       formatType: 'FLAC',
       fileName: 'test-album.flac',
-      fileSize: 150_000_000, // 150 MB
+      fileSize: 150_000_000,
       mimeType: 'audio/flac',
     });
 
-    await loginAsUser(page, testUser.email, testUser.password);
-    await page.goto(`/releases/${testRelease.slug}`);
+    await loginAs(page, testUser);
+    await page.goto(`/releases/${testReleaseId}`);
 
-    const downloadButton = page.locator('button', {
-      hasText: /download.*flac/i,
-    });
-
+    const downloadButton = page.locator('button', { hasText: /download.*flac/i });
     await expect(downloadButton).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
@@ -155,26 +146,19 @@ test.describe('User Downloads Purchased Release', () => {
 
     expect(download.suggestedFilename()).toContain('.flac');
 
-    // Cleanup
-    await prisma.releaseDigitalFormat.deleteMany({
-      where: { id: flacFormat.id },
-    });
+    await prisma.releaseDigitalFormat.deleteMany({ where: { id: flacFormat.id } });
   });
 
   test('download button is disabled for unpurchased releases', async ({ page }) => {
-    // Create another release without purchase
     const unpurchasedRelease = await prisma.release.create({
       data: {
-        title: 'Unpurchased Release',
-        slug: 'unpurchased-release',
-        releaseType: 'Single',
-        releaseDate: new Date('2026-02-01'),
-        artistId: testRelease.artistId,
-        suggestedPrice: 500n,
+        title: 'Unpurchased Release E2E',
+        releasedOn: new Date('2026-02-01'),
+        coverArt: 'https://picsum.photos/seed/unpurchased-test/400/400',
+        suggestedPrice: 500,
       },
     });
 
-    // Upload format for unpurchased release
     const unpurchasedFormat = await uploadTestAudioFile({
       releaseId: unpurchasedRelease.id,
       formatType: 'MP3_320KBPS',
@@ -183,138 +167,93 @@ test.describe('User Downloads Purchased Release', () => {
       mimeType: 'audio/mpeg',
     });
 
-    await loginAsUser(page, testUser.email, testUser.password);
-    await page.goto(`/releases/${unpurchasedRelease.slug}`);
+    await loginAs(page, testUser);
+    await page.goto(`/releases/${unpurchasedRelease.id}`);
 
-    // Download button should either:
-    // 1. Not be visible (replaced by "Purchase" button)
-    // 2. Be disabled
-    // 3. Show error message when clicked
-
-    const downloadButton = page.locator('button', {
-      hasText: /download/i,
-    });
+    const downloadButton = page.locator('button', { hasText: /download/i });
 
     if (await downloadButton.isVisible()) {
       await expect(downloadButton).toBeDisabled();
     } else {
-      // Purchase button should be visible instead
-      const purchaseButton = page.locator('button', {
-        hasText: /purchase|buy/i,
-      });
+      const purchaseButton = page.locator('button', { hasText: /purchase|buy/i });
       await expect(purchaseButton).toBeVisible();
     }
 
-    // Cleanup
-    await prisma.releaseDigitalFormat.deleteMany({
-      where: { id: unpurchasedFormat.id },
-    });
-    await prisma.release.deleteMany({
-      where: { id: unpurchasedRelease.id },
-    });
+    await prisma.releaseDigitalFormat.deleteMany({ where: { id: unpurchasedFormat.id } });
+    await prisma.release.deleteMany({ where: { id: unpurchasedRelease.id } });
   });
 
   test('download fails gracefully when format is soft-deleted beyond grace period', async ({
     page,
   }) => {
-    // Create format and soft-delete it 100 days ago (beyond 90-day grace period)
     const deletedAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
 
     const expiredFormat = await prisma.releaseDigitalFormat.create({
       data: {
-        releaseId: testRelease.id,
+        releaseId: testReleaseId,
         formatType: 'WAV',
-        s3Key: `releases/${testRelease.id}/audio/wav_expired.wav`,
+        s3Key: `releases/${testReleaseId}/audio/wav_expired.wav`,
         fileName: 'expired.wav',
-        fileSize: 400_000_000n,
+        fileSize: BigInt(400_000_000),
         mimeType: 'audio/wav',
         checksum: 'expired_checksum',
         deletedAt,
       },
     });
 
-    await loginAsUser(page, testUser.email, testUser.password);
-    await page.goto(`/releases/${testRelease.slug}`);
+    await loginAs(page, testUser);
+    await page.goto(`/releases/${testReleaseId}`);
 
-    // WAV download button should either not exist or show error when clicked
-    const wavButton = page.locator('button', {
-      hasText: /download.*wav/i,
-    });
+    const wavButton = page.locator('button', { hasText: /download.*wav/i });
 
     if (await wavButton.isVisible()) {
       await wavButton.click();
-
-      // Expect error message to appear
       const errorMessage = page.locator('[role="alert"]', {
         hasText: /no longer available|expired/i,
       });
       await expect(errorMessage).toBeVisible();
     } else {
-      // WAV option is not shown, which is correct
       expect(true).toBe(true);
     }
 
-    // Cleanup
-    await prisma.releaseDigitalFormat.deleteMany({
-      where: { id: expiredFormat.id },
-    });
+    await prisma.releaseDigitalFormat.deleteMany({ where: { id: expiredFormat.id } });
   });
 
   test('unauthenticated users cannot download purchased releases', async ({ page }) => {
-    // Navigate to release page without logging in
-    await page.goto(`/releases/${testRelease.slug}`);
+    await page.goto(`/releases/${testReleaseId}`);
 
-    // Download buttons should either:
-    // 1. Not be visible (requires login)
-    // 2. Redirect to login when clicked
-
-    const downloadButton = page.locator('button', {
-      hasText: /download/i,
-    });
+    const downloadButton = page.locator('button', { hasText: /download/i });
 
     if (await downloadButton.isVisible()) {
       await downloadButton.click();
-
-      // Should redirect to login or show error
       await expect(page).toHaveURL(/\/auth\/login/);
     } else {
-      // Login prompt should be visible instead
       const loginPrompt = page.locator('text=/sign in|log in|login/i');
       await expect(loginPrompt).toBeVisible();
     }
   });
 
   test('download analytics are tracked correctly', async ({ page }) => {
-    // Clear previous download events for clean test
     await prisma.downloadEvent.deleteMany({
-      where: {
-        userId: testUser.id,
-        releaseId: testRelease.id,
-      },
+      where: { userId: testUser.id, releaseId: testReleaseId },
     });
 
-    await loginAsUser(page, testUser.email, testUser.password);
-    await page.goto(`/releases/${testRelease.slug}`);
+    await loginAs(page, testUser);
+    await page.goto(`/releases/${testReleaseId}`);
 
-    const downloadButton = page.locator('button', {
-      hasText: /download.*mp3/i,
-    });
+    const downloadButton = page.locator('button', { hasText: /download.*mp3/i });
 
-    // Perform 3 downloads
     for (let i = 0; i < 3; i++) {
       const downloadPromise = page.waitForEvent('download');
       await downloadButton.click();
       await downloadPromise;
-
-      // Small delay between downloads
       await page.waitForTimeout(500);
     }
 
-    // Verify 3 download events were logged
     const downloadCount = await prisma.downloadEvent.count({
       where: {
         userId: testUser.id,
-        releaseId: testRelease.id,
+        releaseId: testReleaseId,
         formatType: 'MP3_320KBPS',
         success: true,
       },
