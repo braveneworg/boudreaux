@@ -42,12 +42,12 @@ model User {
   // outside Prisma (see prisma/scripts/fix-stripe-customer-id-index.ts). A standard
   // Prisma @unique creates a non-sparse index that rejects multiple null values, which
   // fails when many users have not yet subscribed.
-  stripeCustomerId              String?
-  subscriptionId                String?
-  subscriptionStatus            String?
-  subscriptionTier              String?
-  subscriptionCurrentPeriodEnd  DateTime?
-  confirmationEmailSentAt       DateTime?
+  stripeCustomerId             String?
+  subscriptionId               String?
+  subscriptionStatus           String?
+  subscriptionTier             String?
+  subscriptionCurrentPeriodEnd DateTime?
+  confirmationEmailSentAt      DateTime?
 
   // Optional for WebAuthn support
   Authenticator Authenticator[]
@@ -481,9 +481,9 @@ model Release {
   tagId               String?          @db.ObjectId
 
   // PWYW purchase feature (003-stripe-pwyw-purchase)
-  suggestedPrice      Int?              // Suggested PWYW price in cents (stored as Int, not Decimal - MongoDB limitation); null = no pre-fill
-  releasePurchases    ReleasePurchase[]
-  releaseDownloads    ReleaseDownload[]
+  suggestedPrice   Int? // Suggested PWYW price in cents (stored as Int, not Decimal - MongoDB limitation); null = no pre-fill
+  releasePurchases ReleasePurchase[]
+  releaseDownloads ReleaseDownload[]
 
   // Digital formats feature (004-release-digital-formats)
   digitalFormats ReleaseDigitalFormat[]
@@ -744,10 +744,10 @@ model ReleasePurchase {
   user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   releaseId               String    @db.ObjectId
   release                 Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  amountPaid              Int       // Amount paid in cents
+  amountPaid              Int // Amount paid in cents
   currency                String    @default("usd")
   stripePaymentIntentId   String    @unique // Idempotency key for webhook deduplication
-  stripeSessionId         String?   // Stripe Checkout Session ID
+  stripeSessionId         String? // Stripe Checkout Session ID
   confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
   purchasedAt             DateTime  @default(now())
 
@@ -757,13 +757,13 @@ model ReleasePurchase {
 }
 
 model ReleaseDownload {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String    @db.ObjectId
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  releaseId         String    @db.ObjectId
-  release           Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  downloadCount     Int       @default(0)
-  lastDownloadedAt  DateTime?
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String    @db.ObjectId
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releaseId        String    @db.ObjectId
+  release          Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  downloadCount    Int       @default(0)
+  lastDownloadedAt DateTime?
 
   @@unique([userId, releaseId]) // One record per user per release
   @@index([userId])
@@ -776,14 +776,14 @@ model ReleaseDigitalFormat {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   releaseId     String    @db.ObjectId
   release       Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  formatType    String    // Enum: MP3_V0, MP3_320KBPS, AAC, OGG_VORBIS, FLAC, ALAC, WAV, AIFF (matches existing Format enumeration)
-  s3Key         String?   // DEPRECATED: Legacy single-file S3 key (use files relation instead)
-  fileName      String?   // DEPRECATED: Legacy single-file name (use files relation instead)
-  fileSize      BigInt?   // DEPRECATED: Legacy single-file size (use totalFileSize instead)
-  mimeType      String?   // DEPRECATED: Legacy single-file MIME type
+  formatType    String // Enum: MP3_V0, MP3_320KBPS, AAC, OGG_VORBIS, FLAC, ALAC, WAV, AIFF (matches existing Format enumeration)
+  s3Key         String? // DEPRECATED: Legacy single-file S3 key (use files relation instead)
+  fileName      String? // DEPRECATED: Legacy single-file name (use files relation instead)
+  fileSize      BigInt? // DEPRECATED: Legacy single-file size (use totalFileSize instead)
+  mimeType      String? // DEPRECATED: Legacy single-file MIME type
   trackCount    Int       @default(0) // Cached count of child track files
-  totalFileSize BigInt?   // Cached sum of all child file sizes (bytes)
-  checksum      String?   // MD5 or SHA256 checksum for integrity verification (optional)
+  totalFileSize BigInt? // Cached sum of all child file sizes (bytes)
+  checksum      String? // MD5 or SHA256 checksum for integrity verification (optional)
   deletedAt     DateTime? // Soft delete timestamp; null = active
   uploadedAt    DateTime  @default(now())
   createdAt     DateTime  @default(now())
@@ -801,12 +801,12 @@ model ReleaseDigitalFormatFile {
   id          String               @id @default(auto()) @map("_id") @db.ObjectId
   formatId    String               @db.ObjectId
   format      ReleaseDigitalFormat @relation(fields: [formatId], references: [id], onDelete: Cascade)
-  trackNumber Int                  // 1-based track ordering (derived from filename sort)
-  s3Key       String               // S3 object key for this track file
-  fileName    String               // Original uploaded filename (e.g., "01 - Intro.mp3")
-  fileSize    BigInt               // File size in bytes
-  mimeType    String               // MIME type (e.g., "audio/mpeg")
-  checksum    String?              // Optional SHA-256 hash for integrity verification
+  trackNumber Int // 1-based track ordering (derived from filename sort)
+  s3Key       String // S3 object key for this track file
+  fileName    String // Original uploaded filename (e.g., "01 - Intro.mp3")
+  fileSize    BigInt // File size in bytes
+  mimeType    String // MIME type (e.g., "audio/mpeg")
+  checksum    String? // Optional SHA-256 hash for integrity verification
   uploadedAt  DateTime             @default(now())
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
@@ -826,17 +826,17 @@ model UserDownloadQuota {
 }
 
 model DownloadEvent {
-  id           String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String?   @db.ObjectId // Nullable for guest downloads (future feature)
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  releaseId    String    @db.ObjectId
-  formatType   String    // Format downloaded (e.g., MP3_320KBPS, FLAC)
-  success      Boolean   // true = download succeeded, false = failed (quota exceeded, auth error, etc.)
-  errorCode    String?   // Optional error code for failed downloads (e.g., QUOTA_EXCEEDED, NOT_PURCHASED)
-  ipAddress    String?   // IP address for security audit (optional, privacy-sensitive)
-  userAgent    String?   // User agent string (optional, for analytics)
-  downloadedAt DateTime  @default(now())
-  createdAt    DateTime  @default(now())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String?  @db.ObjectId // Nullable for guest downloads (future feature)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  releaseId    String   @db.ObjectId
+  formatType   String // Format downloaded (e.g., MP3_320KBPS, FLAC)
+  success      Boolean // true = download succeeded, false = failed (quota exceeded, auth error, etc.)
+  errorCode    String? // Optional error code for failed downloads (e.g., QUOTA_EXCEEDED, NOT_PURCHASED)
+  ipAddress    String? // IP address for security audit (optional, privacy-sensitive)
+  userAgent    String? // User agent string (optional, for analytics)
+  downloadedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   @@index([userId])
   @@index([releaseId])

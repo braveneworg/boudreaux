@@ -14,8 +14,8 @@ This document defines the API contracts for digital format download authorizatio
 
 ## Endpoint: Download Authorization
 
-**Route**: `/api/releases/[releaseId]/download/[formatType]`  
-**Method**: `GET`  
+**Route**: `/api/releases/[releaseId]/download/[formatType]`
+**Method**: `GET`
 **Purpose**: Authorize a user to download a specific digital format, generate a time-limited S3 presigned URL, and log the download event.
 
 ### Path Parameters
@@ -142,9 +142,9 @@ The endpoint performs the following checks in order:
 
 ## Endpoint: Upload Presigned URL Generation
 
-**Route**: Server Action (not RESTful endpoint)  
-**Function**: `uploadDigitalFormatAction(releaseId, formatType, fileInfo)`  
-**Method**: Server Action (POST via Next.js Server Actions)  
+**Route**: Server Action (not RESTful endpoint)
+**Function**: `uploadDigitalFormatAction(releaseId, formatType, fileInfo)`
+**Method**: Server Action (POST via Next.js Server Actions)
 **Purpose**: Generate S3 presigned PUT URL for admin to upload digital format file.
 
 ### Parameters
@@ -215,9 +215,9 @@ After the client uploads the file to S3 using the presigned URL:
 
 ## Endpoint: Delete Digital Format
 
-**Route**: Server Action (not RESTful endpoint)  
-**Function**: `deleteDigitalFormatAction(releaseId, formatType)`  
-**Method**: Server Action (POST via Next.js Server Actions)  
+**Route**: Server Action (not RESTful endpoint)
+**Function**: `deleteDigitalFormatAction(releaseId, formatType)`
+**Method**: Server Action (POST via Next.js Server Actions)
 **Purpose**: Soft delete a digital format, setting `deletedAt` timestamp and applying grace period logic.
 
 ### Parameters
@@ -262,9 +262,9 @@ function deleteDigitalFormatAction(
 
 ## Endpoint: Replace Digital Format
 
-**Route**: Server Action (not RESTful endpoint)  
-**Function**: `replaceDigitalFormatAction(releaseId, formatType, fileInfo)`  
-**Method**: Server Action (POST via Next.js Server Actions)  
+**Route**: Server Action (not RESTful endpoint)
+**Function**: `replaceDigitalFormatAction(releaseId, formatType, fileInfo)`
+**Method**: Server Action (POST via Next.js Server Actions)
 **Purpose**: Replace an existing digital format file, archive the old file for 30 days, preserve the download URL pattern.
 
 ### Parameters
@@ -294,8 +294,8 @@ Same as `uploadDigitalFormatAction`, but requires existing `ReleaseDigitalFormat
 
 ## Analytics Endpoint (User Story 5)
 
-**Route**: `/api/releases/[releaseId]/download-analytics`  
-**Method**: `GET`  
+**Route**: `/api/releases/[releaseId]/download-analytics`
+**Method**: `GET`
 **Purpose**: Retrieve download analytics for a specific release (admin-only).
 
 ### Query Parameters

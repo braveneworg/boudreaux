@@ -1,8 +1,8 @@
 # Feature Specification: Release Digital Formats Management
 
-**Feature Branch**: `004-release-digital-formats`  
-**Created**: 2026-03-23  
-**Status**: Draft  
+**Feature Branch**: `004-release-digital-formats`
+**Created**: 2026-03-23
+**Status**: Draft
 **Input**: User description: "Add release digital formats management to the admin panel, allowing admins to upload and manage digital files (MP3, FLAC, etc.) associated with a release. Features include: uploading digital files, managing download URLs, setting suggested prices, unique download URLs for purchased releases, 5 free downloads per user before locking, accordion UI in admin panel showing format types with upload targets, secure URL generation, file validation, access control, logging and monitoring, scalability support, user support mechanism, accessibility standards, analytics and reporting."
 
 ## User Scenarios & Testing _(mandatory)_

@@ -1,8 +1,8 @@
 # Tasks: Release Digital Formats Management
 
-**Feature**: `004-release-digital-formats`  
-**Branch**: `004-release-digital-formats`  
-**Input**: Design documents from `/specs/004-release-digital-formats/`  
+**Feature**: `004-release-digital-formats`
+**Branch**: `004-release-digital-formats`
+**Input**: Design documents from `/specs/004-release-digital-formats/`
 **Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/api.md ✅
 
 ---
@@ -394,7 +394,7 @@ For quickest time-to-value, implement **User Story 1 only** as MVP:
 2. Complete Foundational (Phase 2) - 1 day
 3. Complete User Story 1 (Phase 3) - 2-3 days
 
-**Total MVP Time**: 4-5 days  
+**Total MVP Time**: 4-5 days
 **Deliverable**: Admins can upload digital formats via accordion UI with checkmark indicators
 
 ### Incremental Delivery

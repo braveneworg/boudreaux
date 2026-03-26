@@ -1,8 +1,8 @@
 # Specification Quality Checklist: Release Digital Formats Management
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2026-03-23  
-**Last Updated**: 2026-03-23 (Post-Clarification)  
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2026-03-23
+**Last Updated**: 2026-03-23 (Post-Clarification)
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality

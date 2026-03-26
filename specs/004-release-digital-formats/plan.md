@@ -11,14 +11,14 @@ Enable admins to upload and manage digital audio files (MP3, FLAC, WAV, AAC) for
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5+ (strict mode, no `any` types, explicit function signatures)  
-**Primary Dependencies**: Next.js 16 (App Router, Server Components, Server Actions), React 18, Prisma 5 (MongoDB), AWS SDK S3 v3 (@aws-sdk/client-s3, @aws-sdk/s3-request-presigner), Zod (runtime validation), react-hook-form (form state), shadcn/ui (Accordion, Button, Input components), Auth.js (JWT sessions)  
-**Storage**: MongoDB via Prisma (ReleaseDigitalFormat, UserDownloadQuota, DownloadEvent metadata); AWS S3 (audio file storage with presigned URLs for upload/download, mirroring existing release image pattern)  
-**Testing**: Vitest (unit tests for repositories, services, Server Actions, validation schemas); @testing-library/react (component tests for accordion UI, upload progress, error states); Playwright (E2E tests for admin upload → user download flow, freemium quota enforcement)  
-**Target Platform**: Next.js web application (Node.js runtime on Vercel/self-hosted)  
-**Project Type**: Web application (admin panel extension + user-facing download delivery)  
-**Performance Goals**: <10s upload completion with visual feedback (SC-001), <30s download authorization + file delivery for 100MB files (SC-002), <500ms quota enforcement check, <1min analytics data freshness (SC-007)  
-**Constraints**: Format-specific file size validation (MP3/AAC 100MB, FLAC 250MB, WAV 500MB per FR-010/clarifications), cryptographically secure download URLs with minimum 128-bit entropy (SC-005), 24-hour signed URL validity (clarifications), atomic unique-release tracking for freemium quota (FR-005), soft delete with 90-day grace period for purchasers (FR-012/clarifications), 30-day archive retention for replaced files (clarifications)  
+**Language/Version**: TypeScript 5+ (strict mode, no `any` types, explicit function signatures)
+**Primary Dependencies**: Next.js 16 (App Router, Server Components, Server Actions), React 18, Prisma 5 (MongoDB), AWS SDK S3 v3 (@aws-sdk/client-s3, @aws-sdk/s3-request-presigner), Zod (runtime validation), react-hook-form (form state), shadcn/ui (Accordion, Button, Input components), Auth.js (JWT sessions)
+**Storage**: MongoDB via Prisma (ReleaseDigitalFormat, UserDownloadQuota, DownloadEvent metadata); AWS S3 (audio file storage with presigned URLs for upload/download, mirroring existing release image pattern)
+**Testing**: Vitest (unit tests for repositories, services, Server Actions, validation schemas); @testing-library/react (component tests for accordion UI, upload progress, error states); Playwright (E2E tests for admin upload → user download flow, freemium quota enforcement)
+**Target Platform**: Next.js web application (Node.js runtime on Vercel/self-hosted)
+**Project Type**: Web application (admin panel extension + user-facing download delivery)
+**Performance Goals**: <10s upload completion with visual feedback (SC-001), <30s download authorization + file delivery for 100MB files (SC-002), <500ms quota enforcement check, <1min analytics data freshness (SC-007)
+**Constraints**: Format-specific file size validation (MP3/AAC 100MB, FLAC 250MB, WAV 500MB per FR-010/clarifications), cryptographically secure download URLs with minimum 128-bit entropy (SC-005), 24-hour signed URL validity (clarifications), atomic unique-release tracking for freemium quota (FR-005), soft delete with 90-day grace period for purchasers (FR-012/clarifications), 30-day archive retention for replaced files (clarifications)
 **Scale/Scope**: Catalog of ~50-200 releases, moderate format count (4-6 digital formats per release on average), moderate fan traffic (hundreds of concurrent users during release launches), typical album-length files (40-80 minutes at various bitrates)
 
 ## Constitution Check
