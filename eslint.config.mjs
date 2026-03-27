@@ -50,6 +50,7 @@ const eslintConfig = [
   },
   // Base JavaScript rules
   js.configs.recommended,
+  jsxA11y.flatConfigs.recommended,
   // Prettier integration and custom rules
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -58,7 +59,6 @@ const eslintConfig = [
       '@next/next': nextPlugin,
       react,
       'react-hooks': reactHooks,
-      'jsx-a11y': jsxA11y,
       import: importPlugin,
       prettier: prettierPlugin,
       'unused-imports': unusedImports,
