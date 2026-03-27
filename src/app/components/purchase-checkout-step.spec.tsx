@@ -16,7 +16,7 @@ vi.mock('server-only', () => ({}));
 const mockCheckoutState = vi.fn();
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
-  CheckoutProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CheckoutFormProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   PaymentElement: () => null,
   useCheckout: () => mockCheckoutState(),
 }));

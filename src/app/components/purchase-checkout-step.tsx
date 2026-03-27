@@ -5,7 +5,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { CheckoutProvider, PaymentElement, useCheckout } from '@stripe/react-stripe-js/checkout';
+import {
+  CheckoutFormProvider,
+  PaymentElement,
+  useCheckout,
+} from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, Loader2Icon } from 'lucide-react';
@@ -263,12 +267,12 @@ export const PurchaseCheckoutStep = ({
         <DialogTitle>Purchase {releaseTitle}</DialogTitle>
         <DialogDescription>You are paying {formatCents(amountCents)}</DialogDescription>
       </DialogHeader>
-      <CheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
+      <CheckoutFormProvider stripe={stripePromise} options={{ clientSecret }}>
         <PurchaseCheckoutForm
           amountCents={amountCents}
           onPaymentComplete={() => setPaymentComplete(true)}
         />
-      </CheckoutProvider>
+      </CheckoutFormProvider>
     </>
   );
 };

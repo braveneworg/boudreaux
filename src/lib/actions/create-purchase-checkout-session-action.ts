@@ -60,7 +60,7 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      ui_mode: 'custom',
+      ui_mode: 'elements',
       line_items: [
         {
           price_data: {

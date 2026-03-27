@@ -18,7 +18,7 @@ vi.mock('@stripe/stripe-js', () => ({
 }));
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
-  CheckoutProvider: ({ children }: { children: React.ReactNode }) => (
+  CheckoutFormProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="checkout-provider">{children}</div>
   ),
 }));

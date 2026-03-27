@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { CheckoutProvider } from '@stripe/react-stripe-js/checkout';
+import { CheckoutFormProvider } from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
 import { Loader2Icon } from 'lucide-react';
 
@@ -86,9 +86,9 @@ export const CheckoutStep = ({ tier, customerEmail }: CheckoutStepProps) => {
         <DialogTitle>Checkout</DialogTitle>
         <DialogDescription>Complete your subscription</DialogDescription>
       </DialogHeader>
-      <CheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
+      <CheckoutFormProvider stripe={stripePromise} options={{ clientSecret }}>
         <CheckoutForm />
-      </CheckoutProvider>
+      </CheckoutFormProvider>
     </>
   );
 };
