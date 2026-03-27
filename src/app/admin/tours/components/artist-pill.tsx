@@ -233,10 +233,10 @@ const ArtistPill = ({
               <div className="space-y-3">
                 {/* Set Time picker */}
                 <div className="space-y-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     <Clock className="size-3" />
                     Set Time (optional)
-                  </label>
+                  </span>
                   <TimePicker
                     value={timePickerValue}
                     placeholder="Select set time"

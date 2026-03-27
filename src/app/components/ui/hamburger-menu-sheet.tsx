@@ -56,14 +56,13 @@ export default function HamburgerMenuSheet({
           <Separator className="bg-accent" />
           <SocialMediaIconLinks className="justify-center" />
           <Separator className="bg-accent mb-2" />
-          <ul className="pt-4 space-y-4" role="list">
+          <ul className="pt-4 space-y-4">
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                role="listitem"
               >
                 <a
                   href={item.href}

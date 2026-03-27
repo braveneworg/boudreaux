@@ -478,7 +478,7 @@ export default function VenueSelect<
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Timezone</label>
+              <span className="text-sm font-medium">Timezone</span>
               <TimezoneSelect
                 value={newVenueTimeZone || null}
                 onChange={setNewVenueTimeZone}
@@ -620,7 +620,7 @@ export default function VenueSelect<
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Timezone</label>
+                  <span className="text-sm font-medium">Timezone</span>
                   <TimezoneSelect
                     value={editVenueTimeZone || null}
                     onChange={setEditVenueTimeZone}

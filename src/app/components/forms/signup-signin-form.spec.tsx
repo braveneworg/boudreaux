@@ -109,6 +109,7 @@ vi.mock('@/app/components/ui/button', () => ({
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div data-testid="turnstile-widget" onClick={() => setIsVerified?.(true)} {...props}>
       Turnstile Widget
     </div>

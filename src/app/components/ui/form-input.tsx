@@ -17,6 +17,7 @@ const FormInput = ({ id, placeholder, type, autoFocus, ...properties }: FormInpu
     id={id}
     placeholder={placeholder}
     type={type}
+    // eslint-disable-next-line jsx-a11y/no-autofocus
     autoFocus={autoFocus}
     {...properties}
   />

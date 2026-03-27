@@ -1154,6 +1154,7 @@ const TrackListDrawer = ({
               const coverArt = getCoverArt(releaseTrack);
 
               const trackItem = (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection handled by parent player component
                 <li
                   key={track.id}
                   className={`flex items-center justify-between gap-4 p-3 transition-colors ${

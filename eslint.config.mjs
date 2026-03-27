@@ -173,6 +173,7 @@ const eslintConfig = [
       'jsx-a11y/aria-unsupported-elements': 'error',
       'jsx-a11y/role-has-required-aria-props': 'error',
       'jsx-a11y/role-supports-aria-props': 'error',
+      'jsx-a11y/heading-has-content': ['error', { components: ['Heading'] }],
 
       // Import rules and sorting
       'import/order': [

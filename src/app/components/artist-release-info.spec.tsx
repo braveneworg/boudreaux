@@ -16,6 +16,7 @@ const { mockToast } = vi.hoisted(() => ({
 
 vi.mock('lucide-react', () => ({
   Share2Icon: (props: React.HTMLAttributes<HTMLSpanElement>) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <span data-testid="share2-icon" onClick={props.onClick} />
   ),
 }));

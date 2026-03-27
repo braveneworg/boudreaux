@@ -54,6 +54,7 @@ vi.mock('@/app/components/ui/command', () => ({
     value?: string;
     className?: string;
   }) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
     <div
       data-testid={`command-item-${value}`}
       onClick={onSelect}

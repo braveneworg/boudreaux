@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+/* eslint-disable jsx-a11y/no-static-element-interactions -- canvas-like drag/resize component uses mouse/touch handlers on divs */
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -228,6 +229,7 @@ export function ResizableTextBox({
   };
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- interactive canvas element for text box positioning
     <div
       ref={containerRef}
       className="absolute"

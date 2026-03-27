@@ -69,6 +69,7 @@ const SignupSigninForm = ({
                       placeholder="Email address"
                       type="email"
                       {...field}
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
                       autoFocus
                     />
                   )}

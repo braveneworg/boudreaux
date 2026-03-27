@@ -132,10 +132,10 @@ export function NotificationBanner({ notifications, className }: NotificationBan
 
   const currentNotification = notifications[currentIndex];
 
+  /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard navigation per WAI-ARIA carousel pattern */
   return (
     <section
       className={cn('relative w-full max-w-xl mx-auto overflow-hidden mt-1', className)}
-      role="region"
       aria-label="Notification banner"
       aria-roledescription="carousel"
       onKeyDown={handleKeyDown}
@@ -207,6 +207,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
       )}
     </section>
   );
+  /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
 }
 
 interface BannerSlideProps {
@@ -412,7 +413,7 @@ interface NavigationDotsProps {
 
 function NavigationDots({ total, current, onSelect }: NavigationDotsProps) {
   return (
-    <nav
+    <div
       className="flex items-center justify-center gap-1"
       role="tablist"
       aria-label="Banner navigation"
@@ -438,6 +439,6 @@ function NavigationDots({ total, current, onSelect }: NavigationDotsProps) {
           />
         </button>
       ))}
-    </nav>
+    </div>
   );
 }
