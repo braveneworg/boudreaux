@@ -7,9 +7,7 @@ import Stripe from 'stripe';
 config({ path: '.env.local' });
 config();
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
-  typescript: true,
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '');
 
 const PRODUCT_NAME = 'Fake Four Inc. Subscription';
 
