@@ -5,21 +5,29 @@ import { CONSTANTS } from './src/lib/constants';
 const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+const IS_CI = !!process.env.CI;
+const PLAYWRIGHT_REPORT_OUTPUT = process.env.PLAYWRIGHT_HTML_REPORT || 'e2e/playwright-report';
+const PLAYWRIGHT_TEST_OUTPUT = process.env.PLAYWRIGHT_TEST_OUTPUT || 'e2e/test-results';
 
 export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  forbidOnly: IS_CI,
+  retries: IS_CI ? 1 : 0,
+  timeout: IS_CI ? 45_000 : 30_000,
+  expect: {
+    timeout: 10_000,
+  },
+  globalTimeout: IS_CI ? 1_080_000 : undefined,
   workers: 1,
-  reporter: process.env.CI
-    ? [['html', { outputFolder: 'e2e/playwright-report' }], ['github']]
-    : [['list'], ['html', { outputFolder: 'e2e/playwright-report', open: 'never' }]],
+  reporter: IS_CI
+    ? [['html', { outputFolder: PLAYWRIGHT_REPORT_OUTPUT }], ['github']]
+    : [['list'], ['html', { outputFolder: PLAYWRIGHT_REPORT_OUTPUT, open: 'never' }]],
 
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
 
-  outputDir: 'e2e/test-results',
+  outputDir: PLAYWRIGHT_TEST_OUTPUT,
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
@@ -36,12 +44,14 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'pnpm run dev',
+    command: IS_CI
+      ? 'pnpm exec next build --webpack && pnpm exec next start -p 3000'
+      : 'pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: IS_CI ? 900_000 : 120_000,
     env: {
-      NODE_ENV: 'development',
+      NODE_ENV: IS_CI ? 'production' : 'development',
       E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,
       AUTH_SECRET,

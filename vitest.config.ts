@@ -28,14 +28,39 @@ export default defineConfig({
     name: packageJson.name,
     environment: 'jsdom',
 
+    // Use Vitest 4 workspace projects to split .spec.ts (node) and .spec.tsx (jsdom).
+    // Pure TypeScript spec files run in the lightweight Node environment;
+    // skipping jsdom init saves 1–3s wall clock.
+    // The few .spec.ts files that DO need DOM opt back in via a
+    // `// @vitest-environment jsdom` comment at the top.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: ['**/*.spec.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'jsdom',
+          environment: 'jsdom',
+          include: ['**/*.spec.tsx'],
+        },
+      },
+    ],
+
     // Performance optimizations
     css: false, // Don't process CSS in tests
-    // Use vmThreads locally for ~3x faster tests, forks in CI for better isolation
-    pool: process.env.CI ? 'forks' : 'vmThreads',
+    // vmThreads is ~3x faster than forks: thread startup is cheap, VM contexts
+    // provide per-file isolation identical to forks without subprocess overhead.
+    pool: 'vmThreads',
 
-    // Vitest 4: Worker configuration
-    // Use 75% of cores locally for speed, auto-detect in CI
-    maxWorkers: process.env.CI ? undefined : '75%',
+    // Use all available cores. CI runners typically have 2–4 vCPUs;
+    // local machines benefit equally from full utilisation.
+    maxWorkers: '100%',
 
     isolate: true, // Required for test isolation
     fileParallelism: true, // Run test files in parallel for speed
@@ -65,6 +90,9 @@ export default defineConfig({
     globals: true,
     watch: false,
     setupFiles: ['./setupTests.ts'],
+    // Auto-clear mock call history after every test — equivalent to calling
+    // vi.clearAllMocks() in afterEach but eliminates the hook call overhead.
+    clearMocks: true,
 
     // Optimize dependency pre-bundling
     deps: {
@@ -89,7 +117,12 @@ export default defineConfig({
 
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'json-summary', 'html', 'lcov', 'clover'],
+      // In CI, only generate the reporters consumed downstream
+      // (json-summary for coverage action + regression check, json for PR diff, text for log).
+      // html/lcov/clover are large and unused in CI, and write significant disk I/O.
+      reporter: process.env.CI
+        ? ['text', 'json', 'json-summary']
+        : ['text', 'json', 'json-summary', 'html'],
       exclude: [
         // Configuration files
         '**/*.config.{ts,js,mjs,cjs}',
