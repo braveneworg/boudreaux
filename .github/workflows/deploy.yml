@@ -328,7 +328,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24.14.0"
+          node-version: "24.14.1"
 
       - name: Install dependencies for sync script
         run: pnpm install --frozen-lockfile
@@ -1240,7 +1240,7 @@ jobs:
         if: steps.bump-type.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "24.14.0"
+          node-version: "24.14.1"
 
       - name: Bump version
         if: steps.bump-type.outputs.skip != 'true'
