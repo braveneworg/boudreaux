@@ -35,6 +35,8 @@ describe('ReleaseDigitalFormatFileRepository', () => {
     fileSize: BigInt(10000000),
     mimeType: 'audio/mpeg',
     checksum: null,
+    title: null,
+    duration: null,
     uploadedAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -598,6 +598,7 @@ interface InfoTickerTapeFeaturedArtistProps {
   artistRelease?: never;
   trackName?: never;
   isPlaying?: boolean;
+  trackTitle?: string;
   onTrackSelect?: (trackId: string) => void;
 }
 
@@ -643,7 +644,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
     const { featuredArtist } = props;
     displayName = getFeaturedArtistDisplayName(featuredArtist);
     releaseTitle = featuredArtist.release?.title ?? null;
-    trackTitle = featuredArtist.track?.title ?? '';
+    trackTitle = props.trackTitle ?? '';
   } else {
     const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
     displayName = getArtistDisplayName(artistRelease.artist);
@@ -1239,6 +1240,146 @@ const TrackListDrawer = ({
 };
 
 /**
+ * Props for FormatFileListDrawer
+ */
+interface FormatFileListDrawerProps {
+  files: {
+    id: string;
+    trackNumber: number;
+    title?: string | null;
+    fileName: string;
+    duration?: number | null;
+    s3Key: string;
+  }[];
+  currentFileId: string | null;
+  onFileSelect?: (fileId: string) => void;
+  artistName: string;
+  releaseTitle: string;
+}
+
+/**
+ * FormatFileListDrawer component displays a collapsible drawer with digital format files.
+ * Used by the FeaturedArtistsPlayer to show track-by-track navigation from ReleaseDigitalFormatFiles.
+ */
+const FormatFileListDrawer = ({
+  files,
+  currentFileId,
+  onFileSelect,
+  artistName,
+  releaseTitle,
+}: FormatFileListDrawerProps) => {
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
+        >
+          <span>View all {files.length} tracks</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="sr-only">Track List</DrawerTitle>
+          <DrawerDescription>
+            <article>
+              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <p className="text-sm text-shadow-none mb-0">
+                <em>{releaseTitle}</em>
+              </p>
+              <p>
+                {files.length} track{files.length !== 1 ? 's' : ''}
+              </p>
+            </article>
+          </DrawerDescription>
+        </DrawerHeader>
+        <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
+          <ol className="px-0 -ml-2">
+            {files.map((file) => {
+              const isCurrentFile = currentFileId === file.id;
+              const displayTitle = file.title ?? file.fileName;
+
+              const fileItem = (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- file selection handled by parent player component
+                <li
+                  key={file.id}
+                  className={`flex items-center justify-between gap-4 p-3 transition-colors ${
+                    isCurrentFile
+                      ? 'bg-zinc-800 text-zinc-50'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                  } ${onFileSelect ? 'cursor-pointer' : ''}`}
+                  onClick={() => onFileSelect?.(file.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span
+                      className={`text-sm font-medium w-6 shrink-0 text-right ${
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
+                    >
+                      {file.trackNumber}.
+                    </span>
+                    <span
+                      className={`text-sm truncate ${
+                        isCurrentFile
+                          ? 'font-semibold text-zinc-50!'
+                          : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
+                    >
+                      {displayTitle}
+                    </span>
+                  </div>
+                  {file.duration != null && (
+                    <span
+                      className={`text-sm shrink-0 font-mono ${
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                      }`}
+                    >
+                      {formatDuration(file.duration)}
+                    </span>
+                  )}
+                </li>
+              );
+
+              return onFileSelect ? (
+                <DrawerClose key={file.id} asChild>
+                  {fileItem}
+                </DrawerClose>
+              ) : (
+                fileItem
+              );
+            })}
+          </ol>
+        </div>
+        {files.some((f) => f.duration != null) && (
+          <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
+            <div className="flex justify-between text-sm text-zinc-600">
+              <span>Total time</span>
+              <span className="font-mono">
+                {formatDuration(files.reduce((total, f) => total + (f.duration ?? 0), 0))}
+              </span>
+            </div>
+          </div>
+        )}
+        <DrawerClose asChild>
+          <Button variant="outline" className="mx-4 mb-4">
+            <ChevronUp className="h-4 w-4 mr-2" />
+            Close
+          </Button>
+        </DrawerClose>
+      </DrawerContent>
+    </Drawer>
+  );
+};
+
+/**
  * Interface for navigation menu items.
  *
  * @property label - The display text for the menu item
@@ -1415,4 +1556,5 @@ MediaPlayer.DotNavMenu = DotNavMenu;
 MediaPlayer.DotNavMenuItem = DotNavMenuItem;
 MediaPlayer.DotNavMenuTrigger = DotNavMenuTrigger;
 MediaPlayer.TrackListDrawer = TrackListDrawer;
+MediaPlayer.FormatFileListDrawer = FormatFileListDrawer;
 MediaPlayer.SocialSharer = SocialSharer;

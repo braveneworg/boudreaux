@@ -65,13 +65,11 @@ const mockFeaturedArtist = {
   featuredOn: new Date('2024-06-01'),
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
-  trackId: null,
+  digitalFormatId: null,
   releaseId: null,
-  groupId: null,
   artists: [],
-  track: null,
+  digitalFormat: null,
   release: null,
-  group: null,
 };
 
 describe('FeaturedArtistsService', () => {

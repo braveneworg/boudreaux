@@ -11,7 +11,6 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 
 import { findOrCreateArtistAction } from './find-or-create-artist-action';
-import { findOrCreateGroupAction } from './find-or-create-group-action';
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
 
 import type { Prisma } from '@prisma/client';
@@ -150,11 +149,8 @@ export async function bulkCreateTracksAction(
       string,
       { artistId: string; artistName: string; created: boolean }
     >();
-    const groupCache = new Map<string, { groupId: string; groupName: string; created: boolean }>();
-
     // First pass: Find or create all releases (outside transaction since they're
     // shared resources that shouldn't be rolled back if individual tracks fail)
-    // Also pre-create Groups from albumArtist metadata if present
     for (const track of tracks) {
       if (autoCreateRelease && track.album && track.album.trim() !== '') {
         const albumKey = track.album.trim().toLowerCase();
@@ -176,25 +172,6 @@ export async function bulkCreateTracksAction(
           });
 
           if (releaseResult.success && releaseResult.releaseId) {
-            // If albumArtist is present, find/create a Group (not an Artist)
-            // The albumArtist represents the group/band name on the album
-            if (track.albumArtist?.trim()) {
-              const albumArtistName = track.albumArtist.trim();
-              const groupKey = albumArtistName.toLowerCase();
-
-              if (!groupCache.has(groupKey)) {
-                const groupResult = await findOrCreateGroupAction(albumArtistName);
-
-                if (groupResult.success && groupResult.groupId) {
-                  groupCache.set(groupKey, {
-                    groupId: groupResult.groupId,
-                    groupName: groupResult.groupName || albumArtistName,
-                    created: groupResult.created || false,
-                  });
-                }
-              }
-            }
-
             releaseCache.set(albumKey, {
               releaseId: releaseResult.releaseId,
               releaseTitle: releaseResult.releaseTitle || track.album,
@@ -264,7 +241,7 @@ export async function bulkCreateTracksAction(
 
         // When a resolvable artist name is present, an individual Artist
         // (and ArtistRelease) is created so the release surfaces on artist
-        // pages. When albumArtist is present a Group is also created.
+        // pages.
         //
         // Artist resolution:
         //   - artist differs from albumArtist → use the distinct artist name
@@ -281,8 +258,6 @@ export async function bulkCreateTracksAction(
             ? trimmedArtist
             : trimmedAlbumArtist
           : trimmedArtist;
-
-        const groupName = hasAlbumArtist ? trimmedAlbumArtist : undefined;
 
         // Create track and all associations in a single transaction
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -335,55 +310,6 @@ export async function bulkCreateTracksAction(
             }
           }
 
-          // Handle group creation/association from albumArtist
-          // Groups are created even without an individual artist
-          let groupId: string | undefined;
-
-          if (groupName) {
-            const groupKey = groupName.toLowerCase();
-            const cachedGroup = groupCache.get(groupKey);
-
-            if (cachedGroup) {
-              groupId = cachedGroup.groupId;
-
-              // Create ArtistGroup association if we have an individual artist
-              if (artistId) {
-                const existingArtistGroup = await tx.artistGroup.findUnique({
-                  where: {
-                    artistId_groupId: {
-                      artistId,
-                      groupId,
-                    },
-                  },
-                });
-
-                if (!existingArtistGroup) {
-                  await tx.artistGroup.create({
-                    data: {
-                      artistId,
-                      groupId,
-                    },
-                  });
-                }
-              }
-            } else {
-              // Find or create group with artist association in transaction
-              const groupResult = await findOrCreateGroupAction(groupName, {
-                artistId,
-                tx,
-              });
-
-              if (groupResult.success && groupResult.groupId) {
-                groupId = groupResult.groupId;
-                groupCache.set(groupKey, {
-                  groupId: groupResult.groupId,
-                  groupName: groupResult.groupName || groupName,
-                  created: groupResult.created || false,
-                });
-              }
-            }
-          }
-
           // Association-only mode for existing tracks
           if (track.existingTrackId) {
             const trackId = track.existingTrackId;
@@ -412,7 +338,7 @@ export async function bulkCreateTracksAction(
               }
             }
 
-            return { trackData: { id: trackId }, artistId, groupId };
+            return { trackData: { id: trackId }, artistId };
           }
 
           // Create the track with optional release and artist associations
@@ -456,7 +382,7 @@ export async function bulkCreateTracksAction(
             },
           });
 
-          return { trackData, artistId, groupId };
+          return { trackData, artistId };
         });
 
         results.push({
@@ -500,16 +426,13 @@ export async function bulkCreateTracksAction(
         deferUpload,
         releasesCreated: [...releaseCache.values()].filter((r) => r.created).length,
         artistsCreated: [...artistCache.values()].filter((a) => a.created).length,
-        groupsCreated: [...groupCache.values()].filter((g) => g.created).length,
         artistReleasesCreated: artistCache.size > 0 && releaseCache.size > 0,
-        artistGroupsCreated: artistCache.size > 0 && groupCache.size > 0,
       },
     });
 
     revalidatePath('/admin/tracks');
     revalidatePath('/admin/artists');
     revalidatePath('/admin/releases');
-    revalidatePath('/admin/groups');
 
     return {
       success: failedCount === 0,

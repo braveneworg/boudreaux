@@ -28,7 +28,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Releases',
-  description: 'Browse all published releases. Search by artist, title, or group.',
+  description: 'Browse all published releases. Search by artist or title.',
 };
 
 const breadcrumbItems = [{ anchorText: 'Releases', url: '/releases', isActive: true }];

@@ -643,18 +643,6 @@ export class ArtistService {
                 { displayName: { contains: search, mode: 'insensitive' as const } },
                 { slug: { contains: search, mode: 'insensitive' as const } },
                 {
-                  groups: {
-                    some: {
-                      group: {
-                        OR: [
-                          { displayName: { contains: search, mode: 'insensitive' as const } },
-                          { name: { contains: search, mode: 'insensitive' as const } },
-                        ],
-                      },
-                    },
-                  },
-                },
-                {
                   releases: {
                     some: {
                       release: {
@@ -723,7 +711,6 @@ export class ArtistService {
           images: true,
           labels: true,
           urls: true,
-          groups: { include: { group: true } },
           releases: {
             include: {
               release: {

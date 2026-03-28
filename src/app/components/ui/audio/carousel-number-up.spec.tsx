@@ -88,7 +88,6 @@ const createMockArtist = (
         },
       },
     ],
-    groups: [],
   }) as unknown as Artist;
 
 describe('CarouselNumberUp', () => {

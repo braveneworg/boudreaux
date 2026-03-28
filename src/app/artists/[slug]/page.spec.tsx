@@ -128,7 +128,6 @@ describe('ArtistDetailPage', () => {
     images: [],
     labels: [],
     urls: [],
-    groups: [],
     releases: [
       createMockArtistRelease('release-1', 'Newest Album', 3, new Date('2024-06-01')),
       createMockArtistRelease('release-2', 'Older Album', 2, new Date('2024-01-01')),

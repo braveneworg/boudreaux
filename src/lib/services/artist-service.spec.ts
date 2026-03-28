@@ -71,6 +71,7 @@ describe('ArtistService', () => {
     genres: null,
     bornOn: null,
     diedOn: null,
+    formedOn: null,
     publishedOn: null,
     publishedBy: null,
     createdAt: new Date('2024-01-01'),
@@ -92,7 +93,6 @@ describe('ArtistService', () => {
     featuredArtistId: null,
     images: [],
     labels: [],
-    groups: [],
     releases: [],
     urls: [],
   };
@@ -1100,18 +1100,6 @@ describe('ArtistService', () => {
                   { displayName: { contains: 'john', mode: 'insensitive' } },
                   { slug: { contains: 'john', mode: 'insensitive' } },
                   expect.objectContaining({
-                    groups: expect.objectContaining({
-                      some: expect.objectContaining({
-                        group: expect.objectContaining({
-                          OR: expect.arrayContaining([
-                            { displayName: { contains: 'john', mode: 'insensitive' } },
-                            { name: { contains: 'john', mode: 'insensitive' } },
-                          ]),
-                        }),
-                      }),
-                    }),
-                  }),
-                  expect.objectContaining({
                     releases: expect.objectContaining({
                       some: expect.objectContaining({
                         release: expect.objectContaining({
@@ -1258,7 +1246,6 @@ describe('ArtistService', () => {
             images: true,
             labels: true,
             urls: true,
-            groups: { include: { group: true } },
             releases: expect.objectContaining({
               include: expect.objectContaining({
                 release: expect.objectContaining({

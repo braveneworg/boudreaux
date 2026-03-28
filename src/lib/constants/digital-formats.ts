@@ -160,3 +160,17 @@ export function getFileExtensionForFormat(formatType: DigitalFormatType): string
 export function getDefaultMimeType(formatType: DigitalFormatType): string {
   return FORMAT_MIME_TYPES[formatType][0];
 }
+
+/**
+ * Human-readable labels for digital format types
+ */
+export const FORMAT_LABELS: Record<string, string> = {
+  MP3_V0: 'MP3 V0',
+  MP3_320KBPS: 'MP3 320kbps',
+  AAC: 'AAC',
+  OGG_VORBIS: 'Ogg Vorbis',
+  FLAC: 'FLAC',
+  ALAC: 'ALAC',
+  WAV: 'WAV',
+  AIFF: 'AIFF',
+};

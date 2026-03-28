@@ -770,14 +770,6 @@ describe('ReleaseService', () => {
             firstName: 'John',
             surname: 'Doe',
             displayName: null,
-            groups: [
-              {
-                id: 'ag-1',
-                artistId: 'artist-1',
-                groupId: 'group-1',
-                group: { id: 'group-1', displayName: 'The Does' },
-              },
-            ],
           },
         },
       ],
@@ -819,7 +811,7 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('should include images, artistReleases with artist+groups, and releaseUrls', async () => {
+    it('should include images, artistReleases with artist, and releaseUrls', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
 
       await ReleaseService.getPublishedReleases();
@@ -830,11 +822,7 @@ describe('ReleaseService', () => {
             images: expect.anything(),
             artistReleases: expect.objectContaining({
               include: expect.objectContaining({
-                artist: expect.objectContaining({
-                  include: expect.objectContaining({
-                    groups: expect.anything(),
-                  }),
-                }),
+                artist: true,
               }),
             }),
             releaseUrls: expect.objectContaining({

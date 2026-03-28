@@ -314,13 +314,15 @@ describe('presigned-upload-actions', () => {
         expect(result.data?.[0].s3Key).toMatch(/^media\/artists\//);
       });
 
-      it('should work with groups entity type', async () => {
-        const result = await getPresignedUploadUrlsAction('groups', 'group-123', [
-          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
+      it('should work with featured-artists entity type', async () => {
+        const result = await getPresignedUploadUrlsAction(
+          'featured-artists',
+          'featured-artist-123',
+          [{ fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 }]
+        );
 
         expect(result.success).toBe(true);
-        expect(result.data?.[0].s3Key).toMatch(/^media\/groups\//);
+        expect(result.data?.[0].s3Key).toMatch(/^media\/featured-artists\//);
       });
 
       it('should work with releases entity type', async () => {

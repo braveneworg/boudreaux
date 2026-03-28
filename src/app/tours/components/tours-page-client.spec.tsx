@@ -6,15 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { ToursPageClient } from './tours-page-client';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
   tourDates: Array<
@@ -22,8 +14,7 @@ type TourWithRelations = Tour & {
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -31,24 +22,14 @@ type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
-const createMockArtist = (
-  overrides?: Partial<Artist & { groups: Array<{ group: Group }> }>
-): Artist & { groups: Array<{ group: Group }> } =>
+const createMockArtist = (overrides?: Partial<Artist>): Artist =>
   ({
     id: 'artist-1',
     firstName: 'John',
     surname: 'Doe',
     displayName: 'John Doe',
-    groups: [],
     ...overrides,
-  }) as Artist & { groups: Array<{ group: Group }> };
-
-const createMockGroup = (overrides?: Partial<Group>): Group =>
-  ({
-    id: 'group-1',
-    name: 'Test Group',
-    ...overrides,
-  }) as Group;
+  }) as Artist;
 
 const createMockVenue = (overrides?: Partial<Venue>): Venue =>
   ({
@@ -67,26 +48,21 @@ const createMockVenue = (overrides?: Partial<Venue>): Venue =>
 const createMockHeadliner = (
   overrides?: Partial<
     TourDateHeadliner & {
-      artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-      group: Group | null;
+      artist: Artist | null;
     }
   >
 ): TourDateHeadliner & {
-  artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-  group: Group | null;
+  artist: Artist | null;
 } =>
   ({
     id: 'th-1',
     tourDateId: 'tour-date-1',
     artistId: 'artist-1',
-    groupId: null,
     sortOrder: 0,
     artist: createMockArtist(),
-    group: null,
     ...overrides,
   }) as TourDateHeadliner & {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
+    artist: Artist | null;
   };
 
 const createMockTourDate = (
@@ -95,8 +71,7 @@ const createMockTourDate = (
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -105,8 +80,7 @@ const createMockTourDate = (
   venue: Venue;
   headliners: Array<
     TourDateHeadliner & {
-      artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-      group: Group | null;
+      artist: Artist | null;
     }
   >;
 } =>
@@ -130,8 +104,7 @@ const createMockTourDate = (
     venue: Venue;
     headliners: Array<
       TourDateHeadliner & {
-        artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-        group: Group | null;
+        artist: Artist | null;
       }
     >;
   };
@@ -448,38 +421,6 @@ describe('ToursPageClient', () => {
 
     expect(screen.getByText('West Coast Run')).toBeInTheDocument();
     expect(screen.queryByText('South Run')).not.toBeInTheDocument();
-  });
-
-  it('filters tours by group headliner name', async () => {
-    const user = setupUser();
-    const group = createMockGroup({ id: 'group-1', name: 'The Supremes' });
-    const tours = [
-      createMockTour({
-        id: 'tour-1',
-        title: 'Motown Night',
-        tourDates: [
-          createMockTourDate({
-            headliners: [
-              createMockHeadliner({
-                artist: null,
-                artistId: null,
-                group,
-                groupId: group.id,
-              }),
-            ],
-          }),
-        ],
-      }),
-      createMockTour({ id: 'tour-2', title: 'Rock Night' }),
-    ];
-
-    render(<ToursPageClient tours={tours} />);
-
-    const searchInput = screen.getByLabelText('Search tours by artist name');
-    await typeAndFlush(user, searchInput, 'Supremes');
-
-    expect(screen.getByText('Motown Night')).toBeInTheDocument();
-    expect(screen.queryByText('Rock Night')).not.toBeInTheDocument();
   });
 
   it('does not show count when no search query', () => {

@@ -35,7 +35,7 @@ const getS3Client = () => {
  * Generate a unique file key for S3
  */
 const generateS3Key = (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   fileName: string
 ): string => {
@@ -162,7 +162,7 @@ const validateFile = (
  * This allows clients to upload directly to S3, bypassing Next.js server body size limits
  */
 export const getPresignedUploadUrlsAction = async (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {

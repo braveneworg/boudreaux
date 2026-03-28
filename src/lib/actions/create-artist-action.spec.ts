@@ -110,7 +110,7 @@ describe('createArtistAction', () => {
 
       expect(getActionState).toHaveBeenCalledWith(
         mockFormData,
-        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'publishedOn'],
+        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'publishedOn', 'formedOn'],
         expect.anything()
       );
     });

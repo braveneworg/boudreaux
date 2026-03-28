@@ -117,6 +117,7 @@ describe('updateArtistAction', () => {
           'tags',
           'bornOn',
           'diedOn',
+          'formedOn',
           'publishedOn',
         ],
         expect.anything()

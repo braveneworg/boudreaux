@@ -71,9 +71,8 @@ describe('FeaturedArtistDataView', () => {
         publishedOn: null,
         deletedOn: null,
         artists: [],
-        track: null,
+        digitalFormat: null,
         release: null,
-        group: null,
       },
     ],
     count: 1,
@@ -162,7 +161,7 @@ describe('FeaturedArtistDataView', () => {
               surname: 'McJazzface',
             },
           ],
-          track: null,
+          digitalFormat: null,
           release: null,
           group: null,
         },
@@ -200,64 +199,6 @@ describe('FeaturedArtistDataView', () => {
     });
   });
 
-  it('should filter results when searching by group name', async () => {
-    const mockDataWithGroup = {
-      featuredArtists: [
-        {
-          id: 'featured-with-group',
-          displayName: 'Featured With Group',
-          featuredOn: '2024-02-01T00:00:00.000Z',
-          position: 2,
-          description: 'Group featured artist',
-          coverArt: null,
-          images: [],
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          publishedOn: null,
-          deletedOn: null,
-          artists: [],
-          track: null,
-          release: null,
-          group: {
-            id: 'group-1',
-            name: 'The Groovy Band',
-            displayName: 'Groovy Band',
-          },
-        },
-      ],
-      count: 1,
-    };
-
-    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
-      isPending: false,
-      error: null,
-      data: mockDataWithGroup,
-      refetch: vi.fn(),
-    } as never);
-
-    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
-
-    await waitFor(() => {
-      expect(screen.getByText('Featured With Group')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText('Search featured artists...');
-
-    // Search by group name
-    fireEvent.change(searchInput, { target: { value: 'The Groovy Band' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('Featured With Group')).toBeInTheDocument();
-    });
-
-    // Search by group displayName
-    fireEvent.change(searchInput, { target: { value: 'Groovy Band' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('Featured With Group')).toBeInTheDocument();
-    });
-  });
-
   it('should show resolved display name when displayName is null', async () => {
     const mockDataWithNullDisplayName = {
       featuredArtists: [
@@ -281,7 +222,7 @@ describe('FeaturedArtistDataView', () => {
               surname: 'Doe',
             },
           ],
-          track: null,
+          digitalFormat: null,
           release: null,
           group: null,
         },
@@ -328,7 +269,7 @@ describe('FeaturedArtistDataView', () => {
           publishedOn: null,
           deletedOn: null,
           artists: [],
-          track: null,
+          digitalFormat: null,
           release: null,
           group: null,
         },

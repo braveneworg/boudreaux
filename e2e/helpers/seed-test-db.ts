@@ -87,7 +87,6 @@ async function seedTestDatabase() {
     await prisma.trackArtist.deleteMany({});
     await prisma.artistFeaturedArtist.deleteMany({});
     await prisma.artistRelease.deleteMany({});
-    await prisma.artistGroup.deleteMany({});
     await prisma.artistLabel.deleteMany({});
     await prisma.artistUrl.deleteMany({});
     await prisma.releaseUrl.deleteMany({});
@@ -98,7 +97,6 @@ async function seedTestDatabase() {
     await prisma.track.deleteMany({});
     await prisma.release.deleteMany({});
     await prisma.artist.deleteMany({});
-    await prisma.group.deleteMany({});
     await prisma.authenticator.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.account.deleteMany({});

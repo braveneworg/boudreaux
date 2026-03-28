@@ -142,7 +142,6 @@ describe('updateReleaseAction', () => {
           'coverArt',
           'formats',
           'artistIds',
-          'groupIds',
           'labels',
           'catalogNumber',
           'description',

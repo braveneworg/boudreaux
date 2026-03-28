@@ -66,10 +66,6 @@ vi.mock('@/app/components/forms/fields/artist-multi-select', () => ({
 vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
   default: () => <div data-testid="cover-art-field" />,
 }));
-vi.mock('@/app/components/forms/fields/group-multi-select', () => ({
-  default: () => <div data-testid="group-multi-select" />,
-  __esModule: true,
-}));
 vi.mock('@/app/components/ui/image-uploader', () => ({
   ImageUploader: () => <div data-testid="image-uploader" />,
 }));

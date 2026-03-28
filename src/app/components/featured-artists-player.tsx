@@ -3,10 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
-import type { ArtistRelease, FeaturedArtist } from '@/lib/types/media-models';
+import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 
 import { ArtistReleaseInfo } from './artist-release-info';
 import { DownloadDialog, DownloadTriggerButton } from './download-dialog';
@@ -23,9 +24,31 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const [selectedArtist, setSelectedArtist] = useState<FeaturedArtist | null>(
     featuredArtists.length > 0 ? featuredArtists[0] : null
   );
+  const [currentFileId, setCurrentFileId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
+
+  /** Sorted format files for the selected artist's digital format */
+  const sortedFiles = useMemo<FeaturedArtistFormatFile[]>(() => {
+    const files = selectedArtist?.digitalFormat?.files;
+    if (!files || files.length === 0) return [];
+    return [...files].sort((a, b) => a.trackNumber - b.trackNumber);
+  }, [selectedArtist?.digitalFormat?.files]);
+
+  /** The currently playing format file */
+  const currentFile = useMemo<FeaturedArtistFormatFile | null>(() => {
+    if (currentFileId) {
+      return sortedFiles.find((f) => f.id === currentFileId) ?? sortedFiles[0] ?? null;
+    }
+    return sortedFiles[0] ?? null;
+  }, [currentFileId, sortedFiles]);
+
+  /** CDN URL for the current file's audio */
+  const audioSrc = useMemo<string | null>(() => {
+    if (!currentFile?.s3Key) return null;
+    return buildCdnUrl(currentFile.s3Key);
+  }, [currentFile?.s3Key]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -52,9 +75,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     if (featured.artists && featured.artists.length > 0) {
       const artist = featured.artists[0];
       return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-    }
-    if (featured.group) {
-      return featured.group.name;
     }
     return 'Unknown Artist';
   };
@@ -97,113 +117,75 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
     setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
+    // Reset to first file of the new artist's format
+    const firstFile = artist.digitalFormat?.files?.[0];
+    setCurrentFileId(firstFile?.id ?? null);
   };
 
   /**
-   * Handle track selection from the track list drawer
-   * Updates the selected artist's track to the newly selected track
+   * Handle file selection from the format file list drawer
    */
-  const handleTrackSelect = useCallback(
-    (trackId: string) => {
-      if (!selectedArtist?.release?.releaseTracks) return;
-
-      // Find the track in the release
-      const releaseTrack = selectedArtist.release.releaseTracks.find(
-        (rt: { track: { id: string } }) => rt.track.id === trackId
-      );
-
-      if (releaseTrack) {
-        // Create a new selected artist with the new track
-        const updatedArtist: FeaturedArtist = {
-          ...selectedArtist,
-          track: releaseTrack.track,
-        };
-        setSelectedArtist(updatedArtist);
-        setShouldAutoPlay(true); // Auto-play the selected track
+  const handleFileSelect = useCallback(
+    (fileId: string) => {
+      const file = sortedFiles.find((f) => f.id === fileId);
+      if (file) {
+        setCurrentFileId(file.id);
+        setShouldAutoPlay(true);
       }
     },
-    [selectedArtist]
+    [sortedFiles]
   );
 
   /**
-   * Handle track ended - auto-advance to next track if available
+   * Handle track ended - auto-advance to next file if available
    */
   const handleTrackEnded = useCallback(() => {
-    if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+    if (!currentFile || sortedFiles.length === 0) return;
 
-    const releaseTracks = selectedArtist.release.releaseTracks;
-    // Sort tracks by position
-    const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+    const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);
 
-    // Find the current track index
-    const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
-
-    // If there's a next track, play it
-    if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
-      const nextTrack = sortedTracks[currentIndex + 1].track;
-      const updatedArtist: FeaturedArtist = {
-        ...selectedArtist,
-        track: nextTrack,
-      };
-      setSelectedArtist(updatedArtist);
-      setShouldAutoPlay(true); // Auto-play next track
+    // If there's a next file, play it
+    if (currentIndex !== -1 && currentIndex < sortedFiles.length - 1) {
+      const nextFile = sortedFiles[currentIndex + 1];
+      setCurrentFileId(nextFile.id);
+      setShouldAutoPlay(true);
     }
-  }, [selectedArtist]);
+  }, [currentFile, sortedFiles]);
 
   /**
-   * Handle previous track button - go to previous track in release if available
+   * Handle previous track button - go to previous file in format if available
    */
   const handlePreviousTrack = useCallback(
     (wasPlaying: boolean) => {
-      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+      if (!currentFile || sortedFiles.length === 0) return;
 
-      const releaseTracks = selectedArtist.release.releaseTracks;
-      // Sort tracks by position
-      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+      const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);
 
-      // Find the current track index
-      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
-
-      // If there's a previous track, go to it
       if (currentIndex > 0) {
-        const prevTrack = sortedTracks[currentIndex - 1].track;
-        const updatedArtist: FeaturedArtist = {
-          ...selectedArtist,
-          track: prevTrack,
-        };
-        setSelectedArtist(updatedArtist);
-        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+        const prevFile = sortedFiles[currentIndex - 1];
+        setCurrentFileId(prevFile.id);
+        setShouldAutoPlay(wasPlaying);
       }
     },
-    [selectedArtist]
+    [currentFile, sortedFiles]
   );
 
   /**
-   * Handle next track button - go to next track in release if available
+   * Handle next track button - go to next file in format if available
    */
   const handleNextTrack = useCallback(
     (wasPlaying: boolean) => {
-      if (!selectedArtist?.release?.releaseTracks || !selectedArtist.track) return;
+      if (!currentFile || sortedFiles.length === 0) return;
 
-      const releaseTracks = selectedArtist.release.releaseTracks;
-      // Sort tracks by position
-      const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+      const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);
 
-      // Find the current track index
-      const currentIndex = sortedTracks.findIndex((rt) => rt.track.id === selectedArtist.track?.id);
-
-      // If there's a next track, go to it
-      if (currentIndex !== -1 && currentIndex < sortedTracks.length - 1) {
-        const nextTrack = sortedTracks[currentIndex + 1].track;
-        const updatedArtist: FeaturedArtist = {
-          ...selectedArtist,
-          track: nextTrack,
-        };
-        setSelectedArtist(updatedArtist);
-        setShouldAutoPlay(wasPlaying); // Only auto-play if was playing
+      if (currentIndex !== -1 && currentIndex < sortedFiles.length - 1) {
+        const nextFile = sortedFiles[currentIndex + 1];
+        setCurrentFileId(nextFile.id);
+        setShouldAutoPlay(wasPlaying);
       }
     },
-    [selectedArtist]
+    [currentFile, sortedFiles]
   );
 
   if (featuredArtists.length === 0) {
@@ -214,8 +196,8 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     );
   }
 
-  const showTrackListDrawer = !!selectedArtist?.release?.releaseTracks;
-  const currentTrackId = selectedArtist?.track?.id || null;
+  const showFileListDrawer = sortedFiles.length > 0;
+  const currentTrackTitle = currentFile?.title ?? currentFile?.fileName ?? '';
 
   return (
     <MediaPlayer className="mb-2">
@@ -237,13 +219,14 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             visibleHeading
           />
         )}
-        {showTrackListDrawer && selectedArtist?.release && (
+        {showFileListDrawer && selectedArtist?.release && (
           <div className="flex flex-col items-center">
-            <MediaPlayer.TrackListDrawer
-              artistRelease={selectedArtist as unknown as ArtistRelease}
+            <MediaPlayer.FormatFileListDrawer
+              files={sortedFiles}
+              currentFileId={currentFile?.id ?? null}
+              onFileSelect={handleFileSelect}
               artistName={getDisplayName(selectedArtist)}
-              currentTrackId={currentTrackId ?? ''}
-              onTrackSelect={handleTrackSelect}
+              releaseTitle={selectedArtist.release.title ?? ''}
             />
             <DownloadDialog
               artistName={getDisplayName(selectedArtist)}
@@ -278,10 +261,10 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               })()}
 
               {/* Audio Controls - sits directly beneath the image */}
-              {selectedArtist.track?.audioUrl && (
+              {audioSrc && (
                 <div className="w-full bg-zinc-900">
                   <MediaPlayer.Controls
-                    audioSrc={selectedArtist.track.audioUrl}
+                    audioSrc={audioSrc}
                     onPlay={handlePlay}
                     onPause={handlePause}
                     onEnded={handleTrackEnded}
@@ -294,8 +277,12 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               )}
 
               {/* Info Ticker Tape - beneath the controls */}
-              {selectedArtist.track?.title && (
-                <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} isPlaying={isPlaying} />
+              {currentTrackTitle && (
+                <MediaPlayer.InfoTickerTape
+                  featuredArtist={selectedArtist}
+                  isPlaying={isPlaying}
+                  trackTitle={currentTrackTitle}
+                />
               )}
             </div>
           </div>

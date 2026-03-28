@@ -55,16 +55,7 @@ const tourDateInclude = {
   tour: true,
   headliners: {
     include: {
-      artist: {
-        include: {
-          groups: {
-            include: {
-              group: true,
-            },
-          },
-        },
-      },
-      group: true,
+      artist: true,
     },
     orderBy: { sortOrder: 'asc' as const },
   },

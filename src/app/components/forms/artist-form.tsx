@@ -119,6 +119,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
       tags: '',
       bornOn: '',
       diedOn: '',
+      formedOn: '',
       createdBy: user?.id,
       publishedOn: '',
     },
@@ -166,6 +167,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
           tags: artist.tags || '',
           bornOn: formatDate(artist.bornOn),
           diedOn: formatDate(artist.diedOn),
+          formedOn: formatDate(artist.formedOn),
           publishedOn: formatDate(artist.publishedOn),
           createdBy: artist.createdBy || user?.id,
         });
@@ -825,6 +827,20 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     )}
                   />
                 </div>
+                <FormField
+                  control={control}
+                  name="formedOn"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Formed on</FormLabel>
+                      <FormControl>
+                        <DatePicker fieldName={field.name} onSelect={handleSelectDate} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">Only used for bands</p>
               </section>
             </CardContent>
 

@@ -128,7 +128,6 @@ describe('createReleaseAction', () => {
           'coverArt',
           'formats',
           'artistIds',
-          'groupIds',
           'labels',
           'catalogNumber',
           'description',

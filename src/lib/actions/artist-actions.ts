@@ -11,14 +11,7 @@ import type { Prisma } from '@prisma/client';
 
 export async function createArtistAction(artist: Artist): Promise<ServiceResponse<Artist>> {
   try {
-    const {
-      images,
-      urls,
-      labels: _labels,
-      groups: _groups,
-      releases: _releases,
-      ...artistData
-    } = artist;
+    const { images, urls, labels: _labels, releases: _releases, ...artistData } = artist;
 
     const createInput: Prisma.ArtistCreateInput = {
       ...artistData,

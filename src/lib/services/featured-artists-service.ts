@@ -24,18 +24,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
       return { success: true, data: artist };
@@ -75,18 +75,18 @@ export class FeaturedArtistsService {
                   images: true,
                 },
               },
-              track: true,
+              digitalFormat: {
+                include: {
+                  files: {
+                    orderBy: { trackNumber: 'asc' as const },
+                  },
+                },
+              },
               release: {
                 include: {
-                  releaseTracks: {
-                    include: {
-                      track: true,
-                    },
-                  },
                   images: true,
                 },
               },
-              group: true,
             },
             orderBy: {
               featuredOn: 'desc',
@@ -142,18 +142,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
 
@@ -182,18 +182,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
 
@@ -230,18 +230,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
 
@@ -277,18 +277,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
 
@@ -321,18 +321,18 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
+          digitalFormat: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
+              },
+            },
+          },
           release: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
-              },
               images: true,
             },
           },
-          group: true,
         },
       });
 

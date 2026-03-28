@@ -83,7 +83,6 @@ describe('ReleasesPage', () => {
             firstName: 'John',
             surname: 'Doe',
             displayName: null,
-            groups: [],
           },
         },
       ],

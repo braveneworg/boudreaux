@@ -25,9 +25,8 @@ describe('Featured Artist by ID API Routes', () => {
     position: 1,
     featuredOn: null,
     artistIds: ['aaaaaaaaaaaaaaaaaaaaaaaa'],
-    trackId: 'bbbbbbbbbbbbbbbbbbbbbbbb',
+    digitalFormatId: 'bbbbbbbbbbbbbbbbbbbbbbbb',
     releaseId: 'cccccccccccccccccccccccc',
-    groupId: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };

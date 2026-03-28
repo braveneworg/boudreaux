@@ -40,7 +40,6 @@ export const updateReleaseAction = async (
     'coverArt',
     'formats',
     'artistIds',
-    'groupIds',
     'labels',
     'catalogNumber',
     'description',
@@ -86,7 +85,6 @@ export const updateReleaseAction = async (
       coverArt,
       formats,
       artistIds,
-      groupIds,
       labels,
       catalogNumber,
       description,
@@ -181,9 +179,6 @@ export const updateReleaseAction = async (
       }
       await Promise.all(ops);
     }
-
-    // groupIds is validated but not persisted (no GroupRelease model in schema yet)
-    void groupIds;
 
     // Log release update for security audit
     logSecurityEvent({

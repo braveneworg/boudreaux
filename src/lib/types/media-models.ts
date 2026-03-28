@@ -92,8 +92,6 @@ export interface Image {
   artistId: string;
   release?: Release;
   releaseId?: string;
-  group?: Group;
-  groupId?: string;
   track?: Track;
   trackId?: string;
   url?: Url;
@@ -125,14 +123,14 @@ export interface Label {
 }
 
 /**
- * ArtistGroup model - matches Prisma ArtistGroup model
+ * ArtistMember model - matches Prisma ArtistMember model
  */
-export interface ArtistGroup {
+export interface ArtistMember {
   id: string;
   artist: Artist;
   artistId: string;
-  group: Group;
-  groupId: string;
+  member: Artist;
+  memberId: string;
 }
 
 /**
@@ -218,28 +216,26 @@ export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
         images: true;
       };
     };
-    track: true;
+    digitalFormat: {
+      include: {
+        files: true;
+      };
+    };
     release: {
       include: {
-        releaseTracks: {
-          include: {
-            track: true;
-          };
-        };
         images: true;
       };
     };
-    group: true;
   };
 }>;
 
-export type Group = Prisma.GroupGetPayload<{
-  include: {
-    images: true;
-    artistGroups: true;
-    urls: true;
-  };
-}>;
+/**
+ * A single file within a digital format, used for playback in the
+ * featured artists player.
+ */
+export type FeaturedArtistFormatFile = NonNullable<
+  FeaturedArtist['digitalFormat']
+>['files'][number];
 
 /**
  * Track model - matches Prisma Track model
@@ -258,7 +254,6 @@ export type Artist = Prisma.ArtistGetPayload<{
   include: {
     images: true;
     labels: true;
-    groups: true;
     releases: {
       include: {
         release: true;
@@ -317,23 +312,14 @@ export type ReleaseUrl = Prisma.ReleaseUrlGetPayload<{
 
 /**
  * Published release listing for the public releases grid page.
- * Includes artist info with groups (for display name fallback and search),
- * first image (for cover art fallback), and URLs (for Bandcamp link).
+ * Includes artist info, first image (for cover art fallback), and URLs (for Bandcamp link).
  */
 export type PublishedReleaseListing = Prisma.ReleaseGetPayload<{
   include: {
     images: true;
     artistReleases: {
       include: {
-        artist: {
-          include: {
-            groups: {
-              include: {
-                group: true;
-              };
-            };
-          };
-        };
+        artist: true;
       };
     };
     releaseUrls: {
@@ -357,7 +343,6 @@ export type PublishedReleaseDetail = Prisma.ReleaseGetPayload<{
           include: {
             images: true;
             labels: true;
-            groups: true;
             releases: {
               include: {
                 release: true;
@@ -400,7 +385,7 @@ export type ArtistWithPublishedReleases = Prisma.ArtistGetPayload<{
     images: true;
     labels: true;
     urls: true;
-    groups: { include: { group: true } };
+    members: { include: { member: true } };
     releases: {
       include: {
         release: {

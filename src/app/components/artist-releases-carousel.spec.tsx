@@ -74,7 +74,6 @@ describe('ArtistReleasesCarousel', () => {
           releaseId: 'release-3',
           trackId: null,
           artistId: null,
-          groupId: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },

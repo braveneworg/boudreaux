@@ -349,7 +349,6 @@ describe('getArtistDisplayName', () => {
         notes: [],
         images: [],
         artistLabels: [],
-        artistGroups: [],
         artistReleases: [],
         urls: [],
         isPseudonymous: false,

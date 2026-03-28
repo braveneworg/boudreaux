@@ -26,9 +26,6 @@ export const releaseBaseSchema = z.object({
   artistIds: z
     .array(z.string().regex(mongoObjectIdPattern, { message: 'Invalid artist ID format' }))
     .optional(),
-  groupIds: z
-    .array(z.string().regex(mongoObjectIdPattern, { message: 'Invalid group ID format' }))
-    .optional(),
   labels: z
     .string()
     .max(500, { message: 'Labels must be less than 500 characters' })
@@ -131,11 +128,10 @@ export const releaseBaseSchema = z.object({
 export const createReleaseSchema = releaseBaseSchema.refine(
   (data) => {
     const hasArtists = data.artistIds && data.artistIds.length > 0;
-    const hasGroups = data.groupIds && data.groupIds.length > 0;
-    return hasArtists || hasGroups;
+    return hasArtists;
   },
   {
-    message: 'At least one Artist or one Group is required',
+    message: 'At least one Artist is required',
     path: ['artistIds'],
   }
 );

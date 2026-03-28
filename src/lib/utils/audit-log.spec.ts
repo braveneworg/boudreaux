@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { logSecurityEvent, extractRequestMetadata, type AuditEvent } from './audit-log';
 
@@ -257,14 +256,6 @@ describe('Audit Log', () => {
         'media.artist.image.updated',
         'media.featured_artist.created',
         'media.featured_artist.updated',
-        'media.group.created',
-        'media.group.found',
-        'media.group.updated',
-        'media.group.images.uploaded',
-        'media.group.images.reordered',
-        'media.group.image.deleted',
-        'media.group.member.added',
-        'media.group.member.removed',
         'media.release.created',
         'media.release.updated',
         'media.release.found',
@@ -350,32 +341,6 @@ describe('Audit Log', () => {
       });
     });
 
-    it('should log media.group.found with proper metadata', () => {
-      const consoleSpy = vi.spyOn(console, 'info');
-
-      logSecurityEvent({
-        event: 'media.group.found',
-        userId: 'admin-123',
-        metadata: {
-          groupId: 'group-456',
-          groupName: 'The Beatles',
-          searchedName: 'the beatles',
-          artistGroupCreated: false,
-        },
-      });
-
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0];
-      expect(logCall[1]).toHaveProperty('event', 'media.group.found');
-      expect(logCall[1]).toHaveProperty('metadata');
-      expect(logCall[1].metadata).toEqual({
-        groupId: 'group-456',
-        groupName: 'The Beatles',
-        searchedName: 'the beatles',
-        artistGroupCreated: false,
-      });
-    });
-
     it('should log media.tracks.bulk_created with proper metadata', () => {
       const consoleSpy = vi.spyOn(console, 'info');
 
@@ -389,9 +354,7 @@ describe('Audit Log', () => {
           autoCreateRelease: true,
           releasesCreated: 1,
           artistsCreated: 2,
-          groupsCreated: 1,
           artistReleasesCreated: true,
-          artistGroupsCreated: true,
         },
       });
 
@@ -405,7 +368,6 @@ describe('Audit Log', () => {
         failedCount: 2,
         autoCreateRelease: true,
         artistsCreated: 2,
-        groupsCreated: 1,
       });
     });
   });

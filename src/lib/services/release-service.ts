@@ -394,7 +394,7 @@ export class ReleaseService {
 
   /**
    * Get all published releases for the public listing page.
-   * Includes artist info with groups for display name fallback and search,
+   * Includes artist info for display name and search,
    * images for cover art fallback, and URLs for Bandcamp links.
    * Results are cached for 10 minutes in production.
    */
@@ -416,15 +416,7 @@ export class ReleaseService {
             },
             artistReleases: {
               include: {
-                artist: {
-                  include: {
-                    groups: {
-                      include: {
-                        group: true,
-                      },
-                    },
-                  },
-                },
+                artist: true,
               },
             },
             releaseUrls: {
@@ -479,7 +471,6 @@ export class ReleaseService {
                 include: {
                   images: true,
                   labels: true,
-                  groups: true,
                   releases: {
                     include: {
                       release: true,

@@ -38,7 +38,6 @@ export const createReleaseAction = async (
     'coverArt',
     'formats',
     'artistIds',
-    'groupIds',
     'labels',
     'catalogNumber',
     'description',
@@ -55,7 +54,6 @@ export const createReleaseAction = async (
         coverArt,
         formats,
         artistIds,
-        groupIds,
         labels,
         catalogNumber,
         description,
@@ -96,9 +94,6 @@ export const createReleaseAction = async (
           data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
         });
       }
-
-      // groupIds is validated but not persisted (no GroupRelease model in schema yet)
-      void groupIds;
 
       // Log release creation for security audit
       logSecurityEvent({

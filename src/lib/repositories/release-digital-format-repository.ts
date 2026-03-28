@@ -7,7 +7,12 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
-import type { Prisma, ReleaseDigitalFormat } from '@prisma/client';
+import type { Prisma, ReleaseDigitalFormat, ReleaseDigitalFormatFile } from '@prisma/client';
+
+/** ReleaseDigitalFormat with its child track files included */
+export type ReleaseDigitalFormatWithFiles = ReleaseDigitalFormat & {
+  files: ReleaseDigitalFormatFile[];
+};
 
 /**
  * Repository for ReleaseDigitalFormat data access
@@ -32,7 +37,7 @@ export class ReleaseDigitalFormatRepository {
   async findByReleaseAndFormat(
     releaseId: string,
     formatType: DigitalFormatType
-  ): Promise<ReleaseDigitalFormat | null> {
+  ): Promise<ReleaseDigitalFormatWithFiles | null> {
     const format = await prisma.releaseDigitalFormat.findUnique({
       where: {
         releaseId_formatType: {
@@ -55,7 +60,7 @@ export class ReleaseDigitalFormatRepository {
    * Find all active (non-deleted) digital formats for a release
    * Includes child track files ordered by trackNumber
    */
-  async findAllByRelease(releaseId: string): Promise<ReleaseDigitalFormat[]> {
+  async findAllByRelease(releaseId: string): Promise<ReleaseDigitalFormatWithFiles[]> {
     return await prisma.releaseDigitalFormat.findMany({
       where: {
         releaseId,

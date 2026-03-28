@@ -38,15 +38,13 @@ describe('Featured Artists API Routes', () => {
     position: 1,
     description: 'A featured artist description',
     coverArt: 'https://example.com/cover.jpg',
-    trackId: null,
+    digitalFormatId: null,
     releaseId: null,
-    groupId: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     artists: [],
-    track: null,
+    digitalFormat: null,
     release: null,
-    group: null,
   };
 
   beforeEach(() => {
@@ -155,7 +153,7 @@ describe('Featured Artists API Routes', () => {
       displayName: 'Featured Artist Name',
       position: 1,
       artistIds: ['507f1f77bcf86cd799439011'],
-      trackId: '507f1f77bcf86cd799439012',
+      digitalFormatId: '507f1f77bcf86cd799439012',
       releaseId: '507f1f77bcf86cd799439013',
     };
 

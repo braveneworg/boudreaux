@@ -8,20 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
-
-/**
- * Human-readable labels for digital format types
- */
-const FORMAT_LABELS: Record<string, string> = {
-  MP3_V0: 'MP3 V0',
-  MP3_320KBPS: 'MP3 320kbps',
-  AAC: 'AAC',
-  OGG_VORBIS: 'Ogg Vorbis',
-  FLAC: 'FLAC',
-  ALAC: 'ALAC',
-  WAV: 'WAV',
-  AIFF: 'AIFF',
-};
+import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
   formatType: string;

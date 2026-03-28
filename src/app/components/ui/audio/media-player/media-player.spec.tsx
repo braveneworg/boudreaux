@@ -274,7 +274,6 @@ const createMockArtist = (
     displayName: overrides.displayName ?? null,
     images: [],
     labels: [],
-    groups: [],
     releases: [],
     urls: [],
   }) as unknown as Artist;
@@ -285,7 +284,16 @@ const createMockFeaturedArtist = (
     displayName: string | null;
     position: number;
     coverArt: string | null;
-    track: Track | null;
+    digitalFormat: {
+      id: string;
+      files: Array<{
+        id: string;
+        trackNumber: number;
+        title: string;
+        fileName: string;
+        s3Key: string;
+      }>;
+    } | null;
     release: Release | null;
     artists: Array<{
       id: string;
@@ -293,7 +301,6 @@ const createMockFeaturedArtist = (
       surname: string;
       displayName: string | null;
     }>;
-    group: { id: string; name: string } | null;
   }> = {}
 ): FeaturedArtist =>
   ({
@@ -303,9 +310,8 @@ const createMockFeaturedArtist = (
     position: overrides.position ?? 1,
     description: null,
     coverArt: overrides.coverArt ?? null,
-    trackId: 'track-1',
+    digitalFormatId: 'format-1',
     releaseId: 'release-1',
-    groupId: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     artists:
@@ -313,13 +319,11 @@ const createMockFeaturedArtist = (
         ...a,
         images: [],
         labels: [],
-        groups: [],
         releases: [],
         urls: [],
       })) ?? [],
-    track: overrides.track ?? null,
+    digitalFormat: overrides.digitalFormat ?? null,
     release: overrides.release ?? null,
-    group: overrides.group ?? null,
   }) as unknown as FeaturedArtist;
 
 describe('MediaPlayer', () => {
@@ -437,19 +441,16 @@ describe('MediaPlayer', () => {
 
   describe('InfoTickerTape component', () => {
     it('should render track title and display name with featuredArtist', () => {
-      const mockTrack = createMockTrack({ title: 'My Song' });
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks, { title: 'My Album' });
+      const mockRelease = createMockRelease([], { title: 'My Album' });
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: 'Test Artist',
-        track: mockTrack,
         release: mockRelease,
       });
 
       render(
         <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
+          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} trackTitle="My Song" />
         </MediaPlayer>
       );
 
@@ -464,7 +465,6 @@ describe('MediaPlayer', () => {
       const mockRelease = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: mockTrack,
         release: mockRelease,
       });
 
@@ -484,7 +484,6 @@ describe('MediaPlayer', () => {
       const mockRelease = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: mockTrack,
         release: mockRelease,
       });
 
@@ -504,7 +503,6 @@ describe('MediaPlayer', () => {
       const mockRelease = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: mockTrack,
         release: mockRelease,
       });
 
@@ -525,7 +523,6 @@ describe('MediaPlayer', () => {
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
-        track: mockTrack,
         release: mockRelease,
         artists: [{ id: 'artist-1', firstName: 'Jane', surname: 'Smith', displayName: null }],
       });
@@ -546,7 +543,6 @@ describe('MediaPlayer', () => {
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
-        track: mockTrack,
         release: mockRelease,
         artists: [{ id: 'artist-1', firstName: 'Jane', surname: 'Smith', displayName: 'DJ Jane' }],
       });
@@ -560,39 +556,15 @@ describe('MediaPlayer', () => {
       expect(screen.getByText(/DJ Jane/)).toBeInTheDocument();
     });
 
-    it('should fall back to group name when no displayName and no artists', () => {
+    it('should display Unknown Artist when no displayName and no artists', () => {
       const mockTrack = createMockTrack();
       const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
       const mockRelease = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
-        track: mockTrack,
         release: mockRelease,
         artists: [],
-        group: { id: 'group-1', name: 'The Test Band' },
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByText(/The Test Band/)).toBeInTheDocument();
-    });
-
-    it('should display Unknown Artist when no displayName, artists, or group', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
-
-      const featuredArtist = createMockFeaturedArtist({
-        displayName: null,
-        track: mockTrack,
-        release: mockRelease,
-        artists: [],
-        group: null,
       });
 
       render(
@@ -610,7 +582,6 @@ describe('MediaPlayer', () => {
       const release = createMockRelease(mockReleaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: mockTrack,
         release,
       });
 
@@ -631,7 +602,6 @@ describe('MediaPlayer', () => {
       const release = createMockRelease(releaseTracks);
 
       const featuredArtist = createMockFeaturedArtist({
-        track: track1,
         release,
         artists: [{ id: 'artist-1', firstName: 'Test', surname: 'Artist', displayName: null }],
       });

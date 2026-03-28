@@ -46,7 +46,7 @@ interface CoverArtFieldProps<
   setValue: UseFormSetValue<TFieldValues>;
   artistIds: string[];
   disabled?: boolean;
-  entityType?: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
+  entityType?: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
 }
 
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];

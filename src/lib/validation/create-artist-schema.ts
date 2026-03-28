@@ -75,6 +75,7 @@ export const artistBaseSchema = z.object({
     .or(z.literal('')),
   bornOn: z.string().optional().or(z.literal('')),
   diedOn: z.string().optional().or(z.literal('')),
+  formedOn: z.string().optional().or(z.literal('')),
   publishedOn: z.string().optional().or(z.literal('')),
   // MongoDB ObjectId is a 24-character hex string, not a standard UUID
   createdBy: z

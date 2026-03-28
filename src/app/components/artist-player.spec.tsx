@@ -305,7 +305,6 @@ describe('ArtistPlayer', () => {
     images: [],
     labels: [],
     urls: [],
-    groups: [],
   };
 
   const createArtistWithReleases = (

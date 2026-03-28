@@ -17,9 +17,6 @@ import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-
 import { TextField } from '@/app/components/forms/fields';
 import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
-import GroupMultiSelect, {
-  type GroupOption,
-} from '@/app/components/forms/fields/group-multi-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -134,7 +131,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
   const [imagesReordered, setImagesReordered] = useState(false);
-  const [selectedGroups, setSelectedGroups] = useState<GroupOption[]>([]);
   const isEditMode = releaseId !== null;
 
   // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
@@ -167,7 +163,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       coverArt: '',
       formats: ['DIGITAL'],
       artistIds: [],
-      groupIds: [],
       labels: '',
       catalogNumber: '',
       description: '',
@@ -222,7 +217,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           coverArt: release.coverArt || '',
           formats: release.formats || ['DIGITAL'],
           artistIds: release.artistReleases?.map((ar: { artistId: string }) => ar.artistId) || [],
-          groupIds: release.groupReleases?.map((gr: { groupId: string }) => gr.groupId) || [],
           labels: Array.isArray(release.labels) ? release.labels.join(', ') : '',
           catalogNumber: release.catalogNumber || '',
           description: release.description || '',
@@ -734,14 +728,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 <ArtistMultiSelect
                   control={control}
                   name="artistIds"
-                  label={
-                    <>
-                      <b>Artists: </b>{' '}
-                      <span className="text-muted text-sm">
-                        (and/or add one or more Groups below)
-                      </span>
-                    </>
-                  }
+                  label="Artists"
                   placeholder="Select artists..."
                   searchPlaceholder="Search artists..."
                   emptyMessage="No artists found."
@@ -749,47 +736,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   releaseId={releaseId}
                   disabled={isSubmitting}
                 />
-                <GroupMultiSelect
-                  control={control}
-                  name="groupIds"
-                  label="Groups"
-                  placeholder="Select groups..."
-                  searchPlaceholder="Search groups..."
-                  emptyMessage="No groups found."
-                  setValue={releaseForm.setValue}
-                  releaseId={releaseId}
-                  disabled={isSubmitting}
-                  onGroupsChange={setSelectedGroups}
-                />
-                {/* Display artists from selected groups */}
-                {selectedGroups.length > 0 &&
-                  selectedGroups.some((g) => g.artistGroups && g.artistGroups.length > 0) && (
-                    <div className="rounded-md border p-3 text-sm">
-                      {selectedGroups
-                        .filter((g) => g.artistGroups && g.artistGroups.length > 0)
-                        .map((group, index, filteredGroups) => {
-                          const groupName = group.displayName || group.name;
-                          const artistNames =
-                            group.artistGroups?.map((ag) => {
-                              if (ag.artist.displayName) {
-                                return ag.artist.displayName;
-                              }
-                              const parts = [ag.artist.firstName, ag.artist.surname].filter(
-                                Boolean
-                              );
-                              return parts.join(' ') || 'Unknown Artist';
-                            }) || [];
-                          const isLast = index === filteredGroups.length - 1;
-                          return (
-                            <span key={group.id}>
-                              <span className="font-medium">{groupName}:</span>{' '}
-                              {artistNames.join(', ')}
-                              {!isLast && '; '}
-                            </span>
-                          );
-                        })}
-                    </div>
-                  )}
                 <CoverArtField
                   control={control}
                   name="coverArt"
@@ -813,6 +759,16 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+              </section>
+
+              <Separator />
+              {/* Digital Formats Section - Always visible */}
+              <section className="space-y-4">
+                <DigitalFormatsAccordion
+                  releaseId={preGeneratedId}
+                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
+                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
                 />
               </section>
 
@@ -849,6 +805,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     </div>
                   ))}
                 </div>
+
                 {/* Show all other formats in a collapsible section */}
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
@@ -1008,15 +965,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
               </section>
 
               <Separator />
-
-              {/* Digital Formats Section - Always visible */}
-              <section className="space-y-4">
-                <DigitalFormatsAccordion
-                  releaseId={preGeneratedId}
-                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
-                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
-                />
-              </section>
 
               {isEditMode && (
                 <>
