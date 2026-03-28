@@ -1088,9 +1088,8 @@ const TrackListDrawer = ({
   onTrackSelect?: (trackId: string) => void;
 }) => {
   const { release } = artistRelease;
-  const { releaseTracks } = release;
+  const allFiles = release.digitalFormats.flatMap((format) => format.files);
 
-  // TODO: verify if this function is actually needed?
   /**
    * Format duration from seconds to MM:SS format
    */
@@ -1101,24 +1100,8 @@ const TrackListDrawer = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  /**
-   * Get cover art for a release track, falling back to track coverArt or release coverArt
-   */
-  const getCoverArt = (releaseTrack: (typeof releaseTracks)[number]): string | null => {
-    // First, check ReleaseTrack's coverArt (derived from uploaded file metadata)
-    if ('coverArt' in releaseTrack && releaseTrack.coverArt) {
-      return releaseTrack.coverArt as string;
-    }
-    // Fall back to the track's own coverArt
-    if (releaseTrack.track.coverArt) {
-      return releaseTrack.track.coverArt;
-    }
-    // Fall back to release coverArt
-    return release.coverArt || null;
-  };
-
-  // Sort tracks by position
-  const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+  // Sort tracks by track number
+  const sortedFiles = [...allFiles].sort((a, b) => a.trackNumber - b.trackNumber);
 
   return (
     <Drawer>
@@ -1128,7 +1111,7 @@ const TrackListDrawer = ({
           size="sm"
           className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
         >
-          <span>View all {releaseTracks.length} tracks</span>
+          <span>View all {allFiles.length} tracks</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DrawerTrigger>
@@ -1142,28 +1125,27 @@ const TrackListDrawer = ({
                 <em>{release.title}</em>
               </p>
               <p>
-                {releaseTracks.length} track{releaseTracks.length !== 1 ? 's' : ''}
+                {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
               </p>
             </article>
           </DrawerDescription>
         </DrawerHeader>
         <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
           <ol className="px-0 -ml-2">
-            {sortedTracks.map((releaseTrack, index) => {
-              const { track } = releaseTrack;
-              const isCurrentTrack = currentTrackId === track.id;
-              const coverArt = getCoverArt(releaseTrack);
+            {sortedFiles.map((file, index) => {
+              const isCurrentTrack = currentTrackId === file.id;
+              const coverArt = release.coverArt || null;
 
               const trackItem = (
                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection handled by parent player component
                 <li
-                  key={track.id}
+                  key={file.id}
                   className={`flex items-center justify-between gap-4 p-3 transition-colors ${
                     isCurrentTrack
                       ? 'bg-zinc-800 text-zinc-50'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
                   } ${onTrackSelect ? 'cursor-pointer' : ''}`}
-                  onClick={() => onTrackSelect?.(track.id)}
+                  onClick={() => onTrackSelect?.(file.id)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
@@ -1177,7 +1159,7 @@ const TrackListDrawer = ({
                       <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
                         <Image
                           src={coverArt}
-                          alt={track.title}
+                          alt={file.title ?? file.fileName}
                           fill
                           className="object-cover"
                           sizes="40px"
@@ -1191,7 +1173,7 @@ const TrackListDrawer = ({
                           : 'text-zinc-500 dark:text-zinc-500'
                       }`}
                     >
-                      {track.title}
+                      {file.title ?? file.fileName}
                     </span>
                   </div>
                   <span
@@ -1199,14 +1181,14 @@ const TrackListDrawer = ({
                       isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
                     }`}
                   >
-                    {formatDuration(track.duration)}
+                    {formatDuration(file.duration ?? 0)}
                   </span>
                 </li>
               );
 
               // Wrap with DrawerClose if onTrackSelect is provided to close drawer on selection
               return onTrackSelect ? (
-                <DrawerClose key={track.id} asChild>
+                <DrawerClose key={file.id} asChild>
                   {trackItem}
                 </DrawerClose>
               ) : (
@@ -1219,12 +1201,7 @@ const TrackListDrawer = ({
           <div className="flex justify-between text-sm text-zinc-600">
             <span>Total time</span>
             <span className="font-mono">
-              {formatDuration(
-                releaseTracks.reduce(
-                  (total: number, rt: { track: { duration: number } }) => total + rt.track.duration,
-                  0
-                )
-              )}
+              {formatDuration(allFiles.reduce((total, f) => total + (f.duration ?? 0), 0))}
             </span>
           </div>
         </div>

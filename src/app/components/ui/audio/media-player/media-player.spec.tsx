@@ -6,13 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import videojs from 'video.js';
 
-import type {
-  FeaturedArtist,
-  Release,
-  ReleaseTrack,
-  Track,
-  Artist,
-} from '@/lib/types/media-models';
+import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
 
 import { MediaPlayer } from './media-player';
 
@@ -205,45 +199,33 @@ vi.mock('@/components/ui/button', () => ({
 // Mock DownloadDialog is no longer needed - download dialog lives at consumer level
 
 // Test data factory helpers using type assertions to unknown first
-const createMockTrack = (
+const createMockFormatFile = (
   overrides: Partial<{
     id: string;
-    title: string;
-    duration: number;
-    position: number;
-    audioUrl: string;
-    coverArt: string | null;
+    trackNumber: number;
+    title: string | null;
+    fileName: string;
+    duration: number | null;
+    s3Key: string;
   }> = {}
-): Track =>
-  ({
-    id: overrides.id ?? 'track-1',
-    title: overrides.title ?? 'Test Track',
-    duration: overrides.duration ?? 180,
-    position: overrides.position ?? 1,
-    audioUrl: overrides.audioUrl ?? 'https://example.com/audio.mp3',
-    coverArt: overrides.coverArt ?? null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    images: [],
-    releaseTracks: [],
-  }) as unknown as Track;
-
-const createMockReleaseTrack = (
-  track: Track,
-  overrides: Partial<{ coverArt: string | null }> = {}
-): ReleaseTrack =>
-  ({
-    id: `release-track-${track.id}`,
-    releaseId: 'release-1',
-    trackId: track.id,
-    track,
-    release: null,
-    position: track.position,
-    coverArt: overrides.coverArt ?? null,
-  }) as unknown as ReleaseTrack;
+) => ({
+  id: overrides.id ?? 'file-1',
+  formatId: 'format-1',
+  trackNumber: overrides.trackNumber ?? 1,
+  title: overrides.title !== undefined ? overrides.title : 'Test Track',
+  fileName: overrides.fileName ?? 'test-track.mp3',
+  duration: overrides.duration !== undefined ? overrides.duration : 180,
+  s3Key: overrides.s3Key ?? 'releases/test/test-track.mp3',
+  fileSize: BigInt(1024),
+  mimeType: 'audio/mpeg',
+  checksum: null,
+  uploadedAt: new Date('2024-01-01'),
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+});
 
 const createMockRelease = (
-  releaseTracks: ReleaseTrack[],
+  files: ReturnType<typeof createMockFormatFile>[],
   overrides: Partial<{
     id: string;
     title: string;
@@ -254,7 +236,7 @@ const createMockRelease = (
     id: overrides.id ?? 'release-1',
     title: overrides.title ?? 'Test Album',
     coverArt: overrides.coverArt ?? 'https://example.com/cover.jpg',
-    releaseTracks,
+    digitalFormats: [{ id: 'format-1', formatType: 'MP3_320KBPS', files }],
     images: [],
     artistReleases: [],
     releaseUrls: [],
@@ -460,9 +442,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should use text-xs font class for ticker text', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         release: mockRelease,
@@ -479,9 +459,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should apply marquee animation when isPlaying is true', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         release: mockRelease,
@@ -498,9 +476,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should center text when isPlaying is false', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         release: mockRelease,
@@ -517,9 +493,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should fall back to artist firstName surname when no displayName on featuredArtist', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
@@ -537,9 +511,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should use artist displayName when available', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
@@ -557,9 +529,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should display Unknown Artist when no displayName and no artists', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const mockRelease = createMockRelease(mockReleaseTracks);
+      const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         displayName: null,
@@ -577,9 +547,7 @@ describe('MediaPlayer', () => {
     });
 
     it('should render overflow wrapper with horizontal margin', () => {
-      const mockTrack = createMockTrack();
-      const mockReleaseTracks = [createMockReleaseTrack(mockTrack)];
-      const release = createMockRelease(mockReleaseTracks);
+      const release = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
         release,
@@ -596,10 +564,10 @@ describe('MediaPlayer', () => {
     });
 
     it('should not render TrackListDrawer inside InfoTickerTape', () => {
-      const track1 = createMockTrack({ id: 'track-1', title: 'Track 1', position: 1 });
-      const track2 = createMockTrack({ id: 'track-2', title: 'Track 2', position: 2 });
-      const releaseTracks = [createMockReleaseTrack(track1), createMockReleaseTrack(track2)];
-      const release = createMockRelease(releaseTracks);
+      const release = createMockRelease([
+        createMockFormatFile({ id: 'file-1', trackNumber: 1, title: 'Track 1' }),
+        createMockFormatFile({ id: 'file-2', trackNumber: 2, title: 'Track 2' }),
+      ]);
 
       const featuredArtist = createMockFeaturedArtist({
         release,
@@ -617,30 +585,25 @@ describe('MediaPlayer', () => {
   });
 
   describe('TrackListDrawer component', () => {
-    const track1 = createMockTrack({
-      id: 'track-1',
+    const file1 = createMockFormatFile({
+      id: 'file-1',
+      trackNumber: 1,
       title: 'First Song',
-      position: 1,
       duration: 180,
     });
-    const track2 = createMockTrack({
-      id: 'track-2',
+    const file2 = createMockFormatFile({
+      id: 'file-2',
+      trackNumber: 2,
       title: 'Second Song',
-      position: 2,
       duration: 200,
     });
-    const track3 = createMockTrack({
-      id: 'track-3',
+    const file3 = createMockFormatFile({
+      id: 'file-3',
+      trackNumber: 3,
       title: 'Third Song',
-      position: 3,
       duration: 220,
     });
-    const releaseTracks = [
-      createMockReleaseTrack(track1),
-      createMockReleaseTrack(track2),
-      createMockReleaseTrack(track3),
-    ];
-    const mockRelease = createMockRelease(releaseTracks, { title: 'Test Album' });
+    const mockRelease = createMockRelease([file1, file2, file3], { title: 'Test Album' });
     const mockArtist = createMockArtist({ displayName: 'Test Artist' });
 
     it('should render track count in trigger button', () => {
@@ -732,7 +695,7 @@ describe('MediaPlayer', () => {
 
       fireEvent.click(screen.getByText('Second Song'));
 
-      expect(onTrackSelect).toHaveBeenCalledWith('track-2');
+      expect(onTrackSelect).toHaveBeenCalledWith('file-2');
     });
 
     it('should wrap track items in DrawerClose when onTrackSelect is provided', () => {
@@ -773,7 +736,7 @@ describe('MediaPlayer', () => {
           <MediaPlayer.TrackListDrawer
             artistName="Test Artist"
             artistRelease={{ release: mockRelease, artist: mockArtist }}
-            currentTrackId="track-2"
+            currentTrackId="file-2"
           />
         </MediaPlayer>
       );
@@ -783,18 +746,14 @@ describe('MediaPlayer', () => {
       expect(highlightedItem).toBeInTheDocument();
     });
 
-    it('should display cover art thumbnails when available', () => {
-      const trackWithCoverArt = createMockTrack({
-        id: 'track-cover',
+    it('should display release cover art for each track', () => {
+      const fileWithReleaseCoverArt = createMockFormatFile({
+        id: 'file-cover',
+        trackNumber: 1,
         title: 'Track With Cover',
-        position: 1,
         duration: 180,
-        coverArt: 'https://example.com/track-cover.jpg',
       });
-      const releaseTrackWithCoverArt = createMockReleaseTrack(trackWithCoverArt, {
-        coverArt: 'https://example.com/release-track-cover.jpg',
-      });
-      const releaseWithCoverArt = createMockRelease([releaseTrackWithCoverArt], {
+      const releaseWithCoverArt = createMockRelease([fileWithReleaseCoverArt], {
         title: 'Album With Covers',
         coverArt: 'https://example.com/album-cover.jpg',
       });
@@ -808,68 +767,7 @@ describe('MediaPlayer', () => {
         </MediaPlayer>
       );
 
-      // Should render the cover art image - prioritizes releaseTrack.coverArt
-      const coverArtImages = screen.getAllByTestId('next-image');
-      expect(coverArtImages.length).toBeGreaterThan(0);
-      expect(coverArtImages[0]).toHaveAttribute(
-        'src',
-        'https://example.com/release-track-cover.jpg'
-      );
-    });
-
-    it('should fall back to track coverArt when releaseTrack coverArt is not available', () => {
-      const trackWithCoverArt = createMockTrack({
-        id: 'track-cover',
-        title: 'Track With Cover',
-        position: 1,
-        duration: 180,
-        coverArt: 'https://example.com/track-cover.jpg',
-      });
-      const releaseTrackWithoutCoverArt = createMockReleaseTrack(trackWithCoverArt); // No coverArt override
-      const releaseWithCoverArt = createMockRelease([releaseTrackWithoutCoverArt], {
-        title: 'Album With Covers',
-        coverArt: 'https://example.com/album-cover.jpg',
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.TrackListDrawer
-            artistName="Test Artist"
-            artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
-          />
-        </MediaPlayer>
-      );
-
-      // Should render the track's cover art image as fallback
-      const coverArtImages = screen.getAllByTestId('next-image');
-      expect(coverArtImages.length).toBeGreaterThan(0);
-      expect(coverArtImages[0]).toHaveAttribute('src', 'https://example.com/track-cover.jpg');
-    });
-
-    it('should fall back to release coverArt when no track coverArt is available', () => {
-      const trackWithoutCoverArt = createMockTrack({
-        id: 'track-no-cover',
-        title: 'Track Without Cover',
-        position: 1,
-        duration: 180,
-        coverArt: null,
-      });
-      const releaseTrackWithoutCoverArt = createMockReleaseTrack(trackWithoutCoverArt);
-      const releaseWithCoverArt = createMockRelease([releaseTrackWithoutCoverArt], {
-        title: 'Album With Cover',
-        coverArt: 'https://example.com/album-cover.jpg',
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.TrackListDrawer
-            artistName="Test Artist"
-            artistRelease={{ release: releaseWithCoverArt, artist: mockArtist }}
-          />
-        </MediaPlayer>
-      );
-
-      // Should render the release's cover art as fallback
+      // Should render the release's cover art image for the track
       const coverArtImages = screen.getAllByTestId('next-image');
       expect(coverArtImages.length).toBeGreaterThan(0);
       expect(coverArtImages[0]).toHaveAttribute('src', 'https://example.com/album-cover.jpg');
