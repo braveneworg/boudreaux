@@ -140,8 +140,6 @@ model Image {
   artistId  String?  @db.ObjectId
   release   Release? @relation(fields: [releaseId], references: [id])
   releaseId String?  @db.ObjectId
-  track     Track?   @relation(fields: [trackId], references: [id])
-  trackId   String?  @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   src       String?
@@ -152,7 +150,6 @@ model Image {
 
   @@index([artistId])
   @@index([releaseId])
-  @@index([trackId])
   @@index([urlId])
   @@index([sortOrder])
 }
@@ -174,12 +171,6 @@ enum Platform {
   DISCOGS
 }
 
-enum AudioUploadStatus {
-  PENDING // Track created, upload not yet started
-  UPLOADING // Upload in progress
-  COMPLETED // Upload completed successfully
-  FAILED // Upload failed
-}
 
 enum Format {
   DIGITAL
@@ -228,8 +219,6 @@ model Url {
   url         String // TODO: validate that this is a well-formed URL
   images      Image[]
   releaseUrls ReleaseUrl[]
-  track       Track?       @relation(fields: [trackId], references: [id])
-  trackId     String?      @db.ObjectId
 
   @@index([artistId])
   @@index([platform])
@@ -303,9 +292,6 @@ model Artist {
   artistFeaturedArtists ArtistFeaturedArtist[]
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
-  trackArtists          TrackArtist[]
-  track                 Track?                 @relation(fields: [trackId], references: [id])
-  trackId               String?                @db.ObjectId
   tourHeadliners        TourDateHeadliner[] // Tours where this artist is a headliner
 
   @@index([isActive])
@@ -440,7 +426,6 @@ model Release {
   linerNotesBy        String[]
   imageTypes          String[]
   variants            String[]
-  releaseTracks       ReleaseTrack[]
   artistReleases      ArtistRelease[]
   releaseUrls         ReleaseUrl[]
   createdAt           DateTime         @default(now())
@@ -467,58 +452,6 @@ model Release {
   @@index([featuredOn])
   @@index([featuredUntil])
   @@index([deletedOn])
-}
-
-model Track {
-  id                String            @id @default(auto()) @map("_id") @db.ObjectId
-  title             String
-  duration          Int // Duration in seconds
-  audioUrl          String // URL or file path to the audio file
-  audioFileHash     String? // SHA-256 hash of the audio file content for duplicate detection
-  audioUploadStatus AudioUploadStatus @default(COMPLETED) // Status of audio file upload
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  deletedOn         DateTime? // Date when the track was soft-deleted; null if not deleted
-  publishedOn       DateTime? // Date when the track was published
-  coverArt          String?
-  images            Image[]
-  position          Int // Position of the track in the release 0-based index
-  releaseTracks     ReleaseTrack[]
-  artists           TrackArtist[]
-  urls              Url[]
-  trackArtists      Artist[] // Reverse relation for Artist.track
-
-  @@index([title])
-  @@index([position])
-  @@index([deletedOn])
-  @@index([audioUploadStatus])
-  @@index([audioFileHash])
-}
-
-model TrackArtist {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  track    Track  @relation(fields: [trackId], references: [id])
-  trackId  String @db.ObjectId
-  artist   Artist @relation(fields: [artistId], references: [id])
-  artistId String @db.ObjectId
-
-  @@unique([trackId, artistId])
-  @@index([trackId])
-  @@index([artistId])
-}
-
-model ReleaseTrack {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  releaseId String  @db.ObjectId
-  track     Track   @relation(fields: [trackId], references: [id])
-  trackId   String  @db.ObjectId
-  position  Int     @default(0)
-  coverArt  String? // Cover art derived from the uploaded audio file's metadata
-
-  @@unique([releaseId, trackId])
-  @@index([releaseId])
-  @@index([trackId])
 }
 
 model Instrument {

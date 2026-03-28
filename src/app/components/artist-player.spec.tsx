@@ -10,6 +10,10 @@ import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 
 import { ArtistPlayer } from './artist-player';
 
+vi.mock('@/lib/utils/cdn-url', () => ({
+  buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
+}));
+
 // Mock the MediaPlayer component and sub-components
 vi.mock('@/app/components/ui/audio/media-player', () => {
   const MockMediaPlayer = ({ children }: { children: ReactNode }) => (
@@ -123,35 +127,33 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   InfoTickerTape.displayName = 'InfoTickerTape';
   MockMediaPlayer.InfoTickerTape = InfoTickerTape;
 
-  const TrackListDrawer = ({
+  const FormatFileListDrawer = ({
+    files,
+    currentFileId,
+    onFileSelect,
     artistName,
-    currentTrackId,
-    onTrackSelect,
-    artistRelease,
+    releaseTitle: _releaseTitle,
   }: {
+    files: Array<{ id: string; title?: string | null; fileName: string; trackNumber: number }>;
+    currentFileId: string | null;
+    onFileSelect: (fileId: string) => void;
     artistName: string;
-    artistRelease: { release: { releaseTracks: Array<{ track: { id: string; title: string } }> } };
-    currentTrackId?: string;
-    onTrackSelect?: (trackId: string) => void;
+    releaseTitle: string;
   }) => (
     <div
-      data-testid="track-list-drawer"
-      data-current-track-id={currentTrackId}
+      data-testid="format-file-list-drawer"
+      data-current-file-id={currentFileId ?? ''}
       data-artist-name={artistName}
     >
-      {artistRelease.release.releaseTracks.map((rt) => (
-        <button
-          key={rt.track.id}
-          data-testid={`track-select-${rt.track.id}`}
-          onClick={() => onTrackSelect?.(rt.track.id)}
-        >
-          {rt.track.title}
+      {files.map((f) => (
+        <button key={f.id} data-testid={`file-${f.id}`} onClick={() => onFileSelect(f.id)}>
+          {f.title ?? f.fileName}
         </button>
       ))}
     </div>
   );
-  TrackListDrawer.displayName = 'TrackListDrawer';
-  MockMediaPlayer.TrackListDrawer = TrackListDrawer;
+  FormatFileListDrawer.displayName = 'FormatFileListDrawer';
+  MockMediaPlayer.FormatFileListDrawer = FormatFileListDrawer;
 
   const CoverArtView = ({
     artistRelease,
@@ -253,31 +255,56 @@ vi.mock('@/lib/utils/release-helpers', () => ({
 }));
 
 describe('ArtistPlayer', () => {
-  const mockTrack1 = {
-    id: 'track-1',
+  const mockFile1 = {
+    id: 'file-1',
+    trackNumber: 1,
     title: 'First Track',
-    audioUrl: 'https://example.com/audio1.mp3',
-    duration: 180,
-    position: 1,
+    s3Key: 'releases/file1.mp3',
+    fileName: 'file1.mp3',
+    fileSize: 1000000,
+    mimeType: 'audio/mpeg',
+    formatId: 'fmt-1',
+    duration: null,
+    checksum: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
-  const mockTrack2 = {
-    id: 'track-2',
+  const mockFile2 = {
+    id: 'file-2',
+    trackNumber: 2,
     title: 'Second Track',
-    audioUrl: 'https://example.com/audio2.mp3',
-    duration: 200,
-    position: 2,
+    s3Key: 'releases/file2.mp3',
+    fileName: 'file2.mp3',
+    fileSize: 1000000,
+    mimeType: 'audio/mpeg',
+    formatId: 'fmt-1',
+    duration: null,
+    checksum: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
-  const mockTrack3 = {
-    id: 'track-3',
+  const mockFile3 = {
+    id: 'file-3',
+    trackNumber: 3,
     title: 'Third Track',
-    audioUrl: 'https://example.com/audio3.mp3',
-    duration: 220,
-    position: 3,
+    s3Key: 'releases/file3.mp3',
+    fileName: 'file3.mp3',
+    fileSize: 1000000,
+    mimeType: 'audio/mpeg',
+    formatId: 'fmt-1',
+    duration: null,
+    checksum: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
-  const createRelease = (id: string, title: string, tracks: (typeof mockTrack1)[]) => ({
+  const file1CdnUrl = 'https://cdn.example.com/releases/file1.mp3';
+  const file2CdnUrl = 'https://cdn.example.com/releases/file2.mp3';
+  const file3CdnUrl = 'https://cdn.example.com/releases/file3.mp3';
+
+  const createRelease = (id: string, title: string, files: (typeof mockFile1)[]) => ({
     id,
     title,
     coverArt: `https://example.com/${id}-cover.jpg`,
@@ -286,13 +313,19 @@ describe('ArtistPlayer', () => {
     releasedOn: new Date('2024-01-01'),
     images: [],
     artistReleases: [],
-    releaseTracks: tracks.map((track, index) => ({
-      id: `rt-${track.id}`,
-      releaseId: id,
-      trackId: track.id,
-      position: index + 1,
-      track,
-    })),
+    digitalFormats:
+      files.length > 0
+        ? [
+            {
+              id: `fmt-${id}`,
+              formatType: 'MP3_320KBPS',
+              releaseId: id,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              files,
+            },
+          ]
+        : [],
     releaseUrls: [],
   });
 
@@ -332,7 +365,7 @@ describe('ArtistPlayer', () => {
   });
 
   describe('single release', () => {
-    const release = createRelease('release-1', 'Test Album', [mockTrack1, mockTrack2, mockTrack3]);
+    const release = createRelease('release-1', 'Test Album', [mockFile1, mockFile2, mockFile3]);
     const artist = createArtistWithReleases([release]);
 
     it('should not render the media player with carousel for a single release', () => {
@@ -362,11 +395,11 @@ describe('ArtistPlayer', () => {
       expect(coverArt).toHaveAttribute('data-src', 'https://example.com/release-1-cover.jpg');
     });
 
-    it('should render audio controls for the first track', () => {
+    it('should render audio controls for the first file', () => {
       render(<ArtistPlayer artist={artist} />);
 
       const controls = screen.getByTestId('media-controls');
-      expect(controls).toHaveAttribute('data-audio-src', 'https://example.com/audio1.mp3');
+      expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
     it('should render the info ticker tape with first track name', () => {
@@ -375,12 +408,12 @@ describe('ArtistPlayer', () => {
       expect(screen.getByTestId('info-ticker-tape')).toHaveTextContent('First Track');
     });
 
-    it('should render the TrackListDrawer at the bottom', () => {
+    it('should render the FormatFileListDrawer at the bottom', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      const drawer = screen.getByTestId('track-list-drawer');
+      const drawer = screen.getByTestId('format-file-list-drawer');
       expect(drawer).toBeInTheDocument();
-      expect(drawer).toHaveAttribute('data-current-track-id', 'track-1');
+      expect(drawer).toHaveAttribute('data-current-file-id', 'file-1');
     });
 
     it('should update isPlaying when play is triggered', () => {
@@ -409,156 +442,126 @@ describe('ArtistPlayer', () => {
       expect(screen.getByText('No playable tracks available.')).toBeInTheDocument();
     });
 
-    it('should not render TrackListDrawer when no tracks', () => {
+    it('should not render FormatFileListDrawer when no files', () => {
       const emptyRelease = createRelease('release-empty', 'Empty Album', []);
       const emptyArtist = createArtistWithReleases([emptyRelease]);
 
       render(<ArtistPlayer artist={emptyArtist} />);
 
-      expect(screen.queryByTestId('track-list-drawer')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('format-file-list-drawer')).not.toBeInTheDocument();
     });
 
-    it('should change track when selecting from TrackListDrawer', () => {
+    it('should change file when selecting from FormatFileListDrawer', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      fireEvent.click(screen.getByTestId('track-select-track-2'));
+      fireEvent.click(screen.getByTestId('file-file-2'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
+    });
+
+    it('should update FormatFileListDrawer currentFileId when file changes', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      fireEvent.click(screen.getByTestId('file-file-2'));
+
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-current-file-id',
+        'file-2'
       );
     });
 
-    it('should update TrackListDrawer currentTrackId when track changes', () => {
-      render(<ArtistPlayer artist={artist} />);
-
-      fireEvent.click(screen.getByTestId('track-select-track-2'));
-
-      expect(screen.getByTestId('track-list-drawer')).toHaveAttribute(
-        'data-current-track-id',
-        'track-2'
-      );
-    });
-
-    it('should auto-advance to next track when current track ends', () => {
+    it('should auto-advance to next file when current file ends', () => {
       render(<ArtistPlayer artist={artist} />);
 
       fireEvent.click(screen.getByTestId('ended-trigger'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
-    it('should not advance past the last track', () => {
+    it('should not advance past the last file', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      // Navigate to the last track
-      fireEvent.click(screen.getByTestId('track-select-track-3'));
+      // Navigate to the last file
+      fireEvent.click(screen.getByTestId('file-file-3'));
 
-      // Trigger ended on last track
+      // Trigger ended on last file
       fireEvent.click(screen.getByTestId('ended-trigger'));
 
-      // Should still be on track-3
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio3.mp3'
-      );
+      // Should still be on file-3
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file3CdnUrl);
     });
 
-    it('should go to previous track with wasPlaying=true', () => {
+    it('should go to previous file with wasPlaying=true', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      // Navigate to second track first
-      fireEvent.click(screen.getByTestId('track-select-track-2'));
+      // Navigate to second file first
+      fireEvent.click(screen.getByTestId('file-file-2'));
 
-      // Go back to previous track (was playing)
+      // Go back to previous file (was playing)
       fireEvent.click(screen.getByTestId('previous-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'true');
     });
 
-    it('should go to previous track with wasPlaying=false', () => {
+    it('should go to previous file with wasPlaying=false', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      fireEvent.click(screen.getByTestId('track-select-track-2'));
+      fireEvent.click(screen.getByTestId('file-file-2'));
       fireEvent.click(screen.getByTestId('previous-track-paused-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'false');
     });
 
-    it('should not go before the first track', () => {
+    it('should not go before the first file', () => {
       render(<ArtistPlayer artist={artist} />);
 
       fireEvent.click(screen.getByTestId('previous-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
-    it('should go to next track with wasPlaying=true', () => {
+    it('should go to next file with wasPlaying=true', () => {
       render(<ArtistPlayer artist={artist} />);
 
       fireEvent.click(screen.getByTestId('next-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'true');
     });
 
-    it('should go to next track with wasPlaying=false', () => {
+    it('should go to next file with wasPlaying=false', () => {
       render(<ArtistPlayer artist={artist} />);
 
       fireEvent.click(screen.getByTestId('next-track-paused-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
       expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'false');
     });
 
-    it('should not go past the last track with next', () => {
+    it('should not go past the last file with next', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      fireEvent.click(screen.getByTestId('track-select-track-3'));
+      fireEvent.click(screen.getByTestId('file-file-3'));
       fireEvent.click(screen.getByTestId('next-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio3.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file3CdnUrl);
     });
 
-    it('should not update track when selecting a non-existent track id', () => {
+    it('should not update file when selecting a non-existent file id', () => {
       render(<ArtistPlayer artist={artist} />);
 
       // The handler checks findIndex >= 0, so a bad ID is just ignored
-      // We verify the current track stays the same indirectly
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      // We verify the current file stays the same indirectly
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
   });
 
   describe('>= 3 releases branch', () => {
-    const release1 = createRelease('release-1', 'Album One', [mockTrack1, mockTrack2]);
-    const release2 = createRelease('release-2', 'Album Two', [mockTrack2, mockTrack3]);
-    const release3 = createRelease('release-3', 'Album Three', [mockTrack3]);
+    const release1 = createRelease('release-1', 'Album One', [mockFile1, mockFile2]);
+    const release2 = createRelease('release-2', 'Album Two', [mockFile2, mockFile3]);
+    const release3 = createRelease('release-3', 'Album Three', [mockFile3]);
 
     const artist = createArtistWithReleases([release1, release2, release3]);
 
@@ -605,7 +608,7 @@ describe('ArtistPlayer', () => {
     });
 
     it('should show carousel navigation for > 3 releases', () => {
-      const release4 = createRelease('release-4', 'Album Four', [mockTrack1]);
+      const release4 = createRelease('release-4', 'Album Four', [mockFile1]);
       const manyReleasesArtist = createArtistWithReleases([release1, release2, release3, release4]);
 
       render(<ArtistPlayer artist={manyReleasesArtist} />);
@@ -644,19 +647,16 @@ describe('ArtistPlayer', () => {
     it('should render audio controls for the first release', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
-    it('should render TrackListDrawer at the bottom of the media player', () => {
+    it('should render FormatFileListDrawer at the bottom of the media player', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      const drawer = screen.getByTestId('track-list-drawer');
+      const drawer = screen.getByTestId('format-file-list-drawer');
       expect(drawer).toBeInTheDocument();
       expect(drawer).toHaveAttribute('data-artist-name', 'John Doe');
-      expect(drawer).toHaveAttribute('data-current-track-id', 'track-1');
+      expect(drawer).toHaveAttribute('data-current-file-id', 'file-1');
     });
 
     it('should change release when clicking a different thumbnail', () => {
@@ -665,23 +665,17 @@ describe('ArtistPlayer', () => {
       const playButtons = screen.getAllByRole('button', { name: /Play Album/ });
       fireEvent.click(playButtons[1]); // Click "Play Album Two"
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
-    it('should reset to first track when switching releases', () => {
+    it('should reset to first file when switching releases', () => {
       render(<ArtistPlayer artist={artist} />);
 
       // Switch to release 2
       const playButtons = screen.getAllByRole('button', { name: /Play Album/ });
       fireEvent.click(playButtons[1]);
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
     it('should toggle play/pause when clicking the already-selected release thumbnail', () => {
@@ -693,10 +687,7 @@ describe('ArtistPlayer', () => {
       fireEvent.click(playButtons[0]);
 
       // No crash means toggle was called; the component still displays the same release
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
     it('should set autoPlay when switching releases', () => {
@@ -732,18 +723,15 @@ describe('ArtistPlayer', () => {
   });
 
   describe('initialReleaseId', () => {
-    const release1 = createRelease('release-1', 'Album One', [mockTrack1]);
-    const release2 = createRelease('release-2', 'Album Two', [mockTrack2]);
-    const release3 = createRelease('release-3', 'Album Three', [mockTrack3]);
+    const release1 = createRelease('release-1', 'Album One', [mockFile1]);
+    const release2 = createRelease('release-2', 'Album Two', [mockFile2]);
+    const release3 = createRelease('release-3', 'Album Three', [mockFile3]);
     const artist = createArtistWithReleases([release1, release2, release3]);
 
     it('should select the release matching initialReleaseId', () => {
       render(<ArtistPlayer artist={artist} initialReleaseId="release-2" />);
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
     it('should set autoPlay when initialReleaseId is provided', () => {
@@ -755,10 +743,7 @@ describe('ArtistPlayer', () => {
     it('should default to first release when initialReleaseId is not found', () => {
       render(<ArtistPlayer artist={artist} initialReleaseId="non-existent" />);
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
     it('should not autoPlay when no initialReleaseId is provided', () => {
@@ -769,20 +754,17 @@ describe('ArtistPlayer', () => {
   });
 
   describe('track selection and navigation in >= 3 releases', () => {
-    const release1 = createRelease('release-1', 'Album One', [mockTrack1, mockTrack2, mockTrack3]);
-    const release2 = createRelease('release-2', 'Album Two', [mockTrack2]);
-    const release3 = createRelease('release-3', 'Album Three', [mockTrack3]);
+    const release1 = createRelease('release-1', 'Album One', [mockFile1, mockFile2, mockFile3]);
+    const release2 = createRelease('release-2', 'Album Two', [mockFile2]);
+    const release3 = createRelease('release-3', 'Album Three', [mockFile3]);
     const artist = createArtistWithReleases([release1, release2, release3]);
 
-    it('should change track when selecting from TrackListDrawer', () => {
+    it('should change file when selecting from FormatFileListDrawer', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      fireEvent.click(screen.getByTestId('track-select-track-2'));
+      fireEvent.click(screen.getByTestId('file-file-2'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
     it('should auto-advance on track ended', () => {
@@ -790,36 +772,27 @@ describe('ArtistPlayer', () => {
 
       fireEvent.click(screen.getByTestId('ended-trigger'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
-    it('should navigate to previous track', () => {
+    it('should navigate to previous file', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      // Go to track 2 first
+      // Go to file 2 first
       fireEvent.click(screen.getByTestId('next-track-button'));
 
       // Now go back
       fireEvent.click(screen.getByTestId('previous-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
 
-    it('should navigate to next track', () => {
+    it('should navigate to next file', () => {
       render(<ArtistPlayer artist={artist} />);
 
       fireEvent.click(screen.getByTestId('next-track-button'));
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio2.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
     });
 
     it('should toggle play via interactive cover art', () => {
@@ -843,8 +816,8 @@ describe('ArtistPlayer', () => {
   });
 
   describe('two releases', () => {
-    const release1 = createRelease('release-1', 'Album One', [mockTrack1]);
-    const release2 = createRelease('release-2', 'Album Two', [mockTrack2]);
+    const release1 = createRelease('release-1', 'Album One', [mockFile1]);
+    const release2 = createRelease('release-2', 'Album Two', [mockFile2]);
     const artist = createArtistWithReleases([release1, release2]);
 
     it('should render carousel for 2 releases', () => {
@@ -863,10 +836,7 @@ describe('ArtistPlayer', () => {
     it('should display the first release by default', () => {
       render(<ArtistPlayer artist={artist} />);
 
-      expect(screen.getByTestId('media-controls')).toHaveAttribute(
-        'data-audio-src',
-        'https://example.com/audio1.mp3'
-      );
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
     });
     it('should not render carousel navigation arrows for 2 releases', () => {
       render(<ArtistPlayer artist={artist} />);
@@ -877,15 +847,7 @@ describe('ArtistPlayer', () => {
   });
 
   describe('download dialog', () => {
-    const release = createRelease('release-1', 'Test Album', [
-      {
-        id: 'track-1',
-        title: 'First Track',
-        audioUrl: 'https://example.com/audio1.mp3',
-        duration: 180,
-        position: 1,
-      },
-    ]);
+    const release = createRelease('release-1', 'Test Album', [mockFile1]);
     const artist = createArtistWithReleases([release]);
 
     it('should render the download dialog with the correct artist name', () => {

@@ -330,6 +330,26 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     setPendingConfirms((prev) => prev.filter((p) => p.formatType !== formatType));
   }, []);
 
+  const handleMetadataExtracted = useCallback(
+    (metadata: { album?: string; artist?: string; year?: number; label?: string }) => {
+      if (metadata.album) {
+        releaseForm.setValue('title', metadata.album, { shouldDirty: true });
+      }
+      if (metadata.year) {
+        releaseForm.setValue('releasedOn', `${metadata.year}-01-01`, { shouldDirty: true });
+      }
+      if (metadata.label) {
+        releaseForm.setValue('labels', metadata.label, { shouldDirty: true });
+      }
+      if (metadata.artist) {
+        toast.info(
+          `Artist detected in file: "${metadata.artist}" — assign via the Artists field above.`
+        );
+      }
+    },
+    [releaseForm]
+  );
+
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData) => {
       const formData = new FormData();
@@ -657,7 +677,17 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           >
             <CardContent className="space-y-6">
               <Separator />
+              {/* Digital Formats Section - Always visible */}
+              <section className="space-y-4">
+                <DigitalFormatsAccordion
+                  releaseId={preGeneratedId}
+                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
+                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
+                  onMetadataExtracted={handleMetadataExtracted}
+                />
+              </section>
 
+              <Separator />
               {/* Basic Information Section */}
               <section className="space-y-4 pt-0">
                 <h2 className="font-semibold">Basic Information</h2>
@@ -759,16 +789,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-              </section>
-
-              <Separator />
-              {/* Digital Formats Section - Always visible */}
-              <section className="space-y-4">
-                <DigitalFormatsAccordion
-                  releaseId={preGeneratedId}
-                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
-                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
                 />
               </section>
 

@@ -21,10 +21,6 @@ vi.mock('../prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
-    track: {
-      updateMany: vi.fn(),
-    },
-    $transaction: vi.fn(),
   },
 }));
 
@@ -57,7 +53,7 @@ describe('ReleaseService', () => {
     linerNotesBy: [],
     imageTypes: [],
     variants: [],
-    releaseTracks: [],
+    digitalFormats: [],
     artistReleases: [],
     releaseUrls: [],
     createdAt: new Date('2024-01-01'),
@@ -100,9 +96,9 @@ describe('ReleaseService', () => {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -166,9 +162,11 @@ describe('ReleaseService', () => {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: {
+                orderBy: { trackNumber: 'asc' },
+              },
             },
           },
           releaseUrls: {
@@ -392,136 +390,13 @@ describe('ReleaseService', () => {
       title: 'Updated Album Title',
     };
 
-    const mockReleaseWithTracks = {
-      ...mockRelease,
-      title: 'Updated Album Title',
-      releaseTracks: [
-        { id: 'rt-1', releaseId: 'release-123', trackId: 'track-1', position: 1, coverArt: null },
-        { id: 'rt-2', releaseId: 'release-123', trackId: 'track-2', position: 2, coverArt: null },
-      ],
-    };
-
     it('should update a release successfully', async () => {
       const updatedRelease = { ...mockRelease, title: 'Updated Album Title' };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          release: { update: vi.fn().mockResolvedValue(updatedRelease) },
-          track: { updateMany: vi.fn() },
-        };
-        return callback(tx as never);
-      });
+      vi.mocked(prisma.release.update).mockResolvedValue(updatedRelease);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
       expect(result).toMatchObject({ success: true, data: updatedRelease });
-    });
-
-    it('should publish associated tracks when release is published', async () => {
-      const publishDate = new Date('2024-06-01');
-      const publishData: Prisma.ReleaseUpdateInput = {
-        publishedAt: publishDate,
-      };
-
-      // Release was not previously published
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-
-      const mockTrackUpdateMany = vi.fn().mockResolvedValue({ count: 2 });
-      const publishedRelease = { ...mockReleaseWithTracks, publishedAt: publishDate };
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          release: { update: vi.fn().mockResolvedValue(publishedRelease) },
-          track: { updateMany: mockTrackUpdateMany },
-        };
-        return callback(tx as never);
-      });
-
-      const result = await ReleaseService.updateRelease('release-123', publishData);
-
-      expect(result.success).toBe(true);
-      expect(mockTrackUpdateMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: ['track-1', 'track-2'] },
-          publishedOn: null,
-        },
-        data: {
-          publishedOn: publishDate,
-        },
-      });
-    });
-
-    it('should not publish tracks if release was already published', async () => {
-      const publishDate = new Date('2024-06-01');
-      const publishData: Prisma.ReleaseUpdateInput = {
-        publishedAt: publishDate,
-      };
-
-      // Release was already published
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({
-        publishedAt: new Date('2024-05-01'),
-      } as never);
-
-      const mockTrackUpdateMany = vi.fn();
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          release: { update: vi.fn().mockResolvedValue(mockReleaseWithTracks) },
-          track: { updateMany: mockTrackUpdateMany },
-        };
-        return callback(tx as never);
-      });
-
-      const result = await ReleaseService.updateRelease('release-123', publishData);
-
-      expect(result.success).toBe(true);
-      expect(mockTrackUpdateMany).not.toHaveBeenCalled();
-    });
-
-    it('should not publish tracks when release has no tracks', async () => {
-      const publishDate = new Date('2024-06-01');
-      const publishData: Prisma.ReleaseUpdateInput = {
-        publishedAt: publishDate,
-      };
-
-      // Release was not previously published
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-
-      const mockTrackUpdateMany = vi.fn();
-      const publishedReleaseNoTracks = {
-        ...mockRelease,
-        publishedAt: publishDate,
-        releaseTracks: [],
-      };
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          release: { update: vi.fn().mockResolvedValue(publishedReleaseNoTracks) },
-          track: { updateMany: mockTrackUpdateMany },
-        };
-        return callback(tx as never);
-      });
-
-      const result = await ReleaseService.updateRelease('release-123', publishData);
-
-      expect(result.success).toBe(true);
-      // trackIds.length is 0, so updateMany should NOT be called
-      expect(mockTrackUpdateMany).not.toHaveBeenCalled();
-    });
-
-    it('should not publish tracks when updating non-publish fields', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-
-      const mockTrackUpdateMany = vi.fn();
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          release: { update: vi.fn().mockResolvedValue(mockReleaseWithTracks) },
-          track: { updateMany: mockTrackUpdateMany },
-        };
-        return callback(tx as never);
-      });
-
-      const result = await ReleaseService.updateRelease('release-123', { title: 'New Title' });
-
-      expect(result.success).toBe(true);
-      expect(mockTrackUpdateMany).not.toHaveBeenCalled();
     });
 
     it('should return error when release not found', async () => {
@@ -529,8 +404,7 @@ describe('ReleaseService', () => {
         code: 'P2025',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-      vi.mocked(prisma.$transaction).mockRejectedValue(notFoundError);
+      vi.mocked(prisma.release.update).mockRejectedValue(notFoundError);
 
       const result = await ReleaseService.updateRelease('non-existent', updateData);
 
@@ -542,8 +416,7 @@ describe('ReleaseService', () => {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-      vi.mocked(prisma.$transaction).mockRejectedValue(uniqueError);
+      vi.mocked(prisma.release.update).mockRejectedValue(uniqueError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -555,8 +428,7 @@ describe('ReleaseService', () => {
 
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-      vi.mocked(prisma.$transaction).mockRejectedValue(initError);
+      vi.mocked(prisma.release.update).mockRejectedValue(initError);
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -564,8 +436,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(prisma.release.findUnique).mockResolvedValue({ publishedAt: null } as never);
-      vi.mocked(prisma.$transaction).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(prisma.release.update).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.updateRelease('release-123', updateData);
 
@@ -585,7 +456,7 @@ describe('ReleaseService', () => {
         include: {
           images: true,
           artistReleases: true,
-          releaseTracks: true,
+          digitalFormats: true,
           releaseUrls: true,
         },
       });
@@ -642,9 +513,9 @@ describe('ReleaseService', () => {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -707,9 +578,9 @@ describe('ReleaseService', () => {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -879,36 +750,25 @@ describe('ReleaseService', () => {
           },
         },
       ],
-      releaseTracks: [
+      digitalFormats: [
         {
-          id: 'rt-1',
+          id: 'df-1',
           releaseId: 'release-123',
-          trackId: 'track-1',
-          position: 1,
-          coverArt: null,
-          track: {
-            id: 'track-1',
-            title: 'Track One',
-            duration: 210,
-            audioUrl: 'https://example.com/track1.mp3',
-            position: 1,
-            coverArt: null,
-          },
-        },
-        {
-          id: 'rt-2',
-          releaseId: 'release-123',
-          trackId: 'track-2',
-          position: 2,
-          coverArt: null,
-          track: {
-            id: 'track-2',
-            title: 'Track Two',
-            duration: 185,
-            audioUrl: 'https://example.com/track2.mp3',
-            position: 2,
-            coverArt: null,
-          },
+          format: 'MP3_320KBPS',
+          files: [
+            {
+              id: 'f-1',
+              trackNumber: 1,
+              fileName: 'track-one.mp3',
+              fileSize: 10485760,
+            },
+            {
+              id: 'f-2',
+              trackNumber: 2,
+              fileName: 'track-two.mp3',
+              fileSize: 9437184,
+            },
+          ],
         },
       ],
       releaseUrls: [
@@ -929,9 +789,9 @@ describe('ReleaseService', () => {
       expect(result.success).toBe(true);
       expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('data.id', 'release-123');
-      expect(result).toHaveProperty('data.releaseTracks');
-      const { data } = result as unknown as { data: { releaseTracks: unknown[] } };
-      expect(data.releaseTracks).toHaveLength(2);
+      expect(result).toHaveProperty('data.digitalFormats');
+      const { data } = result as unknown as { data: { digitalFormats: unknown[] } };
+      expect(data.digitalFormats).toHaveLength(1);
     });
 
     it('should filter by id, publishedAt not null, and deletedOn null or unset', async () => {
@@ -950,7 +810,7 @@ describe('ReleaseService', () => {
       );
     });
 
-    it('should order releaseTracks by position', async () => {
+    it('should query digital format files ordered by trackNumber', async () => {
       vi.mocked(prisma.release.findFirst).mockResolvedValue(mockReleaseWithTracks);
 
       await ReleaseService.getReleaseWithTracks('release-123');
@@ -958,9 +818,13 @@ describe('ReleaseService', () => {
       expect(prisma.release.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           include: expect.objectContaining({
-            releaseTracks: expect.objectContaining({
-              orderBy: { position: 'asc' },
-            }),
+            digitalFormats: {
+              include: {
+                files: {
+                  orderBy: { trackNumber: 'asc' },
+                },
+              },
+            },
           }),
         })
       );

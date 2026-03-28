@@ -1194,10 +1194,11 @@ describe('ArtistService', () => {
             title: 'Published Album',
             publishedAt: new Date('2024-01-01'),
             deletedOn: null,
-            releaseTracks: [
+            digitalFormats: [
               {
-                id: 'rt-1',
-                track: { id: 'track-1', title: 'Track 1', audioUrl: 'audio.mp3' },
+                id: 'df-1',
+                format: 'MP3_320KBPS',
+                files: [{ id: 'f-1', trackNumber: 1, fileName: 'track1.mp3' }],
               },
             ],
           },
@@ -1211,7 +1212,7 @@ describe('ArtistService', () => {
             title: 'Unpublished Album',
             publishedAt: null,
             deletedOn: null,
-            releaseTracks: [],
+            digitalFormats: [],
           },
         },
         {
@@ -1223,7 +1224,7 @@ describe('ArtistService', () => {
             title: 'Deleted Album',
             publishedAt: new Date('2024-01-01'),
             deletedOn: new Date('2024-06-01'),
-            releaseTracks: [],
+            digitalFormats: [],
           },
         },
       ],
@@ -1251,9 +1252,10 @@ describe('ArtistService', () => {
                 release: expect.objectContaining({
                   include: expect.objectContaining({
                     images: true,
-                    releaseTracks: expect.objectContaining({
-                      include: { track: true },
-                      orderBy: { position: 'asc' },
+                    digitalFormats: expect.objectContaining({
+                      include: {
+                        files: { orderBy: { trackNumber: 'asc' } },
+                      },
                     }),
                   }),
                 }),

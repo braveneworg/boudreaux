@@ -78,7 +78,7 @@ describe('ArtistDetailPage', () => {
   const createMockArtistRelease = (
     id: string,
     title: string,
-    trackCount: number,
+    fileCount: number,
     releasedOn: Date
   ) => ({
     id: `ar-${id}`,
@@ -93,19 +93,32 @@ describe('ArtistDetailPage', () => {
       releasedOn,
       images: [],
       artistReleases: [],
-      releaseTracks: Array.from({ length: trackCount }, (_, i) => ({
-        id: `rt-${id}-${i}`,
-        releaseId: id,
-        trackId: `track-${id}-${i}`,
-        position: i + 1,
-        track: {
-          id: `track-${id}-${i}`,
-          title: `Track ${i + 1}`,
-          audioUrl: `https://example.com/audio-${id}-${i}.mp3`,
-          duration: 180,
-          position: i + 1,
-        },
-      })),
+      digitalFormats:
+        fileCount > 0
+          ? [
+              {
+                id: `fmt-${id}`,
+                formatType: 'MP3_320KBPS',
+                releaseId: id,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                files: Array.from({ length: fileCount }, (_, i) => ({
+                  id: `file-${id}-${i}`,
+                  trackNumber: i + 1,
+                  title: `Track ${i + 1}`,
+                  s3Key: `track-${id}-${i}.mp3`,
+                  fileName: `track-${id}-${i}.mp3`,
+                  fileSize: 1000,
+                  mimeType: 'audio/mpeg',
+                  formatId: `fmt-${id}`,
+                  duration: null,
+                  checksum: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                })),
+              },
+            ]
+          : [],
       releaseUrls: [],
     },
   });
@@ -181,7 +194,7 @@ describe('ArtistDetailPage', () => {
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
-  it('should filter out releases with zero releaseTracks', async () => {
+  it('should filter out releases with no MP3_320KBPS files', async () => {
     const Page = await ArtistDetailPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
@@ -189,7 +202,7 @@ describe('ArtistDetailPage', () => {
     render(Page);
 
     const player = screen.getByTestId('artist-player');
-    // mockArtist has 3 releases, but 'No Tracks Album' has 0 tracks
+    // mockArtist has 3 releases, but 'No Tracks Album' has no MP3_320KBPS files
     expect(player).toHaveAttribute('data-release-count', '2');
   });
 
@@ -200,7 +213,7 @@ describe('ArtistDetailPage', () => {
     });
     render(Page);
 
-    // Verify that only playable releases (with at least one track) are passed to ArtistPlayer
+    // Verify that only playable releases (with at least one MP3_320KBPS file) are passed to ArtistPlayer
     expect(screen.getByTestId('artist-player')).toHaveAttribute('data-release-count', '2');
   });
 

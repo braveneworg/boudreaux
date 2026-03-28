@@ -6,15 +6,17 @@
  * ReleasePlayer — a client component that wraps the MediaPlayer compound
  * component for release-specific audio playback. Manages play/pause state,
  * track selection, auto-advance, and previous/next navigation.
+ * Audio is sourced from the MP3_320KBPS ReleaseDigitalFormat files.
  */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 interface AvailableFormat {
@@ -23,7 +25,7 @@ interface AvailableFormat {
 }
 
 interface ReleasePlayerProps {
-  /** Full release data with tracks, artist, and images */
+  /** Full release data with digital format files, artist, and images */
   release: PublishedReleaseDetail;
   /** Whether to auto-play the first track on mount (e.g. from Play button click) */
   autoPlay?: boolean;
@@ -39,6 +41,7 @@ interface ReleasePlayerProps {
 /**
  * Release media player. Composes MediaPlayer sub-components with
  * release-specific state management for track playback.
+ * Reads audio from the MP3_320KBPS digital format files array.
  */
 export const ReleasePlayer = ({
   release,
@@ -51,7 +54,7 @@ export const ReleasePlayer = ({
   availableFormats,
 }: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(autoPlay);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
   const hasTriggeredAutoPlay = useRef(false);
@@ -66,10 +69,19 @@ export const ReleasePlayer = ({
     }
   }, [autoPlay, playerControls]);
 
-  const tracks = release.releaseTracks;
-  const currentReleaseTrack = tracks[currentTrackIndex];
-  const currentTrack = currentReleaseTrack?.track;
-  const hasTracks = tracks.length > 0;
+  // Use MP3_320KBPS files as the playback track list
+  const files = useMemo(
+    () => release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files ?? [],
+    [release.digitalFormats]
+  );
+
+  const currentFile = files[currentFileIndex] ?? null;
+  const hasFiles = files.length > 0;
+
+  const audioSrc = useMemo<string | null>(() => {
+    if (!currentFile?.s3Key) return null;
+    return buildCdnUrl(currentFile.s3Key);
+  }, [currentFile?.s3Key]);
 
   const primaryArtist = release.artistReleases[0]?.artist;
 
@@ -88,48 +100,48 @@ export const ReleasePlayer = ({
     playerControls?.toggle();
   }, [playerControls]);
 
-  const handleTrackSelect = useCallback(
-    (trackId: string) => {
-      const index = tracks.findIndex((rt: { track: { id: string } }) => rt.track.id === trackId);
+  const handleFileSelect = useCallback(
+    (fileId: string) => {
+      const index = files.findIndex((f) => f.id === fileId);
       if (index >= 0) {
-        setCurrentTrackIndex(index);
+        setCurrentFileIndex(index);
         setShouldAutoPlay(true);
       }
     },
-    [tracks]
+    [files]
   );
 
   const handleTrackEnded = useCallback(() => {
-    if (currentTrackIndex < tracks.length - 1) {
-      setCurrentTrackIndex((prev) => prev + 1);
+    if (currentFileIndex < files.length - 1) {
+      setCurrentFileIndex((prev) => prev + 1);
       setShouldAutoPlay(true);
     }
-  }, [currentTrackIndex, tracks.length]);
+  }, [currentFileIndex, files.length]);
 
   const handlePreviousTrack = useCallback(
     (wasPlaying: boolean) => {
-      if (currentTrackIndex > 0) {
-        setCurrentTrackIndex((prev) => prev - 1);
+      if (currentFileIndex > 0) {
+        setCurrentFileIndex((prev) => prev - 1);
         setShouldAutoPlay(wasPlaying);
       }
     },
-    [currentTrackIndex]
+    [currentFileIndex]
   );
 
   const handleNextTrack = useCallback(
     (wasPlaying: boolean) => {
-      if (currentTrackIndex < tracks.length - 1) {
-        setCurrentTrackIndex((prev) => prev + 1);
+      if (currentFileIndex < files.length - 1) {
+        setCurrentFileIndex((prev) => prev + 1);
         setShouldAutoPlay(wasPlaying);
       }
     },
-    [currentTrackIndex, tracks.length]
+    [currentFileIndex, files.length]
   );
 
   return (
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
-        {hasTracks && currentTrack && primaryArtist && (
+        {hasFiles && currentFile && primaryArtist && (
           <>
             <DownloadDialog
               artistName={getArtistDisplayName(primaryArtist)}
@@ -142,11 +154,12 @@ export const ReleasePlayer = ({
             >
               <DownloadTriggerButton />
             </DownloadDialog>
-            <MediaPlayer.TrackListDrawer
+            <MediaPlayer.FormatFileListDrawer
+              files={files}
+              currentFileId={currentFile.id}
+              onFileSelect={handleFileSelect}
               artistName={getArtistDisplayName(primaryArtist)}
-              artistRelease={{ release, artist: primaryArtist }}
-              currentTrackId={currentTrack.id}
-              onTrackSelect={handleTrackSelect}
+              releaseTitle={release.title ?? ''}
             />
           </>
         )}
@@ -164,12 +177,12 @@ export const ReleasePlayer = ({
               />
             </div>
 
-            {hasTracks && currentTrack && primaryArtist ? (
+            {hasFiles && currentFile && primaryArtist && audioSrc ? (
               <>
                 <div className="w-full bg-zinc-900">
                   <MediaPlayer.Controls
                     key={`controls-${release.id}`}
-                    audioSrc={currentTrack.audioUrl}
+                    audioSrc={audioSrc}
                     onPlay={handlePlay}
                     onPause={handlePause}
                     onEnded={handleTrackEnded}
@@ -181,7 +194,7 @@ export const ReleasePlayer = ({
                 </div>
                 <MediaPlayer.InfoTickerTape
                   artistRelease={{ release, artist: primaryArtist }}
-                  trackName={currentTrack.title}
+                  trackName={currentFile.title ?? currentFile.fileName}
                   isPlaying={isPlaying}
                 />
               </>

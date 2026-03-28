@@ -25,6 +25,7 @@ import {
 } from '@/app/components/ui/carousel';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { cn } from '@/lib/utils';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
@@ -62,13 +63,19 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
   const selectedArtistRelease = releases[selectedReleaseIndex];
   const selectedRelease = selectedArtistRelease?.release;
 
-  const tracks = useMemo(
-    () => selectedRelease?.releaseTracks ?? [],
-    [selectedRelease?.releaseTracks]
+  const files = useMemo(
+    () =>
+      selectedRelease?.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files ?? [],
+    [selectedRelease?.digitalFormats]
   );
-  const currentReleaseTrack = tracks[currentTrackIndex];
-  const currentTrack = currentReleaseTrack?.track;
-  const hasTracks = tracks.length > 0;
+
+  const currentFile = files[currentTrackIndex] ?? null;
+  const hasFiles = files.length > 0;
+
+  const audioSrc = useMemo<string | null>(() => {
+    if (!currentFile?.s3Key) return null;
+    return buildCdnUrl(currentFile.s3Key);
+  }, [currentFile?.s3Key]);
 
   const artistName = getArtistDisplayName(artist);
 
@@ -102,23 +109,23 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
     playerControls?.toggle();
   }, [playerControls]);
 
-  const handleTrackSelect = useCallback(
-    (trackId: string) => {
-      const index = tracks.findIndex((rt: { track: { id: string } }) => rt.track.id === trackId);
+  const handleFileSelect = useCallback(
+    (fileId: string) => {
+      const index = files.findIndex((f) => f.id === fileId);
       if (index >= 0) {
         setCurrentTrackIndex(index);
         setShouldAutoPlay(true);
       }
     },
-    [tracks]
+    [files]
   );
 
   const handleTrackEnded = useCallback(() => {
-    if (currentTrackIndex < tracks.length - 1) {
+    if (currentTrackIndex < files.length - 1) {
       setCurrentTrackIndex((prev) => prev + 1);
       setShouldAutoPlay(true);
     }
-  }, [currentTrackIndex, tracks.length]);
+  }, [currentTrackIndex, files.length]);
 
   const handlePreviousTrack = useCallback(
     (wasPlaying: boolean) => {
@@ -132,12 +139,12 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   const handleNextTrack = useCallback(
     (wasPlaying: boolean) => {
-      if (currentTrackIndex < tracks.length - 1) {
+      if (currentTrackIndex < files.length - 1) {
         setCurrentTrackIndex((prev) => prev + 1);
         setShouldAutoPlay(wasPlaying);
       }
     },
-    [currentTrackIndex, tracks.length]
+    [currentTrackIndex, files.length]
   );
 
   if (releases.length === 0) {
@@ -226,12 +233,12 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                 </DownloadDialog>
               </div>
 
-              {hasTracks && currentTrack && selectedRelease ? (
+              {hasFiles && currentFile && selectedRelease && audioSrc ? (
                 <>
                   <div className="w-full bg-zinc-900">
                     <MediaPlayer.Controls
                       key={`controls-${selectedRelease.id}`}
-                      audioSrc={currentTrack.audioUrl}
+                      audioSrc={audioSrc}
                       onPlay={handlePlay}
                       onPause={handlePause}
                       onEnded={handleTrackEnded}
@@ -243,7 +250,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   </div>
                   <MediaPlayer.InfoTickerTape
                     artistRelease={{ release: selectedRelease, artist }}
-                    trackName={currentTrack.title}
+                    trackName={currentFile.title ?? currentFile.fileName}
                     isPlaying={isPlaying}
                   />
                 </>
@@ -255,12 +262,13 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
             </div>
           </div>
 
-          {hasTracks && currentTrack && selectedRelease && (
-            <MediaPlayer.TrackListDrawer
+          {hasFiles && currentFile && selectedRelease && (
+            <MediaPlayer.FormatFileListDrawer
+              files={files}
+              currentFileId={currentFile.id}
+              onFileSelect={handleFileSelect}
               artistName={artistName}
-              artistRelease={{ release: selectedRelease, artist }}
-              currentTrackId={currentTrack.id}
-              onTrackSelect={handleTrackSelect}
+              releaseTitle={selectedRelease.title ?? ''}
             />
           )}
         </div>

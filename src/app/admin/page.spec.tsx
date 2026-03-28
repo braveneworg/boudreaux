@@ -61,10 +61,6 @@ vi.mock('./data-views/release-data-view', () => ({
   ReleaseDataView: () => <div data-testid="release-data-view">Release Data View</div>,
 }));
 
-vi.mock('./data-views/track-data-view', () => ({
-  TrackDataView: () => <div data-testid="track-data-view">Track Data View</div>,
-}));
-
 vi.mock('./data-views/featured-artist-data-view', () => ({
   FeaturedArtistDataView: () => (
     <div data-testid="featured-artist-data-view">Featured Artist Data View</div>
@@ -91,9 +87,7 @@ describe('AdminPage', () => {
 
     expect(screen.getByTestId('combobox')).toBeInTheDocument();
     expect(screen.getByTestId('option-artist')).toBeInTheDocument();
-    expect(screen.getByTestId('option-upload bulk tracks')).toBeInTheDocument();
     expect(screen.getByTestId('option-release')).toBeInTheDocument();
-    expect(screen.getByTestId('option-track')).toBeInTheDocument();
     expect(screen.getByTestId('option-featured artist')).toBeInTheDocument();
     expect(screen.getByTestId('option-notifications')).toBeInTheDocument();
     expect(screen.getByTestId('option-tours')).toBeInTheDocument();
@@ -103,9 +97,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
 
     expect(screen.getByText('Artist')).toBeInTheDocument();
-    expect(screen.getByText('Upload Bulk Tracks')).toBeInTheDocument();
     expect(screen.getByText('Release')).toBeInTheDocument();
-    expect(screen.getByText('Track')).toBeInTheDocument();
     expect(screen.getByText('Featured Artist')).toBeInTheDocument();
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Tours')).toBeInTheDocument();
@@ -116,7 +108,6 @@ describe('AdminPage', () => {
 
     expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
     expect(screen.queryByTestId('release-data-view')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('track-data-view')).not.toBeInTheDocument();
     expect(screen.queryByTestId('featured-artist-data-view')).not.toBeInTheDocument();
   });
 
@@ -126,15 +117,6 @@ describe('AdminPage', () => {
     await user.click(screen.getByTestId('option-release'));
 
     expect(screen.getByTestId('release-data-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('artist-data-view')).not.toBeInTheDocument();
-  });
-
-  it('switches to track view when track is selected', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-track'));
-
-    expect(screen.getByTestId('track-data-view')).toBeInTheDocument();
     expect(screen.queryByTestId('artist-data-view')).not.toBeInTheDocument();
   });
 
@@ -153,16 +135,6 @@ describe('AdminPage', () => {
     await user.click(screen.getByTestId('option-notifications'));
 
     expect(mockPush).toHaveBeenCalledWith('/admin/notifications');
-    // Should still show artist view since we navigated away
-    expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
-  });
-
-  it('navigates to bulk upload page when upload bulk tracks is selected', async () => {
-    render(<AdminPage />);
-
-    await user.click(screen.getByTestId('option-upload bulk tracks'));
-
-    expect(mockPush).toHaveBeenCalledWith('/admin/tracks/bulk');
     // Should still show artist view since we navigated away
     expect(screen.getByTestId('artist-data-view')).toBeInTheDocument();
   });

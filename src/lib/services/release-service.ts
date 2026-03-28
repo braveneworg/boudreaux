@@ -30,9 +30,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -78,9 +78,11 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: {
+                orderBy: { trackNumber: 'asc' },
+              },
             },
           },
           releaseUrls: {
@@ -176,72 +178,35 @@ export class ReleaseService {
 
   /**
    * Update a release by ID
-   * When a release is published (publishedAt is set), also publishes all associated tracks
    */
   static async updateRelease(
     id: string,
     data: Prisma.ReleaseUpdateInput
   ): Promise<ServiceResponse<Release>> {
     try {
-      // Check if we're publishing the release (publishedAt is being set)
-      const isPublishing = data.publishedAt !== undefined && data.publishedAt !== null;
-
-      // If publishing, check if the release wasn't already published
-      let shouldPublishTracks = false;
-      if (isPublishing) {
-        const existingRelease = await prisma.release.findUnique({
-          where: { id },
-          select: { publishedAt: true },
-        });
-
-        // Only publish tracks if the release wasn't already published
-        shouldPublishTracks = existingRelease !== null && existingRelease.publishedAt === null;
-      }
-
-      // Use a transaction to update release and tracks atomically
-      const release = await prisma.$transaction(async (tx) => {
-        // Update the release
-        const updatedRelease = await tx.release.update({
-          where: { id },
-          data,
-          include: {
-            images: true,
-            artistReleases: {
-              include: {
-                artist: true,
-              },
+      const release = await prisma.release.update({
+        where: { id },
+        data,
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
             },
-            releaseTracks: {
-              include: {
-                track: true,
-              },
-            },
-            releaseUrls: {
-              include: {
-                url: true,
+          },
+          digitalFormats: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' },
               },
             },
           },
-        });
-
-        // If publishing the release, also publish all associated tracks
-        if (shouldPublishTracks && updatedRelease.publishedAt) {
-          const trackIds = updatedRelease.releaseTracks.map((rt) => rt.trackId);
-
-          if (trackIds.length > 0) {
-            await tx.track.updateMany({
-              where: {
-                id: { in: trackIds },
-                publishedOn: null, // Only update tracks that aren't already published
-              },
-              data: {
-                publishedOn: updatedRelease.publishedAt,
-              },
-            });
-          }
-        }
-
-        return updatedRelease;
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
       });
 
       return { success: true, data: release as unknown as Release };
@@ -276,7 +241,7 @@ export class ReleaseService {
         include: {
           images: true,
           artistReleases: true,
-          releaseTracks: true,
+          digitalFormats: true,
           releaseUrls: true,
         },
       });
@@ -313,9 +278,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -358,9 +323,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -450,7 +415,8 @@ export class ReleaseService {
   }
 
   /**
-   * Get a single published release with full track data for the media player page.
+   * Get a single published release with digital format files for the media player page.
+   * Returns MP3_320KBPS files sorted by track number for audio playback.
    * Returns `{ success: false }` when the release is not found or not published.
    */
   static async getReleaseWithTracks(id: string): Promise<ServiceResponse<PublishedReleaseDetail>> {
@@ -481,10 +447,11 @@ export class ReleaseService {
               },
             },
           },
-          releaseTracks: {
-            orderBy: { position: 'asc' },
+          digitalFormats: {
             include: {
-              track: true,
+              files: {
+                orderBy: { trackNumber: 'asc' },
+              },
             },
           },
           releaseUrls: {

@@ -58,6 +58,16 @@ interface DigitalFormatsAccordionProps {
    * When provided (create mode), called when a pending-save upload is removed.
    */
   onPendingConfirmRemove?: (formatType: DigitalFormatType) => void;
+  /**
+   * Called when audio metadata is successfully extracted from an uploaded MP3_320KBPS file.
+   * The parent form can use this to pre-populate form fields.
+   */
+  onMetadataExtracted?: (metadata: {
+    album?: string;
+    artist?: string;
+    year?: number;
+    label?: string;
+  }) => void;
 }
 
 interface FormatConfig {
@@ -224,6 +234,7 @@ export function DigitalFormatsAccordion({
   existingFormats = [],
   onPendingConfirm,
   onPendingConfirmRemove,
+  onMetadataExtracted,
 }: DigitalFormatsAccordionProps) {
   // Track upload state for each format
   const [uploadStates, setUploadStates] = useState<Record<DigitalFormatType, UploadState>>(
@@ -395,6 +406,27 @@ export function DigitalFormatsAccordion({
         [formatType]: { status: 'uploading', progress: 0, currentFile: 1, totalFiles: 1 },
       }));
 
+      // Extract metadata from MP3_320KBPS before uploading to pre-populate the release form
+      if (formatType === 'MP3_320KBPS' && onMetadataExtracted) {
+        try {
+          const { parseBlob } = await import('music-metadata');
+          const metadata = await parseBlob(file);
+          const { common } = metadata;
+          if (common.album || common.artist || common.year || common.label?.[0]) {
+            const extracted: { album?: string; artist?: string; year?: number; label?: string } =
+              {};
+            if (common.album) extracted.album = common.album;
+            if (common.artist) extracted.artist = common.artist;
+            if (common.year) extracted.year = common.year;
+            if (common.label?.[0]) extracted.label = common.label[0];
+            onMetadataExtracted(extracted);
+            console.info('[upload] MP3_320KBPS: extracted metadata', extracted);
+          }
+        } catch {
+          console.info('[upload] MP3_320KBPS: could not extract metadata');
+        }
+      }
+
       const result = await uploadSingleFile(formatType, file);
 
       if (!result.success) {
@@ -471,12 +503,12 @@ export function DigitalFormatsAccordion({
         }
       }
     },
-    [releaseId, onPendingConfirm, uploadSingleFile]
+    [releaseId, onPendingConfirm, onMetadataExtracted, uploadSingleFile]
   );
 
   /**
    * Handle batch upload of multiple files for a single format type.
-   * Uploads files sequentially, tracks progress, extracts album title from first file,
+   * Uploads files sequentially, tracks progress, extracts album metadata from first MP3_320KBPS file,
    * then sets terminal state and pending confirms after all files complete.
    */
   const handleBatchUpload = useCallback(
@@ -505,17 +537,32 @@ export function DigitalFormatsAccordion({
         },
       }));
 
-      // Try to extract album title from the first file's metadata (client-side)
-      try {
-        const { parseBlob } = await import('music-metadata');
-        const metadata = await parseBlob(files[0]);
-        if (metadata.common.album) {
-          setAlbumTitle(metadata.common.album);
-          console.info(`[batch-upload] Extracted album title: "${metadata.common.album}"`);
+      // Try to extract metadata from the first file (client-side) for MP3_320KBPS
+      if (formatType === 'MP3_320KBPS') {
+        try {
+          const { parseBlob } = await import('music-metadata');
+          const metadata = await parseBlob(files[0]);
+          const { common } = metadata;
+          if (common.album) {
+            setAlbumTitle(common.album);
+          }
+          if (
+            onMetadataExtracted &&
+            (common.album ?? common.artist ?? common.year ?? common.label?.[0])
+          ) {
+            const extracted: { album?: string; artist?: string; year?: number; label?: string } =
+              {};
+            if (common.album) extracted.album = common.album;
+            if (common.artist) extracted.artist = common.artist;
+            if (common.year) extracted.year = common.year;
+            if (common.label?.[0]) extracted.label = common.label[0];
+            onMetadataExtracted(extracted);
+            console.info(`[batch-upload] Extracted album metadata:`, extracted);
+          }
+        } catch {
+          // Metadata extraction is best-effort — not all formats support it
+          console.info('[batch-upload] Could not extract metadata from first file');
         }
-      } catch {
-        // Metadata extraction is best-effort — not all formats support it
-        console.info('[batch-upload] Could not extract album metadata from first file');
       }
 
       const successFiles: UploadedFileInfo[] = [];
@@ -625,7 +672,7 @@ export function DigitalFormatsAccordion({
 
       console.info(`[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`);
     },
-    [releaseId, onPendingConfirm, uploadSingleFile]
+    [releaseId, onPendingConfirm, onMetadataExtracted, uploadSingleFile]
   );
 
   const handleFileInputChange = useCallback(

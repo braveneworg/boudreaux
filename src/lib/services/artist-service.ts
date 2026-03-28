@@ -692,7 +692,7 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and track data.
+   * Get an artist by slug with full release and digital format data.
    * Post-query filters to only published, non-deleted releases.
    */
   static async getArtistBySlugWithReleases(
@@ -717,9 +717,10 @@ export class ArtistService {
                 include: {
                   images: true,
                   artistReleases: { include: { artist: true } },
-                  releaseTracks: {
-                    include: { track: true },
-                    orderBy: { position: 'asc' },
+                  digitalFormats: {
+                    include: {
+                      files: { orderBy: { trackNumber: 'asc' } },
+                    },
                   },
                   releaseUrls: { include: { url: true } },
                 },

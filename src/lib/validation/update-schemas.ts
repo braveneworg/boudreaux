@@ -4,11 +4,9 @@
 import { artistBaseSchema } from './create-artist-schema';
 import { createFeaturedArtistSchema } from './create-featured-artist-schema';
 import { releaseBaseSchema } from './create-release-schema';
-import { createTrackSchema } from './create-track-schema';
 import { notificationBannerBaseSchema } from './notification-banner-schema';
 
 // Schemas without .refine() -- .partial() works directly
-export const updateTrackSchema = createTrackSchema.partial();
 export const updateFeaturedArtistSchema = createFeaturedArtistSchema.partial();
 
 // Schemas with .refine()/.superRefine() -- use the base schema (pre-refine) for partial updates

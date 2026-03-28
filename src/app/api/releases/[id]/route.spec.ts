@@ -44,7 +44,7 @@ describe('Release by ID API Routes', () => {
     linerNotesBy: [],
     imageTypes: [],
     variants: [],
-    releaseTracks: [],
+    digitalFormats: [],
     artistReleases: [],
     releaseUrls: [],
     createdAt: new Date('2024-01-01'),

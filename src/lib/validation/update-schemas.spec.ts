@@ -6,7 +6,6 @@ import {
   updateFeaturedArtistSchema,
   updateNotificationBannerSchema,
   updateReleaseSchema,
-  updateTrackSchema,
 } from './update-schemas';
 
 const validObjectId = '507f1f77bcf86cd799439011';
@@ -56,42 +55,6 @@ describe('update-schemas', () => {
     it('should accept valid createdBy ObjectId', () => {
       const result = updateArtistSchema.safeParse({ createdBy: validObjectId });
       expect(result.success).toBe(true);
-    });
-  });
-
-  describe('updateTrackSchema', () => {
-    it('should accept an empty object', () => {
-      const result = updateTrackSchema.safeParse({});
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept a single field update', () => {
-      const result = updateTrackSchema.safeParse({ title: 'New Track Title' });
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate duration constraints', () => {
-      expect(updateTrackSchema.safeParse({ duration: 0 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ duration: 86401 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ duration: 180 }).success).toBe(true);
-    });
-
-    it('should validate audioUrl as valid URL', () => {
-      expect(updateTrackSchema.safeParse({ audioUrl: 'not-a-url' }).success).toBe(false);
-      expect(
-        updateTrackSchema.safeParse({ audioUrl: 'https://example.com/audio.mp3' }).success
-      ).toBe(true);
-    });
-
-    it('should validate position as non-negative integer', () => {
-      expect(updateTrackSchema.safeParse({ position: -1 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ position: 1.5 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ position: 0 }).success).toBe(true);
-    });
-
-    it('should reject title exceeding max length', () => {
-      const result = updateTrackSchema.safeParse({ title: 'x'.repeat(201) });
-      expect(result.success).toBe(false);
     });
   });
 

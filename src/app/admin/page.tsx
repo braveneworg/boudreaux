@@ -13,7 +13,6 @@ import { toTitleCase } from '@/lib/utils/string-utils';
 import { ArtistDataView } from './data-views/artist-data-view';
 import { FeaturedArtistDataView } from './data-views/featured-artist-data-view';
 import { ReleaseDataView } from './data-views/release-data-view';
-import { TrackDataView } from './data-views/track-data-view';
 import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 
 export default function AdminPage() {
@@ -26,11 +25,6 @@ export default function AdminPage() {
       router.push('/admin/notifications');
       return;
     }
-    // Bulk upload has its own dedicated page
-    if (selectedView === 'upload bulk tracks') {
-      router.push('/admin/tracks/bulk');
-      return;
-    }
     // Tours has its own dedicated page
     if (selectedView === 'tours') {
       router.push('/admin/tours');
@@ -40,15 +34,7 @@ export default function AdminPage() {
   };
 
   const getEntityOptions = useCallback(() => {
-    const entities = [
-      'artist',
-      'upload bulk tracks',
-      'release',
-      'track',
-      'featured artist',
-      'notifications',
-      'tours',
-    ];
+    const entities = ['artist', 'release', 'featured artist', 'notifications', 'tours'];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
       label: toTitleCase(entity),
@@ -75,7 +61,6 @@ export default function AdminPage() {
       />
       {view === 'artist' && <ArtistDataView />}
       {view === 'release' && <ReleaseDataView />}
-      {view === 'track' && <TrackDataView />}
       {view === 'featured artist' && <FeaturedArtistDataView />}
     </>
   );
