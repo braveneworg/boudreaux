@@ -239,6 +239,45 @@ describe('image-resize', () => {
     });
   });
 
+  describe('loadImage error path', () => {
+    it('should reject when the image fails to load', async () => {
+      // Temporarily replace MockImage to trigger onerror instead of onload
+      const ErrorImage = class {
+        onload: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+        private _src = '';
+
+        get naturalWidth() {
+          return 0;
+        }
+
+        get naturalHeight() {
+          return 0;
+        }
+
+        get src() {
+          return this._src;
+        }
+
+        set src(value: string) {
+          this._src = value;
+          setTimeout(() => {
+            if (this.onerror) this.onerror('network error');
+          }, 0);
+        }
+      };
+
+      global.Image = ErrorImage as unknown as typeof Image;
+
+      const file = new File(['test'], 'broken.jpg', { type: 'image/jpeg' });
+
+      await expect(resizeImage(file, { maxWidth: 880 })).rejects.toThrow('Failed to load image');
+
+      // Restore the working MockImage for subsequent tests
+      global.Image = MockImage as unknown as typeof Image;
+    });
+  });
+
   describe('resizeNotificationBannerImage', () => {
     it('should resize to 880px width', async () => {
       const file = new File(['test'], 'banner.jpg', { type: 'image/jpeg' });

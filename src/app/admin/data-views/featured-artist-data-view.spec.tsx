@@ -306,4 +306,166 @@ describe('FeaturedArtistDataView', () => {
       expect(screen.queryByText('Descriptive Artist')).not.toBeInTheDocument();
     });
   });
+
+  it('should handle search on item with null displayName and null description', async () => {
+    const mockDataNullFields = {
+      featuredArtists: [
+        {
+          id: 'featured-null-fields',
+          displayName: null,
+          featuredOn: '2024-05-01T00:00:00.000Z',
+          position: 5,
+          description: null,
+          coverArt: null,
+          images: [],
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          publishedOn: null,
+          deletedOn: null,
+          artists: [
+            {
+              id: 'artist-3',
+              displayName: 'Searchable Artist Name',
+              firstName: 'Searchable',
+              surname: 'Artist',
+            },
+          ],
+          digitalFormat: null,
+          release: null,
+          group: null,
+        },
+      ],
+      count: 1,
+    };
+
+    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: mockDataNullFields,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Searchable Artist Name')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText('Search featured artists...');
+
+    // Search by artist name should still find it despite null displayName and description
+    fireEvent.change(searchInput, { target: { value: 'Searchable Artist Name' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Searchable Artist Name')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle search on item with null artists array', async () => {
+    const mockDataNullArtists = {
+      featuredArtists: [
+        {
+          id: 'featured-null-artists',
+          displayName: 'Only Display Name',
+          featuredOn: '2024-06-01T00:00:00.000Z',
+          position: 6,
+          description: null,
+          coverArt: null,
+          images: [],
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          publishedOn: null,
+          deletedOn: null,
+          artists: null,
+          digitalFormat: null,
+          release: null,
+          group: null,
+        },
+      ],
+      count: 1,
+    };
+
+    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: mockDataNullArtists,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Only Display Name')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText('Search featured artists...');
+
+    // Search by display name should find it even with null artists
+    fireEvent.change(searchInput, { target: { value: 'Only Display Name' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Only Display Name')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle search on item with artist that has null displayName', async () => {
+    const mockDataNullArtistName = {
+      featuredArtists: [
+        {
+          id: 'featured-null-artist-name',
+          displayName: 'Parent Featured Name',
+          featuredOn: '2024-07-01T00:00:00.000Z',
+          position: 7,
+          description: null,
+          coverArt: null,
+          images: [],
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          publishedOn: null,
+          deletedOn: null,
+          artists: [
+            {
+              id: 'artist-no-name',
+              displayName: null,
+              firstName: null,
+              surname: null,
+            },
+          ],
+          digitalFormat: null,
+          release: null,
+          group: null,
+        },
+      ],
+      count: 1,
+    };
+
+    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: mockDataNullArtistName,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Parent Featured Name')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText('Search featured artists...');
+
+    // Search by parent display name should find it
+    fireEvent.change(searchInput, { target: { value: 'Parent Featured Name' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Parent Featured Name')).toBeInTheDocument();
+    });
+
+    // Search for random text should not find it since artist has no displayName
+    fireEvent.change(searchInput, { target: { value: 'unknown musician xyz' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Parent Featured Name')).not.toBeInTheDocument();
+    });
+  });
 });

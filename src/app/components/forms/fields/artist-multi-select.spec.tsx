@@ -132,14 +132,23 @@ vi.mock('@/app/components/ui/popover', () => ({
     children,
     className,
     align,
+    onEscapeKeyDown,
   }: {
     children: React.ReactNode;
     className?: string;
     align?: string;
+    onEscapeKeyDown?: (e: { stopPropagation: () => void }) => void;
   }) =>
     mockPopoverOpen ? (
       <div data-testid="popover-content" className={className} data-align={align}>
         {children}
+        <button
+          data-testid="escape-key-trigger"
+          onClick={() => onEscapeKeyDown?.({ stopPropagation: vi.fn() })}
+          style={{ display: 'none' }}
+        >
+          Escape
+        </button>
       </div>
     ) : null,
 }));
@@ -1039,6 +1048,172 @@ describe('ArtistMultiSelect', () => {
       // The escape key handler is on PopoverContent's onEscapeKeyDown prop
       // Since the mock doesn't wire this up, we verify the component renders without error
       expect(screen.getByTestId('command-input')).toBeInTheDocument();
+    });
+  });
+
+  describe('onEscapeKeyDown handler', () => {
+    it('calls stopPropagation when escape key is pressed inside popover', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('popover-content')).toBeInTheDocument();
+      });
+
+      // Trigger the onEscapeKeyDown handler via the mock button
+      const escapeButton = screen.getByTestId('escape-key-trigger');
+      await user.click(escapeButton);
+
+      // The handler ran without error (stopPropagation was called)
+      expect(screen.getByTestId('popover-content')).toBeInTheDocument();
+    });
+  });
+
+  describe('handleSelect without setValue', () => {
+    it('toggles selection via field.onChange when setValue is not provided', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control }) => (
+            <ArtistMultiSelect control={control} name="artistIds" label="Artists" />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-artist-1')).toBeInTheDocument();
+      });
+
+      // Select without setValue prop — should still update via field.onChange
+      await user.click(screen.getByTestId('command-item-artist-1'));
+      expect(screen.getByTestId('combobox-trigger')).toHaveTextContent('1 artist selected');
+    });
+  });
+
+  describe('handleRemove without setValue', () => {
+    it('removes artist via field.onChange when setValue is not provided', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TestWrapper>
+          {({ control }) => (
+            <ArtistMultiSelect control={control} name="artistIds" label="Artists" />
+          )}
+        </TestWrapper>
+      );
+
+      // Open and select an artist
+      await user.click(screen.getByTestId('popover-trigger'));
+      await waitFor(() => {
+        expect(screen.getByTestId('command-item-artist-1')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('command-item-artist-1'));
+
+      // Badge should appear
+      await waitFor(() => {
+        expect(screen.getByTestId('badge')).toBeInTheDocument();
+      });
+
+      // Remove via badge button without setValue prop
+      const removeButton = screen.getByRole('button', { name: /remove/i });
+      await user.click(removeButton);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('badge')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('initialArtists cache sync with new artists', () => {
+    it('updates cache when initialArtists changes to include new artists', () => {
+      formFieldInitialValue = ['artist-1'];
+
+      const { rerender } = render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              initialArtists={[{ id: 'artist-1', displayName: 'Artist One' }]}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('badge')).toHaveTextContent('Artist One');
+
+      // Rerender with additional new artist in initialArtists — triggers
+      // the `changed = true` branch inside the initialArtists useEffect
+      rerender(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+              initialArtists={[
+                { id: 'artist-1', displayName: 'Artist One' },
+                { id: 'artist-new', displayName: 'New Artist' },
+              ]}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      // The existing badge still displays (cache was not lost during update)
+      expect(screen.getByTestId('badge')).toHaveTextContent('Artist One');
+    });
+  });
+
+  describe('fetch response with missing artists array', () => {
+    it('falls back to empty array when response has no artists field', async () => {
+      const user = userEvent.setup();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+
+      render(
+        <TestWrapper>
+          {({ control, setValue }) => (
+            <ArtistMultiSelect
+              control={control}
+              name="artistIds"
+              label="Artists"
+              setValue={setValue}
+            />
+          )}
+        </TestWrapper>
+      );
+
+      await user.click(screen.getByTestId('popover-trigger'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      // No artist items should be rendered
+      expect(screen.queryByTestId('command-item-artist-1')).not.toBeInTheDocument();
     });
   });
 

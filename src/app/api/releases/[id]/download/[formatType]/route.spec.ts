@@ -4,8 +4,6 @@
 
 import { NextRequest } from 'next/server';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
 import { GET } from './route';
 
 const mockGetToken = vi.fn();
@@ -250,6 +248,45 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
       expect.objectContaining({
         ipAddress: 'unknown',
         userAgent: 'unknown',
+      })
+    );
+  });
+
+  it('should use fallback header values in quota exceeded log event', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+    );
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
+
+    await GET(req, makeParams());
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipAddress: 'unknown',
+        userAgent: 'unknown',
+        errorCode: 'QUOTA_EXCEEDED',
+      })
+    );
+  });
+
+  it('should use fallback header values in deleted format log event', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+    );
+    const deletedFormat = { ...mockFormat, deletedAt: new Date() };
+    mockCheckFormatExists.mockResolvedValue(deletedFormat);
+    mockCheckPurchaseStatus.mockResolvedValue(false);
+    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
+    mockCheckSoftDeleteGracePeriod.mockResolvedValue(false);
+
+    await GET(req, makeParams());
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipAddress: 'unknown',
+        userAgent: 'unknown',
+        errorCode: 'DELETED',
       })
     );
   });

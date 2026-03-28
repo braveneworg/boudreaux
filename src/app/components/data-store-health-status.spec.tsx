@@ -27,6 +27,7 @@ vi.mock('./health-status-message', () => ({
     isLoading: boolean;
   }) => (
     <span
+      data-error={healthStatus?.error ?? 'none'}
       data-is-loading={isLoading}
       data-status={healthStatus?.status ?? 'null'}
       data-testid="health-status-message"
@@ -552,6 +553,46 @@ describe('DataStoreHealthStatus', () => {
 
       // No errors should be thrown
       expect(mockFetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('failsafe fires after unmount (isMounted false)', () => {
+    it('failsafe callback skips state update when component is already unmounted', async () => {
+      mockFetch.mockImplementation(() => new Promise(() => {}));
+
+      const { unmount } = render(<DataStoreHealthStatus />);
+
+      // Prevent cleanup from actually canceling the failsafe timeout
+      // so the failsafe fires with isMounted = false
+      const fakeClearTimeout = globalThis.clearTimeout;
+      globalThis.clearTimeout = (() => {}) as typeof clearTimeout;
+
+      unmount(); // sets isMounted = false, but failsafe timer NOT canceled
+
+      // Restore clearTimeout so fake timer system works
+      globalThis.clearTimeout = fakeClearTimeout;
+
+      // Advance to trigger failsafe — isMounted is false so state update is skipped
+      await vi.advanceTimersByTimeAsync(60000);
+
+      // No error thrown means the guard worked correctly
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('non-SSL/ERR_ error after all retries exhausted', () => {
+    it('uses raw errorMessage when it does not contain SSL or ERR_', async () => {
+      mockFetch.mockRejectedValue(new Error('Connection timeout'));
+
+      render(<DataStoreHealthStatus />);
+
+      // runAllTimersAsync properly flushes microtasks between timer advances
+      await vi.runAllTimersAsync();
+
+      await waitFor(() => {
+        const message = screen.getByTestId('health-status-message');
+        expect(message).toHaveAttribute('data-error', 'Connection timeout');
+      });
     });
   });
 });

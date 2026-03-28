@@ -113,4 +113,15 @@ describe('FormatBundleDownload', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('should display unknown formatType when no label is found', () => {
+    render(
+      <FormatBundleDownload
+        {...defaultProps}
+        availableFormats={[{ formatType: 'CUSTOM_XYZ', fileName: 'file.xyz' }]}
+      />
+    );
+
+    expect(screen.getByText('CUSTOM_XYZ')).toBeInTheDocument();
+  });
 });

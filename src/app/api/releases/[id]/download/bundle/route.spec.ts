@@ -331,6 +331,64 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     consoleSpy.mockRestore();
   });
 
+  it('should skip S3 objects with no Body', async () => {
+    mockS3Send.mockResolvedValue({ Body: null });
+
+    const response = await GET(makeRequest(), makeParams());
+
+    expect(response.status).toBe(200);
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
+  it('should skip format with null files and no legacy s3Key', async () => {
+    mockFindByReleaseAndFormat.mockResolvedValue({
+      id: 'format-empty',
+      formatType: 'FLAC',
+      s3Key: null,
+      fileName: null,
+      files: null,
+    });
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe('NO_FILES');
+  });
+
+  it('should skip format with s3Key but no fileName', async () => {
+    mockFindByReleaseAndFormat.mockResolvedValue({
+      id: 'format-partial',
+      formatType: 'FLAC',
+      s3Key: 'releases/r1/FLAC/file.flac',
+      fileName: null,
+      files: [],
+    });
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe('NO_FILES');
+  });
+
+  it('should use fallback error message when parse issues have no message', async () => {
+    // Request with no formats param at all to trigger validation failure
+    const req = new NextRequest('http://localhost:3000/api/releases/release-1/download/bundle', {
+      headers: {
+        'x-forwarded-for': '127.0.0.1',
+        'user-agent': 'test-agent',
+      },
+    });
+
+    const response = await GET(req, makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('INVALID_FORMATS');
+    expect(body.message).toBeDefined();
+  });
+
   it('should finalize the archive', async () => {
     await GET(makeRequest(), makeParams());
 

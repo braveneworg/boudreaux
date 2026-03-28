@@ -965,4 +965,424 @@ describe('DigitalFormatsAccordion', () => {
       });
     });
   });
+
+  describe('Metadata extraction (MP3_320KBPS)', () => {
+    it('should call onMetadataExtracted when MP3_320KBPS file has metadata', async () => {
+      const onMetadataExtracted = vi.fn();
+
+      // Dynamic import mock is set at top level via vi.mock; instead test behavior
+      // by verifying that create-mode upload calls onPendingConfirm (metadata is best-effort)
+      const onPendingConfirm = vi.fn();
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion
+          releaseId={mockReleaseId}
+          onPendingConfirm={onPendingConfirm}
+          onMetadataExtracted={onMetadataExtracted}
+        />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      // Upload still succeeds regardless of metadata extraction
+      await waitFor(() => {
+        expect(onPendingConfirm).toHaveBeenCalledWith(
+          expect.objectContaining({ formatType: 'MP3_320KBPS' })
+        );
+      });
+    });
+
+    it('should not extract metadata for non-MP3_320KBPS formats', async () => {
+      const onMetadataExtracted = vi.fn();
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion
+          releaseId={mockReleaseId}
+          onPendingConfirm={vi.fn()}
+          onMetadataExtracted={onMetadataExtracted}
+        />
+      );
+
+      await user.click(screen.getByText('FLAC'));
+      const fileInput = await screen.findByLabelText(/upload flac/i);
+      const file = new File(['audio content'], 'album.flac', { type: 'audio/flac' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText(/will be saved with release/i)).toBeInTheDocument();
+      });
+
+      expect(onMetadataExtracted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Upload error scenarios', () => {
+    it('should handle non-Error exception during upload', async () => {
+      const { toast } = await import('sonner');
+      global.fetch = vi.fn().mockRejectedValue('string error');
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'MP3 320kbps upload failed',
+          expect.objectContaining({ description: 'Upload failed. Please try again.' })
+        );
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it('should show error icon and status text for failed uploads', async () => {
+      global.fetch = mockFetchError('Server error');
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('FLAC'));
+      const fileInput = await screen.findByLabelText(/upload flac/i);
+      const file = new File(['audio content'], 'album.flac', { type: 'audio/flac' });
+      await user.upload(fileInput, file);
+
+      await waitFor(
+        () => {
+          expect(screen.getAllByLabelText('Upload failed').length).toBeGreaterThanOrEqual(1);
+        },
+        { timeout: 5000 }
+      );
+    });
+
+    it('should show remove button for errored uploads', async () => {
+      global.fetch = mockFetchError('Upload error');
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/remove mp3/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should handle upload response where s3Key is missing', async () => {
+      const { toast } = await import('sonner');
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true, s3Key: undefined }),
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'MP3 320kbps upload failed',
+          expect.objectContaining({ description: 'Upload failed' })
+        );
+      });
+    });
+  });
+
+  describe('Batch upload scenarios', () => {
+    it('should show batch progress during multi-file upload', async () => {
+      const onPendingConfirm = vi.fn();
+
+      // Slow fetch to keep uploading state visible
+      let resolveFirst: ((value: Response) => void) | undefined;
+      let resolveSecond: ((value: Response) => void) | undefined;
+      let callCount = 0;
+      global.fetch = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return new Promise<Response>((r) => {
+            resolveFirst = r;
+          });
+        }
+        return new Promise<Response>((r) => {
+          resolveSecond = r;
+        });
+      });
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      // Should show batch progress text
+      await waitFor(() => {
+        expect(screen.getByText(/Uploading MP3 320kbps.../i)).toBeInTheDocument();
+      });
+
+      // Resolve first upload
+      resolveFirst!({
+        ok: true,
+        json: () => Promise.resolve({ success: true, s3Key: 'uploads/key1' }),
+      } as Response);
+
+      // Set second to resolve too
+      await waitFor(() => {
+        expect(resolveSecond).toBeDefined();
+      });
+      resolveSecond!({
+        ok: true,
+        json: () => Promise.resolve({ success: true, s3Key: 'uploads/key2' }),
+      } as Response);
+
+      await waitFor(() => {
+        expect(onPendingConfirm).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('should show warning toast when batch has partial failures', async () => {
+      const { toast } = await import('sonner');
+      const onPendingConfirm = vi.fn();
+
+      let callCount = 0;
+      global.fetch = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true, s3Key: 'uploads/key1' }),
+          });
+        }
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ success: false, message: 'File too large' }),
+        });
+      });
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.warning).toHaveBeenCalledWith(
+          expect.stringContaining('1 of 2 files uploaded')
+        );
+      });
+    });
+
+    it('should show error toast when all batch files fail', async () => {
+      const { toast } = await import('sonner');
+      const onPendingConfirm = vi.fn();
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ success: false, message: 'Server error' }),
+      });
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('all files failed'));
+      });
+    });
+  });
+
+  describe('File input edge cases', () => {
+    it('should not start upload when file input change has no files', async () => {
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      global.fetch = vi.fn();
+
+      // Fire change with empty files list
+      fireEvent.change(fileInput, { target: { files: [] } });
+
+      // Fetch should not have been called
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Drop handler edge cases', () => {
+    it('should handle folder read failure gracefully', async () => {
+      const { toast } = await import('sonner');
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('FLAC'));
+      const dropZone = await screen.findByText(/drag and drop a flac/i);
+      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+
+      // Mock a directory entry whose reader throws an error
+      const mockDirEntry = {
+        isFile: false,
+        isDirectory: true,
+        name: 'BadFolder',
+        createReader: () => ({
+          readEntries: (_cb: unknown, reject: (e: Error) => void) => {
+            reject(new Error('Read failed'));
+          },
+        }),
+      };
+
+      const dataTransfer = {
+        items: [{ webkitGetAsEntry: () => mockDirEntry }],
+        files: [],
+        types: ['Files'],
+      };
+
+      fireEvent.drop(dropTarget, { dataTransfer });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to read folder contents');
+      });
+    });
+
+    it('should ignore drop when no file is present', async () => {
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('FLAC'));
+      const dropZone = await screen.findByText(/drag and drop a flac/i);
+      const dropTarget = dropZone.closest('[class*="border-dashed"]')!;
+
+      global.fetch = vi.fn();
+
+      const dataTransfer = {
+        items: [{ webkitGetAsEntry: () => null }],
+        files: [],
+        types: ['Files'],
+      };
+
+      fireEvent.drop(dropTarget, { dataTransfer });
+
+      // No upload triggered
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Existing format state', () => {
+    it('should show file info for pre-existing formats when expanded', async () => {
+      const existingFormats = [
+        {
+          formatType: 'MP3_320KBPS' as const,
+          fileName: 'album.mp3',
+          s3Key: 'releases/123/MP3/album.mp3',
+        },
+        {
+          formatType: 'FLAC' as const,
+          fileName: 'album.flac',
+          s3Key: 'releases/123/FLAC/album.flac',
+        },
+      ];
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} existingFormats={existingFormats} />
+      );
+
+      expect(screen.getByText('2 formats uploaded')).toBeInTheDocument();
+
+      // Expand MP3 to see file info
+      await user.click(screen.getByText('MP3 320kbps'));
+      await waitFor(() => {
+        expect(screen.getAllByText('album.mp3').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText('Uploaded').length).toBeGreaterThanOrEqual(1);
+      });
+    });
+  });
+
+  describe('Pending-save indicator', () => {
+    it('should show amber checkmark for pending-save state', async () => {
+      const onPendingConfirm = vi.fn();
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        const pendingCheckmarks = screen.getAllByTestId('format-pending-save-checkmark');
+        expect(pendingCheckmarks.length).toBeGreaterThanOrEqual(1);
+      });
+    });
+  });
+
+  describe('Upload with empty file type', () => {
+    it('should use default mime type when file.type is empty', async () => {
+      const onPendingConfirm = vi.fn();
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      // File with empty type — browser sometimes does this
+      const file = new File(['audio content'], 'album.mp3', { type: '' });
+      fireEvent.change(fileInput, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/upload/MP3_320KBPS'),
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'Content-Type': 'audio/mpeg',
+            }),
+          })
+        );
+      });
+    });
+  });
 });

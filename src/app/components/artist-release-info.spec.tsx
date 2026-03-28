@@ -271,6 +271,36 @@ describe('ArtistReleaseInfo', () => {
       });
     });
 
+    it('should show error toast when clipboard.writeText fails', async () => {
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const mockWriteText = vi.fn().mockRejectedValue(new Error('Clipboard write failed'));
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      await vi.waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('Failed to copy link to clipboard');
+      });
+    });
+
     it('should not show error toast when user cancels the share dialog', async () => {
       const abortError = new DOMException('Share canceled', 'AbortError');
       const mockShare = vi.fn().mockRejectedValue(abortError);

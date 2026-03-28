@@ -544,4 +544,103 @@ describe('PurchaseCheckoutStep', () => {
     });
     consoleSpy.mockRestore();
   });
+
+  it('shows the Error message when session creation throws an Error instance', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockRejectedValue(new Error('Network failure'));
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onError = vi.fn();
+    const props = buildProps({ onError });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Network failure')).toBeDefined();
+    });
+    expect(onError).toHaveBeenCalledWith('Network failure');
+    consoleSpy.mockRestore();
+  });
+
+  it('refetchInterval covers the non-idle fetchStatus branch', async () => {
+    let capturedConfig: Record<string, unknown> = {};
+    mockUseQuery.mockImplementation((config: Record<string, unknown>) => {
+      capturedConfig = config;
+      return { data: undefined };
+    });
+
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(capturedConfig.refetchInterval).toBeDefined();
+    });
+
+    const refetchInterval = capturedConfig.refetchInterval as (query: unknown) => number | false;
+    const result = refetchInterval({
+      state: { data: { confirmed: false }, fetchStatus: 'fetching' },
+    });
+    expect(result).toBe(2000);
+  });
+
+  it('shows timeout UI when pollCount reaches MAX_POLL_COUNT without confirmation', async () => {
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: {
+        canConfirm: true,
+        confirm: vi.fn().mockResolvedValue({ type: 'success' }),
+      },
+    });
+
+    let capturedConfig: Record<string, unknown> = {};
+    mockUseQuery.mockImplementation((config: Record<string, unknown>) => {
+      capturedConfig = config;
+      return { data: { confirmed: false } };
+    });
+
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      paymentIntentId: 'pi_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    // Wait for checkout form to render
+    await waitFor(() => {
+      expect(screen.getByText(/Pay \$/)).toBeDefined();
+    });
+
+    // Click Pay to trigger paymentComplete
+    fireEvent.click(screen.getByText(/Pay \$/));
+
+    // Wait for payment received UI
+    await waitFor(() => {
+      expect(screen.getByText('Payment received!')).toBeDefined();
+    });
+
+    // Now call queryFn 45 times to increment pollCount to MAX_POLL_COUNT
+    const queryFn = capturedConfig.queryFn as () => Promise<unknown>;
+    const mockFetch = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ confirmed: false }),
+    } as Response);
+
+    for (let i = 0; i < 45; i++) {
+      await queryFn();
+    }
+
+    mockFetch.mockRestore();
+
+    // After 45 polls, the timeout UI should be shown
+    await waitFor(() => {
+      expect(screen.getByText(/taking longer than expected/)).toBeDefined();
+    });
+    expect(screen.getByText(/support@fakefourinc.com/)).toBeDefined();
+  });
 });

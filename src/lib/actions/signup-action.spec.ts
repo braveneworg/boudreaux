@@ -8,6 +8,8 @@ import { signupAction } from '@/lib/actions/signup-action';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import type { FormState } from '@/lib/types/form-state';
 
+import type { Mock } from 'vitest';
+
 const mockSignIn = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
@@ -591,6 +593,54 @@ describe('signupAction', () => {
 
       expect(result.success).toBe(false);
       expect(mockSetUnknownError).toHaveBeenCalled();
+    });
+  });
+
+  describe('IP address resolution', () => {
+    beforeEach(() => {
+      const mockFormState: FormState = {
+        fields: { email: 'test@example.com', termsAndConditions: true },
+        success: false,
+        errors: { email: ['Invalid email format'] },
+      };
+
+      const mockParsed = {
+        success: false,
+        error: {
+          issues: [{ path: ['email'], message: 'Invalid email format' }],
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+    });
+
+    it('should fall back to x-real-ip when x-forwarded-for is null', async () => {
+      mockHeaders.mockResolvedValueOnce({
+        get: vi.fn((name: string) => {
+          if (name === 'x-forwarded-for') return null;
+          if (name === 'x-real-ip') return '10.0.0.1';
+          return null;
+        }),
+      } as unknown as { get: Mock<() => string> });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', '10.0.0.1');
+    });
+
+    it('should fall back to anonymous when both x-forwarded-for and x-real-ip are null', async () => {
+      mockHeaders.mockResolvedValueOnce({
+        get: vi.fn(() => null),
+      } as unknown as { get: Mock<() => string> });
+
+      const result = await signupAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(mockVerifyTurnstile).toHaveBeenCalledWith('test-turnstile-token', 'anonymous');
     });
   });
 

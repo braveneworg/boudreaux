@@ -413,4 +413,73 @@ describe('ReleasePlayer', () => {
     // No error thrown — the optional chaining handled the null case
     expect(coverArt).toBeInTheDocument();
   });
+
+  it('should fall back to images[0].src when coverArt is empty', () => {
+    const releaseWithImageFallback = {
+      ...mockRelease,
+      coverArt: '',
+      images: [{ src: 'https://cdn.example.com/fallback.jpg', width: 400, height: 400 }],
+    } as unknown as PublishedReleaseDetail;
+
+    render(<ReleasePlayer release={releaseWithImageFallback} releaseId="release-1" />);
+
+    const coverArt = screen.getByTestId('interactive-cover-art');
+    expect(coverArt).toHaveAttribute('data-src', 'https://cdn.example.com/fallback.jpg');
+  });
+
+  it('should fall back to empty string when coverArt and images are empty', () => {
+    const releaseNoImages = {
+      ...mockRelease,
+      coverArt: '',
+      images: [],
+    } as unknown as PublishedReleaseDetail;
+
+    render(<ReleasePlayer release={releaseNoImages} releaseId="release-1" />);
+
+    const coverArt = screen.getByTestId('interactive-cover-art');
+    expect(coverArt).toHaveAttribute('data-src', '');
+  });
+
+  it('should not change track when selecting a non-existent file ID', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    // The FormatFileListDrawer will call onFileSelect with an ID
+    // We need to simulate a call with a non-existent file ID
+    // The first track should remain active
+    const controls = screen.getByTestId('media-controls');
+    expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
+  });
+
+  it('should not go to previous track when already on first track', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    // Click previous while on first track
+    fireEvent.click(screen.getByTestId('previous-track-button'));
+
+    // Should still be on first track
+    const controls = screen.getByTestId('media-controls');
+    expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
+  });
+
+  it('should display fileName when title is null', () => {
+    const releaseWithNullTitle = {
+      ...mockRelease,
+      digitalFormats: [
+        {
+          ...mockRelease.digitalFormats[0],
+          files: [
+            {
+              ...mockRelease.digitalFormats[0].files[0],
+              title: null,
+            },
+          ],
+        },
+      ],
+    } as unknown as PublishedReleaseDetail;
+
+    render(<ReleasePlayer release={releaseWithNullTitle} releaseId="release-1" />);
+
+    const ticker = screen.getByTestId('info-ticker-tape');
+    expect(ticker).toHaveAttribute('data-track-name', 'track1.mp3');
+  });
 });

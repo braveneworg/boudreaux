@@ -7,8 +7,6 @@ import { ReadableStream } from 'node:stream/web';
 
 import { NextRequest } from 'next/server';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
 import { PUT } from './route';
 
 // Polyfill ReadableStream for jsdom env
@@ -238,6 +236,69 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(response.status).toBe(500);
     expect(body.message).toBe('Upload failed. Please try again.');
 
+    consoleSpy.mockRestore();
+  });
+
+  it('should return 400 when request body is empty', async () => {
+    const response = await PUT(makeRequest({ noBody: true }), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('NO_BODY');
+    expect(body.message).toBe('Request body is empty.');
+  });
+
+  it('should use default mime type when content-type header is empty', async () => {
+    const response = await PUT(makeRequest({ headers: { 'content-type': '' } }), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+  });
+
+  it('should return undefined trackNumber when x-track-number header is absent', async () => {
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.trackNumber).toBeUndefined();
+  });
+
+  it('should register httpUploadProgress handler', async () => {
+    await PUT(makeRequest(), makeParams());
+
+    expect(mockUploadOn).toHaveBeenCalledWith('httpUploadProgress', expect.any(Function));
+  });
+
+  it('should handle progress callback with loaded bytes', async () => {
+    mockUploadOn.mockImplementation(
+      (event: string, callback: (progress: { loaded?: number }) => void) => {
+        if (event === 'httpUploadProgress') {
+          callback({ loaded: 25000000 });
+        }
+      }
+    );
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    await PUT(makeRequest(), makeParams());
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle progress callback without loaded property', async () => {
+    mockUploadOn.mockImplementation(
+      (event: string, callback: (progress: { loaded?: number }) => void) => {
+        if (event === 'httpUploadProgress') {
+          callback({});
+        }
+      }
+    );
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    await PUT(makeRequest(), makeParams());
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
     consoleSpy.mockRestore();
   });
 });

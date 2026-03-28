@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Special+Elite&display=swap');
 @import 'tw-animate-css';
 @import 'tailwindcss';
 
@@ -11,6 +12,10 @@
 @theme {
   --color-rebecca-purple: #639;
   --animate-spin-slow: rotate(360deg) 1.5s linear infinite;
+  --font-typewriter: 'Special Elite', system-ui, serif;
+  --font-mono: 'Courier Prime', monospace;
+  --color-punk-pink: #ff007f;
+  --color-punk-black: #0a0a0a;
 }
 
 @theme inline {
@@ -111,11 +116,10 @@
   h4,
   h5,
   h6 {
-    font-family:
-      Courier New,
-      Courier,
-      system,
-      serif;
+    font-family: 'Courier Prime', 'Courier New', Courier, monospace, system, serif;
+    /* @apply bg-punk-black text-white font-mono selection:bg-punk-pink selection:text-white;   */
+    /* background-image: url("https://www.transparenttextures.com/patterns/dark-matter.png"); */
+
     text-transform: lowercase;
     overflow-wrap: break-word; /* Standard and preferred */
     word-wrap: break-word; /* Legacy name for browser compatibility */
@@ -407,4 +411,15 @@ nextjs-portal {
   cursor: pointer;
   border-radius: 5px 0 0 5px;
   transform: translateX(10px); /* Adjusts position */
+}
+
+@layer components {
+  .stamped-box {
+    @apply border-2 border-white px-4 py-1 inline-block transform -rotate-1 shadow-[4px_4px_0px_0px_rgba(255,255,255,1)];
+  }
+
+  .hand-drawn-border {
+    border: 2px solid white;
+    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  }
 }

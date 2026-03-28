@@ -123,6 +123,30 @@ describe('GET /api/releases/[id]/download-analytics', () => {
     expect(data.error).toBe('Failed to fetch analytics');
   });
 
+  it('should return 400 when releaseId is empty', async () => {
+    const emptyIdContext = { params: Promise.resolve({ id: '' }) };
+    const request = createRequest('/api/releases//download-analytics');
+
+    const response = await GET(request, emptyIdContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Release ID is required');
+  });
+
+  it('should handle only endDate filter', async () => {
+    const request = createRequest(
+      `/api/releases/${releaseId}/download-analytics?endDate=2026-06-30T23:59:59.999Z`
+    );
+
+    const response = await GET(request, context);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.dateRange.startDate).toBeNull();
+    expect(data.dateRange.endDate).toBe('2026-06-30T23:59:59.999Z');
+  });
+
   it('should return empty format breakdown when no downloads exist', async () => {
     mockGetAnalyticsByRelease.mockResolvedValue([]);
     mockGetUniqueUsers.mockResolvedValue(0);

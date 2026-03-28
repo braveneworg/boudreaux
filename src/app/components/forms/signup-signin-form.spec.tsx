@@ -544,4 +544,31 @@ describe('SignupSigninForm', () => {
       expect(screen.getByTestId('status-indicator')).toBeInTheDocument();
     });
   });
+
+  describe('unverified state', () => {
+    it('renders skeleton placeholders when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      const skeletons = document.querySelectorAll('[data-slot="skeleton"]');
+      expect(skeletons.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('hides email input when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.queryByTestId('form-input-email')).not.toBeInTheDocument();
+    });
+
+    it('hides submit button when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.queryByTestId('submit-button')).not.toBeInTheDocument();
+    });
+
+    it('still renders turnstile widget when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.getByTestId('turnstile-widget')).toBeInTheDocument();
+    });
+  });
 });

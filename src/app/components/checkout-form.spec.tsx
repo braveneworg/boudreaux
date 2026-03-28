@@ -257,5 +257,66 @@ describe('CheckoutForm', () => {
       expect(screen.queryByText('Fake Four Inc. Subscription')).not.toBeInTheDocument();
       expect(screen.getByTestId('payment-element')).toBeInTheDocument();
     });
+
+    it('should show default error message when turnstile error is undefined', async () => {
+      const user = userEvent.setup();
+      mockVerifyTurnstile.mockResolvedValue({ success: false });
+      mockUseCheckout.mockReturnValue(createCheckoutSuccess());
+
+      render(<CheckoutForm />);
+
+      await user.click(screen.getByTestId('verify-turnstile'));
+      await user.click(screen.getByRole('button', { name: /Subscribe/i }));
+
+      expect(screen.getByText('Bot verification failed. Please try again.')).toBeInTheDocument();
+      expect(mockConfirm).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to checkout.recurring when lineItem has no recurring', () => {
+      mockUseCheckout.mockReturnValue(
+        createCheckoutSuccess({
+          lineItems: [
+            {
+              id: 'li_test',
+              name: 'Yearly Plan',
+              unitAmount: { amount: '$99.00', minorUnitsAmount: 9900 },
+              total: { amount: '$99.00', minorUnitsAmount: 9900 },
+              recurring: null,
+            },
+          ],
+          recurring: { interval: 'year', intervalCount: 1 },
+        })
+      );
+
+      render(<CheckoutForm />);
+
+      expect(screen.getByText('$99.00/year')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Subscribe — \$14\.44\/year/i })
+      ).toBeInTheDocument();
+    });
+
+    it('should fall back to "month" in subscribe button when recurring is nullish', () => {
+      mockUseCheckout.mockReturnValue(
+        createCheckoutSuccess({
+          lineItems: [
+            {
+              id: 'li_test',
+              name: 'One-time Plan',
+              unitAmount: { amount: '$5.00', minorUnitsAmount: 500 },
+              total: { amount: '$5.00', minorUnitsAmount: 500 },
+              recurring: null,
+            },
+          ],
+          recurring: null,
+        })
+      );
+
+      render(<CheckoutForm />);
+
+      expect(
+        screen.getByRole('button', { name: /Subscribe — \$14\.44\/month/i })
+      ).toBeInTheDocument();
+    });
   });
 });

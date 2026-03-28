@@ -2,9 +2,44 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DownloadAnalyticsDashboard } from './download-analytics-dashboard';
+
+// Mock Radix Select with a native <select> so jsdom can handle value changes
+vi.mock('@/app/components/ui/select', () => {
+  let onValueChangeFn: ((value: string) => void) | undefined;
+  return {
+    Select: ({
+      children,
+      value,
+      onValueChange,
+    }: {
+      children: ReactNode;
+      value: string;
+      onValueChange: (v: string) => void;
+    }) => {
+      onValueChangeFn = onValueChange;
+      return (
+        <div data-testid="select-root" data-value={value}>
+          {children}
+        </div>
+      );
+    },
+    SelectTrigger: ({ children, ...props }: Record<string, unknown> & { children: ReactNode }) => (
+      <button {...props}>{children}</button>
+    ),
+    SelectValue: () => <span data-testid="select-value">All Time</span>,
+    SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    SelectItem: ({ children, value }: { children: ReactNode; value: string }) => (
+      <button data-testid={`select-option-${value}`} onClick={() => onValueChangeFn?.(value)}>
+        {children}
+      </button>
+    ),
+  };
+});
 
 const mockReleaseId = '507f1f77bcf86cd799439011';
 
@@ -172,7 +207,7 @@ describe('DownloadAnalyticsDashboard', () => {
       });
 
       // Default date range label should be "All Time"
-      expect(screen.getByText('All Time')).toBeInTheDocument();
+      expect(screen.getByTestId('select-value')).toHaveTextContent('All Time');
     });
   });
 
@@ -184,6 +219,40 @@ describe('DownloadAnalyticsDashboard', () => {
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(mockReleaseId));
+      });
+    });
+
+    it('should refetch with date range params when date range is changed', async () => {
+      mockFetchSuccess();
+
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('total-downloads')).toBeInTheDocument();
+      });
+
+      // Click on "Last 7 Days" option using the mocked SelectItem
+      fireEvent.click(screen.getByTestId('select-option-7d'));
+
+      await waitFor(() => {
+        const calls = vi.mocked(global.fetch).mock.calls;
+        const lastCall = calls[calls.length - 1];
+        expect(String(lastCall[0])).toContain('startDate');
+        expect(String(lastCall[0])).toContain('endDate');
+      });
+    });
+
+    it('should render format breakdown table with unknown format label fallback', async () => {
+      mockFetchSuccess({
+        totalDownloads: 10,
+        uniqueUsers: 5,
+        formatBreakdown: [{ formatType: 'UNKNOWN_FMT', count: 10 }],
+      });
+
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('UNKNOWN_FMT')).toBeInTheDocument();
       });
     });
   });
