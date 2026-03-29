@@ -124,7 +124,7 @@ describe('verifyTurnstile', () => {
   describe('test secret key bypass', () => {
     it('should return success immediately when using Cloudflare test secret key in non-production', async () => {
       process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
-      process.env.NODE_ENV = 'test';
+      vi.stubEnv('NODE_ENV', 'test');
 
       const result = await verifyTurnstile('any-token', '127.0.0.1');
 
@@ -134,7 +134,7 @@ describe('verifyTurnstile', () => {
 
     it('should return success immediately when using Cloudflare test secret key in development', async () => {
       process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
-      process.env.NODE_ENV = 'development';
+      vi.stubEnv('NODE_ENV', 'development');
 
       const result = await verifyTurnstile('any-token', '127.0.0.1');
 
@@ -144,7 +144,7 @@ describe('verifyTurnstile', () => {
 
     it('should not bypass verification when test secret is used in production', async () => {
       process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
@@ -157,7 +157,7 @@ describe('verifyTurnstile', () => {
 
     it('should not bypass verification for non-test secret keys in non-production', async () => {
       process.env.CLOUDFLARE_SECRET = 'real-production-secret';
-      process.env.NODE_ENV = 'test';
+      vi.stubEnv('NODE_ENV', 'test');
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
