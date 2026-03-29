@@ -3,8 +3,11 @@ import type { NextConfig } from 'next';
 const config = {
   // Use full CDN URL for all static assets in production
   // This eliminates the need for NGINX redirects and avoids 301 caching issues
+  // Skip CDN prefix for E2E builds so assets are served locally
   assetPrefix:
-    process.env.NODE_ENV === 'production' ? 'https://cdn.fakefourrecords.com' : undefined,
+    process.env.NODE_ENV === 'production' && !process.env.SKIP_CDN_ASSET_PREFIX
+      ? 'https://cdn.fakefourrecords.com'
+      : undefined,
   devIndicators: false,
 
   // Configure images for CDN

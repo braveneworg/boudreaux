@@ -18,7 +18,7 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
-  globalTimeout: IS_CI ? 1_080_000 : undefined,
+  globalTimeout: IS_CI ? 1_800_000 : undefined, // 30 minutes
   workers: 1,
   reporter: IS_CI
     ? [['html', { outputFolder: PLAYWRIGHT_REPORT_OUTPUT }], ['github']]
@@ -34,6 +34,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    navigationTimeout: IS_CI ? 30_000 : 15_000,
   },
 
   projects: [
@@ -44,14 +45,13 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: IS_CI
-      ? 'pnpm exec next build --webpack && pnpm exec next start -p 3000'
-      : 'pnpm run dev',
+    command: IS_CI ? 'pnpm exec next start -p 3000' : 'pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: false,
-    timeout: IS_CI ? 900_000 : 120_000,
+    timeout: IS_CI ? 60_000 : 120_000, // 1 min in CI (pre-built), 2 min locally
     env: {
       NODE_ENV: IS_CI ? 'production' : 'development',
+      PORT: '3000',
       E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,
       AUTH_SECRET,
