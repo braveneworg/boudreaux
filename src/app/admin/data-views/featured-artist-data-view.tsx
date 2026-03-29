@@ -33,10 +33,6 @@ export const FeaturedArtistDataView = () => {
         if (artist.displayName) parts.push(artist.displayName);
       }
     }
-    if (item.group) {
-      if (item.group.name) parts.push(item.group.name);
-      if (item.group.displayName) parts.push(item.group.displayName);
-    }
     return parts.join(' ');
   }, []);
 

@@ -77,17 +77,19 @@ async function seedTestDatabase() {
 
   try {
     // Clear all collections in dependency-safe order
+    await prisma.releaseDigitalFormatFile.deleteMany({});
+    await prisma.releaseDigitalFormat.deleteMany({});
+    await prisma.downloadEvent.deleteMany({});
+    await prisma.releasePurchase.deleteMany({});
+    await prisma.userDownloadQuota.deleteMany({});
     await prisma.tourDateImage.deleteMany({});
     await prisma.tourDateHeadliner.deleteMany({});
     await prisma.tourImage.deleteMany({});
     await prisma.tourDate.deleteMany({});
     await prisma.tour.deleteMany({});
     await prisma.venue.deleteMany({});
-    await prisma.releaseTrack.deleteMany({});
-    await prisma.trackArtist.deleteMany({});
     await prisma.artistFeaturedArtist.deleteMany({});
     await prisma.artistRelease.deleteMany({});
-    await prisma.artistGroup.deleteMany({});
     await prisma.artistLabel.deleteMany({});
     await prisma.artistUrl.deleteMany({});
     await prisma.releaseUrl.deleteMany({});
@@ -95,10 +97,8 @@ async function seedTestDatabase() {
     await prisma.image.deleteMany({});
     await prisma.url.deleteMany({});
     await prisma.featuredArtist.deleteMany({});
-    await prisma.track.deleteMany({});
     await prisma.release.deleteMany({});
     await prisma.artist.deleteMany({});
-    await prisma.group.deleteMany({});
     await prisma.authenticator.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.account.deleteMany({});
@@ -183,36 +183,6 @@ async function seedTestDatabase() {
       }),
     ]);
 
-    // Create tracks for listing/editing tests
-    await Promise.all([
-      prisma.track.create({
-        data: {
-          title: 'E2E Test Track One',
-          duration: 180,
-          audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-          position: 0,
-          publishedOn: new Date(),
-        },
-      }),
-      prisma.track.create({
-        data: {
-          title: 'E2E Test Track Two',
-          duration: 240,
-          audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-          position: 1,
-          publishedOn: new Date(),
-        },
-      }),
-      prisma.track.create({
-        data: {
-          title: 'E2E Track For Deletion',
-          duration: 120,
-          audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-          position: 2,
-        },
-      }),
-    ]);
-
     // Create notification banners for carousel testing
     const now = new Date();
     const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -255,37 +225,6 @@ async function seedTestDatabase() {
       },
     });
 
-    // Create tracks for each release
-    const e2eTrack1 = await prisma.track.create({
-      data: {
-        title: 'E2E Track Alpha',
-        duration: 200,
-        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-        position: 1,
-        publishedOn: new Date(),
-      },
-    });
-
-    const e2eTrack2 = await prisma.track.create({
-      data: {
-        title: 'E2E Track Beta',
-        duration: 220,
-        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-        position: 1,
-        publishedOn: new Date(),
-      },
-    });
-
-    const e2eTrack3 = await prisma.track.create({
-      data: {
-        title: 'E2E Track Gamma',
-        duration: 190,
-        audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-        position: 1,
-        publishedOn: new Date(),
-      },
-    });
-
     // Link artist to releases
     await Promise.all([
       prisma.artistRelease.create({
@@ -299,18 +238,37 @@ async function seedTestDatabase() {
       }),
     ]);
 
-    // Link tracks to releases
-    await Promise.all([
-      prisma.releaseTrack.create({
-        data: { releaseId: e2eRelease1.id, trackId: e2eTrack1.id, position: 1 },
-      }),
-      prisma.releaseTrack.create({
-        data: { releaseId: e2eRelease2.id, trackId: e2eTrack2.id, position: 1 },
-      }),
-      prisma.releaseTrack.create({
-        data: { releaseId: e2eRelease3.id, trackId: e2eTrack3.id, position: 1 },
-      }),
-    ]);
+    // Create MP3_320KBPS digital formats with track files for each E2E release.
+    // The artist page filters releases to only those with playable MP3_320KBPS files.
+    const e2eReleases = [
+      { release: e2eRelease1, trackTitle: 'E2E Track Alpha' },
+      { release: e2eRelease2, trackTitle: 'E2E Track Beta' },
+      { release: e2eRelease3, trackTitle: 'E2E Track Gamma' },
+    ];
+
+    for (const { release, trackTitle } of e2eReleases) {
+      const format = await prisma.releaseDigitalFormat.create({
+        data: {
+          releaseId: release.id,
+          formatType: 'MP3_320KBPS',
+          trackCount: 1,
+          totalFileSize: BigInt(5_000_000),
+        },
+      });
+
+      await prisma.releaseDigitalFormatFile.create({
+        data: {
+          formatId: format.id,
+          trackNumber: 1,
+          title: trackTitle,
+          duration: 210,
+          s3Key: `releases/${release.id}/audio/mp3_320kbps/01-track.mp3`,
+          fileName: '01-track.mp3',
+          fileSize: BigInt(5_000_000),
+          mimeType: 'audio/mpeg',
+        },
+      });
+    }
 
     await Promise.all([
       prisma.notification.create({

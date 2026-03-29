@@ -109,6 +109,7 @@ vi.mock('@/app/components/ui/button', () => ({
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div data-testid="turnstile-widget" onClick={() => setIsVerified?.(true)} {...props}>
       Turnstile Widget
     </div>
@@ -541,6 +542,33 @@ describe('SignupSigninForm', () => {
 
       expect(screen.getByTestId('submit-button')).toBeInTheDocument();
       expect(screen.getByTestId('status-indicator')).toBeInTheDocument();
+    });
+  });
+
+  describe('unverified state', () => {
+    it('renders skeleton placeholders when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      const skeletons = document.querySelectorAll('[data-slot="skeleton"]');
+      expect(skeletons.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('hides email input when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.queryByTestId('form-input-email')).not.toBeInTheDocument();
+    });
+
+    it('hides submit button when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.queryByTestId('submit-button')).not.toBeInTheDocument();
+    });
+
+    it('still renders turnstile widget when isVerified is false', () => {
+      render(<SignupSigninForm {...defaultProps} isVerified={false} />);
+
+      expect(screen.getByTestId('turnstile-widget')).toBeInTheDocument();
     });
   });
 });

@@ -55,7 +55,7 @@ export const createCheckoutSessionAction = async (
           quantity: 1,
         },
       ],
-      ui_mode: 'custom',
+      ui_mode: 'elements',
       ...(resolvedCustomerId
         ? { customer: resolvedCustomerId }
         : verifiedEmail

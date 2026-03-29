@@ -6,6 +6,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../prisma';
+import { deleteS3Object } from '../utils/s3-client';
 import { withCache } from '../utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
@@ -30,9 +31,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -78,9 +79,11 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: {
+                orderBy: { trackNumber: 'asc' },
+              },
             },
           },
           releaseUrls: {
@@ -176,72 +179,35 @@ export class ReleaseService {
 
   /**
    * Update a release by ID
-   * When a release is published (publishedAt is set), also publishes all associated tracks
    */
   static async updateRelease(
     id: string,
     data: Prisma.ReleaseUpdateInput
   ): Promise<ServiceResponse<Release>> {
     try {
-      // Check if we're publishing the release (publishedAt is being set)
-      const isPublishing = data.publishedAt !== undefined && data.publishedAt !== null;
-
-      // If publishing, check if the release wasn't already published
-      let shouldPublishTracks = false;
-      if (isPublishing) {
-        const existingRelease = await prisma.release.findUnique({
-          where: { id },
-          select: { publishedAt: true },
-        });
-
-        // Only publish tracks if the release wasn't already published
-        shouldPublishTracks = existingRelease !== null && existingRelease.publishedAt === null;
-      }
-
-      // Use a transaction to update release and tracks atomically
-      const release = await prisma.$transaction(async (tx) => {
-        // Update the release
-        const updatedRelease = await tx.release.update({
-          where: { id },
-          data,
-          include: {
-            images: true,
-            artistReleases: {
-              include: {
-                artist: true,
-              },
+      const release = await prisma.release.update({
+        where: { id },
+        data,
+        include: {
+          images: true,
+          artistReleases: {
+            include: {
+              artist: true,
             },
-            releaseTracks: {
-              include: {
-                track: true,
-              },
-            },
-            releaseUrls: {
-              include: {
-                url: true,
+          },
+          digitalFormats: {
+            include: {
+              files: {
+                orderBy: { trackNumber: 'asc' },
               },
             },
           },
-        });
-
-        // If publishing the release, also publish all associated tracks
-        if (shouldPublishTracks && updatedRelease.publishedAt) {
-          const trackIds = updatedRelease.releaseTracks.map((rt) => rt.trackId);
-
-          if (trackIds.length > 0) {
-            await tx.track.updateMany({
-              where: {
-                id: { in: trackIds },
-                publishedOn: null, // Only update tracks that aren't already published
-              },
-              data: {
-                publishedOn: updatedRelease.publishedAt,
-              },
-            });
-          }
-        }
-
-        return updatedRelease;
+          releaseUrls: {
+            include: {
+              url: true,
+            },
+          },
+        },
       });
 
       return { success: true, data: release as unknown as Release };
@@ -267,18 +233,76 @@ export class ReleaseService {
   }
 
   /**
-   * Delete a release by ID (hard delete)
+   * Delete a release by ID (hard delete).
+   * Cascades to delete all related data EXCEPT Artist records.
+   * Deletes S3 objects for digital format files and images.
    */
   static async deleteRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.delete({
+      // Verify release exists and fetch related data for S3 cleanup
+      const existing = await prisma.release.findUnique({
         where: { id },
         include: {
+          digitalFormats: {
+            include: { files: true },
+          },
           images: true,
-          artistReleases: true,
-          releaseTracks: true,
-          releaseUrls: true,
         },
+      });
+
+      if (!existing) {
+        return { success: false, error: 'Release not found' };
+      }
+
+      // Collect S3 keys for cleanup
+      const s3KeysToDelete: string[] = [];
+      for (const format of existing.digitalFormats) {
+        for (const file of format.files) {
+          if (file.s3Key) s3KeysToDelete.push(file.s3Key);
+        }
+      }
+
+      // Delete related records in dependency order (children first)
+      // 1. Digital format files (child of ReleaseDigitalFormat)
+      for (const format of existing.digitalFormats) {
+        await prisma.releaseDigitalFormatFile.deleteMany({
+          where: { formatId: format.id },
+        });
+      }
+
+      // 2. Digital formats
+      await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: id } });
+
+      // 3. Purchase and download records
+      await prisma.releasePurchase.deleteMany({ where: { releaseId: id } });
+      await prisma.releaseDownload.deleteMany({ where: { releaseId: id } });
+
+      // 4. Download events (no FK relation, just matching field)
+      await prisma.downloadEvent.deleteMany({ where: { releaseId: id } });
+
+      // 5. Release URLs (junction table)
+      await prisma.releaseUrl.deleteMany({ where: { releaseId: id } });
+
+      // 6. Images (shared model — only delete images linked to this release)
+      await prisma.image.deleteMany({ where: { releaseId: id } });
+
+      // 7. ArtistRelease junction records (does NOT delete the Artist)
+      await prisma.artistRelease.deleteMany({ where: { releaseId: id } });
+
+      // 8. FeaturedArtist references (disconnect, don't delete the featured artist record)
+      await prisma.featuredArtist.updateMany({
+        where: { releaseId: id },
+        data: { releaseId: null },
+      });
+
+      // 9. Delete the release itself
+      const release = await prisma.release.delete({
+        where: { id },
+      });
+
+      // 10. Best-effort S3 cleanup (async, fire-and-forget)
+      Promise.allSettled(s3KeysToDelete.map((key) => deleteS3Object(key))).catch(() => {
+        // Silently ignore — S3 objects will be cleaned up by lifecycle rules
       });
 
       return { success: true, data: release as unknown as Release };
@@ -313,9 +337,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -358,9 +382,9 @@ export class ReleaseService {
               artist: true,
             },
           },
-          releaseTracks: {
+          digitalFormats: {
             include: {
-              track: true,
+              files: true,
             },
           },
           releaseUrls: {
@@ -394,7 +418,7 @@ export class ReleaseService {
 
   /**
    * Get all published releases for the public listing page.
-   * Includes artist info with groups for display name fallback and search,
+   * Includes artist info for display name and search,
    * images for cover art fallback, and URLs for Bandcamp links.
    * Results are cached for 10 minutes in production.
    */
@@ -416,15 +440,7 @@ export class ReleaseService {
             },
             artistReleases: {
               include: {
-                artist: {
-                  include: {
-                    groups: {
-                      include: {
-                        group: true,
-                      },
-                    },
-                  },
-                },
+                artist: true,
               },
             },
             releaseUrls: {
@@ -458,7 +474,8 @@ export class ReleaseService {
   }
 
   /**
-   * Get a single published release with full track data for the media player page.
+   * Get a single published release with digital format files for the media player page.
+   * Returns MP3_320KBPS files sorted by track number for audio playback.
    * Returns `{ success: false }` when the release is not found or not published.
    */
   static async getReleaseWithTracks(id: string): Promise<ServiceResponse<PublishedReleaseDetail>> {
@@ -479,7 +496,6 @@ export class ReleaseService {
                 include: {
                   images: true,
                   labels: true,
-                  groups: true,
                   releases: {
                     include: {
                       release: true,
@@ -490,10 +506,11 @@ export class ReleaseService {
               },
             },
           },
-          releaseTracks: {
-            orderBy: { position: 'asc' },
+          digitalFormats: {
             include: {
-              track: true,
+              files: {
+                orderBy: { trackNumber: 'asc' },
+              },
             },
           },
           releaseUrls: {

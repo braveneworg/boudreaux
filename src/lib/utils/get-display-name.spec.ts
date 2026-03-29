@@ -113,6 +113,28 @@ describe('getDisplayName', () => {
     });
   });
 
+  describe('release.title fallback', () => {
+    it('should return release.title when no direct fields are available', () => {
+      const item = { displayName: null, artists: [], release: { title: 'NO THANKS' } };
+      expect(getDisplayName(item as unknown as Record<string, unknown>)).toBe('NO THANKS');
+    });
+
+    it('should prefer firstName/surname over release.title', () => {
+      const item = { firstName: 'John', surname: 'Doe', release: { title: 'Album' } };
+      expect(getDisplayName(item)).toBe('John Doe');
+    });
+
+    it('should not use release.title when release is not an object', () => {
+      const item = { release: 'not-an-object' };
+      expect(getDisplayName(item)).toBe(' - Error: Unknown entity name');
+    });
+
+    it('should not use release.title when title is not a string', () => {
+      const item = { release: { title: 123 } };
+      expect(getDisplayName(item)).toBe(' - Error: Unknown entity name');
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle empty string displayName', () => {
       const item = { displayName: '', title: 'Title' };

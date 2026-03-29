@@ -15,6 +15,13 @@ export const getDisplayName = (item: Record<string, unknown>): string => {
     typeof item.surname === 'string'
   ) {
     return `${item.firstName} ${item.surname}`;
+  } else if (
+    item.release &&
+    typeof item.release === 'object' &&
+    (item.release as Record<string, unknown>).title &&
+    typeof (item.release as Record<string, unknown>).title === 'string'
+  ) {
+    return (item.release as Record<string, unknown>).title as string;
   } else {
     console.error('Unable to determine display name for item:', JSON.stringify(item, null, 2));
     return ' - Error: Unknown entity name';

@@ -25,9 +25,8 @@ describe('getFeaturedArtistsAction', () => {
       description: 'A test artist description',
       coverArt: 'https://example.com/cover1.jpg',
       artists: [],
-      track: null,
+      digitalFormat: null,
       release: null,
-      group: null,
     },
     {
       id: 'featured-2',
@@ -37,9 +36,8 @@ describe('getFeaturedArtistsAction', () => {
       description: null,
       coverArt: 'https://example.com/cover2.jpg',
       artists: [],
-      track: null,
+      digitalFormat: null,
       release: null,
-      group: null,
     },
   ];
 

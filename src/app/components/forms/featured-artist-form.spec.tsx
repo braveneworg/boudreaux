@@ -6,16 +6,14 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { TrackOption } from '@/app/components/forms/fields/track-select';
-
 import FeaturedArtistForm from './featured-artist-form';
 
 import type * as ReactHookFormTypes from 'react-hook-form';
 
-// Capture props passed to mocked child components
-let capturedOnTrackChange: ((track: TrackOption | null) => void) | undefined;
-// Capture the releaseId prop passed to TrackSelect
-let capturedTrackSelectReleaseId: string | undefined;
+// Capture props passed to mocked ReleaseSelect
+let capturedReleaseSelectSetValue:
+  | ((name: string, value: string, options?: Record<string, boolean>) => void)
+  | undefined;
 
 // Spy for react-hook-form setValue
 const mockSetValue = vi.fn();
@@ -24,21 +22,28 @@ const mockPush = vi.fn();
 
 vi.mock('react-hook-form', async () => {
   const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
-  const { useForm: actualUseForm, ...rest } = actual;
+
+  // Maintain stable setValue wrapper across re-renders to prevent useEffect churn
+  const wrapperByForm = new WeakMap<object, ReturnType<typeof actual.useForm>['setValue']>();
 
   return {
-    ...rest,
-    useForm: <TFieldValues extends ReactHookFormTypes.FieldValues = ReactHookFormTypes.FieldValues>(
-      options?: ReactHookFormTypes.UseFormProps<TFieldValues>
-    ) => {
-      const form = actualUseForm(options);
-      const originalSetValue = form.setValue;
+    ...actual,
+    useForm: (options?: Parameters<typeof actual.useForm>[0]) => {
+      const form = actual.useForm(options);
 
-      // Wrap setValue with our spy
-      form.setValue = (...args: Parameters<typeof originalSetValue>) => {
-        mockSetValue(...args);
-        return originalSetValue(...args);
-      };
+      if (!wrapperByForm.has(form)) {
+        const originalSetValue = form.setValue;
+        const wrapped = ((...args: Parameters<typeof originalSetValue>) => {
+          mockSetValue(...args);
+          return originalSetValue(...args);
+        }) as typeof originalSetValue;
+        wrapperByForm.set(form, wrapped);
+      }
+
+      const cached = wrapperByForm.get(form);
+      if (cached) {
+        form.setValue = cached;
+      }
 
       return form;
     },
@@ -65,34 +70,10 @@ vi.mock('@/lib/utils/console-logger', () => ({
   error: vi.fn(),
 }));
 
-// Mock react-hook-form to capture setValue calls
-vi.mock('react-hook-form', async () => {
-  const actual = (await vi.importActual('react-hook-form')) as typeof ReactHookFormTypes;
-  return {
-    ...actual,
-    useForm: (options?: Parameters<typeof actual.useForm>[0]) => {
-      const originalForm = actual.useForm(options);
-      const originalSetValue = originalForm.setValue;
-      // Wrap setValue to spy on it while preserving original behavior
-      originalForm.setValue = ((...args: Parameters<typeof originalSetValue>) => {
-        mockSetValue(...args);
-        return originalSetValue(...args);
-      }) as typeof originalSetValue;
-      return originalForm;
-    },
-  };
-});
-
 // Mock form field subcomponents as simple stubs, capturing props we care about
 vi.mock('@/app/components/forms/fields', () => ({
   TextField: ({ name, label }: { name: string; label: string }) => (
     <div data-testid={`text-field-${name}`}>{label}</div>
-  ),
-}));
-
-vi.mock('@/app/components/forms/fields/artist-multi-select', () => ({
-  default: ({ name }: { name: string }) => (
-    <div data-testid={`artist-multi-select-${name}`}>ArtistMultiSelect</div>
   ),
 }));
 
@@ -102,35 +83,16 @@ vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
   ),
 }));
 
-vi.mock('@/app/components/forms/fields/group-select', () => ({
-  default: ({ name }: { name: string }) => (
-    <div data-testid={`group-select-${name}`}>GroupSelect</div>
-  ),
-}));
-
 vi.mock('@/app/components/forms/fields/release-select', () => ({
-  default: ({ name }: { name: string }) => (
-    <div data-testid={`release-select-${name}`}>ReleaseSelect</div>
-  ),
-}));
-
-vi.mock('@/app/components/forms/fields/track-select', () => ({
   default: ({
     name,
-    onTrackChange,
-    releaseId,
+    setValue,
   }: {
     name: string;
-    onTrackChange?: (track: TrackOption | null) => void;
-    releaseId?: string;
+    setValue?: (name: string, value: string, options?: Record<string, boolean>) => void;
   }) => {
-    capturedOnTrackChange = onTrackChange;
-    capturedTrackSelectReleaseId = releaseId;
-    return (
-      <div data-testid={`track-select-${name}`} data-release-id={releaseId ?? ''}>
-        TrackSelect
-      </div>
-    );
+    capturedReleaseSelectSetValue = setValue;
+    return <div data-testid={`release-select-${name}`}>ReleaseSelect</div>;
   },
 }));
 
@@ -143,11 +105,18 @@ vi.mock('../ui/datepicker', () => ({
 }));
 
 describe('FeaturedArtistForm', () => {
+  const mockFetch = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockSetValue.mockClear();
-    capturedOnTrackChange = undefined;
-    capturedTrackSelectReleaseId = undefined;
+    mockFetch.mockReset();
+    capturedReleaseSelectSetValue = undefined;
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('rendering', () => {
@@ -158,12 +127,10 @@ describe('FeaturedArtistForm', () => {
       expect(titles.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders all media association fields', () => {
+    it('renders release media association field', () => {
       render(<FeaturedArtistForm />);
 
-      expect(screen.getByTestId('track-select-trackId')).toBeInTheDocument();
       expect(screen.getByTestId('release-select-releaseId')).toBeInTheDocument();
-      expect(screen.getByTestId('group-select-groupId')).toBeInTheDocument();
     });
 
     it('renders cover art field', () => {
@@ -186,144 +153,172 @@ describe('FeaturedArtistForm', () => {
       expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /create featured artist/i })).toBeInTheDocument();
     });
-
-    it('passes onTrackChange callback to TrackSelect', () => {
-      render(<FeaturedArtistForm />);
-
-      expect(capturedOnTrackChange).toBeDefined();
-      expect(typeof capturedOnTrackChange).toBe('function');
-    });
   });
 
-  describe('auto-populate release from track selection', () => {
-    it('populates releaseId from the first release when a track with one release is selected', async () => {
+  describe('digital format auto-fetch on release selection', () => {
+    const TEST_RELEASE_ID = 'abc123def456abc123def456';
+    const TEST_FORMAT_ID = 'def456abc123def456abc123';
+
+    it('auto-sets digitalFormatId when release has MP3_320KBPS format', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            digitalFormat: {
+              id: TEST_FORMAT_ID,
+              files: [{ id: 'file-1' }, { id: 'file-2' }],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
       render(<FeaturedArtistForm />);
 
-      const trackWithRelease: TrackOption = {
-        id: 'track-1',
-        title: 'My Track',
-        duration: 200,
-        releaseTracks: [{ release: { id: 'abc123def456abc123def456', title: 'My Album' } }],
-      };
-
       await act(() => {
-        capturedOnTrackChange?.(trackWithRelease);
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
       });
 
-      // Verify setValue was called with the correct releaseId and options
       await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+        expect(mockFetch).toHaveBeenCalledWith(
+          `/api/releases/${TEST_RELEASE_ID}/digital-formats?formatType=MP3_320KBPS`
+        );
+      });
+
+      await waitFor(() => {
+        expect(mockSetValue).toHaveBeenCalledWith('digitalFormatId', TEST_FORMAT_ID, {
           shouldDirty: true,
           shouldValidate: true,
         });
       });
     });
 
-    it('uses the first release when track has multiple releases', async () => {
+    it('shows format found status with file count when MP3 format exists', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            digitalFormat: {
+              id: TEST_FORMAT_ID,
+              files: [{ id: 'file-1' }, { id: 'file-2' }, { id: 'file-3' }],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
       render(<FeaturedArtistForm />);
 
-      const trackWithMultipleReleases: TrackOption = {
-        id: 'track-2',
-        title: 'Multi-Release Track',
-        releaseTracks: [
-          { release: { id: 'first00000000000000000000', title: 'First Album' } },
-          { release: { id: 'second000000000000000000', title: 'Second Album' } },
-        ],
-      };
-
       await act(() => {
-        capturedOnTrackChange?.(trackWithMultipleReleases);
-      });
-
-      // Assert that setValue was called with the first release ID
-      await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'first00000000000000000000', {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-      });
-    });
-
-    it('clears releaseId when track is deselected (null)', async () => {
-      render(<FeaturedArtistForm />);
-
-      // First select a track to populate releaseId
-      await act(() => {
-        capturedOnTrackChange?.({
-          id: 'track-1',
-          title: 'Track',
-          releaseTracks: [{ release: { id: 'abc123def456abc123def456', title: 'Album' } }],
-        });
-      });
-
-      await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', 'abc123def456abc123def456', {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
           shouldDirty: true,
           shouldValidate: true,
         });
       });
 
-      // Clear the mock to isolate the deselect call
-      mockSetValue.mockClear();
-
-      // Then deselect
-      await act(() => {
-        capturedOnTrackChange?.(null);
-      });
-
-      // Verify setValue was called with empty string for releaseId
-      expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
-        shouldDirty: true,
-        shouldValidate: true,
+      await waitFor(() => {
+        expect(screen.getByText(/MP3 320kbps format available/)).toBeInTheDocument();
+        expect(screen.getByText(/3 files/)).toBeInTheDocument();
       });
     });
 
-    it('sets empty releaseId when track has no releaseTracks', async () => {
+    it('shows missing format status when release has no MP3_320KBPS format', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
       render(<FeaturedArtistForm />);
 
       await act(() => {
-        capturedOnTrackChange?.({
-          id: 'track-3',
-          title: 'Standalone Track',
-          releaseTracks: [],
-        });
-      });
-
-      // Verify setValue was called with empty string
-      await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
           shouldDirty: true,
           shouldValidate: true,
         });
       });
+
+      await waitFor(() => {
+        expect(screen.getByText(/No MP3 320kbps format found/)).toBeInTheDocument();
+      });
     });
 
-    it('sets empty releaseId when track has undefined releaseTracks', async () => {
+    it('shows loading status while checking format availability', async () => {
+      let resolveFetch: (value: Response) => void;
+      const fetchPromise = new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      });
+
+      mockFetch.mockReturnValue(fetchPromise);
+
       render(<FeaturedArtistForm />);
 
       await act(() => {
-        capturedOnTrackChange?.({
-          id: 'track-4',
-          title: 'Legacy Track',
-        });
-      });
-
-      // Verify setValue was called with empty string
-      await waitFor(() => {
-        expect(mockSetValue).toHaveBeenCalledWith('releaseId', '', {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
           shouldDirty: true,
           shouldValidate: true,
         });
       });
-    });
-  });
 
-  describe('releaseId pass-through to TrackSelect', () => {
-    it('passes empty releaseId to TrackSelect initially (no release selected)', () => {
+      await waitFor(() => {
+        expect(screen.getByText(/Checking for MP3 320kbps format/)).toBeInTheDocument();
+      });
+
+      // Clean up pending fetch to avoid act warnings
+      await act(async () => {
+        resolveFetch(
+          new Response(JSON.stringify({ digitalFormat: { id: TEST_FORMAT_ID, files: [] } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      });
+    });
+
+    it('shows missing status when fetch throws a network error', async () => {
+      mockFetch.mockRejectedValue(new Error('Network failure'));
+
       render(<FeaturedArtistForm />);
 
-      // watchedReleaseId starts as '' which becomes undefined via || undefined
-      expect(capturedTrackSelectReleaseId).toBeUndefined();
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/No MP3 320kbps format found/)).toBeInTheDocument();
+      });
+    });
+
+    it('displays singular file text for a single file format', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            digitalFormat: {
+              id: TEST_FORMAT_ID,
+              files: [{ id: 'file-1' }],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      render(<FeaturedArtistForm />);
+
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/1 file\b/)).toBeInTheDocument();
+      });
     });
   });
 
@@ -348,7 +343,6 @@ describe('FeaturedArtistForm', () => {
     it('does not render form fields while loading', () => {
       render(<FeaturedArtistForm featuredArtistId="existing-id-123" />);
 
-      expect(screen.queryByTestId('track-select-trackId')).not.toBeInTheDocument();
       expect(screen.queryByTestId('release-select-releaseId')).not.toBeInTheDocument();
     });
   });

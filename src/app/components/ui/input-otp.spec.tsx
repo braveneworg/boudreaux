@@ -224,6 +224,7 @@ describe('Full InputOTP Integration', () => {
 describe('InputOTPSlot with fake caret', () => {
   it('renders fake caret when slot has focus', async () => {
     const { container } = render(
+      // eslint-disable-next-line jsx-a11y/no-autofocus
       <InputOTP maxLength={4} autoFocus>
         <InputOTPGroup>
           <InputOTPSlot index={0} />

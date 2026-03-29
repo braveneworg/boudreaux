@@ -74,7 +74,7 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
         console.info(
           `[artist-detail] ${slug}: release "${ar.release.title}" — ` +
             `publishedAt=${ar.release.publishedAt}, deletedOn=${ar.release.deletedOn}, ` +
-            `releaseTracks=${ar.release.releaseTracks.length}`
+            `mp3Files=${ar.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files.length ?? 0}`
         );
       }
     }
@@ -85,7 +85,9 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
     ...artist,
     releases: artist.releases
       .filter(
-        (ar: ArtistWithPublishedReleases['releases'][number]) => ar.release.releaseTracks.length > 0
+        (ar: ArtistWithPublishedReleases['releases'][number]) =>
+          (ar.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files
+            .length ?? 0) > 0
       )
       .sort(
         (

@@ -66,7 +66,6 @@ describe('TourService', () => {
             id: 'th-1',
             tourDateId: 'td-1',
             artistId: 'artist-1',
-            groupId: null,
             sortOrder: 0,
             createdAt: new Date('2026-03-01'),
             artist: {
@@ -112,35 +111,6 @@ describe('TourService', () => {
               instruments: null,
               featuredArtistId: null,
               trackId: null,
-              groups: [],
-            },
-            group: null,
-          },
-          {
-            id: 'th-2',
-            tourDateId: 'td-1',
-            artistId: null,
-            groupId: 'group-1',
-            sortOrder: 1,
-            createdAt: new Date('2026-03-01'),
-            artist: null,
-            group: {
-              id: 'group-1',
-              name: 'The Amazing Band',
-              slug: 'the-amazing-band',
-              bio: null,
-              genres: null,
-              formedOn: null,
-              disbandedOn: null,
-              createdAt: new Date('2026-03-01'),
-              createdBy: null,
-              updatedAt: null,
-              updatedBy: null,
-              deletedOn: null,
-              deletedBy: null,
-              notes: [],
-              tags: null,
-              isActive: true,
             },
           },
         ],
@@ -161,7 +131,7 @@ describe('TourService', () => {
       const result = await TourService.findAll();
 
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].displayHeadliners).toEqual(['JDoe', 'The Amazing Band']);
+      expect(result.data[0].displayHeadliners).toEqual(['JDoe']);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(100);
@@ -318,7 +288,7 @@ describe('TourService', () => {
       const result = await TourService.findById('tour-123');
 
       expect(result).toBeTruthy();
-      expect(result?.displayHeadliners).toEqual(['JDoe', 'The Amazing Band']);
+      expect(result?.displayHeadliners).toEqual(['JDoe']);
     });
 
     it('should return null when tour not found', async () => {
@@ -465,7 +435,6 @@ describe('TourService', () => {
           firstName: 'Paul',
           surname: 'Hewson',
         },
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
@@ -480,7 +449,6 @@ describe('TourService', () => {
           firstName: 'John',
           surname: 'Doe',
         },
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
@@ -495,7 +463,6 @@ describe('TourService', () => {
           firstName: 'Prince',
           surname: null,
         },
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
@@ -510,7 +477,6 @@ describe('TourService', () => {
           firstName: null,
           surname: 'Cher',
         },
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
@@ -525,7 +491,6 @@ describe('TourService', () => {
           firstName: null,
           surname: null,
         },
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
@@ -533,23 +498,9 @@ describe('TourService', () => {
       expect(result).toBe('Unknown Artist');
     });
 
-    it('should use group name for group headliners', () => {
+    it('should fallback to "Unknown Artist" when artist is null', () => {
       const headliner = {
         artist: null,
-        group: {
-          name: 'U2',
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBe('U2');
-    });
-
-    it('should fallback to "Unknown Artist" when both artist and group null', () => {
-      const headliner = {
-        artist: null,
-        group: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);

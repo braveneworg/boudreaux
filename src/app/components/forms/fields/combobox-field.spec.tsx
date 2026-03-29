@@ -11,6 +11,9 @@ import ComboboxField from './combobox-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 
+// Allow tests to control the initial field value
+let comboboxFieldInitialValue = '';
+
 // Mock the UI components
 vi.mock('@/app/components/ui/form', () => ({
   FormField: ({
@@ -21,7 +24,7 @@ vi.mock('@/app/components/ui/form', () => ({
     render: (context: Record<string, unknown>) => React.ReactNode;
   }) => {
     const field = {
-      value: '',
+      value: comboboxFieldInitialValue,
       onChange: vi.fn(),
       onBlur: vi.fn(),
       name,
@@ -72,6 +75,13 @@ vi.mock('@/app/components/ui/popover', () => ({
         style={{ display: 'none' }}
       >
         Close
+      </button>
+      <button
+        data-testid="open-popover-trigger"
+        onClick={() => onOpenChange?.(true)}
+        style={{ display: 'none' }}
+      >
+        Open
       </button>
     </div>
   ),
@@ -167,9 +177,16 @@ vi.mock('@/app/components/ui/command', () => {
       onSelect?: (value?: string) => void;
       value?: string;
     }) => (
-      <button data-testid="command-item" data-value={value} onClick={() => onSelect?.(value)}>
-        {children}
-      </button>
+      <>
+        <button data-testid="command-item" data-value={value} onClick={() => onSelect?.(value)}>
+          {children}
+        </button>
+        <button
+          data-testid={`bad-select-${value}`}
+          onClick={() => onSelect?.('__nonexistent_value__')}
+          style={{ display: 'none' }}
+        />
+      </>
     ),
     CommandList: ({ children }: { children: React.ReactNode }) => (
       <div data-testid="command-list">{children}</div>
@@ -221,6 +238,7 @@ describe('ComboboxField', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    comboboxFieldInitialValue = '';
   });
 
   it('renders with correct label and placeholder', () => {
@@ -887,5 +905,106 @@ describe('ComboboxField', () => {
         expect(commandInput).toHaveValue('-');
       });
     });
+  });
+
+  it('shows nothing for label when field.value is set but option is not found', () => {
+    // Set field value to something that does not match any option
+    comboboxFieldInitialValue = 'nonexistent-value';
+
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} />
+      </TestWrapper>
+    );
+
+    const trigger = screen.getByTestId('combobox-trigger');
+    // field.value is truthy but options.find() returns undefined,
+    // so ?.label evaluates to undefined (rendered as nothing)
+    expect(trigger).not.toHaveTextContent('Select an option...');
+  });
+
+  it('does not clear search value when popover opens via onOpenChange', async () => {
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} />
+      </TestWrapper>
+    );
+
+    const trigger = screen.getByTestId('combobox-trigger');
+    const commandInput = screen.getByTestId('command-input');
+
+    // Type to set search value and open popover
+    fireEvent.keyDown(trigger, { key: 'a' });
+    await waitFor(() => {
+      expect(commandInput).toHaveValue('a');
+    });
+
+    // Trigger onOpenChange(true) — opening should NOT clear search value
+    const openButton = screen.getByTestId('open-popover-trigger');
+    fireEvent.click(openButton);
+
+    // Search value should remain 'a' since !newOpen is false
+    expect(commandInput).toHaveValue('a');
+  });
+
+  it('updates search value without closing popover when typing non-empty text in command input', async () => {
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} />
+      </TestWrapper>
+    );
+
+    const trigger = screen.getByTestId('combobox-trigger');
+    const popover = screen.getByTestId('popover');
+    const commandInput = screen.getByTestId('command-input');
+
+    // Open popover first
+    fireEvent.keyDown(trigger, { key: 'a' });
+    await waitFor(() => {
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+
+    // Type non-empty text into the command input to trigger handleValueChange with non-empty value
+    fireEvent.change(commandInput, { target: { value: 'test' } });
+
+    // Popover should remain open and search value should be updated
+    await waitFor(() => {
+      expect(commandInput).toHaveValue('test');
+      expect(popover).toHaveAttribute('data-open', 'true');
+    });
+  });
+
+  it('does not call setValue or field.onChange when selected option is not found', () => {
+    const setValue = vi.fn();
+
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} setValue={setValue} />
+      </TestWrapper>
+    );
+
+    // Click the bad-select trigger to simulate onSelect with a non-matching value
+    const badSelectTrigger = screen.getByTestId('bad-select-option 1');
+    fireEvent.click(badSelectTrigger);
+
+    // setValue should NOT have been called since selectedOption was undefined
+    expect(setValue).not.toHaveBeenCalled();
+  });
+
+  it('shows opacity-100 check icon when field value matches an option', () => {
+    comboboxFieldInitialValue = 'option1';
+
+    render(
+      <TestWrapper>
+        <ComboboxField {...defaultProps} />
+      </TestWrapper>
+    );
+
+    const checkIcons = screen.getAllByTestId('check-icon');
+    // First option (value='option1') should have opacity-100 since it matches field.value
+    expect(checkIcons[0]).toHaveClass('opacity-100');
+    // Other options should have opacity-0
+    expect(checkIcons[1]).toHaveClass('opacity-0');
+    expect(checkIcons[2]).toHaveClass('opacity-0');
   });
 });

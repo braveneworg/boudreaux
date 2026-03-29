@@ -4,10 +4,8 @@
 import {
   updateArtistSchema,
   updateFeaturedArtistSchema,
-  updateGroupSchema,
   updateNotificationBannerSchema,
   updateReleaseSchema,
-  updateTrackSchema,
 } from './update-schemas';
 
 const validObjectId = '507f1f77bcf86cd799439011';
@@ -60,42 +58,6 @@ describe('update-schemas', () => {
     });
   });
 
-  describe('updateTrackSchema', () => {
-    it('should accept an empty object', () => {
-      const result = updateTrackSchema.safeParse({});
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept a single field update', () => {
-      const result = updateTrackSchema.safeParse({ title: 'New Track Title' });
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate duration constraints', () => {
-      expect(updateTrackSchema.safeParse({ duration: 0 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ duration: 86401 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ duration: 180 }).success).toBe(true);
-    });
-
-    it('should validate audioUrl as valid URL', () => {
-      expect(updateTrackSchema.safeParse({ audioUrl: 'not-a-url' }).success).toBe(false);
-      expect(
-        updateTrackSchema.safeParse({ audioUrl: 'https://example.com/audio.mp3' }).success
-      ).toBe(true);
-    });
-
-    it('should validate position as non-negative integer', () => {
-      expect(updateTrackSchema.safeParse({ position: -1 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ position: 1.5 }).success).toBe(false);
-      expect(updateTrackSchema.safeParse({ position: 0 }).success).toBe(true);
-    });
-
-    it('should reject title exceeding max length', () => {
-      const result = updateTrackSchema.safeParse({ title: 'x'.repeat(201) });
-      expect(result.success).toBe(false);
-    });
-  });
-
   describe('updateFeaturedArtistSchema', () => {
     it('should accept an empty object', () => {
       const result = updateFeaturedArtistSchema.safeParse({});
@@ -112,41 +74,18 @@ describe('update-schemas', () => {
       expect(updateFeaturedArtistSchema.safeParse({ position: 0 }).success).toBe(true);
     });
 
-    it('should validate trackId as ObjectId', () => {
-      expect(updateFeaturedArtistSchema.safeParse({ trackId: 'not-valid' }).success).toBe(false);
-      expect(updateFeaturedArtistSchema.safeParse({ trackId: validObjectId }).success).toBe(true);
+    it('should validate digitalFormatId as ObjectId', () => {
+      expect(updateFeaturedArtistSchema.safeParse({ digitalFormatId: 'not-valid' }).success).toBe(
+        false
+      );
+      expect(updateFeaturedArtistSchema.safeParse({ digitalFormatId: validObjectId }).success).toBe(
+        true
+      );
     });
 
     it('should reject description exceeding max length', () => {
       const result = updateFeaturedArtistSchema.safeParse({ description: 'x'.repeat(2001) });
       expect(result.success).toBe(false);
-    });
-  });
-
-  describe('updateGroupSchema', () => {
-    it('should accept an empty object', () => {
-      const result = updateGroupSchema.safeParse({});
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept a single field update', () => {
-      const result = updateGroupSchema.safeParse({ name: 'Updated Group' });
-      expect(result.success).toBe(true);
-    });
-
-    it('should reject name exceeding max length', () => {
-      const result = updateGroupSchema.safeParse({ name: 'x'.repeat(201) });
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject bio exceeding max length', () => {
-      const result = updateGroupSchema.safeParse({ bio: 'x'.repeat(5001) });
-      expect(result.success).toBe(false);
-    });
-
-    it('should accept valid createdBy ObjectId', () => {
-      const result = updateGroupSchema.safeParse({ createdBy: validObjectId });
-      expect(result.success).toBe(true);
     });
   });
 
@@ -178,8 +117,8 @@ describe('update-schemas', () => {
       expect(updateReleaseSchema.safeParse({ artistIds: [validObjectId] }).success).toBe(true);
     });
 
-    it('should not require artistIds or groupIds (refinement stripped on partial)', () => {
-      const result = updateReleaseSchema.safeParse({ title: 'No artists or groups' });
+    it('should not require artistIds (refinement stripped on partial)', () => {
+      const result = updateReleaseSchema.safeParse({ title: 'No artists' });
       expect(result.success).toBe(true);
     });
 

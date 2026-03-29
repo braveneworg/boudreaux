@@ -10,6 +10,7 @@ import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 import { prisma } from '../prisma';
 import { ReleaseService } from '../services/release-service';
@@ -23,17 +24,25 @@ export const createReleaseAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
+  // Read the pre-generated ObjectId set by the client before calling getActionState,
+  // since getActionState strips fields not in permittedFieldNames.
+  const rawPreGeneratedId = payload.get('preGeneratedId');
+  const preGeneratedId =
+    typeof rawPreGeneratedId === 'string' && isValidObjectId(rawPreGeneratedId)
+      ? rawPreGeneratedId
+      : undefined;
+
   const permittedFieldNames = [
     'title',
     'releasedOn',
     'coverArt',
     'formats',
     'artistIds',
-    'groupIds',
     'labels',
     'catalogNumber',
     'description',
     'publishedAt',
+    'suggestedPrice',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
 
@@ -45,10 +54,10 @@ export const createReleaseAction = async (
         coverArt,
         formats,
         artistIds,
-        groupIds,
         labels,
         catalogNumber,
         description,
+        suggestedPrice,
       } = parsed.data;
 
       // Parse labels from comma-separated string to array
@@ -59,8 +68,15 @@ export const createReleaseAction = async (
             .filter(Boolean)
         : [];
 
+      // Convert dollar string to cents integer
+      const suggestedPriceCents =
+        suggestedPrice && suggestedPrice !== ''
+          ? Math.round(parseFloat(suggestedPrice) * 100)
+          : undefined;
+
       // Create release in database
       const response = await ReleaseService.createRelease({
+        ...(preGeneratedId !== undefined ? { id: preGeneratedId } : {}),
         title,
         releasedOn: new Date(releasedOn),
         coverArt,
@@ -68,6 +84,7 @@ export const createReleaseAction = async (
         labels: labelsArray,
         catalogNumber: catalogNumber || undefined,
         description: description || undefined,
+        suggestedPrice: suggestedPriceCents,
       });
 
       // Create ArtistRelease associations if release was created and artistIds provided
@@ -77,9 +94,6 @@ export const createReleaseAction = async (
           data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
         });
       }
-
-      // groupIds is validated but not persisted (no GroupRelease model in schema yet)
-      void groupIds;
 
       // Log release creation for security audit
       logSecurityEvent({

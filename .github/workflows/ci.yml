@@ -11,12 +11,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Tests & Quality
+  # ── Lint & type-check ─────────────────────────────────────────────────────
+  # Fast quality gate (~2–3 min). Tests only run after this passes, so a lint
+  # failure cancels the shard jobs immediately without burning CI minutes.
+  quality:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,10 +32,79 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm exec tsc --noEmit
 
-      - name: Run tests with coverage
-        run: pnpm run test:coverage:check
+  # ── Unit tests (sharded) ───────────────────────────────────────────────────
+  # The 310-file suite is split into two parallel jobs. Each shard runs with
+  # the vmThreads pool (≈3× faster than forks) and stores its results plus
+  # coverage data in a Vitest blob artifact for the merge step.
+  test:
+    name: Unit Tests (Shard ${{ matrix.shard }}/2)
+    needs: [quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      - name: Run tests (shard ${{ matrix.shard }}/2)
+        run: pnpm run test:shard -- --shard=${{ matrix.shard }}/2
         env:
           CI: true
+
+      - name: Rename blob for unique artifact naming
+        if: always()
+        run: |
+          if [ -f .vitest-reports/blob.json ]; then
+            mv .vitest-reports/blob.json .vitest-reports/blob-${{ matrix.shard }}.json
+          fi
+
+      - name: Upload blob report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports/blob-${{ matrix.shard }}.json
+          retention-days: 1
+          if-no-files-found: warn
+
+  # ── Merge shards → coverage ────────────────────────────────────────────────
+  # Combines both blobs into a single coverage report, runs the regression
+  # check, posts the PR comment, and updates badges on main.
+  coverage:
+    name: Coverage & Regression Check
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge reports and generate coverage
+        run: pnpm run test:merge
+        env:
+          CI: true
+
+      - name: Check coverage regression
+        run: pnpm exec tsx scripts/check-coverage-regression.ts
 
       - name: Vitest Coverage Report
         if: github.event_name == 'pull_request'
@@ -106,6 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIST_TOKEN }}
 
+  # ── Next.js build ──────────────────────────────────────────────────────────
   build:
     name: Build Next.js app
     runs-on: ubuntu-latest
@@ -160,10 +232,19 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # ── E2E tests (sharded) ────────────────────────────────────────────────────
+  # The E2E suite is split across 3 parallel runners. Each shard runs its own
+  # MongoDB replica set, builds Next.js, and executes a subset of test files.
+  # Blob reports are uploaded for the merge step.
   e2e:
-    name: E2E Tests
+    name: E2E Tests (Shard ${{ matrix.shardIndex }}/3)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3]
+        shardTotal: [3]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -193,8 +274,38 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      - name: Run E2E Tests
-        run: pnpm run e2e
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-e2e-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
+          restore-keys: |
+            ${{ runner.os }}-next-e2e-cache-
+
+      - name: Build Next.js for E2E
+        env:
+          SKIP_ENV_VALIDATION: "true"
+          SKIP_CDN_ASSET_PREFIX: "true"
+          DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e?directConnection=true"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x00000000000000000000AA"
+          NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: "1x00000000000000000000AA"
+          NEXT_PUBLIC_BANNER_INTERVAL: "1000"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_STRIPE_PRICE_MINIMUM: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
+          NODE_ENV: "production"
+          AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
+          AUTH_URL: "http://localhost:3000"
+        run: pnpm exec next build --webpack
+
+      - name: Prepare standalone server assets
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d "public" ]; then cp -r public .next/standalone/public; fi
+
+      - name: Run E2E Tests (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+        run: pnpm run e2e --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
         env:
           CI: true
           DATABASE_URL: "mongodb://localhost:27018/boudreaux-e2e?directConnection=true"
@@ -204,19 +315,51 @@ jobs:
           SKIP_ENV_VALIDATION: "true"
           NODE_ENV: "test"
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"
+          PLAYWRIGHT_TEST_OUTPUT: "/tmp/playwright-results"
 
-      - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
+      - name: Upload blob report
         if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: e2e/playwright-report/
-          retention-days: 14
+          name: e2e-blob-report-${{ matrix.shardIndex }}
+          path: blob-report/
+          retention-days: 1
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-results
-          path: e2e/test-results/
+          name: e2e-results-${{ matrix.shardIndex }}
+          path: /tmp/playwright-results/
           retention-days: 7
+
+  # ── Merge E2E reports ─────────────────────────────────────────────────────
+  # Combines blob reports from all shards into a single HTML report.
+  e2e-report:
+    name: Merge E2E Reports
+    if: ${{ !cancelled() }}
+    needs: [e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: e2e-blob-report-*
+          merge-multiple: true
+
+      - name: Merge into HTML report
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

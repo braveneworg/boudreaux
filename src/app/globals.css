@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Special+Elite&display=swap');
 @import 'tw-animate-css';
 @import 'tailwindcss';
 
@@ -11,6 +12,10 @@
 @theme {
   --color-rebecca-purple: #639;
   --animate-spin-slow: rotate(360deg) 1.5s linear infinite;
+  --font-typewriter: 'Special Elite', system-ui, serif;
+  --font-mono: 'Courier Prime', monospace;
+  --color-punk-pink: #ff007f;
+  --color-punk-black: #0a0a0a;
 }
 
 @theme inline {
@@ -94,10 +99,11 @@
   }
   html {
     height: 100%;
+    font-family: 'Courier Prime', 'Courier New', Courier, monospace, system, serif !important;
   }
+
   body {
-    @apply bg-background text-foreground;
-    min-height: 100%;
+    @apply bg-background text-foreground min-h-dvh;
   }
   input,
   textarea,
@@ -111,11 +117,9 @@
   h4,
   h5,
   h6 {
-    font-family:
-      Courier New,
-      Courier,
-      system,
-      serif;
+    /* @apply bg-punk-black text-white font-mono selection:bg-punk-pink selection:text-white;   */
+    /* background-image: url("https://www.transparenttextures.com/patterns/dark-matter.png"); */
+
     text-transform: lowercase;
     overflow-wrap: break-word; /* Standard and preferred */
     word-wrap: break-word; /* Legacy name for browser compatibility */

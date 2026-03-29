@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Share2Icon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,20 +40,18 @@ export const ArtistReleaseInfo = ({
   featuredArtists = [],
   setSelectedArtist,
 }: ArtistReleaseInfoProps) => {
-  const [artistUrl, setArtistUrl] = useState<string>(
-    process.env.NEXT_PUBLIC_HOST_NAME || 'https://fakefourrecords.com'
-  );
+  const baseUrl = process.env.NEXT_PUBLIC_HOST_NAME ?? 'https://fakefourrecords.com';
+
+  const artistUrl = useMemo(() => {
+    const artistSlug = selectedArtist?.artists?.[0]?.slug;
+    return artistSlug ? `${baseUrl}/artists/${artistSlug}` : baseUrl;
+  }, [baseUrl, selectedArtist]);
+
   const handleShare2IconClick = useCallback(() => {
     if (!selectedArtist) {
       featuredArtists.length > 0 && setSelectedArtist?.(featuredArtists.slice(1, 2)[0]);
       return;
     }
-
-    const artistSlug = selectedArtist.artists?.[0]?.slug;
-    const artistUrl = artistSlug
-      ? `${process.env.NEXT_PUBLIC_HOST_NAME}/artists/${artistSlug}`
-      : `${process.env.NEXT_PUBLIC_HOST_NAME}`;
-    setArtistUrl(artistUrl);
 
     const shareData = {
       title: selectedArtist.release?.title || getDisplayName(selectedArtist),
@@ -79,7 +77,7 @@ export const ArtistReleaseInfo = ({
         })
         .catch(() => toast.error('Failed to copy link to clipboard'));
     }
-  }, [featuredArtists, selectedArtist, setSelectedArtist]);
+  }, [artistUrl, featuredArtists, selectedArtist, setSelectedArtist]);
   return (
     <>
       <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">

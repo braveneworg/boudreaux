@@ -88,7 +88,19 @@ describe('Home Page', () => {
           displayName: 'Test Artist',
           coverArt: 'https://example.com/cover.jpg',
           artists: [{ id: 'a1', displayName: 'Artist One' }],
-          track: { id: 't1', title: 'Test Track', audioUrl: 'https://example.com/audio.mp3' },
+          digitalFormat: {
+            id: 'df1',
+            files: [
+              {
+                id: 'f1',
+                trackNumber: 1,
+                title: 'Test Track',
+                fileName: 'test.mp3',
+                s3Key: 'audio/test.mp3',
+                duration: 180,
+              },
+            ],
+          },
         },
       ],
     });

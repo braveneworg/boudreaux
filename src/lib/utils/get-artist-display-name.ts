@@ -1,9 +1,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { Artist } from '@/lib/types/media-models';
+interface ArtistNameFields {
+  displayName: string | null;
+  firstName: string;
+  middleName: string | null;
+  surname: string;
+  title: string | null;
+  suffix: string | null;
+}
 
-export const getArtistDisplayName = (artist: Artist) => {
+export const getArtistDisplayName = (artist: ArtistNameFields) => {
   // prefer displayName, otherwise construct from name parts
   const { displayName, firstName, middleName, surname, title, suffix } = artist;
 

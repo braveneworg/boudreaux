@@ -40,7 +40,6 @@ export const updateReleaseAction = async (
     'coverArt',
     'formats',
     'artistIds',
-    'groupIds',
     'labels',
     'catalogNumber',
     'description',
@@ -58,6 +57,7 @@ export const updateReleaseAction = async (
     'featuredOn',
     'featuredUntil',
     'featuredDescription',
+    'suggestedPrice',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
 
@@ -85,7 +85,6 @@ export const updateReleaseAction = async (
       coverArt,
       formats,
       artistIds,
-      groupIds,
       labels,
       catalogNumber,
       description,
@@ -103,6 +102,7 @@ export const updateReleaseAction = async (
       featuredOn,
       featuredUntil,
       featuredDescription,
+      suggestedPrice,
     } = parsed.data;
 
     // Parse comma-separated strings to arrays
@@ -113,6 +113,9 @@ export const updateReleaseAction = async (
             .map((v) => v.trim())
             .filter(Boolean)
         : [];
+
+    const suggestedPriceCents =
+      suggestedPrice && suggestedPrice !== '' ? Math.round(parseFloat(suggestedPrice) * 100) : null;
 
     // Update release in database
     const response = await ReleaseService.updateRelease(releaseId, {
@@ -137,6 +140,7 @@ export const updateReleaseAction = async (
       featuredOn: featuredOn ? new Date(featuredOn) : undefined,
       featuredUntil: featuredUntil ? new Date(featuredUntil) : undefined,
       featuredDescription: featuredDescription || undefined,
+      suggestedPrice: suggestedPriceCents,
     });
 
     // Sync ArtistRelease associations if artistIds provided
@@ -175,9 +179,6 @@ export const updateReleaseAction = async (
       }
       await Promise.all(ops);
     }
-
-    // groupIds is validated but not persisted (no GroupRelease model in schema yet)
-    void groupIds;
 
     // Log release update for security audit
     logSecurityEvent({

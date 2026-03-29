@@ -13,15 +13,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface TourDetailProps {
   tour: Tour & {
@@ -30,8 +22,7 @@ export interface TourDetailProps {
         venue: Venue;
         headliners: Array<
           TourDateHeadliner & {
-            artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-            group: Group | null;
+            artist: Artist | null;
           }
         >;
       }
@@ -51,16 +42,9 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 
-  const getHeadlinerDisplayName = (headliner: {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
-  }) => {
+  const getHeadlinerDisplayName = (headliner: { artist: Artist | null }) => {
     if (headliner.artist?.displayName) {
       return headliner.artist.displayName;
-    }
-
-    if (headliner.group?.name) {
-      return headliner.group.name;
     }
 
     if (headliner.artist) {

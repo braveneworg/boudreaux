@@ -36,9 +36,8 @@ export const createFeaturedArtistAction = async (
     'coverArt',
     'position',
     'featuredOn',
-    'trackId',
+    'digitalFormatId',
     'releaseId',
-    'groupId',
   ];
 
   // FormData sends all values as strings, so use z.coerce.number() for position
@@ -72,16 +71,8 @@ export const createFeaturedArtistAction = async (
   }
 
   try {
-    const {
-      displayName,
-      description,
-      coverArt,
-      position,
-      featuredOn,
-      trackId,
-      releaseId,
-      groupId,
-    } = baseParsed.data;
+    const { displayName, description, coverArt, position, featuredOn, digitalFormatId, releaseId } =
+      baseParsed.data;
 
     // Build Prisma create input
     const createData = {
@@ -93,9 +84,8 @@ export const createFeaturedArtistAction = async (
       artists: {
         connect: artistIds.map((id) => ({ id })),
       },
-      ...(trackId && { track: { connect: { id: trackId } } }),
+      ...(digitalFormatId && { digitalFormat: { connect: { id: digitalFormatId } } }),
       ...(releaseId && { release: { connect: { id: releaseId } } }),
-      ...(groupId && { group: { connect: { id: groupId } } }),
     };
 
     // Create featured artist in database

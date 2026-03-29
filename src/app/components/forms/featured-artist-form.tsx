@@ -3,20 +3,19 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
-import GroupSelect from '@/app/components/forms/fields/group-select';
 import ReleaseSelect, { type ReleaseOption } from '@/app/components/forms/fields/release-select';
-import TrackSelect, { type TrackOption } from '@/app/components/forms/fields/track-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -79,8 +78,6 @@ export default function FeaturedArtistForm({
   const router = useRouter();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
-  const previousReleaseIdRef = useRef<string | undefined>(undefined);
-  const releaseSetByTrackRef = useRef(false);
 
   const form = useForm<FeaturedArtistFormData>({
     resolver: zodResolver(createFeaturedArtistSchema),
@@ -90,15 +87,18 @@ export default function FeaturedArtistForm({
       coverArt: '',
       position: 0,
       featuredOn: new Date().toISOString().split('T')[0],
-      trackId: '',
+      digitalFormatId: '',
       releaseId: '',
-      groupId: '',
     },
   });
   const { control, setValue } = form;
   const watchedReleaseId = useWatch({ control, name: 'releaseId' }) as string | undefined;
   const [derivedArtistIds, setDerivedArtistIds] = useState<string[]>([]);
   const [derivedArtistNames, setDerivedArtistNames] = useState<string[]>([]);
+  const [formatStatus, setFormatStatus] = useState<'idle' | 'loading' | 'found' | 'missing'>(
+    'idle'
+  );
+  const [formatFileCount, setFormatFileCount] = useState(0);
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -131,10 +131,14 @@ export default function FeaturedArtistForm({
           coverArt: featuredArtist.coverArt || '',
           position: featuredArtist.position ?? 0,
           featuredOn: formatDate(featuredArtist.featuredOn),
-          trackId: featuredArtist.trackId || '',
+          digitalFormatId: featuredArtist.digitalFormatId || '',
           releaseId: featuredArtist.releaseId || '',
-          groupId: featuredArtist.groupId || '',
         });
+
+        // Set format status if editing an existing entry
+        if (featuredArtist.digitalFormatId) {
+          setFormatStatus('found');
+        }
 
         // Populate derived artist data for display and CoverArtField
         const ids = featuredArtist.artists?.map((a: { id: string }) => a.id) || [];
@@ -169,74 +173,66 @@ export default function FeaturedArtistForm({
     }
   }, [formState.errors, form]);
 
-  // Clear trackId when releaseId changes to prevent inconsistent associations.
-  // Skip if the releaseId change was triggered by selecting a track (handleTrackChange),
-  // since in that case we want to keep the track the user just chose.
-  useEffect(() => {
-    // Skip on initial render (when previousReleaseIdRef is undefined)
-    if (previousReleaseIdRef.current === undefined) {
-      previousReleaseIdRef.current = watchedReleaseId;
-      return;
-    }
+  // Fetch the MP3_320KBPS digital format for a given release and auto-set digitalFormatId
+  const fetchDigitalFormat = useCallback(
+    async (releaseId: string) => {
+      setFormatStatus('loading');
+      setFormatFileCount(0);
+      setValue('digitalFormatId', '');
 
-    // Skip if loading featured artist data (form is being populated)
-    if (isLoadingFeaturedArtist) {
-      return;
-    }
+      try {
+        const response = await fetch(
+          `/api/releases/${releaseId}/digital-formats?formatType=MP3_320KBPS`
+        );
 
-    // If releaseId changed, clear trackId only when the user changed the release directly
-    if (previousReleaseIdRef.current !== watchedReleaseId) {
-      if (releaseSetByTrackRef.current) {
-        // Release was set by handleTrackChange — keep the track
-        releaseSetByTrackRef.current = false;
-      } else {
-        setValue('trackId', '');
+        if (!response.ok) {
+          setFormatStatus('missing');
+          form.setError('digitalFormatId', {
+            type: 'manual',
+            message:
+              'Selected release has no MP3 320kbps format. Please upload format files first.',
+          });
+          return;
+        }
+
+        const { digitalFormat } = await response.json();
+        setValue('digitalFormatId', digitalFormat.id, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        setFormatStatus('found');
+        setFormatFileCount(digitalFormat.files?.length ?? 0);
+        form.clearErrors('digitalFormatId');
+      } catch {
+        setFormatStatus('missing');
+        form.setError('digitalFormatId', {
+          type: 'manual',
+          message: 'Failed to check digital format availability.',
+        });
       }
-      previousReleaseIdRef.current = watchedReleaseId;
+    },
+    [setValue, form]
+  );
+
+  // When releaseId changes (and not during initial load), fetch the digital format
+  useEffect(() => {
+    if (isLoadingFeaturedArtist) return;
+
+    if (watchedReleaseId) {
+      fetchDigitalFormat(watchedReleaseId);
+    } else {
+      setFormatStatus('idle');
+      setFormatFileCount(0);
+      setValue('digitalFormatId', '');
     }
-  }, [watchedReleaseId, setValue, isLoadingFeaturedArtist]);
+  }, [watchedReleaseId, fetchDigitalFormat, setValue, isLoadingFeaturedArtist]);
 
   const handleDateSelect = (dateString: string, _fieldName: string) => {
     const dateOnly = dateString.split('T')[0];
     setValue('featuredOn', dateOnly);
   };
 
-  const handleTrackChange = (track: TrackOption | null) => {
-    const release = track?.releaseTracks?.[0]?.release;
-    const releaseId = release?.id ?? '';
-    // Flag that this releaseId change originated from a track selection,
-    // so the useEffect above does not clear the trackId the user just chose.
-    releaseSetByTrackRef.current = true;
-    setValue('releaseId', releaseId, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-
-    // Derive artistIds from track-level artists first, then fall back to
-    // release-level artists (tracks often lack TrackArtist entries).
-    if (track?.artists && track.artists.length > 0) {
-      const ids = track.artists.map((a) => a.artist.id);
-      const names = track.artists.map((a) => a.artist.displayName).filter((n): n is string => !!n);
-      setDerivedArtistIds(ids);
-      setDerivedArtistNames(names);
-    } else if (release?.artistReleases && release.artistReleases.length > 0) {
-      const ids = release.artistReleases.map((ar) => ar.artist.id);
-      const names = release.artistReleases
-        .map((ar) => ar.artist.displayName)
-        .filter((n): n is string => !!n);
-      setDerivedArtistIds(ids);
-      setDerivedArtistNames(names);
-    } else if (!track) {
-      setDerivedArtistIds([]);
-      setDerivedArtistNames([]);
-    }
-  };
-
   const handleReleaseChange = (release: ReleaseOption | null) => {
-    // Only derive artists from release when it's a direct user selection
-    // (not triggered by track selection, which handles its own artist derivation)
-    if (releaseSetByTrackRef.current) return;
-
     if (release?.artistReleases && release.artistReleases.length > 0) {
       const ids = release.artistReleases.map((ar) => ar.artist.id);
       const names = release.artistReleases
@@ -263,8 +259,8 @@ export default function FeaturedArtistForm({
     }
 
     // Build FormData from React Hook Form state instead of the DOM.
-    // Custom select components (TrackSelect, ReleaseSelect, GroupSelect)
-    // and DatePicker don't render <input> elements with name attributes,
+    // Custom select components (ReleaseSelect) and DatePicker
+    // don't render <input> elements with name attributes,
     // so new FormData(formRef) would miss their values.
     const values = form.getValues();
     const formData = new FormData();
@@ -349,29 +345,41 @@ export default function FeaturedArtistForm({
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Media Associations</h3>
                 <p className="text-sm text-muted-foreground">
-                  Associate this featured artist with a track and release. Optionally associate with
-                  a group. Artists are automatically derived from the selected track or release.
+                  Associate this featured artist with a release. The MP3 320kbps digital format is
+                  automatically used for audio playback.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <TrackSelect
-                    control={control}
-                    name="trackId"
-                    label="Track"
-                    placeholder="Select a track..."
-                    setValue={setValue}
-                    onTrackChange={handleTrackChange}
-                    releaseId={watchedReleaseId || undefined}
-                  />
+                  <div className="space-y-2">
+                    <ReleaseSelect
+                      control={control}
+                      name="releaseId"
+                      label="Release"
+                      placeholder="Select a release..."
+                      setValue={setValue}
+                      onReleaseChange={handleReleaseChange}
+                    />
 
-                  <ReleaseSelect
-                    control={control}
-                    name="releaseId"
-                    label="Release"
-                    placeholder="Select a release..."
-                    setValue={setValue}
-                    onReleaseChange={handleReleaseChange}
-                  />
+                    {/* Digital format status indicator */}
+                    {formatStatus === 'loading' && (
+                      <p className="text-sm text-muted-foreground">
+                        Checking for MP3 320kbps format...
+                      </p>
+                    )}
+                    {formatStatus === 'found' && (
+                      <p className="flex items-center gap-1.5 text-sm text-green-600">
+                        <CheckCircle2 className="h-4 w-4" />
+                        MP3 320kbps format available ({formatFileCount}{' '}
+                        {formatFileCount === 1 ? 'file' : 'files'})
+                      </p>
+                    )}
+                    {formatStatus === 'missing' && (
+                      <p className="flex items-center gap-1.5 text-sm text-destructive">
+                        <XCircle className="h-4 w-4" />
+                        No MP3 320kbps format found. Please upload format files first.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Derived artists indicator */}
@@ -380,14 +388,6 @@ export default function FeaturedArtistForm({
                     Associated artists: {derivedArtistNames.join(', ')}
                   </p>
                 )}
-
-                <GroupSelect
-                  control={control}
-                  name="groupId"
-                  label="Group (Optional)"
-                  placeholder="Select a group..."
-                  setValue={setValue}
-                />
 
                 <Separator />
 

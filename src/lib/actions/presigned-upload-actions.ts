@@ -35,7 +35,7 @@ const getS3Client = () => {
  * Generate a unique file key for S3
  */
 const generateS3Key = (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   fileName: string
 ): string => {
@@ -162,7 +162,7 @@ const validateFile = (
  * This allows clients to upload directly to S3, bypassing Next.js server body size limits
  */
 export const getPresignedUploadUrlsAction = async (
-  entityType: 'artists' | 'groups' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
+  entityType: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists',
   entityId: string,
   files: PresignedUrlRequest[]
 ): Promise<PresignedUrlActionResult> => {
@@ -177,18 +177,12 @@ export const getPresignedUploadUrlsAction = async (
     hasCdnDomain: !!process.env.CDN_DOMAIN,
   });
 
-  await requireRole('admin');
-
   try {
+    await requireRole('admin');
     const session = await auth();
 
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      logger.warn('Unauthorized access attempt', {
-        hasSession: !!session,
-        hasUserId: !!session?.user?.id,
-        role: session?.user?.role,
-      });
-      return { success: false, error: 'Unauthorized' };
+    if (!session) {
+      return { success: false, error: 'Authentication required' };
     }
 
     if (files.length === 0) {

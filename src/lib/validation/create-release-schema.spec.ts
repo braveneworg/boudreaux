@@ -6,7 +6,6 @@ import { createReleaseSchema, type ReleaseFormData } from './create-release-sche
 describe('create-release-schema', () => {
   // Valid MongoDB ObjectId for testing
   const validArtistId = '507f1f77bcf86cd799439011';
-  const validGroupId = '507f1f77bcf86cd799439012';
 
   const validData: ReleaseFormData = {
     title: 'Test Album',
@@ -493,51 +492,31 @@ describe('create-release-schema', () => {
     });
   });
 
-  describe('artist and group validation', () => {
+  describe('artist validation', () => {
     it('should accept data with at least one artist', () => {
       const result = createReleaseSchema.safeParse({
         ...validData,
         artistIds: [validArtistId],
-        groupIds: [],
       });
       expect(result.success).toBe(true);
     });
 
-    it('should accept data with at least one group', () => {
-      const result = createReleaseSchema.safeParse({
-        ...validData,
-        artistIds: [],
-        groupIds: [validGroupId],
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept data with both artists and groups', () => {
-      const result = createReleaseSchema.safeParse({
-        ...validData,
-        artistIds: [validArtistId],
-        groupIds: [validGroupId],
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('should reject data with no artists and no groups', () => {
+    it('should reject data with no artists', () => {
       const result = createReleaseSchema.safeParse({
         title: 'Test Album',
         releasedOn: '2024-01-15',
         coverArt: 'https://example.com/cover.jpg',
         formats: ['DIGITAL'],
         artistIds: [],
-        groupIds: [],
       });
       expect(result.success).toBe(false);
       expect(
         (result as { success: false; error: { issues: Array<{ message: string }> } }).error
           .issues[0].message
-      ).toBe('At least one Artist or one Group is required');
+      ).toBe('At least one Artist is required');
     });
 
-    it('should reject data with undefined artists and groups', () => {
+    it('should reject data with undefined artists', () => {
       const result = createReleaseSchema.safeParse({
         title: 'Test Album',
         releasedOn: '2024-01-15',
@@ -548,7 +527,68 @@ describe('create-release-schema', () => {
       expect(
         (result as { success: false; error: { issues: Array<{ message: string }> } }).error
           .issues[0].message
-      ).toBe('At least one Artist or one Group is required');
+      ).toBe('At least one Artist is required');
+    });
+  });
+
+  describe('suggestedPrice validation', () => {
+    it('should accept valid dollar amounts', () => {
+      const validPrices = ['5.99', '10', '0.50', '100.00', '1'];
+      validPrices.forEach((suggestedPrice) => {
+        const result = createReleaseSchema.safeParse({
+          ...validData,
+          suggestedPrice,
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    it('should accept empty string (optional field)', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept undefined (optional field)', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: undefined,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject negative values', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '-5.00',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject zero', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '0',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject more than 2 decimal places', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: '5.999',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject non-numeric strings', () => {
+      const result = createReleaseSchema.safeParse({
+        ...validData,
+        suggestedPrice: 'abc',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

@@ -37,7 +37,6 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { Switch } from '@/app/components/ui/switch';
-import { TrackPlayButton } from '@/app/components/ui/track-play-button';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 import { toDisplayLabel, toEntityUrlPath, toPascalCase } from '@/lib/utils/string-utils';
 
@@ -516,12 +515,6 @@ export function DataView<T extends Record<string, unknown>>({
                     })}
                     <Separator className="border-[0.5px] mt-2 mb-4 border-zinc-400" />
                     <div className="flex gap-2 justify-end items-center mr-2">
-                      {entity === 'track' && !!(item as Record<string, unknown>).audioUrl && (
-                        <TrackPlayButton
-                          audioUrl={(item as Record<string, unknown>).audioUrl as string}
-                          size="default"
-                        />
-                      )}
                       <Button asChild variant="outline">
                         <Link href={`/admin/${entityUrlPath}/${id}`}>
                           <Pencil className="mr-2 size-4" />

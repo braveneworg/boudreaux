@@ -32,7 +32,6 @@ interface TourDateHeadlinerFields {
   id: string;
   tourDateId: string;
   artistId: string | null;
-  groupId: string | null;
   sortOrder: number;
   setTime: Date | null;
   createdAt: Date;
@@ -42,13 +41,6 @@ interface ArtistFields {
   id: string;
   firstName: string;
   surname: string;
-  displayName: string | null;
-  [key: string]: unknown;
-}
-
-interface GroupFields {
-  id: string;
-  name: string;
   displayName: string | null;
   [key: string]: unknown;
 }
@@ -87,7 +79,6 @@ function shouldUseBlackText(hexColor: string): boolean {
 
 export interface HeadlinerWithRelations extends TourDateHeadlinerFields {
   artist: ArtistFields | null;
-  group: GroupFields | null;
 }
 
 interface ArtistPillProps {
@@ -120,9 +111,7 @@ const ArtistPill = ({
 
   const displayName = headliner.artist
     ? getDisplayName(headliner.artist as unknown as Record<string, unknown>)
-    : headliner.group
-      ? getDisplayName(headliner.group as unknown as Record<string, unknown>)
-      : 'Unknown Artist';
+    : 'Unknown Artist';
 
   const setTimeDisplay = headliner.setTime
     ? (() => {
@@ -233,10 +222,10 @@ const ArtistPill = ({
               <div className="space-y-3">
                 {/* Set Time picker */}
                 <div className="space-y-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     <Clock className="size-3" />
                     Set Time (optional)
-                  </label>
+                  </span>
                   <TimePicker
                     value={timePickerValue}
                     placeholder="Select set time"

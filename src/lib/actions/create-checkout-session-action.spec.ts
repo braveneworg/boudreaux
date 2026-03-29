@@ -66,7 +66,7 @@ describe('createCheckoutSessionAction', () => {
       expect.objectContaining({
         mode: 'subscription',
         line_items: [{ price: 'price_minimum_test', quantity: 1 }],
-        ui_mode: 'custom',
+        ui_mode: 'elements',
         return_url: expect.stringContaining('/subscribe/success?session_id='),
       })
     );

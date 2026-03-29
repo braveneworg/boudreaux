@@ -41,6 +41,7 @@ export const updateArtistAction = async (
     'tags',
     'bornOn',
     'diedOn',
+    'formedOn',
     'publishedOn',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
@@ -79,6 +80,7 @@ export const updateArtistAction = async (
       tags,
       bornOn,
       diedOn,
+      formedOn,
       publishedOn,
     } = parsed.data;
 
@@ -99,6 +101,7 @@ export const updateArtistAction = async (
       tags: tags || undefined,
       bornOn: bornOn ? new Date(bornOn) : undefined,
       diedOn: diedOn ? new Date(diedOn) : undefined,
+      formedOn: formedOn ? new Date(formedOn) : undefined,
       publishedOn: publishedOn ? new Date(publishedOn) : undefined,
     });
 

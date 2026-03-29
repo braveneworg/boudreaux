@@ -142,7 +142,6 @@ describe('updateReleaseAction', () => {
           'coverArt',
           'formats',
           'artistIds',
-          'groupIds',
           'labels',
           'catalogNumber',
           'description',
@@ -160,6 +159,7 @@ describe('updateReleaseAction', () => {
           'featuredOn',
           'featuredUntil',
           'featuredDescription',
+          'suggestedPrice',
         ],
         expect.anything()
       );
@@ -229,6 +229,24 @@ describe('updateReleaseAction', () => {
       ]);
       expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
     });
+
+    it('should assign root-level Zod errors without path to "general" field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: {} },
+        parsed: {
+          success: false,
+          error: {
+            issues: [{ path: [], message: 'Form-level validation error' }],
+          },
+        },
+      } as never);
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Form-level validation error']);
+      expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
+    });
   });
 
   describe('Release Update', () => {
@@ -282,6 +300,7 @@ describe('updateReleaseAction', () => {
         featuredOn: undefined,
         featuredUntil: undefined,
         featuredDescription: undefined,
+        suggestedPrice: null,
       });
 
       expect(result.success).toBe(true);

@@ -634,6 +634,15 @@ export class ArtistService {
         // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
         // set to null, not missing fields. Use OR to handle both cases.
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        // Only return artists that have at least one published, non-deleted release
+        releases: {
+          some: {
+            release: {
+              publishedAt: { not: null },
+              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            },
+          },
+        },
         ...(search && {
           AND: [
             {
@@ -642,18 +651,6 @@ export class ArtistService {
                 { surname: { contains: search, mode: 'insensitive' as const } },
                 { displayName: { contains: search, mode: 'insensitive' as const } },
                 { slug: { contains: search, mode: 'insensitive' as const } },
-                {
-                  groups: {
-                    some: {
-                      group: {
-                        OR: [
-                          { displayName: { contains: search, mode: 'insensitive' as const } },
-                          { name: { contains: search, mode: 'insensitive' as const } },
-                        ],
-                      },
-                    },
-                  },
-                },
                 {
                   releases: {
                     some: {
@@ -704,7 +701,7 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and track data.
+   * Get an artist by slug with full release and digital format data.
    * Post-query filters to only published, non-deleted releases.
    */
   static async getArtistBySlugWithReleases(
@@ -723,16 +720,16 @@ export class ArtistService {
           images: true,
           labels: true,
           urls: true,
-          groups: { include: { group: true } },
           releases: {
             include: {
               release: {
                 include: {
                   images: true,
                   artistReleases: { include: { artist: true } },
-                  releaseTracks: {
-                    include: { track: true },
-                    orderBy: { position: 'asc' },
+                  digitalFormats: {
+                    include: {
+                      files: { orderBy: { trackNumber: 'asc' } },
+                    },
                   },
                   releaseUrls: { include: { url: true } },
                 },

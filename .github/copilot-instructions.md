@@ -227,6 +227,9 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Zod for runtime validation of external data, such as API responses and user input, to ensure data integrity and prevent potential security vulnerabilities
 - Always write tests for new features and bug fixes to ensure code quality and prevent regressions
 - Always use the zod version from package.json to ensure consistency across the codebase and avoid version conflicts
+- Always write accessibility-friendly code by following best practices such as using semantic HTML, ARIA attributes, and ensuring keyboard navigation support
+- Always use descriptive variable and function names to improve code readability and maintainability
+- Always use JSDoc comments for complex functions and components to provide clear documentation and improve developer experience
 
 ## Never Do
 
