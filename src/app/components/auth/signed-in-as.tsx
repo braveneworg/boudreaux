@@ -36,11 +36,7 @@ const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
           </div>
         )}
         <KeyIcon size={16} className="md:hidden" />
-        <Link
-          className="text-sm text-zinc-50 hover:underline underline-offset-4"
-          href="/profile"
-          onClick={onClick}
-        >
+        <Link className="text-sm text-zinc-50" href="/profile" onClick={onClick}>
           {username ? `@${username}` : displayName}
         </Link>
       </div>

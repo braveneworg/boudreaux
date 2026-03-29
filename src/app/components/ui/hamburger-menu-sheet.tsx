@@ -5,7 +5,6 @@
 
 import { motion } from 'framer-motion';
 
-import { Separator } from '@/app/components/ui/separator';
 import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
 
 import SocialMediaIconLinks from './social-media-icon-links';
@@ -52,11 +51,9 @@ export default function HamburgerMenuSheet({
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav className="flex flex-col" aria-label="Main navigation">
-          <AuthToolbar className="text-zinc-50 pb-4" onNavigate={() => onOpenChange(false)} />
-          <Separator className="bg-accent" />
+          <AuthToolbar className="text-zinc-50 pb-0" onNavigate={() => onOpenChange(false)} />
           <SocialMediaIconLinks className="justify-center" />
-          <Separator className="bg-accent mb-2" />
-          <ul className="pt-4 space-y-4">
+          <ul>
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}
@@ -66,7 +63,7 @@ export default function HamburgerMenuSheet({
               >
                 <a
                   href={item.href}
-                  className="text-white text-shadow-sm text-2xl font-light hover:text-gray-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
+                  className="mt-2 text-zinc-50 text-shadow-sm text-2xl font-light hover:text-gray-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
                   style={{
                     textShadow: '0 2px 18px rgba(255, 255, 255, 0.8)',
                   }}

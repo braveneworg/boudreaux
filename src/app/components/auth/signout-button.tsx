@@ -30,7 +30,7 @@ const SignedinToolbar = ({
   const router = useRouter();
 
   return (
-    <div className={cn('h-3 my-4', className)}>
+    <div className={cn('h-3 mt-3 mb-5', className)}>
       <div
         className={cn(
           'flex h-3 items-center relative justify-center gap-2',
