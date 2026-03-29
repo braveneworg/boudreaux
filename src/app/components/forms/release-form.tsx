@@ -48,7 +48,7 @@ import {
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
-import { VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
+import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { FormState } from '@/lib/types/form-state';
 import { FORMATS, type Format } from '@/lib/types/media-models';
@@ -129,7 +129,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   const [imagesReordered, setImagesReordered] = useState(false);
   const [existingFormats, setExistingFormats] = useState<
     Array<{
-      formatType: string;
+      formatType: DigitalFormatType;
       trackCount: number;
       totalFileSize: number;
       files: Array<{
@@ -284,7 +284,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     duration?: number | null;
                   }>;
                 }) => ({
-                  formatType: df.formatType,
+                  formatType: df.formatType as DigitalFormatType,
                   trackCount: df.trackCount ?? df.files?.length ?? 0,
                   totalFileSize: Number(df.totalFileSize ?? 0),
                   files: (df.files ?? []).map((f) => ({
