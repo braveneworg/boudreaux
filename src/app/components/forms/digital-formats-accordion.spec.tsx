@@ -10,6 +10,15 @@ import { DigitalFormatsAccordion } from './digital-formats-accordion';
 // Mock Server Actions
 vi.mock('@/lib/actions/confirm-upload-action', () => ({
   confirmDigitalFormatUploadAction: vi.fn(),
+  confirmMultiTrackUploadAction: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/find-or-create-release-action', () => ({
+  findOrCreateReleaseAction: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/delete-format-files-action', () => ({
+  deleteFormatFilesAction: vi.fn().mockResolvedValue({ success: true, data: { deletedCount: 0 } }),
 }));
 
 // Mock sonner toast
@@ -309,8 +318,17 @@ describe('DigitalFormatsAccordion', () => {
       const existingFormats = [
         {
           formatType: 'MP3_320KBPS' as const,
-          fileName: 'album.mp3',
-          s3Key: 'releases/123/MP3/album.mp3',
+          trackCount: 1,
+          totalFileSize: 5000000,
+          files: [
+            {
+              trackNumber: 1,
+              title: null,
+              fileName: 'album.mp3',
+              fileSize: 5000000,
+              duration: null,
+            },
+          ],
         },
       ];
 
@@ -364,8 +382,17 @@ describe('DigitalFormatsAccordion', () => {
       const existingFormats = [
         {
           formatType: 'MP3_320KBPS' as const,
-          fileName: 'album.mp3',
-          s3Key: 'releases/123/MP3/album.mp3',
+          trackCount: 1,
+          totalFileSize: 5000000,
+          files: [
+            {
+              trackNumber: 1,
+              title: null,
+              fileName: 'album.mp3',
+              fileSize: 5000000,
+              duration: null,
+            },
+          ],
         },
       ];
 
@@ -560,7 +587,10 @@ describe('DigitalFormatsAccordion', () => {
       render(<DigitalFormatsAccordion />);
 
       expect(screen.getByText('Digital Formats')).toBeInTheDocument();
-      expect(screen.getByText(/save the release first/i)).toBeInTheDocument();
+      const triggers = screen.getAllByRole('button');
+      triggers.forEach((trigger) => {
+        expect(trigger).toBeDisabled();
+      });
     });
 
     it('should render all format labels in disabled state', () => {
@@ -572,59 +602,30 @@ describe('DigitalFormatsAccordion', () => {
     });
   });
 
-  describe('Create mode (onPendingConfirm)', () => {
-    it('should call onPendingConfirm instead of confirmAction after upload', async () => {
-      const onPendingConfirm = vi.fn();
+  describe('Create mode (onReleaseAutoCreated)', () => {
+    it('should call onReleaseAutoCreated after MP3_320KBPS upload in create mode', async () => {
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+      const onReleaseAutoCreated = vi.fn();
 
-      const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
-
-      await user.click(screen.getByText('MP3 320kbps'));
-      const fileInput = await screen.findByLabelText(/upload mp3/i);
-      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
-      await user.upload(fileInput, file);
-
-      await waitFor(() => {
-        expect(onPendingConfirm).toHaveBeenCalledWith(
-          expect.objectContaining({
-            releaseId: mockReleaseId,
-            formatType: 'MP3_320KBPS',
-            fileName: 'album.mp3',
-          })
-        );
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Test Album',
+        created: true,
       });
-    });
-
-    it('should show pending-save status text after create-mode upload', async () => {
-      const onPendingConfirm = vi.fn();
-
-      const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
-
-      await user.click(screen.getByText('MP3 320kbps'));
-      const fileInput = await screen.findByLabelText(/upload mp3/i);
-      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
-      await user.upload(fileInput, file);
-
-      await waitFor(() => {
-        expect(screen.getByText(/will be saved with release/i)).toBeInTheDocument();
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
       });
-    });
-
-    it('should call onPendingConfirmRemove when removing a pending-save upload', async () => {
-      const onPendingConfirm = vi.fn();
-      const onPendingConfirmRemove = vi.fn();
 
       const user = userEvent.setup();
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
-          onPendingConfirm={onPendingConfirm}
-          onPendingConfirmRemove={onPendingConfirmRemove}
+          onReleaseAutoCreated={onReleaseAutoCreated}
         />
       );
 
@@ -634,12 +635,113 @@ describe('DigitalFormatsAccordion', () => {
       await user.upload(fileInput, file);
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/remove mp3/i)).toBeInTheDocument();
+        expect(onReleaseAutoCreated).toHaveBeenCalledWith(
+          expect.objectContaining({
+            releaseId: mockReleaseId,
+            releaseTitle: 'Test Album',
+          })
+        );
+      });
+    });
+
+    it('should show success status after auto-creating release on MP3_320KBPS upload', async () => {
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Test Album',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
       });
 
-      await user.click(screen.getByLabelText(/remove mp3/i));
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
-      expect(onPendingConfirmRemove).toHaveBeenCalledWith('MP3_320KBPS');
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText(/upload successful/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should show error when findOrCreateReleaseAction fails during MP3_320KBPS upload', async () => {
+      const { toast } = await import('sonner');
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: false,
+        error: 'DB error',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'Failed to create release',
+          expect.objectContaining({ description: 'DB error' })
+        );
+      });
+    });
+  });
+
+  describe('Create mode locked state', () => {
+    it('should show locked description in card header when MP3_320 not yet uploaded', () => {
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      expect(screen.getByText(/upload mp3 320kbps first/i)).toBeInTheDocument();
+    });
+
+    it('should show "Upload MP3 320kbps first" message in non-MP3_320 drag zones', async () => {
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('FLAC'));
+
+      await waitFor(() => {
+        const messages = screen.getAllByText(/upload mp3 320kbps first/i);
+        // At least one message inside the accordion content
+        expect(messages.length).toBeGreaterThanOrEqual(1);
+      });
+    });
+
+    it('should disable upload button for non-MP3_320 formats in create mode', async () => {
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('FLAC'));
+
+      await waitFor(() => {
+        const uploadBtn = screen.getByRole('button', { name: /upload files/i });
+        expect(uploadBtn).toBeDisabled();
+      });
+    });
+
+    it('should not lock MP3_320KBPS drag zone in create mode', async () => {
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/drag and drop a mp3.*file or folder/i)).toBeInTheDocument();
+      });
     });
   });
 
@@ -778,12 +880,15 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Batch upload via folder input', () => {
     it('should upload multiple matching files from folder input', async () => {
-      const onPendingConfirm = vi.fn();
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'format123', fileCount: 2 },
+      });
 
       const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);
@@ -794,7 +899,7 @@ describe('DigitalFormatsAccordion', () => {
       fireEvent.change(fileInput, { target: { files: [file1, file2] } });
 
       await waitFor(() => {
-        expect(onPendingConfirm).toHaveBeenCalled();
+        expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
       });
     });
 
@@ -968,17 +1073,20 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Metadata extraction (MP3_320KBPS)', () => {
     it('should call onMetadataExtracted when MP3_320KBPS file has metadata', async () => {
-      const onMetadataExtracted = vi.fn();
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
 
-      // Dynamic import mock is set at top level via vi.mock; instead test behavior
-      // by verifying that create-mode upload calls onPendingConfirm (metadata is best-effort)
-      const onPendingConfirm = vi.fn();
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
+      const onMetadataExtracted = vi.fn();
 
       const user = userEvent.setup();
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
-          onPendingConfirm={onPendingConfirm}
           onMetadataExtracted={onMetadataExtracted}
         />
       );
@@ -990,20 +1098,27 @@ describe('DigitalFormatsAccordion', () => {
 
       // Upload still succeeds regardless of metadata extraction
       await waitFor(() => {
-        expect(onPendingConfirm).toHaveBeenCalledWith(
+        expect(confirmDigitalFormatUploadAction).toHaveBeenCalledWith(
           expect.objectContaining({ formatType: 'MP3_320KBPS' })
         );
       });
     });
 
     it('should not extract metadata for non-MP3_320KBPS formats', async () => {
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
       const onMetadataExtracted = vi.fn();
 
       const user = userEvent.setup();
       render(
         <DigitalFormatsAccordion
           releaseId={mockReleaseId}
-          onPendingConfirm={vi.fn()}
           onMetadataExtracted={onMetadataExtracted}
         />
       );
@@ -1014,7 +1129,7 @@ describe('DigitalFormatsAccordion', () => {
       await user.upload(fileInput, file);
 
       await waitFor(() => {
-        expect(screen.getByText(/will be saved with release/i)).toBeInTheDocument();
+        expect(confirmDigitalFormatUploadAction).toHaveBeenCalled();
       });
 
       expect(onMetadataExtracted).not.toHaveBeenCalled();
@@ -1105,7 +1220,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Batch upload scenarios', () => {
     it('should show batch progress during multi-file upload', async () => {
-      const onPendingConfirm = vi.fn();
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
 
       // Slow fetch to keep uploading state visible
       let resolveFirst: ((value: Response) => void) | undefined;
@@ -1123,10 +1238,13 @@ describe('DigitalFormatsAccordion', () => {
         });
       });
 
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'format123', fileCount: 2 },
+      });
+
       const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);
@@ -1157,13 +1275,24 @@ describe('DigitalFormatsAccordion', () => {
       } as Response);
 
       await waitFor(() => {
-        expect(onPendingConfirm).toHaveBeenCalledTimes(2);
+        expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
       });
     });
 
     it('should show warning toast when batch has partial failures', async () => {
       const { toast } = await import('sonner');
-      const onPendingConfirm = vi.fn();
+      const { confirmDigitalFormatUploadAction, confirmMultiTrackUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      // When only 1 file succeeds, the code uses confirmDigitalFormatUploadAction (single-file path)
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'format123', fileCount: 1 },
+      });
 
       let callCount = 0;
       global.fetch = vi.fn().mockImplementation(() => {
@@ -1181,9 +1310,7 @@ describe('DigitalFormatsAccordion', () => {
       });
 
       const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);
@@ -1202,7 +1329,6 @@ describe('DigitalFormatsAccordion', () => {
 
     it('should show error toast when all batch files fail', async () => {
       const { toast } = await import('sonner');
-      const onPendingConfirm = vi.fn();
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -1210,9 +1336,7 @@ describe('DigitalFormatsAccordion', () => {
       });
 
       const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);
@@ -1310,13 +1434,31 @@ describe('DigitalFormatsAccordion', () => {
       const existingFormats = [
         {
           formatType: 'MP3_320KBPS' as const,
-          fileName: 'album.mp3',
-          s3Key: 'releases/123/MP3/album.mp3',
+          trackCount: 1,
+          totalFileSize: 5000000,
+          files: [
+            {
+              trackNumber: 1,
+              title: null,
+              fileName: 'album.mp3',
+              fileSize: 5000000,
+              duration: null,
+            },
+          ],
         },
         {
           formatType: 'FLAC' as const,
-          fileName: 'album.flac',
-          s3Key: 'releases/123/FLAC/album.flac',
+          trackCount: 1,
+          totalFileSize: 25000000,
+          files: [
+            {
+              trackNumber: 1,
+              title: null,
+              fileName: 'album.flac',
+              fileSize: 25000000,
+              duration: null,
+            },
+          ],
         },
       ];
 
@@ -1336,35 +1478,509 @@ describe('DigitalFormatsAccordion', () => {
     });
   });
 
-  describe('Pending-save indicator', () => {
-    it('should show amber checkmark for pending-save state', async () => {
-      const onPendingConfirm = vi.fn();
+  describe('Re-upload confirmation flow', () => {
+    it('should show re-upload confirmation dialog when clicking re-upload on already-uploaded format', async () => {
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Upload a file first
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      // Button should now say "Re-upload files" — click it to trigger dialog
+      const reuploadButton = screen.getByRole('button', { name: /re-upload files/i });
+      await user.click(reuploadButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Re-upload files?')).toBeInTheDocument();
+      });
+    });
+
+    it('should delete existing files and open file picker on confirm re-upload', async () => {
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+      const { deleteFormatFilesAction } = await import('@/lib/actions/delete-format-files-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+      vi.mocked(deleteFormatFilesAction).mockResolvedValue({
+        success: true,
+        data: { deletedCount: 1 },
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Upload a file first
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      // Click re-upload button to trigger dialog
+      const reuploadButton = screen.getByRole('button', { name: /re-upload files/i });
+      await user.click(reuploadButton);
+
+      // Click confirm in the dialog
+      await waitFor(() => {
+        expect(screen.getByText('Re-upload files?')).toBeInTheDocument();
+      });
+      const confirmBtn = screen.getByRole('button', { name: /delete & re-upload/i });
+      await user.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(deleteFormatFilesAction).toHaveBeenCalledWith({
+          releaseId: mockReleaseId,
+          formatType: 'MP3_320KBPS',
+        });
+      });
+    });
+
+    it('should show error when delete fails during re-upload', async () => {
+      const { toast } = await import('sonner');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+      const { deleteFormatFilesAction } = await import('@/lib/actions/delete-format-files-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+      vi.mocked(deleteFormatFilesAction).mockResolvedValue({
+        success: false,
+        error: 'S3 error',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Upload a file first
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      const file = new File(['audio'], 'album.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      // Click re-upload button to trigger dialog, then confirm
+      const reuploadButton = screen.getByRole('button', { name: /re-upload files/i });
+      await user.click(reuploadButton);
+      await waitFor(() => {
+        expect(screen.getByText('Re-upload files?')).toBeInTheDocument();
+      });
+      const confirmBtn = screen.getByRole('button', { name: /delete & re-upload/i });
+      await user.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'Failed to delete existing files',
+          expect.objectContaining({ description: 'S3 error' })
+        );
+      });
+    });
+
+    it('should show error when delete throws an exception', async () => {
+      const { toast } = await import('sonner');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+      const { deleteFormatFilesAction } = await import('@/lib/actions/delete-format-files-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+      vi.mocked(deleteFormatFilesAction).mockRejectedValue(new Error('Network error'));
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Upload, then re-upload confirm
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      await user.upload(fileInput, new File(['audio'], 'album.mp3', { type: 'audio/mpeg' }));
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      const reuploadButton = screen.getByRole('button', { name: /re-upload files/i });
+      await user.click(reuploadButton);
+      await waitFor(() => {
+        expect(screen.getByText('Re-upload files?')).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole('button', { name: /delete & re-upload/i }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to delete existing files');
+      });
+    });
+
+    it('should close re-upload dialog when dismissed', async () => {
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Upload a file first
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      await user.upload(fileInput, new File(['audio'], 'album.mp3', { type: 'audio/mpeg' }));
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      // Open re-upload dialog
+      const reuploadButton = screen.getByRole('button', { name: /re-upload files/i });
+      await user.click(reuploadButton);
+      await waitFor(() => {
+        expect(screen.getByText('Re-upload files?')).toBeInTheDocument();
+      });
+
+      // Cancel
+      const cancelBtn = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Re-upload files?')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Create mode confirm failure (single file)', () => {
+    it('should show error when confirm action fails in create mode single file upload', async () => {
+      const { toast } = await import('sonner');
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Test Album',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: false,
+        error: 'DB confirm error',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      await user.upload(fileInput, new File(['audio'], 'album.mp3', { type: 'audio/mpeg' }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringContaining('upload failed'),
+          expect.objectContaining({ description: 'DB confirm error' })
+        );
+      });
+    });
+  });
+
+  describe('Create mode batch upload', () => {
+    it('should auto-create release and confirm batch upload in create mode', async () => {
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
+      const onReleaseAutoCreated = vi.fn();
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Batch Album',
+        created: true,
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'format123', fileCount: 2 },
+      });
 
       const user = userEvent.setup();
       render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
+        <DigitalFormatsAccordion
+          releaseId={mockReleaseId}
+          onReleaseAutoCreated={onReleaseAutoCreated}
+        />
       );
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);
-      const file = new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' });
-      await user.upload(fileInput, file);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
 
       await waitFor(() => {
-        const pendingCheckmarks = screen.getAllByTestId('format-pending-save-checkmark');
-        expect(pendingCheckmarks.length).toBeGreaterThanOrEqual(1);
+        expect(onReleaseAutoCreated).toHaveBeenCalledWith(
+          expect.objectContaining({
+            releaseId: mockReleaseId,
+            releaseTitle: 'Batch Album',
+          })
+        );
       });
+    });
+
+    it('should show error when findOrCreateReleaseAction fails in batch create mode', async () => {
+      const { toast } = await import('sonner');
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: false,
+        error: 'Batch create error',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'Failed to create release',
+          expect.objectContaining({ description: 'Batch create error' })
+        );
+      });
+    });
+
+    it('should show error when batch confirm fails in create mode', async () => {
+      const { toast } = await import('sonner');
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Batch Album',
+        created: true,
+      });
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: false,
+        error: 'Confirm fail',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringContaining('upload failed'),
+          expect.objectContaining({ description: 'Failed to confirm upload' })
+        );
+      });
+    });
+
+    it('should show warning toast for partial failures in create mode batch upload', async () => {
+      const { toast } = await import('sonner');
+      const { findOrCreateReleaseAction } =
+        await import('@/lib/actions/find-or-create-release-action');
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+        success: true,
+        releaseId: mockReleaseId,
+        releaseTitle: 'Partial Album',
+        created: true,
+      });
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
+      let callCount = 0;
+      global.fetch = vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true, s3Key: 'uploads/key1' }),
+          });
+        }
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ success: false, message: 'File too large' }),
+        });
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.warning).toHaveBeenCalledWith(
+          expect.stringContaining('1 of 2 files uploaded')
+        );
+      });
+    });
+  });
+
+  describe('Batch confirm failure in edit mode', () => {
+    it('should show error when batch confirm fails in edit mode', async () => {
+      const { toast } = await import('sonner');
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: false,
+        error: 'Edit batch confirm fail',
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          expect.stringContaining('upload failed'),
+          expect.objectContaining({ description: 'Failed to confirm upload' })
+        );
+      });
+    });
+  });
+
+  describe('Batch metadata extraction', () => {
+    it('should extract metadata from first MP3_320KBPS file in batch upload', async () => {
+      const { confirmMultiTrackUploadAction } = await import('@/lib/actions/confirm-upload-action');
+      const onMetadataExtracted = vi.fn();
+
+      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+        success: true,
+        data: { formatId: 'format123', fileCount: 2 },
+      });
+
+      // Mock music-metadata
+      vi.doMock('music-metadata', () => ({
+        parseBlob: vi.fn().mockResolvedValue({
+          common: {
+            album: 'Batch Album',
+            artist: 'Test Artist',
+            year: 2025,
+            label: ['Test Label'],
+          },
+        }),
+      }));
+
+      const user = userEvent.setup();
+      render(
+        <DigitalFormatsAccordion
+          releaseId={mockReleaseId}
+          onMetadataExtracted={onMetadataExtracted}
+        />
+      );
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
+      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
+      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(onMetadataExtracted).toHaveBeenCalledWith(
+          expect.objectContaining({ album: 'Batch Album' })
+        );
+      });
+
+      vi.doUnmock('music-metadata');
+    });
+  });
+
+  describe('formatFileSize edge case', () => {
+    it('should show 0 Bytes for zero-size files in uploaded file list', async () => {
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      // Mock confirm to succeed and produce a 0-byte uploaded file entry
+      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+        success: true,
+        data: { id: 'format123' },
+      });
+
+      // Mock fetch to return success with s3Key
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true, s3Key: 'uploads/empty-key' }),
+      });
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+
+      // Create a 0-byte file
+      const emptyFile = new File([], 'empty.mp3', { type: 'audio/mpeg' });
+      await user.upload(fileInput, emptyFile);
+
+      await waitFor(() => {
+        expect(screen.getByText('Upload successful!')).toBeInTheDocument();
+      });
+
+      // The uploaded file list should display "0 Bytes"
+      expect(screen.getByText('0 Bytes')).toBeInTheDocument();
     });
   });
 
   describe('Upload with empty file type', () => {
     it('should use default mime type when file.type is empty', async () => {
-      const onPendingConfirm = vi.fn();
-
       const user = userEvent.setup();
-      render(
-        <DigitalFormatsAccordion releaseId={mockReleaseId} onPendingConfirm={onPendingConfirm} />
-      );
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
       const fileInput = await screen.findByLabelText(/upload mp3/i);

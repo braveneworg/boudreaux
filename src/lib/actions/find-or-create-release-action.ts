@@ -33,6 +33,9 @@ export interface ReleaseMetadata {
   coverArt?: string;
   /** Whether the audio is lossless */
   lossless?: boolean;
+  /** Pre-generated MongoDB ObjectId — when provided, the newly created release
+   *  uses this value as its `_id` so that S3 keys already referencing it remain valid. */
+  id?: string;
 }
 
 /**
@@ -184,6 +187,7 @@ export async function findOrCreateReleaseAction(
     const labels = metadata.label ? [metadata.label.trim()] : [];
 
     const createResponse = await ReleaseService.createRelease({
+      ...(metadata.id ? { id: metadata.id } : {}),
       title: albumTitle,
       releasedOn,
       formats,

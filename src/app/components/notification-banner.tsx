@@ -135,7 +135,7 @@ export function NotificationBanner({ notifications, className }: NotificationBan
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard navigation per WAI-ARIA carousel pattern */
   return (
     <section
-      className={cn('relative w-full max-w-xl mx-auto overflow-hidden mt-1', className)}
+      className={cn('relative w-full max-w-xl mx-auto overflow-hidden', className)}
       aria-label="Notification banner"
       aria-roledescription="carousel"
       onKeyDown={handleKeyDown}
@@ -285,7 +285,7 @@ function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
 
   const content = (
     <div
-      className={cn('absolute inset-0', !hasImage && 'bg-zinc-900')}
+      className={cn('absolute inset-0 shadow-accent', !hasImage && 'bg-zinc-900')}
       style={{
         backgroundColor: !hasImage && backgroundColor ? backgroundColor : undefined,
       }}

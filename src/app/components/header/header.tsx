@@ -98,14 +98,14 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
         ))}
       </div>
       {/* Header content layer */}
-      <div className="relative mx-auto w-full max-w-[1920px] pl-0 pb-1.5 md:px-8 overflow-hidden z-20">
-        <header className="flex items-center justify-between leading-[58px] h-[58px] md:h-[122px] w-full min-w-0">
+      <div className="relative mx-auto w-full max-w-480 pl-0 md:px-8 overflow-hidden z-20">
+        <header className="relative flex items-center justify-between leading-12 h-12 md:h-30.5 w-full min-w-0">
           <Logo isMobile={isMobile} />
           {isMobile && (
             <>
               <Image
                 alt="Fake Four Inc. Words"
-                className="relative right-0.5 w-[222px] h-auto"
+                className="relative right-0.5 w-50.5 h-auto"
                 priority
                 src="/media/fake-four-inc-words.png"
                 width={222}

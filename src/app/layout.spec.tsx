@@ -149,7 +149,7 @@ describe('RootLayout', () => {
       render(await RootLayout({ children: <div>Test</div> }));
 
       const main = screen.getByRole('main');
-      expect(main).toHaveClass('font-sans', 'px-1.5', 'flex', 'flex-col', 'flex-1');
+      expect(main).toHaveClass('flex', 'flex-col', 'w-full', 'max-w-full', 'overflow-x-hidden');
     });
   });
 
@@ -239,11 +239,11 @@ describe('RootLayout', () => {
       expect(jsx.props.suppressHydrationWarning).toBe(true);
     });
 
-    it('renders body with font variable class', async () => {
+    it('renders body with overflow-x-hidden class', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
       const body = jsx.props.children;
 
-      expect(body.props.className).toContain('--font-dawning-of-a-new-day');
+      expect(body.props.className).toContain('overflow-x-hidden');
     });
 
     it('renders body with layout classes', async () => {

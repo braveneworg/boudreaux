@@ -634,6 +634,15 @@ export class ArtistService {
         // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
         // set to null, not missing fields. Use OR to handle both cases.
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        // Only return artists that have at least one published, non-deleted release
+        releases: {
+          some: {
+            release: {
+              publishedAt: { not: null },
+              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            },
+          },
+        },
         ...(search && {
           AND: [
             {

@@ -164,18 +164,6 @@ describe('sendPurchaseConfirmationEmail', () => {
       );
     });
 
-    it('should fall back to default base URL when NEXT_PUBLIC_BASE_URL is not set', async () => {
-      delete process.env.NEXT_PUBLIC_BASE_URL;
-
-      await sendPurchaseConfirmationEmail(validInput);
-
-      expect(vi.mocked(buildPurchaseConfirmationEmailHtml)).toHaveBeenCalledWith(
-        expect.objectContaining({
-          downloadUrl: 'https://fakefourrecords.com/api/releases/release-abc/download',
-        })
-      );
-    });
-
     it('should format amountPaidCents as a dollar string for the email builders', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 

@@ -8,14 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import {
-  ChevronDown,
-  ChevronUp,
-  EllipsisVertical,
-  Pause,
-  Play,
-  Search as SearchIcon,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, EllipsisVertical, Pause, Play } from 'lucide-react';
 import videojs from 'video.js';
 
 import {
@@ -25,7 +18,6 @@ import {
   getSkipNextButton,
   resetClasses,
 } from '@/app/components/ui/audio/audio-controls';
-import TextField from '@/components/forms/fields/text-field';
 import { Button } from '@/components/ui/button';
 import {
   type CarouselApi,
@@ -48,7 +40,6 @@ import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 
-import type { Control } from 'react-hook-form';
 import type Player from 'video.js/dist/types/player';
 
 import 'video.js/dist/video-js.css';
@@ -155,15 +146,6 @@ const clearPlayerErrorState = (player: Player): void => {
 };
 
 /**
- * Form values interface for the search component.
- *
- * @property search - The search query string
- */
-export interface SearchFormValues {
-  search: string;
-}
-
-/**
  * Interface for accessing player controls from parent components.
  *
  * @property play - Function to start playback
@@ -198,55 +180,6 @@ interface MediaControlsProps {
   autoPlay?: boolean;
   controlsRef?: (controls: MediaPlayerControls | null) => void;
 }
-
-/**
- * Search component for the media player.
- *
- * @param control - The react-hook-form control object
- * @returns The rendered search component
- *
- * @remarks
- * - Uses a TextField for input and a Button for submission
- * - Placeholder text is "Search..."
- * - Button has a search icon and is labeled for accessibility
- * @example
- * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.Search control={form.control} />
- *   ...
- * </MediaPlayer>
- * ```
- */
-const Search = ({ control }: { control: Control<SearchFormValues> }) => {
-  const handleSearch = () => {
-    // TODO: Implement search functionality
-  };
-
-  return (
-    <div className="flex w-full">
-      <div className="flex-1">
-        <TextField
-          control={control}
-          name="search"
-          label=""
-          placeholder="Search..."
-          type="text"
-          className="[&_input]:rounded-r-none [&_input]:border-r-0 [&_input]:focus-visible:z-10 [&_label]:sr-only"
-        />
-      </div>
-      <Button
-        type="button"
-        size="icon"
-        variant="outline"
-        className="rounded-l-none mt-auto mb-auto"
-        onClick={handleSearch}
-        aria-label="Search"
-      >
-        <SearchIcon />
-      </Button>
-    </div>
-  );
-};
 
 /**
  * A carousel component that displays a grid of artist images.
@@ -1521,7 +1454,6 @@ export const MediaPlayer = ({ children, className }: MediaPlayerProps) => (
   <div className={className}>{children}</div>
 );
 
-MediaPlayer.Search = Search;
 MediaPlayer.CoverArtView = CoverArtView;
 MediaPlayer.InteractiveCoverArt = InteractiveCoverArt;
 MediaPlayer.InfoTickerTape = InfoTickerTape;

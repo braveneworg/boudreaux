@@ -11,6 +11,10 @@ import { prisma } from '../prisma';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
+vi.mock('../utils/s3-client', () => ({
+  deleteS3Object: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../prisma', () => ({
   prisma: {
     release: {
@@ -20,6 +24,33 @@ vi.mock('../prisma', () => ({
       findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+    },
+    releaseDigitalFormatFile: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    releaseDigitalFormat: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    releasePurchase: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    releaseDownload: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    downloadEvent: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    releaseUrl: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    image: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    artistRelease: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    featuredArtist: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   },
 }));
@@ -445,38 +476,92 @@ describe('ReleaseService', () => {
   });
 
   describe('deleteRelease', () => {
-    it('should delete a release successfully', async () => {
+    const existingRelease = {
+      id: 'release-123',
+      digitalFormats: [
+        {
+          id: 'format-1',
+          files: [
+            { id: 'file-1', s3Key: 'releases/release-123/mp3/track1.mp3' },
+            { id: 'file-2', s3Key: 'releases/release-123/mp3/track2.mp3' },
+          ],
+        },
+      ],
+      images: [{ id: 'img-1', src: 'https://cdn.example.com/cover.jpg' }],
+    };
+
+    it('should delete a release successfully with cascade', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
       vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
       expect(result).toMatchObject({ success: true, data: mockRelease });
-      expect(prisma.release.delete).toHaveBeenCalledWith({
+      // Verify cascade delete order
+      expect(prisma.release.findUnique).toHaveBeenCalledWith({
         where: { id: 'release-123' },
         include: {
+          digitalFormats: { include: { files: true } },
           images: true,
-          artistReleases: true,
-          digitalFormats: true,
-          releaseUrls: true,
         },
+      });
+      expect(prisma.releaseDigitalFormatFile.deleteMany).toHaveBeenCalledWith({
+        where: { formatId: 'format-1' },
+      });
+      expect(prisma.releaseDigitalFormat.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.releasePurchase.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.releaseDownload.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.downloadEvent.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.releaseUrl.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.image.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.artistRelease.deleteMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+      });
+      expect(prisma.featuredArtist.updateMany).toHaveBeenCalledWith({
+        where: { releaseId: 'release-123' },
+        data: { releaseId: null },
+      });
+      expect(prisma.release.delete).toHaveBeenCalledWith({
+        where: { id: 'release-123' },
       });
     });
 
     it('should return error when release not found', async () => {
-      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
-      vi.mocked(prisma.release.delete).mockRejectedValue(notFoundError);
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
 
       const result = await ReleaseService.deleteRelease('non-existent');
 
       expect(result).toMatchObject({ success: false, error: 'Release not found' });
     });
 
+    it('should return error when release not found during delete step', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
+      const notFoundError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.release.delete).mockRejectedValue(notFoundError);
+
+      const result = await ReleaseService.deleteRelease('release-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Release not found' });
+    });
+
     it('should return error when database is unavailable', async () => {
       const initError = new Prisma.PrismaClientInitializationError('Connection failed', '5.0.0');
-      vi.mocked(prisma.release.delete).mockRejectedValue(initError);
+      vi.mocked(prisma.release.findUnique).mockRejectedValue(initError);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
@@ -484,6 +569,7 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(existingRelease as never);
       vi.mocked(prisma.release.delete).mockRejectedValue(Error('Unknown error'));
 
       const result = await ReleaseService.deleteRelease('release-123');

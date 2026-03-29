@@ -40,10 +40,6 @@ import { Input } from '@/app/components/ui/input';
 import { Separator } from '@/app/components/ui/separator';
 import { Switch } from '@/app/components/ui/switch';
 import { Textarea } from '@/app/components/ui/textarea';
-import {
-  confirmDigitalFormatUploadAction,
-  confirmMultiTrackUploadAction,
-} from '@/lib/actions/confirm-upload-action';
 import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { registerReleaseImagesAction } from '@/lib/actions/register-image-actions';
@@ -53,7 +49,7 @@ import {
 } from '@/lib/actions/release-image-actions';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
-import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { FormState } from '@/lib/types/form-state';
 import { FORMATS, type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
@@ -131,6 +127,20 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
   const [imagesReordered, setImagesReordered] = useState(false);
+  const [existingFormats, setExistingFormats] = useState<
+    Array<{
+      formatType: string;
+      trackCount: number;
+      totalFileSize: number;
+      files: Array<{
+        trackNumber: number;
+        title: string | null;
+        fileName: string;
+        fileSize: number;
+        duration: number | null;
+      }>;
+    }>
+  >([]);
   const isEditMode = releaseId !== null;
 
   // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
@@ -138,18 +148,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   // uploads whose DB confirms are flushed after createReleaseAction succeeds.
   const [preGeneratedId] = useState<string>(() => initialReleaseId ?? generateObjectId());
 
-  // Pending digital format confirms: S3 upload succeeded but DB record creation is deferred
-  // until createReleaseAction succeeds (release must exist in DB before connecting).
-  const [pendingConfirms, setPendingConfirms] = useState<
-    {
-      releaseId: string;
-      formatType: DigitalFormatType;
-      s3Key: string;
-      fileName: string;
-      fileSize: number;
-      mimeType: string;
-    }[]
-  >([]);
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
@@ -267,6 +265,39 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           );
           setImages(existingImages);
         }
+
+        // Load existing digital formats with track files
+        if (release.digitalFormats && release.digitalFormats.length > 0) {
+          setExistingFormats(
+            release.digitalFormats
+              .filter((df: { deletedAt?: string | null }) => df.deletedAt == null)
+              .map(
+                (df: {
+                  formatType: string;
+                  trackCount?: number;
+                  totalFileSize?: number | string;
+                  files?: Array<{
+                    trackNumber: number;
+                    title?: string | null;
+                    fileName: string;
+                    fileSize: number | string;
+                    duration?: number | null;
+                  }>;
+                }) => ({
+                  formatType: df.formatType,
+                  trackCount: df.trackCount ?? df.files?.length ?? 0,
+                  totalFileSize: Number(df.totalFileSize ?? 0),
+                  files: (df.files ?? []).map((f) => ({
+                    trackNumber: f.trackNumber,
+                    title: f.title ?? null,
+                    fileName: f.fileName,
+                    fileSize: Number(f.fileSize),
+                    duration: f.duration ?? null,
+                  })),
+                })
+              )
+          );
+        }
       } catch (err) {
         error('Failed to fetch release:', err);
         toast.error('Failed to load release data');
@@ -312,23 +343,16 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     []
   );
 
-  const handlePendingConfirm = useCallback(
-    (params: {
+  const handleReleaseAutoCreated = useCallback(
+    (_result: {
       releaseId: string;
-      formatType: DigitalFormatType;
-      s3Key: string;
-      fileName: string;
-      fileSize: number;
-      mimeType: string;
+      releaseTitle: string;
+      metadata: { album?: string; artist?: string; year?: number; label?: string };
     }) => {
-      setPendingConfirms((prev) => [...prev, params]);
+      router.replace(`/admin/releases/${_result.releaseId}`, { scroll: false });
     },
-    []
+    [router]
   );
-
-  const handlePendingConfirmRemove = useCallback((formatType: DigitalFormatType) => {
-    setPendingConfirms((prev) => prev.filter((p) => p.formatType !== formatType));
-  }, []);
 
   const handleMetadataExtracted = useCallback(
     (metadata: { album?: string; artist?: string; year?: number; label?: string }) => {
@@ -401,51 +425,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
               if (createdReleaseId) {
                 setReleaseId(createdReleaseId);
 
-                // Flush deferred digital format confirms now that the release exists in DB
-                if (pendingConfirms.length > 0) {
-                  // Group pending confirms by format type — multi-file formats use multi-track action
-                  const byFormat = new Map<string, typeof pendingConfirms>();
-                  for (const pc of pendingConfirms) {
-                    const existing = byFormat.get(pc.formatType) ?? [];
-                    existing.push(pc);
-                    byFormat.set(pc.formatType, existing);
-                  }
-
-                  const confirmPromises: Promise<{ success: boolean; error?: string }>[] = [];
-                  for (const [formatType, files] of byFormat) {
-                    if (files.length === 1) {
-                      // Single file — use simple confirm
-                      confirmPromises.push(confirmDigitalFormatUploadAction(files[0]));
-                    } else {
-                      // Multiple files — use multi-track confirm
-                      confirmPromises.push(
-                        confirmMultiTrackUploadAction({
-                          releaseId: files[0].releaseId,
-                          formatType: formatType as DigitalFormatType,
-                          files: files.map((f, idx) => ({
-                            trackNumber: idx + 1,
-                            s3Key: f.s3Key,
-                            fileName: f.fileName,
-                            fileSize: f.fileSize,
-                            mimeType: f.mimeType,
-                          })),
-                        })
-                      );
-                    }
-                  }
-
-                  const results = await Promise.allSettled(confirmPromises);
-                  const failedCount = results.filter(
-                    (r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)
-                  ).length;
-                  if (failedCount > 0) {
-                    toast.warning(
-                      `${failedCount} digital format upload(s) could not be linked. Re-upload from the edit page.`
-                    );
-                  }
-                  setPendingConfirms([]);
-                }
-
                 router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
 
                 if (data.publishedAt) {
@@ -475,16 +454,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
         }
       });
     },
-    [
-      formState,
-      images,
-      releaseId,
-      isPublished,
-      releaseForm,
-      router,
-      pendingConfirms,
-      preGeneratedId,
-    ]
+    [formState, images, releaseId, isPublished, releaseForm, router, preGeneratedId]
   );
 
   const uploadImages = async (
@@ -656,13 +626,13 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           },
         ]}
       />
-      <Card>
+      <Card className="px-0 pb-0 w-full">
         <CardHeader>
           <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {isEditMode
               ? 'Update release information. Changes are saved when you click Save.'
-              : 'Required fields are marked with an asterisk *'}
+              : `Upload ${FORMAT_CONFIGS[0].label} first. Creates the release upon upload.`}
           </CardDescription>
         </CardHeader>
         <Form {...releaseForm}>
@@ -681,8 +651,8 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
               <section className="space-y-4">
                 <DigitalFormatsAccordion
                   releaseId={preGeneratedId}
-                  onPendingConfirm={!isEditMode ? handlePendingConfirm : undefined}
-                  onPendingConfirmRemove={!isEditMode ? handlePendingConfirmRemove : undefined}
+                  existingFormats={existingFormats}
+                  onReleaseAutoCreated={!isEditMode ? handleReleaseAutoCreated : undefined}
                   onMetadataExtracted={handleMetadataExtracted}
                 />
               </section>

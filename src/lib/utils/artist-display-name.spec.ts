@@ -50,7 +50,6 @@ describe('getArtistDisplayNameForTour', () => {
     isActive: true,
     instruments: null,
     featuredArtistId: null,
-    trackId: null,
   };
 
   describe('Fallback Algorithm', () => {

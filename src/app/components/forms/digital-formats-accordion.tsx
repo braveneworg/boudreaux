@@ -6,9 +6,28 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { Upload, FileAudio, Trash2, CheckCircle2, Loader2, AlertCircle, Music } from 'lucide-react';
+import {
+  Upload,
+  FileAudio,
+  Trash2,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Music,
+  RefreshCw,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/app/components/ui/alert-dialog';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -27,37 +46,45 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
-import { confirmDigitalFormatUploadAction } from '@/lib/actions/confirm-upload-action';
+import {
+  confirmDigitalFormatUploadAction,
+  confirmMultiTrackUploadAction,
+} from '@/lib/actions/confirm-upload-action';
+import { deleteFormatFilesAction } from '@/lib/actions/delete-format-files-action';
+import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-action';
 import { getFileExtensionForFormat, getDefaultMimeType } from '@/lib/constants/digital-formats';
+import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import { cn } from '@/lib/utils';
 import type { DigitalFormatType, UploadState } from '@/types/digital-format';
 
+interface ExistingFormatFile {
+  trackNumber: number;
+  title: string | null;
+  fileName: string;
+  fileSize: number;
+  duration: number | null;
+}
+
 interface ExistingFormat {
   formatType: DigitalFormatType;
-  fileName: string;
-  s3Key: string;
+  trackCount: number;
+  totalFileSize: number;
+  files: ExistingFormatFile[];
 }
 
 interface DigitalFormatsAccordionProps {
   releaseId?: string;
   existingFormats?: ExistingFormat[];
   /**
-   * When provided (create mode), called instead of confirmDigitalFormatUploadAction
-   * after a successful S3 upload. The DB record creation is deferred until the
-   * release is saved to the database.
+   * Called after the first MP3_320KBPS upload in create mode: the release has
+   * been auto-created in the DB and the upload confirmed. The parent form should
+   * switch to edit mode and populate fields from the returned metadata.
    */
-  onPendingConfirm?: (params: {
+  onReleaseAutoCreated?: (result: {
     releaseId: string;
-    formatType: DigitalFormatType;
-    s3Key: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
+    releaseTitle: string;
+    metadata: { album?: string; artist?: string; year?: number; label?: string };
   }) => void;
-  /**
-   * When provided (create mode), called when a pending-save upload is removed.
-   */
-  onPendingConfirmRemove?: (formatType: DigitalFormatType) => void;
   /**
    * Called when audio metadata is successfully extracted from an uploaded MP3_320KBPS file.
    * The parent form can use this to pre-populate form fields.
@@ -69,73 +96,6 @@ interface DigitalFormatsAccordionProps {
     label?: string;
   }) => void;
 }
-
-interface FormatConfig {
-  type: DigitalFormatType;
-  label: string;
-  description: string;
-  acceptTypes: string;
-  mimeTypes: string[];
-}
-
-const FORMAT_CONFIGS: FormatConfig[] = [
-  {
-    type: 'MP3_V0',
-    label: 'MP3 V0',
-    description: 'Variable bitrate MP3 (excellent quality, efficient file size)',
-    acceptTypes: '.mp3,audio/mpeg',
-    mimeTypes: ['audio/mpeg', 'audio/mp3'],
-  },
-  {
-    type: 'MP3_320KBPS',
-    label: 'MP3 320kbps',
-    description: 'High quality compressed audio (recommended for most users)',
-    acceptTypes: '.mp3,audio/mpeg',
-    mimeTypes: ['audio/mpeg', 'audio/mp3'],
-  },
-  {
-    type: 'AAC',
-    label: 'AAC',
-    description: 'Advanced audio coding (efficient compression, good quality)',
-    acceptTypes: '.aac,.m4a,audio/aac,audio/x-aac,audio/mp4,audio/x-m4a',
-    mimeTypes: ['audio/aac', 'audio/x-aac', 'audio/mp4', 'audio/x-m4a', 'audio/m4a'],
-  },
-  {
-    type: 'OGG_VORBIS',
-    label: 'Ogg Vorbis',
-    description: 'Open-source lossy compression (high quality, royalty-free)',
-    acceptTypes: '.ogg,audio/ogg,audio/vorbis,application/ogg',
-    mimeTypes: ['audio/ogg', 'audio/vorbis', 'application/ogg'],
-  },
-  {
-    type: 'FLAC',
-    label: 'FLAC',
-    description: 'Lossless audio compression (highest quality, larger file size)',
-    acceptTypes: '.flac,audio/flac,audio/x-flac',
-    mimeTypes: ['audio/flac', 'audio/x-flac'],
-  },
-  {
-    type: 'ALAC',
-    label: 'ALAC',
-    description: 'Apple lossless compression (highest quality, Apple ecosystem)',
-    acceptTypes: '.m4a,audio/x-m4a,audio/m4a,audio/mp4',
-    mimeTypes: ['audio/x-m4a', 'audio/m4a', 'audio/mp4'],
-  },
-  {
-    type: 'WAV',
-    label: 'WAV',
-    description: 'Uncompressed audio (studio quality, very large files)',
-    acceptTypes: '.wav,audio/wav,audio/x-wav,audio/wave',
-    mimeTypes: ['audio/wav', 'audio/x-wav', 'audio/wave'],
-  },
-  {
-    type: 'AIFF',
-    label: 'AIFF',
-    description: 'Uncompressed audio (studio quality, Apple ecosystem)',
-    acceptTypes: '.aiff,.aif,audio/aiff,audio/x-aiff',
-    mimeTypes: ['audio/aiff', 'audio/x-aiff'],
-  },
-];
 
 /**
  * Format file size for display
@@ -232,8 +192,7 @@ function findMatchingFilesForFormat(files: File[], formatType: DigitalFormatType
 export function DigitalFormatsAccordion({
   releaseId,
   existingFormats = [],
-  onPendingConfirm,
-  onPendingConfirmRemove,
+  onReleaseAutoCreated,
   onMetadataExtracted,
 }: DigitalFormatsAccordionProps) {
   // Track upload state for each format
@@ -256,10 +215,12 @@ export function DigitalFormatsAccordion({
     () => {
       const initial: Record<string, SelectedFile> = {};
       for (const fmt of existingFormats) {
+        const label = fmt.files.length === 1 ? fmt.files[0].fileName : `${fmt.files.length} files`;
         initial[fmt.formatType] = {
-          file: new File([], fmt.fileName),
-          fileName: fmt.fileName,
-          fileSize: 0,
+          file: new File([], label),
+          fileName: label,
+          fileSize: fmt.totalFileSize,
+          fileCount: fmt.files.length > 1 ? fmt.files.length : undefined,
         };
       }
       return initial as Record<DigitalFormatType, SelectedFile>;
@@ -272,10 +233,30 @@ export function DigitalFormatsAccordion({
   // Track uploaded file details per format (for displaying the file list)
   const [uploadedFilesList, setUploadedFilesList] = useState<
     Record<DigitalFormatType, UploadedFileInfo[]>
-  >({} as Record<DigitalFormatType, UploadedFileInfo[]>);
+  >(() => {
+    const initial: Record<string, UploadedFileInfo[]> = {};
+    for (const fmt of existingFormats) {
+      if (fmt.files.length > 0) {
+        initial[fmt.formatType] = fmt.files.map((f) => ({
+          fileName: f.fileName,
+          fileSize: f.fileSize,
+          s3Key: '', // Existing files don't expose s3Key to the client
+        }));
+      }
+    }
+    return initial as Record<DigitalFormatType, UploadedFileInfo[]>;
+  });
 
   // Track album title extracted from audio metadata
   const [albumTitle, setAlbumTitle] = useState<string | null>(null);
+
+  // Track which format is pending re-upload confirmation
+  const [confirmReuploadFormat, setConfirmReuploadFormat] = useState<DigitalFormatType | null>(
+    null
+  );
+
+  // Track whether we're deleting existing files before re-upload
+  const [isDeletingFiles, setIsDeletingFiles] = useState(false);
 
   // File input refs per format for programmatic click
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -406,21 +387,21 @@ export function DigitalFormatsAccordion({
         [formatType]: { status: 'uploading', progress: 0, currentFile: 1, totalFiles: 1 },
       }));
 
-      // Extract metadata from MP3_320KBPS before uploading to pre-populate the release form
-      if (formatType === 'MP3_320KBPS' && onMetadataExtracted) {
+      // Extract metadata from MP3_320KBPS before uploading
+      const extractedMetadata: { album?: string; artist?: string; year?: number; label?: string } =
+        {};
+      if (formatType === 'MP3_320KBPS') {
         try {
           const { parseBlob } = await import('music-metadata');
-          const metadata = await parseBlob(file);
-          const { common } = metadata;
+          const parsedMeta = await parseBlob(file);
+          const { common } = parsedMeta;
           if (common.album || common.artist || common.year || common.label?.[0]) {
-            const extracted: { album?: string; artist?: string; year?: number; label?: string } =
-              {};
-            if (common.album) extracted.album = common.album;
-            if (common.artist) extracted.artist = common.artist;
-            if (common.year) extracted.year = common.year;
-            if (common.label?.[0]) extracted.label = common.label[0];
-            onMetadataExtracted(extracted);
-            console.info('[upload] MP3_320KBPS: extracted metadata', extracted);
+            if (common.album) extractedMetadata.album = common.album;
+            if (common.artist) extractedMetadata.artist = common.artist;
+            if (common.year) extractedMetadata.year = common.year;
+            if (common.label?.[0]) extractedMetadata.label = common.label[0];
+            onMetadataExtracted?.(extractedMetadata);
+            console.info('[upload] MP3_320KBPS: extracted metadata', extractedMetadata);
           }
         } catch {
           console.info('[upload] MP3_320KBPS: could not extract metadata');
@@ -442,10 +423,30 @@ export function DigitalFormatsAccordion({
       }
 
       const { s3Key } = result;
+      const config = FORMAT_CONFIGS.find((c) => c.type === formatType);
 
-      // Confirm upload — immediately in edit mode, or deferred in create mode
-      if (onPendingConfirm) {
-        onPendingConfirm({
+      // In create mode, auto-create the release on the first MP3_320KBPS upload
+      if (onReleaseAutoCreated && formatType === 'MP3_320KBPS') {
+        setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
+
+        const autoCreateResult = await findOrCreateReleaseAction({
+          ...extractedMetadata,
+          album: extractedMetadata.album ?? 'Untitled Release',
+          id: releaseId,
+        });
+
+        if (!autoCreateResult.success) {
+          const errMsg = autoCreateResult.error ?? 'Failed to create release';
+          setUploadStates((prev) => ({
+            ...prev,
+            [formatType]: { status: 'error', message: errMsg },
+          }));
+          setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+          toast.error('Failed to create release', { description: errMsg });
+          return;
+        }
+
+        const confirmResult = await confirmDigitalFormatUploadAction({
           releaseId: releaseId!,
           formatType,
           s3Key: s3Key!,
@@ -453,57 +454,73 @@ export function DigitalFormatsAccordion({
           fileSize: file.size,
           mimeType: file.type,
         });
+
+        if (!confirmResult.success) {
+          const errMsg = confirmResult.error ?? 'Failed to confirm upload';
+          setUploadStates((prev) => ({
+            ...prev,
+            [formatType]: { status: 'error', message: errMsg },
+          }));
+          setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+          toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
+          return;
+        }
+
         setUploadStates((prev) => ({
           ...prev,
-          [formatType]: { status: 'pending-save', s3Keys: [s3Key!] },
+          [formatType]: { status: 'success', s3Keys: [s3Key!] },
         }));
         setUploadedFormats((prev) => new Set([...prev, formatType]));
         setUploadedFilesList((prev) => ({
           ...prev,
           [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key: s3Key! }],
         }));
-        const pendingConfig = FORMAT_CONFIGS.find((c) => c.type === formatType);
-        toast.success(
-          `${pendingConfig?.label ?? formatType} uploaded — will be saved with release`
-        );
-      } else {
-        setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
-        try {
-          const confirmResult = await confirmDigitalFormatUploadAction({
-            releaseId: releaseId!,
-            formatType,
-            s3Key: s3Key!,
-            fileName: file.name,
-            fileSize: file.size,
-            mimeType: file.type,
-          });
-          if (!confirmResult.success) {
-            throw new Error(confirmResult.error || 'Failed to confirm upload');
-          }
-          setUploadStates((prev) => ({
-            ...prev,
-            [formatType]: { status: 'success', s3Keys: [s3Key!] },
-          }));
-          setUploadedFormats((prev) => new Set([...prev, formatType]));
-          setUploadedFilesList((prev) => ({
-            ...prev,
-            [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key: s3Key! }],
-          }));
-          const config = FORMAT_CONFIGS.find((c) => c.type === formatType);
-          toast.success(`${config?.label ?? formatType} uploaded successfully`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Upload failed';
-          setUploadStates((prev) => ({
-            ...prev,
-            [formatType]: { status: 'error', message },
-          }));
-          setErrorMessages((prev) => ({ ...prev, [formatType]: message }));
-          const config = FORMAT_CONFIGS.find((c) => c.type === formatType);
-          toast.error(`${config?.label ?? formatType} upload failed`, { description: message });
+
+        onReleaseAutoCreated({
+          releaseId: autoCreateResult.releaseId!,
+          releaseTitle: autoCreateResult.releaseTitle!,
+          metadata: extractedMetadata,
+        });
+
+        toast.success(`Release "${autoCreateResult.releaseTitle}" created`);
+        return;
+      }
+
+      // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+      setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
+      try {
+        const confirmResult = await confirmDigitalFormatUploadAction({
+          releaseId: releaseId!,
+          formatType,
+          s3Key: s3Key!,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+        });
+        if (!confirmResult.success) {
+          throw new Error(confirmResult.error || 'Failed to confirm upload');
         }
+        setUploadStates((prev) => ({
+          ...prev,
+          [formatType]: { status: 'success', s3Keys: [s3Key!] },
+        }));
+        setUploadedFormats((prev) => new Set([...prev, formatType]));
+        setUploadedFilesList((prev) => ({
+          ...prev,
+          [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key: s3Key! }],
+        }));
+        toast.success(`${config?.label ?? formatType} uploaded successfully`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed';
+        setUploadStates((prev) => ({
+          ...prev,
+          [formatType]: { status: 'error', message },
+        }));
+        setErrorMessages((prev) => ({ ...prev, [formatType]: message }));
+        toast.error(`${config?.label ?? formatType} upload failed`, { description: message });
       }
     },
-    [releaseId, onPendingConfirm, onMetadataExtracted, uploadSingleFile]
+    [releaseId, onReleaseAutoCreated, onMetadataExtracted, uploadSingleFile]
   );
 
   /**
@@ -537,27 +554,24 @@ export function DigitalFormatsAccordion({
         },
       }));
 
-      // Try to extract metadata from the first file (client-side) for MP3_320KBPS
+      // Extract metadata from the first MP3_320KBPS file
+      const extractedMetadata: { album?: string; artist?: string; year?: number; label?: string } =
+        {};
       if (formatType === 'MP3_320KBPS') {
         try {
           const { parseBlob } = await import('music-metadata');
-          const metadata = await parseBlob(files[0]);
-          const { common } = metadata;
+          const parsedMeta = await parseBlob(files[0]);
+          const { common } = parsedMeta;
           if (common.album) {
             setAlbumTitle(common.album);
+            extractedMetadata.album = common.album;
           }
-          if (
-            onMetadataExtracted &&
-            (common.album ?? common.artist ?? common.year ?? common.label?.[0])
-          ) {
-            const extracted: { album?: string; artist?: string; year?: number; label?: string } =
-              {};
-            if (common.album) extracted.album = common.album;
-            if (common.artist) extracted.artist = common.artist;
-            if (common.year) extracted.year = common.year;
-            if (common.label?.[0]) extracted.label = common.label[0];
-            onMetadataExtracted(extracted);
-            console.info(`[batch-upload] Extracted album metadata:`, extracted);
+          if (common.artist) extractedMetadata.artist = common.artist;
+          if (common.year) extractedMetadata.year = common.year;
+          if (common.label?.[0]) extractedMetadata.label = common.label[0];
+          if (Object.keys(extractedMetadata).length > 0) {
+            onMetadataExtracted?.(extractedMetadata);
+            console.info(`[batch-upload] Extracted album metadata:`, extractedMetadata);
           }
         } catch {
           // Metadata extraction is best-effort — not all formats support it
@@ -589,19 +603,6 @@ export function DigitalFormatsAccordion({
         if (result.success && result.s3Key) {
           successFiles.push({ fileName: file.name, fileSize: file.size, s3Key: result.s3Key });
           s3Keys.push(result.s3Key);
-
-          // Notify parent of each pending confirm (create mode)
-          if (onPendingConfirm) {
-            onPendingConfirm({
-              releaseId: releaseId!,
-              formatType,
-              s3Key: result.s3Key,
-              fileName: file.name,
-              fileSize: file.size,
-              mimeType: file.type,
-            });
-          }
-
           console.info(`[batch-upload] Finished ${i + 1}/${files.length}: ${formatType} (success)`);
         } else {
           failCount++;
@@ -624,25 +625,151 @@ export function DigitalFormatsAccordion({
 
       // Set terminal state
       if (successFiles.length > 0) {
-        const terminalStatus = onPendingConfirm ? 'pending-save' : 'success';
-
-        // In edit mode, confirm all files via multi-track action
-        if (!onPendingConfirm) {
-          setUploadStates((prev) => ({
-            ...prev,
-            [formatType]: { status: 'confirming' },
-          }));
-          // Individual confirms are handled per-file in edit mode too; just mark success
-        }
-
         setUploadStates((prev) => ({
           ...prev,
-          [formatType]: { status: terminalStatus, s3Keys },
+          [formatType]: { status: 'confirming' },
         }));
+
+        // In create mode, auto-create the release on first MP3_320KBPS batch upload
+        if (onReleaseAutoCreated && formatType === 'MP3_320KBPS') {
+          const autoCreateResult = await findOrCreateReleaseAction({
+            ...extractedMetadata,
+            album: extractedMetadata.album ?? 'Untitled Release',
+            id: releaseId,
+          });
+
+          if (!autoCreateResult.success) {
+            const errMsg = autoCreateResult.error ?? 'Failed to create release';
+            setUploadStates((prev) => ({
+              ...prev,
+              [formatType]: { status: 'error', message: errMsg },
+            }));
+            setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+            toast.error('Failed to create release', { description: errMsg });
+            return;
+          }
+
+          // Confirm all successful files via multi-track or single action
+          let confirmOk = false;
+          if (successFiles.length === 1) {
+            const cr = await confirmDigitalFormatUploadAction({
+              releaseId: releaseId!,
+              formatType,
+              s3Key: successFiles[0].s3Key,
+              fileName: successFiles[0].fileName,
+              fileSize: successFiles[0].fileSize,
+              mimeType: files[0].type,
+            });
+            confirmOk = cr.success;
+          } else {
+            const cr = await confirmMultiTrackUploadAction({
+              releaseId: releaseId!,
+              formatType,
+              files: successFiles.map((f, idx) => ({
+                trackNumber: idx + 1,
+                s3Key: f.s3Key,
+                fileName: f.fileName,
+                fileSize: f.fileSize,
+                mimeType:
+                  files[successFiles.indexOf(f)]?.type ||
+                  files.find((orig) => orig.name === f.fileName)?.type ||
+                  '',
+              })),
+            });
+            confirmOk = cr.success;
+          }
+
+          if (!confirmOk) {
+            const errMsg = 'Failed to confirm upload';
+            setUploadStates((prev) => ({
+              ...prev,
+              [formatType]: { status: 'error', message: errMsg },
+            }));
+            setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+            toast.error(`${config?.label ?? formatType} upload failed`, {
+              description: errMsg,
+            });
+            return;
+          }
+
+          setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'success', s3Keys } }));
+          setUploadedFormats((prev) => new Set([...prev, formatType]));
+          setUploadedFilesList((prev) => ({ ...prev, [formatType]: successFiles }));
+          setSelectedFiles((prev) => ({
+            ...prev,
+            [formatType]: {
+              file: files[0],
+              fileName: `${successFiles.length} files`,
+              fileSize: successFiles.reduce((sum, f) => sum + f.fileSize, 0),
+              fileCount: successFiles.length,
+            },
+          }));
+
+          onReleaseAutoCreated({
+            releaseId: autoCreateResult.releaseId!,
+            releaseTitle: autoCreateResult.releaseTitle!,
+            metadata: extractedMetadata,
+          });
+
+          if (failCount > 0) {
+            toast.warning(
+              `${config?.label ?? formatType}: ${successFiles.length} of ${files.length} files uploaded — release "${autoCreateResult.releaseTitle}" created`
+            );
+          } else {
+            toast.success(
+              `Release "${autoCreateResult.releaseTitle}" created with ${successFiles.length} files`
+            );
+          }
+          console.info(
+            `[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`
+          );
+          return;
+        }
+
+        // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+        let confirmOk = false;
+        if (successFiles.length === 1) {
+          const cr = await confirmDigitalFormatUploadAction({
+            releaseId: releaseId!,
+            formatType,
+            s3Key: successFiles[0].s3Key,
+            fileName: successFiles[0].fileName,
+            fileSize: successFiles[0].fileSize,
+            mimeType: files[0].type,
+          });
+          confirmOk = cr.success;
+        } else {
+          const cr = await confirmMultiTrackUploadAction({
+            releaseId: releaseId!,
+            formatType,
+            files: successFiles.map((f, idx) => ({
+              trackNumber: idx + 1,
+              s3Key: f.s3Key,
+              fileName: f.fileName,
+              fileSize: f.fileSize,
+              mimeType: files.find((orig) => orig.name === f.fileName)?.type || '',
+            })),
+          });
+          confirmOk = cr.success;
+        }
+
+        if (!confirmOk) {
+          const errMsg = 'Failed to confirm upload';
+          setUploadStates((prev) => ({
+            ...prev,
+            [formatType]: { status: 'error', message: errMsg },
+          }));
+          setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+          toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
+          console.info(
+            `[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`
+          );
+          return;
+        }
+
+        setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'success', s3Keys } }));
         setUploadedFormats((prev) => new Set([...prev, formatType]));
         setUploadedFilesList((prev) => ({ ...prev, [formatType]: successFiles }));
-
-        // Update the display to show count
         setSelectedFiles((prev) => ({
           ...prev,
           [formatType]: {
@@ -659,7 +786,7 @@ export function DigitalFormatsAccordion({
           );
         } else {
           toast.success(
-            `${config?.label ?? formatType}: ${successFiles.length} files uploaded — will be saved with release`
+            `${config?.label ?? formatType}: ${successFiles.length} files uploaded successfully`
           );
         }
       } else {
@@ -672,7 +799,7 @@ export function DigitalFormatsAccordion({
 
       console.info(`[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`);
     },
-    [releaseId, onPendingConfirm, onMetadataExtracted, uploadSingleFile]
+    [releaseId, onReleaseAutoCreated, onMetadataExtracted, uploadSingleFile]
   );
 
   const handleFileInputChange = useCallback(
@@ -782,39 +909,31 @@ export function DigitalFormatsAccordion({
     setDragOverFormat(null);
   }, []);
 
-  const handleRemoveFile = useCallback(
-    (formatType: DigitalFormatType) => {
-      const currentState = uploadStates[formatType];
-      if (currentState?.status === 'pending-save') {
-        onPendingConfirmRemove?.(formatType);
-      }
+  const handleRemoveFile = useCallback((formatType: DigitalFormatType) => {
+    setSelectedFiles((prev) => {
+      const next = { ...prev };
+      delete next[formatType];
+      return next;
+    });
+    setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'idle' } }));
+    setUploadedFormats((prev) => {
+      const next = new Set(prev);
+      next.delete(formatType);
+      return next;
+    });
+    setErrorMessages((prev) => ({ ...prev, [formatType]: null }));
+    setUploadedFilesList((prev) => {
+      const next = { ...prev };
+      delete next[formatType];
+      return next;
+    });
 
-      setSelectedFiles((prev) => {
-        const next = { ...prev };
-        delete next[formatType];
-        return next;
-      });
-      setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'idle' } }));
-      setUploadedFormats((prev) => {
-        const next = new Set(prev);
-        next.delete(formatType);
-        return next;
-      });
-      setErrorMessages((prev) => ({ ...prev, [formatType]: null }));
-      setUploadedFilesList((prev) => {
-        const next = { ...prev };
-        delete next[formatType];
-        return next;
-      });
-
-      // Reset file input
-      const input = fileInputRefs.current[formatType];
-      if (input) {
-        input.value = '';
-      }
-    },
-    [uploadStates, onPendingConfirmRemove]
-  );
+    // Reset file input
+    const input = fileInputRefs.current[formatType];
+    if (input) {
+      input.value = '';
+    }
+  }, []);
 
   const getUploadState = useCallback(
     (formatType: DigitalFormatType): UploadState => {
@@ -838,18 +957,76 @@ export function DigitalFormatsAccordion({
     [uploadedFormats]
   );
 
+  /**
+   * Handle upload button click — show confirmation dialog if format already has files
+   */
+  const handleUploadButtonClick = useCallback(
+    (formatType: DigitalFormatType) => {
+      if (isUploaded(formatType)) {
+        setConfirmReuploadFormat(formatType);
+        return;
+      }
+      fileInputRefs.current[formatType]?.click();
+    },
+    [isUploaded]
+  );
+
+  /**
+   * Handle confirmed re-upload: delete existing files then open the file picker
+   */
+  const handleConfirmReupload = useCallback(async () => {
+    const formatType = confirmReuploadFormat;
+    if (!formatType || !releaseId) {
+      setConfirmReuploadFormat(null);
+      return;
+    }
+
+    setIsDeletingFiles(true);
+    try {
+      const result = await deleteFormatFilesAction({ releaseId, formatType });
+      if (!result.success) {
+        toast.error('Failed to delete existing files', { description: result.error });
+        return;
+      }
+
+      // Clear local state for this format
+      setUploadedFormats((prev) => {
+        const next = new Set(prev);
+        next.delete(formatType);
+        return next;
+      });
+      setUploadedFilesList((prev) => {
+        const next = { ...prev };
+        delete next[formatType];
+        return next;
+      });
+      setSelectedFiles((prev) => {
+        const next = { ...prev };
+        delete next[formatType];
+        return next;
+      });
+      setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'idle' } }));
+      setErrorMessages((prev) => ({ ...prev, [formatType]: null }));
+
+      // Reset file input
+      const input = fileInputRefs.current[formatType];
+      if (input) {
+        input.value = '';
+      }
+
+      // Open file picker
+      fileInputRefs.current[formatType]?.click();
+    } catch {
+      toast.error('Failed to delete existing files');
+    } finally {
+      setIsDeletingFiles(false);
+      setConfirmReuploadFormat(null);
+    }
+  }, [confirmReuploadFormat, releaseId]);
+
   const getStatusIcon = useCallback(
     (formatType: DigitalFormatType) => {
       const state = getUploadState(formatType);
-      if (state.status === 'pending-save') {
-        return (
-          <CheckCircle2
-            className="h-5 w-5 text-amber-500"
-            data-testid="format-pending-save-checkmark"
-            aria-label="Format uploaded, pending release save"
-          />
-        );
-      }
       if (isUploaded(formatType) || state.status === 'success') {
         return (
           <CheckCircle2
@@ -885,8 +1062,6 @@ export function DigitalFormatsAccordion({
         }
         case 'confirming':
           return 'Finalizing upload...';
-        case 'pending-save':
-          return 'Uploaded — will be saved with release';
         case 'success':
           return 'Upload successful!';
         case 'error':
@@ -906,6 +1081,9 @@ export function DigitalFormatsAccordion({
   const isAnyUploading = uploadingCount > 0;
   const isDisabled = !releaseId;
 
+  // In create mode (onReleaseAutoCreated provided), lock other formats until MP3_320KBPS is uploaded first
+  const isLockedForOtherFormats = !!onReleaseAutoCreated && !uploadedFormats.has('MP3_320KBPS');
+
   // Total files uploaded across all formats (for badge display)
   const totalFilesUploaded = Object.values(uploadedFilesList).reduce(
     (sum, files) => sum + files.length,
@@ -920,9 +1098,6 @@ export function DigitalFormatsAccordion({
             <Music className="h-5 w-5" />
             Digital Formats
           </CardTitle>
-          <CardDescription>
-            Save the release first, then return here to upload digital format files.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="w-full">
@@ -954,9 +1129,10 @@ export function DigitalFormatsAccordion({
             </span>
           )}
         </CardTitle>
-        <CardDescription>
-          Upload audio files in various formats for user downloads. Expand each format to upload or
-          replace files.
+        <CardDescription className="text-sm">
+          {isLockedForOtherFormats
+            ? 'Upload MP3 320kbps first — the release will be created automatically from the audio metadata.'
+            : 'Upload audio files in various formats for user downloads. Expand each format to upload or replace files.'}
         </CardDescription>
         {(successCount > 0 || errorCount > 0) && (
           <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -1009,6 +1185,7 @@ export function DigitalFormatsAccordion({
             const selected = selectedFiles[config.type];
             const uploaded = isUploaded(config.type);
             const uploading = isUploading(config.type);
+            const isLocked = isLockedForOtherFormats && config.type !== 'MP3_320KBPS';
 
             return (
               <AccordionItem key={config.type} value={config.type}>
@@ -1038,13 +1215,20 @@ export function DigitalFormatsAccordion({
                         'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6',
                         'transition-colors hover:border-primary/50',
                         dragOverFormat === config.type && 'border-primary bg-primary/5',
-                        uploading && 'pointer-events-none opacity-50'
+                        (uploading || isLocked) && 'pointer-events-none opacity-50'
                       )}
                     >
                       <Upload className="mb-3 h-8 w-8 text-muted-foreground" />
-                      <p className="mb-1 text-sm text-muted-foreground">
-                        Drag and drop a {config.label} file or folder here, or choose a folder below
-                      </p>
+                      {isLocked ? (
+                        <p className="mb-1 text-sm text-muted-foreground">
+                          Upload MP3 320kbps first
+                        </p>
+                      ) : (
+                        <p className="mb-1 text-sm text-muted-foreground">
+                          Drag and drop a {config.label} file or folder here, or choose a folder
+                          below
+                        </p>
+                      )}
                       <p className="mb-3 text-xs text-muted-foreground">
                         Accepts: {config.acceptTypes}
                       </p>
@@ -1062,7 +1246,7 @@ export function DigitalFormatsAccordion({
                           webkitdirectory=""
                           directory=""
                           onChange={(e) => handleFileInputChange(config.type, e)}
-                          disabled={uploading}
+                          disabled={uploading || isLocked}
                           aria-label={`Upload ${config.label} folder`}
                           className="hidden"
                         />
@@ -1070,11 +1254,20 @@ export function DigitalFormatsAccordion({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={uploading}
-                          onClick={() => fileInputRefs.current[config.type]?.click()}
+                          disabled={uploading || isLocked || isDeletingFiles}
+                          onClick={() => handleUploadButtonClick(config.type)}
                         >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload files
+                          {uploaded ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Re-upload files
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload files
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -1085,9 +1278,7 @@ export function DigitalFormatsAccordion({
                         className={cn(
                           'rounded-md border p-3',
                           state.status === 'error' && 'border-destructive bg-destructive/10',
-                          state.status === 'pending-save' && 'border-amber-400 bg-amber-50',
                           (uploaded || state.status === 'success') &&
-                            state.status !== 'pending-save' &&
                             'border-green-500 bg-green-500/10'
                         )}
                       >
@@ -1102,9 +1293,8 @@ export function DigitalFormatsAccordion({
                                 className={cn(
                                   'text-xs',
                                   state.status === 'error' && 'text-destructive',
-                                  state.status === 'pending-save' && 'text-amber-600',
                                   state.status === 'success' && 'text-green-600',
-                                  !['error', 'success', 'pending-save'].includes(state.status) &&
+                                  !['error', 'success'].includes(state.status) &&
                                     'text-muted-foreground'
                                 )}
                               >
@@ -1130,8 +1320,8 @@ export function DigitalFormatsAccordion({
                           )}
                         </div>
 
-                        {/* Uploaded files list for batch uploads */}
-                        {uploadedFilesList[config.type]?.length > 1 && (
+                        {/* Uploaded files list */}
+                        {uploadedFilesList[config.type]?.length >= 1 && (
                           <ul className="mt-2 space-y-1 border-t pt-2">
                             {uploadedFilesList[config.type].map((fileInfo, idx) => (
                               <li
@@ -1169,6 +1359,30 @@ export function DigitalFormatsAccordion({
           })}
         </Accordion>
       </CardContent>
+
+      {/* Re-upload confirmation dialog */}
+      <AlertDialog
+        open={confirmReuploadFormat !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmReuploadFormat(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-upload files?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This format already has files uploaded. Re-uploading will permanently delete the
+              existing files and replace them with the new ones. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingFiles}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReupload} disabled={isDeletingFiles}>
+              {isDeletingFiles ? 'Deleting...' : 'Delete & Re-upload'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

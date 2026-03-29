@@ -1059,6 +1059,14 @@ describe('ArtistService', () => {
           where: expect.objectContaining({
             isActive: true,
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            releases: {
+              some: {
+                release: {
+                  publishedAt: { not: null },
+                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                },
+              },
+            },
           }),
           skip: 0,
           take: 50,
@@ -1175,6 +1183,14 @@ describe('ArtistService', () => {
           where: {
             isActive: true,
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            releases: {
+              some: {
+                release: {
+                  publishedAt: { not: null },
+                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                },
+              },
+            },
           },
         })
       );

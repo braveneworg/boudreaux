@@ -200,7 +200,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const currentTrackTitle = currentFile?.title ?? currentFile?.fileName ?? '';
 
   return (
-    <MediaPlayer className="mb-2">
+    <MediaPlayer className="mx-2 mb-2">
       <div className="space-y-2 mt-0">
         {/* Featured Artists Carousel */}
         {featuredArtists.length >= 3 && (

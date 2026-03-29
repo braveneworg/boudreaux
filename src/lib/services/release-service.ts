@@ -6,6 +6,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../prisma';
+import { deleteS3Object } from '../utils/s3-client';
 import { withCache } from '../utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
@@ -232,18 +233,76 @@ export class ReleaseService {
   }
 
   /**
-   * Delete a release by ID (hard delete)
+   * Delete a release by ID (hard delete).
+   * Cascades to delete all related data EXCEPT Artist records.
+   * Deletes S3 objects for digital format files and images.
    */
   static async deleteRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
-      const release = await prisma.release.delete({
+      // Verify release exists and fetch related data for S3 cleanup
+      const existing = await prisma.release.findUnique({
         where: { id },
         include: {
+          digitalFormats: {
+            include: { files: true },
+          },
           images: true,
-          artistReleases: true,
-          digitalFormats: true,
-          releaseUrls: true,
         },
+      });
+
+      if (!existing) {
+        return { success: false, error: 'Release not found' };
+      }
+
+      // Collect S3 keys for cleanup
+      const s3KeysToDelete: string[] = [];
+      for (const format of existing.digitalFormats) {
+        for (const file of format.files) {
+          if (file.s3Key) s3KeysToDelete.push(file.s3Key);
+        }
+      }
+
+      // Delete related records in dependency order (children first)
+      // 1. Digital format files (child of ReleaseDigitalFormat)
+      for (const format of existing.digitalFormats) {
+        await prisma.releaseDigitalFormatFile.deleteMany({
+          where: { formatId: format.id },
+        });
+      }
+
+      // 2. Digital formats
+      await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: id } });
+
+      // 3. Purchase and download records
+      await prisma.releasePurchase.deleteMany({ where: { releaseId: id } });
+      await prisma.releaseDownload.deleteMany({ where: { releaseId: id } });
+
+      // 4. Download events (no FK relation, just matching field)
+      await prisma.downloadEvent.deleteMany({ where: { releaseId: id } });
+
+      // 5. Release URLs (junction table)
+      await prisma.releaseUrl.deleteMany({ where: { releaseId: id } });
+
+      // 6. Images (shared model — only delete images linked to this release)
+      await prisma.image.deleteMany({ where: { releaseId: id } });
+
+      // 7. ArtistRelease junction records (does NOT delete the Artist)
+      await prisma.artistRelease.deleteMany({ where: { releaseId: id } });
+
+      // 8. FeaturedArtist references (disconnect, don't delete the featured artist record)
+      await prisma.featuredArtist.updateMany({
+        where: { releaseId: id },
+        data: { releaseId: null },
+      });
+
+      // 9. Delete the release itself
+      const release = await prisma.release.delete({
+        where: { id },
+      });
+
+      // 10. Best-effort S3 cleanup (async, fire-and-forget)
+      Promise.allSettled(s3KeysToDelete.map((key) => deleteS3Object(key))).catch(() => {
+        // Silently ignore — S3 objects will be cleaned up by lifecycle rules
       });
 
       return { success: true, data: release as unknown as Release };

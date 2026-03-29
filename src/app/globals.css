@@ -99,10 +99,11 @@
   }
   html {
     height: 100%;
+    font-family: 'Courier Prime', 'Courier New', Courier, monospace, system, serif !important;
   }
+
   body {
-    @apply bg-background text-foreground;
-    min-height: 100%;
+    @apply bg-background text-foreground min-h-dvh;
   }
   input,
   textarea,
@@ -116,7 +117,6 @@
   h4,
   h5,
   h6 {
-    font-family: 'Courier Prime', 'Courier New', Courier, monospace, system, serif;
     /* @apply bg-punk-black text-white font-mono selection:bg-punk-pink selection:text-white;   */
     /* background-image: url("https://www.transparenttextures.com/patterns/dark-matter.png"); */
 
@@ -411,15 +411,4 @@ nextjs-portal {
   cursor: pointer;
   border-radius: 5px 0 0 5px;
   transform: translateX(10px); /* Adjusts position */
-}
-
-@layer components {
-  .stamped-box {
-    @apply border-2 border-white px-4 py-1 inline-block transform -rotate-1 shadow-[4px_4px_0px_0px_rgba(255,255,255,1)];
-  }
-
-  .hand-drawn-border {
-    border: 2px solid white;
-    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
-  }
 }

@@ -73,7 +73,7 @@ describe('Logo', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByTestId('logo-image');
-    expect(img).toHaveClass('rounded-full', 'bg-white', 'size-12', 'md:size-36');
+    expect(img).toHaveClass('rounded-full', 'bg-white', 'size-10', 'md:size-36');
   });
 
   describe('mobile vs desktop logo source', () => {

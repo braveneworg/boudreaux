@@ -121,7 +121,7 @@ describe('ArtistSearchInput', () => {
 
     const input = screen.getByRole('combobox');
     expect(input).toBeInTheDocument();
-    expect(input).toHaveAttribute('placeholder', 'Search all artists & releases...');
+    expect(input).toHaveAttribute('placeholder', 'Search artists & releases');
   });
 
   it('should have correct accessibility attributes', () => {
