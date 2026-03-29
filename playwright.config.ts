@@ -21,7 +21,7 @@ export default defineConfig({
   globalTimeout: IS_CI ? 1_800_000 : undefined, // 30 minutes
   workers: 1,
   reporter: IS_CI
-    ? [['html', { outputFolder: PLAYWRIGHT_REPORT_OUTPUT }], ['github']]
+    ? [['blob', { outputDir: './blob-report' }], ['github']]
     : [['list'], ['html', { outputFolder: PLAYWRIGHT_REPORT_OUTPUT, open: 'never' }]],
 
   globalSetup: './e2e/global-setup.ts',
