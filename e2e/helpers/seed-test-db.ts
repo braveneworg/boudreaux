@@ -77,6 +77,11 @@ async function seedTestDatabase() {
 
   try {
     // Clear all collections in dependency-safe order
+    await prisma.releaseDigitalFormatFile.deleteMany({});
+    await prisma.releaseDigitalFormat.deleteMany({});
+    await prisma.downloadEvent.deleteMany({});
+    await prisma.releasePurchase.deleteMany({});
+    await prisma.userDownloadQuota.deleteMany({});
     await prisma.tourDateImage.deleteMany({});
     await prisma.tourDateHeadliner.deleteMany({});
     await prisma.tourImage.deleteMany({});
@@ -232,6 +237,38 @@ async function seedTestDatabase() {
         data: { artistId: e2eArtist.id, releaseId: e2eRelease3.id },
       }),
     ]);
+
+    // Create MP3_320KBPS digital formats with track files for each E2E release.
+    // The artist page filters releases to only those with playable MP3_320KBPS files.
+    const e2eReleases = [
+      { release: e2eRelease1, trackTitle: 'E2E Track Alpha' },
+      { release: e2eRelease2, trackTitle: 'E2E Track Beta' },
+      { release: e2eRelease3, trackTitle: 'E2E Track Gamma' },
+    ];
+
+    for (const { release, trackTitle } of e2eReleases) {
+      const format = await prisma.releaseDigitalFormat.create({
+        data: {
+          releaseId: release.id,
+          formatType: 'MP3_320KBPS',
+          trackCount: 1,
+          totalFileSize: BigInt(5_000_000),
+        },
+      });
+
+      await prisma.releaseDigitalFormatFile.create({
+        data: {
+          formatId: format.id,
+          trackNumber: 1,
+          title: trackTitle,
+          duration: 210,
+          s3Key: `releases/${release.id}/audio/mp3_320kbps/01-track.mp3`,
+          fileName: '01-track.mp3',
+          fileSize: BigInt(5_000_000),
+          mimeType: 'audio/mpeg',
+        },
+      });
+    }
 
     await Promise.all([
       prisma.notification.create({
