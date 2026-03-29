@@ -325,7 +325,7 @@ export function DataView<T extends Record<string, unknown>>({
   );
 
   return (
-    <>
+    <div className="mx-1">
       <Button
         className="w-full"
         onClick={handleCreateEntityButtonClick}
@@ -683,6 +683,6 @@ export function DataView<T extends Record<string, unknown>>({
           </DialogClose>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
