@@ -123,6 +123,19 @@ if (typeof window !== 'undefined') {
   // Mock scrollIntoView for JSDOM
   Element.prototype.scrollIntoView = vi.fn();
 
+  // Polyfill HTMLFormElement.requestSubmit for jsdom (not implemented in jsdom@26)
+  // This is triggered when clicking submit buttons inside forms
+  if (!HTMLFormElement.prototype.requestSubmit) {
+    HTMLFormElement.prototype.requestSubmit = function (submitter?: HTMLElement) {
+      if (submitter) {
+        const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+        this.dispatchEvent(submitEvent);
+      } else {
+        this.submit();
+      }
+    };
+  }
+
   // Mock HTMLCanvasElement.getContext for components that use canvas
   // (e.g., chart libraries, image processing, etc.)
   HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((contextType: string) => {
