@@ -45,7 +45,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: IS_CI ? 'pnpm exec next start -p 3000' : 'pnpm run dev',
+    command: IS_CI ? 'node .next/standalone/server.js' : 'pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: false,
     timeout: IS_CI ? 60_000 : 120_000, // 1 min in CI (pre-built), 2 min locally

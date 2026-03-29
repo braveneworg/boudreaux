@@ -299,6 +299,11 @@ jobs:
           AUTH_URL: "http://localhost:3000"
         run: pnpm exec next build --webpack
 
+      - name: Prepare standalone server assets
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d "public" ]; then cp -r public .next/standalone/public; fi
+
       - name: Run E2E Tests (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
         run: pnpm run e2e --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
         env:
