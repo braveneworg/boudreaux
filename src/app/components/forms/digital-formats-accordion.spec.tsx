@@ -871,7 +871,7 @@ describe('DigitalFormatsAccordion', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid file type'),
+          expect.stringContaining('Wrong file type'),
           expect.any(Object)
         );
       });
@@ -978,9 +978,9 @@ describe('DigitalFormatsAccordion', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'FLAC upload failed',
+          'Wrong file type for FLAC',
           expect.objectContaining({
-            description: expect.stringContaining('Wrong file type'),
+            description: expect.stringContaining('.flac'),
           })
         );
       });

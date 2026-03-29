@@ -808,7 +808,19 @@ export function DigitalFormatsAccordion({
       if (!files?.length) return;
 
       if (files.length === 1) {
-        handleFileUpload(_formatType, files[0]);
+        // Validate file extension matches the target format before uploading
+        const file = files[0];
+        const fileExtension = file.name.split('.').pop()?.toLowerCase() ?? '';
+        const expectedExtension = getFileExtensionForFormat(_formatType);
+        const validExtensions = MULTI_EXT_MAP[expectedExtension] ?? [expectedExtension];
+        if (!validExtensions.includes(fileExtension)) {
+          const config = FORMAT_CONFIGS.find((c) => c.type === _formatType);
+          toast.error(`Wrong file type for ${config?.label ?? _formatType}`, {
+            description: `Expected a .${expectedExtension} file, got .${fileExtension || 'unknown'}`,
+          });
+          return;
+        }
+        handleFileUpload(_formatType, file);
         return;
       }
 
@@ -884,10 +896,21 @@ export function DigitalFormatsAccordion({
       const file = event.dataTransfer.files[0];
       if (!file) return;
 
-      // Validate MIME type matches the target format
-      if (!config.mimeTypes.includes(file.type)) {
+      // Validate file extension matches the target format
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const expectedExtension = getFileExtensionForFormat(formatType);
+      const validExtensions = MULTI_EXT_MAP[expectedExtension] ?? [expectedExtension];
+      if (!validExtensions.includes(fileExtension)) {
+        toast.error(`Wrong file type for ${config.label}`, {
+          description: `Expected a .${expectedExtension} file, got .${fileExtension || 'unknown'}`,
+        });
+        return;
+      }
+
+      // Validate MIME type matches the target format (skip if browser reports empty type)
+      if (file.type !== '' && !config.mimeTypes.includes(file.type)) {
         toast.error(`Invalid file type for ${config.label}`, {
-          description: `Expected ${config.acceptTypes}, got ${file.type || 'unknown'}`,
+          description: `Expected ${config.acceptTypes}, got ${file.type}`,
         });
         return;
       }
