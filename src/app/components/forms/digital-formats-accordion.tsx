@@ -94,6 +94,7 @@ interface DigitalFormatsAccordionProps {
     artist?: string;
     year?: number;
     label?: string;
+    coverArt?: string;
   }) => void;
 }
 
@@ -388,20 +389,36 @@ export function DigitalFormatsAccordion({
       }));
 
       // Extract metadata from MP3_320KBPS before uploading
-      const extractedMetadata: { album?: string; artist?: string; year?: number; label?: string } =
-        {};
+      const extractedMetadata: {
+        album?: string;
+        artist?: string;
+        year?: number;
+        label?: string;
+        coverArt?: string;
+      } = {};
       if (formatType === 'MP3_320KBPS') {
         try {
           const { parseBlob } = await import('music-metadata');
           const parsedMeta = await parseBlob(file);
           const { common } = parsedMeta;
-          if (common.album || common.artist || common.year || common.label?.[0]) {
-            if (common.album) extractedMetadata.album = common.album;
-            if (common.artist) extractedMetadata.artist = common.artist;
-            if (common.year) extractedMetadata.year = common.year;
-            if (common.label?.[0]) extractedMetadata.label = common.label[0];
+          if (common.album) extractedMetadata.album = common.album;
+          if (common.artist) extractedMetadata.artist = common.artist;
+          if (common.year) extractedMetadata.year = common.year;
+          if (common.label?.[0]) extractedMetadata.label = common.label[0];
+          // Extract embedded cover art from ID3 tags
+          if (common.picture && common.picture.length > 0) {
+            const pic = common.picture[0];
+            const base64 = btoa(
+              pic.data.reduce((acc: string, byte: number) => acc + String.fromCharCode(byte), '')
+            );
+            extractedMetadata.coverArt = `data:${pic.format};base64,${base64}`;
+          }
+          if (Object.keys(extractedMetadata).length > 0) {
             onMetadataExtracted?.(extractedMetadata);
-            console.info('[upload] MP3_320KBPS: extracted metadata', extractedMetadata);
+            console.info('[upload] MP3_320KBPS: extracted metadata', {
+              ...extractedMetadata,
+              coverArt: extractedMetadata.coverArt ? '(base64 data URL)' : undefined,
+            });
           }
         } catch {
           console.info('[upload] MP3_320KBPS: could not extract metadata');
@@ -555,8 +572,13 @@ export function DigitalFormatsAccordion({
       }));
 
       // Extract metadata from the first MP3_320KBPS file
-      const extractedMetadata: { album?: string; artist?: string; year?: number; label?: string } =
-        {};
+      const extractedMetadata: {
+        album?: string;
+        artist?: string;
+        year?: number;
+        label?: string;
+        coverArt?: string;
+      } = {};
       if (formatType === 'MP3_320KBPS') {
         try {
           const { parseBlob } = await import('music-metadata');
@@ -569,9 +591,20 @@ export function DigitalFormatsAccordion({
           if (common.artist) extractedMetadata.artist = common.artist;
           if (common.year) extractedMetadata.year = common.year;
           if (common.label?.[0]) extractedMetadata.label = common.label[0];
+          // Extract embedded cover art from ID3 tags
+          if (common.picture && common.picture.length > 0) {
+            const pic = common.picture[0];
+            const base64 = btoa(
+              pic.data.reduce((acc: string, byte: number) => acc + String.fromCharCode(byte), '')
+            );
+            extractedMetadata.coverArt = `data:${pic.format};base64,${base64}`;
+          }
           if (Object.keys(extractedMetadata).length > 0) {
             onMetadataExtracted?.(extractedMetadata);
-            console.info(`[batch-upload] Extracted album metadata:`, extractedMetadata);
+            console.info(`[batch-upload] Extracted album metadata:`, {
+              ...extractedMetadata,
+              coverArt: extractedMetadata.coverArt ? '(base64 data URL)' : undefined,
+            });
           }
         } catch {
           // Metadata extraction is best-effort — not all formats support it

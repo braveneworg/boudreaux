@@ -262,6 +262,26 @@ export class ReleaseService {
         }
       }
 
+      // Collect S3 keys from images and coverArt
+      const cdnDomainRaw = process.env.CDN_DOMAIN;
+      const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
+      const imageUrls = existing.images
+        .map((image) => image.src)
+        .filter((src): src is string => Boolean(src));
+      if (existing.coverArt) imageUrls.push(existing.coverArt);
+      for (const url of imageUrls) {
+        let s3Key: string | null = null;
+        if (cdnDomain && url.includes(cdnDomain)) {
+          s3Key = url.replace(/^(https?:\/\/)+/, '').replace(`${cdnDomain}/`, '');
+        } else if (url.includes('.s3.')) {
+          const urlParts = url.split('.s3.');
+          if (urlParts[1]) {
+            s3Key = urlParts[1].split('/').slice(1).join('/');
+          }
+        }
+        if (s3Key) s3KeysToDelete.push(s3Key);
+      }
+
       // Delete related records in dependency order (children first)
       // 1. Digital format files (child of ReleaseDigitalFormat)
       for (const format of existing.digitalFormats) {

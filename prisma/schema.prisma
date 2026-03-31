@@ -303,6 +303,7 @@ model FeaturedArtist {
   id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
   displayName           String? // Override artist's display name when featured; if not provided, use artist's displayName
   featuredOn            DateTime               @default(now())
+  featuredUntil         DateTime? // Optional end date for featuring; null = indefinite
   digitalFormat         ReleaseDigitalFormat?  @relation(fields: [digitalFormatId], references: [id])
   digitalFormatId       String?                @db.ObjectId
   createdAt             DateTime               @default(now())
@@ -311,12 +312,14 @@ model FeaturedArtist {
   position              Int                    @default(0) // Position in the featured artists list; lower numbers appear first
   description           String? // Markdown supported post-MVP; A special description to use when the artist is featured; keep it brief
   coverArt              String? // Optional cover art to use when featuring the artist; if not provided,
+  featuredTrackNumber   Int? // 1-based track number to start playback on; null = start at track 1
   release               Release?               @relation(fields: [releaseId], references: [id])
   releaseId             String?                @db.ObjectId
   artists               Artist[]
   artistFeaturedArtists ArtistFeaturedArtist[]
 
   @@index([featuredOn])
+  @@index([featuredUntil])
   @@index([digitalFormatId])
 }
 

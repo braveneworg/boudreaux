@@ -13,6 +13,11 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
+function serializeBigInts<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/featured-artists
  * Get all featured artists or search for featured artists
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      featuredArtists: result.data,
+      featuredArtists: serializeBigInts(result.data),
       count: result.data.length,
     });
   } catch (error) {
@@ -73,7 +78,7 @@ export const POST = await withAdmin(async (request: NextRequest) => {
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data, { status: 201 });
+    return NextResponse.json(serializeBigInts(result.data), { status: 201 });
   } catch (error) {
     console.error('FeaturedArtist POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

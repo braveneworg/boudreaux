@@ -42,7 +42,7 @@ export default function AdminPage() {
   }, []);
 
   return (
-    <>
+    <div className="mx-1.5">
       <BreadcrumbMenu
         items={[
           {
@@ -62,6 +62,6 @@ export default function AdminPage() {
       {view === 'artist' && <ArtistDataView />}
       {view === 'release' && <ReleaseDataView />}
       {view === 'featured artist' && <FeaturedArtistDataView />}
-    </>
+    </div>
   );
 }

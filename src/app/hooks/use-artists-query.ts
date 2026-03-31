@@ -20,7 +20,7 @@ const useArtistsQuery = () => {
   } = useQuery({
     queryKey: ['artistsData'],
     queryFn: fetchArtists,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // Always refetch when the query is accessed
   });
 
   return { isPending, error, data, refetch };

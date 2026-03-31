@@ -125,7 +125,15 @@ describe('FeaturedArtistsService', () => {
       expect(result).toMatchObject({ success: true, data: artists });
       expect(mockFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { featuredOn: { lte: currentDate } },
+          where: {
+            publishedOn: { not: null },
+            featuredOn: { lte: currentDate },
+            OR: [
+              { featuredUntil: null },
+              { featuredUntil: { isSet: false } },
+              { featuredUntil: { gte: currentDate } },
+            ],
+          },
           orderBy: { featuredOn: 'desc' },
           take: 5,
         })

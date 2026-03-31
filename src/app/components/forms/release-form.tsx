@@ -355,7 +355,13 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   );
 
   const handleMetadataExtracted = useCallback(
-    (metadata: { album?: string; artist?: string; year?: number; label?: string }) => {
+    (metadata: {
+      album?: string;
+      artist?: string;
+      year?: number;
+      label?: string;
+      coverArt?: string;
+    }) => {
       if (metadata.album) {
         releaseForm.setValue('title', metadata.album, { shouldDirty: true });
       }
@@ -364,6 +370,9 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       }
       if (metadata.label) {
         releaseForm.setValue('labels', metadata.label, { shouldDirty: true });
+      }
+      if (metadata.coverArt) {
+        releaseForm.setValue('coverArt', metadata.coverArt, { shouldDirty: true });
       }
       if (metadata.artist) {
         toast.info(
@@ -594,7 +603,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
   if (!releaseForm || !control || isLoadingRelease) {
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>{initialReleaseId ? 'Edit Release' : 'Create New Release'}</CardTitle>
           <CardDescription>Loading...</CardDescription>
@@ -626,7 +635,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           },
         ]}
       />
-      <Card className="px-0 pb-0 w-full">
+      <Card className="px-0 pb-0 w-full border-none">
         <CardHeader>
           <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
           <CardDescription className="text-sm">
@@ -646,7 +655,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
             noValidate
           >
             <CardContent className="space-y-6">
-              <Separator />
               {/* Digital Formats Section - Always visible */}
               <section className="space-y-4">
                 <DigitalFormatsAccordion

@@ -7,6 +7,11 @@ import { NextResponse } from 'next/server';
 import { type DigitalFormatType, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
+function serializeBigInts<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/releases/[id]/digital-formats?formatType=MP3_320KBPS
  *
@@ -39,7 +44,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ digitalFormat: format });
+    return NextResponse.json({ digitalFormat: serializeBigInts(format) });
   } catch (error) {
     console.error('Digital formats GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

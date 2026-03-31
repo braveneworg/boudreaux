@@ -39,6 +39,7 @@ import {
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 import type Player from 'video.js/dist/types/player';
 
@@ -1052,15 +1053,13 @@ const TrackListDrawer = ({
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription>
-            <article>
-              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
-              <p className="text-sm text-shadow-none mb-0">
-                <em>{release.title}</em>
-              </p>
-              <p>
-                {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
-              </p>
-            </article>
+            <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+            <p className="text-sm text-shadow-none mb-0">
+              <em>{release.title}</em>
+            </p>
+            <p>
+              {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
+            </p>
           </DrawerDescription>
         </DrawerHeader>
         <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
@@ -1092,7 +1091,7 @@ const TrackListDrawer = ({
                       <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
                         <Image
                           src={coverArt}
-                          alt={file.title ?? file.fileName}
+                          alt={getTrackDisplayTitle(file.title, file.fileName)}
                           fill
                           className="object-cover"
                           sizes="40px"
@@ -1106,7 +1105,7 @@ const TrackListDrawer = ({
                           : 'text-zinc-500 dark:text-zinc-500'
                       }`}
                     >
-                      {file.title ?? file.fileName}
+                      {getTrackDisplayTitle(file.title, file.fileName)}
                     </span>
                   </div>
                   <span
@@ -1215,7 +1214,7 @@ const FormatFileListDrawer = ({
           <ol className="px-0 -ml-2">
             {files.map((file) => {
               const isCurrentFile = currentFileId === file.id;
-              const displayTitle = file.title ?? file.fileName;
+              const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
 
               const fileItem = (
                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- file selection handled by parent player component

@@ -52,8 +52,8 @@ export default function HamburgerMenuSheet({
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <nav className="flex flex-col" aria-label="Main navigation">
           <AuthToolbar className="text-zinc-50 pb-0" onNavigate={() => onOpenChange(false)} />
-          <SocialMediaIconLinks className="justify-center" />
-          <ul>
+          <SocialMediaIconLinks className="pt-2 justify-center" />
+          <ul className="-mt-4">
             {menuItems.map((item, index) => (
               <motion.li
                 key={item.name}
@@ -63,7 +63,7 @@ export default function HamburgerMenuSheet({
               >
                 <a
                   href={item.href}
-                  className="mt-2 text-zinc-50 text-shadow-sm text-2xl font-light hover:text-gray-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
+                  className="mt-4 text-zinc-50 text-shadow-sm text-xl transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:rounded-md block"
                   style={{
                     textShadow: '0 2px 18px rgba(255, 255, 255, 0.8)',
                   }}

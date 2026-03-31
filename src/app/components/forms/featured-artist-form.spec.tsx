@@ -139,11 +139,11 @@ describe('FeaturedArtistForm', () => {
       expect(screen.getByTestId('cover-art-field-coverArt')).toBeInTheDocument();
     });
 
-    it('renders breadcrumb, date picker, and display name field', () => {
+    it('renders breadcrumb, date pickers, and display name field', () => {
       render(<FeaturedArtistForm />);
 
       expect(screen.getByTestId('breadcrumb-menu')).toBeInTheDocument();
-      expect(screen.getByTestId('date-picker')).toBeInTheDocument();
+      expect(screen.getAllByTestId('date-picker')).toHaveLength(2);
       expect(screen.getByTestId('text-field-displayName')).toBeInTheDocument();
     });
 

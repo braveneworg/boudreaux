@@ -10,6 +10,11 @@ import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
 
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
+function serializeBigInts<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/featured-artists/[id]
  * Get a single featured artist by ID
@@ -30,7 +35,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeBigInts(result.data));
   } catch (error) {
     console.error('FeaturedArtist GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -51,10 +56,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return validation.response;
     }
 
-    const result = await FeaturedArtistsService.updateFeaturedArtist(
-      id,
-      validation.data as unknown as Prisma.FeaturedArtistUpdateInput
-    );
+    // Convert date strings to Date objects for Prisma DateTime fields
+    const updateData: Prisma.FeaturedArtistUpdateInput = {
+      ...(validation.data as Record<string, unknown>),
+      ...(validation.data.publishedOn && { publishedOn: new Date(validation.data.publishedOn) }),
+      ...(validation.data.featuredOn && { featuredOn: new Date(validation.data.featuredOn) }),
+      ...(validation.data.featuredUntil && {
+        featuredUntil: new Date(validation.data.featuredUntil),
+      }),
+    };
+
+    const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
 
     if (!result.success) {
       const status =
@@ -66,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeBigInts(result.data));
   } catch (error) {
     console.error('FeaturedArtist PATCH error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

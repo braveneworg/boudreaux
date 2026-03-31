@@ -68,7 +68,9 @@ export default async function RootLayout({
       >
         <Providers>
           <Header isMobile={isMobile} />
-          <main className="flex flex-col w-full max-w-full overflow-x-hidden">{children}</main>
+          <main className="flex flex-col flex-grow w-full max-w-full overflow-x-hidden">
+            {children}
+          </main>
           <Footer />
         </Providers>
         <Toaster position="bottom-center" />

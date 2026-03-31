@@ -65,6 +65,7 @@ export const ReleaseDataView = () => {
       data={transformedData}
       fieldsToShow={fieldsToShow}
       imageField="images"
+      forceHardDelete
       refetch={refetch}
       isPending={isPending}
     />

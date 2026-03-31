@@ -50,6 +50,12 @@ import { DatePicker } from '../ui/datepicker';
 
 type FormFieldName = keyof FeaturedArtistFormData;
 
+interface TrackOption {
+  trackNumber: number;
+  title: string | null;
+  fileName: string;
+}
+
 interface FeaturedArtistFormProps {
   featuredArtistId?: string;
 }
@@ -59,9 +65,16 @@ const initialFormState: FormState = {
   success: false,
 };
 
-const ToastContent = ({ displayName }: { displayName: string }) => (
+const ToastContent = ({
+  displayName,
+  isEditMode,
+}: {
+  displayName: string;
+  isEditMode: boolean;
+}) => (
   <>
-    Featured artist <b>{displayName || 'entry'}</b> created successfully.
+    Featured artist <b>{displayName || 'entry'}</b> {isEditMode ? 'updated' : 'created'}{' '}
+    successfully.
   </>
 );
 
@@ -87,6 +100,7 @@ export default function FeaturedArtistForm({
       coverArt: '',
       position: 0,
       featuredOn: new Date().toISOString().split('T')[0],
+      featuredUntil: '',
       digitalFormatId: '',
       releaseId: '',
     },
@@ -99,6 +113,7 @@ export default function FeaturedArtistForm({
     'idle'
   );
   const [formatFileCount, setFormatFileCount] = useState(0);
+  const [_formatTracks, setFormatTracks] = useState<TrackOption[]>([]);
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -131,6 +146,7 @@ export default function FeaturedArtistForm({
           coverArt: featuredArtist.coverArt || '',
           position: featuredArtist.position ?? 0,
           featuredOn: formatDate(featuredArtist.featuredOn),
+          featuredUntil: formatDate(featuredArtist.featuredUntil),
           digitalFormatId: featuredArtist.digitalFormatId || '',
           releaseId: featuredArtist.releaseId || '',
         });
@@ -178,6 +194,7 @@ export default function FeaturedArtistForm({
     async (releaseId: string) => {
       setFormatStatus('loading');
       setFormatFileCount(0);
+      setFormatTracks([]);
       setValue('digitalFormatId', '');
 
       try {
@@ -201,7 +218,20 @@ export default function FeaturedArtistForm({
           shouldValidate: true,
         });
         setFormatStatus('found');
-        setFormatFileCount(digitalFormat.files?.length ?? 0);
+        const files = digitalFormat.files ?? [];
+        setFormatFileCount(files.length);
+        setFormatTracks(
+          [...files]
+            .sort(
+              (a: { trackNumber: number }, b: { trackNumber: number }) =>
+                a.trackNumber - b.trackNumber
+            )
+            .map((f: { trackNumber: number; title: string | null; fileName: string }) => ({
+              trackNumber: f.trackNumber,
+              title: f.title,
+              fileName: f.fileName,
+            }))
+        );
         form.clearErrors('digitalFormatId');
       } catch {
         setFormatStatus('missing');
@@ -223,13 +253,15 @@ export default function FeaturedArtistForm({
     } else {
       setFormatStatus('idle');
       setFormatFileCount(0);
+      setFormatTracks([]);
       setValue('digitalFormatId', '');
+      setValue('featuredTrackNumber', undefined);
     }
   }, [watchedReleaseId, fetchDigitalFormat, setValue, isLoadingFeaturedArtist]);
 
-  const handleDateSelect = (dateString: string, _fieldName: string) => {
-    const dateOnly = dateString.split('T')[0];
-    setValue('featuredOn', dateOnly);
+  const handleDateSelect = (dateString: string, fieldName: string) => {
+    const dateOnly = dateString ? dateString.split('T')[0] : '';
+    setValue(fieldName as FormFieldName, dateOnly);
   };
 
   const handleReleaseChange = (release: ReleaseOption | null) => {
@@ -278,24 +310,51 @@ export default function FeaturedArtistForm({
 
     setIsPending(true);
     try {
-      const result = await createFeaturedArtistAction(formState, formData);
-      setFormState(result);
+      if (isEditMode && featuredArtistId) {
+        // In edit mode, use the PATCH API route
+        const patchBody: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(values)) {
+          if (value !== undefined && value !== null && value !== '') {
+            patchBody[key] =
+              key === 'position' || key === 'featuredTrackNumber' ? Number(value) : value;
+          }
+        }
 
-      if (result.success && result.data?.featuredArtistId) {
-        const displayName = form.getValues('displayName');
-        toast.success(<ToastContent displayName={displayName || ''} />);
-        const newId =
-          typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
-        setFeaturedArtistId(newId);
-        router.push('/admin?entity=featuredArtist');
-      } else if (!result.success) {
-        const generalMsg = result.errors?.general?.[0];
-        const errorDetails = result.errors
-          ? Object.entries(result.errors)
-              .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
-              .join('; ')
-          : 'Unknown error';
-        toast.error(generalMsg || `Failed to create featured artist: ${errorDetails}`);
+        const response = await fetch(`/api/featured-artists/${featuredArtistId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody),
+        });
+
+        if (response.ok) {
+          const displayName = form.getValues('displayName');
+          toast.success(<ToastContent displayName={displayName || ''} isEditMode />);
+          router.push('/admin?entity=featuredArtist');
+        } else {
+          const errorData = await response.json();
+          toast.error(errorData.error || 'Failed to update featured artist');
+        }
+      } else {
+        // In create mode, use the server action
+        const result = await createFeaturedArtistAction(formState, formData);
+        setFormState(result);
+
+        if (result.success && result.data?.featuredArtistId) {
+          const displayName = form.getValues('displayName');
+          toast.success(<ToastContent displayName={displayName || ''} isEditMode={false} />);
+          const newId =
+            typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
+          setFeaturedArtistId(newId);
+          router.push('/admin?entity=featuredArtist');
+        } else if (!result.success) {
+          const generalMsg = result.errors?.general?.[0];
+          const errorDetails = result.errors
+            ? Object.entries(result.errors)
+                .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
+                .join('; ')
+            : 'Unknown error';
+          toast.error(generalMsg || `Failed to create featured artist: ${errorDetails}`);
+        }
       }
     } catch (err) {
       error('Featured artist submission failed:', err);
@@ -457,8 +516,25 @@ export default function FeaturedArtistForm({
 
                   <FormItem className="flex flex-col">
                     <FormLabel>Featured Date</FormLabel>
-                    <DatePicker fieldName="featuredOn" onSelect={handleDateSelect} />
+                    <DatePicker
+                      fieldName="featuredOn"
+                      onSelect={handleDateSelect}
+                      value={form.watch('featuredOn')}
+                    />
                     <FormDescription>When this artist should start being featured.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Featured Until (Optional)</FormLabel>
+                    <DatePicker
+                      fieldName="featuredUntil"
+                      onSelect={handleDateSelect}
+                      value={form.watch('featuredUntil')}
+                    />
+                    <FormDescription>
+                      When this artist should stop being featured. Leave blank for indefinite.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 </div>

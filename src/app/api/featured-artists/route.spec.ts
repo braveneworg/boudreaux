@@ -65,7 +65,7 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({
-        featuredArtists: mockFeaturedArtists,
+        featuredArtists: JSON.parse(JSON.stringify(mockFeaturedArtists)),
         count: 1,
       });
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({});
@@ -172,7 +172,7 @@ describe('Featured Artists API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(201);
-      expect(data).toEqual(mockFeaturedArtist);
+      expect(data).toEqual(JSON.parse(JSON.stringify(mockFeaturedArtist)));
     });
 
     it('should return 400 when required fields are missing', async () => {

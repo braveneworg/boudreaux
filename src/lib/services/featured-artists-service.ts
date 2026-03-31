@@ -34,6 +34,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -65,9 +70,15 @@ export class FeaturedArtistsService {
         try {
           const artists = await prisma.featuredArtist.findMany({
             where: {
+              publishedOn: { not: null },
               featuredOn: {
                 lte: currentDate,
               },
+              OR: [
+                { featuredUntil: null },
+                { featuredUntil: { isSet: false } },
+                { featuredUntil: { gte: currentDate } },
+              ],
             },
             include: {
               artists: {
@@ -85,6 +96,11 @@ export class FeaturedArtistsService {
               release: {
                 include: {
                   images: true,
+                  artistReleases: {
+                    include: {
+                      artist: true,
+                    },
+                  },
                 },
               },
             },
@@ -152,6 +168,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -192,6 +213,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -240,6 +266,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -287,6 +318,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -331,6 +367,11 @@ export class FeaturedArtistsService {
           release: {
             include: {
               images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },

@@ -66,7 +66,8 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   }, [playerControls]);
 
   /**
-   * Get the display name for a featured artist
+   * Get the display name for a featured artist.
+   * Falls back through: featuredArtist.displayName → connected artists → release artists
    */
   const getDisplayName = (featured: FeaturedArtist): string => {
     if (featured.displayName) {
@@ -74,6 +75,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     }
     if (featured.artists && featured.artists.length > 0) {
       const artist = featured.artists[0];
+      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
+    }
+    // Fallback to release's associated artists
+    if (featured.release?.artistReleases && featured.release.artistReleases.length > 0) {
+      const artist = featured.release.artistReleases[0].artist;
       return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
     }
     return 'Unknown Artist';

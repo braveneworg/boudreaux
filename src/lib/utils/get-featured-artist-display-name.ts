@@ -23,9 +23,14 @@ export const getFeaturedArtistDisplayName = (featured: FeaturedArtist): string =
   if (featured.displayName) {
     return featured.displayName;
   }
-  // Fall back to first artist's display name
+  // Fall back to first connected artist's display name
   if (featured.artists && featured.artists.length > 0) {
     const artist = featured.artists[0];
+    return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
+  }
+  // Fall back to release's associated artists
+  if (featured.release?.artistReleases && featured.release.artistReleases.length > 0) {
+    const artist = featured.release.artistReleases[0].artist;
     return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
   }
   return 'Unknown Artist';

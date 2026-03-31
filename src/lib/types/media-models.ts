@@ -209,6 +209,11 @@ export type FeaturedArtist = Prisma.FeaturedArtistGetPayload<{
     release: {
       include: {
         images: true;
+        artistReleases: {
+          include: {
+            artist: true;
+          };
+        };
       };
     };
   };

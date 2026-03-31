@@ -16,6 +16,7 @@ export const FeaturedArtistDataView = () => {
   const fieldsToShow = [
     'displayName',
     'featuredOn',
+    'featuredUntil',
     'position',
     'description',
     'createdAt',

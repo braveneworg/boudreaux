@@ -36,18 +36,27 @@ export const createFeaturedArtistAction = async (
     'coverArt',
     'position',
     'featuredOn',
+    'featuredUntil',
     'digitalFormatId',
     'releaseId',
+    'featuredTrackNumber',
   ];
 
-  // FormData sends all values as strings, so use z.coerce.number() for position
+  // FormData sends all values as strings, so use z.coerce.number() for numeric fields
   // on the server side (the client schema uses z.number() for React Hook Form compatibility)
-  const serverSchema = createFeaturedArtistSchema.omit({ position: true }).extend({
-    position: z.coerce
-      .number()
-      .int({ message: 'Position must be a whole number' })
-      .min(0, { message: 'Position must be 0 or greater' }),
-  });
+  const serverSchema = createFeaturedArtistSchema
+    .omit({ position: true, featuredTrackNumber: true })
+    .extend({
+      position: z.coerce
+        .number()
+        .int({ message: 'Position must be a whole number' })
+        .min(0, { message: 'Position must be 0 or greater' }),
+      featuredTrackNumber: z.coerce
+        .number()
+        .int({ message: 'Featured track number must be a whole number' })
+        .min(1, { message: 'Featured track number must be at least 1' })
+        .optional(),
+    });
 
   const { formState, parsed: baseParsed } = getActionState(
     payload,
@@ -71,8 +80,17 @@ export const createFeaturedArtistAction = async (
   }
 
   try {
-    const { displayName, description, coverArt, position, featuredOn, digitalFormatId, releaseId } =
-      baseParsed.data;
+    const {
+      displayName,
+      description,
+      coverArt,
+      position,
+      featuredOn,
+      featuredUntil,
+      digitalFormatId,
+      releaseId,
+      featuredTrackNumber,
+    } = baseParsed.data;
 
     // Build Prisma create input
     const createData = {
@@ -81,6 +99,9 @@ export const createFeaturedArtistAction = async (
       coverArt: coverArt || undefined,
       position: position ?? 0,
       featuredOn: featuredOn ? new Date(featuredOn) : new Date(),
+      featuredUntil: featuredUntil ? new Date(featuredUntil) : undefined,
+      featuredTrackNumber: featuredTrackNumber ?? undefined,
+      publishedOn: new Date(),
       artists: {
         connect: artistIds.map((id) => ({ id })),
       },
