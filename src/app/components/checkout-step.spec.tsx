@@ -14,11 +14,11 @@ vi.mock('@/lib/actions/create-checkout-session-action', () => ({
 }));
 
 vi.mock('@stripe/stripe-js', () => ({
-  loadStripe: vi.fn(() => Promise.resolve(null)),
+  loadStripe: vi.fn((_key: string, _options?: Record<string, unknown>) => Promise.resolve(null)),
 }));
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
-  CheckoutFormProvider: ({ children }: { children: React.ReactNode }) => (
+  CheckoutElementsProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="checkout-provider">{children}</div>
   ),
 }));

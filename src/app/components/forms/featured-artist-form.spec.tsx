@@ -104,6 +104,39 @@ vi.mock('../ui/datepicker', () => ({
   DatePicker: () => <div data-testid="date-picker">DatePicker</div>,
 }));
 
+let _capturedSelectOnValueChange: ((val: string) => void) | undefined;
+
+vi.mock('@/app/components/ui/select', () => ({
+  Select: ({
+    children,
+    value,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    value?: string;
+    onValueChange?: (val: string) => void;
+  }) => {
+    _capturedSelectOnValueChange = onValueChange;
+    return (
+      <div data-testid="featured-track-select" data-value={value ?? ''}>
+        {children}
+      </div>
+    );
+  },
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="select-trigger">{children}</div>
+  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => (
+    <span data-testid="select-value">{placeholder}</span>
+  ),
+  SelectContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="select-content">{children}</div>
+  ),
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
+    <div data-testid={`select-item-${value}`}>{children}</div>
+  ),
+}));
+
 describe('FeaturedArtistForm', () => {
   const mockFetch = vi.fn();
 
@@ -112,6 +145,7 @@ describe('FeaturedArtistForm', () => {
     mockSetValue.mockClear();
     mockFetch.mockReset();
     capturedReleaseSelectSetValue = undefined;
+    _capturedSelectOnValueChange = undefined;
     vi.stubGlobal('fetch', mockFetch);
   });
 
@@ -165,7 +199,10 @@ describe('FeaturedArtistForm', () => {
           JSON.stringify({
             digitalFormat: {
               id: TEST_FORMAT_ID,
-              files: [{ id: 'file-1' }, { id: 'file-2' }],
+              files: [
+                { id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' },
+                { id: 'file-2', trackNumber: 2, title: null, fileName: 'track-2.mp3' },
+              ],
             },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -201,7 +238,11 @@ describe('FeaturedArtistForm', () => {
           JSON.stringify({
             digitalFormat: {
               id: TEST_FORMAT_ID,
-              files: [{ id: 'file-1' }, { id: 'file-2' }, { id: 'file-3' }],
+              files: [
+                { id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' },
+                { id: 'file-2', trackNumber: 2, title: null, fileName: 'track-2.mp3' },
+                { id: 'file-3', trackNumber: 3, title: null, fileName: 'track-3.mp3' },
+              ],
             },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -300,7 +341,7 @@ describe('FeaturedArtistForm', () => {
           JSON.stringify({
             digitalFormat: {
               id: TEST_FORMAT_ID,
-              files: [{ id: 'file-1' }],
+              files: [{ id: 'file-1', trackNumber: 1, title: null, fileName: 'track-1.mp3' }],
             },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -330,6 +371,94 @@ describe('FeaturedArtistForm', () => {
       await user.click(screen.getByRole('button', { name: /cancel/i }));
 
       expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist');
+    });
+  });
+
+  describe('featured track dropdown', () => {
+    const TEST_RELEASE_ID = 'abc123def456abc123def456';
+    const TEST_FORMAT_ID = 'def456abc123def456abc123';
+
+    it('renders featured track dropdown when format files are loaded', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            digitalFormat: {
+              id: TEST_FORMAT_ID,
+              files: [
+                { id: 'file-1', trackNumber: 1, title: 'Track One', fileName: 'track-1.mp3' },
+                { id: 'file-2', trackNumber: 2, title: 'Track Two', fileName: 'track-2.mp3' },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      render(<FeaturedArtistForm />);
+
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('featured-track-select')).toBeInTheDocument();
+        expect(screen.getByTestId('select-item-1')).toBeInTheDocument();
+        expect(screen.getByTestId('select-item-2')).toBeInTheDocument();
+      });
+    });
+
+    it('does not render featured track dropdown when no format files', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      render(<FeaturedArtistForm />);
+
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('featured-track-select')).not.toBeInTheDocument();
+      });
+    });
+
+    it('displays the default placeholder text', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            digitalFormat: {
+              id: TEST_FORMAT_ID,
+              files: [
+                { id: 'file-1', trackNumber: 1, title: 'Track One', fileName: 'track-1.mp3' },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      render(<FeaturedArtistForm />);
+
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', TEST_RELEASE_ID, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Default (Track 1)')).toBeInTheDocument();
+      });
     });
   });
 

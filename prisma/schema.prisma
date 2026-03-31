@@ -654,7 +654,7 @@ model ReleasePurchase {
   amountPaid              Int // Amount paid in cents
   currency                String    @default("usd")
   stripePaymentIntentId   String    @unique // Idempotency key for webhook deduplication
-  stripeSessionId         String? // Stripe Checkout Session ID
+  stripeSessionId         String?   @unique // Stripe Checkout Session ID — polling key
   confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
   purchasedAt             DateTime  @default(now())
 

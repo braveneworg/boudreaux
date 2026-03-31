@@ -19,6 +19,11 @@ export const CheckoutForm = () => {
   const [error, setError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [paymentComplete, setPaymentComplete] = useState(false);
+
+  const handlePaymentChange = useCallback((event: { complete: boolean }) => {
+    setPaymentComplete(event.complete);
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (checkoutState.type !== 'success') return;
@@ -64,6 +69,7 @@ export const CheckoutForm = () => {
   const { checkout } = checkoutState;
   const lineItem = checkout.lineItems[0];
   const recurring = lineItem?.recurring ?? checkout.recurring;
+  const canSubmit = checkout.canConfirm || paymentComplete;
 
   return (
     <div className="space-y-4">
@@ -79,7 +85,7 @@ export const CheckoutForm = () => {
 
       <Separator />
 
-      <PaymentElement />
+      <PaymentElement onChange={handlePaymentChange} />
 
       <TurnstileWidget
         isVerified={isVerified}
@@ -92,7 +98,7 @@ export const CheckoutForm = () => {
       <Button
         className="w-full"
         onClick={handleConfirm}
-        disabled={!checkout.canConfirm || !isVerified || isProcessing}
+        disabled={!canSubmit || !isVerified || isProcessing}
       >
         {isProcessing ? (
           <>

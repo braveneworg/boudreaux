@@ -20,7 +20,7 @@ const prisma = new PrismaClient();
 const isDryRun = process.argv.includes('--dry-run');
 
 async function main() {
-  console.log(isDryRun ? '=== DRY RUN ===' : '=== LIVE RUN ===');
+  console.info(isDryRun ? '=== DRY RUN ===' : '=== LIVE RUN ===');
 
   // Find all featured artists with their connected artists and release artists
   const featuredArtists = await prisma.featuredArtist.findMany({
@@ -38,7 +38,7 @@ async function main() {
     },
   });
 
-  console.log(`Found ${featuredArtists.length} featured artist(s)\n`);
+  console.info(`Found ${featuredArtists.length} featured artist(s)\n`);
 
   let fixedCount = 0;
 
@@ -51,12 +51,12 @@ async function main() {
       const artistNames = fa.artists
         .map((a) => a.displayName || `${a.firstName} ${a.surname}`.trim() || a.id)
         .join(', ');
-      console.log(`✓ ${name} — already has ${fa.artists.length} artist(s): ${artistNames}`);
+      console.info(`✓ ${name} — already has ${fa.artists.length} artist(s): ${artistNames}`);
       continue;
     }
 
     if (releaseArtists.length === 0) {
-      console.log(
+      console.info(
         `⚠ ${name} — no connected artists and no release artists to backfill from${fa.releaseId ? ` (release: ${fa.releaseId})` : ' (no release linked)'}`
       );
       continue;
@@ -65,7 +65,7 @@ async function main() {
     const artistNames = releaseArtists
       .map((a) => a.displayName || `${a.firstName} ${a.surname}`.trim() || a.id)
       .join(', ');
-    console.log(`→ ${name} — connecting ${releaseArtists.length} artist(s): ${artistNames}`);
+    console.info(`→ ${name} — connecting ${releaseArtists.length} artist(s): ${artistNames}`);
 
     if (!isDryRun) {
       // Set featuredArtistId on each Artist to link them to this FeaturedArtist
@@ -82,7 +82,7 @@ async function main() {
     fixedCount++;
   }
 
-  console.log(`\n${isDryRun ? 'Would fix' : 'Fixed'} ${fixedCount} featured artist(s)`);
+  console.info(`\n${isDryRun ? 'Would fix' : 'Fixed'} ${fixedCount} featured artist(s)`);
 }
 
 main()

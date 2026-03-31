@@ -441,7 +441,9 @@ export const DownloadDialog = ({
             releaseId={releaseId}
             releaseTitle={releaseTitle}
             amountCents={amountCents}
+            customerEmail={customerEmail ?? session?.user?.email}
             onConfirmed={() => setStep('purchase-success')}
+            onCancel={() => setStep('download')}
             onError={(msg) => {
               setPurchaseError(msg);
               setStep('download');

@@ -35,11 +35,19 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import {
   createFeaturedArtistSchema,
   type FeaturedArtistFormData,
@@ -113,7 +121,7 @@ export default function FeaturedArtistForm({
     'idle'
   );
   const [formatFileCount, setFormatFileCount] = useState(0);
-  const [_formatTracks, setFormatTracks] = useState<TrackOption[]>([]);
+  const [formatTracks, setFormatTracks] = useState<TrackOption[]>([]);
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -149,6 +157,7 @@ export default function FeaturedArtistForm({
           featuredUntil: formatDate(featuredArtist.featuredUntil),
           digitalFormatId: featuredArtist.digitalFormatId || '',
           releaseId: featuredArtist.releaseId || '',
+          featuredTrackNumber: featuredArtist.featuredTrackNumber ?? undefined,
         });
 
         // Set format status if editing an existing entry
@@ -202,6 +211,7 @@ export default function FeaturedArtistForm({
       setFormatFileCount(0);
       setFormatTracks([]);
       setValue('digitalFormatId', '');
+      setValue('featuredTrackNumber', undefined);
 
       try {
         const response = await fetch(
@@ -454,6 +464,47 @@ export default function FeaturedArtistForm({
                         <XCircle className="h-4 w-4" />
                         No MP3 320kbps format found. Please upload format files first.
                       </p>
+                    )}
+
+                    {/* Featured Track selector */}
+                    {formatStatus === 'found' && formatTracks.length > 0 && (
+                      <FormField
+                        control={control}
+                        name="featuredTrackNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Featured Track (Optional)</FormLabel>
+                            <Select
+                              value={field.value != null ? String(field.value) : ''}
+                              onValueChange={(val) => {
+                                field.onChange(val ? parseInt(val, 10) : undefined);
+                              }}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Default (Track 1)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {formatTracks.map((track) => (
+                                  <SelectItem
+                                    key={track.trackNumber}
+                                    value={String(track.trackNumber)}
+                                  >
+                                    {track.trackNumber}.{' '}
+                                    {getTrackDisplayTitle(track.title, track.fileName)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Select the track that plays first when a user clicks play. Defaults to
+                              track 1.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
                   </div>
                 </div>

@@ -167,6 +167,9 @@ vi.mock('lucide-react', () => ({
     <span data-testid="play-icon" className={className} />
   ),
   Search: () => <span data-testid="search-icon" />,
+  Star: ({ className, 'aria-label': ariaLabel }: { className?: string; 'aria-label'?: string }) => (
+    <span data-testid="star-icon" className={className} aria-label={ariaLabel} />
+  ),
 }));
 
 // Mock Button from shadcn/ui
@@ -1002,6 +1005,63 @@ describe('MediaPlayer', () => {
 
       // Should still scroll even without onSelect
       expect(mockScrollTo).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe('FormatFileListDrawer featured track indicator', () => {
+    const trackFiles = [
+      createMockFormatFile({ id: 'f-1', trackNumber: 1, title: 'Track One' }),
+      createMockFormatFile({ id: 'f-2', trackNumber: 2, title: 'Track Two' }),
+      createMockFormatFile({ id: 'f-3', trackNumber: 3, title: 'Track Three' }),
+    ];
+
+    it('should render a star icon for the featured track', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FormatFileListDrawer
+            files={trackFiles}
+            currentFileId={null}
+            artistName="Test Artist"
+            releaseTitle="Test Album"
+            featuredTrackNumber={2}
+          />
+        </MediaPlayer>
+      );
+
+      const starIcons = screen.getAllByTestId('star-icon');
+      expect(starIcons).toHaveLength(1);
+      expect(starIcons[0]).toHaveAttribute('aria-label', 'Featured track');
+    });
+
+    it('should not render a star icon when no featured track is set', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FormatFileListDrawer
+            files={trackFiles}
+            currentFileId={null}
+            artistName="Test Artist"
+            releaseTitle="Test Album"
+          />
+        </MediaPlayer>
+      );
+
+      expect(screen.queryByTestId('star-icon')).not.toBeInTheDocument();
+    });
+
+    it('should not render a star icon when featuredTrackNumber does not match any file', () => {
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FormatFileListDrawer
+            files={trackFiles}
+            currentFileId={null}
+            artistName="Test Artist"
+            releaseTitle="Test Album"
+            featuredTrackNumber={99}
+          />
+        </MediaPlayer>
+      );
+
+      expect(screen.queryByTestId('star-icon')).not.toBeInTheDocument();
     });
   });
 });

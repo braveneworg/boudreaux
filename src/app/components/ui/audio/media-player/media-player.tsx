@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import { ChevronDown, ChevronUp, EllipsisVertical, Pause, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, EllipsisVertical, Pause, Play, Star } from 'lucide-react';
 import videojs from 'video.js';
 
 import {
@@ -41,6 +41,7 @@ import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
+import { cn } from '@/lib/utils/tailwind-utils';
 
 import type Player from 'video.js/dist/types/player';
 
@@ -341,7 +342,7 @@ const FeaturedArtistCarousel = ({
                   {coverArt && !imageError ? (
                     <Image
                       src={coverArt}
-                      alt={displayName}
+                      alt={displayName ?? ''}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"
                       sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
@@ -1166,6 +1167,7 @@ interface FormatFileListDrawerProps {
   onFileSelect?: (fileId: string) => void;
   artistName: string;
   releaseTitle: string;
+  featuredTrackNumber?: number;
 }
 
 /**
@@ -1178,6 +1180,7 @@ const FormatFileListDrawer = ({
   onFileSelect,
   artistName,
   releaseTitle,
+  featuredTrackNumber,
 }: FormatFileListDrawerProps) => {
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -1285,6 +1288,15 @@ const FormatFileListDrawer = ({
                     >
                       {displayTitle}
                     </span>
+                    {featuredTrackNumber != null && file.trackNumber === featuredTrackNumber && (
+                      <Star
+                        className={cn(
+                          'h-3.5 w-3.5 shrink-0 fill-current',
+                          isCurrentFile ? 'text-amber-400' : 'text-amber-500'
+                        )}
+                        aria-label="Featured track"
+                      />
+                    )}
                   </div>
                   {file.duration != null && (
                     <span

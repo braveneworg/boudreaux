@@ -49,8 +49,15 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     if (currentFileId) {
       return sortedFiles.find((f) => f.id === currentFileId) ?? sortedFiles[0] ?? null;
     }
+    // Default to the featured track if set, otherwise the first track
+    if (selectedArtist?.featuredTrackNumber != null) {
+      const featured = sortedFiles.find(
+        (f) => f.trackNumber === selectedArtist.featuredTrackNumber
+      );
+      if (featured) return featured;
+    }
     return sortedFiles[0] ?? null;
-  }, [currentFileId, sortedFiles]);
+  }, [currentFileId, sortedFiles, selectedArtist?.featuredTrackNumber]);
 
   /** CDN URL for the current file's audio */
   const audioSrc = useMemo<string | null>(() => {
@@ -111,9 +118,15 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
     setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
     setSelectedArtist(artist);
-    // Reset to first file of the new artist's format
-    const firstFile = artist.digitalFormat?.files?.[0];
-    setCurrentFileId(firstFile?.id ?? null);
+    // Reset to the featured track if set, otherwise the first file
+    const files = artist.digitalFormat?.files ?? [];
+    const sorted = [...files].sort((a, b) => a.trackNumber - b.trackNumber);
+    let targetFile = sorted[0];
+    if (artist.featuredTrackNumber != null) {
+      const featured = sorted.find((f) => f.trackNumber === artist.featuredTrackNumber);
+      if (featured) targetFile = featured;
+    }
+    setCurrentFileId(targetFile?.id ?? null);
   };
 
   /**
@@ -223,6 +236,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               onFileSelect={handleFileSelect}
               artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
               releaseTitle={selectedArtist.release.title ?? ''}
+              featuredTrackNumber={selectedArtist.featuredTrackNumber ?? undefined}
             />
             <DownloadDialog
               artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}

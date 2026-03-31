@@ -16,7 +16,7 @@ vi.mock('server-only', () => ({}));
 const mockCheckoutState = vi.fn();
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
-  CheckoutFormProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CheckoutElementsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   PaymentElement: () => null,
   useCheckout: () => mockCheckoutState(),
 }));
@@ -75,6 +75,7 @@ interface DefaultProps {
   amountCents: number;
   onConfirmed: () => void;
   onError: (message: string) => void;
+  onCancel: () => void;
 }
 
 const buildProps = (overrides: Partial<DefaultProps> = {}): DefaultProps => ({
@@ -83,6 +84,7 @@ const buildProps = (overrides: Partial<DefaultProps> = {}): DefaultProps => ({
   amountCents: 1000,
   onConfirmed: vi.fn(),
   onError: vi.fn(),
+  onCancel: vi.fn(),
   ...overrides,
 });
 
@@ -162,7 +164,7 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      paymentIntentId: 'pi_xxx',
+      sessionId: 'cs_xxx',
     });
 
     const props = buildProps({ releaseTitle: 'My Album' });
@@ -179,7 +181,7 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      paymentIntentId: 'pi_xxx',
+      sessionId: 'cs_xxx',
     });
 
     const onConfirmed = vi.fn();
@@ -203,7 +205,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -237,7 +239,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -267,7 +269,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -300,7 +302,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -328,7 +330,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -353,7 +355,7 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      paymentIntentId: 'pi_xxx',
+      sessionId: 'cs_xxx',
     });
 
     mockCheckoutState.mockReturnValue({
@@ -426,7 +428,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -452,7 +454,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -487,7 +489,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -519,7 +521,7 @@ describe('PurchaseCheckoutStep', () => {
       mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
         success: true,
         clientSecret: 'cs_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
 
       const props = buildProps();
@@ -529,6 +531,33 @@ describe('PurchaseCheckoutStep', () => {
         const payButton = screen.getByText(/Pay \$/);
         expect(payButton.closest('button')).toBeDisabled();
       });
+    });
+
+    it('calls onCancel when cancel button is clicked', async () => {
+      mockCheckoutState.mockReturnValue({
+        type: 'success',
+        checkout: {
+          canConfirm: true,
+          confirm: vi.fn(),
+        },
+      });
+
+      mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+        success: true,
+        clientSecret: 'cs_xxx',
+        sessionId: 'cs_xxx',
+      });
+
+      const onCancel = vi.fn();
+      const props = buildProps({ onCancel });
+      render(<PurchaseCheckoutStep {...props} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Cancel')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(onCancel).toHaveBeenCalledOnce();
     });
   });
 
@@ -570,7 +599,7 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      paymentIntentId: 'pi_xxx',
+      sessionId: 'cs_xxx',
     });
 
     const props = buildProps();
@@ -605,7 +634,7 @@ describe('PurchaseCheckoutStep', () => {
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      paymentIntentId: 'pi_xxx',
+      sessionId: 'cs_xxx',
     });
 
     const props = buildProps();

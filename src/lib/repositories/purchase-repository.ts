@@ -31,6 +31,13 @@ export class PurchaseRepository {
     });
   }
 
+  /** Find a purchase by its Stripe Checkout Session ID (polling key). */
+  static async findBySessionId(sessionId: string) {
+    return prisma.releasePurchase.findUnique({
+      where: { stripeSessionId: sessionId },
+    });
+  }
+
   /** Find a purchase by userId + releaseId composite key. */
   static async findByUserAndRelease(userId: string, releaseId: string) {
     return prisma.releasePurchase.findUnique({

@@ -156,14 +156,20 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     files,
     currentFileId,
     onFileSelect,
+    featuredTrackNumber,
   }: {
     files: Array<{ id: string; title?: string | null; fileName: string }>;
     currentFileId: string | null;
     onFileSelect?: (fileId: string) => void;
     artistName: string;
     releaseTitle: string;
+    featuredTrackNumber?: number;
   }) => (
-    <div data-testid="format-file-list-drawer" data-current-file-id={currentFileId}>
+    <div
+      data-testid="format-file-list-drawer"
+      data-current-file-id={currentFileId}
+      data-featured-track-number={featuredTrackNumber?.toString() ?? ''}
+    >
       {files.map((f) => (
         <button key={f.id} data-testid={`file-select-${f.id}`} onClick={() => onFileSelect?.(f.id)}>
           {f.title ?? f.fileName}
@@ -1080,6 +1086,99 @@ describe('FeaturedArtistsPlayer', () => {
       expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
         'data-current-file-id',
         'file-2'
+      );
+    });
+  });
+
+  describe('featured track', () => {
+    const mockArtistWithFeaturedTrack: FeaturedArtist = {
+      id: 'featured-ft',
+      displayName: 'Featured Track Artist',
+      featuredOn: new Date('2024-01-14'),
+      featuredTrackNumber: 2,
+      position: 2,
+      description: null,
+      coverArt: 'https://example.com/cover-ft.jpg',
+      digitalFormatId: 'format-1',
+      releaseId: 'release-1',
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      artists: [],
+      digitalFormat: mockDigitalFormat,
+      release: mockRelease,
+    } as unknown as FeaturedArtist;
+
+    it('should default to the featured track when featuredTrackNumber is set', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={[mockArtistWithFeaturedTrack]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Should play track 2 (the featured track) instead of track 1
+      expect(screen.getByTestId('media-controls')).toHaveAttribute(
+        'data-audio-src',
+        'https://cdn.example.com/audio/track-2.mp3'
+      );
+    });
+
+    it('should fall back to first track when featuredTrackNumber does not match', () => {
+      const artistWithBadTrackNumber: FeaturedArtist = {
+        ...mockArtistWithFeaturedTrack,
+        featuredTrackNumber: 99,
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithBadTrackNumber]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Should fall back to track 1
+      expect(screen.getByTestId('media-controls')).toHaveAttribute(
+        'data-audio-src',
+        'https://cdn.example.com/audio/track-1.mp3'
+      );
+    });
+
+    it('should use featured track when selecting artist from carousel', () => {
+      const artists = [
+        mockFeaturedArtists[0],
+        mockArtistWithFeaturedTrack,
+        mockFeaturedArtists[2],
+      ] as unknown as FeaturedArtist[];
+
+      render(<FeaturedArtistsPlayer featuredArtists={artists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select the artist with featured track 2
+      fireEvent.click(screen.getByTestId('artist-featured-ft'));
+
+      expect(screen.getByTestId('media-controls')).toHaveAttribute(
+        'data-audio-src',
+        'https://cdn.example.com/audio/track-2.mp3'
+      );
+    });
+
+    it('should pass featuredTrackNumber to FormatFileListDrawer', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={[mockArtistWithFeaturedTrack]} />, {
+        wrapper: createWrapper(),
+      });
+
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-featured-track-number',
+        '2'
+      );
+    });
+
+    it('should pass empty featuredTrackNumber when not set', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with release but no featured track
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-featured-track-number',
+        ''
       );
     });
   });
