@@ -52,7 +52,7 @@ export const FeaturedArtistDataView = () => {
       fieldsToShow={fieldsToShow}
       refetch={refetch}
       isPending={isPending}
-      getItemDisplayName={getFeaturedArtistDisplayName}
+      getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
       getSearchableText={getSearchableText}
     />
   );

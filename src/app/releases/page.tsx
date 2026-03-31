@@ -39,12 +39,12 @@ const breadcrumbItems = [{ anchorText: 'Releases', url: '/releases', isActive: t
 const toCardRelease = (release: PublishedReleaseListing) => {
   const artistName = release.artistReleases[0]
     ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
-    : null;
+    : 'Unknown Artist';
 
   return {
     id: release.id,
     title: release.title,
-    artistName,
+    artistName: artistName ?? 'Unknown Artist',
     coverArt: getReleaseCoverArt(release),
     bandcampUrl: getBandcampUrl(release),
   };
