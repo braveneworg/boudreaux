@@ -18,6 +18,7 @@ import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 interface AvailableFormat {
   formatType: string;
@@ -194,7 +195,7 @@ export const ReleasePlayer = ({
                 </div>
                 <MediaPlayer.InfoTickerTape
                   artistRelease={{ release, artist: primaryArtist }}
-                  trackName={currentFile.title ?? currentFile.fileName}
+                  trackName={getTrackDisplayTitle(currentFile.title, currentFile.fileName)}
                   isPlaying={isPlaying}
                 />
               </>

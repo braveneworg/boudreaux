@@ -343,7 +343,7 @@ describe('ReleasePlayerPage', () => {
     expect(player).toHaveAttribute('data-auto-play', 'false');
   });
 
-  it('should use "Unknown Artist" fallback when no artistReleases exist', async () => {
+  it('should handle missing artistReleases gracefully', async () => {
     const releaseNoArtists = {
       ...mockReleaseData,
       artistReleases: [],

@@ -1217,8 +1217,8 @@ describe('ArtistMultiSelect', () => {
     });
   });
 
-  describe('Unknown Artist fallback', () => {
-    it('shows Unknown Artist when displayName, firstName, and surname are all empty', async () => {
+  describe('(no name) fallback', () => {
+    it('shows (no name) when displayName, firstName, and surname are all empty', async () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1244,7 +1244,7 @@ describe('ArtistMultiSelect', () => {
       await user.click(screen.getByTestId('popover-trigger'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('command-item-artist-empty')).toHaveTextContent('Unknown Artist');
+        expect(screen.getByTestId('command-item-artist-empty')).toHaveTextContent('(no name)');
       });
     });
   });

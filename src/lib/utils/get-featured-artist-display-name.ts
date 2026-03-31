@@ -7,18 +7,18 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
  * Gets the display name for a featured artist.
  *
  * @param featured - The featured artist object
- * @returns The display name in the following priority:
+ * @returns The display name in the following priority, or null if no name resolves:
  *   1. FeaturedArtist.displayName if set
  *   2. First artist's displayName or firstName + surname
- *   3. "Unknown Artist" as fallback
+ *   3. null (no name available)
  *
  * @example
  * ```ts
  * const name = getFeaturedArtistDisplayName(featuredArtist);
- * // Returns "DJ Cool" or "John Doe" or "Unknown Artist"
+ * // Returns "DJ Cool" or "John Doe" or null
  * ```
  */
-export const getFeaturedArtistDisplayName = (featured: FeaturedArtist): string => {
+export const getFeaturedArtistDisplayName = (featured: FeaturedArtist): string | null => {
   // Use featured displayName if available
   if (featured.displayName) {
     return featured.displayName;
@@ -33,5 +33,5 @@ export const getFeaturedArtistDisplayName = (featured: FeaturedArtist): string =
     const artist = featured.release.artistReleases[0].artist;
     return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
   }
-  return 'Unknown Artist';
+  return null;
 };

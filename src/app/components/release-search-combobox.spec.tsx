@@ -177,7 +177,7 @@ describe('ReleaseSearchCombobox', () => {
     expect(screen.queryByTestId('search-thumbnail')).not.toBeInTheDocument();
   });
 
-  it('should display "Unknown Artist" when artistReleases is empty', async () => {
+  it('should not display artist name when artistReleases is empty', async () => {
     const user = userEvent.setup();
     const releasesNoArtist = [
       {
@@ -194,7 +194,9 @@ describe('ReleaseSearchCombobox', () => {
     await user.click(screen.getByLabelText('Search releases'));
 
     await waitFor(() => {
-      expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+      expect(screen.getByText('Mystery Album')).toBeInTheDocument();
+      // No artist name should be rendered
+      expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
     });
   });
 

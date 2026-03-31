@@ -33,7 +33,7 @@ describe('release-helpers', () => {
       expect(getArtistDisplayNameForRelease(artist)).toBe('John Doe');
     });
 
-    it('should return "Unknown Artist" when no name sources available', () => {
+    it('should return null when no name sources available', () => {
       const artist = {
         id: 'artist-1',
         firstName: '',
@@ -41,7 +41,7 @@ describe('release-helpers', () => {
         displayName: null,
       };
 
-      expect(getArtistDisplayNameForRelease(artist)).toBe('Unknown Artist');
+      expect(getArtistDisplayNameForRelease(artist)).toBeNull();
     });
 
     it('should handle empty displayName as falsy', () => {

@@ -27,6 +27,7 @@ import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { cn } from '@/lib/utils';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 import { ArtistReleaseInfo } from './artist-release-info';
@@ -206,9 +207,9 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
       {/* Artist + release header */}
       {selectedRelease && (
-        <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
+        <div className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
           <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
-        </article>
+        </div>
       )}
 
       {/* Media player */}
@@ -250,7 +251,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   </div>
                   <MediaPlayer.InfoTickerTape
                     artistRelease={{ release: selectedRelease, artist }}
-                    trackName={currentFile.title ?? currentFile.fileName}
+                    trackName={getTrackDisplayTitle(currentFile.title, currentFile.fileName)}
                     isPlaying={isPlaying}
                   />
                 </>

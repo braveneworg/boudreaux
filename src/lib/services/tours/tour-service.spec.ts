@@ -251,7 +251,7 @@ describe('TourService', () => {
       expect(result.data[0].displayHeadliners).toEqual(['Madonna']);
     });
 
-    it('should fallback to "Unknown Artist" when all names null', async () => {
+    it('should filter out headliners with no resolved name', async () => {
       const tourWithNoNames = {
         ...mockTour,
         tourDates: [
@@ -277,7 +277,7 @@ describe('TourService', () => {
 
       const result = await TourService.findAll();
 
-      expect(result.data[0].displayHeadliners).toEqual(['Unknown Artist']);
+      expect(result.data[0].displayHeadliners).toEqual([]);
     });
   });
 
@@ -484,7 +484,7 @@ describe('TourService', () => {
       expect(result).toBe('Cher');
     });
 
-    it('should fallback to "Unknown Artist" when all artist fields null', () => {
+    it('should return null when all artist fields null', () => {
       const headliner = {
         artist: {
           displayName: null,
@@ -495,17 +495,17 @@ describe('TourService', () => {
 
       const result = TourService['getArtistDisplayName'](headliner as never);
 
-      expect(result).toBe('Unknown Artist');
+      expect(result).toBeNull();
     });
 
-    it('should fallback to "Unknown Artist" when artist is null', () => {
+    it('should return null when artist is null', () => {
       const headliner = {
         artist: null,
       };
 
       const result = TourService['getArtistDisplayName'](headliner as never);
 
-      expect(result).toBe('Unknown Artist');
+      expect(result).toBeNull();
     });
   });
 });

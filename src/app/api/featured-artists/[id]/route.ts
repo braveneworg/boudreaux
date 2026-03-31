@@ -57,12 +57,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Convert date strings to Date objects for Prisma DateTime fields
+    const { artistIds, ...scalarData } = validation.data;
     const updateData: Prisma.FeaturedArtistUpdateInput = {
-      ...(validation.data as Record<string, unknown>),
-      ...(validation.data.publishedOn && { publishedOn: new Date(validation.data.publishedOn) }),
-      ...(validation.data.featuredOn && { featuredOn: new Date(validation.data.featuredOn) }),
-      ...(validation.data.featuredUntil && {
-        featuredUntil: new Date(validation.data.featuredUntil),
+      ...(scalarData as Record<string, unknown>),
+      ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
+      ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
+      ...(scalarData.featuredUntil && {
+        featuredUntil: new Date(scalarData.featuredUntil),
+      }),
+      // Reconnect artists: clear existing connections and set the new ones
+      ...(artistIds && {
+        artists: {
+          set: artistIds.map((artistId: string) => ({ id: artistId })),
+        },
       }),
     };
 

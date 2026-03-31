@@ -358,6 +358,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     (metadata: {
       album?: string;
       artist?: string;
+      albumArtist?: string;
       year?: number;
       label?: string;
       coverArt?: string;
@@ -374,10 +375,9 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       if (metadata.coverArt) {
         releaseForm.setValue('coverArt', metadata.coverArt, { shouldDirty: true });
       }
-      if (metadata.artist) {
-        toast.info(
-          `Artist detected in file: "${metadata.artist}" — assign via the Artists field above.`
-        );
+      const detectedArtist = metadata.albumArtist ?? metadata.artist;
+      if (detectedArtist) {
+        toast.success(`Artist "${detectedArtist}" auto-connected to this release.`);
       }
     },
     [releaseForm]

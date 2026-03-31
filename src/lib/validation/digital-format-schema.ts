@@ -196,6 +196,8 @@ export const multiTrackConfirmationSchema = z
           fileName: z.string().min(1, 'File name is required'),
           fileSize: z.number().positive('File size must be positive'),
           mimeType: z.string(),
+          title: z.string().optional(),
+          duration: z.number().int().optional(),
         })
       )
       .min(1, 'At least one file is required')

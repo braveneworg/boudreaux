@@ -95,13 +95,13 @@ export default function CoverArtField<
               getArtistImagesAction(artistId),
             ]);
 
-            let artistName = 'Unknown Artist';
+            let artistName = '(no name)';
             if (artistResponse.ok) {
               const artist = await artistResponse.json();
               artistName =
                 artist.displayName ||
                 [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
-                'Unknown Artist';
+                '(no name)';
             }
 
             if (imagesResult.success && imagesResult.data) {

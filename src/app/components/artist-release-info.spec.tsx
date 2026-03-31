@@ -78,13 +78,6 @@ describe('ArtistReleaseInfo', () => {
     expect(heading).toHaveAttribute('aria-label', 'Now playing:  - Test Album');
   });
 
-  it('should render inside an article element', () => {
-    const { container } = render(<ArtistReleaseInfo artistName="Test Artist" title="Test Album" />);
-
-    const article = container.querySelector('article');
-    expect(article).toBeInTheDocument();
-  });
-
   it('should render both artist name and title with special characters', () => {
     render(<ArtistReleaseInfo artistName="Beyoncé" title="4 (Deluxe)" />);
 

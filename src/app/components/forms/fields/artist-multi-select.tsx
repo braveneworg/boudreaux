@@ -164,7 +164,7 @@ export default function ArtistMultiSelect<
       return artist.displayName;
     }
     const parts = [artist.firstName, artist.surname].filter(Boolean);
-    return parts.join(' ') || 'Unknown Artist';
+    return parts.join(' ') || '(no name)';
   };
 
   // Build the create artist URL with querystring parameters

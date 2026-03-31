@@ -10,6 +10,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { auth } from '../../../auth';
 import { prisma } from '../prisma';
+import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 
@@ -29,6 +30,8 @@ export interface ReleaseMetadata {
   date?: string;
   /** Album artist (may differ from track artist) */
   albumArtist?: string;
+  /** Track artist from ID3 metadata */
+  artist?: string;
   /** Cover art URL (already uploaded) */
   coverArt?: string;
   /** Whether the audio is lossless */
@@ -49,6 +52,8 @@ export interface FindOrCreateReleaseResult {
   releaseTitle?: string;
   /** Whether the release was newly created (vs found existing) */
   created?: boolean;
+  /** The artist ID if found or created from metadata */
+  artistId?: string;
   /** Error message if failed */
   error?: string;
 }
@@ -90,6 +95,33 @@ export interface FindOrCreateReleaseOptions {
   /** When true the release will be published (publishedAt set) if it is newly
    *  created, or if an existing unpublished release is found. */
   publish?: boolean;
+}
+
+/**
+ * Best-effort artist find-or-create and release connection from metadata.
+ * Prefers `albumArtist` over `artist` (ID3 convention: albumArtist is album-level,
+ * artist is per-track). Returns the artist ID if successful, undefined otherwise.
+ */
+async function connectArtistFromMetadata(
+  metadata: ReleaseMetadata,
+  releaseId: string
+): Promise<string | undefined> {
+  const artistName = metadata.albumArtist?.trim() || metadata.artist?.trim();
+  if (!artistName) {
+    return undefined;
+  }
+
+  try {
+    const result = await ArtistService.findOrCreateByName(artistName);
+    if (result.success) {
+      await ArtistService.connectToRelease(result.data.id, releaseId);
+      return result.data.id;
+    }
+  } catch (err) {
+    // Artist connection is best-effort — never fail the release creation
+    console.warn('[findOrCreateRelease] Could not connect artist from metadata:', err);
+  }
+  return undefined;
 }
 
 /**
@@ -173,11 +205,15 @@ export async function findOrCreateReleaseAction(
         },
       });
 
+      // Connect artist from metadata (best-effort)
+      const foundArtistId = await connectArtistFromMetadata(metadata, existingRelease.id);
+
       return {
         success: true,
         releaseId: existingRelease.id,
         releaseTitle: existingRelease.title,
         created: false,
+        artistId: foundArtistId,
       };
     }
 
@@ -228,11 +264,15 @@ export async function findOrCreateReleaseAction(
 
     revalidatePath('/admin/releases');
 
+    // Connect artist from metadata (best-effort)
+    const createdArtistId = await connectArtistFromMetadata(metadata, createResponse.data.id);
+
     return {
       success: true,
       releaseId: createResponse.data.id,
       releaseTitle: createResponse.data.title,
       created: true,
+      artistId: createdArtistId,
     };
   } catch (error) {
     console.error('Error in findOrCreateReleaseAction:', error);

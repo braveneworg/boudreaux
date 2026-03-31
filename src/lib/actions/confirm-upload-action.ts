@@ -167,6 +167,8 @@ async function confirmMultiTrackUploadActionHandler(
         fileName: f.fileName,
         fileSize: BigInt(f.fileSize),
         mimeType: f.mimeType,
+        title: f.title,
+        duration: f.duration,
       }))
     );
 

@@ -10,7 +10,7 @@ import type { Artist } from '@prisma/client';
  * Fallback Algorithm:
  * 1. Use artist.displayName if present
  * 2. Fall back to firstName + " " + surname
- * 3. Fall back to "Unknown Artist"
+ * 3. Fall back to null
  *
  * @param artist - Artist from Prisma
  * @returns The computed display name string
@@ -18,10 +18,14 @@ import type { Artist } from '@prisma/client';
  * @example
  * ```typescript
  * const name = getArtistDisplayNameForTour(artist);
- * // Returns: "Artist Name" or "John Doe" or "Unknown Artist"
+ * // Returns: "Artist Name" or "John Doe" or null
  * ```
  */
-export function getArtistDisplayNameForTour(artist: Artist): string {
+export function getArtistDisplayNameForTour(artist: Artist | null): string | null {
+  if (!artist) {
+    return null;
+  }
+
   // 1. Check artist displayName
   if (artist.displayName?.trim()) {
     return artist.displayName.trim();
@@ -39,6 +43,6 @@ export function getArtistDisplayNameForTour(artist: Artist): string {
     return surname;
   }
 
-  // 3. Final fallback
-  return 'Unknown Artist';
+  // 3. No name available
+  return null;
 }

@@ -887,7 +887,7 @@ describe('FeaturedArtistsPlayer', () => {
       expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'DJ Jane');
     });
 
-    it('should show Unknown Artist when no displayName or artists', () => {
+    it('should not render when no displayName or artists (filtered out)', () => {
       const artistWithNoDisplayInfo: FeaturedArtist = {
         ...mockFeaturedArtists[0],
         displayName: null,
@@ -898,7 +898,8 @@ describe('FeaturedArtistsPlayer', () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Unknown Artist');
+      // Artist with no resolvable name is filtered out; player renders empty state
+      expect(screen.queryByTestId('cover-art-image')).not.toBeInTheDocument();
     });
   });
 

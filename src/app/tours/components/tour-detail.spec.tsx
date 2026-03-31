@@ -434,7 +434,7 @@ describe('TourDetail', () => {
     expect(screen.getByText('Tour Dates')).toBeInTheDocument();
   });
 
-  it('renders "Unknown Artist" when headliner has no artist', () => {
+  it('hides headliner section when headliner has no artist', () => {
     const tour = createMockTour({
       tourDates: [
         createMockTourDate({
@@ -449,7 +449,8 @@ describe('TourDetail', () => {
     });
     render(<TourDetail tour={tour} />);
 
-    expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+    // With no resolvable name, the headliner section should not render
+    expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
   });
 
   it('falls back to first and last name for headliner when displayName is null', () => {

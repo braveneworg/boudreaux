@@ -48,6 +48,8 @@ export class ReleaseDigitalFormatFileRepository {
       fileName: string;
       fileSize: bigint;
       mimeType: string;
+      title?: string;
+      duration?: number;
     }>
   ): Promise<number> {
     const result = await prisma.releaseDigitalFormatFile.createMany({
@@ -58,6 +60,8 @@ export class ReleaseDigitalFormatFileRepository {
         fileName: file.fileName,
         fileSize: file.fileSize,
         mimeType: file.mimeType,
+        ...(file.title && { title: file.title }),
+        ...(file.duration && { duration: file.duration }),
       })),
     });
     return result.count;

@@ -55,6 +55,7 @@ import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-
 import { getFileExtensionForFormat, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import { cn } from '@/lib/utils';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import type { DigitalFormatType, UploadState } from '@/types/digital-format';
 
 interface ExistingFormatFile {
@@ -92,6 +93,7 @@ interface DigitalFormatsAccordionProps {
   onMetadataExtracted?: (metadata: {
     album?: string;
     artist?: string;
+    albumArtist?: string;
     year?: number;
     label?: string;
     coverArt?: string;
@@ -122,6 +124,8 @@ interface UploadedFileInfo {
   fileName: string;
   fileSize: number;
   s3Key: string;
+  title?: string;
+  duration?: number;
 }
 
 /** Result of uploading a single file to the server proxy */
@@ -392,6 +396,7 @@ export function DigitalFormatsAccordion({
       const extractedMetadata: {
         album?: string;
         artist?: string;
+        albumArtist?: string;
         year?: number;
         label?: string;
         coverArt?: string;
@@ -403,6 +408,7 @@ export function DigitalFormatsAccordion({
           const { common } = parsedMeta;
           if (common.album) extractedMetadata.album = common.album;
           if (common.artist) extractedMetadata.artist = common.artist;
+          if (common.albumartist) extractedMetadata.albumArtist = common.albumartist;
           if (common.year) extractedMetadata.year = common.year;
           if (common.label?.[0]) extractedMetadata.label = common.label[0];
           // Extract embedded cover art from ID3 tags
@@ -575,6 +581,7 @@ export function DigitalFormatsAccordion({
       const extractedMetadata: {
         album?: string;
         artist?: string;
+        albumArtist?: string;
         year?: number;
         label?: string;
         coverArt?: string;
@@ -589,6 +596,7 @@ export function DigitalFormatsAccordion({
             extractedMetadata.album = common.album;
           }
           if (common.artist) extractedMetadata.artist = common.artist;
+          if (common.albumartist) extractedMetadata.albumArtist = common.albumartist;
           if (common.year) extractedMetadata.year = common.year;
           if (common.label?.[0]) extractedMetadata.label = common.label[0];
           // Extract embedded cover art from ID3 tags
@@ -634,7 +642,27 @@ export function DigitalFormatsAccordion({
         const result = await uploadSingleFile(formatType, file);
 
         if (result.success && result.s3Key) {
-          successFiles.push({ fileName: file.name, fileSize: file.size, s3Key: result.s3Key });
+          // Extract per-track metadata (title, duration) from the audio file
+          let trackTitle: string | undefined;
+          let trackDuration: number | undefined;
+          try {
+            const { parseBlob } = await import('music-metadata');
+            const parsedTrack = await parseBlob(file);
+            trackTitle = parsedTrack.common.title;
+            trackDuration = parsedTrack.format.duration
+              ? Math.round(parsedTrack.format.duration)
+              : undefined;
+          } catch {
+            // Metadata extraction is best-effort
+          }
+
+          successFiles.push({
+            fileName: file.name,
+            fileSize: file.size,
+            s3Key: result.s3Key,
+            title: trackTitle,
+            duration: trackDuration,
+          });
           s3Keys.push(result.s3Key);
           console.info(`[batch-upload] Finished ${i + 1}/${files.length}: ${formatType} (success)`);
         } else {
@@ -707,6 +735,8 @@ export function DigitalFormatsAccordion({
                   files[successFiles.indexOf(f)]?.type ||
                   files.find((orig) => orig.name === f.fileName)?.type ||
                   '',
+                title: f.title,
+                duration: f.duration,
               })),
             });
             confirmOk = cr.success;
@@ -781,6 +811,8 @@ export function DigitalFormatsAccordion({
               fileName: f.fileName,
               fileSize: f.fileSize,
               mimeType: files.find((orig) => orig.name === f.fileName)?.type || '',
+              title: f.title,
+              duration: f.duration,
             })),
           });
           confirmOk = cr.success;
@@ -1386,7 +1418,8 @@ export function DigitalFormatsAccordion({
                               >
                                 <FileAudio className="h-3 w-3 shrink-0" />
                                 <span className="truncate">
-                                  {idx + 1}. {fileInfo.fileName}
+                                  {idx + 1}.{' '}
+                                  {getTrackDisplayTitle(fileInfo.title ?? null, fileInfo.fileName)}
                                 </span>
                                 <span className="ml-auto shrink-0">
                                   {formatFileSize(fileInfo.fileSize)}

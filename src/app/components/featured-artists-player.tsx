@@ -8,6 +8,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 import { ArtistReleaseInfo } from './artist-release-info';
 import { DownloadDialog, DownloadTriggerButton } from './download-dialog';
@@ -21,8 +23,14 @@ interface FeaturedArtistsPlayerProps {
  * @param featuredArtists - Array of featured artists to display
  */
 export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayerProps) => {
+  /** Only show featured artists with a resolvable display name */
+  const displayableArtists = useMemo(
+    () => featuredArtists.filter((fa) => getFeaturedArtistDisplayName(fa) !== null),
+    [featuredArtists]
+  );
+
   const [selectedArtist, setSelectedArtist] = useState<FeaturedArtist | null>(
-    featuredArtists.length > 0 ? featuredArtists[0] : null
+    displayableArtists.length > 0 ? displayableArtists[0] : null
   );
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -64,26 +72,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const handleTogglePlay = useCallback(() => {
     playerControls?.toggle();
   }, [playerControls]);
-
-  /**
-   * Get the display name for a featured artist.
-   * Falls back through: featuredArtist.displayName → connected artists → release artists
-   */
-  const getDisplayName = (featured: FeaturedArtist): string => {
-    if (featured.displayName) {
-      return featured.displayName;
-    }
-    if (featured.artists && featured.artists.length > 0) {
-      const artist = featured.artists[0];
-      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-    }
-    // Fallback to release's associated artists
-    if (featured.release?.artistReleases && featured.release.artistReleases.length > 0) {
-      const artist = featured.release.artistReleases[0].artist;
-      return artist.displayName ?? `${artist.firstName} ${artist.surname}`;
-    }
-    return 'Unknown Artist';
-  };
 
   /**
    * Get the cover art URL for a featured artist
@@ -203,23 +191,25 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   }
 
   const showFileListDrawer = sortedFiles.length > 0;
-  const currentTrackTitle = currentFile?.title ?? currentFile?.fileName ?? '';
+  const currentTrackTitle = currentFile
+    ? getTrackDisplayTitle(currentFile.title, currentFile.fileName)
+    : '';
 
   return (
     <MediaPlayer className="mx-2 mb-2">
       <div className="space-y-2 mt-0">
         {/* Featured Artists Carousel */}
-        {featuredArtists.length >= 3 && (
+        {displayableArtists.length >= 3 && (
           <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={featuredArtists}
+            featuredArtists={displayableArtists}
             onSelect={handleSelectArtist}
           />
         )}
         {selectedArtist?.release && (
           <ArtistReleaseInfo
-            artistName={getDisplayName(selectedArtist)}
+            artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
             title={selectedArtist.release.title ?? ''}
-            featuredArtists={featuredArtists}
+            featuredArtists={displayableArtists}
             selectedArtist={selectedArtist}
             setSelectedArtist={setSelectedArtist}
             visibleHeading
@@ -231,11 +221,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               files={sortedFiles}
               currentFileId={currentFile?.id ?? null}
               onFileSelect={handleFileSelect}
-              artistName={getDisplayName(selectedArtist)}
+              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
               releaseTitle={selectedArtist.release.title ?? ''}
             />
             <DownloadDialog
-              artistName={getDisplayName(selectedArtist)}
+              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
               releaseId={selectedArtist.release.id}
               releaseTitle={selectedArtist.release.title ?? ''}
             >
@@ -257,7 +247,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                   <div className="relative">
                     <MediaPlayer.InteractiveCoverArt
                       src={coverArt}
-                      alt={getDisplayName(selectedArtist)}
+                      alt={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
                       isPlaying={isPlaying}
                       onTogglePlay={handleTogglePlay}
                       className="shadow-lg"

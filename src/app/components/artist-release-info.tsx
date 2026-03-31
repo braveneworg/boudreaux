@@ -80,7 +80,7 @@ export const ArtistReleaseInfo = ({
   }, [artistUrl, featuredArtists, selectedArtist, setSelectedArtist]);
   return (
     <>
-      <article className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
+      <div className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
         <h2
           className={
             visibleHeading
@@ -94,7 +94,7 @@ export const ArtistReleaseInfo = ({
         <p>
           <em>{title}</em>
         </p>
-      </article>
+      </div>
       <div className="max-w-90 mx-auto mt-3 -mb-3 overflow-hidden flex justify-center items-center">
         <span className="inline-block size-10 -mb-3.25">
           <Share2Icon onClick={handleShare2IconClick} size={22} className="ml-2 opacity-60" />

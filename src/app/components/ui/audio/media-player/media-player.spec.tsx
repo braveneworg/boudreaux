@@ -528,7 +528,7 @@ describe('MediaPlayer', () => {
       expect(screen.getByText(/DJ Jane/)).toBeInTheDocument();
     });
 
-    it('should display Unknown Artist when no displayName and no artists', () => {
+    it('should not display artist name when no displayName and no artists', () => {
       const mockRelease = createMockRelease([createMockFormatFile()]);
 
       const featuredArtist = createMockFeaturedArtist({
@@ -543,7 +543,7 @@ describe('MediaPlayer', () => {
         </MediaPlayer>
       );
 
-      expect(screen.getByText(/Unknown Artist/)).toBeInTheDocument();
+      expect(screen.queryByText(/Unknown Artist/)).not.toBeInTheDocument();
     });
 
     it('should render overflow wrapper with horizontal margin', () => {

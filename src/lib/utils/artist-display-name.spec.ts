@@ -73,7 +73,7 @@ describe('getArtistDisplayNameForTour', () => {
       expect(getArtistDisplayNameForTour(artist)).toBe('Jane Smith');
     });
 
-    it('should return "Unknown Artist" when all fields are missing', () => {
+    it('should return null when all fields are missing', () => {
       const artist: Artist = {
         ...baseArtist,
         displayName: null,
@@ -81,7 +81,7 @@ describe('getArtistDisplayNameForTour', () => {
         surname: '',
       };
 
-      expect(getArtistDisplayNameForTour(artist)).toBe('Unknown Artist');
+      expect(getArtistDisplayNameForTour(artist)).toBeNull();
     });
   });
 

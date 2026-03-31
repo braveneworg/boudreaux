@@ -267,9 +267,9 @@ export interface ActionResult<T = void> {
  * Algorithm:
  * 1. Use artist.displayName if present
  * 2. Fall back to firstName + " " + surname
- * 3. Fall back to "Unknown Artist"
+ * 3. Fall back to null
  */
-export type GetArtistDisplayName = (artist: Artist) => string;
+export type GetArtistDisplayName = (artist: Artist) => string | null;
 
 // ============================================================================
 // Service Response Type (matching existing pattern)

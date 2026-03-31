@@ -37,6 +37,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
@@ -570,7 +571,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
   const { isPlaying = false } = props;
 
   // Determine display values based on prop type
-  let displayName: string;
+  let displayName: string | null;
   let releaseTitle: string | null;
   let trackTitle: string;
 
@@ -591,7 +592,8 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
       <div className="overflow-hidden mx-3">
         <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-xs font-medium text-zinc-100">
-            {trackTitle} • by {displayName}
+            {trackTitle}
+            {displayName && ` • by ${displayName}`}
             {releaseTitle && ` • ${releaseTitle}`}
           </span>
         </div>
@@ -1183,6 +1185,45 @@ const FormatFileListDrawer = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Debug: extract and log audio metadata (ID3 tags) from CDN files
+  useEffect(() => {
+    if (files.length === 0) return;
+
+    const extractMetadata = async () => {
+      try {
+        const { parseBlob } = await import('music-metadata');
+        const firstFile = files[0];
+        const cdnUrl = buildCdnUrl(firstFile.s3Key);
+        const response = await fetch(cdnUrl);
+        const blob = await response.blob();
+        const metadata = await parseBlob(blob);
+        console.info('[metadata] Extracted ID3 tags from first track:', {
+          title: metadata.common.title,
+          artist: metadata.common.artist,
+          album: metadata.common.album,
+          albumArtist: metadata.common.albumartist,
+          year: metadata.common.year,
+          genre: metadata.common.genre,
+          label: metadata.common.label,
+          trackNumber: metadata.common.track?.no,
+          trackTotal: metadata.common.track?.of,
+          duration: metadata.format.duration
+            ? `${Math.round(metadata.format.duration)}s`
+            : undefined,
+          bitrate: metadata.format.bitrate
+            ? `${Math.round(metadata.format.bitrate / 1000)}kbps`
+            : undefined,
+          codec: metadata.format.codec,
+          hasCoverArt: (metadata.common.picture?.length ?? 0) > 0,
+        });
+      } catch (err) {
+        console.info('[metadata] Could not extract metadata:', err);
+      }
+    };
+
+    extractMetadata();
+  }, [files]);
+
   return (
     <Drawer>
       <DrawerTrigger asChild>
@@ -1199,7 +1240,7 @@ const FormatFileListDrawer = ({
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription>
-            <article>
+            <div>
               <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
               <p className="text-sm text-shadow-none mb-0">
                 <em>{releaseTitle}</em>
@@ -1207,7 +1248,7 @@ const FormatFileListDrawer = ({
               <p>
                 {files.length} track{files.length !== 1 ? 's' : ''}
               </p>
-            </article>
+            </div>
           </DrawerDescription>
         </DrawerHeader>
         <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">

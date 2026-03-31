@@ -376,7 +376,7 @@ describe('TourCard', () => {
     });
   });
 
-  it('renders "Unknown Artist" when headliner has no artist', () => {
+  it('shows TBD when headliner has no artist (no resolvable name)', () => {
     const tour = createMockTour({
       tourDates: [
         createMockTourDate({
@@ -391,7 +391,9 @@ describe('TourCard', () => {
     });
 
     render(<TourCard tour={tour} />);
-    expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+    // When no headliner names resolve, the card falls back to 'TBD'
+    expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
+    expect(screen.getByText('TBD')).toBeInTheDocument();
   });
 
   it('places headliner with setTime before one without setTime', () => {

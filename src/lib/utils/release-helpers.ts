@@ -68,12 +68,12 @@ interface ReleaseSearchSource {
  * Implements the fallback chain:
  * 1. `artist.displayName` (if non-null and non-empty)
  * 2. `artist.firstName + ' ' + artist.surname` (if either is non-empty)
- * 3. `'Unknown Artist'`
+ * 3. `null`
  *
  * @param artist - Lightweight artist object
  * @returns The resolved display name string
  */
-export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string => {
+export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string | null => {
   // 1. Prefer explicit display name
   if (artist.displayName) {
     return artist.displayName;
@@ -85,8 +85,8 @@ export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string =>
     return fullName;
   }
 
-  // 3. Ultimate fallback
-  return 'Unknown Artist';
+  // 3. No name available
+  return null;
 };
 
 /**

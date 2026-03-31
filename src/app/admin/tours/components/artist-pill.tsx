@@ -111,7 +111,7 @@ const ArtistPill = ({
 
   const displayName = headliner.artist
     ? getDisplayName(headliner.artist as unknown as Record<string, unknown>)
-    : 'Unknown Artist';
+    : '(no name)';
 
   const setTimeDisplay = headliner.setTime
     ? (() => {

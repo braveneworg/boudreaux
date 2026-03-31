@@ -461,7 +461,7 @@ describe('ReleasePlayer', () => {
     expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
   });
 
-  it('should display fileName when title is null', () => {
+  it('should display cleaned fileName when title is null', () => {
     const releaseWithNullTitle = {
       ...mockRelease,
       digitalFormats: [
@@ -480,6 +480,6 @@ describe('ReleasePlayer', () => {
     render(<ReleasePlayer release={releaseWithNullTitle} releaseId="release-1" />);
 
     const ticker = screen.getByTestId('info-ticker-tape');
-    expect(ticker).toHaveAttribute('data-track-name', 'track1.mp3');
+    expect(ticker).toHaveAttribute('data-track-name', 'Track1');
   });
 });

@@ -44,6 +44,7 @@ import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { generateSlug } from '@/lib/utils/generate-slug';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
@@ -535,14 +536,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
     }
 
     if (slugSource) {
-      const generatedSlug = slugSource
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-
-      artistForm.setValue('slug', generatedSlug, { shouldValidate: false });
+      artistForm.setValue('slug', generateSlug(slugSource), { shouldValidate: false });
     }
   }, [displayName, firstName, middleName, surname, artistForm]);
 

@@ -74,7 +74,7 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   const primaryArtist = release.artistReleases[0]?.artist;
   const primaryArtistId = primaryArtist?.id;
 
-  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : 'Unknown Artist';
+  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
   const otherReleasesResult = primaryArtistId
     ? await ReleaseService.getArtistOtherReleases(primaryArtistId, releaseId)

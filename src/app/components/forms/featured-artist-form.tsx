@@ -161,8 +161,14 @@ export default function FeaturedArtistForm({
         setDerivedArtistIds(ids);
         const names =
           featuredArtist.artists
-            ?.map((a: { displayName?: string }) => a.displayName)
-            .filter((n: string | undefined): n is string => !!n) ?? [];
+            ?.map((a: { displayName?: string; firstName?: string; surname?: string }) => {
+              if (a.displayName) return a.displayName;
+              const first = a.firstName ?? '';
+              const last = a.surname ?? '';
+              const full = `${first} ${last}`.trim();
+              return full || null;
+            })
+            .filter((n: string | null): n is string => !!n) ?? [];
         setDerivedArtistNames(names);
       } catch (err) {
         error('Failed to fetch featured artist:', err);
@@ -268,7 +274,13 @@ export default function FeaturedArtistForm({
     if (release?.artistReleases && release.artistReleases.length > 0) {
       const ids = release.artistReleases.map((ar) => ar.artist.id);
       const names = release.artistReleases
-        .map((ar) => ar.artist.displayName)
+        .map((ar) => {
+          if (ar.artist.displayName) return ar.artist.displayName;
+          const first = ar.artist.firstName ?? '';
+          const last = ar.artist.surname ?? '';
+          const full = `${first} ${last}`.trim();
+          return full || null;
+        })
         .filter((n): n is string => !!n);
       setDerivedArtistIds(ids);
       setDerivedArtistNames(names);
@@ -318,6 +330,11 @@ export default function FeaturedArtistForm({
             patchBody[key] =
               key === 'position' || key === 'featuredTrackNumber' ? Number(value) : value;
           }
+        }
+
+        // Include derived artistIds so the PATCH handler can reconnect the artists relation
+        if (derivedArtistIds.length > 0) {
+          patchBody.artistIds = derivedArtistIds;
         }
 
         const response = await fetch(`/api/featured-artists/${featuredArtistId}`, {
