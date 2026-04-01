@@ -65,6 +65,7 @@ global.ResizeObserver = MockResizeObserver;
 class MockIntersectionObserver {
   readonly root: Element | null = null;
   readonly rootMargin: string = '';
+  readonly scrollMargin: string = '';
   readonly thresholds: ReadonlyArray<number> = [];
 
   observe() {}
