@@ -284,3 +284,5 @@ Then run the Stripe CLI to forward webhooks to your local server:
 ```bash
 stripe listen --forward-to http://localhost:3000/api/stripe/webhook
 ```
+
+Run `npx ncu` to check for dependency updates. Update dependencies in `package.json` and run `pnpm install` to apply them.
