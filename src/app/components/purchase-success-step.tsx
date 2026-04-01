@@ -11,9 +11,10 @@ import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
+import { DigitalFormatType } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
-  formatType: string;
+  formatType: DigitalFormatType;
   fileName: string;
 }
 
