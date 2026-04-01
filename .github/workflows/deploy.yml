@@ -58,7 +58,7 @@ jobs:
             }
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download build artifact from CI run
         uses: dawidd6/action-download-artifact@v6
@@ -101,7 +101,7 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Setup Docker layer caching
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-website-${{ github.sha }}
@@ -202,7 +202,7 @@ jobs:
       digest: ${{ steps.capture-digest.outputs.digest }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to container registry
         uses: docker/login-action@v3
@@ -212,7 +212,7 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Setup Docker layer caching
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-nginx-${{ github.sha }}
@@ -297,7 +297,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download build artifact from CI run
         uses: dawidd6/action-download-artifact@v6
@@ -323,10 +323,10 @@ jobs:
           echo "✓ Build artifact extracted and verified"
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.14.1"
 
@@ -387,7 +387,7 @@ jobs:
       NGINX_DIGEST: ${{ needs.build-nginx.outputs.digest }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate image digests
         run: |
@@ -1162,7 +1162,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GHCR_PAT }}
@@ -1234,11 +1234,11 @@ jobs:
 
       - name: Install pnpm
         if: steps.bump-type.outputs.skip != 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Setup Node.js
         if: steps.bump-type.outputs.skip != 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.14.1"
 
