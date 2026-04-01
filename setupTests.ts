@@ -115,6 +115,21 @@ if (typeof window !== 'undefined') {
     })),
   });
 
+  // Suppress jsdom "Not implemented: navigation (except hash changes)" errors.
+  // jsdom cannot handle window.location.href assignments; these fire console.error
+  // messages that cause the test runner to exit with code 1 in CI.
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    const message = typeof args[0] === 'string' ? args[0] : String(args[0]);
+    if (message.includes('Not implemented: navigation (except hash changes)')) {
+      return;
+    }
+    originalConsoleError.call(console, ...args);
+  };
+
+  // Mock window.open to prevent jsdom navigation errors from anchor clicks with target="_blank"
+  window.open = vi.fn();
+
   // Mock scrollTo for scroll-based components
   Object.defineProperty(window, 'scrollTo', {
     writable: true,
