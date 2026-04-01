@@ -452,7 +452,12 @@ export const DownloadDialog = ({
         )}
 
         {step === 'purchase-success' && (
-          <PurchaseSuccessStep releaseId={releaseId} releaseTitle={releaseTitle} />
+          <PurchaseSuccessStep
+            releaseId={releaseId}
+            releaseTitle={releaseTitle}
+            availableFormats={availableFormats}
+            downloadCount={downloadCount}
+          />
         )}
 
         {step === 'returning-download' && (
@@ -477,6 +482,13 @@ export const DownloadDialog = ({
                   for assistance.
                 </p>
               </>
+            ) : availableFormats.length > 0 ? (
+              <FormatBundleDownload
+                releaseId={releaseId}
+                releaseTitle={releaseTitle}
+                availableFormats={availableFormats}
+                downloadCount={downloadCount}
+              />
             ) : (
               <Link href={`/api/releases/${releaseId}/download`}>
                 <Button className="w-full" type="button">
