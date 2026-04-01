@@ -1,17 +1,16 @@
 name: 'Setup Node.js Environment'
-description: 'Checkout, setup Node.js with pnpm, and install dependencies'
+description: 'Setup Node.js with pnpm and install dependencies'
 
 runs:
   using: 'composite'
   steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v5
+      with:
+        version: 10.12.4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '24.14.1'
         cache: 'pnpm'
