@@ -324,6 +324,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.4
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -1235,6 +1237,8 @@ jobs:
       - name: Install pnpm
         if: steps.bump-type.outputs.skip != 'true'
         uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.4
 
       - name: Setup Node.js
         if: steps.bump-type.outputs.skip != 'true'

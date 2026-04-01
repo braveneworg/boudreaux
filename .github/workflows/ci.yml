@@ -20,9 +20,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
       - name: Setup environment
         uses: ./.github/actions/setup
 
@@ -47,9 +44,6 @@ jobs:
       matrix:
         shard: [1, 2]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
       - name: Setup environment
         uses: ./.github/actions/setup
 
@@ -85,9 +79,6 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
       - name: Setup environment
         uses: ./.github/actions/setup
 
@@ -182,9 +173,6 @@ jobs:
     name: Build Next.js app
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
       - name: Setup environment
         uses: ./.github/actions/setup
 
