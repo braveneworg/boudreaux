@@ -27,7 +27,10 @@ interface PurchaseSuccessStepProps {
 /**
  * Final step shown after a PWYW purchase is confirmed.
  * When digital formats are available, displays the format bundle picker.
- * Otherwise falls back to the legacy download link.
+ * When digital formats are explicitly unavailable (empty array), displays a
+ *   "No digital formats available for download." message.
+ * When digital formats are not provided (undefined), falls back to the
+ *   legacy download link.
  */
 export const PurchaseSuccessStep = ({
   releaseId,
