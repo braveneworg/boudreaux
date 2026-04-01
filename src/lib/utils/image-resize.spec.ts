@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+// @vitest-environment jsdom
 /**
  * Tests for image resize utility
  * Note: These tests use mocked browser APIs since they run in a Node environment
@@ -235,6 +236,45 @@ describe('image-resize', () => {
       await expect(resizeImage(file, { maxWidth: 880 })).rejects.toThrow(
         'Failed to create image blob'
       );
+    });
+  });
+
+  describe('loadImage error path', () => {
+    it('should reject when the image fails to load', async () => {
+      // Temporarily replace MockImage to trigger onerror instead of onload
+      const ErrorImage = class {
+        onload: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+        private _src = '';
+
+        get naturalWidth() {
+          return 0;
+        }
+
+        get naturalHeight() {
+          return 0;
+        }
+
+        get src() {
+          return this._src;
+        }
+
+        set src(value: string) {
+          this._src = value;
+          setTimeout(() => {
+            if (this.onerror) this.onerror('network error');
+          }, 0);
+        }
+      };
+
+      global.Image = ErrorImage as unknown as typeof Image;
+
+      const file = new File(['test'], 'broken.jpg', { type: 'image/jpeg' });
+
+      await expect(resizeImage(file, { maxWidth: 880 })).rejects.toThrow('Failed to load image');
+
+      // Restore the working MockImage for subsequent tests
+      global.Image = MockImage as unknown as typeof Image;
     });
   });
 

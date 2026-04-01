@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 
 import { NotificationBannerService } from './notification-banner-service';
 import { prisma } from '../prisma';
+import { withCache } from '../utils/simple-cache';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -121,6 +122,17 @@ describe('NotificationBannerService', () => {
         error: 'Failed to create notification banner: Unexpected error',
       });
     });
+
+    it('should return Unknown error when a non-Error is thrown', async () => {
+      vi.mocked(prisma.notification.create).mockRejectedValue('string-error');
+
+      const result = await NotificationBannerService.createNotificationBanner(createInput);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Failed to create notification banner: Unknown error',
+      });
+    });
   });
 
   describe('getActiveNotificationBanners', () => {
@@ -163,6 +175,16 @@ describe('NotificationBannerService', () => {
       const result = await NotificationBannerService.getActiveNotificationBanners(new Date());
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('should use 5-minute cache TTL in non-development environments', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.mocked(prisma.notification.findMany).mockResolvedValue([]);
+
+      await NotificationBannerService.getActiveNotificationBanners(new Date());
+
+      expect(withCache).toHaveBeenCalledWith(expect.any(String), expect.any(Function), 300);
+      vi.unstubAllEnvs();
     });
   });
 
@@ -384,6 +406,22 @@ describe('NotificationBannerService', () => {
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
+    it('should fall through to generic error for PrismaClientKnownRequestError with non-P2025 code', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+      vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+      const result =
+        await NotificationBannerService.unpublishNotificationBanner('notification-123');
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Failed to unpublish notification banner',
+      });
+    });
+
     it('should return generic error on unexpected failure', async () => {
       vi.mocked(prisma.notification.update).mockRejectedValue(new Error('Unexpected'));
 
@@ -464,6 +502,24 @@ describe('NotificationBannerService', () => {
     });
 
     describe('updateNotificationBanner errors', () => {
+      it('should fall through to generic error for PrismaClientKnownRequestError with non-P2025 code', async () => {
+        const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        });
+        vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.updateNotificationBanner(
+          'notification-123',
+          { message: 'Updated' }
+        );
+
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to update notification banner',
+        });
+      });
+
       it('should return error on database connection failure', async () => {
         const prismaError = new Prisma.PrismaClientInitializationError(
           'Database connection failed',
@@ -499,6 +555,21 @@ describe('NotificationBannerService', () => {
     });
 
     describe('deleteNotificationBanner errors', () => {
+      it('should fall through to generic error for PrismaClientKnownRequestError with non-P2025 code', async () => {
+        const prismaError = new Prisma.PrismaClientKnownRequestError('Foreign key constraint', {
+          code: 'P2003',
+          clientVersion: '5.0.0',
+        });
+        vi.mocked(prisma.notification.delete).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.deleteNotificationBanner('notification-123');
+
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to delete notification banner',
+        });
+      });
+
       it('should return error on database connection failure', async () => {
         const prismaError = new Prisma.PrismaClientInitializationError(
           'Database connection failed',
@@ -524,6 +595,24 @@ describe('NotificationBannerService', () => {
     });
 
     describe('publishNotificationBanner errors', () => {
+      it('should fall through to generic error for PrismaClientKnownRequestError with non-P2025 code', async () => {
+        const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        });
+        vi.mocked(prisma.notification.update).mockRejectedValue(prismaError);
+
+        const result = await NotificationBannerService.publishNotificationBanner(
+          'notification-123',
+          'user-123'
+        );
+
+        expect(result).toMatchObject({
+          success: false,
+          error: 'Failed to publish notification banner',
+        });
+      });
+
       it('should return error on database connection failure', async () => {
         const prismaError = new Prisma.PrismaClientInitializationError(
           'Database connection failed',

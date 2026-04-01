@@ -42,6 +42,9 @@ vi.mock('../prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    artistRelease: {
+      upsert: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -71,6 +74,7 @@ describe('ArtistService', () => {
     genres: null,
     bornOn: null,
     diedOn: null,
+    formedOn: null,
     publishedOn: null,
     publishedBy: null,
     createdAt: new Date('2024-01-01'),
@@ -92,7 +96,6 @@ describe('ArtistService', () => {
     featuredArtistId: null,
     images: [],
     labels: [],
-    groups: [],
     releases: [],
     urls: [],
   };
@@ -1059,6 +1062,14 @@ describe('ArtistService', () => {
           where: expect.objectContaining({
             isActive: true,
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            releases: {
+              some: {
+                release: {
+                  publishedAt: { not: null },
+                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                },
+              },
+            },
           }),
           skip: 0,
           take: 50,
@@ -1099,18 +1110,6 @@ describe('ArtistService', () => {
                   { surname: { contains: 'john', mode: 'insensitive' } },
                   { displayName: { contains: 'john', mode: 'insensitive' } },
                   { slug: { contains: 'john', mode: 'insensitive' } },
-                  expect.objectContaining({
-                    groups: expect.objectContaining({
-                      some: expect.objectContaining({
-                        group: expect.objectContaining({
-                          OR: expect.arrayContaining([
-                            { displayName: { contains: 'john', mode: 'insensitive' } },
-                            { name: { contains: 'john', mode: 'insensitive' } },
-                          ]),
-                        }),
-                      }),
-                    }),
-                  }),
                   expect.objectContaining({
                     releases: expect.objectContaining({
                       some: expect.objectContaining({
@@ -1187,6 +1186,14 @@ describe('ArtistService', () => {
           where: {
             isActive: true,
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            releases: {
+              some: {
+                release: {
+                  publishedAt: { not: null },
+                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                },
+              },
+            },
           },
         })
       );
@@ -1206,10 +1213,11 @@ describe('ArtistService', () => {
             title: 'Published Album',
             publishedAt: new Date('2024-01-01'),
             deletedOn: null,
-            releaseTracks: [
+            digitalFormats: [
               {
-                id: 'rt-1',
-                track: { id: 'track-1', title: 'Track 1', audioUrl: 'audio.mp3' },
+                id: 'df-1',
+                format: 'MP3_320KBPS',
+                files: [{ id: 'f-1', trackNumber: 1, fileName: 'track1.mp3' }],
               },
             ],
           },
@@ -1223,7 +1231,7 @@ describe('ArtistService', () => {
             title: 'Unpublished Album',
             publishedAt: null,
             deletedOn: null,
-            releaseTracks: [],
+            digitalFormats: [],
           },
         },
         {
@@ -1235,7 +1243,7 @@ describe('ArtistService', () => {
             title: 'Deleted Album',
             publishedAt: new Date('2024-01-01'),
             deletedOn: new Date('2024-06-01'),
-            releaseTracks: [],
+            digitalFormats: [],
           },
         },
       ],
@@ -1258,15 +1266,15 @@ describe('ArtistService', () => {
             images: true,
             labels: true,
             urls: true,
-            groups: { include: { group: true } },
             releases: expect.objectContaining({
               include: expect.objectContaining({
                 release: expect.objectContaining({
                   include: expect.objectContaining({
                     images: true,
-                    releaseTracks: expect.objectContaining({
-                      include: { track: true },
-                      orderBy: { position: 'asc' },
+                    digitalFormats: expect.objectContaining({
+                      include: {
+                        files: { orderBy: { trackNumber: 'asc' } },
+                      },
                     }),
                   }),
                 }),
@@ -1363,6 +1371,184 @@ describe('ArtistService', () => {
         result as unknown as { success: true; data: typeof artistWithMissingPublishedAt }
       ).data;
       expect(data.releases).toHaveLength(0);
+    });
+  });
+
+  describe('findOrCreateByName', () => {
+    const selectFields = { id: true, displayName: true, firstName: true, surname: true };
+    const existingArtist = {
+      id: 'artist-existing',
+      displayName: 'Ceschi',
+      firstName: 'Ceschi',
+      surname: '',
+    };
+
+    it('should return artist found by slug', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(existingArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result).toEqual({ success: true, data: existingArtist });
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
+        where: { slug: 'ceschi' },
+        select: selectFields,
+      });
+    });
+
+    it('should fall back to displayName match when slug not found', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(existingArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result).toEqual({ success: true, data: existingArtist });
+      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
+        where: { displayName: { equals: 'Ceschi', mode: 'insensitive' } },
+        select: selectFields,
+      });
+    });
+
+    it('should fall back to firstName + surname match', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.findFirst)
+        .mockResolvedValueOnce(null as never) // displayName miss
+        .mockResolvedValueOnce(existingArtist as never); // firstName+surname hit
+
+      const result = await ArtistService.findOrCreateByName('Ceschi Ramos');
+
+      expect(result).toEqual({ success: true, data: existingArtist });
+      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
+            { surname: { equals: 'Ramos', mode: 'insensitive' } },
+          ],
+        },
+        select: selectFields,
+      });
+    });
+
+    it('should create a new artist when no match found', async () => {
+      const newArtist = {
+        id: 'artist-new',
+        displayName: 'Jane Smith',
+        firstName: 'Jane',
+        surname: 'Smith',
+      };
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.create).mockResolvedValue(newArtist as never);
+
+      const result = await ArtistService.findOrCreateByName('Jane Smith');
+
+      expect(result).toEqual({ success: true, data: newArtist });
+      expect(prisma.artist.create).toHaveBeenCalledWith({
+        data: {
+          firstName: 'Jane',
+          surname: 'Smith',
+          displayName: 'Jane Smith',
+          slug: 'jane-smith',
+          isActive: true,
+        },
+        select: selectFields,
+      });
+    });
+
+    it('should handle single-word artist name', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.create).mockResolvedValue({
+        id: 'artist-new',
+        displayName: 'Ceschi',
+        firstName: 'Ceschi',
+        surname: '',
+      } as never);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result.success).toBe(true);
+      expect(prisma.artist.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            firstName: 'Ceschi',
+            surname: '',
+            displayName: 'Ceschi',
+            slug: 'ceschi',
+          }),
+        })
+      );
+    });
+
+    it('should return error for empty name', async () => {
+      const result = await ArtistService.findOrCreateByName('');
+
+      expect(result).toEqual({ success: false, error: 'Artist name is empty' });
+    });
+
+    it('should return error for whitespace-only name', async () => {
+      const result = await ArtistService.findOrCreateByName('   ');
+
+      expect(result).toEqual({ success: false, error: 'Artist name is empty' });
+    });
+
+    it('should handle P2002 slug collision by finding existing artist', async () => {
+      const p2002Error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        meta: { target: ['slug'] },
+        clientVersion: '5.0.0',
+      });
+
+      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(null as never); // slug lookup
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.create).mockRejectedValue(p2002Error);
+      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(existingArtist as never); // retry
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should return error when database is unavailable', async () => {
+      const initError = new Prisma.PrismaClientInitializationError('Connection refused', '5.0.0');
+
+      vi.mocked(prisma.artist.findUnique).mockRejectedValue(initError);
+
+      const result = await ArtistService.findOrCreateByName('Ceschi');
+
+      expect(result).toEqual({ success: false, error: 'Database unavailable' });
+    });
+  });
+
+  describe('connectToRelease', () => {
+    it('should upsert an ArtistRelease join record', async () => {
+      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({
+        id: 'join-1',
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      } as never);
+
+      await ArtistService.connectToRelease('artist-1', 'release-1');
+
+      expect(prisma.artistRelease.upsert).toHaveBeenCalledWith({
+        where: {
+          artistId_releaseId: { artistId: 'artist-1', releaseId: 'release-1' },
+        },
+        update: {},
+        create: { artistId: 'artist-1', releaseId: 'release-1' },
+      });
+    });
+
+    it('should be idempotent on duplicate calls', async () => {
+      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({
+        id: 'join-1',
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      } as never);
+
+      await ArtistService.connectToRelease('artist-1', 'release-1');
+      await ArtistService.connectToRelease('artist-1', 'release-1');
+
+      expect(prisma.artistRelease.upsert).toHaveBeenCalledTimes(2);
     });
   });
 });

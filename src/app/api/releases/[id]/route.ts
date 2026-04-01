@@ -14,6 +14,11 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
+function serializeRelease<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/releases/[id]
  * Get a single release by ID
@@ -34,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeRelease(result.data));
   } catch (error) {
     console.error('Release GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -72,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeRelease(result.data));
   } catch (error) {
     console.error('Release PATCH error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

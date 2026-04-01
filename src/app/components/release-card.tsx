@@ -20,8 +20,8 @@ interface ReleaseCardProps {
   id: string;
   /** Release title */
   title: string;
-  /** Resolved artist display name */
-  artistName: string;
+  /** Resolved artist display name, or null if unresolvable */
+  artistName: string | null;
   /** Cover art source and alt text, or null for styled placeholder */
   coverArt: { src: string; alt: string } | null;
   /** Bandcamp URL for external purchase link, or null */
@@ -34,7 +34,7 @@ interface ReleaseCardProps {
  */
 export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: ReleaseCardProps) => {
   return (
-    <article className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+    <div className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
       {/* Cover Art */}
       <div className="relative aspect-square w-full overflow-hidden rounded-md bg-zinc-100">
         {coverArt ? (
@@ -55,7 +55,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
             )}
           >
             <span className="text-sm font-medium">{title}</span>
-            <span className="text-xs text-zinc-400">{artistName}</span>
+            {artistName && <span className="text-xs text-zinc-400">{artistName}</span>}
           </div>
         )}
       </div>
@@ -63,7 +63,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
       {/* Info */}
       <div className="flex flex-col gap-0.5">
         <h3 className="text-sm font-semibold text-zinc-900 line-clamp-1">{title}</h3>
-        <p className="text-xs text-zinc-500 line-clamp-1">{artistName}</p>
+        {artistName && <p className="text-xs text-zinc-500 line-clamp-1">{artistName}</p>}
       </div>
 
       {/* Actions */}
@@ -91,6 +91,6 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
           </Link>
         ) : null}
       </div>
-    </article>
+    </div>
   );
 };

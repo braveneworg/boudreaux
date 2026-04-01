@@ -73,6 +73,28 @@ describe('PurchaseRepository', () => {
     });
   });
 
+  describe('findBySessionId', () => {
+    it('should call prisma.releasePurchase.findUnique with the sessionId and return the result', async () => {
+      const mockRecord = { id: 'purchase-1', stripeSessionId: 'cs_test_123' };
+      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(mockRecord as never);
+
+      const result = await PurchaseRepository.findBySessionId('cs_test_123');
+
+      expect(prisma.releasePurchase.findUnique).toHaveBeenCalledWith({
+        where: { stripeSessionId: 'cs_test_123' },
+      });
+      expect(result).toEqual(mockRecord);
+    });
+
+    it('should return null when no matching record exists', async () => {
+      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(null);
+
+      const result = await PurchaseRepository.findBySessionId('cs_nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findByUserAndRelease', () => {
     it('should call prisma.releasePurchase.findUnique with the userId+releaseId composite key', async () => {
       const mockRecord = { id: 'purchase-1', userId: 'user-123', releaseId: 'release-abc' };

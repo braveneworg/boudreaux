@@ -190,6 +190,64 @@ describe('changeUsernameAction', () => {
       expect(result.errors?.confirmUsername).toEqual(['Usernames do not match']);
       expect(mockUpdateUser).not.toHaveBeenCalled();
     });
+
+    it('should add general errors from Zod formErrors', async () => {
+      const mockFormState: FormState = {
+        fields: { username: 'a', confirmUsername: 'a' },
+        success: false,
+        errors: {},
+      };
+
+      const mockParsed = {
+        success: false,
+        error: {
+          issues: [],
+          flatten: () => ({
+            fieldErrors: {},
+            formErrors: ['Usernames must be different from current'],
+          }),
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.errors?.general).toEqual(['Usernames must be different from current']);
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('should initialize formState.errors when undefined during validation failure', async () => {
+      const mockFormState: FormState = {
+        fields: { username: '', confirmUsername: '' },
+        success: false,
+      };
+
+      const mockParsed = {
+        success: false,
+        error: {
+          issues: [{ path: ['username'], message: 'Required' }],
+          flatten: () => ({
+            fieldErrors: { username: ['Required'] },
+            formErrors: [],
+          }),
+        },
+      };
+
+      vi.mocked(mockGetActionState).mockReturnValue({
+        formState: mockFormState,
+        parsed: mockParsed,
+      });
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.username).toEqual(['Required']);
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('authentication failures', () => {
@@ -363,6 +421,36 @@ describe('changeUsernameAction', () => {
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual([
         'Database error (P1000). Please try again or contact support.',
+      ]);
+    });
+
+    it('should handle Prisma P2025 error (user not found)', async () => {
+      const notFoundError = new PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '4.0.0',
+      });
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(notFoundError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['User not found. Please refresh and try again.']);
+    });
+
+    it('should handle Prisma P2023 error (data validation)', async () => {
+      const dataValidationError = new PrismaClientKnownRequestError('Data validation failed', {
+        code: 'P2023',
+        clientVersion: '4.0.0',
+      });
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(dataValidationError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual([
+        'There was a data validation issue. Please refresh and try again.',
       ]);
     });
 

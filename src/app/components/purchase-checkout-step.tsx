@@ -5,7 +5,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { CheckoutProvider, PaymentElement, useCheckout } from '@stripe/react-stripe-js/checkout';
+import {
+  CheckoutElementsProvider,
+  PaymentElement,
+  useCheckout,
+} from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, Loader2Icon } from 'lucide-react';
@@ -38,8 +42,10 @@ interface PurchaseCheckoutStepProps {
   releaseId: string;
   releaseTitle: string;
   amountCents: number;
+  customerEmail?: string | null;
   onConfirmed: () => void;
   onError: (message: string) => void;
+  onCancel: () => void;
 }
 
 /** Formats an integer cent amount to a USD display string, e.g. 500 → "$5.00". */
@@ -50,12 +56,22 @@ function formatCents(cents: number): string {
 interface PurchaseCheckoutFormProps {
   amountCents: number;
   onPaymentComplete: () => void;
+  onCancel: () => void;
 }
 
-const PurchaseCheckoutForm = ({ amountCents, onPaymentComplete }: PurchaseCheckoutFormProps) => {
+const PurchaseCheckoutForm = ({
+  amountCents,
+  onPaymentComplete,
+  onCancel,
+}: PurchaseCheckoutFormProps) => {
   const checkoutState = useCheckout();
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentComplete, setPaymentComplete] = useState(false);
+
+  const handlePaymentChange = useCallback((event: { complete: boolean }) => {
+    setPaymentComplete(event.complete);
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (checkoutState.type !== 'success') return;
@@ -87,17 +103,15 @@ const PurchaseCheckoutForm = ({ amountCents, onPaymentComplete }: PurchaseChecko
     return <p className="text-destructive text-sm">{checkoutState.error.message}</p>;
   }
 
+  const canSubmit = checkoutState.checkout.canConfirm || paymentComplete;
+
   return (
     <div className="space-y-4">
-      <PaymentElement />
+      <PaymentElement onChange={handlePaymentChange} />
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Button
-        className="w-full"
-        onClick={handleConfirm}
-        disabled={!checkoutState.checkout.canConfirm || isConfirming}
-      >
+      <Button className="w-full" onClick={handleConfirm} disabled={!canSubmit || isConfirming}>
         {isConfirming ? (
           <>
             <Loader2Icon className="size-4 animate-spin" />
@@ -106,6 +120,10 @@ const PurchaseCheckoutForm = ({ amountCents, onPaymentComplete }: PurchaseChecko
         ) : (
           `Pay ${formatCents(amountCents)}`
         )}
+      </Button>
+
+      <Button variant="destructive" className="w-full" onClick={onCancel} disabled={isConfirming}>
+        Cancel
       </Button>
     </div>
   );
@@ -126,11 +144,13 @@ export const PurchaseCheckoutStep = ({
   releaseId,
   releaseTitle,
   amountCents,
+  customerEmail,
   onConfirmed,
   onError,
+  onCancel,
 }: PurchaseCheckoutStepProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [pollCount, setPollCount] = useState(0);
@@ -143,6 +163,7 @@ export const PurchaseCheckoutStep = ({
         const result = await createPurchaseCheckoutSessionAction({
           releaseId,
           amountCents,
+          ...(customerEmail ? { customerEmail } : {}),
         });
 
         if (cancelled) return;
@@ -155,7 +176,7 @@ export const PurchaseCheckoutStep = ({
         }
 
         setClientSecret(result.clientSecret);
-        setPaymentIntentId(result.paymentIntentId);
+        setSessionId(result.sessionId);
       } catch (err: unknown) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Failed to initialize checkout';
@@ -170,19 +191,17 @@ export const PurchaseCheckoutStep = ({
     return () => {
       cancelled = true;
     };
-  }, [releaseId, releaseTitle, amountCents, onError]);
+  }, [releaseId, releaseTitle, amountCents, customerEmail, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
-    queryKey: ['purchase-status', releaseId, paymentIntentId],
+    queryKey: ['purchase-status', releaseId, sessionId],
     queryFn: async () => {
       setPollCount((prev) => prev + 1);
-      const res = await fetch(
-        `/api/releases/${releaseId}/purchase-status?paymentIntentId=${paymentIntentId}`
-      );
+      const res = await fetch(`/api/releases/${releaseId}/purchase-status?sessionId=${sessionId}`);
       if (!res.ok) throw new Error('Failed to fetch purchase status');
       return res.json() as Promise<PurchaseStatusResponse>;
     },
-    enabled: paymentComplete && paymentIntentId !== null,
+    enabled: paymentComplete && sessionId !== null,
     refetchInterval: (query) => {
       const confirmed = query.state.data?.confirmed;
       const count = query.state.fetchStatus === 'idle' ? pollCount : pollCount;
@@ -263,12 +282,13 @@ export const PurchaseCheckoutStep = ({
         <DialogTitle>Purchase {releaseTitle}</DialogTitle>
         <DialogDescription>You are paying {formatCents(amountCents)}</DialogDescription>
       </DialogHeader>
-      <CheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
+      <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
         <PurchaseCheckoutForm
           amountCents={amountCents}
           onPaymentComplete={() => setPaymentComplete(true)}
+          onCancel={onCancel}
         />
-      </CheckoutProvider>
+      </CheckoutElementsProvider>
     </>
   );
 };

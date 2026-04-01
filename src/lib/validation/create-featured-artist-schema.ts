@@ -24,19 +24,21 @@ export const createFeaturedArtistSchema = z.object({
     .int({ message: 'Position must be a whole number' })
     .min(0, { message: 'Position must be 0 or greater' }),
   featuredOn: z.string().optional().or(z.literal('')),
-  trackId: z
+  featuredUntil: z.string().optional().or(z.literal('')),
+  digitalFormatId: z
     .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid track ID format' })
-    .min(1, { message: 'Track is required' }),
+    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid digital format ID format' })
+    .min(1, { message: 'Digital format is required' }),
   releaseId: z
     .string()
     .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid release ID format' })
     .min(1, { message: 'Release is required' }),
-  groupId: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid group ID format' })
-    .optional()
-    .or(z.literal('')),
+  featuredTrackNumber: z
+    .number()
+    .int({ message: 'Featured track number must be a whole number' })
+    .min(1, { message: 'Featured track number must be at least 1' })
+    .optional(),
+  publishedOn: z.string().optional().or(z.literal('')),
 });
 
 export type FeaturedArtistFormData = z.infer<typeof createFeaturedArtistSchema>;

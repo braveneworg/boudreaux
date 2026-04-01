@@ -16,6 +16,7 @@ export const FeaturedArtistDataView = () => {
   const fieldsToShow = [
     'displayName',
     'featuredOn',
+    'featuredUntil',
     'position',
     'description',
     'createdAt',
@@ -32,10 +33,6 @@ export const FeaturedArtistDataView = () => {
       for (const artist of item.artists) {
         if (artist.displayName) parts.push(artist.displayName);
       }
-    }
-    if (item.group) {
-      if (item.group.name) parts.push(item.group.name);
-      if (item.group.displayName) parts.push(item.group.displayName);
     }
     return parts.join(' ');
   }, []);
@@ -55,7 +52,7 @@ export const FeaturedArtistDataView = () => {
       fieldsToShow={fieldsToShow}
       refetch={refetch}
       isPending={isPending}
-      getItemDisplayName={getFeaturedArtistDisplayName}
+      getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
       getSearchableText={getSearchableText}
     />
   );

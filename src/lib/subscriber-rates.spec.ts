@@ -72,6 +72,21 @@ describe('subscriber-rates', () => {
     });
   });
 
+  describe('SUBSCRIBER_RATE_STRIPE_PRICE_IDS ?? fallback', () => {
+    it('should fall back to empty string when env vars are undefined', async () => {
+      delete process.env.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM;
+      delete process.env.NEXT_PUBLIC_STRIPE_PRICE_EXTRA;
+      delete process.env.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA;
+
+      vi.resetModules();
+      const mod = await import('./subscriber-rates');
+
+      expect(mod.SUBSCRIBER_RATE_STRIPE_PRICE_IDS.minimum).toBe('');
+      expect(mod.SUBSCRIBER_RATE_STRIPE_PRICE_IDS.extra).toBe('');
+      expect(mod.SUBSCRIBER_RATE_STRIPE_PRICE_IDS.extraExtra).toBe('');
+    });
+  });
+
   describe('getTierByPriceId', () => {
     it('should return the tier for a known price ID', () => {
       // Set a known price ID so the test works even without env vars

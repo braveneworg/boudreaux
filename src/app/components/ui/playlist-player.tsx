@@ -61,6 +61,7 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
         <h3 className="text-lg font-semibold mb-3">Playlist</h3>
         <ul className="space-y-2">
           {tracks.map((track, index) => (
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection in playlist player
             <li
               key={track.id}
               className={`p-3 rounded cursor-pointer transition-colors ${

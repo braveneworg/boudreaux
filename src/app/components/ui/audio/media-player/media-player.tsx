@@ -8,14 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import {
-  ChevronDown,
-  ChevronUp,
-  EllipsisVertical,
-  Pause,
-  Play,
-  Search as SearchIcon,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, EllipsisVertical, Pause, Play, Star } from 'lucide-react';
 import videojs from 'video.js';
 
 import {
@@ -25,7 +18,6 @@ import {
   getSkipNextButton,
   resetClasses,
 } from '@/app/components/ui/audio/audio-controls';
-import TextField from '@/components/forms/fields/text-field';
 import { Button } from '@/components/ui/button';
 import {
   type CarouselApi,
@@ -45,10 +37,12 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
+import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
+import { cn } from '@/lib/utils/tailwind-utils';
 
-import type { Control } from 'react-hook-form';
 import type Player from 'video.js/dist/types/player';
 
 import 'video.js/dist/video-js.css';
@@ -155,15 +149,6 @@ const clearPlayerErrorState = (player: Player): void => {
 };
 
 /**
- * Form values interface for the search component.
- *
- * @property search - The search query string
- */
-export interface SearchFormValues {
-  search: string;
-}
-
-/**
  * Interface for accessing player controls from parent components.
  *
  * @property play - Function to start playback
@@ -198,55 +183,6 @@ interface MediaControlsProps {
   autoPlay?: boolean;
   controlsRef?: (controls: MediaPlayerControls | null) => void;
 }
-
-/**
- * Search component for the media player.
- *
- * @param control - The react-hook-form control object
- * @returns The rendered search component
- *
- * @remarks
- * - Uses a TextField for input and a Button for submission
- * - Placeholder text is "Search..."
- * - Button has a search icon and is labeled for accessibility
- * @example
- * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.Search control={form.control} />
- *   ...
- * </MediaPlayer>
- * ```
- */
-const Search = ({ control }: { control: Control<SearchFormValues> }) => {
-  const handleSearch = () => {
-    // TODO: Implement search functionality
-  };
-
-  return (
-    <div className="flex w-full">
-      <div className="flex-1">
-        <TextField
-          control={control}
-          name="search"
-          label=""
-          placeholder="Search..."
-          type="text"
-          className="[&_input]:rounded-r-none [&_input]:border-r-0 [&_input]:focus-visible:z-10 [&_label]:sr-only"
-        />
-      </div>
-      <Button
-        type="button"
-        size="icon"
-        variant="outline"
-        className="rounded-l-none mt-auto mb-auto"
-        onClick={handleSearch}
-        aria-label="Search"
-      >
-        <SearchIcon />
-      </Button>
-    </div>
-  );
-};
 
 /**
  * A carousel component that displays a grid of artist images.
@@ -406,7 +342,7 @@ const FeaturedArtistCarousel = ({
                   {coverArt && !imageError ? (
                     <Image
                       src={coverArt}
-                      alt={displayName}
+                      alt={displayName ?? ''}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"
                       sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
@@ -598,6 +534,7 @@ interface InfoTickerTapeFeaturedArtistProps {
   artistRelease?: never;
   trackName?: never;
   isPlaying?: boolean;
+  trackTitle?: string;
   onTrackSelect?: (trackId: string) => void;
 }
 
@@ -635,7 +572,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
   const { isPlaying = false } = props;
 
   // Determine display values based on prop type
-  let displayName: string;
+  let displayName: string | null;
   let releaseTitle: string | null;
   let trackTitle: string;
 
@@ -643,7 +580,7 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
     const { featuredArtist } = props;
     displayName = getFeaturedArtistDisplayName(featuredArtist);
     releaseTitle = featuredArtist.release?.title ?? null;
-    trackTitle = featuredArtist.track?.title ?? '';
+    trackTitle = props.trackTitle ?? '';
   } else {
     const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
     displayName = getArtistDisplayName(artistRelease.artist);
@@ -656,7 +593,8 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
       <div className="overflow-hidden mx-3">
         <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-xs font-medium text-zinc-100">
-            {trackTitle} • by {displayName}
+            {trackTitle}
+            {displayName && ` • by ${displayName}`}
             {releaseTitle && ` • ${releaseTitle}`}
           </span>
         </div>
@@ -1087,9 +1025,8 @@ const TrackListDrawer = ({
   onTrackSelect?: (trackId: string) => void;
 }) => {
   const { release } = artistRelease;
-  const { releaseTracks } = release;
+  const allFiles = release.digitalFormats.flatMap((format) => format.files);
 
-  // TODO: verify if this function is actually needed?
   /**
    * Format duration from seconds to MM:SS format
    */
@@ -1100,24 +1037,8 @@ const TrackListDrawer = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  /**
-   * Get cover art for a release track, falling back to track coverArt or release coverArt
-   */
-  const getCoverArt = (releaseTrack: (typeof releaseTracks)[number]): string | null => {
-    // First, check ReleaseTrack's coverArt (derived from uploaded file metadata)
-    if ('coverArt' in releaseTrack && releaseTrack.coverArt) {
-      return releaseTrack.coverArt as string;
-    }
-    // Fall back to the track's own coverArt
-    if (releaseTrack.track.coverArt) {
-      return releaseTrack.track.coverArt;
-    }
-    // Fall back to release coverArt
-    return release.coverArt || null;
-  };
-
-  // Sort tracks by position
-  const sortedTracks = [...releaseTracks].sort((a, b) => a.track.position - b.track.position);
+  // Sort tracks by track number
+  const sortedFiles = [...allFiles].sort((a, b) => a.trackNumber - b.trackNumber);
 
   return (
     <Drawer>
@@ -1127,7 +1048,7 @@ const TrackListDrawer = ({
           size="sm"
           className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
         >
-          <span>View all {releaseTracks.length} tracks</span>
+          <span>View all {allFiles.length} tracks</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DrawerTrigger>
@@ -1135,33 +1056,31 @@ const TrackListDrawer = ({
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription>
-            <article>
-              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
-              <p className="text-sm text-shadow-none mb-0">
-                <em>{release.title}</em>
-              </p>
-              <p>
-                {releaseTracks.length} track{releaseTracks.length !== 1 ? 's' : ''}
-              </p>
-            </article>
+            <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+            <p className="text-sm text-shadow-none mb-0">
+              <em>{release.title}</em>
+            </p>
+            <p>
+              {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
+            </p>
           </DrawerDescription>
         </DrawerHeader>
         <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
           <ol className="px-0 -ml-2">
-            {sortedTracks.map((releaseTrack, index) => {
-              const { track } = releaseTrack;
-              const isCurrentTrack = currentTrackId === track.id;
-              const coverArt = getCoverArt(releaseTrack);
+            {sortedFiles.map((file, index) => {
+              const isCurrentTrack = currentTrackId === file.id;
+              const coverArt = release.coverArt || null;
 
               const trackItem = (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection handled by parent player component
                 <li
-                  key={track.id}
+                  key={file.id}
                   className={`flex items-center justify-between gap-4 p-3 transition-colors ${
                     isCurrentTrack
                       ? 'bg-zinc-800 text-zinc-50'
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
                   } ${onTrackSelect ? 'cursor-pointer' : ''}`}
-                  onClick={() => onTrackSelect?.(track.id)}
+                  onClick={() => onTrackSelect?.(file.id)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
@@ -1175,7 +1094,7 @@ const TrackListDrawer = ({
                       <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
                         <Image
                           src={coverArt}
-                          alt={track.title}
+                          alt={getTrackDisplayTitle(file.title, file.fileName)}
                           fill
                           className="object-cover"
                           sizes="40px"
@@ -1189,7 +1108,7 @@ const TrackListDrawer = ({
                           : 'text-zinc-500 dark:text-zinc-500'
                       }`}
                     >
-                      {track.title}
+                      {getTrackDisplayTitle(file.title, file.fileName)}
                     </span>
                   </div>
                   <span
@@ -1197,14 +1116,14 @@ const TrackListDrawer = ({
                       isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
                     }`}
                   >
-                    {formatDuration(track.duration)}
+                    {formatDuration(file.duration ?? 0)}
                   </span>
                 </li>
               );
 
               // Wrap with DrawerClose if onTrackSelect is provided to close drawer on selection
               return onTrackSelect ? (
-                <DrawerClose key={track.id} asChild>
+                <DrawerClose key={file.id} asChild>
                   {trackItem}
                 </DrawerClose>
               ) : (
@@ -1217,15 +1136,200 @@ const TrackListDrawer = ({
           <div className="flex justify-between text-sm text-zinc-600">
             <span>Total time</span>
             <span className="font-mono">
-              {formatDuration(
-                releaseTracks.reduce(
-                  (total: number, rt: { track: { duration: number } }) => total + rt.track.duration,
-                  0
-                )
-              )}
+              {formatDuration(allFiles.reduce((total, f) => total + (f.duration ?? 0), 0))}
             </span>
           </div>
         </div>
+        <DrawerClose asChild>
+          <Button variant="outline" className="mx-4 mb-4">
+            <ChevronUp className="h-4 w-4 mr-2" />
+            Close
+          </Button>
+        </DrawerClose>
+      </DrawerContent>
+    </Drawer>
+  );
+};
+
+/**
+ * Props for FormatFileListDrawer
+ */
+interface FormatFileListDrawerProps {
+  files: {
+    id: string;
+    trackNumber: number;
+    title?: string | null;
+    fileName: string;
+    duration?: number | null;
+    s3Key: string;
+  }[];
+  currentFileId: string | null;
+  onFileSelect?: (fileId: string) => void;
+  artistName: string;
+  releaseTitle: string;
+  featuredTrackNumber?: number;
+}
+
+/**
+ * FormatFileListDrawer component displays a collapsible drawer with digital format files.
+ * Used by the FeaturedArtistsPlayer to show track-by-track navigation from ReleaseDigitalFormatFiles.
+ */
+const FormatFileListDrawer = ({
+  files,
+  currentFileId,
+  onFileSelect,
+  artistName,
+  releaseTitle,
+  featuredTrackNumber,
+}: FormatFileListDrawerProps) => {
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Debug: extract and log audio metadata (ID3 tags) from CDN files
+  useEffect(() => {
+    if (files.length === 0) return;
+
+    const extractMetadata = async () => {
+      try {
+        const { parseBlob } = await import('music-metadata');
+        const firstFile = files[0];
+        const cdnUrl = buildCdnUrl(firstFile.s3Key);
+        const response = await fetch(cdnUrl);
+        const blob = await response.blob();
+        const metadata = await parseBlob(blob);
+        console.info('[metadata] Extracted ID3 tags from first track:', {
+          title: metadata.common.title,
+          artist: metadata.common.artist,
+          album: metadata.common.album,
+          albumArtist: metadata.common.albumartist,
+          year: metadata.common.year,
+          genre: metadata.common.genre,
+          label: metadata.common.label,
+          trackNumber: metadata.common.track?.no,
+          trackTotal: metadata.common.track?.of,
+          duration: metadata.format.duration
+            ? `${Math.round(metadata.format.duration)}s`
+            : undefined,
+          bitrate: metadata.format.bitrate
+            ? `${Math.round(metadata.format.bitrate / 1000)}kbps`
+            : undefined,
+          codec: metadata.format.codec,
+          hasCoverArt: (metadata.common.picture?.length ?? 0) > 0,
+        });
+      } catch (err) {
+        console.info('[metadata] Could not extract metadata:', err);
+      }
+    };
+
+    extractMetadata();
+  }, [files]);
+
+  return (
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
+        >
+          <span>View all {files.length} tracks</span>
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="sr-only">Track List</DrawerTitle>
+          <DrawerDescription>
+            <div>
+              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <p className="text-sm text-shadow-none mb-0">
+                <em>{releaseTitle}</em>
+              </p>
+              <p>
+                {files.length} track{files.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </DrawerDescription>
+        </DrawerHeader>
+        <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
+          <ol className="px-0 -ml-2">
+            {files.map((file) => {
+              const isCurrentFile = currentFileId === file.id;
+              const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
+
+              const fileItem = (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- file selection handled by parent player component
+                <li
+                  key={file.id}
+                  className={`flex items-center justify-between gap-4 p-3 transition-colors ${
+                    isCurrentFile
+                      ? 'bg-zinc-800 text-zinc-50'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                  } ${onFileSelect ? 'cursor-pointer' : ''}`}
+                  onClick={() => onFileSelect?.(file.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span
+                      className={`text-sm font-medium w-6 shrink-0 text-right ${
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
+                    >
+                      {file.trackNumber}.
+                    </span>
+                    <span
+                      className={`text-sm truncate ${
+                        isCurrentFile
+                          ? 'font-semibold text-zinc-50!'
+                          : 'text-zinc-500 dark:text-zinc-500'
+                      }`}
+                    >
+                      {displayTitle}
+                    </span>
+                    {featuredTrackNumber != null && file.trackNumber === featuredTrackNumber && (
+                      <Star
+                        className={cn(
+                          'h-3.5 w-3.5 shrink-0 fill-current',
+                          isCurrentFile ? 'text-amber-400' : 'text-amber-500'
+                        )}
+                        aria-label="Featured track"
+                      />
+                    )}
+                  </div>
+                  {file.duration != null && (
+                    <span
+                      className={`text-sm shrink-0 font-mono ${
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                      }`}
+                    >
+                      {formatDuration(file.duration)}
+                    </span>
+                  )}
+                </li>
+              );
+
+              return onFileSelect ? (
+                <DrawerClose key={file.id} asChild>
+                  {fileItem}
+                </DrawerClose>
+              ) : (
+                fileItem
+              );
+            })}
+          </ol>
+        </div>
+        {files.some((f) => f.duration != null) && (
+          <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
+            <div className="flex justify-between text-sm text-zinc-600">
+              <span>Total time</span>
+              <span className="font-mono">
+                {formatDuration(files.reduce((total, f) => total + (f.duration ?? 0), 0))}
+              </span>
+            </div>
+          </div>
+        )}
         <DrawerClose asChild>
           <Button variant="outline" className="mx-4 mb-4">
             <ChevronUp className="h-4 w-4 mr-2" />
@@ -1402,7 +1506,6 @@ export const MediaPlayer = ({ children, className }: MediaPlayerProps) => (
   <div className={className}>{children}</div>
 );
 
-MediaPlayer.Search = Search;
 MediaPlayer.CoverArtView = CoverArtView;
 MediaPlayer.InteractiveCoverArt = InteractiveCoverArt;
 MediaPlayer.InfoTickerTape = InfoTickerTape;
@@ -1414,4 +1517,5 @@ MediaPlayer.DotNavMenu = DotNavMenu;
 MediaPlayer.DotNavMenuItem = DotNavMenuItem;
 MediaPlayer.DotNavMenuTrigger = DotNavMenuTrigger;
 MediaPlayer.TrackListDrawer = TrackListDrawer;
+MediaPlayer.FormatFileListDrawer = FormatFileListDrawer;
 MediaPlayer.SocialSharer = SocialSharer;

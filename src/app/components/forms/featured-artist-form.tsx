@@ -3,20 +3,19 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
-import GroupSelect from '@/app/components/forms/fields/group-select';
 import ReleaseSelect, { type ReleaseOption } from '@/app/components/forms/fields/release-select';
-import TrackSelect, { type TrackOption } from '@/app/components/forms/fields/track-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -36,11 +35,19 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/app/components/ui/select';
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
+import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import {
   createFeaturedArtistSchema,
   type FeaturedArtistFormData,
@@ -51,6 +58,12 @@ import { DatePicker } from '../ui/datepicker';
 
 type FormFieldName = keyof FeaturedArtistFormData;
 
+interface TrackOption {
+  trackNumber: number;
+  title: string | null;
+  fileName: string;
+}
+
 interface FeaturedArtistFormProps {
   featuredArtistId?: string;
 }
@@ -60,9 +73,16 @@ const initialFormState: FormState = {
   success: false,
 };
 
-const ToastContent = ({ displayName }: { displayName: string }) => (
+const ToastContent = ({
+  displayName,
+  isEditMode,
+}: {
+  displayName: string;
+  isEditMode: boolean;
+}) => (
   <>
-    Featured artist <b>{displayName || 'entry'}</b> created successfully.
+    Featured artist <b>{displayName || 'entry'}</b> {isEditMode ? 'updated' : 'created'}{' '}
+    successfully.
   </>
 );
 
@@ -79,8 +99,6 @@ export default function FeaturedArtistForm({
   const router = useRouter();
   const { data: _session } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
-  const previousReleaseIdRef = useRef<string | undefined>(undefined);
-  const releaseSetByTrackRef = useRef(false);
 
   const form = useForm<FeaturedArtistFormData>({
     resolver: zodResolver(createFeaturedArtistSchema),
@@ -90,15 +108,20 @@ export default function FeaturedArtistForm({
       coverArt: '',
       position: 0,
       featuredOn: new Date().toISOString().split('T')[0],
-      trackId: '',
+      featuredUntil: '',
+      digitalFormatId: '',
       releaseId: '',
-      groupId: '',
     },
   });
   const { control, setValue } = form;
   const watchedReleaseId = useWatch({ control, name: 'releaseId' }) as string | undefined;
   const [derivedArtistIds, setDerivedArtistIds] = useState<string[]>([]);
   const [derivedArtistNames, setDerivedArtistNames] = useState<string[]>([]);
+  const [formatStatus, setFormatStatus] = useState<'idle' | 'loading' | 'found' | 'missing'>(
+    'idle'
+  );
+  const [formatFileCount, setFormatFileCount] = useState(0);
+  const [formatTracks, setFormatTracks] = useState<TrackOption[]>([]);
 
   // Fetch featured artist data when initialFeaturedArtistId is provided
   useEffect(() => {
@@ -131,18 +154,30 @@ export default function FeaturedArtistForm({
           coverArt: featuredArtist.coverArt || '',
           position: featuredArtist.position ?? 0,
           featuredOn: formatDate(featuredArtist.featuredOn),
-          trackId: featuredArtist.trackId || '',
+          featuredUntil: formatDate(featuredArtist.featuredUntil),
+          digitalFormatId: featuredArtist.digitalFormatId || '',
           releaseId: featuredArtist.releaseId || '',
-          groupId: featuredArtist.groupId || '',
+          featuredTrackNumber: featuredArtist.featuredTrackNumber ?? undefined,
         });
+
+        // Set format status if editing an existing entry
+        if (featuredArtist.digitalFormatId) {
+          setFormatStatus('found');
+        }
 
         // Populate derived artist data for display and CoverArtField
         const ids = featuredArtist.artists?.map((a: { id: string }) => a.id) || [];
         setDerivedArtistIds(ids);
         const names =
           featuredArtist.artists
-            ?.map((a: { displayName?: string }) => a.displayName)
-            .filter((n: string | undefined): n is string => !!n) ?? [];
+            ?.map((a: { displayName?: string; firstName?: string; surname?: string }) => {
+              if (a.displayName) return a.displayName;
+              const first = a.firstName ?? '';
+              const last = a.surname ?? '';
+              const full = `${first} ${last}`.trim();
+              return full || null;
+            })
+            .filter((n: string | null): n is string => !!n) ?? [];
         setDerivedArtistNames(names);
       } catch (err) {
         error('Failed to fetch featured artist:', err);
@@ -169,78 +204,93 @@ export default function FeaturedArtistForm({
     }
   }, [formState.errors, form]);
 
-  // Clear trackId when releaseId changes to prevent inconsistent associations.
-  // Skip if the releaseId change was triggered by selecting a track (handleTrackChange),
-  // since in that case we want to keep the track the user just chose.
-  useEffect(() => {
-    // Skip on initial render (when previousReleaseIdRef is undefined)
-    if (previousReleaseIdRef.current === undefined) {
-      previousReleaseIdRef.current = watchedReleaseId;
-      return;
-    }
+  // Fetch the MP3_320KBPS digital format for a given release and auto-set digitalFormatId
+  const fetchDigitalFormat = useCallback(
+    async (releaseId: string) => {
+      setFormatStatus('loading');
+      setFormatFileCount(0);
+      setFormatTracks([]);
+      setValue('digitalFormatId', '');
+      setValue('featuredTrackNumber', undefined);
 
-    // Skip if loading featured artist data (form is being populated)
-    if (isLoadingFeaturedArtist) {
-      return;
-    }
+      try {
+        const response = await fetch(
+          `/api/releases/${releaseId}/digital-formats?formatType=MP3_320KBPS`
+        );
 
-    // If releaseId changed, clear trackId only when the user changed the release directly
-    if (previousReleaseIdRef.current !== watchedReleaseId) {
-      if (releaseSetByTrackRef.current) {
-        // Release was set by handleTrackChange — keep the track
-        releaseSetByTrackRef.current = false;
-      } else {
-        setValue('trackId', '');
+        if (!response.ok) {
+          setFormatStatus('missing');
+          form.setError('digitalFormatId', {
+            type: 'manual',
+            message:
+              'Selected release has no MP3 320kbps format. Please upload format files first.',
+          });
+          return;
+        }
+
+        const { digitalFormat } = await response.json();
+        setValue('digitalFormatId', digitalFormat.id, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        setFormatStatus('found');
+        const files = digitalFormat.files ?? [];
+        setFormatFileCount(files.length);
+        setFormatTracks(
+          [...files]
+            .sort(
+              (a: { trackNumber: number }, b: { trackNumber: number }) =>
+                a.trackNumber - b.trackNumber
+            )
+            .map((f: { trackNumber: number; title: string | null; fileName: string }) => ({
+              trackNumber: f.trackNumber,
+              title: f.title,
+              fileName: f.fileName,
+            }))
+        );
+        form.clearErrors('digitalFormatId');
+      } catch {
+        setFormatStatus('missing');
+        form.setError('digitalFormatId', {
+          type: 'manual',
+          message: 'Failed to check digital format availability.',
+        });
       }
-      previousReleaseIdRef.current = watchedReleaseId;
+    },
+    [setValue, form]
+  );
+
+  // When releaseId changes (and not during initial load), fetch the digital format
+  useEffect(() => {
+    if (isLoadingFeaturedArtist) return;
+
+    if (watchedReleaseId) {
+      fetchDigitalFormat(watchedReleaseId);
+    } else {
+      setFormatStatus('idle');
+      setFormatFileCount(0);
+      setFormatTracks([]);
+      setValue('digitalFormatId', '');
+      setValue('featuredTrackNumber', undefined);
     }
-  }, [watchedReleaseId, setValue, isLoadingFeaturedArtist]);
+  }, [watchedReleaseId, fetchDigitalFormat, setValue, isLoadingFeaturedArtist]);
 
-  const handleDateSelect = (dateString: string, _fieldName: string) => {
-    const dateOnly = dateString.split('T')[0];
-    setValue('featuredOn', dateOnly);
-  };
-
-  const handleTrackChange = (track: TrackOption | null) => {
-    const release = track?.releaseTracks?.[0]?.release;
-    const releaseId = release?.id ?? '';
-    // Flag that this releaseId change originated from a track selection,
-    // so the useEffect above does not clear the trackId the user just chose.
-    releaseSetByTrackRef.current = true;
-    setValue('releaseId', releaseId, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-
-    // Derive artistIds from track-level artists first, then fall back to
-    // release-level artists (tracks often lack TrackArtist entries).
-    if (track?.artists && track.artists.length > 0) {
-      const ids = track.artists.map((a) => a.artist.id);
-      const names = track.artists.map((a) => a.artist.displayName).filter((n): n is string => !!n);
-      setDerivedArtistIds(ids);
-      setDerivedArtistNames(names);
-    } else if (release?.artistReleases && release.artistReleases.length > 0) {
-      const ids = release.artistReleases.map((ar) => ar.artist.id);
-      const names = release.artistReleases
-        .map((ar) => ar.artist.displayName)
-        .filter((n): n is string => !!n);
-      setDerivedArtistIds(ids);
-      setDerivedArtistNames(names);
-    } else if (!track) {
-      setDerivedArtistIds([]);
-      setDerivedArtistNames([]);
-    }
+  const handleDateSelect = (dateString: string, fieldName: string) => {
+    const dateOnly = dateString ? dateString.split('T')[0] : '';
+    setValue(fieldName as FormFieldName, dateOnly);
   };
 
   const handleReleaseChange = (release: ReleaseOption | null) => {
-    // Only derive artists from release when it's a direct user selection
-    // (not triggered by track selection, which handles its own artist derivation)
-    if (releaseSetByTrackRef.current) return;
-
     if (release?.artistReleases && release.artistReleases.length > 0) {
       const ids = release.artistReleases.map((ar) => ar.artist.id);
       const names = release.artistReleases
-        .map((ar) => ar.artist.displayName)
+        .map((ar) => {
+          if (ar.artist.displayName) return ar.artist.displayName;
+          const first = ar.artist.firstName ?? '';
+          const last = ar.artist.surname ?? '';
+          const full = `${first} ${last}`.trim();
+          return full || null;
+        })
         .filter((n): n is string => !!n);
       setDerivedArtistIds(ids);
       setDerivedArtistNames(names);
@@ -263,8 +313,8 @@ export default function FeaturedArtistForm({
     }
 
     // Build FormData from React Hook Form state instead of the DOM.
-    // Custom select components (TrackSelect, ReleaseSelect, GroupSelect)
-    // and DatePicker don't render <input> elements with name attributes,
+    // Custom select components (ReleaseSelect) and DatePicker
+    // don't render <input> elements with name attributes,
     // so new FormData(formRef) would miss their values.
     const values = form.getValues();
     const formData = new FormData();
@@ -282,24 +332,56 @@ export default function FeaturedArtistForm({
 
     setIsPending(true);
     try {
-      const result = await createFeaturedArtistAction(formState, formData);
-      setFormState(result);
+      if (isEditMode && featuredArtistId) {
+        // In edit mode, use the PATCH API route
+        const patchBody: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(values)) {
+          if (value !== undefined && value !== null && value !== '') {
+            patchBody[key] =
+              key === 'position' || key === 'featuredTrackNumber' ? Number(value) : value;
+          }
+        }
 
-      if (result.success && result.data?.featuredArtistId) {
-        const displayName = form.getValues('displayName');
-        toast.success(<ToastContent displayName={displayName || ''} />);
-        const newId =
-          typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
-        setFeaturedArtistId(newId);
-        router.push('/admin?entity=featuredArtist');
-      } else if (!result.success) {
-        const generalMsg = result.errors?.general?.[0];
-        const errorDetails = result.errors
-          ? Object.entries(result.errors)
-              .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
-              .join('; ')
-          : 'Unknown error';
-        toast.error(generalMsg || `Failed to create featured artist: ${errorDetails}`);
+        // Include derived artistIds so the PATCH handler can reconnect the artists relation
+        if (derivedArtistIds.length > 0) {
+          patchBody.artistIds = derivedArtistIds;
+        }
+
+        const response = await fetch(`/api/featured-artists/${featuredArtistId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody),
+        });
+
+        if (response.ok) {
+          const displayName = form.getValues('displayName');
+          toast.success(<ToastContent displayName={displayName || ''} isEditMode />);
+          router.push('/admin?entity=featuredArtist');
+        } else {
+          const errorData = await response.json();
+          toast.error(errorData.error || 'Failed to update featured artist');
+        }
+      } else {
+        // In create mode, use the server action
+        const result = await createFeaturedArtistAction(formState, formData);
+        setFormState(result);
+
+        if (result.success && result.data?.featuredArtistId) {
+          const displayName = form.getValues('displayName');
+          toast.success(<ToastContent displayName={displayName || ''} isEditMode={false} />);
+          const newId =
+            typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
+          setFeaturedArtistId(newId);
+          router.push('/admin?entity=featuredArtist');
+        } else if (!result.success) {
+          const generalMsg = result.errors?.general?.[0];
+          const errorDetails = result.errors
+            ? Object.entries(result.errors)
+                .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
+                .join('; ')
+            : 'Unknown error';
+          toast.error(generalMsg || `Failed to create featured artist: ${errorDetails}`);
+        }
       }
     } catch (err) {
       error('Featured artist submission failed:', err);
@@ -349,29 +431,82 @@ export default function FeaturedArtistForm({
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Media Associations</h3>
                 <p className="text-sm text-muted-foreground">
-                  Associate this featured artist with a track and release. Optionally associate with
-                  a group. Artists are automatically derived from the selected track or release.
+                  Associate this featured artist with a release. The MP3 320kbps digital format is
+                  automatically used for audio playback.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <TrackSelect
-                    control={control}
-                    name="trackId"
-                    label="Track"
-                    placeholder="Select a track..."
-                    setValue={setValue}
-                    onTrackChange={handleTrackChange}
-                    releaseId={watchedReleaseId || undefined}
-                  />
+                  <div className="space-y-2">
+                    <ReleaseSelect
+                      control={control}
+                      name="releaseId"
+                      label="Release"
+                      placeholder="Select a release..."
+                      setValue={setValue}
+                      onReleaseChange={handleReleaseChange}
+                    />
 
-                  <ReleaseSelect
-                    control={control}
-                    name="releaseId"
-                    label="Release"
-                    placeholder="Select a release..."
-                    setValue={setValue}
-                    onReleaseChange={handleReleaseChange}
-                  />
+                    {/* Digital format status indicator */}
+                    {formatStatus === 'loading' && (
+                      <p className="text-sm text-muted-foreground">
+                        Checking for MP3 320kbps format...
+                      </p>
+                    )}
+                    {formatStatus === 'found' && (
+                      <p className="flex items-center gap-1.5 text-sm text-green-600">
+                        <CheckCircle2 className="h-4 w-4" />
+                        MP3 320kbps format available ({formatFileCount}{' '}
+                        {formatFileCount === 1 ? 'file' : 'files'})
+                      </p>
+                    )}
+                    {formatStatus === 'missing' && (
+                      <p className="flex items-center gap-1.5 text-sm text-destructive">
+                        <XCircle className="h-4 w-4" />
+                        No MP3 320kbps format found. Please upload format files first.
+                      </p>
+                    )}
+
+                    {/* Featured Track selector */}
+                    {formatStatus === 'found' && formatTracks.length > 0 && (
+                      <FormField
+                        control={control}
+                        name="featuredTrackNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Featured Track (Optional)</FormLabel>
+                            <Select
+                              value={field.value != null ? String(field.value) : ''}
+                              onValueChange={(val) => {
+                                field.onChange(val ? parseInt(val, 10) : undefined);
+                              }}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Default (Track 1)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {formatTracks.map((track) => (
+                                  <SelectItem
+                                    key={track.trackNumber}
+                                    value={String(track.trackNumber)}
+                                  >
+                                    {track.trackNumber}.{' '}
+                                    {getTrackDisplayTitle(track.title, track.fileName)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Select the track that plays first when a user clicks play. Defaults to
+                              track 1.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Derived artists indicator */}
@@ -380,14 +515,6 @@ export default function FeaturedArtistForm({
                     Associated artists: {derivedArtistNames.join(', ')}
                   </p>
                 )}
-
-                <GroupSelect
-                  control={control}
-                  name="groupId"
-                  label="Group (Optional)"
-                  placeholder="Select a group..."
-                  setValue={setValue}
-                />
 
                 <Separator />
 
@@ -457,8 +584,25 @@ export default function FeaturedArtistForm({
 
                   <FormItem className="flex flex-col">
                     <FormLabel>Featured Date</FormLabel>
-                    <DatePicker fieldName="featuredOn" onSelect={handleDateSelect} />
+                    <DatePicker
+                      fieldName="featuredOn"
+                      onSelect={handleDateSelect}
+                      value={form.watch('featuredOn')}
+                    />
                     <FormDescription>When this artist should start being featured.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Featured Until (Optional)</FormLabel>
+                    <DatePicker
+                      fieldName="featuredUntil"
+                      onSelect={handleDateSelect}
+                      value={form.watch('featuredUntil')}
+                    />
+                    <FormDescription>
+                      When this artist should stop being featured. Leave blank for indefinite.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 </div>

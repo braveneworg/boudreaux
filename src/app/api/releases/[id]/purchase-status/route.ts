@@ -9,7 +9,7 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/releases/[id]/purchase-status?paymentIntentId=pi_xxx
+ * GET /api/releases/[id]/purchase-status?sessionId=cs_xxx
  *
  * Polled by the client after Stripe payment confirmation to check
  * whether the webhook has recorded the purchase in the database.
@@ -19,16 +19,16 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const paymentIntentId = searchParams.get('paymentIntentId');
+  const sessionId = searchParams.get('sessionId');
 
-  if (!paymentIntentId) {
+  if (!sessionId) {
     return NextResponse.json(
-      { error: 'missing_payment_intent_id' },
+      { error: 'missing_session_id' },
       { status: 400, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
-  const purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+  const purchase = await PurchaseRepository.findBySessionId(sessionId);
 
   return NextResponse.json(
     { confirmed: purchase !== null },

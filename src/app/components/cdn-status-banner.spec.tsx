@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 import CDNStatusBanner from './cdn-status-banner';
 
@@ -194,7 +194,7 @@ describe('CDNStatusBanner', () => {
   });
 
   it('does not show invalidation warning when status is not invalidating', async () => {
-    mockFetch.mockResolvedValueOnce({
+    mockFetch.mockResolvedValue({
       json: () =>
         Promise.resolve({
           status: 'unknown',
@@ -213,5 +213,95 @@ describe('CDNStatusBanner', () => {
     expect(
       screen.queryByText(/Some assets may be temporarily unavailable/)
     ).not.toBeInTheDocument();
+  });
+
+  describe('interval polling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('re-fetches CDN status every 30 seconds when status is invalidating', async () => {
+      mockFetch.mockResolvedValue({
+        json: () =>
+          Promise.resolve({
+            status: 'invalidating',
+            message: 'CDN cache is being invalidated',
+            estimatedMinutesRemaining: 5,
+          }),
+      });
+
+      await act(async () => {
+        render(<CDNStatusBanner />);
+      });
+
+      expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
+
+      // useEffect re-runs when status?.status changes (null -> 'invalidating'),
+      // so checkStatus is called twice during initial render cycle
+      const callsAfterRender = mockFetch.mock.calls.length;
+
+      // Advance timers by 30 seconds to trigger the interval callback
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      // Interval should have triggered an additional fetch
+      expect(mockFetch).toHaveBeenCalledTimes(callsAfterRender + 1);
+    });
+
+    it('does not re-fetch when status is not invalidating', async () => {
+      mockFetch.mockResolvedValue({
+        json: () =>
+          Promise.resolve({
+            status: 'error',
+            message: 'CDN status check failed',
+          }),
+      });
+
+      await act(async () => {
+        render(<CDNStatusBanner />);
+      });
+
+      expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
+
+      const callsAfterRender = mockFetch.mock.calls.length;
+
+      // Advance timers — interval fires but checkStatus should NOT be called
+      // because status is 'error', not 'invalidating'
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(callsAfterRender);
+    });
+
+    it('clears the interval on unmount', async () => {
+      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+
+      mockFetch.mockResolvedValue({
+        json: () =>
+          Promise.resolve({
+            status: 'invalidating',
+            message: 'CDN cache is being invalidated',
+          }),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = render(<CDNStatusBanner />);
+        unmount = result.unmount;
+      });
+
+      expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
+
+      unmount!();
+
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      clearIntervalSpy.mockRestore();
+    });
   });
 });

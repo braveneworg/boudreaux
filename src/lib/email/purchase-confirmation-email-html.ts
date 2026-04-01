@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-
 export interface PurchaseConfirmationEmailData {
   email: string;
   releaseTitle: string;
@@ -81,7 +79,7 @@ export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEma
           <tr>
             <td style="padding: 24px 32px;">
               <p style="margin: 0 0 16px; color: #27272a; font-size: 14px; line-height: 1.6;">
-                Your download is ready. You can download up to ${MAX_RELEASE_DOWNLOAD_COUNT} times using the link below.
+                Your download is ready. You can download up to 5 times using the link below.
               </p>
               <a href="${data.downloadUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">Download Now</a>
             </td>

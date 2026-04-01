@@ -23,8 +23,8 @@ import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 interface ArtistReleasesCarouselProps {
   /** Other releases by the same artist */
   releases: ReleaseCarouselItem[];
-  /** Display name of the artist (used for aria-label) */
-  artistName: string;
+  /** Display name of the artist (used for aria-label), or null if unresolvable */
+  artistName: string | null;
 }
 
 /**
@@ -37,7 +37,10 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
   }
 
   return (
-    <Carousel aria-label={`Other releases by ${artistName}`} opts={{ align: 'start' }}>
+    <Carousel
+      aria-label={artistName ? `Other releases by ${artistName}` : 'Other releases'}
+      opts={{ align: 'start' }}
+    >
       <CarouselContent className="-ml-2 justify-center">
         {releases.map((release) => {
           const coverArt = getReleaseCoverArt(release);

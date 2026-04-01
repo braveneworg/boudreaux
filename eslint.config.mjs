@@ -45,10 +45,12 @@ const eslintConfig = [
       '*.pem',
       '*.crt',
       '*.key',
+      '**/.claude/**',
     ],
   },
   // Base JavaScript rules
   js.configs.recommended,
+  jsxA11y.flatConfigs.recommended,
   // Prettier integration and custom rules
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -57,7 +59,6 @@ const eslintConfig = [
       '@next/next': nextPlugin,
       react,
       'react-hooks': reactHooks,
-      'jsx-a11y': jsxA11y,
       import: importPlugin,
       prettier: prettierPlugin,
       'unused-imports': unusedImports,
@@ -81,6 +82,10 @@ const eslintConfig = [
         FormDataEntryValue: 'readonly',
         CanvasTextAlign: 'readonly',
         CanvasTextBaseline: 'readonly',
+        FileSystemEntry: 'readonly',
+        FileSystemFileEntry: 'readonly',
+        FileSystemDirectoryEntry: 'readonly',
+        FileSystemDirectoryReader: 'readonly',
       },
     },
     settings: {
@@ -168,6 +173,7 @@ const eslintConfig = [
       'jsx-a11y/aria-unsupported-elements': 'error',
       'jsx-a11y/role-has-required-aria-props': 'error',
       'jsx-a11y/role-supports-aria-props': 'error',
+      'jsx-a11y/heading-has-content': ['error', { components: ['Heading'] }],
 
       // Import rules and sorting
       'import/order': [

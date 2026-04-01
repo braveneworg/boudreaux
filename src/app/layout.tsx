@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Dawning_of_a_New_Day } from 'next/font/google';
 import { headers } from 'next/headers';
 import { userAgentFromString } from 'next/server';
 
@@ -35,14 +34,6 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   }
 }
 
-const dawningOfANewDay = Dawning_of_a_New_Day({
-  variable: '--font-dawning-of-a-new-day',
-  subsets: ['latin'],
-  weight: '400',
-  display: 'swap',
-  adjustFontFallback: false,
-});
-
 export const metadata: Metadata = {
   title: 'Fake Four Inc.',
   description:
@@ -72,12 +63,12 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${dawningOfANewDay.variable} antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full`}
+        className="antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full"
         suppressHydrationWarning
       >
         <Providers>
           <Header isMobile={isMobile} />
-          <main className="font-sans px-1.5 flex flex-col flex-1 w-full max-w-full overflow-x-hidden">
+          <main className="flex flex-col flex-grow w-full max-w-full overflow-x-hidden">
             {children}
           </main>
           <Footer />

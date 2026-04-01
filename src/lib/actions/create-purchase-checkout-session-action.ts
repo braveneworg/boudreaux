@@ -13,7 +13,7 @@ import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
 import { auth } from '../../../auth';
 
 type ActionResult =
-  | { success: true; clientSecret: string; paymentIntentId: string }
+  | { success: true; clientSecret: string; sessionId: string }
   | { success: false; error: string };
 
 /**
@@ -21,7 +21,7 @@ type ActionResult =
  * for a PWYW release purchase.
  *
  * Returns the clientSecret for the embedded Stripe Payment Element
- * and the paymentIntentId used to poll for webhook confirmation.
+ * and the sessionId used to poll for webhook confirmation.
  */
 export async function createPurchaseCheckoutSessionAction(input: unknown): Promise<ActionResult> {
   const parsed = purchaseCheckoutActionSchema.safeParse(input);
@@ -29,11 +29,12 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { releaseId, amountCents } = parsed.data;
+  const { releaseId, amountCents, customerEmail } = parsed.data;
 
   // Resolve user identity server-side; never trust a client-supplied userId.
   const authSession = await auth();
   const userId = authSession?.user?.id ?? null;
+  const email = authSession?.user?.email ?? customerEmail ?? null;
 
   try {
     // Minimum Stripe charge is $0.50
@@ -60,7 +61,8 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      ui_mode: 'custom',
+      ui_mode: 'elements',
+      ...(email ? { customer_email: email } : {}),
       line_items: [
         {
           price_data: {
@@ -86,19 +88,18 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/releases/${releaseId}`,
     });
 
-    if (!session.client_secret || !session.payment_intent) {
+    if (!session.client_secret) {
+      console.error('Checkout session missing client_secret', {
+        sessionId: session.id,
+        uiMode: 'elements',
+      });
       return { success: false, error: 'stripe_error' };
     }
-
-    const paymentIntentId =
-      typeof session.payment_intent === 'string'
-        ? session.payment_intent
-        : session.payment_intent.id;
 
     return {
       success: true,
       clientSecret: session.client_secret,
-      paymentIntentId,
+      sessionId: session.id,
     };
   } catch (error) {
     console.error('Failed to create purchase checkout session:', error);

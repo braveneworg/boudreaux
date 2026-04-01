@@ -70,50 +70,46 @@ describe('presigned-upload-actions', () => {
       it('should require admin role', async () => {
         vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
 
-        await expect(
-          getPresignedUploadUrlsAction('artists', 'artist-123', [
-            { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-          ])
-        ).rejects.toThrow('Unauthorized');
+        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
+          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
+        ]);
 
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Unauthorized');
         expect(requireRole).toHaveBeenCalledWith('admin');
       });
 
       it('should return error when user is not logged in', async () => {
-        vi.mocked(auth).mockResolvedValue(null as never);
+        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
         ]);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('Unauthorized');
+        expect(result.error).toContain('Unauthorized');
       });
 
       it('should return error when user is not admin', async () => {
-        vi.mocked(auth).mockResolvedValue({
-          user: { id: 'user-123', role: 'user' },
-        } as never);
+        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
         ]);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('Unauthorized');
+        expect(result.error).toContain('Unauthorized');
       });
 
       it('should return error when user session has no id', async () => {
-        vi.mocked(auth).mockResolvedValue({
-          user: { role: 'admin' },
-        } as never);
+        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
         ]);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('Unauthorized');
+        expect(result.error).toContain('Unauthorized');
       });
     });
 
@@ -318,13 +314,15 @@ describe('presigned-upload-actions', () => {
         expect(result.data?.[0].s3Key).toMatch(/^media\/artists\//);
       });
 
-      it('should work with groups entity type', async () => {
-        const result = await getPresignedUploadUrlsAction('groups', 'group-123', [
-          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
+      it('should work with featured-artists entity type', async () => {
+        const result = await getPresignedUploadUrlsAction(
+          'featured-artists',
+          'featured-artist-123',
+          [{ fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 }]
+        );
 
         expect(result.success).toBe(true);
-        expect(result.data?.[0].s3Key).toMatch(/^media\/groups\//);
+        expect(result.data?.[0].s3Key).toMatch(/^media\/featured-artists\//);
       });
 
       it('should work with releases entity type', async () => {

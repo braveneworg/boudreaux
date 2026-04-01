@@ -316,6 +316,33 @@ describe('Venue Actions', () => {
       expect(result.errors?.city).toEqual(['City cannot be empty']);
     });
 
+    it('should accumulate multiple errors for the same field', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: {
+          fields: {},
+          success: false,
+          errors: {},
+        },
+        parsed: {
+          success: false,
+          error: {
+            issues: [
+              { path: ['name'], message: 'Name cannot be empty' },
+              { path: ['name'], message: 'Name must be at least 2 characters' },
+            ],
+          },
+        },
+      } as never);
+
+      const result = await updateVenueAction(venueId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.name).toEqual([
+        'Name cannot be empty',
+        'Name must be at least 2 characters',
+      ]);
+    });
+
     it('should handle service errors', async () => {
       vi.mocked(VenueService.update).mockRejectedValue(new Error('Database error'));
 

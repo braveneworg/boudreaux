@@ -13,8 +13,6 @@ import type {
   TourDateHeadliner as PrismaTourHeadliner,
   TourImage as PrismaTourImage,
   Artist,
-  Group,
-  ArtistGroup,
 } from '@prisma/client';
 
 // ============================================================================
@@ -268,13 +266,10 @@ export interface ActionResult<T = void> {
  * Function type for computing artist display name with fallback logic
  * Algorithm:
  * 1. Use artist.displayName if present
- * 2. Fall back to group.displayName if artist is in a group
- * 3. Fall back to firstName + " " + surname
- * 4. Fall back to "Unknown Artist"
+ * 2. Fall back to firstName + " " + surname
+ * 3. Fall back to null
  */
-export type GetArtistDisplayName = (
-  artist: Artist & { groups: Array<ArtistGroup & { group: Group }> }
-) => string;
+export type GetArtistDisplayName = (artist: Artist) => string | null;
 
 // ============================================================================
 // Service Response Type (matching existing pattern)

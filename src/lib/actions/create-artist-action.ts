@@ -28,12 +28,14 @@ export const createArtistAction = async (
     'displayName',
     'middleName',
     'publishedOn',
+    'formedOn',
   ];
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
 
   if (parsed.success) {
     try {
-      const { firstName, surname, slug, middleName, displayName, publishedOn } = parsed.data;
+      const { firstName, surname, slug, middleName, displayName, publishedOn, formedOn } =
+        parsed.data;
 
       // Create artist in database
       const response = await ArtistService.createArtist({
@@ -43,6 +45,7 @@ export const createArtistAction = async (
         middleName,
         displayName,
         publishedOn: publishedOn ? new Date(publishedOn) : undefined,
+        formedOn: formedOn ? new Date(formedOn) : undefined,
       });
 
       // Log artist creation for security audit

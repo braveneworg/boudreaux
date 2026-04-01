@@ -12,12 +12,11 @@ import { useSession } from 'next-auth/react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { DownloadAnalyticsDashboard } from '@/app/components/download-analytics-dashboard';
+import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-accordion';
 import { TextField } from '@/app/components/forms/fields';
 import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
 import CoverArtField from '@/app/components/forms/fields/cover-art-field';
-import GroupMultiSelect, {
-  type GroupOption,
-} from '@/app/components/forms/fields/group-multi-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -37,6 +36,7 @@ import {
   FormDescription,
 } from '@/app/components/ui/form';
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+import { Input } from '@/app/components/ui/input';
 import { Separator } from '@/app/components/ui/separator';
 import { Switch } from '@/app/components/ui/switch';
 import { Textarea } from '@/app/components/ui/textarea';
@@ -48,10 +48,13 @@ import {
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
+import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
+import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { FormState } from '@/lib/types/form-state';
 import { FORMATS, type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
@@ -69,9 +72,8 @@ const initialFormState: FormState = {
   success: false,
 };
 
-// Common formats grouped for easier selection
+// Common formats grouped for easier selection (digital formats managed via accordion)
 const FORMAT_GROUPS = {
-  Digital: ['DIGITAL', 'MP3_320KBPS', 'FLAC', 'WAV', 'AAC'] as Format[],
   Vinyl: [
     'VINYL',
     'VINYL_7_INCH',
@@ -125,8 +127,27 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
   const [releaseId, setReleaseId] = useState<string | null>(initialReleaseId || null);
   const [isPublished, setIsPublished] = useState(false);
   const [imagesReordered, setImagesReordered] = useState(false);
-  const [selectedGroups, setSelectedGroups] = useState<GroupOption[]>([]);
+  const [existingFormats, setExistingFormats] = useState<
+    Array<{
+      formatType: DigitalFormatType;
+      trackCount: number;
+      totalFileSize: number;
+      files: Array<{
+        trackNumber: number;
+        title: string | null;
+        fileName: string;
+        fileSize: number;
+        duration: number | null;
+      }>;
+    }>
+  >([]);
   const isEditMode = releaseId !== null;
+
+  // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
+  // is saved. In edit mode this equals initialReleaseId; in create mode it enables immediate
+  // uploads whose DB confirms are flushed after createReleaseAction succeeds.
+  const [preGeneratedId] = useState<string>(() => initialReleaseId ?? generateObjectId());
+
   const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
@@ -140,7 +161,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       coverArt: '',
       formats: ['DIGITAL'],
       artistIds: [],
-      groupIds: [],
       labels: '',
       catalogNumber: '',
       description: '',
@@ -158,6 +178,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
       featuredOn: '',
       featuredUntil: '',
       featuredDescription: '',
+      suggestedPrice: '',
       createdBy: user?.id,
     },
   });
@@ -194,7 +215,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           coverArt: release.coverArt || '',
           formats: release.formats || ['DIGITAL'],
           artistIds: release.artistReleases?.map((ar: { artistId: string }) => ar.artistId) || [],
-          groupIds: release.groupReleases?.map((gr: { groupId: string }) => gr.groupId) || [],
           labels: Array.isArray(release.labels) ? release.labels.join(', ') : '',
           catalogNumber: release.catalogNumber || '',
           description: release.description || '',
@@ -216,6 +236,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           featuredOn: formatDate(release.featuredOn),
           featuredUntil: formatDate(release.featuredUntil),
           featuredDescription: release.featuredDescription || '',
+          suggestedPrice: release.suggestedPrice ? (release.suggestedPrice / 100).toFixed(2) : '',
           createdBy: release.createdBy || user?.id,
         });
 
@@ -243,6 +264,39 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
             })
           );
           setImages(existingImages);
+        }
+
+        // Load existing digital formats with track files
+        if (release.digitalFormats && release.digitalFormats.length > 0) {
+          setExistingFormats(
+            release.digitalFormats
+              .filter((df: { deletedAt?: string | null }) => df.deletedAt == null)
+              .map(
+                (df: {
+                  formatType: string;
+                  trackCount?: number;
+                  totalFileSize?: number | string;
+                  files?: Array<{
+                    trackNumber: number;
+                    title?: string | null;
+                    fileName: string;
+                    fileSize: number | string;
+                    duration?: number | null;
+                  }>;
+                }) => ({
+                  formatType: df.formatType as DigitalFormatType,
+                  trackCount: df.trackCount ?? df.files?.length ?? 0,
+                  totalFileSize: Number(df.totalFileSize ?? 0),
+                  files: (df.files ?? []).map((f) => ({
+                    trackNumber: f.trackNumber,
+                    title: f.title ?? null,
+                    fileName: f.fileName,
+                    fileSize: Number(f.fileSize),
+                    duration: f.duration ?? null,
+                  })),
+                })
+              )
+          );
         }
       } catch (err) {
         error('Failed to fetch release:', err);
@@ -289,6 +343,46 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     []
   );
 
+  const handleReleaseAutoCreated = useCallback(
+    (_result: {
+      releaseId: string;
+      releaseTitle: string;
+      metadata: { album?: string; artist?: string; year?: number; label?: string };
+    }) => {
+      router.replace(`/admin/releases/${_result.releaseId}`, { scroll: false });
+    },
+    [router]
+  );
+
+  const handleMetadataExtracted = useCallback(
+    (metadata: {
+      album?: string;
+      artist?: string;
+      albumArtist?: string;
+      year?: number;
+      label?: string;
+      coverArt?: string;
+    }) => {
+      if (metadata.album) {
+        releaseForm.setValue('title', metadata.album, { shouldDirty: true });
+      }
+      if (metadata.year) {
+        releaseForm.setValue('releasedOn', `${metadata.year}-01-01`, { shouldDirty: true });
+      }
+      if (metadata.label) {
+        releaseForm.setValue('labels', metadata.label, { shouldDirty: true });
+      }
+      if (metadata.coverArt) {
+        releaseForm.setValue('coverArt', metadata.coverArt, { shouldDirty: true });
+      }
+      const detectedArtist = metadata.albumArtist ?? metadata.artist;
+      if (detectedArtist) {
+        toast.success(`Artist "${detectedArtist}" auto-connected to this release.`);
+      }
+    },
+    [releaseForm]
+  );
+
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData) => {
       const formData = new FormData();
@@ -301,6 +395,9 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           }
         }
       });
+
+      // Always include the pre-generated ID so the server can use it as the MongoDB _id
+      formData.append('preGeneratedId', preGeneratedId);
 
       startTransition(async () => {
         if (formRef.current) {
@@ -336,6 +433,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
               if (createdReleaseId) {
                 setReleaseId(createdReleaseId);
+
                 router.replace(`/admin/releases/${createdReleaseId}`, { scroll: false });
 
                 if (data.publishedAt) {
@@ -365,7 +463,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
         }
       });
     },
-    [formState, images, releaseId, isPublished, releaseForm, router]
+    [formState, images, releaseId, isPublished, releaseForm, router, preGeneratedId]
   );
 
   const uploadImages = async (
@@ -505,7 +603,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
   if (!releaseForm || !control || isLoadingRelease) {
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>{initialReleaseId ? 'Edit Release' : 'Create New Release'}</CardTitle>
           <CardDescription>Loading...</CardDescription>
@@ -537,13 +635,13 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           },
         ]}
       />
-      <Card>
+      <Card className="px-0 pb-0 w-full border-none">
         <CardHeader>
           <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {isEditMode
               ? 'Update release information. Changes are saved when you click Save.'
-              : 'Required fields are marked with an asterisk *'}
+              : `Upload ${FORMAT_CONFIGS[0].label} first. Creates the release upon upload.`}
           </CardDescription>
         </CardHeader>
         <Form {...releaseForm}>
@@ -557,8 +655,17 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
             noValidate
           >
             <CardContent className="space-y-6">
-              <Separator />
+              {/* Digital Formats Section - Always visible */}
+              <section className="space-y-4">
+                <DigitalFormatsAccordion
+                  releaseId={preGeneratedId}
+                  existingFormats={existingFormats}
+                  onReleaseAutoCreated={!isEditMode ? handleReleaseAutoCreated : undefined}
+                  onMetadataExtracted={handleMetadataExtracted}
+                />
+              </section>
 
+              <Separator />
               {/* Basic Information Section */}
               <section className="space-y-4 pt-0">
                 <h2 className="font-semibold">Basic Information</h2>
@@ -574,6 +681,31 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     name="catalogNumber"
                     label="Catalog Number"
                     placeholder="e.g., CAT-001"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={control}
+                    name="suggestedPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Suggested Price (USD)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="e.g., 7.99"
+                            className="w-32"
+                            aria-label="Suggested price in dollars"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Optional pay-what-you-want suggested price
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -604,14 +736,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 <ArtistMultiSelect
                   control={control}
                   name="artistIds"
-                  label={
-                    <>
-                      <b>Artists: </b>{' '}
-                      <span className="text-muted text-sm">
-                        (and/or add one or more Groups below)
-                      </span>
-                    </>
-                  }
+                  label="Artists"
                   placeholder="Select artists..."
                   searchPlaceholder="Search artists..."
                   emptyMessage="No artists found."
@@ -619,47 +744,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   releaseId={releaseId}
                   disabled={isSubmitting}
                 />
-                <GroupMultiSelect
-                  control={control}
-                  name="groupIds"
-                  label="Groups"
-                  placeholder="Select groups..."
-                  searchPlaceholder="Search groups..."
-                  emptyMessage="No groups found."
-                  setValue={releaseForm.setValue}
-                  releaseId={releaseId}
-                  disabled={isSubmitting}
-                  onGroupsChange={setSelectedGroups}
-                />
-                {/* Display artists from selected groups */}
-                {selectedGroups.length > 0 &&
-                  selectedGroups.some((g) => g.artistGroups && g.artistGroups.length > 0) && (
-                    <div className="rounded-md border p-3 text-sm">
-                      {selectedGroups
-                        .filter((g) => g.artistGroups && g.artistGroups.length > 0)
-                        .map((group, index, filteredGroups) => {
-                          const groupName = group.displayName || group.name;
-                          const artistNames =
-                            group.artistGroups?.map((ag) => {
-                              if (ag.artist.displayName) {
-                                return ag.artist.displayName;
-                              }
-                              const parts = [ag.artist.firstName, ag.artist.surname].filter(
-                                Boolean
-                              );
-                              return parts.join(' ') || 'Unknown Artist';
-                            }) || [];
-                          const isLast = index === filteredGroups.length - 1;
-                          return (
-                            <span key={group.id}>
-                              <span className="font-medium">{groupName}:</span>{' '}
-                              {artistNames.join(', ')}
-                              {!isLast && '; '}
-                            </span>
-                          );
-                        })}
-                    </div>
-                  )}
                 <CoverArtField
                   control={control}
                   name="coverArt"
@@ -719,6 +803,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     </div>
                   ))}
                 </div>
+
                 {/* Show all other formats in a collapsible section */}
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
@@ -728,7 +813,10 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                     {Object.values(FORMATS)
                       .filter(
                         (format) =>
-                          !FORMAT_GROUPS.Digital.includes(format as Format) &&
+                          !VALID_FORMAT_TYPES.includes(
+                            format as (typeof VALID_FORMAT_TYPES)[number]
+                          ) &&
+                          format !== 'DIGITAL' &&
                           !FORMAT_GROUPS.Vinyl.includes(format as Format) &&
                           !FORMAT_GROUPS.Physical.includes(format as Format)
                       )
@@ -874,8 +962,17 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 />
               </section>
 
+              <Separator />
+
               {isEditMode && (
                 <>
+                  <Separator />
+
+                  {/* Download Analytics Section - Edit mode only */}
+                  <section className="space-y-4">
+                    <DownloadAnalyticsDashboard releaseId={initialReleaseId!} />
+                  </section>
+
                   <Separator />
 
                   {/* Featured Section - Edit mode only */}

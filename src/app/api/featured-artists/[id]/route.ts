@@ -10,6 +10,11 @@ import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
 
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
+function serializeBigInts<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/featured-artists/[id]
  * Get a single featured artist by ID
@@ -30,7 +35,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeBigInts(result.data));
   } catch (error) {
     console.error('FeaturedArtist GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -51,10 +56,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return validation.response;
     }
 
-    const result = await FeaturedArtistsService.updateFeaturedArtist(
-      id,
-      validation.data as unknown as Prisma.FeaturedArtistUpdateInput
-    );
+    // Convert date strings to Date objects for Prisma DateTime fields
+    const { artistIds, ...scalarData } = validation.data;
+    const updateData: Prisma.FeaturedArtistUpdateInput = {
+      ...(scalarData as Record<string, unknown>),
+      ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
+      ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
+      ...(scalarData.featuredUntil && {
+        featuredUntil: new Date(scalarData.featuredUntil),
+      }),
+      // Reconnect artists: clear existing connections and set the new ones
+      ...(artistIds && {
+        artists: {
+          set: artistIds.map((artistId: string) => ({ id: artistId })),
+        },
+      }),
+    };
+
+    const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
 
     if (!result.success) {
       const status =
@@ -66,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeBigInts(result.data));
   } catch (error) {
     console.error('FeaturedArtist PATCH error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

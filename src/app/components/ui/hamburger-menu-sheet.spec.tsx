@@ -130,16 +130,17 @@ describe('HamburgerMenuSheet', () => {
     expect(authToolbar).toHaveClass('text-zinc-50');
   });
 
-  it('renders separator between auth toolbar and social media links', () => {
+  it('renders social media links after auth toolbar', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
 
-    // Sheet content renders in a Radix portal on document.body, not inside container
-    const separators = document.querySelectorAll('[data-slot="separator"]');
-    expect(separators.length).toBeGreaterThanOrEqual(1);
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(nav).toBeInTheDocument();
+    // Social media links are rendered within the nav
+    expect(nav.querySelector('[data-testid="facebook-icon"]')).toBeInTheDocument();
   });
 
   it('renders empty menu list when no items provided', () => {
@@ -161,9 +162,8 @@ describe('HamburgerMenuSheet', () => {
     );
 
     const homeLink = screen.getByRole('link', { name: 'Home' });
-    expect(homeLink).toHaveClass('text-white');
-    expect(homeLink).toHaveClass('text-2xl');
-    expect(homeLink).toHaveClass('font-light');
+    expect(homeLink).toHaveClass('text-zinc-50');
+    expect(homeLink).toHaveClass('text-xl');
   });
 
   it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {

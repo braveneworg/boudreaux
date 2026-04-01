@@ -24,18 +24,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
       return { success: true, data: artist };
@@ -65,9 +70,15 @@ export class FeaturedArtistsService {
         try {
           const artists = await prisma.featuredArtist.findMany({
             where: {
+              publishedOn: { not: null },
               featuredOn: {
                 lte: currentDate,
               },
+              OR: [
+                { featuredUntil: null },
+                { featuredUntil: { isSet: false } },
+                { featuredUntil: { gte: currentDate } },
+              ],
             },
             include: {
               artists: {
@@ -75,18 +86,23 @@ export class FeaturedArtistsService {
                   images: true,
                 },
               },
-              track: true,
-              release: {
+              digitalFormat: {
                 include: {
-                  releaseTracks: {
-                    include: {
-                      track: true,
-                    },
+                  files: {
+                    orderBy: { trackNumber: 'asc' as const },
                   },
-                  images: true,
                 },
               },
-              group: true,
+              release: {
+                include: {
+                  images: true,
+                  artistReleases: {
+                    include: {
+                      artist: true,
+                    },
+                  },
+                },
+              },
             },
             orderBy: {
               featuredOn: 'desc',
@@ -142,18 +158,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -182,18 +203,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -230,18 +256,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -277,18 +308,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -321,18 +357,23 @@ export class FeaturedArtistsService {
               images: true,
             },
           },
-          track: true,
-          release: {
+          digitalFormat: {
             include: {
-              releaseTracks: {
-                include: {
-                  track: true,
-                },
+              files: {
+                orderBy: { trackNumber: 'asc' as const },
               },
-              images: true,
             },
           },
-          group: true,
+          release: {
+            include: {
+              images: true,
+              artistReleases: {
+                include: {
+                  artist: true,
+                },
+              },
+            },
+          },
         },
       });
 

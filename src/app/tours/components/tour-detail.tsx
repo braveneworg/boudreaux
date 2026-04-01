@@ -11,17 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/ca
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
+import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface TourDetailProps {
   tour: Tour & {
@@ -30,8 +23,7 @@ export interface TourDetailProps {
         venue: Venue;
         headliners: Array<
           TourDateHeadliner & {
-            artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-            group: Group | null;
+            artist: Artist | null;
           }
         >;
       }
@@ -50,25 +42,6 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
   const sortedTourDates = [...tour.tourDates].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
-
-  const getHeadlinerDisplayName = (headliner: {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
-  }) => {
-    if (headliner.artist?.displayName) {
-      return headliner.artist.displayName;
-    }
-
-    if (headliner.group?.name) {
-      return headliner.group.name;
-    }
-
-    if (headliner.artist) {
-      return `${headliner.artist.firstName} ${headliner.artist.surname}`.trim() || 'Unknown Artist';
-    }
-
-    return 'Unknown Artist';
-  };
 
   const lastTourDate = sortedTourDates[sortedTourDates.length - 1];
   const isPastTour = lastTourDate ? new Date(lastTourDate.startDate) < new Date() : false;
@@ -172,7 +145,8 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                 sortedTourDates.map((tourDate, index) => {
                   const headlinerNames = tourDate.headliners
                     .sort((a, b) => b.sortOrder - a.sortOrder)
-                    .map((headliner) => getHeadlinerDisplayName(headliner));
+                    .map((headliner) => getArtistDisplayNameForTour(headliner.artist))
+                    .filter((name): name is string => name !== null);
 
                   return (
                     <div key={tourDate.id} className="space-y-4">

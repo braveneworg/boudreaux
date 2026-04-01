@@ -182,7 +182,7 @@ describe('SocialShareWidget', () => {
       render(<SocialShareWidget artistUrl={TEST_URL} />);
 
       const smsLink = screen.getByLabelText('Share via SMS');
-      const expectedHref = `sms:?body=${encodeURIComponent(`${SHARE_TITLE} ${TEST_URL}`)}`;
+      const expectedHref = `sms:?&body=${encodeURIComponent(`${SHARE_TITLE} ${TEST_URL}`)}`;
 
       expect(smsLink).toHaveAttribute('href', expectedHref);
     });

@@ -11,17 +11,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/app/comp
 import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
+import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface TourCardProps {
   tour: Tour & {
@@ -30,8 +23,7 @@ export interface TourCardProps {
         venue: Venue;
         headliners: Array<
           TourDateHeadliner & {
-            artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-            group: Group | null;
+            artist: Artist | null;
           }
         >;
       }
@@ -46,25 +38,6 @@ export interface TourCardProps {
 export const TourCard = ({ tour }: TourCardProps) => {
   const primaryImage = tour.images.find((img) => img.displayOrder === 0) || tour.images[0];
   const hasTourDates = tour.tourDates.length > 0;
-
-  const getArtistDisplayName = (headliner: {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
-  }) => {
-    if (headliner.artist?.displayName) {
-      return headliner.artist.displayName;
-    }
-
-    if (headliner.group?.name) {
-      return headliner.group.name;
-    }
-
-    if (headliner.artist) {
-      return `${headliner.artist.firstName} ${headliner.artist.surname}`.trim() || 'Unknown Artist';
-    }
-
-    return 'Unknown Artist';
-  };
 
   const sortedTourDates = [...tour.tourDates].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -96,7 +69,7 @@ export const TourCard = ({ tour }: TourCardProps) => {
         if (bTime !== null) return 1;
         return b.sortOrder - a.sortOrder;
       })
-      .map((h) => getArtistDisplayName(h))
+      .map((h) => getArtistDisplayNameForTour(h.artist))
       .filter((name): name is string => {
         if (!name || seen.has(name)) return false;
         seen.add(name);

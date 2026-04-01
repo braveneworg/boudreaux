@@ -5,15 +5,7 @@ import { render, screen } from '@testing-library/react';
 
 import { TourDetail } from './tour-detail';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
   tourDates: Array<
@@ -21,8 +13,7 @@ type TourWithRelations = Tour & {
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -30,24 +21,14 @@ type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
-const createMockArtist = (
-  overrides?: Partial<Artist & { groups: Array<{ group: Group }> }>
-): Artist & { groups: Array<{ group: Group }> } =>
+const createMockArtist = (overrides?: Partial<Artist>): Artist =>
   ({
     id: 'artist-1',
     firstName: 'John',
     surname: 'Doe',
     displayName: 'John Doe',
-    groups: [],
     ...overrides,
-  }) as Artist & { groups: Array<{ group: Group }> };
-
-const createMockGroup = (overrides?: Partial<Group>): Group =>
-  ({
-    id: 'group-1',
-    name: 'Test Group',
-    ...overrides,
-  }) as Group;
+  }) as Artist;
 
 const createMockVenue = (overrides?: Partial<Venue>): Venue =>
   ({
@@ -86,26 +67,21 @@ const createMockImage = (overrides?: Partial<TourImage>): TourImage =>
 const createMockTourDateHeadliner = (
   overrides?: Partial<
     TourDateHeadliner & {
-      artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-      group: Group | null;
+      artist: Artist | null;
     }
   >
 ): TourDateHeadliner & {
-  artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-  group: Group | null;
+  artist: Artist | null;
 } =>
   ({
     id: 'th-1',
     tourDateId: 'tour-date-1',
     artistId: 'artist-1',
-    groupId: null,
     sortOrder: 0,
     artist: createMockArtist(),
-    group: null,
     ...overrides,
   }) as TourDateHeadliner & {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
+    artist: Artist | null;
   };
 
 const createMockTourDate = (
@@ -114,8 +90,7 @@ const createMockTourDate = (
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -124,8 +99,7 @@ const createMockTourDate = (
   venue: Venue;
   headliners: Array<
     TourDateHeadliner & {
-      artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-      group: Group | null;
+      artist: Artist | null;
     }
   >;
 } =>
@@ -152,8 +126,7 @@ const createMockTourDate = (
     venue: Venue;
     headliners: Array<
       TourDateHeadliner & {
-        artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-        group: Group | null;
+        artist: Artist | null;
       }
     >;
   };
@@ -461,8 +434,7 @@ describe('TourDetail', () => {
     expect(screen.getByText('Tour Dates')).toBeInTheDocument();
   });
 
-  it('renders group headliner name when artist is null', () => {
-    const group = createMockGroup({ name: 'The Supremes' });
+  it('hides headliner section when headliner has no artist', () => {
     const tour = createMockTour({
       tourDates: [
         createMockTourDate({
@@ -470,8 +442,6 @@ describe('TourDetail', () => {
             createMockTourDateHeadliner({
               artist: null,
               artistId: null,
-              group,
-              groupId: group.id,
             }),
           ],
         }),
@@ -479,27 +449,8 @@ describe('TourDetail', () => {
     });
     render(<TourDetail tour={tour} />);
 
-    expect(screen.getByText('The Supremes')).toBeInTheDocument();
-  });
-
-  it('renders "Unknown Artist" when headliner has no artist and no group', () => {
-    const tour = createMockTour({
-      tourDates: [
-        createMockTourDate({
-          headliners: [
-            createMockTourDateHeadliner({
-              artist: null,
-              artistId: null,
-              group: null,
-              groupId: null,
-            }),
-          ],
-        }),
-      ],
-    });
-    render(<TourDetail tour={tour} />);
-
-    expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+    // With no resolvable name, the headliner section should not render
+    expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
   });
 
   it('falls back to first and last name for headliner when displayName is null', () => {

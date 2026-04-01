@@ -70,7 +70,8 @@ echo ""
 echo "🧪 Running tests before push..."
 
 # Suppress console output during tests to reduce verbosity
-SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
+# SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
+pnpm run test:coverage:check --reporter=dot
 
 if [ $? -ne 0 ]; then
   echo ""

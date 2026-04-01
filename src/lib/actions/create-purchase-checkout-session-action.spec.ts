@@ -56,8 +56,8 @@ describe('createPurchaseCheckoutSessionAction', () => {
       title: 'Test Album',
     } as never);
     vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
+      id: 'cs_xxx',
       client_secret: 'secret_xxx',
-      payment_intent: 'pi_xxx',
     } as never);
   });
 
@@ -75,6 +75,16 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(result.success).toBe(false);
       expect(typeof failure.error).toBe('string');
       expect(failure.error.length).toBeGreaterThan(0);
+    });
+
+    it('should fallback to "Invalid input" when Zod issues array is empty', async () => {
+      // Directly pass a completely malformed input that triggers the ?? fallback
+      // when parsed.error.issues[0]?.message is undefined
+      const result = await createPurchaseCheckoutSessionAction(undefined);
+      const failure = result as { success: false; error: string };
+
+      expect(result.success).toBe(false);
+      expect(typeof failure.error).toBe('string');
     });
 
     it('should return an error when amountCents is below the schema minimum of 50', async () => {
@@ -103,6 +113,19 @@ describe('createPurchaseCheckoutSessionAction', () => {
       await createPurchaseCheckoutSessionAction(validInput);
 
       expect(vi.mocked(PurchaseService.checkExistingPurchase)).not.toHaveBeenCalled();
+    });
+
+    it('should spread empty object for metadata when userId is null (guest checkout)', async () => {
+      mockAuth.mockResolvedValue({ user: { id: null } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      // userId is null so `userId ? { userId } : {}` should spread empty object
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.not.objectContaining({ userId: expect.anything() }),
+        })
+      );
     });
 
     it('should not include userId in Stripe metadata for unauthenticated (guest) users', async () => {
@@ -159,33 +182,44 @@ describe('createPurchaseCheckoutSessionAction', () => {
   describe('Stripe session creation', () => {
     it('should return "stripe_error" when the session has no client_secret', async () => {
       vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
+        id: 'cs_xxx',
         client_secret: null,
-        payment_intent: 'pi_xxx',
       } as never);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({ success: false, error: 'stripe_error' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Checkout session missing client_secret',
+        expect.objectContaining({ sessionId: 'cs_xxx' })
+      );
+      consoleErrorSpy.mockRestore();
     });
 
-    it('should return "stripe_error" when the session has no payment_intent', async () => {
+    it('should succeed even when payment_intent is null (deferred in dahlia API)', async () => {
       vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
-        client_secret: 'secret_xxx',
+        id: 'cs_deferred',
+        client_secret: 'secret_deferred',
         payment_intent: null,
       } as never);
 
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
-      expect(result).toEqual({ success: false, error: 'stripe_error' });
+      expect(result).toEqual({
+        success: true,
+        clientSecret: 'secret_deferred',
+        sessionId: 'cs_deferred',
+      });
     });
 
-    it('should return success with clientSecret and paymentIntentId when session is valid', async () => {
+    it('should return success with clientSecret and sessionId when session is valid', async () => {
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({
         success: true,
         clientSecret: 'secret_xxx',
-        paymentIntentId: 'pi_xxx',
+        sessionId: 'cs_xxx',
       });
     });
 
@@ -196,21 +230,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
       const createCall = vi.mocked(stripe.checkout.sessions.create).mock
         .calls[0][0] as LineItemsParam;
       expect(createCall.line_items[0].price_data.product_data.name).toBe('Test Album');
-    });
-
-    it('should extract the id when payment_intent is an object rather than a string', async () => {
-      vi.mocked(stripe.checkout.sessions.create).mockResolvedValue({
-        client_secret: 'secret_yyy',
-        payment_intent: { id: 'pi_yyy' },
-      } as never);
-
-      const result = await createPurchaseCheckoutSessionAction(validInput);
-
-      expect(result).toEqual({
-        success: true,
-        clientSecret: 'secret_yyy',
-        paymentIntentId: 'pi_yyy',
-      });
     });
 
     it('should return "stripe_error" when stripe.checkout.sessions.create throws', async () => {

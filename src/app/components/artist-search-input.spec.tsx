@@ -54,6 +54,7 @@ vi.mock('@/app/components/ui/command', () => ({
     value?: string;
     className?: string;
   }) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
     <div
       data-testid={`command-item-${value}`}
       onClick={onSelect}
@@ -67,6 +68,8 @@ vi.mock('@/app/components/ui/command', () => ({
     <div data-testid="command-list">{children}</div>
   ),
 }));
+
+const mockPreventDefault = vi.fn();
 
 vi.mock('@/app/components/ui/popover', () => ({
   Popover: ({
@@ -86,12 +89,19 @@ vi.mock('@/app/components/ui/popover', () => ({
   ),
   PopoverContent: ({
     children,
+    onOpenAutoFocus,
   }: {
     children: ReactNode;
     className?: string;
     align?: string;
     onOpenAutoFocus?: (e: Event) => void;
-  }) => <div data-testid="popover-content">{children}</div>,
+  }) => {
+    if (onOpenAutoFocus) {
+      const mockEvent = { preventDefault: mockPreventDefault } as unknown as Event;
+      onOpenAutoFocus(mockEvent);
+    }
+    return <div data-testid="popover-content">{children}</div>;
+  },
 }));
 
 describe('ArtistSearchInput', () => {
@@ -111,7 +121,7 @@ describe('ArtistSearchInput', () => {
 
     const input = screen.getByRole('combobox');
     expect(input).toBeInTheDocument();
-    expect(input).toHaveAttribute('placeholder', 'Search all artists & releases...');
+    expect(input).toHaveAttribute('placeholder', 'Search artists & releases');
   });
 
   it('should have correct accessibility attributes', () => {
@@ -477,6 +487,13 @@ describe('ArtistSearchInput', () => {
     // Verify the popover state
     const popover = screen.getByTestId('popover');
     expect(popover).toHaveAttribute('data-open', 'true');
+  });
+
+  it('should prevent auto-focus on popover open to keep input focused', () => {
+    render(<ArtistSearchInput />);
+
+    expect(screen.getByTestId('popover-content')).toBeInTheDocument();
+    expect(mockPreventDefault).toHaveBeenCalled();
   });
 
   it('should display multiple results with their releases', async () => {

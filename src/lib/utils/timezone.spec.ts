@@ -48,6 +48,22 @@ describe('timezone utilities', () => {
       const result = getTimezoneOffsetMinutes('UTC');
       expect(typeof result).toBe('number');
     });
+
+    it('normalises hour "24" to 0 when Intl returns midnight as 24', () => {
+      const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([
+        { type: 'year', value: '2025' },
+        { type: 'month', value: '07' },
+        { type: 'day', value: '04' },
+        { type: 'hour', value: '24' },
+        { type: 'minute', value: '00' },
+        { type: 'second', value: '00' },
+      ] as Intl.DateTimeFormatPart[]);
+
+      const result = getTimezoneOffsetMinutes('UTC', summerDate);
+      // hour 24 → 0 means the localMs is computed with hour=0
+      expect(typeof result).toBe('number');
+      spy.mockRestore();
+    });
   });
 
   // ─── formatUTCOffset ────────────────────────────────────────────────────────
@@ -110,6 +126,21 @@ describe('timezone utilities', () => {
     it('returns a Date object', () => {
       const result = localToUTC('2025-06-01T12:00', 'UTC');
       expect(result).toBeInstanceOf(Date);
+    });
+
+    it('normalises hour "24" to 0 inside getLocalParts when Intl returns midnight as 24', () => {
+      const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([
+        { type: 'year', value: '2025' },
+        { type: 'month', value: '06' },
+        { type: 'day', value: '01' },
+        { type: 'hour', value: '24' },
+        { type: 'minute', value: '00' },
+        { type: 'second', value: '00' },
+      ] as Intl.DateTimeFormatPart[]);
+
+      const result = localToUTC('2025-06-01T00:00', 'UTC');
+      expect(result).toBeInstanceOf(Date);
+      spy.mockRestore();
     });
   });
 
@@ -209,6 +240,20 @@ describe('timezone utilities', () => {
     it('accepts an ISO string as the date argument', () => {
       const result = toLocalDateTimeString('2025-04-15T01:00:00Z', 'America/Chicago');
       expect(result).toBe('2025-04-14T20:00');
+    });
+
+    it('normalises hour "24" to "00" when Intl returns midnight as 24', () => {
+      const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([
+        { type: 'year', value: '2025' },
+        { type: 'month', value: '07' },
+        { type: 'day', value: '05' },
+        { type: 'hour', value: '24' },
+        { type: 'minute', value: '00' },
+      ] as Intl.DateTimeFormatPart[]);
+
+      const result = toLocalDateTimeString(new Date('2025-07-04T18:30:00Z'), 'Asia/Kolkata');
+      expect(result).toBe('2025-07-05T00:00');
+      spy.mockRestore();
     });
   });
 });

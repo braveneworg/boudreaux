@@ -17,7 +17,6 @@ describe('release-helpers', () => {
         firstName: 'John',
         surname: 'Doe',
         displayName: 'JD the Great',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForRelease(artist)).toBe('JD the Great');
@@ -29,60 +28,20 @@ describe('release-helpers', () => {
         firstName: 'John',
         surname: 'Doe',
         displayName: null,
-        groups: [],
       };
 
       expect(getArtistDisplayNameForRelease(artist)).toBe('John Doe');
     });
 
-    it('should return group displayName when artist has no displayName and group exists', () => {
+    it('should return null when no name sources available', () => {
       const artist = {
         id: 'artist-1',
         firstName: '',
         surname: '',
         displayName: null,
-        groups: [
-          {
-            id: 'ag-1',
-            artistId: 'artist-1',
-            groupId: 'group-1',
-            group: { id: 'group-1', displayName: 'The Band' },
-          },
-        ],
       };
 
-      expect(getArtistDisplayNameForRelease(artist)).toBe('The Band');
-    });
-
-    it('should return "Unknown Artist" when no name sources available', () => {
-      const artist = {
-        id: 'artist-1',
-        firstName: '',
-        surname: '',
-        displayName: null,
-        groups: [],
-      };
-
-      expect(getArtistDisplayNameForRelease(artist)).toBe('Unknown Artist');
-    });
-
-    it('should prefer displayName over group name', () => {
-      const artist = {
-        id: 'artist-1',
-        firstName: 'John',
-        surname: 'Doe',
-        displayName: 'Stage Name',
-        groups: [
-          {
-            id: 'ag-1',
-            artistId: 'artist-1',
-            groupId: 'group-1',
-            group: { id: 'group-1', displayName: 'The Band' },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForRelease(artist)).toBe('Stage Name');
+      expect(getArtistDisplayNameForRelease(artist)).toBeNull();
     });
 
     it('should handle empty displayName as falsy', () => {
@@ -91,54 +50,9 @@ describe('release-helpers', () => {
         firstName: 'John',
         surname: 'Doe',
         displayName: '',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForRelease(artist)).toBe('John Doe');
-    });
-
-    it('should use first group when multiple groups exist', () => {
-      const artist = {
-        id: 'artist-1',
-        firstName: '',
-        surname: '',
-        displayName: null,
-        groups: [
-          {
-            id: 'ag-1',
-            artistId: 'artist-1',
-            groupId: 'group-1',
-            group: { id: 'group-1', displayName: 'First Band' },
-          },
-          {
-            id: 'ag-2',
-            artistId: 'artist-1',
-            groupId: 'group-2',
-            group: { id: 'group-2', displayName: 'Second Band' },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForRelease(artist)).toBe('First Band');
-    });
-
-    it('should fall through group with null displayName', () => {
-      const artist = {
-        id: 'artist-1',
-        firstName: '',
-        surname: '',
-        displayName: null,
-        groups: [
-          {
-            id: 'ag-1',
-            artistId: 'artist-1',
-            groupId: 'group-1',
-            group: { id: 'group-1', displayName: null },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForRelease(artist)).toBe('Unknown Artist');
     });
   });
 
@@ -306,7 +220,7 @@ describe('release-helpers', () => {
   });
 
   describe('buildReleaseSearchValue', () => {
-    it('should concatenate title, artist names, and group names', () => {
+    it('should concatenate title and artist names', () => {
       const release = {
         title: 'Midnight Serenade',
         artistReleases: [
@@ -315,11 +229,6 @@ describe('release-helpers', () => {
               firstName: 'John',
               surname: 'Doe',
               displayName: 'JD',
-              groups: [
-                {
-                  group: { displayName: 'The Does' },
-                },
-              ],
             },
           },
         ],
@@ -331,7 +240,6 @@ describe('release-helpers', () => {
       expect(result).toContain('john');
       expect(result).toContain('doe');
       expect(result).toContain('jd');
-      expect(result).toContain('the does');
     });
 
     it('should return lowercase string', () => {
@@ -343,7 +251,6 @@ describe('release-helpers', () => {
               firstName: 'JANE',
               surname: 'DOE',
               displayName: null,
-              groups: [],
             },
           },
         ],
@@ -363,7 +270,6 @@ describe('release-helpers', () => {
               firstName: 'A',
               surname: 'B',
               displayName: null,
-              groups: [],
             },
           },
           {
@@ -371,7 +277,6 @@ describe('release-helpers', () => {
               firstName: 'C',
               surname: 'D',
               displayName: null,
-              groups: [],
             },
           },
         ],
@@ -405,11 +310,6 @@ describe('release-helpers', () => {
               firstName: '',
               surname: '',
               displayName: null,
-              groups: [
-                {
-                  group: { displayName: null },
-                },
-              ],
             },
           },
         ],

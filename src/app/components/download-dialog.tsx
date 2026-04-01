@@ -15,6 +15,8 @@ import { useForm } from 'react-hook-form';
 
 import { CheckoutStep } from '@/app/components/checkout-step';
 import { EmailStep } from '@/app/components/email-step';
+import { FormatBundleDownload } from '@/app/components/format-bundle-download';
+import { FormatDownloadList } from '@/app/components/format-download-list';
 import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
 import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
 import { RateSelectStep } from '@/app/components/rate-select-step';
@@ -49,12 +51,18 @@ import downloadSchema, {
 
 type DialogStep =
   | 'download'
+  | 'format-select'
   | 'rate-select'
   | 'email-step'
   | 'checkout'
   | 'purchase-checkout'
   | 'purchase-success'
   | 'returning-download';
+
+interface AvailableFormat {
+  formatType: string;
+  fileName: string;
+}
 
 interface DownloadDialogProps {
   artistName: string;
@@ -64,6 +72,7 @@ interface DownloadDialogProps {
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
   downloadCount?: number;
+  availableFormats?: AvailableFormat[];
   children: ReactElement;
 }
 
@@ -75,10 +84,13 @@ export const DownloadDialog = ({
   suggestedPrice = null,
   hasPurchase = false,
   downloadCount = 0,
+  availableFormats = [],
   children,
 }: DownloadDialogProps) => {
+  const initialStep: DialogStep =
+    hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? 'format-select' : 'download';
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<DialogStep>('download');
+  const [step, setStep] = useState<DialogStep>(initialStep);
   const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [purchaseMode, setPurchaseMode] = useState(false);
@@ -138,7 +150,7 @@ export const DownloadDialog = ({
     setOpen(nextOpen);
     if (!nextOpen) {
       form.reset();
-      setStep('download');
+      setStep(initialStep);
       setSelectedTier(null);
       setCustomerEmail(null);
       setPurchaseMode(false);
@@ -280,13 +292,21 @@ export const DownloadDialog = ({
                 {/* Submit button — PWYW purchase-aware */}
                 {selectedOption === 'premium-digital' ? (
                   hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? (
-                    <Link href={`/api/releases/${releaseId}/download`}>
-                      <Button className="w-full" type="button">
-                        <DownloadIcon className="size-4" />
-                        Download (already purchased, {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT}{' '}
-                        used)
-                      </Button>
-                    </Link>
+                    availableFormats.length > 0 ? (
+                      <FormatDownloadList
+                        releaseId={releaseId}
+                        formats={availableFormats}
+                        hasPurchased
+                      />
+                    ) : (
+                      <Link href={`/api/releases/${releaseId}/download`}>
+                        <Button className="w-full" type="button">
+                          <DownloadIcon className="size-4" />
+                          Download (already purchased, {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT}{' '}
+                          used)
+                        </Button>
+                      </Link>
+                    )
                   ) : hasPurchase && downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
                     <>
                       <Button className="w-full" type="button" disabled>
@@ -331,6 +351,39 @@ export const DownloadDialog = ({
                 Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
               </Button>
             </div>
+          </>
+        )}
+
+        {step === 'format-select' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Download Again</DialogTitle>
+              <DialogDescription>
+                Select formats for <strong>{releaseTitle}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
+              <>
+                <Button className="w-full" type="button" disabled>
+                  <DownloadIcon className="size-4" />
+                  Download limit reached
+                </Button>
+                <p className="text-muted-foreground text-sm">
+                  You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
+                  <a href="mailto:support@fakefourinc.com" className="underline">
+                    support@fakefourinc.com
+                  </a>{' '}
+                  for assistance.
+                </p>
+              </>
+            ) : (
+              <FormatBundleDownload
+                releaseId={releaseId}
+                releaseTitle={releaseTitle}
+                availableFormats={availableFormats}
+                downloadCount={downloadCount}
+              />
+            )}
           </>
         )}
 
@@ -388,7 +441,9 @@ export const DownloadDialog = ({
             releaseId={releaseId}
             releaseTitle={releaseTitle}
             amountCents={amountCents}
+            customerEmail={customerEmail ?? session?.user?.email}
             onConfirmed={() => setStep('purchase-success')}
+            onCancel={() => setStep('download')}
             onError={(msg) => {
               setPurchaseError(msg);
               setStep('download');

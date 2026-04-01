@@ -11,6 +11,8 @@ import { ContentContainer } from './components/ui/content-container';
 import { Heading } from './components/ui/heading';
 import PageContainer from './components/ui/page-container';
 
+export const dynamic = 'force-dynamic';
+
 const DEFAULT_FEATURED_ARTISTS_LIMIT = 7;
 
 export default async function Home() {

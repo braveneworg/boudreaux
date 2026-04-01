@@ -5,18 +5,12 @@
 
 import { useMemo, useState } from 'react';
 
+import { getArtistDisplayNameForTour } from '@/lib/utils/artist-display-name';
+
 import { TourList } from './tour-list';
 import { TourSearch } from './tour-search';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 export interface ToursPageClientProps {
   tours: (Tour & {
@@ -25,8 +19,7 @@ export interface ToursPageClientProps {
         venue: Venue;
         headliners: Array<
           TourDateHeadliner & {
-            artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-            group: Group | null;
+            artist: Artist | null;
           }
         >;
       }
@@ -41,25 +34,6 @@ export interface ToursPageClientProps {
  */
 export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  const getHeadlinerDisplayName = (headliner: {
-    artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-    group: Group | null;
-  }): string => {
-    if (headliner.artist?.displayName) {
-      return headliner.artist.displayName;
-    }
-
-    if (headliner.group?.name) {
-      return headliner.group.name;
-    }
-
-    if (headliner.artist) {
-      return `${headliner.artist.firstName} ${headliner.artist.surname}`.trim() || 'Unknown Artist';
-    }
-
-    return 'Unknown Artist';
-  };
 
   // Filter tours based on search query
   const filteredTours = useMemo(() => {
@@ -92,8 +66,8 @@ export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
 
       const hasHeadlinerMatch = tour.tourDates.some((tourDate) =>
         tourDate.headliners.some((headliner) => {
-          const artistName = getHeadlinerDisplayName(headliner);
-          return artistName.toLowerCase().includes(query);
+          const artistName = getArtistDisplayNameForTour(headliner.artist);
+          return artistName?.toLowerCase().includes(query) ?? false;
         })
       );
 

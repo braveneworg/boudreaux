@@ -117,6 +117,7 @@ describe('updateArtistAction', () => {
           'tags',
           'bornOn',
           'diedOn',
+          'formedOn',
           'publishedOn',
         ],
         expect.anything()
@@ -383,6 +384,109 @@ describe('updateArtistAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Failed to update artist']);
+    });
+
+    it('should pass empty string when firstName is falsy', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: '',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({ firstName: '' })
+      );
+    });
+
+    it('should pass empty string when surname is falsy', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: '',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({ surname: '' })
+      );
+    });
+
+    it('should convert formedOn to Date when provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+            formedOn: '2005-03-15',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({ formedOn: new Date('2005-03-15') })
+      );
+    });
+
+    it('should preserve existing errors object on service failure', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: { existing: ['prior error'] } },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: false,
+        error: 'Some generic error',
+      } as never);
+
+      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual(['Some generic error']);
     });
 
     it('should handle exception during update', async () => {

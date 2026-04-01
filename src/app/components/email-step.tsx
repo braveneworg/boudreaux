@@ -83,6 +83,7 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
                   <Input type="email" placeholder="you@example.com" autoFocus {...field} />
                 </FormControl>
                 <FormMessage />

@@ -109,7 +109,7 @@ describe('SocialMediaIconLinks', () => {
       render(<SocialMediaIconLinks className="" />);
 
       const container = screen.getByTestId('facebook-icon').parentElement;
-      expect(container).toHaveClass('pt-4');
+      expect(container).toHaveClass('pt-0');
     });
   });
 });

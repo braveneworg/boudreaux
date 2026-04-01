@@ -145,7 +145,10 @@ export class TourService {
       for (const tourDate of tour.tourDates) {
         if (tourDate.headliners && Array.isArray(tourDate.headliners)) {
           for (const headliner of tourDate.headliners) {
-            headlinerNames.add(this.getArtistDisplayName(headliner));
+            const name = this.getArtistDisplayName(headliner);
+            if (name) {
+              headlinerNames.add(name);
+            }
           }
         }
       }
@@ -160,19 +163,13 @@ export class TourService {
   }
 
   /**
-   * Get display name for a tour headliner (artist or group)
-   * Priority: group.name > artist.displayName > "firstName surname" > firstName > surname > "Unknown Artist"
+   * Get display name for a tour headliner
+   * Priority: artist.displayName > "firstName surname" > firstName > surname > null
    * @private
    */
   private static getArtistDisplayName(headliner: {
     artist?: { displayName?: string | null; firstName?: string; surname?: string } | null;
-    group?: { name?: string } | null;
-  }): string {
-    // Handle group headliners
-    if (headliner.group?.name) {
-      return headliner.group.name;
-    }
-
+  }): string | null {
     // Handle artist headliners
     if (headliner.artist) {
       const { displayName, firstName, surname } = headliner.artist;
@@ -192,7 +189,7 @@ export class TourService {
       }
     }
 
-    // Fallback when no name information available
-    return 'Unknown Artist';
+    // No name available
+    return null;
   }
 }

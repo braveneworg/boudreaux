@@ -5,6 +5,7 @@
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
 import { auth } from '../../../auth';
 import { prisma } from '../prisma';
+import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';
 import { requireRole } from '../utils/auth/require-role';
 
@@ -24,6 +25,7 @@ vi.mock('../prisma', () => ({
   },
 }));
 vi.mock('../services/release-service');
+vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
@@ -759,6 +761,147 @@ describe('findOrCreateReleaseAction', () => {
         expect.not.objectContaining({
           publishedAt: expect.anything(),
         })
+      );
+    });
+  });
+
+  describe('artist connection from metadata', () => {
+    const createdRelease = {
+      id: 'new-release-123',
+      title: 'New Album',
+      formats: ['DIGITAL'],
+      labels: [],
+      releasedOn: new Date(),
+      coverArt: '',
+    };
+
+    beforeEach(() => {
+      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseServiceCreate.mockResolvedValue({
+        success: true,
+        data: createdRelease as unknown as never,
+      });
+    });
+
+    it('should connect artist when albumArtist is provided', async () => {
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-99', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' },
+      });
+      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+
+      const result = await findOrCreateReleaseAction({
+        album: 'New Album',
+        albumArtist: 'Ceschi',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.artistId).toBe('artist-99');
+      expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Ceschi');
+      expect(ArtistService.connectToRelease).toHaveBeenCalledWith('artist-99', 'new-release-123');
+    });
+
+    it('should prefer albumArtist over artist', async () => {
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: true,
+        data: {
+          id: 'artist-99',
+          displayName: 'Album Artist',
+          firstName: 'Album',
+          surname: 'Artist',
+        },
+      });
+      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+
+      await findOrCreateReleaseAction({
+        album: 'New Album',
+        albumArtist: 'Album Artist',
+        artist: 'Track Artist',
+      });
+
+      expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Album Artist');
+    });
+
+    it('should fall back to artist when albumArtist is empty', async () => {
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: true,
+        data: {
+          id: 'artist-99',
+          displayName: 'Track Artist',
+          firstName: 'Track',
+          surname: 'Artist',
+        },
+      });
+      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+
+      await findOrCreateReleaseAction({
+        album: 'New Album',
+        artist: 'Track Artist',
+      });
+
+      expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Track Artist');
+    });
+
+    it('should skip artist handling when no artist metadata', async () => {
+      await findOrCreateReleaseAction({
+        album: 'New Album',
+      });
+
+      expect(ArtistService.findOrCreateByName).not.toHaveBeenCalled();
+    });
+
+    it('should not fail release creation if artist creation fails', async () => {
+      vi.mocked(ArtistService.findOrCreateByName).mockRejectedValue(new Error('DB error'));
+
+      const result = await findOrCreateReleaseAction({
+        album: 'New Album',
+        albumArtist: 'Ceschi',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.releaseId).toBe('new-release-123');
+      expect(result.artistId).toBeUndefined();
+    });
+
+    it('should not fail release creation if findOrCreateByName returns failure', async () => {
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: false,
+        error: 'Artist name is empty',
+      });
+
+      const result = await findOrCreateReleaseAction({
+        album: 'New Album',
+        albumArtist: 'Ceschi',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.artistId).toBeUndefined();
+    });
+
+    it('should connect artist when finding an existing release', async () => {
+      mockPrismaReleaseFindFirst.mockResolvedValue({
+        id: 'existing-release-456',
+        title: 'Existing Album',
+        publishedAt: new Date(),
+        deletedOn: null,
+      } as never);
+
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-99', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' },
+      });
+      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+
+      const result = await findOrCreateReleaseAction({
+        album: 'Existing Album',
+        albumArtist: 'Ceschi',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.artistId).toBe('artist-99');
+      expect(ArtistService.connectToRelease).toHaveBeenCalledWith(
+        'artist-99',
+        'existing-release-456'
       );
     });
   });

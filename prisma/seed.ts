@@ -537,6 +537,89 @@ const createNotifications = async (adminUserId: string) => {
   console.info(`✅ Created ${notifications.length} notification banners.`);
 };
 
+/**
+ * Create sample digital formats for development testing (Feature 004-release-digital-formats)
+ * Adds digital formats to the first available release in the database
+ */
+const createSampleDigitalFormats = async () => {
+  console.info('🎵 Creating sample digital formats...');
+
+  // Find the first release to attach formats to
+  const sampleRelease = await prisma.release.findFirst();
+
+  if (!sampleRelease) {
+    console.warn(
+      '⚠️ No releases found in database. Skipping digital format seeding. Create releases first.'
+    );
+    return;
+  }
+
+  console.info(`   Adding digital formats to release: ${sampleRelease.title}`);
+
+  // Define sample digital formats (simulating uploaded files)
+  // In production, s3Key would point to actual S3 objects
+  const digitalFormats: Prisma.ReleaseDigitalFormatCreateInput[] = [
+    {
+      release: { connect: { id: sampleRelease.id } },
+      formatType: 'MP3_320KBPS',
+      s3Key: `releases/${sampleRelease.id}/digital-formats/MP3_320KBPS/sample-${Date.now()}.mp3`,
+      fileName: `${sampleRelease.title} - MP3 320kbps.mp3`,
+      fileSize: BigInt(45000000), // 45MB (typical album-length MP3 at 320kbps)
+      mimeType: 'audio/mpeg',
+      uploadedAt: new Date(),
+    },
+    {
+      release: { connect: { id: sampleRelease.id } },
+      formatType: 'FLAC',
+      s3Key: `releases/${sampleRelease.id}/digital-formats/FLAC/sample-${Date.now()}.flac`,
+      fileName: `${sampleRelease.title} - FLAC.flac`,
+      fileSize: BigInt(180000000), // 180MB (typical album-length FLAC)
+      mimeType: 'audio/flac',
+      uploadedAt: new Date(),
+    },
+    {
+      release: { connect: { id: sampleRelease.id } },
+      formatType: 'WAV',
+      s3Key: `releases/${sampleRelease.id}/digital-formats/WAV/sample-${Date.now()}.wav`,
+      fileName: `${sampleRelease.title} - WAV.wav`,
+      fileSize: BigInt(420000000), // 420MB (typical album-length WAV uncompressed)
+      mimeType: 'audio/wav',
+      uploadedAt: new Date(),
+    },
+    {
+      release: { connect: { id: sampleRelease.id } },
+      formatType: 'AAC',
+      s3Key: `releases/${sampleRelease.id}/digital-formats/AAC/sample-${Date.now()}.aac`,
+      fileName: `${sampleRelease.title} - AAC.aac`,
+      fileSize: BigInt(38000000), // 38MB (typical album-length AAC)
+      mimeType: 'audio/aac',
+      uploadedAt: new Date(),
+    },
+  ];
+
+  // Create digital formats (upsert to avoid duplicates on re-seeding)
+  for (const formatData of digitalFormats) {
+    await prisma.releaseDigitalFormat.upsert({
+      where: {
+        releaseId_formatType: {
+          releaseId: sampleRelease.id,
+          formatType: formatData.formatType,
+        },
+      },
+      update: {
+        fileName: formatData.fileName,
+        fileSize: formatData.fileSize,
+        s3Key: formatData.s3Key,
+      },
+      create: formatData,
+    });
+
+    console.info(`   ✓ Created ${formatData.formatType} format`);
+  }
+
+  console.info('✅ Sample digital formats created successfully.');
+};
+
 async function main() {
   // Check for --drop-database flag
   const shouldDropDatabase = process.argv.includes('--drop-database');
@@ -598,6 +681,9 @@ async function main() {
     } else {
       console.warn('⚠️ No admin user found. Skipping notification creation.');
     }
+
+    // Create sample digital formats for releases (Feature 004-release-digital-formats)
+    await createSampleDigitalFormats();
 
     console.info('✅ Development database seeded.');
   }

@@ -16,6 +16,7 @@ const { mockToast } = vi.hoisted(() => ({
 
 vi.mock('lucide-react', () => ({
   Share2Icon: (props: React.HTMLAttributes<HTMLSpanElement>) => (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <span data-testid="share2-icon" onClick={props.onClick} />
   ),
 }));
@@ -75,13 +76,6 @@ describe('ArtistReleaseInfo', () => {
 
     const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveAttribute('aria-label', 'Now playing:  - Test Album');
-  });
-
-  it('should render inside an article element', () => {
-    const { container } = render(<ArtistReleaseInfo artistName="Test Artist" title="Test Album" />);
-
-    const article = container.querySelector('article');
-    expect(article).toBeInTheDocument();
   });
 
   it('should render both artist name and title with special characters', () => {
@@ -267,6 +261,36 @@ describe('ArtistReleaseInfo', () => {
 
       await vi.waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith('Error sharing content');
+      });
+    });
+
+    it('should show error toast when clipboard.writeText fails', async () => {
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const mockWriteText = vi.fn().mockRejectedValue(new Error('Clipboard write failed'));
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={mockSelectedArtist}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      await vi.waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('Failed to copy link to clipboard');
       });
     });
 

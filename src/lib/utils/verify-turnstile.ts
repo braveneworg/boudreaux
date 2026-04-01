@@ -37,11 +37,11 @@ export const verifyTurnstile = async (
 
   // Cloudflare's well-known test secret key — skip the API call during testing
   // @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
-  // Only bypass when BOTH conditions are met:
+  // Bypass when BOTH conditions are met:
   // 1. Using Cloudflare's test secret key
-  // 2. E2E_MODE is explicitly enabled
+  // 2. Not running in production
   // This prevents accidental bypass in production if test secret is misconfigured
-  if (secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.E2E_MODE === 'true') {
+  if (secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.NODE_ENV !== 'production') {
     return { success: true };
   }
 

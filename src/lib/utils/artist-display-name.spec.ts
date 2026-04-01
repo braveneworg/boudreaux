@@ -4,11 +4,7 @@
 
 import { getArtistDisplayNameForTour } from './artist-display-name';
 
-import type { Artist, ArtistGroup, Group } from '@prisma/client';
-
-type ArtistWithGroups = Artist & {
-  groups: Array<ArtistGroup & { group: Group }>;
-};
+import type { Artist } from '@prisma/client';
 
 describe('getArtistDisplayNameForTour', () => {
   const baseArtist: Artist = {
@@ -35,6 +31,7 @@ describe('getArtistDisplayNameForTour', () => {
     genres: null,
     bornOn: null,
     diedOn: null,
+    formedOn: null,
     publishedOn: null,
     publishedBy: null,
     createdAt: new Date(),
@@ -53,205 +50,79 @@ describe('getArtistDisplayNameForTour', () => {
     isActive: true,
     instruments: null,
     featuredArtistId: null,
-    trackId: null,
-  };
-
-  const baseGroup: Group = {
-    id: '1',
-    name: 'The Band',
-    displayName: 'The Band',
-    formedOn: null,
-    endedOn: null,
-    bio: null,
-    shortBio: null,
-    publishedOn: null,
-    deletedOn: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  const baseArtistGroup: ArtistGroup = {
-    id: '1',
-    artistId: '1',
-    groupId: '1',
   };
 
   describe('Fallback Algorithm', () => {
     it('should return artist displayName when present', () => {
-      const artist: ArtistWithGroups = {
+      const artist: Artist = {
         ...baseArtist,
         displayName: 'Johnny D',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('Johnny D');
     });
 
-    it('should return group displayName when artist has no displayName', () => {
-      const artist: ArtistWithGroups = {
-        ...baseArtist,
-        displayName: null,
-        groups: [
-          {
-            ...baseArtistGroup,
-            group: {
-              ...baseGroup,
-              displayName: 'Cool Band',
-            },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForTour(artist)).toBe('Cool Band');
-    });
-
-    it('should return firstName + surname when no displayName or group', () => {
-      const artist: ArtistWithGroups = {
+    it('should return firstName + surname when no displayName', () => {
+      const artist: Artist = {
         ...baseArtist,
         displayName: null,
         firstName: 'Jane',
         surname: 'Smith',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('Jane Smith');
     });
 
-    it('should return "Unknown Artist" when all fields are missing', () => {
-      const artist: ArtistWithGroups = {
+    it('should return null when all fields are missing', () => {
+      const artist: Artist = {
         ...baseArtist,
         displayName: null,
         firstName: '',
         surname: '',
-        groups: [],
       };
 
-      expect(getArtistDisplayNameForTour(artist)).toBe('Unknown Artist');
+      expect(getArtistDisplayNameForTour(artist)).toBeNull();
     });
   });
 
   describe('Edge Cases', () => {
-    it('should prioritize artist displayName over group displayName', () => {
-      const artist: ArtistWithGroups = {
-        ...baseArtist,
-        displayName: 'Artist Override',
-        groups: [
-          {
-            ...baseArtistGroup,
-            group: {
-              ...baseGroup,
-              displayName: 'Cool Band',
-            },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForTour(artist)).toBe('Artist Override');
-    });
-
-    it('should use first group when artist is in multiple groups', () => {
-      const artist: ArtistWithGroups = {
-        ...baseArtist,
-        displayName: null,
-        groups: [
-          {
-            ...baseArtistGroup,
-            id: '1',
-            group: {
-              ...baseGroup,
-              id: '1',
-              displayName: 'First Group',
-            },
-          },
-          {
-            ...baseArtistGroup,
-            id: '2',
-            group: {
-              ...baseGroup,
-              id: '2',
-              displayName: 'Second Group',
-            },
-          },
-        ],
-      };
-
-      expect(getArtistDisplayNameForTour(artist)).toBe('First Group');
-    });
-
     it('should return firstName only when surname is missing', () => {
-      const artist: ArtistWithGroups = {
+      const artist: Artist = {
         ...baseArtist,
         displayName: null,
         firstName: 'Madonna',
         surname: '',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('Madonna');
     });
 
     it('should return surname only when firstName is missing', () => {
-      const artist: ArtistWithGroups = {
+      const artist: Artist = {
         ...baseArtist,
         displayName: null,
         firstName: '',
         surname: 'Cher',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('Cher');
     });
 
     it('should trim whitespace from displayName', () => {
-      const artist: ArtistWithGroups = {
+      const artist: Artist = {
         ...baseArtist,
         displayName: '  Artist Name  ',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('Artist Name');
     });
 
     it('should trim whitespace from names', () => {
-      const artist: ArtistWithGroups = {
+      const artist: Artist = {
         ...baseArtist,
         displayName: null,
         firstName: '  John  ',
         surname: '  Doe  ',
-        groups: [],
-      };
-
-      expect(getArtistDisplayNameForTour(artist)).toBe('John Doe');
-    });
-
-    it('should handle null group displayName', () => {
-      const artist: ArtistWithGroups = {
-        ...baseArtist,
-        displayName: null,
-        firstName: 'John',
-        surname: 'Doe',
-        groups: [
-          {
-            ...baseArtistGroup,
-            group: {
-              ...baseGroup,
-              displayName: '',
-            },
-          },
-        ],
-      };
-
-      // Should fall back to firstName + surname since group displayName is empty
-      expect(getArtistDisplayNameForTour(artist)).toBe('John Doe');
-    });
-
-    it('should handle empty groups array', () => {
-      const artist: ArtistWithGroups = {
-        ...baseArtist,
-        displayName: null,
-        firstName: 'John',
-        surname: 'Doe',
-        groups: [],
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('John Doe');

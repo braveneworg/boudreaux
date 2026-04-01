@@ -263,3 +263,26 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 [Download Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 Open the Docker Desktop application and ensure it is running. You should see the Docker icon in your system tray (Windows) or menu bar (macOS). If Docker is not running, start it from the application.
+
+# Running the development server
+
+First install stripe-cli:
+
+```bash
+# macOS with Homebrew
+brew install stripe-cli so
+```
+
+Then, run the development server:
+
+```bash
+pnpm run dev
+```
+
+Then run the Stripe CLI to forward webhooks to your local server:
+
+```bash
+stripe listen --forward-to http://localhost:3000/api/stripe/webhook
+```
+
+Run `npx ncu` to check for dependency updates. Update dependencies in `package.json` and run `pnpm install` to apply them.

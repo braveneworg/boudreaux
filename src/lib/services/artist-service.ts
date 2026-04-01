@@ -7,6 +7,8 @@ import { PutObjectCommand, S3Client, DeleteObjectCommand } from '@aws-sdk/client
 import { Prisma } from '@prisma/client';
 
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import { generateSlug } from '@/lib/utils/generate-slug';
+import { splitFullName } from '@/lib/utils/split-full-name';
 
 import { prisma } from '../prisma';
 
@@ -634,6 +636,15 @@ export class ArtistService {
         // Prisma 6 + MongoDB: `deletedOn: null` only matches fields explicitly
         // set to null, not missing fields. Use OR to handle both cases.
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        // Only return artists that have at least one published, non-deleted release
+        releases: {
+          some: {
+            release: {
+              publishedAt: { not: null },
+              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+            },
+          },
+        },
         ...(search && {
           AND: [
             {
@@ -642,18 +653,6 @@ export class ArtistService {
                 { surname: { contains: search, mode: 'insensitive' as const } },
                 { displayName: { contains: search, mode: 'insensitive' as const } },
                 { slug: { contains: search, mode: 'insensitive' as const } },
-                {
-                  groups: {
-                    some: {
-                      group: {
-                        OR: [
-                          { displayName: { contains: search, mode: 'insensitive' as const } },
-                          { name: { contains: search, mode: 'insensitive' as const } },
-                        ],
-                      },
-                    },
-                  },
-                },
                 {
                   releases: {
                     some: {
@@ -704,7 +703,7 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and track data.
+   * Get an artist by slug with full release and digital format data.
    * Post-query filters to only published, non-deleted releases.
    */
   static async getArtistBySlugWithReleases(
@@ -723,16 +722,16 @@ export class ArtistService {
           images: true,
           labels: true,
           urls: true,
-          groups: { include: { group: true } },
           releases: {
             include: {
               release: {
                 include: {
                   images: true,
                   artistReleases: { include: { artist: true } },
-                  releaseTracks: {
-                    include: { track: true },
-                    orderBy: { position: 'asc' },
+                  digitalFormats: {
+                    include: {
+                      files: { orderBy: { trackNumber: 'asc' } },
+                    },
                   },
                   releaseUrls: { include: { url: true } },
                 },
@@ -765,5 +764,121 @@ export class ArtistService {
       console.error('Unexpected error:', error);
       return { success: false, error: 'Failed to retrieve artist' };
     }
+  }
+
+  /**
+   * Find an existing artist by name or create a new one.
+   *
+   * Search order:
+   *   1. Slug match (deterministic, unique)
+   *   2. Case-insensitive displayName match
+   *   3. Case-insensitive firstName + surname match
+   *   4. Create new artist if no match found
+   *
+   * @param artistName - Full artist name from ID3 metadata (e.g., "Ceschi", "John Doe")
+   * @returns The artist ID and display name
+   */
+  static async findOrCreateByName(
+    artistName: string
+  ): Promise<
+    ServiceResponse<{ id: string; displayName: string | null; firstName: string; surname: string }>
+  > {
+    const trimmed = artistName.trim();
+    if (!trimmed) {
+      return { success: false, error: 'Artist name is empty' };
+    }
+
+    try {
+      const slug = generateSlug(trimmed);
+      const { firstName, lastName } = splitFullName(trimmed);
+      const selectFields = { id: true, displayName: true, firstName: true, surname: true };
+
+      // 1. Try slug match (unique index, most reliable)
+      if (slug) {
+        const bySlug = await prisma.artist.findUnique({
+          where: { slug },
+          select: selectFields,
+        });
+        if (bySlug) {
+          return { success: true, data: bySlug };
+        }
+      }
+
+      // 2. Try case-insensitive displayName match
+      const byDisplayName = await prisma.artist.findFirst({
+        where: { displayName: { equals: trimmed, mode: 'insensitive' } },
+        select: selectFields,
+      });
+      if (byDisplayName) {
+        return { success: true, data: byDisplayName };
+      }
+
+      // 3. Try case-insensitive firstName + surname match
+      if (firstName) {
+        const byName = await prisma.artist.findFirst({
+          where: {
+            AND: [
+              { firstName: { equals: firstName, mode: 'insensitive' } },
+              { surname: { equals: lastName, mode: 'insensitive' } },
+            ],
+          },
+          select: selectFields,
+        });
+        if (byName) {
+          return { success: true, data: byName };
+        }
+      }
+
+      // 4. Create new artist
+      const newArtist = await prisma.artist.create({
+        data: {
+          firstName,
+          surname: lastName,
+          displayName: trimmed,
+          slug: slug || generateSlug(firstName || 'artist'),
+          isActive: true,
+        },
+        select: selectFields,
+      });
+      return { success: true, data: newArtist };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Slug collision — try to find the existing artist instead
+        const slug = generateSlug(trimmed);
+        const existing = await prisma.artist.findUnique({
+          where: { slug },
+          select: { id: true, displayName: true, firstName: true, surname: true },
+        });
+        if (existing) {
+          return { success: true, data: existing };
+        }
+        return { success: false, error: 'Artist with this slug already exists' };
+      }
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Database connection failed:', error);
+        return { success: false, error: 'Database unavailable' };
+      }
+
+      console.error('Unexpected error in findOrCreateByName:', error);
+      return { success: false, error: 'Failed to find or create artist' };
+    }
+  }
+
+  /**
+   * Idempotently connect an artist to a release via the ArtistRelease join table.
+   * Uses upsert to avoid duplicate constraint violations.
+   *
+   * @param artistId - The Artist ID
+   * @param releaseId - The Release ID
+   */
+  static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
+    await prisma.artistRelease.upsert({
+      where: {
+        artistId_releaseId: { artistId, releaseId },
+      },
+      update: {},
+      create: { artistId, releaseId },
+    });
   }
 }

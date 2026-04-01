@@ -128,11 +128,11 @@ describe('createReleaseAction', () => {
           'coverArt',
           'formats',
           'artistIds',
-          'groupIds',
           'labels',
           'catalogNumber',
           'description',
           'publishedAt',
+          'suggestedPrice',
         ],
         expect.anything()
       );
@@ -730,6 +730,131 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, mockFormData);
 
       expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('preGeneratedId', () => {
+    it('should pass preGeneratedId to createRelease when a valid ObjectId is provided', async () => {
+      const validObjectId = '507f1f77bcf86cd799439011';
+      const formDataWithId = new FormData();
+      formDataWithId.append('title', 'Test Album');
+      formDataWithId.append('releasedOn', '2024-01-15');
+      formDataWithId.append('coverArt', 'https://example.com/cover.jpg');
+      formDataWithId.append('formats', 'DIGITAL');
+      formDataWithId.append('preGeneratedId', validObjectId);
+
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: validObjectId },
+      } as never);
+
+      await createReleaseAction(initialFormState, formDataWithId);
+
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ id: validObjectId })
+      );
+    });
+
+    it('should not pass preGeneratedId when an invalid ObjectId is provided', async () => {
+      const formDataWithBadId = new FormData();
+      formDataWithBadId.append('title', 'Test Album');
+      formDataWithBadId.append('releasedOn', '2024-01-15');
+      formDataWithBadId.append('coverArt', 'https://example.com/cover.jpg');
+      formDataWithBadId.append('formats', 'DIGITAL');
+      formDataWithBadId.append('preGeneratedId', 'not-a-valid-id');
+
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, formDataWithBadId);
+
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        expect.not.objectContaining({ id: expect.anything() })
+      );
+    });
+  });
+
+  describe('suggestedPrice', () => {
+    it('should convert suggestedPrice from dollars to cents', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            suggestedPrice: '9.99',
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ suggestedPrice: 999 })
+      );
+    });
+
+    it('should not include suggestedPriceCents when suggestedPrice is empty', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Test Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            suggestedPrice: '',
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-123' },
+      } as never);
+
+      await createReleaseAction(initialFormState, mockFormData);
+
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ suggestedPrice: undefined })
+      );
     });
   });
 });

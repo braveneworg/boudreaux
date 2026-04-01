@@ -66,7 +66,7 @@ export const SocialShareWidget = ({
 
       {/* SMS / Messages button */}
       <a
-        href={`sms:?body=${encodeURIComponent(`${shareTitle} ${artistUrl}`)}`}
+        href={`sms:?&body=${encodeURIComponent(`${shareTitle} ${artistUrl}`)}`}
         className="size-10 -mt-1.5 pointer-events-auto inline-flex items-center justify-center rounded-sm"
         aria-label="Share via SMS"
         title="Share via SMS"

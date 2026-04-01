@@ -1,53 +1,56 @@
-import React from 'react';
-
-import * as matchers from '@testing-library/jest-dom/matchers';
-import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
-import { afterEach, expect, vi } from 'vitest';
-
-// Make React available globally for tests
-// This is required by vitest when testing React components
-// Next.js doesn't require this, but our test environment does
-globalThis.React = React;
+import { afterEach, vi } from 'vitest';
 
 // Mock server-only module to allow testing server-side code
 vi.mock('server-only', () => ({}));
 
-// Mock Next.js server modules that cause ESM resolution issues
-vi.mock('next/server', async () => {
-  const actual = await vi.importActual('next/dist/server/web/exports/index.js');
+// Pure stub for next/server — extends the native Node.js Request so route handlers get a
+// fully-functional headers/json()/text() API without loading any real Next.js module.
+vi.mock('next/server', () => {
+  class MockNextRequest extends Request {
+    nextUrl: URL;
+    // eslint-disable-next-line no-undef
+    constructor(url: string | URL, options?: RequestInit) {
+      super(url, options);
+      this.nextUrl = new URL(url);
+    }
+  }
   return {
-    ...actual,
+    NextRequest: MockNextRequest,
     NextResponse: {
-      json: vi.fn((data, init) => ({
+      // eslint-disable-next-line no-undef
+      json: vi.fn((data: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
         json: async () => data,
-        status: init?.status || 200,
+        status: init?.status ?? 200,
         headers: new Headers(init?.headers),
       })),
-      redirect: vi.fn((url) => ({
-        headers: new Headers({ Location: url }),
-        status: 307,
+      next: vi.fn(() => ({ type: 'next' })),
+      redirect: vi.fn((url: string | URL, init?: { status?: number }) => ({
+        headers: new Headers({ Location: String(url) }),
+        status: init?.status ?? 307,
       })),
     },
   };
 });
 
-vi.mock('next/navigation', async () => {
-  const actual = await vi.importActual('next/dist/client/components/navigation.js');
-  return {
-    ...actual,
-    useRouter: vi.fn(() => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      refresh: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      prefetch: vi.fn(),
-    })),
-    usePathname: vi.fn(() => '/'),
-    useSearchParams: vi.fn(() => new URLSearchParams()),
-  };
-});
+// Pure stub for next/navigation — avoids loading the real Next.js module in every test context.
+vi.mock('next/navigation', () => ({
+  notFound: vi.fn(),
+  permanentRedirect: vi.fn(),
+  redirect: vi.fn(),
+  useParams: vi.fn(() => ({})),
+  usePathname: vi.fn(() => '/'),
+  useRouter: vi.fn(() => ({
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+    push: vi.fn(),
+    refresh: vi.fn(),
+    replace: vi.fn(),
+  })),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
+  useSelectedLayoutSegment: vi.fn(() => null),
+  useSelectedLayoutSegments: vi.fn(() => []),
+}));
 
 // Mock ResizeObserver which is not available in Node.js test environment
 // This is commonly needed for components that use responsive layouts or size detection
@@ -62,6 +65,7 @@ global.ResizeObserver = MockResizeObserver;
 class MockIntersectionObserver {
   readonly root: Element | null = null;
   readonly rootMargin: string = '';
+  readonly scrollMargin: string = '';
   readonly thresholds: ReadonlyArray<number> = [];
 
   observe() {}
@@ -73,10 +77,30 @@ class MockIntersectionObserver {
 }
 global.IntersectionObserver = MockIntersectionObserver;
 
-// Mock window.matchMedia which is not available in Node.js test environment
-// This is commonly needed for components that use media queries or responsive hooks
-// Only set up window mocks in browser-like environments (jsdom)
+// React, jest-dom matchers, cleanup, and window polyfills are only needed in jsdom.
+// node-env tests (*.spec.ts — server actions, API routes, repos, services, utils, schemas)
+// skip this block entirely, avoiding ~0.4–0.6s of import overhead per file across
+// the ~150 server-side spec files that never touch the DOM.
+let cleanupFn: () => void = () => {};
+
 if (typeof window !== 'undefined') {
+  // Load React, jest-dom, and testing-library in parallel to minimize startup latency.
+  // @testing-library/jest-dom/vitest is a side-effect import that registers all
+  // DOM matchers on vitest's expect — no explicit expect.extend() needed.
+  const [{ default: React }, { cleanup }] = await Promise.all([
+    import('react'),
+    import('@testing-library/react'),
+    import('@testing-library/jest-dom/vitest'), // side effect: registers all DOM matchers
+  ]);
+
+  // Make React available globally for tests
+  // This is required by vitest when testing React components
+  globalThis.React = React;
+
+  cleanupFn = cleanup;
+
+  // Mock window.matchMedia which is not available in Node.js test environment
+  // This is commonly needed for components that use media queries or responsive hooks
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query) => ({
@@ -91,6 +115,21 @@ if (typeof window !== 'undefined') {
     })),
   });
 
+  // Suppress jsdom "Not implemented: navigation (except hash changes)" errors.
+  // jsdom cannot handle window.location.href assignments; these fire console.error
+  // messages that cause the test runner to exit with code 1 in CI.
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    const message = typeof args[0] === 'string' ? args[0] : String(args[0]);
+    if (message.includes('Not implemented: navigation (except hash changes)')) {
+      return;
+    }
+    originalConsoleError.call(console, ...args);
+  };
+
+  // Mock window.open to prevent jsdom navigation errors from anchor clicks with target="_blank"
+  window.open = vi.fn();
+
   // Mock scrollTo for scroll-based components
   Object.defineProperty(window, 'scrollTo', {
     writable: true,
@@ -99,6 +138,17 @@ if (typeof window !== 'undefined') {
 
   // Mock scrollIntoView for JSDOM
   Element.prototype.scrollIntoView = vi.fn();
+
+  // Override HTMLFormElement.requestSubmit for jsdom (jsdom@26 defines it but throws
+  // "Not implemented" when called, so we must replace it unconditionally)
+  HTMLFormElement.prototype.requestSubmit = function (submitter?: HTMLElement) {
+    if (submitter) {
+      const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+      this.dispatchEvent(submitEvent);
+    } else {
+      this.submit();
+    }
+  };
 
   // Mock HTMLCanvasElement.getContext for components that use canvas
   // (e.g., chart libraries, image processing, etc.)
@@ -145,15 +195,8 @@ if (typeof window !== 'undefined') {
   });
 }
 
-expect.extend(matchers); // Add custom jest matchers from jest-dom
-
-// Clean up the DOM and clear mock call history after each test to ensure isolation
+// Clean up the DOM after each test to ensure isolation.
+// Mock call history is cleared automatically by clearMocks: true in vitest.config.ts.
 afterEach(() => {
-  cleanup();
-  // Clear all mock call history after each test (but keep implementations intact)
-  // This provides a consistent, clean mock state across the entire test suite
-  // while preserving mock implementations set up in setupTests or test files.
-  // Use vi.clearAllMocks() instead of vi.resetAllMocks() to avoid breaking
-  // global mocks like matchMedia, ResizeObserver, IntersectionObserver, etc.
-  vi.clearAllMocks();
+  cleanupFn();
 });

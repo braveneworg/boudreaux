@@ -37,7 +37,6 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
 import { Switch } from '@/app/components/ui/switch';
-import { TrackPlayButton } from '@/app/components/ui/track-play-button';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 import { toDisplayLabel, toEntityUrlPath, toPascalCase } from '@/lib/utils/string-utils';
 
@@ -76,6 +75,7 @@ export function DataView<T extends Record<string, unknown>>({
   fieldsToShow,
   imageField,
   coverArtField,
+  forceHardDelete = false,
   refetch,
   isPending,
   error,
@@ -92,6 +92,8 @@ export function DataView<T extends Record<string, unknown>>({
   imageField?: string;
   /** Field name containing a direct cover art URL string */
   coverArtField?: string;
+  /** Force hard delete (DELETE request) even if the entity has a deletedOn field */
+  forceHardDelete?: boolean;
   refetch: () => void;
   isPending: boolean;
   error?: string | null;
@@ -215,14 +217,15 @@ export function DataView<T extends Record<string, unknown>>({
 
   // Check if entity supports soft delete by checking if first item has deletedOn property
   const supportsSoftDelete = useMemo(() => {
+    if (forceHardDelete) return false;
     const baseData = data?.[`${String(entity)}s`] as T[];
     if (!baseData || baseData.length === 0) return true; // Default to soft delete for empty data
     // Check if 'deletedOn' exists in the first item (including if it's null)
     return 'deletedOn' in baseData[0];
-  }, [data, entity]);
+  }, [data, entity, forceHardDelete]);
 
   const handleCreateEntityButtonClick = () => {
-    router?.push(`/admin/${entityUrlPath}`);
+    router?.push(`/admin/${entityUrlPath}/new`);
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +329,7 @@ export function DataView<T extends Record<string, unknown>>({
   );
 
   return (
-    <>
+    <div className="mx-1">
       <Button
         className="w-full"
         onClick={handleCreateEntityButtonClick}
@@ -515,13 +518,7 @@ export function DataView<T extends Record<string, unknown>>({
                       );
                     })}
                     <Separator className="border-[0.5px] mt-2 mb-4 border-zinc-400" />
-                    <div className="flex gap-2 justify-end items-center mr-2">
-                      {entity === 'track' && !!(item as Record<string, unknown>).audioUrl && (
-                        <TrackPlayButton
-                          audioUrl={(item as Record<string, unknown>).audioUrl as string}
-                          size="default"
-                        />
-                      )}
+                    <div className="flex gap-2 justify-center items-center">
                       <Button asChild variant="outline">
                         <Link href={`/admin/${entityUrlPath}/${id}`}>
                           <Pencil className="mr-2 size-4" />
@@ -690,6 +687,6 @@ export function DataView<T extends Record<string, unknown>>({
           </DialogClose>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

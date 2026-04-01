@@ -98,6 +98,13 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
+// Mock ReleaseDigitalFormatRepository (added for digital formats feature)
+vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
+  ReleaseDigitalFormatRepository: class {
+    findAllByRelease = vi.fn().mockResolvedValue([]);
+  },
+}));
+
 describe('ReleasePlayerPage', () => {
   const mockReleaseData = {
     id: 'release-1',
@@ -334,5 +341,46 @@ describe('ReleasePlayerPage', () => {
 
     const player = screen.getByTestId('release-player');
     expect(player).toHaveAttribute('data-auto-play', 'false');
+  });
+
+  it('should handle missing artistReleases gracefully', async () => {
+    const releaseNoArtists = {
+      ...mockReleaseData,
+      artistReleases: [],
+    };
+    mockGetReleaseWithTracks.mockResolvedValue({
+      success: true,
+      data: releaseNoArtists,
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    // Without primaryArtistId, getArtistOtherReleases should not be called
+    expect(mockGetArtistOtherReleases).not.toHaveBeenCalled();
+    // Should still render page structure
+    expect(screen.getByTestId('page-container')).toBeInTheDocument();
+  });
+
+  it('should handle failed otherReleasesResult gracefully', async () => {
+    mockGetArtistOtherReleases.mockResolvedValue({
+      success: false,
+      error: 'Service error',
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    // When otherReleasesResult.success is false, otherReleases should be []
+    // So carousel should not render
+    expect(screen.queryByTestId('artist-releases-carousel')).not.toBeInTheDocument();
+    // Player should still render
+    expect(screen.getByTestId('release-player')).toBeInTheDocument();
   });
 });

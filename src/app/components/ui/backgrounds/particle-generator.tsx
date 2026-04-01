@@ -194,7 +194,7 @@ export default function ParticleGeneratorDemo() {
 
         <div className="mb-4">
           <div className="mb-4">
-            <label className="block mb-1.5 font-medium">Particle Color</label>
+            <span className="block mb-1.5 font-medium">Particle Color</span>
             <div className="flex gap-2.5 items-center">
               <input
                 type="color"
@@ -242,7 +242,7 @@ export default function ParticleGeneratorDemo() {
           {!isTransparent && (
             <>
               <div className="mb-4">
-                <label className="block mb-1.5 font-medium">Background Color</label>
+                <span className="block mb-1.5 font-medium">Background Color</span>
                 <div className="flex gap-2.5 items-center">
                   <input
                     type="color"

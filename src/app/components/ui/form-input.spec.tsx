@@ -45,6 +45,7 @@ describe('FormInput', () => {
   });
 
   it('can have autoFocus', () => {
+    // eslint-disable-next-line jsx-a11y/no-autofocus
     render(<FormInput {...defaultProps} autoFocus />);
 
     expect(screen.getByRole('textbox')).toHaveFocus();

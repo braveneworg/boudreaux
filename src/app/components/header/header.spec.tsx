@@ -215,13 +215,13 @@ describe('Header', () => {
     it('applies desktop height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('md:h-[122px]');
+      expect(header).toHaveClass('md:h-30.5');
     });
 
     it('applies mobile height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('h-[58px]');
+      expect(header).toHaveClass('h-12');
     });
 
     it('renders content layer with proper z-index', () => {
@@ -233,7 +233,7 @@ describe('Header', () => {
     it('content layer has max-width constraint', () => {
       const { container } = render(<Header />);
       const contentLayer = container.querySelector('.z-20');
-      expect(contentLayer).toHaveClass('max-w-[1920px]');
+      expect(contentLayer).toHaveClass('max-w-480');
     });
 
     it('content layer has overflow hidden', () => {

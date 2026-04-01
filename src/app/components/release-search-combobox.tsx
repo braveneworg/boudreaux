@@ -77,7 +77,7 @@ export const ReleaseSearchCombobox = ({ releases }: ReleaseSearchComboboxProps) 
                 const coverArt = getReleaseCoverArt(release);
                 const artistName = release.artistReleases[0]
                   ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
-                  : 'Unknown Artist';
+                  : null;
                 const searchValue = buildReleaseSearchValue(release);
 
                 return (
@@ -102,7 +102,7 @@ export const ReleaseSearchCombobox = ({ releases }: ReleaseSearchComboboxProps) 
                     )}
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{release.title}</span>
-                      <span className="text-xs text-zinc-500">{artistName}</span>
+                      {artistName && <span className="text-xs text-zinc-500">{artistName}</span>}
                     </div>
                   </CommandItem>
                 );

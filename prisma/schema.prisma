@@ -42,12 +42,12 @@ model User {
   // outside Prisma (see prisma/scripts/fix-stripe-customer-id-index.ts). A standard
   // Prisma @unique creates a non-sparse index that rejects multiple null values, which
   // fails when many users have not yet subscribed.
-  stripeCustomerId              String?
-  subscriptionId                String?
-  subscriptionStatus            String?
-  subscriptionTier              String?
-  subscriptionCurrentPeriodEnd  DateTime?
-  confirmationEmailSentAt       DateTime?
+  stripeCustomerId             String?
+  subscriptionId               String?
+  subscriptionStatus           String?
+  subscriptionTier             String?
+  subscriptionCurrentPeriodEnd DateTime?
+  confirmationEmailSentAt      DateTime?
 
   // Optional for WebAuthn support
   Authenticator Authenticator[]
@@ -59,6 +59,10 @@ model User {
   // PWYW purchase feature (003-stripe-pwyw-purchase)
   releasePurchases ReleasePurchase[]
   releaseDownloads ReleaseDownload[]
+
+  // Digital formats feature (004-release-digital-formats)
+  userDownloadQuotas UserDownloadQuota[]
+  downloadEvents     DownloadEvent[]
 
   // Indexes for performance
   @@index([failedLoginAttempts])
@@ -136,10 +140,6 @@ model Image {
   artistId  String?  @db.ObjectId
   release   Release? @relation(fields: [releaseId], references: [id])
   releaseId String?  @db.ObjectId
-  group     Group?   @relation(fields: [groupId], references: [id])
-  groupId   String?  @db.ObjectId
-  track     Track?   @relation(fields: [trackId], references: [id])
-  trackId   String?  @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   src       String?
@@ -150,31 +150,8 @@ model Image {
 
   @@index([artistId])
   @@index([releaseId])
-  @@index([groupId])
-  @@index([trackId])
   @@index([urlId])
   @@index([sortOrder])
-}
-
-model Group {
-  id              String              @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  displayName     String? // The primary name to display for the group; Will be derived from name if not provided
-  formedOn        DateTime?
-  endedOn         DateTime?
-  bio             String? // Markdown supported post-MVP, for now just plain text blurb
-  shortBio        String? // Ditto md support; A shorter version of the bio for use in thumbnails and listings
-  publishedOn     DateTime? // Date when the group was published
-  deletedOn       DateTime? // Soft delete date
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  images          Image[]
-  artistGroups    ArtistGroup[]
-  urls            Url[]
-  featuredArtists FeaturedArtist[]
-  tourHeadliners  TourDateHeadliner[]
-
-  @@index([name])
 }
 
 enum Platform {
@@ -194,12 +171,6 @@ enum Platform {
   DISCOGS
 }
 
-enum AudioUploadStatus {
-  PENDING // Track created, upload not yet started
-  UPLOADING // Upload in progress
-  COMPLETED // Upload completed successfully
-  FAILED // Upload failed
-}
 
 enum Format {
   DIGITAL
@@ -244,14 +215,10 @@ model Url {
   artistId    String?      @db.ObjectId
   release     Release?     @relation(fields: [releaseId], references: [id])
   releaseId   String?      @db.ObjectId
-  group       Group?       @relation(fields: [groupId], references: [id])
-  groupId     String?      @db.ObjectId
   platform    Platform // Platform.SPOTIFY, Platform.APPLE_MUSIC, etc.
   url         String // TODO: validate that this is a well-formed URL
   images      Image[]
   releaseUrls ReleaseUrl[]
-  track       Track?       @relation(fields: [trackId], references: [id])
-  trackId     String?      @db.ObjectId
 
   @@index([artistId])
   @@index([platform])
@@ -297,6 +264,7 @@ model Artist {
   genres                String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
   bornOn                DateTime? // Always feature artist on their birthday if known
   diedOn                DateTime?
+  formedOn              DateTime? // Date the band was formed; only used for bands/groups
   publishedOn           DateTime? // Date when the artist was published
   publishedBy           String? // User ID of the admin who published the artist
   createdAt             DateTime               @default(now())
@@ -312,7 +280,8 @@ model Artist {
   notes                 String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
   images                Image[]
   labels                ArtistLabel[] // All labels the artist is/was associated with
-  groups                ArtistGroup[] // Names of musical groups the artist is/was associated with
+  members               ArtistMember[]  @relation("ArtistMembers") // Artists who are members of this band
+  memberOf              ArtistMember[]  @relation("MemberOf") // Bands this artist belongs to
   releases              ArtistRelease[] // Releases associated with the artist, including Tracks released
   urls                  Url[] // Various platform URLs associated with the artist
   tags                  String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
@@ -323,9 +292,6 @@ model Artist {
   artistFeaturedArtists ArtistFeaturedArtist[]
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
-  trackArtists          TrackArtist[]
-  track                 Track?                 @relation(fields: [trackId], references: [id])
-  trackId               String?                @db.ObjectId
   tourHeadliners        TourDateHeadliner[] // Tours where this artist is a headliner
 
   @@index([isActive])
@@ -337,34 +303,36 @@ model FeaturedArtist {
   id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
   displayName           String? // Override artist's display name when featured; if not provided, use artist's displayName
   featuredOn            DateTime               @default(now())
-  track                 Track?                 @relation(fields: [trackId], references: [id])
-  trackId               String?                @db.ObjectId
+  featuredUntil         DateTime? // Optional end date for featuring; null = indefinite
+  digitalFormat         ReleaseDigitalFormat?  @relation(fields: [digitalFormatId], references: [id])
+  digitalFormatId       String?                @db.ObjectId
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   publishedOn           DateTime? // Date when the featured artist was published
   position              Int                    @default(0) // Position in the featured artists list; lower numbers appear first
   description           String? // Markdown supported post-MVP; A special description to use when the artist is featured; keep it brief
   coverArt              String? // Optional cover art to use when featuring the artist; if not provided,
+  featuredTrackNumber   Int? // 1-based track number to start playback on; null = start at track 1
   release               Release?               @relation(fields: [releaseId], references: [id])
   releaseId             String?                @db.ObjectId
-  group                 Group?                 @relation(fields: [groupId], references: [id])
-  groupId               String?                @db.ObjectId
   artists               Artist[]
   artistFeaturedArtists ArtistFeaturedArtist[]
 
   @@index([featuredOn])
+  @@index([featuredUntil])
+  @@index([digitalFormatId])
 }
 
-model ArtistGroup {
+model ArtistMember {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
-  artist   Artist @relation(fields: [artistId], references: [id])
+  artist   Artist @relation("ArtistMembers", fields: [artistId], references: [id])
   artistId String @db.ObjectId
-  group    Group  @relation(fields: [groupId], references: [id])
-  groupId  String @db.ObjectId
+  member   Artist @relation("MemberOf", fields: [memberId], references: [id])
+  memberId String @db.ObjectId
 
-  @@unique([artistId, groupId])
+  @@unique([artistId, memberId])
   @@index([artistId])
-  @@index([groupId])
+  @@index([memberId])
 }
 
 model ArtistLabel {
@@ -461,7 +429,6 @@ model Release {
   linerNotesBy        String[]
   imageTypes          String[]
   variants            String[]
-  releaseTracks       ReleaseTrack[]
   artistReleases      ArtistRelease[]
   releaseUrls         ReleaseUrl[]
   createdAt           DateTime         @default(now())
@@ -477,67 +444,17 @@ model Release {
   tagId               String?          @db.ObjectId
 
   // PWYW purchase feature (003-stripe-pwyw-purchase)
-  suggestedPrice      Int?              // Suggested price in cents; null = no pre-fill
-  releasePurchases    ReleasePurchase[]
-  releaseDownloads    ReleaseDownload[]
+  suggestedPrice   Int? // Suggested PWYW price in cents (stored as Int, not Decimal - MongoDB limitation); null = no pre-fill
+  releasePurchases ReleasePurchase[]
+  releaseDownloads ReleaseDownload[]
+
+  // Digital formats feature (004-release-digital-formats)
+  digitalFormats ReleaseDigitalFormat[]
 
   @@index([releasedOn])
   @@index([featuredOn])
   @@index([featuredUntil])
   @@index([deletedOn])
-}
-
-model Track {
-  id                String            @id @default(auto()) @map("_id") @db.ObjectId
-  title             String
-  duration          Int // Duration in seconds
-  audioUrl          String // URL or file path to the audio file
-  audioFileHash     String? // SHA-256 hash of the audio file content for duplicate detection
-  audioUploadStatus AudioUploadStatus @default(COMPLETED) // Status of audio file upload
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  deletedOn         DateTime? // Date when the track was soft-deleted; null if not deleted
-  publishedOn       DateTime? // Date when the track was published
-  coverArt          String?
-  images            Image[]
-  position          Int // Position of the track in the release 0-based index
-  releaseTracks     ReleaseTrack[]
-  artists           TrackArtist[]
-  urls              Url[]
-  featuredArtists   FeaturedArtist[]
-  trackArtists      Artist[] // Reverse relation for Artist.track
-
-  @@index([title])
-  @@index([position])
-  @@index([deletedOn])
-  @@index([audioUploadStatus])
-  @@index([audioFileHash])
-}
-
-model TrackArtist {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  track    Track  @relation(fields: [trackId], references: [id])
-  trackId  String @db.ObjectId
-  artist   Artist @relation(fields: [artistId], references: [id])
-  artistId String @db.ObjectId
-
-  @@unique([trackId, artistId])
-  @@index([trackId])
-  @@index([artistId])
-}
-
-model ReleaseTrack {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  releaseId String  @db.ObjectId
-  track     Track   @relation(fields: [trackId], references: [id])
-  trackId   String  @db.ObjectId
-  position  Int     @default(0)
-  coverArt  String? // Cover art derived from the uploaded audio file's metadata
-
-  @@unique([releaseId, trackId])
-  @@index([releaseId])
-  @@index([trackId])
 }
 
 model Instrument {
@@ -680,15 +597,12 @@ model TourDateHeadliner {
   tourDate   TourDate  @relation(fields: [tourDateId], references: [id], onDelete: Cascade)
   artistId   String?   @db.ObjectId
   artist     Artist?   @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  groupId    String?   @db.ObjectId
-  group      Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   sortOrder  Int       @default(0)
   setTime    DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([tourDateId])
   @@index([artistId])
-  @@index([groupId])
 }
 
 model TourImage {
@@ -737,10 +651,10 @@ model ReleasePurchase {
   user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   releaseId               String    @db.ObjectId
   release                 Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  amountPaid              Int       // Amount paid in cents
+  amountPaid              Int // Amount paid in cents
   currency                String    @default("usd")
   stripePaymentIntentId   String    @unique // Idempotency key for webhook deduplication
-  stripeSessionId         String?   // Stripe Checkout Session ID
+  stripeSessionId         String?   @unique // Stripe Checkout Session ID — polling key
   confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
   purchasedAt             DateTime  @default(now())
 
@@ -750,15 +664,92 @@ model ReleasePurchase {
 }
 
 model ReleaseDownload {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String    @db.ObjectId
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  releaseId         String    @db.ObjectId
-  release           Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  downloadCount     Int       @default(0)
-  lastDownloadedAt  DateTime?
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String    @db.ObjectId
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releaseId        String    @db.ObjectId
+  release          Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  downloadCount    Int       @default(0)
+  lastDownloadedAt DateTime?
 
   @@unique([userId, releaseId]) // One record per user per release
   @@index([userId])
   @@index([releaseId])
+}
+
+// Digital Format Management (004-release-digital-formats)
+
+model ReleaseDigitalFormat {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  releaseId     String    @db.ObjectId
+  release       Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  formatType    String // Enum: MP3_V0, MP3_320KBPS, AAC, OGG_VORBIS, FLAC, ALAC, WAV, AIFF (matches existing Format enumeration)
+  s3Key         String? // DEPRECATED: Legacy single-file S3 key (use files relation instead)
+  fileName      String? // DEPRECATED: Legacy single-file name (use files relation instead)
+  fileSize      BigInt? // DEPRECATED: Legacy single-file size (use totalFileSize instead)
+  mimeType      String? // DEPRECATED: Legacy single-file MIME type
+  trackCount    Int       @default(0) // Cached count of child track files
+  totalFileSize BigInt? // Cached sum of all child file sizes (bytes)
+  checksum      String? // MD5 or SHA256 checksum for integrity verification (optional)
+  deletedAt     DateTime? // Soft delete timestamp; null = active
+  uploadedAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  files           ReleaseDigitalFormatFile[]
+  featuredArtists FeaturedArtist[]
+
+  @@unique([releaseId, formatType]) // One format group per release
+  @@index([releaseId])
+  @@index([s3Key])
+  @@index([deletedAt]) // For soft delete queries
+}
+
+model ReleaseDigitalFormatFile {
+  id          String               @id @default(auto()) @map("_id") @db.ObjectId
+  formatId    String               @db.ObjectId
+  format      ReleaseDigitalFormat @relation(fields: [formatId], references: [id], onDelete: Cascade)
+  trackNumber Int // 1-based track ordering (derived from filename sort)
+  title       String? // Track title for display (fallback: fileName)
+  duration    Int? // Duration in seconds
+  s3Key       String // S3 object key for this track file
+  fileName    String // Original uploaded filename (e.g., "01 - Intro.mp3")
+  fileSize    BigInt // File size in bytes
+  mimeType    String // MIME type (e.g., "audio/mpeg")
+  checksum    String? // Optional SHA-256 hash for integrity verification
+  uploadedAt  DateTime             @default(now())
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([formatId, trackNumber]) // No duplicate track numbers within a format
+  @@index([formatId])
+  @@index([s3Key])
+}
+
+model UserDownloadQuota {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @unique @db.ObjectId
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uniqueReleaseIds String[] // Array of release ObjectId strings downloaded for free (max 5)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model DownloadEvent {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String?  @db.ObjectId // Nullable for guest downloads (future feature)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  releaseId    String   @db.ObjectId
+  formatType   String // Format downloaded (e.g., MP3_320KBPS, FLAC)
+  success      Boolean // true = download succeeded, false = failed (quota exceeded, auth error, etc.)
+  errorCode    String? // Optional error code for failed downloads (e.g., QUOTA_EXCEEDED, NOT_PURCHASED)
+  ipAddress    String? // IP address for security audit (optional, privacy-sensitive)
+  userAgent    String? // User agent string (optional, for analytics)
+  downloadedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([releaseId])
+  @@index([downloadedAt]) // For time-based analytics queries
+  @@index([userId, releaseId]) // For per-user per-release download history
 }

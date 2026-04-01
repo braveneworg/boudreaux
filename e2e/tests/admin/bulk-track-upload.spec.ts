@@ -2,7 +2,8 @@ import { test, expect } from '../../fixtures/base.fixture';
 
 import type { Page } from '@playwright/test';
 
-test.describe('Admin Bulk Track Upload', () => {
+// Skip: Bulk track upload feature has not been built yet — no /admin/tracks/bulk route.
+test.describe.skip('Admin Bulk Track Upload', () => {
   test.describe('Page Layout', () => {
     test('should display the bulk track upload form', async ({ adminPage }) => {
       await adminPage.goto('/admin/tracks/bulk');

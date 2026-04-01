@@ -189,10 +189,23 @@ function CarouselItem({ className, onClick, ...props }: ComponentProps<'div'>) {
     [onClick]
   );
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        onClick(event as unknown as React.MouseEvent<HTMLDivElement>);
+      }
+    },
+    [onClick]
+  );
+
   return (
     <>
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- role="group" required for carousel slide semantics; onClick is optional navigation */}
       <div
         onClick={handleClick}
+        onKeyDown={onClick ? handleKeyDown : undefined}
+        tabIndex={onClick ? 0 : undefined}
         role="group"
         aria-roledescription="slide"
         data-slot="carousel-item"
@@ -203,6 +216,7 @@ function CarouselItem({ className, onClick, ...props }: ComponentProps<'div'>) {
         )}
         {...props}
       />
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
     </>
   );
 }

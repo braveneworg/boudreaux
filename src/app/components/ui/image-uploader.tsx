@@ -228,7 +228,7 @@ export const ImageUploader = ({
   onReorder,
   onDelete,
   maxImages = 10,
-  maxFileSize = 5 * 1024 * 1024, // 5MB
+  maxFileSize = 20 * 1024 * 1024, // 20MB
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   disabled = false,
   className,

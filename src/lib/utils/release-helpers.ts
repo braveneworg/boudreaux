@@ -19,12 +19,6 @@ interface ReleaseArtist {
   firstName: string;
   surname: string;
   displayName: string | null;
-  groups: Array<{
-    id: string;
-    artistId: string;
-    groupId: string;
-    group: { id: string; displayName: string | null };
-  }>;
 }
 
 /** Minimal release shape for cover art extraction */
@@ -61,9 +55,6 @@ interface ReleaseSearchSource {
       firstName: string;
       surname: string;
       displayName: string | null;
-      groups: Array<{
-        group: { displayName: string | null };
-      }>;
     };
   }>;
 }
@@ -77,13 +68,12 @@ interface ReleaseSearchSource {
  * Implements the fallback chain:
  * 1. `artist.displayName` (if non-null and non-empty)
  * 2. `artist.firstName + ' ' + artist.surname` (if either is non-empty)
- * 3. First group's `displayName` (if available and non-null)
- * 4. `'Unknown Artist'`
+ * 3. `null`
  *
- * @param artist - Lightweight artist object with groups included
+ * @param artist - Lightweight artist object
  * @returns The resolved display name string
  */
-export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string => {
+export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string | null => {
   // 1. Prefer explicit display name
   if (artist.displayName) {
     return artist.displayName;
@@ -95,14 +85,8 @@ export const getArtistDisplayNameForRelease = (artist: ReleaseArtist): string =>
     return fullName;
   }
 
-  // 3. Fall back to first group's display name
-  const groupDisplayName = artist.groups[0]?.group?.displayName;
-  if (groupDisplayName) {
-    return groupDisplayName;
-  }
-
-  // 4. Ultimate fallback
-  return 'Unknown Artist';
+  // 3. No name available
+  return null;
 };
 
 /**
@@ -151,10 +135,10 @@ export const getBandcampUrl = (release: ReleaseBandcampSource): string | null =>
 
 /**
  * Build a searchable value string for a release, used as the `value` prop
- * on cmdk's `CommandItem`. Concatenates title, artist names (first, surname,
- * displayName), and group names into a single lowercase string for matching.
+ * on cmdk's `CommandItem`. Concatenates title and artist names (first, surname,
+ * displayName) into a single lowercase string for matching.
  *
- * @param release - Release with title and artistReleases with artist+groups
+ * @param release - Release with title and artistReleases with artist data
  * @returns Lowercase string with all searchable fields joined by spaces
  */
 export const buildReleaseSearchValue = (release: ReleaseSearchSource): string => {
@@ -165,10 +149,6 @@ export const buildReleaseSearchValue = (release: ReleaseSearchSource): string =>
     if (firstName) parts.push(firstName);
     if (surname) parts.push(surname);
     if (displayName) parts.push(displayName);
-
-    for (const g of ar.artist.groups) {
-      if (g.group.displayName) parts.push(g.group.displayName);
-    }
   }
 
   return parts.filter(Boolean).join(' ').toLowerCase();

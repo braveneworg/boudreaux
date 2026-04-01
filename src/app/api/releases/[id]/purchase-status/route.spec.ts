@@ -5,56 +5,56 @@ import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
-const mockFindByPaymentIntentId = vi.fn();
+const mockFindBySessionId = vi.fn();
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
-    findByPaymentIntentId: (...args: unknown[]) => mockFindByPaymentIntentId(...args),
+    findBySessionId: (...args: unknown[]) => mockFindBySessionId(...args),
   },
 }));
 
-const makeRequest = (paymentIntentId?: string) => {
-  const url = `http://localhost/api/releases/release-123/purchase-status${paymentIntentId ? `?paymentIntentId=${paymentIntentId}` : ''}`;
+const makeRequest = (sessionId?: string) => {
+  const url = `http://localhost/api/releases/release-123/purchase-status${sessionId ? `?sessionId=${sessionId}` : ''}`;
   return new NextRequest(url);
 };
 
 describe('GET /api/releases/[id]/purchase-status', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns 400 with missing_payment_intent_id when paymentIntentId is absent', async () => {
+  it('returns 400 with missing_session_id when sessionId is absent', async () => {
     const request = makeRequest();
     const response = await GET(request);
 
     expect(response.status).toBe(400);
     const json = await response.json();
-    expect(json).toEqual({ error: 'missing_payment_intent_id' });
+    expect(json).toEqual({ error: 'missing_session_id' });
   });
 
   it('returns 200 with confirmed: false and no-store header when purchase is not found', async () => {
-    mockFindByPaymentIntentId.mockResolvedValue(null);
+    mockFindBySessionId.mockResolvedValue(null);
 
-    const request = makeRequest('pi_test_notfound');
+    const request = makeRequest('cs_test_notfound');
     const response = await GET(request);
 
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toEqual({ confirmed: false });
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(mockFindByPaymentIntentId).toHaveBeenCalledWith('pi_test_notfound');
+    expect(mockFindBySessionId).toHaveBeenCalledWith('cs_test_notfound');
   });
 
   it('returns 200 with confirmed: true when a purchase record exists', async () => {
-    mockFindByPaymentIntentId.mockResolvedValue({
+    mockFindBySessionId.mockResolvedValue({
       id: 'purchase-abc',
-      stripePaymentIntentId: 'pi_test_found',
+      stripeSessionId: 'cs_test_found',
     });
 
-    const request = makeRequest('pi_test_found');
+    const request = makeRequest('cs_test_found');
     const response = await GET(request);
 
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toEqual({ confirmed: true });
-    expect(mockFindByPaymentIntentId).toHaveBeenCalledWith('pi_test_found');
+    expect(mockFindBySessionId).toHaveBeenCalledWith('cs_test_found');
   });
 });

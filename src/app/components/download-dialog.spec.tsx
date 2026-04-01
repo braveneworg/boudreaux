@@ -81,6 +81,33 @@ vi.mock('@/lib/actions/check-guest-purchase-action', () => ({
   checkGuestPurchaseAction: (...args: unknown[]) => mockCheckGuestPurchaseAction(...args),
 }));
 
+vi.mock('@/app/components/format-bundle-download', () => ({
+  FormatBundleDownload: ({
+    releaseId,
+    availableFormats,
+    downloadCount,
+  }: {
+    releaseId: string;
+    releaseTitle: string;
+    availableFormats: Array<{ formatType: string; fileName: string }>;
+    downloadCount: number;
+  }) => {
+    if (availableFormats.length === 0) {
+      return <p>No digital formats available for download.</p>;
+    }
+    return (
+      <div
+        data-testid="format-bundle-download"
+        data-release-id={releaseId}
+        data-format-count={availableFormats.length}
+        data-download-count={downloadCount}
+      >
+        Mock Format Bundle Download
+      </div>
+    );
+  },
+}));
+
 describe('DownloadDialog', () => {
   const defaultProps = {
     artistName: 'Test Artist',
@@ -414,6 +441,7 @@ describe('DownloadTriggerButton', () => {
     const parentHandler = vi.fn();
 
     render(
+      // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
       <div onClick={parentHandler}>
         <DownloadTriggerButton />
       </div>
@@ -906,27 +934,29 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
-  it('should show "Download (already purchased, X/Y used)" link when hasPurchase=true and under limit', async () => {
+  it('should open to format-select step when hasPurchase=true and under limit', async () => {
     const user = userEvent.setup();
 
     render(
-      <DownloadDialog {...defaultProps} hasPurchase downloadCount={2}>
+      <DownloadDialog
+        {...defaultProps}
+        hasPurchase
+        downloadCount={2}
+        availableFormats={[
+          { formatType: 'FLAC', fileName: 'album-flac.zip' },
+          { formatType: 'WAV', fileName: 'album-wav.zip' },
+        ]}
+      >
         <button>Open Download</button>
       </DownloadDialog>
     );
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /already purchased, 2\/5 used/ })
-      ).toBeInTheDocument();
-    });
-
-    // Should be a link wrapping the button
-    const downloadLink = screen.getByRole('link');
-    expect(downloadLink).toHaveAttribute('href', '/api/releases/release-123/download');
+    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    expect(screen.getByText(/Select formats for/)).toBeInTheDocument();
+    // Should NOT show the radio group
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 
   it('should show disabled "Download limit reached" button when hasPurchase=true and at limit', async () => {
@@ -939,6 +969,9 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    // At download limit, opens to 'download' step (not format-select)
+    // since initialStep only goes to format-select when downloadCount < MAX
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
@@ -959,11 +992,56 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
     });
+  });
+
+  it('should reset to format-select step when dialog is closed and reopened with hasPurchase', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        hasPurchase
+        downloadCount={2}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    // Open — should show format-select
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+
+    // Close via Escape
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Download Again' })).not.toBeInTheDocument()
+    );
+
+    // Reopen — should still show format-select
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+  });
+
+  it('should show "No digital formats" message when hasPurchase but no formats available', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps} hasPurchase downloadCount={2} availableFormats={[]}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    expect(screen.getByText('No digital formats available for download.')).toBeInTheDocument();
   });
 });
 

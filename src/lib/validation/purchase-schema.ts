@@ -25,6 +25,7 @@ export const purchaseCheckoutActionSchema = z.object({
     .number()
     .int('Amount must be a whole number of cents')
     .min(50, 'Minimum amount is $0.50'),
+  customerEmail: z.string().email('Must be a valid email address').optional(),
 });
 
 export type PurchaseCheckoutActionSchemaType = z.infer<typeof purchaseCheckoutActionSchema>;

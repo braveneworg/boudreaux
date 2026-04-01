@@ -5,15 +5,7 @@ import { render, screen } from '@testing-library/react';
 
 import { TourList } from './tour-list';
 
-import type {
-  Artist,
-  Group,
-  Tour,
-  TourDate,
-  TourDateHeadliner,
-  TourImage,
-  Venue,
-} from '@prisma/client';
+import type { Artist, Tour, TourDate, TourDateHeadliner, TourImage, Venue } from '@prisma/client';
 
 type TourWithRelations = Tour & {
   tourDates: Array<
@@ -21,8 +13,7 @@ type TourWithRelations = Tour & {
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -30,17 +21,14 @@ type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
-const createMockArtist = (
-  overrides?: Partial<Artist & { groups: Array<{ group: Group }> }>
-): Artist & { groups: Array<{ group: Group }> } =>
+const createMockArtist = (overrides?: Partial<Artist>): Artist =>
   ({
     id: 'artist-1',
     firstName: 'John',
     surname: 'Doe',
     displayName: 'John Doe',
-    groups: [],
     ...overrides,
-  }) as Artist & { groups: Array<{ group: Group }> };
+  }) as Artist;
 
 const createMockVenue = (overrides?: Partial<Venue>): Venue =>
   ({
@@ -62,8 +50,7 @@ const createMockTourDate = (
       venue: Venue;
       headliners: Array<
         TourDateHeadliner & {
-          artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-          group: Group | null;
+          artist: Artist | null;
         }
       >;
     }
@@ -72,8 +59,7 @@ const createMockTourDate = (
   venue: Venue;
   headliners: Array<
     TourDateHeadliner & {
-      artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-      group: Group | null;
+      artist: Artist | null;
     }
   >;
 } =>
@@ -96,13 +82,10 @@ const createMockTourDate = (
         id: 'th-1',
         tourDateId: 'tour-date-1',
         artistId: 'artist-1',
-        groupId: null,
         sortOrder: 0,
         artist: createMockArtist(),
-        group: null,
       } as TourDateHeadliner & {
-        artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-        group: Group | null;
+        artist: Artist | null;
       },
     ],
     ...overrides,
@@ -110,8 +93,7 @@ const createMockTourDate = (
     venue: Venue;
     headliners: Array<
       TourDateHeadliner & {
-        artist: (Artist & { groups: Array<{ group: Group }> }) | null;
-        group: Group | null;
+        artist: Artist | null;
       }
     >;
   };

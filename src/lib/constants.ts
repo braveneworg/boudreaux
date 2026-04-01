@@ -37,7 +37,6 @@ export const ENTITIES = {
   artist: 'artist',
   release: 'release',
   track: 'track',
-  group: 'group',
   featuredArtist: 'featuredArtist',
 } as const;
 

@@ -404,4 +404,36 @@ describe('ReleaseDataView', () => {
       });
     });
   });
+
+  it('should handle null data when not pending and no error', () => {
+    vi.mocked(useReleasesQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: null,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    // transformedData will be null since !data?.releases is true
+    // Component should render DataView with null data (no crash)
+    expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
+  });
+
+  it('should handle data with undefined releases property', () => {
+    vi.mocked(useReleasesQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: { count: 0 },
+      refetch: vi.fn(),
+    } as never);
+
+    render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+    // data exists but data.releases is undefined, so !data?.releases is true
+    // transformedData will be null
+    expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Error loading releases')).not.toBeInTheDocument();
+  });
 });

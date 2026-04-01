@@ -19,25 +19,53 @@ const levelStyles: Record<number, string> = {
   6: 'pt-1 px-4 h-6 mb-0 leading-snug',
 };
 
-const Heading = ({ className, level = 1, ref, ...props }: HeadingProps) => {
+const Heading = ({ className, level = 1, ref, children, ...props }: HeadingProps) => {
   const levelStyle = levelStyles[level];
   const combinedClassName = cn(levelStyle, className);
 
   switch (level) {
     case 1:
-      return <h1 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h1 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h1>
+      );
     case 2:
-      return <h2 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h2 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h2>
+      );
     case 3:
-      return <h3 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h3 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h3>
+      );
     case 4:
-      return <h4 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h4 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h4>
+      );
     case 5:
-      return <h5 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h5 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h5>
+      );
     case 6:
-      return <h6 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h6 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h6>
+      );
     default:
-      return <h1 ref={ref} className={combinedClassName} {...props} />;
+      return (
+        <h1 ref={ref} className={combinedClassName} {...props}>
+          {children}
+        </h1>
+      );
   }
 };
 

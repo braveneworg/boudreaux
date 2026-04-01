@@ -21,7 +21,7 @@ function getStripe(): Stripe {
     throw new Error('STRIPE_SECRET_KEY environment variable is not set');
   }
 
-  const client = new Stripe(key, { typescript: true });
+  const client = new Stripe(key);
 
   if (process.env.NODE_ENV !== 'production') {
     globalForStripe.stripe = client;

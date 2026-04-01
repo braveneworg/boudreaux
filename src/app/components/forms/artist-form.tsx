@@ -44,6 +44,7 @@ import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { generateSlug } from '@/lib/utils/generate-slug';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
@@ -119,6 +120,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
       tags: '',
       bornOn: '',
       diedOn: '',
+      formedOn: '',
       createdBy: user?.id,
       publishedOn: '',
     },
@@ -166,6 +168,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
           tags: artist.tags || '',
           bornOn: formatDate(artist.bornOn),
           diedOn: formatDate(artist.diedOn),
+          formedOn: formatDate(artist.formedOn),
           publishedOn: formatDate(artist.publishedOn),
           createdBy: artist.createdBy || user?.id,
         });
@@ -533,14 +536,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
     }
 
     if (slugSource) {
-      const generatedSlug = slugSource
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-
-      artistForm.setValue('slug', generatedSlug, { shouldValidate: false });
+      artistForm.setValue('slug', generateSlug(slugSource), { shouldValidate: false });
     }
   }, [displayName, firstName, middleName, surname, artistForm]);
 
@@ -825,6 +821,20 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     )}
                   />
                 </div>
+                <FormField
+                  control={control}
+                  name="formedOn"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Formed on</FormLabel>
+                      <FormControl>
+                        <DatePicker fieldName={field.name} onSelect={handleSelectDate} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">Only used for bands</p>
               </section>
             </CardContent>
 

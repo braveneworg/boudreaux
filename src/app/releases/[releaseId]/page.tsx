@@ -18,6 +18,7 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { ReleaseService } from '@/lib/services/release-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
@@ -60,10 +61,20 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   ]);
   const downloadCount = downloadRecord?.downloadCount ?? 0;
 
+  // Fetch available digital formats for this release
+  const formatRepo = new ReleaseDigitalFormatRepository();
+  const digitalFormats = await formatRepo.findAllByRelease(releaseId);
+  const availableFormats = digitalFormats
+    .filter((f): f is typeof f & { fileName: string } => f.fileName !== null)
+    .map((f) => ({
+      formatType: f.formatType,
+      fileName: f.fileName,
+    }));
+
   const primaryArtist = release.artistReleases[0]?.artist;
   const primaryArtistId = primaryArtist?.id;
 
-  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : 'Unknown Artist';
+  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
   const otherReleasesResult = primaryArtistId
     ? await ReleaseService.getArtistOtherReleases(primaryArtistId, releaseId)
@@ -94,10 +105,13 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
           releaseId={release.id}
           releaseTitle={release.title}
           suggestedPrice={
-            (release as unknown as { suggestedPrice?: number | null }).suggestedPrice ?? null
+            (release as unknown as { suggestedPrice?: number | null }).suggestedPrice
+              ? (release as unknown as { suggestedPrice: number }).suggestedPrice / 100
+              : null
           }
           hasPurchase={hasPurchase}
           downloadCount={downloadCount}
+          availableFormats={availableFormats}
         />
         <ReleaseDescription description={release.description ?? null} />
       </ContentContainer>
