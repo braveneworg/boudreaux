@@ -47,18 +47,12 @@ export const PurchaseSuccessStep = ({
 
       <div className="space-y-4">
         {availableFormats !== undefined ? (
-          availableFormats.length > 0 ? (
-            <FormatBundleDownload
-              releaseId={releaseId}
-              releaseTitle={releaseTitle}
-              availableFormats={availableFormats}
-              downloadCount={downloadCount}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              No digital formats available for download.
-            </p>
-          )
+          <FormatBundleDownload
+            releaseId={releaseId}
+            releaseTitle={releaseTitle}
+            availableFormats={availableFormats}
+            downloadCount={downloadCount}
+          />
         ) : (
           <Button asChild variant="default" className="w-full">
             <Link href={`/api/releases/${releaseId}/download`}>
