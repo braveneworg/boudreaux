@@ -124,6 +124,7 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRICE_MINIMUM: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
+          NEXT_PUBLIC_CDN_DOMAIN: ${{ secrets.NEXT_PUBLIC_CDN_DOMAIN }}
         run: |
           set -e
           TOK='${{ secrets.GHCR_TOKEN }}'
@@ -152,6 +153,7 @@ jobs:
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${NEXT_PUBLIC_STRIPE_PRICE_MINIMUM} \
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA} \
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA} \
+              --build-arg NEXT_PUBLIC_CDN_DOMAIN=${NEXT_PUBLIC_CDN_DOMAIN} \
               --build-arg CACHE_BUST=${CACHE_BUST} \
               --provenance=false \
               --sbom=false \
