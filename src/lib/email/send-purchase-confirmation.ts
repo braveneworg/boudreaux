@@ -45,7 +45,7 @@ export async function sendPurchaseConfirmationEmail(
 
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://fakefourrecords.com';
-    const downloadUrl = `${baseUrl}/api/releases/${input.releaseId}/download`;
+    const downloadUrl = `${baseUrl}/releases/${input.releaseId}`;
     const amountPaid = `$${(input.amountPaidCents / 100).toFixed(2)}`;
 
     const emailData = {

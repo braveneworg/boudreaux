@@ -15,13 +15,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 interface AvailableFormat {
-  formatType: string;
+  formatType: DigitalFormatType;
   fileName: string;
 }
 

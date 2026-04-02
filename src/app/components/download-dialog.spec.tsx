@@ -71,8 +71,23 @@ vi.mock('@/app/components/purchase-checkout-step', () => ({
 }));
 
 vi.mock('@/app/components/purchase-success-step', () => ({
-  PurchaseSuccessStep: ({ releaseTitle }: { releaseTitle: string }) => (
-    <div data-testid="purchase-success-step">Purchase complete for {releaseTitle}</div>
+  PurchaseSuccessStep: ({
+    releaseTitle,
+    availableFormats,
+    downloadCount,
+  }: {
+    releaseId: string;
+    releaseTitle: string;
+    availableFormats?: Array<{ formatType: string; fileName: string }>;
+    downloadCount?: number;
+  }) => (
+    <div
+      data-testid="purchase-success-step"
+      data-format-count={availableFormats?.length ?? 0}
+      data-download-count={downloadCount ?? 0}
+    >
+      Purchase complete for {releaseTitle}
+    </div>
   ),
 }));
 
@@ -1399,6 +1414,45 @@ describe('DownloadDialog — purchase-checkout step', () => {
     // purchaseError should be displayed
     expect(screen.getByText('Test payment error')).toBeInTheDocument();
   });
+
+  it('should pass availableFormats and downloadCount to PurchaseSuccessStep', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[
+          { formatType: 'FLAC', fileName: 'album-flac.zip' },
+          { formatType: 'WAV', fileName: 'album-wav.zip' },
+        ]}
+        downloadCount={2}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Custom amount'), '10');
+    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
+    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Confirm Purchase' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('purchase-success-step')).toBeInTheDocument();
+    });
+
+    const successStep = screen.getByTestId('purchase-success-step');
+    expect(successStep).toHaveAttribute('data-format-count', '2');
+    expect(successStep).toHaveAttribute('data-download-count', '2');
+  });
 });
 
 describe('DownloadDialog — returning-download step', () => {
@@ -1436,7 +1490,7 @@ describe('DownloadDialog — returning-download step', () => {
     );
   };
 
-  it('should show "Download Now" link when guestAtCap is false', async () => {
+  it('should show "Download Now" link when guestAtCap is false and no formats available', async () => {
     const user = userEvent.setup();
 
     render(
@@ -1450,6 +1504,29 @@ describe('DownloadDialog — returning-download step', () => {
     expect(screen.getByRole('button', { name: /Download Now/ })).toBeInTheDocument();
     const downloadLink = screen.getByRole('link');
     expect(downloadLink).toHaveAttribute('href', '/api/releases/release-123/download');
+  });
+
+  it('should show FormatBundleDownload when guestAtCap is false and formats are available', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[
+          { formatType: 'FLAC', fileName: 'album-flac.zip' },
+          { formatType: 'MP3_V0', fileName: 'album-mp3v0.zip' },
+        ]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await navigateToReturningDownload(user, false);
+
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+    expect(screen.getByTestId('format-bundle-download')).toHaveAttribute('data-format-count', '2');
+    // Legacy download link should NOT be present
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('should show disabled "Download limit reached" button when guestAtCap is true', async () => {
