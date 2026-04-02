@@ -53,16 +53,19 @@ vi.mock('@/app/components/format-bundle-download', () => ({
     releaseTitle: string;
     availableFormats: Array<{ formatType: string; fileName: string }>;
     downloadCount: number;
-  }) => (
-    <div
-      data-testid="format-bundle-download"
-      data-release-id={releaseId}
-      data-format-count={availableFormats.length}
-      data-download-count={downloadCount}
-    >
-      Mock Format Bundle Download
-    </div>
-  ),
+  }) =>
+    availableFormats.length > 0 ? (
+      <div
+        data-testid="format-bundle-download"
+        data-release-id={releaseId}
+        data-format-count={availableFormats.length}
+        data-download-count={downloadCount}
+      >
+        Mock Format Bundle Download
+      </div>
+    ) : (
+      <p className="text-muted-foreground text-sm">No digital formats available for download.</p>
+    ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -93,8 +96,8 @@ describe('PurchaseSuccessStep', () => {
 
 describe('PurchaseSuccessStep — with available formats', () => {
   const formats = [
-    { formatType: 'FLAC', fileName: 'album-flac.zip' },
-    { formatType: 'WAV', fileName: 'album-wav.zip' },
+    { formatType: 'FLAC' as const, fileName: 'album-flac.zip' },
+    { formatType: 'WAV' as const, fileName: 'album-wav.zip' },
   ];
 
   beforeEach(() => vi.clearAllMocks());

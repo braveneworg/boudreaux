@@ -17,6 +17,7 @@ import { ReleasePlayer } from '@/app/components/release-player';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { ReleaseService } from '@/lib/services/release-service';
@@ -67,7 +68,7 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   const availableFormats = digitalFormats
     .filter((f): f is typeof f & { fileName: string } => f.fileName !== null)
     .map((f) => ({
-      formatType: f.formatType,
+      formatType: f.formatType as DigitalFormatType,
       fileName: f.fileName,
     }));
 

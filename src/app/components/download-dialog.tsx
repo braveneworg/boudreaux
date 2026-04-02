@@ -41,6 +41,7 @@ import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -60,7 +61,7 @@ type DialogStep =
   | 'returning-download';
 
 interface AvailableFormat {
-  formatType: string;
+  formatType: DigitalFormatType;
   fileName: string;
 }
 

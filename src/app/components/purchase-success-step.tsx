@@ -11,7 +11,7 @@ import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-import { DigitalFormatType } from '@/lib/constants/digital-formats';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
   formatType: DigitalFormatType;
@@ -48,12 +48,18 @@ export const PurchaseSuccessStep = ({
 
       <div className="space-y-4">
         {availableFormats !== undefined ? (
-          <FormatBundleDownload
-            releaseId={releaseId}
-            releaseTitle={releaseTitle}
-            availableFormats={availableFormats}
-            downloadCount={downloadCount}
-          />
+          availableFormats.length > 0 ? (
+            <FormatBundleDownload
+              releaseId={releaseId}
+              releaseTitle={releaseTitle}
+              availableFormats={availableFormats}
+              downloadCount={downloadCount}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No digital formats available for download.
+            </p>
+          )
         ) : (
           <Button asChild variant="default" className="w-full">
             <Link href={`/api/releases/${releaseId}/download`}>
