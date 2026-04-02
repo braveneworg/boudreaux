@@ -10,7 +10,7 @@ vi.mock('server-only', () => ({}));
 const mockDispose = vi.fn();
 const mockSave = vi.fn();
 const mockTag = { comment: undefined as string | undefined };
-const mockCreateFromPath = vi.fn(() => ({
+const mockCreateFromPath = vi.fn((_path: string) => ({
   tag: mockTag,
   save: mockSave,
   dispose: mockDispose,
@@ -18,7 +18,7 @@ const mockCreateFromPath = vi.fn(() => ({
 
 vi.mock('node-taglib-sharp', () => ({
   File: {
-    createFromPath: (...args: unknown[]) => mockCreateFromPath(...args),
+    createFromPath: (path: string) => mockCreateFromPath(path),
   },
 }));
 

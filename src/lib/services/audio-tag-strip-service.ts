@@ -46,7 +46,7 @@ export class AudioTagStripService {
       const originalComment = tagFile.tag.comment;
 
       if (originalComment && originalComment.trim().length > 0) {
-        tagFile.tag.comment = undefined;
+        tagFile.tag.comment = undefined as unknown as string;
         tagFile.save();
 
         const fileStat = await stat(filePath);
