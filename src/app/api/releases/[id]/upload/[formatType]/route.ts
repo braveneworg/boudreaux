@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { stat, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -11,6 +17,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 
 import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { AudioTagStripService } from '@/lib/services/audio-tag-strip-service';
 import { UploadService } from '@/lib/services/upload-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
@@ -32,8 +39,11 @@ export const maxDuration = 300;
  * 1. Authenticate user as admin (JWT token)
  * 2. Validate format type and file metadata headers
  * 3. Validate file size/MIME constraints via UploadService
- * 4. Stream file body to S3 via multipart Upload (no CORS needed)
- * 5. Return { s3Key, contentType } for the client to pass to confirmDigitalFormatUploadAction
+ * 4. Stream file body to temp file
+ * 5. Strip Comment metadata tag from the audio file (best-effort, executed before upload)
+ * 6. Upload processed file to S3 via multipart Upload (no CORS needed)
+ * 7. Clean up temp file
+ * 8. Return { s3Key, contentType } for the client to pass to confirmDigitalFormatUploadAction
  */
 export async function PUT(
   request: NextRequest,
@@ -127,7 +137,7 @@ export async function PUT(
     const s3Key = `releases/${releaseId}/digital-formats/${formatType}/${trackPrefix}${timestamp}-${sanitizedFileName}`;
     const contentType = mimeType || getDefaultMimeType(formatType as DigitalFormatType);
 
-    // Step 6: Stream file body to S3 via multipart upload (no full-buffer in memory)
+    // Step 6: Validate request body exists
     if (!request.body) {
       console.warn(`[upload-proxy] Empty request body for ${formatType}`);
       return NextResponse.json(
@@ -136,44 +146,81 @@ export async function PUT(
       );
     }
 
-    const s3Client = getS3Client();
-    const bucketName = getS3BucketName();
+    // Step 7: Stream request body to temp file, strip comment tag, then upload to S3
+    const tempFilePath = join(tmpdir(), `upload-${randomUUID()}.tmp`);
 
-    console.info(`[upload-proxy] ${formatType}: starting S3 multipart upload to key=${s3Key}`);
+    try {
+      // Write incoming stream to a temp file
+      const nodeStream = Readable.fromWeb(request.body as NodeReadableStream);
+      await pipeline(nodeStream, createWriteStream(tempFilePath));
 
-    // Convert Web ReadableStream to Node.js Readable for AWS SDK compatibility
-    const nodeStream = Readable.fromWeb(request.body as NodeReadableStream);
+      console.info(`[upload-proxy] ${formatType}: saved to temp file, stripping comment tag`);
 
-    const upload = new Upload({
-      client: s3Client,
-      params: {
-        Bucket: bucketName,
-        Key: s3Key,
-        Body: nodeStream,
-        ContentType: contentType,
-        ContentLength: fileSize,
-      },
-      // 10 MB part size — balances memory usage with upload throughput
-      partSize: 10 * 1024 * 1024,
-      // Up to 4 concurrent part uploads to S3
-      queueSize: 4,
-      leavePartsOnError: false,
-    });
+      // Strip comment metadata tag (best-effort — upload proceeds even on failure)
+      const stripResult = await AudioTagStripService.stripCommentTag(tempFilePath);
+      if (stripResult.success && stripResult.data.commentFound) {
+        console.info(`[upload-proxy] ${formatType}: stripped comment tag`);
+      } else if (!stripResult.success) {
+        console.warn(
+          `[upload-proxy] ${formatType}: comment strip failed (${stripResult.error}) — uploading original file`
+        );
+      }
 
-    upload.on('httpUploadProgress', (progress) => {
-      const loaded = progress.loaded ?? 0;
-      const pct = fileSize > 0 ? ((loaded / fileSize) * 100).toFixed(1) : '?';
-      console.info(
-        `[upload-proxy] ${formatType}: progress ${pct}% (${(loaded / 1024 / 1024).toFixed(1)}MB / ${(fileSize / 1024 / 1024).toFixed(1)}MB)`
-      );
-    });
+      // Read actual file size from disk (may differ after tag modification)
+      const fileStat = await stat(tempFilePath);
+      const actualFileSize = fileStat.size;
 
-    await upload.done();
+      // Upload processed file to S3
+      const s3Client = getS3Client();
+      const bucketName = getS3BucketName();
 
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.info(`[upload-proxy] ${formatType}: COMPLETE in ${elapsed}s — s3Key=${s3Key}`);
+      console.info(`[upload-proxy] ${formatType}: starting S3 multipart upload to key=${s3Key}`);
 
-    return NextResponse.json({ success: true, s3Key, contentType, trackNumber }, { status: 200 });
+      const fileStream = createReadStream(tempFilePath);
+      const upload = new Upload({
+        client: s3Client,
+        params: {
+          Bucket: bucketName,
+          Key: s3Key,
+          Body: fileStream,
+          ContentType: contentType,
+          ContentLength: actualFileSize,
+        },
+        // 10 MB part size — balances memory usage with upload throughput
+        partSize: 10 * 1024 * 1024,
+        // Up to 4 concurrent part uploads to S3
+        queueSize: 4,
+        leavePartsOnError: false,
+      });
+
+      upload.on('httpUploadProgress', (progress) => {
+        const loaded = progress.loaded ?? 0;
+        const pct = actualFileSize > 0 ? ((loaded / actualFileSize) * 100).toFixed(1) : '?';
+        console.info(
+          `[upload-proxy] ${formatType}: progress ${pct}% (${(loaded / 1024 / 1024).toFixed(1)}MB / ${(actualFileSize / 1024 / 1024).toFixed(1)}MB)`
+        );
+      });
+
+      await upload.done();
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.info(`[upload-proxy] ${formatType}: COMPLETE in ${elapsed}s — s3Key=${s3Key}`);
+
+      return NextResponse.json({ success: true, s3Key, contentType, trackNumber }, { status: 200 });
+    } finally {
+      // Always clean up temp file
+      try {
+        await unlink(tempFilePath);
+      } catch (error) {
+        console.warn('[upload-proxy] Failed to clean up temp file', {
+          tempFilePath,
+          error:
+            error instanceof Error
+              ? { message: error.message, name: error.name, stack: error.stack }
+              : error,
+        });
+      }
+    }
   } catch (error) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(

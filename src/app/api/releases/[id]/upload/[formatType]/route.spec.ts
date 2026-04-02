@@ -44,6 +44,52 @@ vi.mock('@aws-sdk/lib-storage', () => {
   };
 });
 
+// Mock AudioTagStripService
+const mockStripCommentTag = vi.fn();
+vi.mock('@/lib/services/audio-tag-strip-service', () => ({
+  AudioTagStripService: {
+    stripCommentTag: (...args: unknown[]) => mockStripCommentTag(...args),
+  },
+}));
+
+// Mock node:stream/promises (pipeline)
+vi.mock('node:stream/promises', () => ({
+  pipeline: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock node:fs (createWriteStream, createReadStream)
+vi.mock('node:fs', () => ({
+  createWriteStream: vi.fn().mockReturnValue({ on: vi.fn(), end: vi.fn() }),
+  createReadStream: vi.fn().mockReturnValue(
+    new Readable({
+      read() {
+        this.push(null);
+      },
+    })
+  ),
+}));
+
+// Mock node:fs/promises (stat, unlink)
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn().mockResolvedValue({ size: 50_000_000 }),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock node:os (tmpdir)
+vi.mock('node:os', () => ({
+  tmpdir: vi.fn().mockReturnValue('/tmp'),
+}));
+
+// Mock node:path (join)
+vi.mock('node:path', () => ({
+  join: vi.fn((...parts: string[]) => parts.join('/')),
+}));
+
+// Mock node:crypto (randomUUID)
+vi.mock('node:crypto', () => ({
+  randomUUID: vi.fn().mockReturnValue('test-uuid-1234'),
+}));
+
 // Mock Readable.fromWeb to avoid actual stream conversion
 vi.spyOn(Readable, 'fromWeb').mockReturnValue(
   new Readable({
@@ -97,6 +143,10 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockGetS3BucketName.mockReturnValue('test-bucket');
     mockUploadDone.mockResolvedValue({});
     mockUploadOn.mockReturnValue(undefined);
+    mockStripCommentTag.mockResolvedValue({
+      success: true,
+      data: { commentFound: false, finalFileSize: 50_000_000 },
+    });
   });
 
   it('should return 401 when user is not authenticated', async () => {
@@ -299,6 +349,41 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     await PUT(makeRequest(), makeParams());
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
+    consoleSpy.mockRestore();
+  });
+
+  it('should call stripCommentTag during upload', async () => {
+    await PUT(makeRequest(), makeParams());
+
+    expect(mockStripCommentTag).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.tmp');
+  });
+
+  it('should upload successfully even when stripCommentTag fails', async () => {
+    mockStripCommentTag.mockResolvedValue({
+      success: false,
+      error: 'Unsupported format',
+    });
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+  });
+
+  it('should log stripped comment info when comment was found', async () => {
+    mockStripCommentTag.mockResolvedValue({
+      success: true,
+      data: {
+        commentFound: true,
+        finalFileSize: 49_999_500,
+      },
+    });
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    await PUT(makeRequest(), makeParams());
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('stripped comment tag'));
     consoleSpy.mockRestore();
   });
 });
