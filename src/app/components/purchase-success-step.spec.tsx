@@ -43,6 +43,31 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('@/app/components/format-bundle-download', () => ({
+  FormatBundleDownload: ({
+    releaseId,
+    availableFormats,
+    downloadCount,
+  }: {
+    releaseId: string;
+    releaseTitle: string;
+    availableFormats: Array<{ formatType: string; fileName: string }>;
+    downloadCount: number;
+  }) =>
+    availableFormats.length > 0 ? (
+      <div
+        data-testid="format-bundle-download"
+        data-release-id={releaseId}
+        data-format-count={availableFormats.length}
+        data-download-count={downloadCount}
+      >
+        Mock Format Bundle Download
+      </div>
+    ) : (
+      <p className="text-muted-foreground text-sm">No digital formats available for download.</p>
+    ),
+}));
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -56,14 +81,6 @@ describe('PurchaseSuccessStep', () => {
     expect(screen.getByText('Purchase Complete!')).toBeDefined();
   });
 
-  it('renders a download link whose href contains the download API route for the release', () => {
-    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
-
-    const link = screen.getByRole('link', { name: /download now/i });
-    expect(link).toBeDefined();
-    expect((link as HTMLAnchorElement).href).toContain('/api/releases/release-123/download');
-  });
-
   it('renders the releaseTitle in the dialog description', () => {
     render(<PurchaseSuccessStep releaseId="release-456" releaseTitle="Special Edition EP" />);
 
@@ -74,5 +91,81 @@ describe('PurchaseSuccessStep', () => {
     render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
 
     expect(screen.getByText(/confirmation email/i)).toBeDefined();
+  });
+});
+
+describe('PurchaseSuccessStep — with available formats', () => {
+  const formats = [
+    { formatType: 'FLAC' as const, fileName: 'album-flac.zip' },
+    { formatType: 'WAV' as const, fileName: 'album-wav.zip' },
+  ];
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('renders FormatBundleDownload instead of legacy download link when formats are available', () => {
+    render(
+      <PurchaseSuccessStep
+        releaseId="release-123"
+        releaseTitle="Test Album"
+        availableFormats={formats}
+        downloadCount={0}
+      />
+    );
+
+    expect(screen.getByTestId('format-bundle-download')).toBeDefined();
+    expect(screen.getByTestId('format-bundle-download')).toHaveAttribute(
+      'data-release-id',
+      'release-123'
+    );
+    expect(screen.getByTestId('format-bundle-download')).toHaveAttribute('data-format-count', '2');
+    expect(screen.getByTestId('format-bundle-download')).toHaveAttribute(
+      'data-download-count',
+      '0'
+    );
+    // Legacy download link should NOT be present
+    expect(screen.queryByRole('link', { name: /download now/i })).toBeNull();
+  });
+
+  it('passes the correct downloadCount to FormatBundleDownload', () => {
+    render(
+      <PurchaseSuccessStep
+        releaseId="release-123"
+        releaseTitle="Test Album"
+        availableFormats={formats}
+        downloadCount={3}
+      />
+    );
+
+    expect(screen.getByTestId('format-bundle-download')).toHaveAttribute(
+      'data-download-count',
+      '3'
+    );
+  });
+});
+
+describe('PurchaseSuccessStep — no available formats', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('renders fallback message when availableFormats is empty', () => {
+    render(
+      <PurchaseSuccessStep
+        releaseId="release-123"
+        releaseTitle="Test Album"
+        availableFormats={[]}
+        downloadCount={0}
+      />
+    );
+
+    expect(screen.getByText('No digital formats available for download.')).toBeDefined();
+    expect(screen.queryByTestId('format-bundle-download')).toBeNull();
+    expect(screen.queryByRole('link', { name: /download now/i })).toBeNull();
+  });
+
+  it('renders legacy download link when availableFormats is not provided', () => {
+    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
+
+    const link = screen.getByRole('link', { name: /download now/i });
+    expect(link).toBeDefined();
+    expect((link as HTMLAnchorElement).href).toContain('/api/releases/release-123/download');
   });
 });

@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPurchaseConfirmationEmailHtml } from './purchase-confirmation-email-html';
 import { buildPurchaseConfirmationEmailText } from './purchase-confirmation-email-text';
@@ -154,12 +153,12 @@ describe('sendPurchaseConfirmationEmail', () => {
       );
     });
 
-    it('should build the downloadUrl from NEXT_PUBLIC_BASE_URL and releaseId', async () => {
+    it('should build the downloadUrl from NEXT_PUBLIC_BASE_URL and releaseId pointing to the release page', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
       expect(vi.mocked(buildPurchaseConfirmationEmailHtml)).toHaveBeenCalledWith(
         expect.objectContaining({
-          downloadUrl: 'https://example.com/api/releases/release-abc/download',
+          downloadUrl: 'https://example.com/releases/release-abc',
         })
       );
     });

@@ -7,20 +7,38 @@ import Link from 'next/link';
 
 import { DownloadIcon } from 'lucide-react';
 
+import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
+import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+
+interface AvailableFormat {
+  formatType: DigitalFormatType;
+  fileName: string;
+}
 
 interface PurchaseSuccessStepProps {
   releaseId: string;
   releaseTitle: string;
+  availableFormats?: AvailableFormat[];
+  downloadCount?: number;
 }
 
 /**
  * Final step shown after a PWYW purchase is confirmed.
- * Displays a download link and confirmation messaging.
+ * When digital formats are available, displays the format bundle picker.
+ * When digital formats are explicitly unavailable (empty array), displays a
+ *   "No digital formats available for download." message.
+ * When digital formats are not provided (undefined), falls back to the
+ *   legacy download link.
  */
-export const PurchaseSuccessStep = ({ releaseId, releaseTitle }: PurchaseSuccessStepProps) => {
+export const PurchaseSuccessStep = ({
+  releaseId,
+  releaseTitle,
+  availableFormats,
+  downloadCount = 0,
+}: PurchaseSuccessStepProps) => {
   return (
     <>
       <DialogHeader>
@@ -29,12 +47,27 @@ export const PurchaseSuccessStep = ({ releaseId, releaseTitle }: PurchaseSuccess
       </DialogHeader>
 
       <div className="space-y-4">
-        <Button asChild variant="default" className="w-full">
-          <Link href={`/api/releases/${releaseId}/download`}>
-            <DownloadIcon className="size-4" />
-            Download Now
-          </Link>
-        </Button>
+        {availableFormats !== undefined ? (
+          availableFormats.length > 0 ? (
+            <FormatBundleDownload
+              releaseId={releaseId}
+              releaseTitle={releaseTitle}
+              availableFormats={availableFormats}
+              downloadCount={downloadCount}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No digital formats available for download.
+            </p>
+          )
+        ) : (
+          <Button asChild variant="default" className="w-full">
+            <Link href={`/api/releases/${releaseId}/download`}>
+              <DownloadIcon className="size-4" />
+              Download Now
+            </Link>
+          </Button>
+        )}
 
         <p className="text-muted-foreground text-sm">
           A confirmation email with your download link is on its way.
