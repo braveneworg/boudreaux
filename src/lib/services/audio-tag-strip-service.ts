@@ -15,8 +15,6 @@ import type { ServiceResponse } from '@/lib/services/service.types';
 export interface CommentStripResult {
   /** Whether a comment was found and stripped */
   commentFound: boolean;
-  /** The original comment value (for logging) */
-  originalComment?: string;
   /** Final file size in bytes after stripping (may differ from original) */
   finalFileSize: number;
 }
@@ -50,8 +48,6 @@ export class AudioTagStripService {
       if (originalComment && originalComment.trim().length > 0) {
         tagFile.tag.comment = undefined;
         tagFile.save();
-        tagFile.dispose();
-        tagFile = undefined;
 
         const fileStat = await stat(filePath);
 
@@ -59,16 +55,12 @@ export class AudioTagStripService {
           success: true,
           data: {
             commentFound: true,
-            originalComment,
             finalFileSize: fileStat.size,
           },
         };
       }
 
       // No comment found — file unchanged
-      tagFile.dispose();
-      tagFile = undefined;
-
       const fileStat = await stat(filePath);
 
       return {

@@ -376,7 +376,6 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
       success: true,
       data: {
         commentFound: true,
-        originalComment: 'Encoded by LAME',
         finalFileSize: 49_999_500,
       },
     });
@@ -384,9 +383,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
 
     await PUT(makeRequest(), makeParams());
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('stripped comment tag: "Encoded by LAME"')
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('stripped comment tag'));
     consoleSpy.mockRestore();
   });
 });

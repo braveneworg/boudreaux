@@ -44,7 +44,6 @@ describe('AudioTagStripService', () => {
       expect(result.success).toBe(true);
       if (!result.success) throw new Error('Expected success');
       expect(result.data.commentFound).toBe(true);
-      expect(result.data.originalComment).toBe('Encoded by LAME 3.99.5');
       expect(result.data.finalFileSize).toBe(5_000_000);
       expect(mockSave).toHaveBeenCalledOnce();
       expect(mockDispose).toHaveBeenCalled();
@@ -58,7 +57,6 @@ describe('AudioTagStripService', () => {
       expect(result.success).toBe(true);
       if (!result.success) throw new Error('Expected success');
       expect(result.data.commentFound).toBe(false);
-      expect(result.data.originalComment).toBeUndefined();
       expect(result.data.finalFileSize).toBe(5_000_000);
       expect(mockSave).not.toHaveBeenCalled();
       expect(mockDispose).toHaveBeenCalled();

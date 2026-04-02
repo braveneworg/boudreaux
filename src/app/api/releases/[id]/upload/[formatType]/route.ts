@@ -40,7 +40,7 @@ export const maxDuration = 300;
  * 2. Validate format type and file metadata headers
  * 3. Validate file size/MIME constraints via UploadService
  * 4. Stream file body to temp file
- * 5. Strip Comment metadata tag from the audio file (best-effort, non-blocking)
+ * 5. Strip Comment metadata tag from the audio file (best-effort, executed before upload)
  * 6. Upload processed file to S3 via multipart Upload (no CORS needed)
  * 7. Clean up temp file
  * 8. Return { s3Key, contentType } for the client to pass to confirmDigitalFormatUploadAction
@@ -159,9 +159,7 @@ export async function PUT(
       // Strip comment metadata tag (best-effort — upload proceeds even on failure)
       const stripResult = await AudioTagStripService.stripCommentTag(tempFilePath);
       if (stripResult.success && stripResult.data.commentFound) {
-        console.info(
-          `[upload-proxy] ${formatType}: stripped comment tag: "${stripResult.data.originalComment}"`
-        );
+        console.info(`[upload-proxy] ${formatType}: stripped comment tag`);
       } else if (!stripResult.success) {
         console.warn(
           `[upload-proxy] ${formatType}: comment strip failed (${stripResult.error}) — uploading original file`
@@ -213,8 +211,14 @@ export async function PUT(
       // Always clean up temp file
       try {
         await unlink(tempFilePath);
-      } catch {
-        // Temp file may not exist if write failed — ignore cleanup errors
+      } catch (error) {
+        console.warn('[upload-proxy] Failed to clean up temp file', {
+          tempFilePath,
+          error:
+            error instanceof Error
+              ? { message: error.message, name: error.name, stack: error.stack }
+              : error,
+        });
       }
     }
   } catch (error) {
