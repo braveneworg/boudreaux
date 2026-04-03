@@ -59,12 +59,17 @@ export class ReleaseDigitalFormatRepository {
   /**
    * Find all active (non-deleted) digital formats for a release
    * Includes child track files ordered by trackNumber
+   *
+   * NOTE: Uses OR + isSet to handle MongoDB's distinction between a field
+   * that is explicitly null vs a field that doesn't exist in the document.
+   * Prisma's MongoDB adapter omits optional fields on create, so most
+   * active records won't have deletedAt in the document at all.
    */
   async findAllByRelease(releaseId: string): Promise<ReleaseDigitalFormatWithFiles[]> {
     return await prisma.releaseDigitalFormat.findMany({
       where: {
         releaseId,
-        deletedAt: null, // Only active formats
+        OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
       },
       include: { files: { orderBy: { trackNumber: 'asc' } } },
     });

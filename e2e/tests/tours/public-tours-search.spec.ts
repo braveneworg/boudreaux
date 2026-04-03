@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 
 const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?directConnection=true';
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 const prisma = new PrismaClient({
   datasourceUrl: E2E_DATABASE_URL,

@@ -2,11 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
 import { test, expect } from '../fixtures/base.fixture';
 
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
+const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+
 test.describe('Admin Tour Creation', () => {
+  test.afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
   test.afterEach(async () => {
     await prisma.tour.deleteMany({
       where: {

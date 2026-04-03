@@ -66,10 +66,10 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   const formatRepo = new ReleaseDigitalFormatRepository();
   const digitalFormats = await formatRepo.findAllByRelease(releaseId);
   const availableFormats = digitalFormats
-    .filter((f): f is typeof f & { fileName: string } => f.fileName !== null)
+    .filter((f) => f.files.length > 0 || f.fileName !== null)
     .map((f) => ({
       formatType: f.formatType as DigitalFormatType,
-      fileName: f.fileName,
+      fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
     }));
 
   const primaryArtist = release.artistReleases[0]?.artist;
