@@ -23,8 +23,18 @@ describe('FormatDownloadList', () => {
     downloadedReleaseIds: [] as string[],
   };
 
+  // Prevent jsdom "Not implemented: navigation" errors from programmatic anchor.click()
+  const originalCreateElement = document.createElement.bind(document);
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const el = originalCreateElement(tagName);
+      if (tagName === 'a') {
+        (el as HTMLAnchorElement).click = vi.fn();
+      }
+      return el;
+    });
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/user/download-quota') {
         return Promise.resolve({
@@ -146,18 +156,6 @@ describe('FormatDownloadList', () => {
     });
 
     it('should trigger browser download on success', async () => {
-      const mockClick = vi.fn();
-      const originalCreateElement = document.createElement.bind(document);
-
-      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-        if (tagName === 'a') {
-          const anchor = originalCreateElement('a');
-          anchor.click = mockClick;
-          return anchor;
-        }
-        return originalCreateElement(tagName);
-      });
-
       vi.mocked(global.fetch).mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         if (urlStr === '/api/user/download-quota') {
@@ -178,16 +176,23 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
+      const appendChildSpy = vi.spyOn(document.body, 'appendChild');
+
       const user = userEvent.setup();
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
 
       await waitFor(() => {
-        expect(mockClick).toHaveBeenCalled();
+        const anchorCalls = appendChildSpy.mock.calls.filter(
+          (call) => (call[0] as HTMLElement).tagName === 'A'
+        );
+        expect(anchorCalls.length).toBeGreaterThan(0);
+        const anchor = anchorCalls[0][0] as HTMLAnchorElement;
+        expect(anchor.click).toHaveBeenCalled();
       });
 
-      vi.restoreAllMocks();
+      appendChildSpy.mockRestore();
     });
 
     it('should show error alert with role attribute', async () => {
