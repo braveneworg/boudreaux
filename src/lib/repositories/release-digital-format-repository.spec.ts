@@ -169,7 +169,7 @@ describe('ReleaseDigitalFormatRepository', () => {
       expect(prisma.releaseDigitalFormat.findMany).toHaveBeenCalledWith({
         where: {
           releaseId: mockReleaseId,
-          deletedAt: null,
+          OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
         },
         include: { files: { orderBy: { trackNumber: 'asc' } } },
       });

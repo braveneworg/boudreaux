@@ -38,6 +38,46 @@ const TEST_USERS: Record<string, TestUser> = {
 };
 
 /**
+ * Wait for the MongoDB replica set to be ready. The Docker healthcheck
+ * initiates `rs.initiate()` but there is a race — Prisma can connect
+ * before the replica set election completes. This helper retries a
+ * lightweight write until it succeeds or the timeout is exceeded.
+ */
+async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Promise<void> {
+  const start = Date.now();
+  const retryIntervalMs = 1_000;
+
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      // A simple findMany doesn't require transactions; use deleteMany on a
+      // likely-empty collection to exercise the write path that needs the RS.
+      await prisma.verificationToken.deleteMany({ where: { identifier: '__rs_probe__' } });
+      return;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isReplicaSetNotReady =
+        message.includes('Transactions are not supported') ||
+        message.includes('not primary') ||
+        message.includes('node is recovering');
+
+      if (!isReplicaSetNotReady) {
+        throw error; // unexpected error — don't swallow it
+      }
+
+      console.info(
+        `Waiting for MongoDB replica set to be ready... (${Math.round((Date.now() - start) / 1000)}s)`
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryIntervalMs));
+    }
+  }
+
+  throw new Error(
+    `MongoDB replica set was not ready after ${maxWaitMs / 1000}s. ` +
+      'Ensure the Docker container is running: pnpm run e2e:docker:up'
+  );
+}
+
+/**
  * Idempotent seed script for the E2E test database. Clears all collections
  * and creates deterministic test data.
  */
@@ -76,11 +116,15 @@ async function seedTestDatabase() {
   });
 
   try {
+    // Wait for the replica set to be ready before proceeding
+    await waitForReplicaSet(prisma);
+
     // Clear all collections in dependency-safe order
     await prisma.releaseDigitalFormatFile.deleteMany({});
     await prisma.releaseDigitalFormat.deleteMany({});
     await prisma.downloadEvent.deleteMany({});
     await prisma.releasePurchase.deleteMany({});
+    await prisma.releaseDownload.deleteMany({});
     await prisma.userDownloadQuota.deleteMany({});
     await prisma.tourDateImage.deleteMany({});
     await prisma.tourDateHeadliner.deleteMany({});
@@ -204,6 +248,7 @@ async function seedTestDatabase() {
         releasedOn: new Date('2024-03-01'),
         coverArt: 'https://picsum.photos/seed/e2e-release1/400/400',
         publishedAt: new Date(),
+        suggestedPrice: 799,
       },
     });
 
@@ -253,6 +298,7 @@ async function seedTestDatabase() {
           formatType: 'MP3_320KBPS',
           trackCount: 1,
           totalFileSize: BigInt(5_000_000),
+          deletedAt: null,
         },
       });
 
@@ -269,6 +315,65 @@ async function seedTestDatabase() {
         },
       });
     }
+
+    // Add FLAC and WAV formats to E2E Album One for download/purchase flow testing
+    const flacFormat = await prisma.releaseDigitalFormat.create({
+      data: {
+        releaseId: e2eRelease1.id,
+        formatType: 'FLAC',
+        trackCount: 1,
+        totalFileSize: BigInt(30_000_000),
+        deletedAt: null,
+      },
+    });
+
+    await prisma.releaseDigitalFormatFile.create({
+      data: {
+        formatId: flacFormat.id,
+        trackNumber: 1,
+        title: 'E2E Track Alpha',
+        duration: 210,
+        s3Key: `releases/${e2eRelease1.id}/audio/flac/01-track.flac`,
+        fileName: '01-track.flac',
+        fileSize: BigInt(30_000_000),
+        mimeType: 'audio/flac',
+      },
+    });
+
+    const wavFormat = await prisma.releaseDigitalFormat.create({
+      data: {
+        releaseId: e2eRelease1.id,
+        formatType: 'WAV',
+        trackCount: 1,
+        totalFileSize: BigInt(50_000_000),
+        deletedAt: null,
+      },
+    });
+
+    await prisma.releaseDigitalFormatFile.create({
+      data: {
+        formatId: wavFormat.id,
+        trackNumber: 1,
+        title: 'E2E Track Alpha',
+        duration: 210,
+        s3Key: `releases/${e2eRelease1.id}/audio/wav/01-track.wav`,
+        fileName: '01-track.wav',
+        fileSize: BigInt(50_000_000),
+        mimeType: 'audio/wav',
+      },
+    });
+
+    // Create a purchase record for regular user on E2E Album One (for download tests)
+    await prisma.releasePurchase.create({
+      data: {
+        userId: TEST_USERS.regular.id,
+        releaseId: e2eRelease1.id,
+        amountPaid: 799,
+        stripePaymentIntentId: 'pi_e2e_test_purchase_album_one',
+        stripeSessionId: 'cs_e2e_test_session_album_one',
+        purchasedAt: new Date(),
+      },
+    });
 
     await Promise.all([
       prisma.notification.create({
