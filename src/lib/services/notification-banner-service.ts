@@ -129,7 +129,7 @@ export class NotificationBannerService {
           return { success: false as const, error: 'Failed to fetch notification banners' };
         }
       },
-      process.env.NODE_ENV === 'development' ? 0 : 300 // Cache for 5 minutes
+      process.env.NODE_ENV === 'development' || process.env.E2E_MODE === 'true' ? 0 : 300 // Cache for 5 minutes; disabled in E2E to avoid stale data from webServer health check
     );
   }
 

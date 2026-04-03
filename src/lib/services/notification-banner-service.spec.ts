@@ -186,6 +186,17 @@ describe('NotificationBannerService', () => {
       expect(withCache).toHaveBeenCalledWith(expect.any(String), expect.any(Function), 300);
       vi.unstubAllEnvs();
     });
+
+    it('should disable cache (TTL 0) when E2E_MODE is true', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('E2E_MODE', 'true');
+      vi.mocked(prisma.notification.findMany).mockResolvedValue([]);
+
+      await NotificationBannerService.getActiveNotificationBanners(new Date());
+
+      expect(withCache).toHaveBeenCalledWith(expect.any(String), expect.any(Function), 0);
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('getAllNotificationBanners', () => {
