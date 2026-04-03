@@ -183,7 +183,7 @@ jobs:
   # service container. Blob reports are uploaded for the merge step.
   e2e:
     name: E2E Tests (Shard ${{ matrix.shard }}/3)
-    needs: [quality, build]
+    needs: [quality, build-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -207,7 +207,7 @@ jobs:
             -e MONGO_INITDB_DATABASE=boudreaux-e2e \
             mongo:7 mongod --replSet rs0 --bind_ip_all --port 27018
 
-          # Wait for mongod to accept connections, then init the replica set
+          # Wait for mongod to accept connections
           for i in $(seq 1 30); do
             if docker exec mongo-e2e mongosh --port 27018 --eval "db.runCommand({ping:1})" 2>/dev/null; then
               echo "MongoDB is ready"
@@ -217,16 +217,20 @@ jobs:
             sleep 2
           done
 
+          # Initiate replica set (ignore "already initialized" errors)
           docker exec mongo-e2e mongosh --port 27018 --eval "
-            rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27018'}]});
+            try { rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27018'}]}) }
+            catch(e) { if (e.codeName !== 'AlreadyInitialized') throw e; }
           "
 
-          # Wait for replica set to elect primary
+          # Wait for primary election
           for i in $(seq 1 15); do
-            if docker exec mongo-e2e mongosh --port 27018 --eval "rs.status().ok" 2>/dev/null; then
-              echo "Replica set is ready"
+            PRIMARY=$(docker exec mongo-e2e mongosh --port 27018 --quiet --eval "rs.isMaster().ismaster" 2>/dev/null || echo "false")
+            if [ "$PRIMARY" = "true" ]; then
+              echo "Replica set primary elected"
               break
             fi
+            echo "Waiting for primary election... ($i/15)"
             sleep 2
           done
 
@@ -236,12 +240,12 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v8
         with:
-          name: nextjs-build
+          name: nextjs-build-e2e
           path: .
 
       - name: Extract build artifact
         run: |
-          tar -xzf next-build.tar.gz
+          tar -xzf next-build-e2e.tar.gz
           # Standalone server needs static files alongside it
           cp -r .next/static .next/standalone/.next/static
           # Copy public directory for standalone server
@@ -253,7 +257,8 @@ jobs:
         run: pnpm exec playwright test --shard=${{ matrix.shard }}/3
         env:
           CI: true
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          E2E_DATABASE_URL: mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0
+          SKIP_ENV_VALIDATION: "true"
 
       - name: Upload blob report
         if: always()
@@ -322,10 +327,61 @@ jobs:
             echo "One or more shards failed. See the [Playwright Report](../artifacts) for details." >> $GITHUB_STEP_SUMMARY
           fi
 
-  # ── Next.js build ──────────────────────────────────────────────────────────
+  # ── Next.js build (E2E) ────────────────────────────────────────────────────
+  # Builds without CDN asset prefix and with E2E-specific env vars so the
+  # standalone server can serve assets locally during Playwright tests.
+  build-e2e:
+    name: Build Next.js (E2E)
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      - name: Cache Next.js build cache
+        uses: actions/cache@v5
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
+          restore-keys: |
+            ${{ runner.os }}-next-e2e-
+
+      - name: Build Next.js (E2E)
+        env:
+          SKIP_ENV_VALIDATION: "true"
+          SKIP_CDN_ASSET_PREFIX: "true"
+          DATABASE_URL: "mongodb://localhost:27017/build-placeholder"
+          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: "1x00000000000000000000AA"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          NEXT_PUBLIC_STRIPE_PRICE_MINIMUM: "500"
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA: "1000"
+          NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: "2000"
+          NEXT_PUBLIC_BANNER_INTERVAL: "1000"
+          NODE_ENV: "production"
+          AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
+          AUTH_URL: "http://localhost:3000"
+        run: pnpm exec next build --webpack
+
+      - name: Package standalone output
+        run: |
+          tar -czf next-build-e2e.tar.gz .next/standalone .next/static .next/BUILD_ID
+          ls -lh next-build-e2e.tar.gz
+
+      - name: Upload E2E build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nextjs-build-e2e
+          path: next-build-e2e.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  # ── Next.js build (deploy) ───────────────────────────────────────────────
+  # Production build with CDN asset prefix for the deploy workflow.
   build:
     name: Build Next.js app
-    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
