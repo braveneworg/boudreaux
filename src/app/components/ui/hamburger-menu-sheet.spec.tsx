@@ -26,6 +26,15 @@ describe('HamburgerMenuSheet', () => {
 
   beforeEach(() => {
     mockOnOpenChange.mockClear();
+    // Prevent jsdom "Not implemented: navigation" errors from anchor clicks
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'A' || target.closest('a')) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
   });
 
   it('renders when open', () => {
