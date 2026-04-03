@@ -82,7 +82,11 @@ test.describe('Notification Banner Carousel', () => {
     // Wait for initial state to be stable
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Capture which tab is selected before hovering
+    // Hover over the carousel to pause auto-cycling BEFORE capturing the index
+    // to avoid a race where auto-cycle fires between capture and hover
+    await carousel.hover();
+
+    // Capture which tab is selected after hovering (paused state)
     const getSelectedIndex = async () => {
       return await tabs.evaluateAll((tabList) => {
         return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
@@ -90,9 +94,6 @@ test.describe('Notification Banner Carousel', () => {
     };
 
     const selectedTab = await getSelectedIndex();
-
-    // Hover over the carousel to pause auto-cycling
-    await carousel.hover();
 
     // Poll for 2 seconds (2x the interval) to ensure the selection doesn't change
     // If auto-cycling were still active, it would have changed after 1 second
