@@ -291,4 +291,4 @@ Run `npx ncu` to check for dependency updates. Update dependencies in `package.j
 
 To open last HTML report run:
 
-`npx playwright show-report e2e/playwright-report`
+`pnpm run e2e:report`
