@@ -43,6 +43,11 @@ interface TestUser {
   allowSmsNotifications?: boolean;
 }
 
+/**
+ * Cookie name must match what auth.ts uses at runtime.
+ * In E2E mode (E2E_MODE=true), auth.ts uses the non-secure cookie name
+ * even in production, since the standalone server runs over HTTP.
+ */
 const COOKIE_NAME = 'next-auth.session-token';
 
 /**

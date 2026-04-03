@@ -123,7 +123,7 @@ export class FeaturedArtistsService {
           return { success: false as const, error: 'Failed to fetch artists' };
         }
       },
-      process.env.NODE_ENV === 'development' ? 0 : 600 // Cache for 10 minutes
+      process.env.NODE_ENV === 'development' || process.env.E2E_MODE === 'true' ? 0 : 600 // Cache for 10 minutes; disabled in E2E to avoid stale data from webServer health check
     );
   }
 
