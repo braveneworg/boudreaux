@@ -37,8 +37,10 @@ test.describe('Download Dialog — Purchased User', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    // Dialog should open with "Download" heading for purchased users
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+    // Dialog should open with "Download Again" heading for returning purchasers
+    await expect(
+      userPage.getByRole('heading', { name: 'Download Again', exact: true })
+    ).toBeVisible({
       timeout: 5_000,
     });
   });
@@ -50,7 +52,9 @@ test.describe('Download Dialog — Purchased User', () => {
     await downloadButton.click();
 
     // Wait for the dialog heading to confirm we're in the right step
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+    await expect(
+      userPage.getByRole('heading', { name: 'Download Again', exact: true })
+    ).toBeVisible({
       timeout: 5_000,
     });
 
@@ -72,7 +76,9 @@ test.describe('Download Dialog — Purchased User', () => {
     await downloadButton.click();
 
     // Wait for the dialog heading
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+    await expect(
+      userPage.getByRole('heading', { name: 'Download Again', exact: true })
+    ).toBeVisible({
       timeout: 5_000,
     });
 
@@ -158,7 +164,9 @@ test.describe('Download Dialog — Multi-format selection', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+    await expect(
+      userPage.getByRole('heading', { name: 'Download Again', exact: true })
+    ).toBeVisible({
       timeout: 5_000,
     });
 
@@ -185,7 +193,9 @@ test.describe('Download Dialog — Multi-format selection', () => {
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
 
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+    await expect(
+      userPage.getByRole('heading', { name: 'Download Again', exact: true })
+    ).toBeVisible({
       timeout: 5_000,
     });
 
