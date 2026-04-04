@@ -44,7 +44,8 @@
     "e2e:docker:down": "docker compose -f docker-compose.e2e.yml down -v",
     "e2e:ci": "playwright test --shard=$SHARD_INDEX/$SHARD_TOTAL",
     "e2e:merge": "playwright merge-reports --reporter=html ./blob-report",
-    "prepare": "husky"
+    "prepare": "husky",
+    "stripe:forward": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"
   },
   "prisma": {
     "seed": "pnpm exec tsx prisma/seed.ts"
