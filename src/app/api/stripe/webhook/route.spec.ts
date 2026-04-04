@@ -9,6 +9,24 @@ import type Stripe from 'stripe';
 
 vi.mock('server-only', () => ({}));
 
+const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
+  class MockPrismaClientKnownRequestError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, opts: { code: string; clientVersion: string }) {
+      super(message);
+      this.code = opts.code;
+      this.clientVersion = opts.clientVersion;
+      this.name = 'PrismaClientKnownRequestError';
+    }
+  }
+  return { MockPrismaClientKnownRequestError };
+});
+
+vi.mock('@prisma/client/runtime/library', () => ({
+  PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
+}));
+
 vi.mock('unique-username-generator', () => ({
   generateUsername: () => 'generated-username',
 }));
@@ -101,22 +119,6 @@ vi.mock('@/lib/prisma', () => ({
     },
   },
 }));
-
-vi.mock('@prisma/client/runtime/library', () => {
-  class MockPrismaClientKnownRequestError extends Error {
-    code: string;
-    clientVersion: string;
-    constructor(message: string, opts: { code: string; clientVersion: string }) {
-      super(message);
-      this.code = opts.code;
-      this.clientVersion = opts.clientVersion;
-      this.name = 'PrismaClientKnownRequestError';
-    }
-  }
-  return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
-});
-
-const { PrismaClientKnownRequestError } = await import('@prisma/client/runtime/library');
 
 const WEBHOOK_SECRET = 'whsec_test_secret';
 
@@ -1468,7 +1470,7 @@ describe('POST /api/stripe/webhook', () => {
         // Second findUserByEmail (after P2002) returns the already-created user
         .mockResolvedValueOnce({ id: 'u-raced' });
       mockPrismaUserCreate.mockRejectedValue(
-        new PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
           code: 'P2002',
           clientVersion: '5.0.0',
         })

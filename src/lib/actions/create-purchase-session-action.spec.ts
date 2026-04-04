@@ -6,6 +6,24 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 
 vi.mock('server-only', () => ({}));
 
+const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
+  class MockPrismaClientKnownRequestError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, opts: { code: string; clientVersion: string }) {
+      super(message);
+      this.code = opts.code;
+      this.clientVersion = opts.clientVersion;
+      this.name = 'PrismaClientKnownRequestError';
+    }
+  }
+  return { MockPrismaClientKnownRequestError };
+});
+
+vi.mock('@prisma/client/runtime/library', () => ({
+  PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
+}));
+
 const mockAuth = vi.fn();
 vi.mock('../../../auth', () => ({
   auth: () => mockAuth(),
@@ -51,25 +69,10 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
-vi.mock('@prisma/client/runtime/library', () => {
-  class MockPrismaClientKnownRequestError extends Error {
-    code: string;
-    clientVersion: string;
-    constructor(message: string, opts: { code: string; clientVersion: string }) {
-      super(message);
-      this.code = opts.code;
-      this.clientVersion = opts.clientVersion;
-      this.name = 'PrismaClientKnownRequestError';
-    }
-  }
-  return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
-});
-
 // Must import after mocks are set up
 const { createPurchaseSessionAction } = await import('./create-purchase-session-action');
 const { prisma } = await import('@/lib/prisma');
 const { stripe } = await import('@/lib/stripe');
-const { PrismaClientKnownRequestError } = await import('@prisma/client/runtime/library');
 
 const mockUser = {
   id: 'user-123',
@@ -304,7 +307,7 @@ describe('createPurchaseSessionAction', () => {
         // Second call (after P2002) returns the already-created user
         .mockResolvedValueOnce({ id: 'raced-user-id' });
       vi.mocked(prisma.user.create).mockRejectedValue(
-        new PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
           code: 'P2002',
           clientVersion: '5.0.0',
         })

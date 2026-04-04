@@ -191,6 +191,11 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
           const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
           if (racedUser) {
             userId = racedUser.id;
+          } else {
+            console.error('release_purchase webhook: P2002 race — user not found on re-fetch', {
+              sessionId: retrievedSession.id,
+              email: customerEmail,
+            });
           }
         } else {
           throw createError;

@@ -121,6 +121,11 @@ export async function createPurchaseSessionAction(
             const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
             if (racedUser) {
               userId = racedUser.id;
+            } else {
+              console.error(
+                '[createPurchaseSession] P2002 race: user not found on re-fetch',
+                customerEmail
+              );
             }
           } else {
             throw createError;
