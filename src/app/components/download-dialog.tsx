@@ -368,7 +368,7 @@ export const DownloadDialog = ({
               </p>
               <Button
                 type="button"
-                className="w-full !bg-(--fake-four-orange) text-white hover:bg-(--fake-four-orange-hover) focus-visible:ring-(--fake-four-orange) data-[state=open]:bg-(--fake-four-orange-hover)"
+                className="w-full bg-(--fake-four-orange)! text-white hover:bg-(--fake-four-orange-hover) focus-visible:ring-(--fake-four-orange) data-[state=open]:bg-(--fake-four-orange-hover)"
                 variant="outline"
                 onClick={handleSubscribe}
               >
