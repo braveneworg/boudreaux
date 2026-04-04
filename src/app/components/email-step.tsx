@@ -27,7 +27,9 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { Switch } from '@/app/components/ui/switch';
+import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import { resolveSubscriberAction } from '@/lib/actions/resolve-subscriber-action';
+import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import emailStepSchema from '@/lib/validation/email-step-schema';
 import type { EmailStepFormSchemaType } from '@/lib/validation/email-step-schema';
 
@@ -39,6 +41,8 @@ interface EmailStepProps {
 export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
   const [isPending, setIsPending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
 
   const form = useForm<EmailStepFormSchemaType>({
     resolver: zodResolver(emailStepSchema),
@@ -51,6 +55,16 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
   const handleSubmit = async (data: EmailStepFormSchemaType) => {
     setIsPending(true);
     setServerError(null);
+
+    const turnstileResult = await verifyTurnstile(turnstileToken);
+
+    if (!turnstileResult.success) {
+      setServerError(turnstileResult.error ?? 'Bot verification failed. Please try again.');
+      setIsPending(false);
+      setIsVerified(false);
+      setTurnstileToken('');
+      return;
+    }
 
     const result = await resolveSubscriberAction({
       email: data.email,
@@ -110,13 +124,19 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
             )}
           />
 
+          <TurnstileWidget
+            isVerified={isVerified}
+            setIsVerified={setIsVerified}
+            onToken={setTurnstileToken}
+          />
+
           {serverError && <p className="text-destructive text-sm">{serverError}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onCancel}>
               Back
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || !isVerified}>
               {isPending ? 'Checking...' : 'Continue to Checkout'}
             </Button>
           </DialogFooter>

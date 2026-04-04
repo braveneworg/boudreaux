@@ -30,13 +30,13 @@ vi.mock('@/app/components/format-bundle-download', () => ({
     releaseId,
     availableFormats,
     downloadCount,
-    onDownloadStarted,
+    onDownloadComplete,
   }: {
     releaseId: string;
     releaseTitle: string;
     availableFormats: Array<{ formatType: string; fileName: string }>;
     downloadCount: number;
-    onDownloadStarted?: () => void;
+    onDownloadComplete?: () => void;
   }) =>
     availableFormats.length > 0 ? (
       <div
@@ -46,8 +46,8 @@ vi.mock('@/app/components/format-bundle-download', () => ({
         data-download-count={downloadCount}
       >
         Mock Format Bundle Download
-        {onDownloadStarted && (
-          <button data-testid="mock-download-btn" onClick={onDownloadStarted}>
+        {onDownloadComplete && (
+          <button data-testid="mock-download-btn" onClick={onDownloadComplete}>
             Download
           </button>
         )}
@@ -297,19 +297,19 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
   });
 });
 
-describe('PurchaseSuccessStep — onDownloadStarted callback', () => {
+describe('PurchaseSuccessStep — onDownloadComplete callback', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('passes onDownloadStarted through to FormatBundleDownload', async () => {
+  it('passes onDownloadComplete through to FormatBundleDownload', async () => {
     mockFetchFormats(mockFormats);
-    const onDownloadStarted = vi.fn();
+    const onDownloadComplete = vi.fn();
 
     render(
       <PurchaseSuccessStep
         releaseId="release-123"
         releaseTitle="Test Album"
         downloadCount={0}
-        onDownloadStarted={onDownloadStarted}
+        onDownloadComplete={onDownloadComplete}
       />
     );
 
@@ -318,6 +318,6 @@ describe('PurchaseSuccessStep — onDownloadStarted callback', () => {
     });
 
     screen.getByTestId('mock-download-btn').click();
-    expect(onDownloadStarted).toHaveBeenCalledOnce();
+    expect(onDownloadComplete).toHaveBeenCalledOnce();
   });
 });

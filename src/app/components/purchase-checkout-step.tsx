@@ -18,6 +18,7 @@ import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purchase-checkout-session-action';
 import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
+import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
 
@@ -25,7 +26,7 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_COUNT = 45;
 
 const SESSION_ERROR_MESSAGES: Record<string, string> = {
-  already_purchased: 'You have already purchased this release.',
+  already_purchased: ALREADY_PURCHASED_ERROR,
   amount_below_minimum: 'The minimum purchase amount is $0.50.',
   release_unavailable: 'This release is no longer available for purchase.',
   stripe_error: 'A payment error occurred. Please try again or contact support.',

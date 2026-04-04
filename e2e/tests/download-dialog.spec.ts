@@ -37,57 +37,52 @@ test.describe('Download Dialog — Purchased User', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    // Dialog should open with "Download Again" heading (format-select step for purchased users)
-    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
+    // Dialog should open with "Download" heading for purchased users
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
   });
 
-  test('shows format toggle options for purchased release', async ({ userPage }) => {
+  test('shows format options via multi-combobox', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
 
     // Wait for the dialog heading to confirm we're in the right step
-    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
-    // Should show format selection with toggle items for available formats
-    // E2E Album One has MP3_320KBPS, FLAC, and WAV seeded
-    await expect(userPage.getByRole('button', { name: /Select MP3 320kbps/i })).toBeVisible();
-    await expect(userPage.getByRole('button', { name: /Select FLAC/i })).toBeVisible();
-    await expect(userPage.getByRole('button', { name: /Select WAV/i })).toBeVisible();
+    // Should show a multi-combobox for format selection
+    const combobox = userPage.getByRole('combobox');
+    await expect(combobox).toBeVisible();
+    await combobox.click();
+
+    // E2E Album One has MP3_320KBPS, FLAC, and WAV seeded — verify options in dropdown
+    await expect(userPage.getByRole('option', { name: /FLAC/i })).toBeVisible({ timeout: 5_000 });
+    await expect(userPage.getByRole('option', { name: /WAV/i })).toBeVisible();
+    await expect(userPage.getByRole('option', { name: /MP3 320kbps/i })).toBeVisible();
   });
 
-  test('shows download counter for purchased release', async ({ userPage }) => {
+  test('shows download button with format count after selecting formats', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
 
     // Wait for the dialog heading
-    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
-    // Should show download counter "0/5 downloads used" (fresh purchase)
-    await expect(userPage.getByText(/\/5 downloads used/)).toBeVisible();
-  });
+    // Select all formats via the multi-combobox
+    const combobox = userPage.getByRole('combobox');
+    await combobox.click();
+    await userPage.getByRole('option', { name: 'Select all' }).click();
+    await userPage.keyboard.press('Escape');
 
-  test('shows download button with format count', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
-
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
-    await downloadButton.click();
-
-    // Wait for the dialog heading
-    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
-      timeout: 5_000,
-    });
-
-    // All 3 formats should be pre-selected, showing "Download 3 formats"
+    // All 3 formats selected — should show "Download 3 formats"
     await expect(userPage.getByRole('button', { name: /Download \d+ formats?/ })).toBeVisible();
   });
 });
@@ -152,5 +147,93 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
 
     // Should show custom amount input
     await expect(userPage.getByLabel('Custom amount')).toBeVisible({ timeout: 5_000 });
+  });
+});
+
+test.describe('Download Dialog — Multi-format selection', () => {
+  test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
+    await userPage.goto(`/releases/${e2eRelease1Id}`);
+
+    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await expect(downloadButton).toBeVisible({ timeout: 10_000 });
+    await downloadButton.click();
+
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Open the multi-combobox
+    const combobox = userPage.getByRole('combobox');
+    await combobox.click();
+
+    // Select all formats
+    await userPage.getByRole('option', { name: 'Select all' }).click();
+
+    // Verify the combobox trigger shows the selected count
+    await expect(combobox).toContainText('3 formats selected');
+
+    // Deselect an individual format (WAV)
+    await userPage.getByRole('option', { name: /WAV/i }).click();
+
+    // Count should decrease to 2
+    await expect(combobox).toContainText('2 formats selected');
+  });
+
+  test('shows selected format pills below combobox', async ({ userPage }) => {
+    await userPage.goto(`/releases/${e2eRelease1Id}`);
+
+    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await downloadButton.click();
+
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Open the multi-combobox and select all formats
+    const combobox = userPage.getByRole('combobox');
+    await combobox.click();
+    await userPage.getByRole('option', { name: 'Select all' }).click();
+    await userPage.keyboard.press('Escape');
+
+    // Verify pills are shown with format labels
+    const pillList = userPage.getByRole('list', { name: 'Selected formats' });
+    await expect(pillList).toBeVisible();
+    await expect(pillList.getByRole('listitem').filter({ hasText: /FLAC/ })).toBeVisible();
+    await expect(pillList.getByRole('listitem').filter({ hasText: /WAV/ })).toBeVisible();
+    await expect(pillList.getByRole('listitem').filter({ hasText: /MP3 320kbps/ })).toBeVisible();
+  });
+});
+
+test.describe('Download Dialog — Free download flow', () => {
+  let e2eRelease2Id: string;
+
+  test.beforeAll(async () => {
+    const release = await prisma.release.findFirstOrThrow({
+      where: { title: 'E2E Album Two' },
+      select: { id: true },
+    });
+    e2eRelease2Id = release.id;
+  });
+
+  test('can select free download option and proceed', async ({ userPage }) => {
+    await userPage.goto(`/releases/${e2eRelease2Id}`);
+
+    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await expect(downloadButton).toBeVisible({ timeout: 10_000 });
+    await downloadButton.click();
+
+    // Wait for dialog
+    await expect(userPage.getByRole('heading', { name: 'Download' })).toBeVisible({
+      timeout: 5_000,
+    });
+
+    // Select the free download option
+    const freeOption = userPage.getByLabel(/Free.*320Kbps/);
+    await freeOption.click();
+
+    // Click the Download button to proceed
+    const submitButton = userPage.getByRole('button', { name: 'Download', exact: true });
+    await expect(submitButton).toBeVisible({ timeout: 5_000 });
+    await submitButton.click();
   });
 });

@@ -502,7 +502,7 @@ describe('ReleasePlayerPage', () => {
     expect(formats).toEqual([{ formatType: 'WAV', fileName: 'WAV.zip' }]);
   });
 
-  it('should exclude formats with no files and no fileName', async () => {
+  it('should fall back to formatType.zip for formats with no files and no fileName', async () => {
     mockFindAllByRelease.mockResolvedValue([
       {
         formatType: 'AAC',
@@ -519,6 +519,6 @@ describe('ReleasePlayerPage', () => {
 
     const player = screen.getByTestId('release-player');
     const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
-    expect(formats).toEqual([]);
+    expect(formats).toEqual([{ formatType: 'AAC', fileName: 'AAC.zip' }]);
   });
 });

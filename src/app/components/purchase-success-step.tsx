@@ -21,7 +21,7 @@ interface PurchaseSuccessStepProps {
   releaseTitle: string;
   availableFormats?: AvailableFormat[];
   downloadCount?: number;
-  onDownloadStarted?: () => void;
+  onDownloadComplete?: () => void;
 }
 
 /**
@@ -34,7 +34,7 @@ export const PurchaseSuccessStep = ({
   releaseTitle,
   availableFormats: initialFormats,
   downloadCount = 0,
-  onDownloadStarted,
+  onDownloadComplete,
 }: PurchaseSuccessStepProps) => {
   const [formats, setFormats] = useState<AvailableFormat[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +93,7 @@ export const PurchaseSuccessStep = ({
             releaseTitle={releaseTitle}
             availableFormats={resolvedFormats}
             downloadCount={downloadCount}
-            onDownloadStarted={onDownloadStarted}
+            onDownloadComplete={onDownloadComplete}
           />
         ) : (
           <p className="text-muted-foreground text-sm">

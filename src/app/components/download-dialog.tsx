@@ -9,7 +9,7 @@ import type { ComponentProps, ReactElement } from 'react';
 import Link from 'next/link';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Download, DownloadIcon, UserPlus2Icon } from 'lucide-react';
+import { Download, DownloadIcon, LogInIcon, UserPlus2Icon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 
@@ -39,7 +39,7 @@ import {
 import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
+import { ALREADY_PURCHASED_ERROR, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
@@ -99,7 +99,10 @@ export const DownloadDialog = ({
   const [amountCents, setAmountCents] = useState<number>(0);
   const [guestAtCap, setGuestAtCap] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [purchaseConfirmed, setPurchaseConfirmed] = useState(false);
   const { data: session } = useSession();
+
+  const effectiveHasPurchase = hasPurchase || purchaseConfirmed;
 
   const form = useForm<DownloadFormSchemaType>({
     resolver: zodResolver(downloadSchema),
@@ -160,6 +163,7 @@ export const DownloadDialog = ({
       setAmountCents(0);
       setGuestAtCap(false);
       setPurchaseError(null);
+      setPurchaseConfirmed(false);
     }
   };
 
@@ -181,7 +185,57 @@ export const DownloadDialog = ({
           if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
         }}
       >
-        {step === 'download' && (
+        {step === 'download' && effectiveHasPurchase && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Download</DialogTitle>
+              <DialogDescription>
+                Select formats for <strong>{releaseTitle}</strong>
+              </DialogDescription>
+            </DialogHeader>
+
+            <p className="text-zinc-900 text-sm">
+              You already purchased this on{' '}
+              <strong>
+                {purchasedAt
+                  ? new Date(purchasedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                  : 'a previous date'}
+              </strong>
+              .
+            </p>
+
+            {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
+              <>
+                <Button className="w-full" type="button" disabled>
+                  <DownloadIcon className="size-4" />
+                  Download limit reached
+                </Button>
+                <p className="text-muted-foreground text-sm">
+                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
+                  Contact{' '}
+                  <a href="mailto:support@fakefourinc.com" className="underline">
+                    support@fakefourinc.com
+                  </a>{' '}
+                  for assistance.
+                </p>
+              </>
+            ) : (
+              <FormatBundleDownload
+                releaseId={releaseId}
+                releaseTitle={releaseTitle}
+                availableFormats={availableFormats}
+                downloadCount={downloadCount}
+                onDownloadComplete={() => setOpen(false)}
+              />
+            )}
+          </>
+        )}
+
+        {step === 'download' && !effectiveHasPurchase && (
           <>
             <DialogHeader>
               <DialogTitle>Download</DialogTitle>
@@ -233,7 +287,7 @@ export const DownloadDialog = ({
                 />
 
                 {/* Custom amount section — visible when premium is selected */}
-                {selectedOption === 'premium-digital' && !hasPurchase && (
+                {selectedOption === 'premium-digital' && (
                   <FormField
                     control={form.control}
                     name="finalAmount"
@@ -293,55 +347,12 @@ export const DownloadDialog = ({
                   />
                 )}
 
-                {/* Already purchased — show message + format selection */}
-                {selectedOption === 'premium-digital' && hasPurchase && (
-                  <div className="space-y-4">
-                    <p className="text-zinc-900 text-sm">
-                      You already purchased this on{' '}
-                      <strong>
-                        {purchasedAt
-                          ? new Date(purchasedAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
-                          : 'a previous date'}
-                      </strong>
-                      .
-                    </p>
-                    {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
-                      <>
-                        <Button className="w-full" type="button" disabled>
-                          <DownloadIcon className="size-4" />
-                          Download limit reached
-                        </Button>
-                        <p className="text-muted-foreground text-sm">
-                          You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit.
-                          Contact{' '}
-                          <a href="mailto:support@fakefourinc.com" className="underline">
-                            support@fakefourinc.com
-                          </a>{' '}
-                          for assistance.
-                        </p>
-                      </>
-                    ) : (
-                      <FormatBundleDownload
-                        releaseId={releaseId}
-                        releaseTitle={releaseTitle}
-                        availableFormats={availableFormats}
-                        downloadCount={downloadCount}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Submit button — only when not already purchased */}
-                {selectedOption === 'premium-digital' && !hasPurchase ? (
+                {selectedOption === 'premium-digital' ? (
                   <Button className="w-full" type="submit">
                     <DownloadIcon className="size-4" />
                     Buy &amp; Download for {displayAmount}
                   </Button>
-                ) : selectedOption === 'premium-digital' && hasPurchase ? null : (
+                ) : (
                   <Button className="w-full" type="submit">
                     <DownloadIcon className="size-4" />
                     Download
@@ -383,7 +394,8 @@ export const DownloadDialog = ({
                   Download limit reached
                 </Button>
                 <p className="text-muted-foreground text-sm">
-                  You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
+                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
+                  Contact{' '}
                   <a href="mailto:support@fakefourinc.com" className="underline">
                     support@fakefourinc.com
                   </a>{' '}
@@ -396,6 +408,7 @@ export const DownloadDialog = ({
                 releaseTitle={releaseTitle}
                 availableFormats={availableFormats}
                 downloadCount={downloadCount}
+                onDownloadComplete={() => setOpen(false)}
               />
             )}
           </>
@@ -459,7 +472,11 @@ export const DownloadDialog = ({
             onConfirmed={() => setStep('purchase-success')}
             onCancel={() => setStep('download')}
             onError={(msg) => {
-              setPurchaseError(msg);
+              if (msg === ALREADY_PURCHASED_ERROR) {
+                setPurchaseConfirmed(true);
+              } else {
+                setPurchaseError(msg);
+              }
               setStep('download');
             }}
           />
@@ -471,7 +488,7 @@ export const DownloadDialog = ({
             releaseTitle={releaseTitle}
             availableFormats={availableFormats}
             downloadCount={downloadCount}
-            onDownloadStarted={() => setOpen(false)}
+            onDownloadComplete={() => setOpen(false)}
           />
         )}
 
@@ -490,27 +507,24 @@ export const DownloadDialog = ({
                   Download limit reached
                 </Button>
                 <p className="text-muted-foreground text-sm">
-                  You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
+                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
+                  Contact{' '}
                   <a href="mailto:support@fakefourinc.com" className="underline">
                     support@fakefourinc.com
                   </a>{' '}
                   for assistance.
                 </p>
               </>
-            ) : availableFormats.length > 0 ? (
-              <FormatBundleDownload
-                releaseId={releaseId}
-                releaseTitle={releaseTitle}
-                availableFormats={availableFormats}
-                downloadCount={downloadCount}
-              />
             ) : (
-              <Link href={`/api/releases/${releaseId}/download`}>
-                <Button className="w-full" type="button">
-                  <DownloadIcon className="size-4" />
-                  Download Now
+              <>
+                <p className="text-sm">Sign in to access your downloads.</p>
+                <Button asChild className="w-full">
+                  <Link href="/signin">
+                    <LogInIcon className="size-4" />
+                    Sign in to download
+                  </Link>
                 </Button>
-              </Link>
+              </>
             )}
           </>
         )}

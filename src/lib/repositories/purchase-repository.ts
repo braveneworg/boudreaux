@@ -53,6 +53,17 @@ export class PurchaseRepository {
   }
 
   /**
+   * Reset the download counter for a user+release pair back to 0.
+   * Used when the 6-hour cooldown window has elapsed.
+   */
+  static async resetDownloadCount(userId: string, releaseId: string) {
+    return prisma.releaseDownload.update({
+      where: { userId_releaseId: { userId, releaseId } },
+      data: { downloadCount: 0, lastDownloadedAt: new Date() },
+    });
+  }
+
+  /**
    * Atomically increment the download counter for a user+release pair.
    * Upserts the record if it does not yet exist.
    */

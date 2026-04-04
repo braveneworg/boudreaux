@@ -1055,14 +1055,16 @@ const TrackListDrawer = ({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
-          <DrawerDescription>
-            <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
-            <p className="text-sm text-shadow-none mb-0">
-              <em>{release.title}</em>
-            </p>
-            <p>
-              {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
-            </p>
+          <DrawerDescription asChild>
+            <div>
+              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <p className="text-sm text-shadow-none mb-0">
+                <em>{release.title}</em>
+              </p>
+              <p>
+                {allFiles.length} track{allFiles.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </DrawerDescription>
         </DrawerHeader>
         <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
@@ -1242,7 +1244,7 @@ const FormatFileListDrawer = ({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
-          <DrawerDescription>
+          <DrawerDescription asChild>
             <div>
               <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
               <p className="text-sm text-shadow-none mb-0">
