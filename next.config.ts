@@ -72,7 +72,7 @@ const config = {
       "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
       "worker-src 'self' blob:",
       // Allow fetch to Stripe API (server actions use fetch; Stripe.js connects to api.stripe.com)
-      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com",
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com",
       // Allow media from CDN and S3, plus blob: for local playback
       "media-src 'self' https: blob:",
       "object-src 'none'",
