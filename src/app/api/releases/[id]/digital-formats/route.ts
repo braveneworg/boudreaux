@@ -13,11 +13,11 @@ function serializeBigInts<T>(data: T): T {
 }
 
 /**
+ * GET /api/releases/[id]/digital-formats
  * GET /api/releases/[id]/digital-formats?formatType=MP3_320KBPS
  *
- * Lookup a digital format (with child files) for a given release and format type.
- * Used by the admin FeaturedArtist form to validate MP3_320KBPS availability
- * and auto-populate the digitalFormatId.
+ * Without formatType: returns all active digital formats with downloadable files.
+ * With formatType: looks up a single format (with child files) for a given release.
  */
 export async function GET(
   request: NextRequest,
@@ -26,15 +26,26 @@ export async function GET(
   try {
     const { id: releaseId } = await context.params;
     const formatType = request.nextUrl.searchParams.get('formatType');
+    const repo = new ReleaseDigitalFormatRepository();
 
-    if (!formatType || !VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {
-      return NextResponse.json(
-        { error: 'Invalid or missing formatType query parameter.' },
-        { status: 400 }
-      );
+    // When no formatType is provided, return all available formats
+    if (!formatType) {
+      const allFormats = await repo.findAllByRelease(releaseId);
+      const formats = allFormats
+        .filter((f) => f.files.length > 0 || f.fileName !== null)
+        .map((f) => ({
+          formatType: f.formatType as DigitalFormatType,
+          fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
+        }));
+
+      return NextResponse.json({ formats });
     }
 
-    const repo = new ReleaseDigitalFormatRepository();
+    // Single-format lookup (existing behavior)
+    if (!VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {
+      return NextResponse.json({ error: 'Invalid formatType query parameter.' }, { status: 400 });
+    }
+
     const format = await repo.findByReleaseAndFormat(releaseId, formatType as DigitalFormatType);
 
     if (!format) {

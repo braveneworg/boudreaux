@@ -307,6 +307,65 @@ describe('updateReleaseAction', () => {
       expect(result.data?.releaseId).toBe(mockReleaseId);
     });
 
+    it('should convert suggestedPrice to cents when a non-empty value is provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+            suggestedPrice: '9.99',
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        mockReleaseId,
+        expect.objectContaining({
+          suggestedPrice: 999,
+        })
+      );
+    });
+
+    it('should default formats to ["DIGITAL"] when formats is undefined', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            // formats deliberately omitted (undefined)
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+
+      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        mockReleaseId,
+        expect.objectContaining({
+          formats: ['DIGITAL'],
+        })
+      );
+    });
+
     it('should parse comma-separated credits fields', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },

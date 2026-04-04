@@ -73,5 +73,9 @@ describe('profile-utils', () => {
       expect(formatPhoneNumber('123')).toBe('123');
       expect(formatPhoneNumber('123456789012')).toBe('123456789012');
     });
+
+    it('should return original for 11-digit number not starting with 1', () => {
+      expect(formatPhoneNumber('23456789012')).toBe('23456789012');
+    });
   });
 });

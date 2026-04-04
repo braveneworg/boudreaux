@@ -241,18 +241,14 @@ const CollectionDownloadDialog = ({
     const formats = selectedFormats.join(',');
     const url = `/api/releases/${releaseId}/download/bundle?formats=${formats}`;
 
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${releaseTitle}.zip`;
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    // Use window.open for reliable downloads on all platforms
+    // (iOS Safari ignores the download attribute on programmatic anchors).
+    window.open(url, '_self');
 
     setTimeout(() => {
       setIsDownloading(false);
     }, 3000);
-  }, [hasSelection, atLimit, selectedFormats, releaseId, releaseTitle]);
+  }, [hasSelection, atLimit, selectedFormats, releaseId]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {

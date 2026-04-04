@@ -58,13 +58,16 @@ vi.mock('@/app/components/email-step', () => ({
 vi.mock('@/app/components/purchase-checkout-step', () => ({
   PurchaseCheckoutStep: ({
     onConfirmed,
+    onCancel,
     onError,
   }: {
     onConfirmed: () => void;
+    onCancel: () => void;
     onError: (msg: string) => void;
   }) => (
     <div data-testid="purchase-checkout-step">
       <button onClick={onConfirmed}>Confirm Purchase</button>
+      <button onClick={onCancel}>Cancel Purchase</button>
       <button onClick={() => onError('Test payment error')}>Trigger Error</button>
     </div>
   ),
@@ -75,11 +78,13 @@ vi.mock('@/app/components/purchase-success-step', () => ({
     releaseTitle,
     availableFormats,
     downloadCount,
+    onDownloadStarted,
   }: {
     releaseId: string;
     releaseTitle: string;
     availableFormats?: Array<{ formatType: string; fileName: string }>;
     downloadCount?: number;
+    onDownloadStarted?: () => void;
   }) => (
     <div
       data-testid="purchase-success-step"
@@ -87,6 +92,11 @@ vi.mock('@/app/components/purchase-success-step', () => ({
       data-download-count={downloadCount ?? 0}
     >
       Purchase complete for {releaseTitle}
+      {onDownloadStarted && (
+        <button data-testid="mock-success-download-btn" onClick={onDownloadStarted}>
+          Download
+        </button>
+      )}
     </div>
   ),
 }));
@@ -1415,6 +1425,39 @@ describe('DownloadDialog — purchase-checkout step', () => {
     expect(screen.getByText('Test payment error')).toBeInTheDocument();
   });
 
+  it('should return to download step when onCancel is called on purchase-checkout', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Custom amount'), '10');
+    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument();
+    });
+
+    // Click Cancel Purchase to trigger onCancel → setStep('download')
+    await user.click(screen.getByRole('button', { name: 'Cancel Purchase' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('purchase-checkout-step')).not.toBeInTheDocument();
+  });
+
   it('should pass availableFormats and downloadCount to PurchaseSuccessStep', async () => {
     mockUseSession.mockReturnValue({
       data: { user: { email: 'user@test.com', id: 'user-123' } },
@@ -1632,5 +1675,80 @@ describe('DownloadDialog — onBlur with empty input', () => {
 
     // Input should remain empty (no value set)
     expect(input).toHaveValue('');
+  });
+});
+
+describe('DownloadDialog — onDownloadStarted closes dialog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCheckGuestPurchaseAction.mockReset();
+  });
+
+  it('should close the dialog when onDownloadStarted is triggered from purchase-success step', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        artistName="Test Artist"
+        premiumPrice={8}
+        releaseId="release-123"
+        releaseTitle="Test Release"
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    // Navigate to purchase-checkout → purchase-success
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Custom amount'), '10');
+    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
+    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Confirm Purchase' }));
+    await waitFor(() => expect(screen.getByTestId('purchase-success-step')).toBeInTheDocument());
+
+    // Click the mock download button that triggers onDownloadStarted → setOpen(false)
+    await user.click(screen.getByTestId('mock-success-download-btn'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('purchase-success-step')).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+  });
+
+  it('should fall back to default premiumPrice ($8) when both suggestedPrice and premiumPrice are undefined', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        artistName="Test Artist"
+        releaseId="release-123"
+        premiumPrice={undefined}
+        suggestedPrice={undefined}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Buy & Download for \$8\.00/ })
+      ).toBeInTheDocument();
+    });
   });
 });

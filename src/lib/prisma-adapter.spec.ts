@@ -174,6 +174,34 @@ describe('CustomPrismaAdapter', () => {
       expect(result.username).toMatch(/^[a-z-]+$/);
     });
 
+    it('should create a new user without email (skip findUnique check)', async () => {
+      const userData = {
+        id: '1',
+        email: '',
+        emailVerified: null,
+        username: 'testuser',
+      } as AdapterUser;
+
+      const createdUser = {
+        id: '1',
+        name: null,
+        email: '',
+        emailVerified: null,
+        image: null,
+        username: 'generated-username',
+      };
+
+      mockPrisma.user.create.mockResolvedValue(createdUser);
+
+      const result = await adapter.createUser(userData);
+
+      // Should NOT call findUnique since email is falsy
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+      // Should directly create the user
+      expect(mockPrisma.user.create).toHaveBeenCalled();
+      expect(result.id).toBe('1');
+    });
+
     it('should handle database errors during user creation', async () => {
       const userData: AdapterUser = {
         id: '1',
@@ -939,6 +967,31 @@ describe('CustomPrismaAdapter', () => {
       ).rejects.toThrow('Token error');
 
       consoleSpy.mockRestore();
+    });
+
+    it('should not update emailVerified when user is not found by email', async () => {
+      const mockToken = {
+        identifier: 'nonexistent@example.com',
+        token: 'abc123',
+        expires: new Date(),
+      };
+
+      mockUseVerificationToken.mockResolvedValue(mockToken);
+      mockPrisma.verificationToken.delete.mockResolvedValue(mockToken);
+      // User not found
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await adapter.useVerificationToken?.({
+        identifier: 'nonexistent@example.com',
+        token: 'abc123',
+      });
+
+      expect(result).toEqual(mockToken);
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'nonexistent@example.com' },
+      });
+      // Should NOT call update since user is null
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
     it('should return null when base adapter lacks useVerificationToken', async () => {

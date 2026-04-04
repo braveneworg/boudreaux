@@ -66,6 +66,18 @@ describe('Avatar', () => {
       expect(AvatarImage).toBeDefined();
       expect(typeof AvatarImage).toBe('function');
     });
+
+    it('renders with src prop', () => {
+      const { container } = render(
+        <Avatar>
+          <AvatarImage src="https://example.com/avatar.png" alt="User avatar" />
+          <AvatarFallback>JD</AvatarFallback>
+        </Avatar>
+      );
+
+      // AvatarImage renders inside the Avatar root — verify the component tree mounts
+      expect(container.querySelector('[data-slot="avatar"]')).toBeInTheDocument();
+    });
   });
 
   describe('AvatarFallback', () => {

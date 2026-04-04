@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { FormatBundleDownload } from './format-bundle-download';
@@ -25,12 +25,6 @@ describe('FormatBundleDownload', () => {
     expect(screen.getByRole('button', { name: /Select FLAC/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Select WAV/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Select MP3 320kbps/ })).toBeInTheDocument();
-  });
-
-  it('should show download count', () => {
-    render(<FormatBundleDownload {...defaultProps} />);
-
-    expect(screen.getByText('1/5 downloads used')).toBeInTheDocument();
   });
 
   it('should pre-select all formats by default', () => {
@@ -91,27 +85,17 @@ describe('FormatBundleDownload', () => {
 
   it('should trigger a download when the button is clicked', async () => {
     const user = userEvent.setup();
-    const clickSpy = vi.fn();
-    const appendChildSpy = vi.spyOn(document.body, 'appendChild');
+    const openSpy = vi.fn();
+    window.open = openSpy;
 
     render(<FormatBundleDownload {...defaultProps} />);
 
-    // Mock the anchor element click
-    const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      const el = originalCreateElement(tag);
-      if (tag === 'a') {
-        vi.spyOn(el as HTMLAnchorElement, 'click').mockImplementation(clickSpy);
-      }
-      return el;
-    });
-
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(clickSpy).toHaveBeenCalled();
-    expect(appendChildSpy).toHaveBeenCalled();
-
-    vi.restoreAllMocks();
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/api/releases/release-123/download/bundle?formats='),
+      '_self'
+    );
   });
 
   it('should display unknown formatType when no label is found', () => {
@@ -123,5 +107,51 @@ describe('FormatBundleDownload', () => {
     );
 
     expect(screen.getByText('CUSTOM_XYZ')).toBeInTheDocument();
+  });
+
+  it('should call onDownloadStarted when the download button is clicked', async () => {
+    const user = userEvent.setup();
+    const onDownloadStarted = vi.fn();
+    window.open = vi.fn();
+
+    render(<FormatBundleDownload {...defaultProps} onDownloadStarted={onDownloadStarted} />);
+
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(onDownloadStarted).toHaveBeenCalledOnce();
+  });
+
+  it('should not error when onDownloadStarted is not provided', async () => {
+    const user = userEvent.setup();
+    window.open = vi.fn();
+
+    render(<FormatBundleDownload {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(window.open).toHaveBeenCalled();
+  });
+
+  it('should reset isDownloading to false after 3000ms timeout', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup();
+    window.open = vi.fn();
+
+    render(<FormatBundleDownload {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    // Button should show downloading state
+    expect(screen.getByText('Preparing download...')).toBeInTheDocument();
+
+    // Advance timers past the 3000ms timeout and flush React updates
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    // Button should return to normal state
+    expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

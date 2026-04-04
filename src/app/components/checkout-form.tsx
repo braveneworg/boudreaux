@@ -11,6 +11,7 @@ import { Loader2Icon } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Separator } from '@/app/components/ui/separator';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 
 export const CheckoutForm = () => {
@@ -49,6 +50,15 @@ export const CheckoutForm = () => {
       setError(result.error.message);
       setIsProcessing(false);
       return;
+    }
+
+    // Auto-login: create a session cookie so the user is authenticated
+    // on the success page and can access subscriber-only features immediately.
+    // Best-effort — failure does not block the redirect.
+    try {
+      await createPurchaseSessionAction({ sessionId: result.session.id });
+    } catch {
+      // Silently continue — the user can sign in manually later.
     }
 
     window.location.href = `/subscribe/success?session_id=${result.session.id}`;

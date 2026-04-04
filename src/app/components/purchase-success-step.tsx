@@ -3,14 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
-import { DownloadIcon } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
-import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
@@ -23,22 +21,58 @@ interface PurchaseSuccessStepProps {
   releaseTitle: string;
   availableFormats?: AvailableFormat[];
   downloadCount?: number;
+  onDownloadStarted?: () => void;
 }
 
 /**
  * Final step shown after a PWYW purchase is confirmed.
- * When digital formats are available, displays the format bundle picker.
- * When digital formats are explicitly unavailable (empty array), displays a
- *   "No digital formats available for download." message.
- * When digital formats are not provided (undefined), falls back to the
- *   legacy download link.
+ * Fetches available digital formats from the API on mount to ensure
+ * fresh data, falling back to the prop value if provided.
  */
 export const PurchaseSuccessStep = ({
   releaseId,
   releaseTitle,
-  availableFormats,
+  availableFormats: initialFormats,
   downloadCount = 0,
+  onDownloadStarted,
 }: PurchaseSuccessStepProps) => {
+  const [formats, setFormats] = useState<AvailableFormat[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchFormats = async () => {
+      try {
+        const res = await fetch(`/api/releases/${releaseId}/digital-formats`);
+        if (!res.ok) {
+          setFormats(initialFormats ?? []);
+          return;
+        }
+        const data: { formats: AvailableFormat[] } = await res.json();
+        if (!cancelled) {
+          setFormats(data.formats);
+        }
+      } catch {
+        if (!cancelled) {
+          setFormats(initialFormats ?? []);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchFormats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [releaseId, initialFormats]);
+
+  const resolvedFormats = formats ?? initialFormats ?? [];
+
   return (
     <>
       <DialogHeader>
@@ -47,34 +81,26 @@ export const PurchaseSuccessStep = ({
       </DialogHeader>
 
       <div className="space-y-4">
-        {availableFormats !== undefined ? (
-          availableFormats.length > 0 ? (
-            <FormatBundleDownload
-              releaseId={releaseId}
-              releaseTitle={releaseTitle}
-              availableFormats={availableFormats}
-              downloadCount={downloadCount}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              No digital formats available for download.
-            </p>
-          )
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4" role="status">
+            <Loader2Icon className="text-muted-foreground size-5 animate-spin" />
+          </div>
+        ) : resolvedFormats.length > 0 ? (
+          <FormatBundleDownload
+            releaseId={releaseId}
+            releaseTitle={releaseTitle}
+            availableFormats={resolvedFormats}
+            downloadCount={downloadCount}
+            onDownloadStarted={onDownloadStarted}
+          />
         ) : (
-          <Button asChild variant="default" className="w-full">
-            <Link href={`/api/releases/${releaseId}/download`}>
-              <DownloadIcon className="size-4" />
-              Download Now
-            </Link>
-          </Button>
+          <p className="text-muted-foreground text-sm">
+            No digital formats available for download.
+          </p>
         )}
 
         <p className="text-muted-foreground text-sm">
-          A confirmation email with your download link is on its way.
-        </p>
-
-        <p className="text-muted-foreground text-sm">
-          You can download up to {MAX_RELEASE_DOWNLOAD_COUNT} times.
+          A confirmation email with your download link is also on its way.
         </p>
       </div>
     </>

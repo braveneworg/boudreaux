@@ -355,6 +355,66 @@ describe('notification-banner-action', () => {
         })
       );
     });
+
+    it('should populate form fields with boolean values for boolean keys and strings for others', async () => {
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData();
+      const result = await createNotificationBannerAction(initialFormState, formData);
+
+      // Boolean fields should be stored directly as booleans (typeof === 'boolean' branch)
+      expect(result.fields.isOverlayed).toBe(true);
+      expect(result.fields.isActive).toBe(true);
+      expect(result.fields.messageTextShadow).toBe(true);
+      expect(result.fields.secondaryMessageTextShadow).toBe(true);
+      // Non-boolean fields should be stored as strings via String()
+      expect(result.fields.message).toBe('Test notification message');
+      expect(result.fields.messageFontSize).toBe('2.5');
+      expect(result.fields.messagePositionX).toBe('50');
+    });
+
+    it('should default numeric fields to 0 when parseFloat returns NaN', async () => {
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData({
+        messageRotation: 'not-a-number',
+        secondaryMessageRotation: 'abc',
+        imageOffsetX: 'xyz',
+        imageOffsetY: '',
+        messageWidth: 'invalid',
+        messageHeight: 'bad',
+      });
+      const result = await createNotificationBannerAction(initialFormState, formData);
+
+      // parseFloat('not-a-number') returns NaN, NaN || 0 = 0
+      expect(result.fields.messageRotation).toBe('0');
+      expect(result.fields.secondaryMessageRotation).toBe('0');
+      expect(result.fields.imageOffsetX).toBe('0');
+      expect(result.fields.imageOffsetY).toBe('0');
+      expect(result.fields.messageWidth).toBe('0');
+      expect(result.fields.messageHeight).toBe('0');
+    });
+
+    it('should default sortOrder to 0 when parseInt returns NaN', async () => {
+      vi.mocked(NotificationBannerService.createNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData({
+        sortOrder: 'not-a-number',
+      });
+      const result = await createNotificationBannerAction(initialFormState, formData);
+
+      // parseInt('not-a-number', 10) returns NaN, NaN || 0 = 0
+      expect(result.fields.sortOrder).toBe('0');
+    });
   });
 
   describe('updateNotificationBannerAction', () => {
@@ -558,6 +618,52 @@ describe('notification-banner-action', () => {
           secondaryMessageHeight: 30,
         })
       );
+    });
+
+    it('should populate form fields with boolean values for boolean keys', async () => {
+      vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData({
+        isOverlayed: 'true',
+        isActive: 'true',
+        messageTextShadow: 'true',
+        secondaryMessageTextShadow: 'true',
+      });
+      formData.append('notificationId', 'aabbccddee112233ff445566');
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      // Boolean fields should be stored directly as booleans (typeof === 'boolean' branch)
+      expect(result.fields.isOverlayed).toBe(true);
+      expect(result.fields.isActive).toBe(true);
+      expect(result.fields.messageTextShadow).toBe(true);
+      expect(result.fields.secondaryMessageTextShadow).toBe(true);
+      // Non-boolean fields should be strings
+      expect(result.fields.message).toBe('Test notification message');
+    });
+
+    it('should default numeric fields to 0 when parseFloat returns NaN in update', async () => {
+      vi.mocked(NotificationBannerService.updateNotificationBanner).mockResolvedValue({
+        success: true,
+        data: mockNotificationBanner,
+      });
+
+      const formData = createValidFormData({
+        messageRotation: 'invalid',
+        imageOffsetX: 'not-a-number',
+        secondaryMessageWidth: 'bad',
+        secondaryMessageHeight: '',
+      });
+      formData.append('notificationId', 'aabbccddee112233ff445566');
+      const result = await updateNotificationBannerAction(initialFormState, formData);
+
+      // parseFloat returns NaN for invalid values, NaN || 0 = 0
+      expect(result.fields.messageRotation).toBe('0');
+      expect(result.fields.imageOffsetX).toBe('0');
+      expect(result.fields.secondaryMessageWidth).toBe('0');
+      expect(result.fields.secondaryMessageHeight).toBe('0');
     });
   });
 

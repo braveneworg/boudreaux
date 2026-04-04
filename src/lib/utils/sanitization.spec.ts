@@ -357,6 +357,28 @@ describe('sanitization utilities', () => {
       });
     });
 
+    describe('resolved path escape detection', () => {
+      it('should throw when relative path calculation shows escape from base directory', async () => {
+        vi.resetModules();
+        vi.doMock('path', async () => {
+          // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+          const actual = await vi.importActual<typeof import('path')>('path');
+          return {
+            ...actual,
+            relative: () => '../escaped/path',
+          };
+        });
+
+        const { sanitizeFilePath: mockedSanitizeFilePath } = await import('./sanitization');
+
+        expect(() => mockedSanitizeFilePath('valid.txt', '/base')).toThrow(
+          'Resolved path escapes base directory'
+        );
+
+        vi.doUnmock('path');
+      });
+    });
+
     describe('edge cases', () => {
       it('handles paths with spaces', () => {
         expect(sanitizeFilePath('my file.txt', baseDir)).toBe('my file.txt');

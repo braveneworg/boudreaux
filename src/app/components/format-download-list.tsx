@@ -86,14 +86,9 @@ export const FormatDownloadList = ({
           return;
         }
 
-        // Trigger browser download via temporary anchor element
-        const anchor = document.createElement('a');
-        anchor.href = data.downloadUrl;
-        anchor.download = data.fileName;
-        anchor.rel = 'noopener noreferrer';
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
+        // Use window.open for presigned S3 URL downloads — iOS Safari
+        // ignores the download attribute on programmatic anchor elements.
+        window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
       } catch {
         setError('An unexpected error occurred. Please try again.');
       } finally {

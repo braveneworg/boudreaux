@@ -348,6 +348,20 @@ describe('ArtistDetailPage', () => {
       expect(metadata.description).toBe('Listen to releases by John Doe.');
     });
 
+    it('should return fallback description when shortBio is empty string', async () => {
+      mockGetArtistBySlugWithReleases.mockResolvedValue({
+        success: true,
+        data: { ...mockArtist, shortBio: '' },
+      });
+
+      const metadata = await generateMetadata({
+        params: defaultParams,
+        searchParams: defaultSearchParams,
+      });
+
+      expect(metadata.description).toBe('Listen to releases by John Doe.');
+    });
+
     it('should return "Artist Not Found" when service fails', async () => {
       mockGetArtistBySlugWithReleases.mockResolvedValue({
         success: false,
@@ -360,6 +374,71 @@ describe('ArtistDetailPage', () => {
       });
 
       expect(metadata.title).toBe('Artist Not Found');
+    });
+  });
+
+  describe('debug logging in non-production', () => {
+    it('should log warning when artist has zero releases', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockGetArtistBySlugWithReleases.mockResolvedValue({
+        success: true,
+        data: { ...mockArtist, releases: [] },
+      });
+
+      const Page = await ArtistDetailPage({
+        params: defaultParams,
+        searchParams: defaultSearchParams,
+      });
+      render(Page);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('returned 0 releases'));
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should log info for each release in non-production', async () => {
+      const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      mockGetArtistBySlugWithReleases.mockResolvedValue({
+        success: true,
+        data: mockArtist,
+      });
+
+      const Page = await ArtistDetailPage({
+        params: defaultParams,
+        searchParams: defaultSearchParams,
+      });
+      render(Page);
+
+      // 3 releases should produce 3 info logs
+      const artistDetailLogs = consoleInfoSpy.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('[artist-detail]')
+      );
+      expect(artistDetailLogs.length).toBe(3);
+      consoleInfoSpy.mockRestore();
+    });
+  });
+
+  describe('sorting with null releasedOn', () => {
+    it('should sort releases with null releasedOn to the end', async () => {
+      const artistWithNullDate = {
+        ...mockArtist,
+        releases: [
+          createMockArtistRelease('release-null', 'Null Date Album', 2, null as unknown as Date),
+          createMockArtistRelease('release-dated', 'Dated Album', 2, new Date('2024-06-01')),
+        ],
+      };
+      mockGetArtistBySlugWithReleases.mockResolvedValue({
+        success: true,
+        data: artistWithNullDate,
+      });
+
+      const Page = await ArtistDetailPage({
+        params: defaultParams,
+        searchParams: defaultSearchParams,
+      });
+      render(Page);
+
+      // Both releases have MP3 files so both are included
+      expect(screen.getByTestId('artist-player')).toHaveAttribute('data-release-count', '2');
     });
   });
 });

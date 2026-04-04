@@ -15,9 +15,14 @@ vi.mock('server-only', () => ({}));
 
 const mockCheckoutState = vi.fn();
 
+let capturedPaymentOnChange: ((event: { complete: boolean }) => void) | undefined;
+
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
   CheckoutElementsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PaymentElement: () => null,
+  PaymentElement: ({ onChange }: { onChange?: (event: { complete: boolean }) => void }) => {
+    capturedPaymentOnChange = onChange;
+    return null;
+  },
   useCheckout: () => mockCheckoutState(),
 }));
 
@@ -36,6 +41,12 @@ const mockCreatePurchaseCheckoutSessionAction = vi.fn();
 vi.mock('@/lib/actions/create-purchase-checkout-session-action', () => ({
   createPurchaseCheckoutSessionAction: (...args: unknown[]) =>
     mockCreatePurchaseCheckoutSessionAction(...args),
+}));
+
+const mockCreatePurchaseSessionAction = vi.fn();
+
+vi.mock('@/lib/actions/create-purchase-session-action', () => ({
+  createPurchaseSessionAction: (...args: unknown[]) => mockCreatePurchaseSessionAction(...args),
 }));
 
 vi.mock('lucide-react', () => ({
@@ -99,6 +110,8 @@ describe('PurchaseCheckoutStep', () => {
     mockUseQuery.mockReturnValue({ data: undefined });
     // Default: useCheckout in loading state (form not yet ready)
     mockCheckoutState.mockReturnValue({ type: 'loading' });
+    // Default: auto-login succeeds silently
+    mockCreatePurchaseSessionAction.mockResolvedValue({ success: true });
   });
 
   it('shows error UI when createPurchaseCheckoutSessionAction returns a failure', async () => {
@@ -175,14 +188,35 @@ describe('PurchaseCheckoutStep', () => {
     });
   });
 
-  it('calls onConfirmed when useQuery reports confirmed: true', async () => {
+  it('calls createPurchaseSessionAction then onConfirmed when purchase is confirmed', async () => {
     // Simulate webhook confirmation arriving immediately
     mockUseQuery.mockReturnValue({ data: { confirmed: true } });
     mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
       success: true,
       clientSecret: 'cs_xxx',
-      sessionId: 'cs_xxx',
+      sessionId: 'cs_test_session',
     });
+
+    const onConfirmed = vi.fn();
+    const props = buildProps({ onConfirmed });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(mockCreatePurchaseSessionAction).toHaveBeenCalledWith({
+        sessionId: 'cs_test_session',
+      });
+      expect(onConfirmed).toHaveBeenCalled();
+    });
+  });
+
+  it('calls onConfirmed even when auto-login fails', async () => {
+    mockUseQuery.mockReturnValue({ data: { confirmed: true } });
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'cs_test_session',
+    });
+    mockCreatePurchaseSessionAction.mockRejectedValue(new Error('Auto-login failed'));
 
     const onConfirmed = vi.fn();
     const props = buildProps({ onConfirmed });
@@ -558,6 +592,42 @@ describe('PurchaseCheckoutStep', () => {
 
       fireEvent.click(screen.getByText('Cancel'));
       expect(onCancel).toHaveBeenCalledOnce();
+    });
+
+    it('enables Pay button via handlePaymentChange when onChange fires with complete: true', async () => {
+      mockCheckoutState.mockReturnValue({
+        type: 'success',
+        checkout: {
+          canConfirm: false,
+          confirm: vi.fn(),
+        },
+      });
+
+      mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+        success: true,
+        clientSecret: 'cs_xxx',
+        sessionId: 'cs_xxx',
+      });
+
+      const props = buildProps();
+      render(<PurchaseCheckoutStep {...props} />);
+
+      // Wait for PaymentElement to render and capture onChange
+      await waitFor(() => {
+        expect(capturedPaymentOnChange).toBeDefined();
+      });
+
+      // Pay button should be disabled because canConfirm is false and paymentComplete is false
+      const payButton = screen.getByText(/Pay \$/).closest('button');
+      expect(payButton).toBeDisabled();
+
+      // Simulate PaymentElement calling onChange with complete: true
+      capturedPaymentOnChange!({ complete: true });
+
+      // Pay button should now be enabled because paymentComplete is true
+      await waitFor(() => {
+        expect(screen.getByText(/Pay \$/).closest('button')).not.toBeDisabled();
+      });
     });
   });
 

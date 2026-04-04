@@ -1141,6 +1141,188 @@ describe('NotificationBanner', () => {
     });
   });
 
+  describe('non-null dimension and position values', () => {
+    it('should render message with explicit width, height, position, and fontSize', () => {
+      const notification = createMockNotification({
+        message: 'Sized message',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageWidth: 60,
+        messageHeight: 20,
+        messagePositionX: 30,
+        messagePositionY: 40,
+        messageFontSize: 3.5,
+        messageContrast: 80,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const el = screen.getByText('Sized message');
+      expect(el.parentElement?.style.width).toBe('60%');
+      expect(el.parentElement?.style.height).toBe('20%');
+      expect(el.parentElement?.style.left).toBe('30%');
+      expect(el.parentElement?.style.top).toBe('40%');
+      expect(el.style.fontSize).toBe('3.5rem');
+    });
+
+    it('should render secondary message with explicit width, height, position, and fontSize', () => {
+      const notification = createMockNotification({
+        message: 'Primary',
+        secondaryMessage: 'Sized secondary',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        secondaryMessageWidth: 70,
+        secondaryMessageHeight: 25,
+        secondaryMessagePositionX: 40,
+        secondaryMessagePositionY: 60,
+        secondaryMessageFontSize: 1.5,
+        secondaryMessageContrast: 80,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const el = screen.getByText('Sized secondary');
+      expect(el.parentElement?.style.width).toBe('70%');
+      expect(el.parentElement?.style.height).toBe('25%');
+      expect(el.parentElement?.style.left).toBe('40%');
+      expect(el.parentElement?.style.top).toBe('60%');
+      expect(el.style.fontSize).toBe('1.5rem');
+    });
+
+    it('should render with explicit text colors', () => {
+      const notification = createMockNotification({
+        message: 'Colored text',
+        secondaryMessage: 'Secondary colored',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageTextColor: '#ff0000',
+        secondaryMessageTextColor: '#00ff00',
+        messageContrast: 100,
+        secondaryMessageContrast: 100,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const primary = screen.getByText('Colored text');
+      expect(primary.style.color).toContain('255, 0, 0');
+
+      const secondary = screen.getByText('Secondary colored');
+      expect(secondary.style.color).toContain('0, 255, 0');
+    });
+
+    it('should render with explicit text shadow darkness values', () => {
+      const notification = createMockNotification({
+        message: 'Shadow text',
+        secondaryMessage: 'Shadow secondary',
+        isOverlayed: true,
+        imageUrl: 'https://example.com/banner.jpg',
+        messageTextShadow: true,
+        messageTextShadowDarkness: 100,
+        secondaryMessageTextShadow: true,
+        secondaryMessageTextShadowDarkness: 100,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const primary = screen.getByText('Shadow text');
+      expect(primary.style.textShadow).toContain('rgba(0,0,0,');
+      const secondary = screen.getByText('Shadow secondary');
+      expect(secondary.style.textShadow).toContain('rgba(0,0,0,');
+    });
+  });
+
+  describe('preload image URL fallback', () => {
+    it('should preload using imageUrl when available', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: 'https://example.com/processed.jpg',
+        originalImageUrl: null,
+        isOverlayed: false,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      // Preload image should use imageUrl
+      const images = screen.getAllByTestId('banner-image');
+      expect(
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/processed.jpg')
+      ).toBe(true);
+    });
+
+    it('should preload using originalImageUrl when imageUrl is null', () => {
+      const notification = createMockNotification({
+        message: 'Test',
+        imageUrl: null,
+        originalImageUrl: 'https://example.com/original.jpg',
+        isOverlayed: false,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const images = screen.getAllByTestId('banner-image');
+      expect(
+        images.some((img) => img.getAttribute('data-src') === 'https://example.com/original.jpg')
+      ).toBe(true);
+    });
+  });
+
+  describe('background color when no image', () => {
+    it('should apply backgroundColor style when no image is available', () => {
+      const notification = createMockNotification({
+        message: 'Color only',
+        imageUrl: null,
+        originalImageUrl: null,
+        backgroundColor: '#ff5500',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      // No images should be rendered
+      expect(screen.queryAllByTestId('banner-image')).toHaveLength(0);
+    });
+
+    it('should not apply backgroundColor when image is present', () => {
+      const notification = createMockNotification({
+        message: 'With image',
+        imageUrl: 'https://example.com/image.jpg',
+        backgroundColor: '#ff5500',
+        isOverlayed: true,
+      });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      // Image should be rendered
+      const images = screen.getAllByTestId('banner-image');
+      expect(images.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('keyboard navigation edge cases', () => {
+    it('should ignore non-arrow key presses', () => {
+      const notifications = [
+        createMockNotification({ id: '1', message: 'First' }),
+        createMockNotification({ id: '2', message: 'Second' }),
+      ];
+      render(<NotificationBanner notifications={notifications} />);
+
+      const banner = screen.getByRole('region');
+      fireEvent.keyDown(banner, { key: 'Enter' });
+
+      // Should still show the first notification
+      expect(screen.getByText('First')).toBeInTheDocument();
+    });
+
+    it('does not auto-cycle or navigate when only one notification', () => {
+      const notification = createMockNotification({ id: '1', message: 'Only one' });
+      render(<NotificationBanner notifications={[notification]} />);
+
+      const banner = screen.getByRole('region');
+      fireEvent.keyDown(banner, { key: 'ArrowRight' });
+      expect(screen.getByText('Only one')).toBeInTheDocument();
+
+      fireEvent.keyDown(banner, { key: 'ArrowLeft' });
+      expect(screen.getByText('Only one')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(15000);
+      });
+      expect(screen.getByText('Only one')).toBeInTheDocument();
+    });
+  });
+
   describe('link with secondary message', () => {
     it('renders link with both primary and secondary messages', () => {
       const notification = createMockNotification({

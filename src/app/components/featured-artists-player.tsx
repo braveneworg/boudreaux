@@ -147,6 +147,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
    * Handle track ended - auto-advance to next file if available
    */
   const handleTrackEnded = useCallback(() => {
+    /* v8 ignore next -- defensive guard: handler only fires when a track is playing */
     if (!currentFile || sortedFiles.length === 0) return;
 
     const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);
@@ -164,6 +165,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
    */
   const handlePreviousTrack = useCallback(
     (wasPlaying: boolean) => {
+      /* v8 ignore next -- defensive guard: handler only fires when a track is playing */
       if (!currentFile || sortedFiles.length === 0) return;
 
       const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);
@@ -182,6 +184,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
    */
   const handleNextTrack = useCallback(
     (wasPlaying: boolean) => {
+      /* v8 ignore next -- defensive guard: handler only fires when a track is playing */
       if (!currentFile || sortedFiles.length === 0) return;
 
       const currentIndex = sortedFiles.findIndex((f) => f.id === currentFile.id);

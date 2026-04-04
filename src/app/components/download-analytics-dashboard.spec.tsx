@@ -242,6 +242,21 @@ describe('DownloadAnalyticsDashboard', () => {
       });
     });
 
+    it('should display 0% share when totalFormatDownloads is zero', async () => {
+      mockFetchSuccess({
+        totalDownloads: 0,
+        uniqueUsers: 0,
+        formatBreakdown: [{ formatType: 'FLAC', count: 0 }],
+      });
+
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('format-row-FLAC')).toBeInTheDocument();
+      });
+      expect(screen.getByText('0%')).toBeInTheDocument();
+    });
+
     it('should render format breakdown table with unknown format label fallback', async () => {
       mockFetchSuccess({
         totalDownloads: 10,

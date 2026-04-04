@@ -14,7 +14,9 @@ vi.mock('@/lib/prisma', () => ({
     releasePurchase: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       updateMany: vi.fn(),
+      delete: vi.fn(),
     },
     releaseDownload: {
       findUnique: vi.fn(),
@@ -193,6 +195,55 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markEmailSent('purchase-1');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('findAllByUser', () => {
+    it('should call prisma.releasePurchase.findMany with the userId and include release details', async () => {
+      const mockRecords = [
+        {
+          id: 'purchase-1',
+          userId: 'user-123',
+          releaseId: 'release-abc',
+          release: { id: 'release-abc', title: 'Test Album' },
+        },
+      ];
+      vi.mocked(prisma.releasePurchase.findMany).mockResolvedValue(mockRecords as never);
+
+      const result = await PurchaseRepository.findAllByUser('user-123');
+
+      expect(prisma.releasePurchase.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-123' },
+          orderBy: { purchasedAt: 'desc' },
+          include: expect.objectContaining({
+            release: expect.any(Object),
+          }),
+        })
+      );
+      expect(result).toEqual(mockRecords);
+    });
+
+    it('should return empty array when user has no purchases', async () => {
+      vi.mocked(prisma.releasePurchase.findMany).mockResolvedValue([]);
+
+      const result = await PurchaseRepository.findAllByUser('user-no-purchases');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('deleteById', () => {
+    it('should call prisma.releasePurchase.delete with the purchase id', async () => {
+      const mockRecord = { id: 'purchase-1', userId: 'user-123' };
+      vi.mocked(prisma.releasePurchase.delete).mockResolvedValue(mockRecord as never);
+
+      const result = await PurchaseRepository.deleteById('purchase-1');
+
+      expect(prisma.releasePurchase.delete).toHaveBeenCalledWith({
+        where: { id: 'purchase-1' },
+      });
+      expect(result).toEqual(mockRecord);
     });
   });
 

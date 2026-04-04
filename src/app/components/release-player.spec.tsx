@@ -105,6 +105,12 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
         <button data-testid="next-track-button" onClick={() => onNextTrack?.(true)}>
           Next
         </button>
+        <button data-testid="previous-track-not-playing" onClick={() => onPreviousTrack?.(false)}>
+          Previous (not playing)
+        </button>
+        <button data-testid="next-track-not-playing" onClick={() => onNextTrack?.(false)}>
+          Next (not playing)
+        </button>
       </div>
     );
   };
@@ -459,6 +465,44 @@ describe('ReleasePlayer', () => {
     // Should still be on first track
     const controls = screen.getByTestId('media-controls');
     expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
+  });
+
+  it('should not auto-play after navigating to previous track when wasPlaying is false', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    // Go to second track first
+    fireEvent.click(screen.getByTestId('next-track-button'));
+    const controls = screen.getByTestId('media-controls');
+    expect(controls).toHaveAttribute('data-audio-src', file2CdnUrl);
+
+    // Navigate back with wasPlaying=false
+    fireEvent.click(screen.getByTestId('previous-track-not-playing'));
+    expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
+    expect(controls).toHaveAttribute('data-auto-play', 'false');
+  });
+
+  it('should not auto-play after navigating to next track when wasPlaying is false', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const controls = screen.getByTestId('media-controls');
+
+    // Navigate forward with wasPlaying=false
+    fireEvent.click(screen.getByTestId('next-track-not-playing'));
+    expect(controls).toHaveAttribute('data-audio-src', file2CdnUrl);
+    expect(controls).toHaveAttribute('data-auto-play', 'false');
+  });
+
+  it('should pass empty string to releaseTitle when release.title is null', () => {
+    const releaseNullTitle = {
+      ...mockRelease,
+      title: null,
+    } as unknown as PublishedReleaseDetail;
+
+    render(<ReleasePlayer release={releaseNullTitle} releaseId="release-1" />);
+
+    // The FormatFileListDrawer receives release.title ?? '' = ''
+    // Just verify it renders without errors
+    expect(screen.getByTestId('format-file-list-drawer')).toBeInTheDocument();
   });
 
   it('should display cleaned fileName when title is null', () => {

@@ -298,6 +298,29 @@ describe('TourService', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should return empty displayHeadliners when tour has no tourDates property', async () => {
+      const tourWithoutTourDates = {
+        id: 'tour-123',
+        title: 'Minimal Tour',
+        subtitle: null,
+        subtitle2: null,
+        description: null,
+        notes: null,
+        createdBy: 'user-123',
+        updatedBy: null,
+        createdAt: new Date('2026-03-01'),
+        updatedAt: new Date('2026-03-01'),
+        images: [],
+      };
+
+      vi.mocked(TourRepository.findById).mockResolvedValue(tourWithoutTourDates as never);
+
+      const result = await TourService.findById('tour-123');
+
+      expect(result).toBeTruthy();
+      expect(result?.displayHeadliners).toEqual([]);
+    });
   });
 
   describe('create', () => {

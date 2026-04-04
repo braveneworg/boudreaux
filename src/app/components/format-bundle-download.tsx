@@ -22,6 +22,7 @@ interface FormatBundleDownloadProps {
   releaseTitle: string;
   availableFormats: AvailableFormat[];
   downloadCount: number;
+  onDownloadStarted?: () => void;
 }
 
 /**
@@ -32,9 +33,10 @@ interface FormatBundleDownloadProps {
  */
 export const FormatBundleDownload = ({
   releaseId,
-  releaseTitle,
+  _releaseTitle,
   availableFormats,
   downloadCount,
+  onDownloadStarted,
 }: FormatBundleDownloadProps) => {
   const allFormatTypes = availableFormats.map((f) => f.formatType);
   const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
@@ -53,21 +55,21 @@ export const FormatBundleDownload = ({
     const formats = selectedFormats.join(',');
     const url = `/api/releases/${releaseId}/download/bundle?formats=${formats}`;
 
-    // Trigger browser download via temporary anchor
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${releaseTitle}.zip`;
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    // Use window.open for reliable downloads on all platforms
+    // (iOS Safari ignores the download attribute on programmatic anchors).
+    // The API returns Content-Disposition: attachment, so the browser treats
+    // it as a file download rather than a navigation.
+    window.open(url, '_self');
+
+    // Notify the parent (e.g. dialog) that the download has started
+    onDownloadStarted?.();
 
     // Reset loading state after a reasonable delay
     // (browser handles the actual download natively)
     setTimeout(() => {
       setIsDownloading(false);
     }, 3000);
-  }, [hasSelection, atLimit, selectedFormats, releaseId, releaseTitle]);
+  }, [hasSelection, atLimit, selectedFormats, releaseId, onDownloadStarted]);
 
   if (availableFormats.length === 0) {
     return (
@@ -79,9 +81,6 @@ export const FormatBundleDownload = ({
     <div className="space-y-4">
       <div className="space-y-2">
         <p className="text-sm font-medium">Select formats:</p>
-        <p className="text-muted-foreground text-xs">
-          {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT} downloads used
-        </p>
       </div>
 
       <ToggleGroup

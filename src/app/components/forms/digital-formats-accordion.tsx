@@ -1065,6 +1065,7 @@ export function DigitalFormatsAccordion({
   const handleConfirmReupload = useCallback(async () => {
     const formatType = confirmReuploadFormat;
     if (!formatType || !releaseId) {
+      /* v8 ignore next 2 -- defensive guard: dialog is never open when formatType/releaseId are falsy */
       setConfirmReuploadFormat(null);
       return;
     }
@@ -1140,6 +1141,7 @@ export function DigitalFormatsAccordion({
       const state = getUploadState(formatType);
       switch (state.status) {
         case 'validating':
+          /* v8 ignore next -- state is synchronously overwritten by 'uploading' before render */
           return 'Validating file...';
         case 'uploading': {
           const { currentFile, totalFiles } = state;

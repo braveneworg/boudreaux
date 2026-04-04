@@ -125,6 +125,7 @@ export const DownloadDialog = ({
       const cleanedAmount = data.finalAmount?.replace(/[^\d.]/g, '').trim();
       const dollars = cleanedAmount ? Number(cleanedAmount) : effectiveSuggestedPrice;
       if (!Number.isFinite(dollars)) {
+        /* v8 ignore next 2 -- Zod resolver rejects non-numeric amounts before handleSubmit runs */
         form.setError('finalAmount', { message: 'Amount must be a valid number' });
         return;
       }
@@ -174,6 +175,7 @@ export const DownloadDialog = ({
           (step === 'checkout' || step === 'purchase-checkout') &&
             'max-h-[90vh] overflow-y-auto sm:max-w-lg'
         )}
+        /* v8 ignore next 3 -- Radix UI callback: not invocable from userEvent without real Radix focus management */
         onOpenAutoFocus={(e) => {
           if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
         }}
@@ -458,6 +460,7 @@ export const DownloadDialog = ({
             releaseTitle={releaseTitle}
             availableFormats={availableFormats}
             downloadCount={downloadCount}
+            onDownloadStarted={() => setOpen(false)}
           />
         )}
 

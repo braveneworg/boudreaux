@@ -23,6 +23,7 @@ const GOLDEN_RATIO = 1.618;
  * Auto-cycle interval in milliseconds (~6.5 seconds)
  * Can be overridden via NEXT_PUBLIC_BANNER_INTERVAL env var for E2E testing
  */
+/* v8 ignore start -- module-level IIFE: requires vi.resetModules() + dynamic import to test env branch */
 const AUTO_CYCLE_INTERVAL = (() => {
   const envInterval = process.env.NEXT_PUBLIC_BANNER_INTERVAL;
   if (envInterval == null) {
@@ -36,6 +37,7 @@ const AUTO_CYCLE_INTERVAL = (() => {
   }
   return 6500;
 })();
+/* v8 ignore stop */
 
 interface NotificationBannerProps {
   notifications: NotificationBannerType[];
@@ -239,6 +241,7 @@ const hexToRgba = (hex: string, opacity: number): string => {
 };
 
 function BannerSlide({ notification, isFirst = false }: BannerSlideProps) {
+  /* v8 ignore next -- defensive guard: notification is always defined when rendered from the parent map */
   if (!notification) return null;
 
   const {

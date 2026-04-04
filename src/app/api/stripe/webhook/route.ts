@@ -4,6 +4,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { generateUsername } from 'unique-username-generator';
+
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
 import { prisma } from '@/lib/prisma';
@@ -164,12 +166,26 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   // Resolve userId: prefer metadata, fall back to email lookup for guest purchases.
   let userId: string | undefined = metadataUserId;
   if (!userId && customerEmail) {
-    const user = await PurchaseRepository.findUserByEmail(customerEmail);
-    userId = user?.id;
+    const existingUser = await PurchaseRepository.findUserByEmail(customerEmail);
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      // Create a new user for first-time guest purchasers so the purchase can
+      // be linked and the auto-login flow can create a session for them.
+      const placeholderUsername = generateUsername('', 0, 15);
+      const newUser = await prisma.user.create({
+        data: {
+          email: customerEmail,
+          emailVerified: new Date(),
+          username: placeholderUsername,
+        },
+      });
+      userId = newUser.id;
+    }
   }
 
   if (!userId) {
-    console.error('release_purchase webhook: could not resolve userId', {
+    console.error('release_purchase webhook: could not resolve userId (no email available)', {
       sessionId: retrievedSession.id,
       releaseId,
     });

@@ -232,6 +232,57 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(createCall.line_items[0].price_data.product_data.name).toBe('Test Album');
     });
 
+    it('should use AUTH_URL env var for return_url when set', async () => {
+      vi.stubEnv('AUTH_URL', 'https://myapp.example.com');
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          return_url: 'https://myapp.example.com/releases/release-123',
+        })
+      );
+    });
+
+    it('should include customer_email in Stripe session when auth email is available', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-123', email: 'auth@example.com' } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer_email: 'auth@example.com',
+        })
+      );
+    });
+
+    it('should not include customer_email when email is null', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-123', email: null } });
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      const createArgs = vi.mocked(stripe.checkout.sessions.create).mock.calls[0][0] as Record<
+        string,
+        unknown
+      >;
+      expect(createArgs).not.toHaveProperty('customer_email');
+    });
+
+    it('should fall back to customerEmail from input when auth email is null', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-123', email: null } });
+
+      await createPurchaseCheckoutSessionAction({
+        ...validInput,
+        customerEmail: 'guest@example.com',
+      });
+
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer_email: 'guest@example.com',
+        })
+      );
+    });
+
     it('should return "stripe_error" when stripe.checkout.sessions.create throws', async () => {
       vi.mocked(stripe.checkout.sessions.create).mockRejectedValue(
         new Error('Stripe network error')
@@ -243,6 +294,18 @@ describe('createPurchaseCheckoutSessionAction', () => {
       expect(result).toEqual({ success: false, error: 'stripe_error' });
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should use localhost fallback for return_url when AUTH_URL is not set', async () => {
+      delete process.env.AUTH_URL;
+
+      await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          return_url: 'http://localhost:3000/releases/release-123',
+        })
+      );
     });
   });
 });

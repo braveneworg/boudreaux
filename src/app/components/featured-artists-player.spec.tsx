@@ -1235,4 +1235,202 @@ describe('FeaturedArtistsPlayer', () => {
       expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
     });
   });
+
+  describe('additional branch coverage', () => {
+    it('should fall back to fileName in ticker tape when track title is null', () => {
+      const filesWithNullTitle = [
+        {
+          ...mockFiles[0],
+          title: null,
+        },
+      ];
+      const artistWithNullTitle: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        digitalFormat: { id: 'format-1', files: filesWithNullTitle },
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithNullTitle]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // The ticker tape should display using fileName since title is null
+      expect(screen.getByTestId('info-ticker-tape')).toBeInTheDocument();
+    });
+
+    it('should handle selecting an artist with no digital format files from carousel', () => {
+      const artistNoFiles: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        id: 'featured-no-files',
+        displayName: 'No Files Artist',
+        digitalFormat: { id: 'format-empty', files: [] },
+      } as unknown as FeaturedArtist;
+
+      const artists = [
+        mockFeaturedArtists[0],
+        artistNoFiles,
+        mockFeaturedArtists[2],
+      ] as unknown as FeaturedArtist[];
+
+      render(<FeaturedArtistsPlayer featuredArtists={artists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with no files
+      fireEvent.click(screen.getByTestId('artist-featured-no-files'));
+
+      // No media controls should be rendered since there are no files
+      expect(screen.queryByTestId('media-controls')).not.toBeInTheDocument();
+    });
+
+    it('should handle selecting an artist with null digitalFormat from carousel', () => {
+      const artistNullFormat: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        id: 'featured-null-fmt',
+        displayName: 'Null Format Artist',
+        digitalFormat: null,
+      } as unknown as FeaturedArtist;
+
+      const artists = [
+        mockFeaturedArtists[0],
+        artistNullFormat,
+        mockFeaturedArtists[2],
+      ] as unknown as FeaturedArtist[];
+
+      render(<FeaturedArtistsPlayer featuredArtists={artists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with null digital format
+      fireEvent.click(screen.getByTestId('artist-featured-null-fmt'));
+
+      // No media controls should be rendered
+      expect(screen.queryByTestId('media-controls')).not.toBeInTheDocument();
+    });
+
+    it('should skip artists with empty images arrays and use next artist with images', () => {
+      const artistWithMultipleArtists: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: { ...mockRelease, coverArt: null, images: [] },
+        artists: [
+          {
+            id: 'artist-no-images',
+            firstName: 'No',
+            surname: 'Images',
+            displayName: 'No Images Artist',
+            images: [],
+          },
+          {
+            id: 'artist-with-images',
+            firstName: 'With',
+            surname: 'Images',
+            displayName: 'With Images Artist',
+            images: [{ src: 'https://example.com/second-artist-image.jpg' }],
+          },
+        ],
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithMultipleArtists]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Should skip first artist (no images) and use second artist's image
+      expect(screen.getByTestId('cover-art-image')).toHaveAttribute(
+        'data-src',
+        'https://example.com/second-artist-image.jpg'
+      );
+    });
+
+    it('should return null cover art when all artists have empty images arrays', () => {
+      const artistWithNoImages: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: { ...mockRelease, coverArt: null, images: [] },
+        artists: [
+          {
+            id: 'artist-1',
+            firstName: 'No',
+            surname: 'Images',
+            displayName: 'No Images',
+            images: [],
+          },
+        ],
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithNoImages]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // No cover art should be rendered since all paths returned null
+      expect(screen.queryByTestId('cover-art-image')).not.toBeInTheDocument();
+    });
+
+    it('should handle selecting artist with unmatched featuredTrackNumber from carousel', () => {
+      const artistWithBadFeaturedTrack: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        id: 'featured-bad-track',
+        displayName: 'Bad Track Artist',
+        featuredTrackNumber: 999,
+      } as unknown as FeaturedArtist;
+
+      const artists = [
+        mockFeaturedArtists[0],
+        artistWithBadFeaturedTrack,
+        mockFeaturedArtists[2],
+      ] as unknown as FeaturedArtist[];
+
+      render(<FeaturedArtistsPlayer featuredArtists={artists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with bad featured track number
+      fireEvent.click(screen.getByTestId('artist-featured-bad-track'));
+
+      // Should fall back to first file
+      expect(screen.getByTestId('media-controls')).toHaveAttribute(
+        'data-audio-src',
+        'https://cdn.example.com/audio/track-1.mp3'
+      );
+    });
+
+    it('should handle file with no s3Key', () => {
+      const filesWithNoS3Key = [
+        {
+          ...mockFiles[0],
+          s3Key: null,
+        },
+      ];
+      const artistNoS3Key: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        digitalFormat: { id: 'format-1', files: filesWithNoS3Key },
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistNoS3Key]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // No media controls since audioSrc is null (s3Key is null)
+      expect(screen.queryByTestId('media-controls')).not.toBeInTheDocument();
+    });
+
+    it('should handle release.images with falsy first image src', () => {
+      const artistWithFalsyImageSrc: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: {
+          ...mockRelease,
+          coverArt: null,
+          images: [{ src: '' }],
+        },
+        artists: [],
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithFalsyImageSrc]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Empty src is falsy, so getCoverArt should return null
+      expect(screen.queryByTestId('cover-art-image')).not.toBeInTheDocument();
+    });
+  });
 });
