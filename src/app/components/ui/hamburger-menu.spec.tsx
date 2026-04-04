@@ -6,6 +6,12 @@ import userEvent from '@testing-library/user-event';
 
 import HamburgerMenu from './hamburger-menu';
 
+const mockUseSession = vi.hoisted(() => vi.fn());
+
+vi.mock('next-auth/react', () => ({
+  useSession: mockUseSession,
+}));
+
 vi.mock('../auth/auth-toolbar', () => ({
   default: ({ className }: { className?: string }) => (
     <div data-testid="auth-toolbar" className={className}>
@@ -15,6 +21,13 @@ vi.mock('../auth/auth-toolbar', () => ({
 }));
 
 describe('HamburgerMenu', () => {
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      status: 'unauthenticated',
+      update: vi.fn(),
+    });
+  });
   it('renders', () => {
     render(<HamburgerMenu />);
 
@@ -88,5 +101,27 @@ describe('HamburgerMenu', () => {
     const triggerButton = screen.getByRole('button', { name: 'Close menu', hidden: true });
     fireEvent.click(triggerButton);
     expect(screen.getByText('Open menu')).toBeInTheDocument();
+  });
+
+  it('shows My Collection link when user is authenticated', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { id: '1', name: 'Test' } },
+      status: 'authenticated',
+      update: vi.fn(),
+    });
+
+    const user = userEvent.setup();
+    render(<HamburgerMenu />);
+    await user.click(screen.getByRole('button'));
+
+    expect(screen.getByText('My Collection')).toBeInTheDocument();
+  });
+
+  it('does not show My Collection link when user is unauthenticated', async () => {
+    const user = userEvent.setup();
+    render(<HamburgerMenu />);
+    await user.click(screen.getByRole('button'));
+
+    expect(screen.queryByText('My Collection')).not.toBeInTheDocument();
   });
 });

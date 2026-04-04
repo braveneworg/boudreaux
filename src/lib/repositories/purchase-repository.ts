@@ -88,6 +88,66 @@ export class PurchaseRepository {
   }
 
   /**
+   * Fetch all purchases for a given user, including release details
+   * (title, cover art, images, artists) and download info.
+   * Ordered by most recent purchase first.
+   */
+  static async findAllByUser(userId: string) {
+    return prisma.releasePurchase.findMany({
+      where: { userId },
+      orderBy: { purchasedAt: 'desc' },
+      include: {
+        release: {
+          select: {
+            id: true,
+            title: true,
+            coverArt: true,
+            images: true,
+            artistReleases: {
+              include: {
+                artist: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    surname: true,
+                    displayName: true,
+                  },
+                },
+              },
+            },
+            digitalFormats: {
+              where: {
+                OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+              },
+              select: {
+                formatType: true,
+                files: {
+                  select: { fileName: true },
+                  orderBy: { trackNumber: 'asc' },
+                  take: 1,
+                },
+              },
+            },
+            releaseDownloads: {
+              where: { userId },
+              select: { downloadCount: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Delete a purchase record by its ID. Admin-only operation for testing.
+   */
+  static async deleteById(purchaseId: string) {
+    return prisma.releasePurchase.delete({
+      where: { id: purchaseId },
+    });
+  }
+
+  /**
    * Look up a user by email address to retrieve their ID.
    * Used in the guest-returner flow where only email is available.
    */
