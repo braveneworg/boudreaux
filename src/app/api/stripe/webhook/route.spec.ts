@@ -102,6 +102,22 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+vi.mock('@prisma/client/runtime/library', () => {
+  class MockPrismaClientKnownRequestError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, opts: { code: string; clientVersion: string }) {
+      super(message);
+      this.code = opts.code;
+      this.clientVersion = opts.clientVersion;
+      this.name = 'PrismaClientKnownRequestError';
+    }
+  }
+  return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
+});
+
+const { PrismaClientKnownRequestError } = await import('@prisma/client/runtime/library');
+
 const WEBHOOK_SECRET = 'whsec_test_secret';
 
 function createRequest(body: string, signature: string | null = 'sig_test'): NextRequest {
@@ -1428,6 +1444,71 @@ describe('POST /api/stripe/webhook', () => {
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'u-new', releaseId: 'r-newuser' })
       );
+    });
+
+    it('recovers from P2002 race on guest-user creation by re-fetching the existing user', async () => {
+      const session = {
+        id: 'cs_race',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-race' },
+        payment_intent: 'pi_race',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'race@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      // First findUserByEmail returns null → triggers create
+      mockFindUserByEmail
+        .mockResolvedValueOnce(null)
+        // Second findUserByEmail (after P2002) returns the already-created user
+        .mockResolvedValueOnce({ id: 'u-raced' });
+      mockPrismaUserCreate.mockRejectedValue(
+        new PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        })
+      );
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Race Release' });
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-race' });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockFindUserByEmail).toHaveBeenCalledTimes(2);
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u-raced', releaseId: 'r-race' })
+      );
+    });
+
+    it('propagates non-P2002 errors from guest-user creation and returns 500', async () => {
+      const session = {
+        id: 'cs_dberr',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-dberr' },
+        payment_intent: 'pi_dberr',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'dberr@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindUserByEmail.mockResolvedValue(null);
+      mockPrismaUserCreate.mockRejectedValue(new Error('Unexpected DB error'));
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(500);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
     });
 
     it('returns early when no email is available and userId cannot be resolved', async () => {

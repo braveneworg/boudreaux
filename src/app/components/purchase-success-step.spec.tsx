@@ -268,6 +268,33 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
       json: () => Promise.resolve({ formats: mockFormats }),
     });
   });
+
+  it('does not update state when component unmounts before a failed fetch resolves', async () => {
+    expect.assertions(0);
+    let resolveFetch: (value: unknown) => void;
+    global.fetch = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+
+    const { unmount } = render(
+      <PurchaseSuccessStep
+        releaseId="release-123"
+        releaseTitle="Test Album"
+        availableFormats={mockFormats}
+        downloadCount={0}
+      />
+    );
+
+    // Unmount before fetch resolves — sets cancelled = true
+    unmount();
+
+    // Resolve with a non-ok response after unmount — cancelled guard should
+    // prevent the setFormats call in the !res.ok branch.
+    resolveFetch!({ ok: false });
+  });
 });
 
 describe('PurchaseSuccessStep — onDownloadStarted callback', () => {

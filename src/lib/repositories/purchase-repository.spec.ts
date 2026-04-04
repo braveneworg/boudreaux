@@ -217,7 +217,28 @@ describe('PurchaseRepository', () => {
           where: { userId: 'user-123' },
           orderBy: { purchasedAt: 'desc' },
           include: expect.objectContaining({
-            release: expect.any(Object),
+            release: expect.objectContaining({
+              select: expect.objectContaining({
+                digitalFormats: expect.objectContaining({
+                  where: expect.objectContaining({
+                    AND: expect.arrayContaining([
+                      expect.objectContaining({
+                        OR: expect.arrayContaining([
+                          { files: { some: {} } },
+                          expect.objectContaining({
+                            AND: expect.arrayContaining([{ fileName: { not: null } }]),
+                          }),
+                        ]),
+                      }),
+                    ]),
+                  }),
+                  select: expect.objectContaining({
+                    formatType: true,
+                    fileName: true,
+                  }),
+                }),
+              }),
+            }),
           }),
         })
       );

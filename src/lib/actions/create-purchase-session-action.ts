@@ -8,6 +8,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 
 import { encode } from '@auth/core/jwt';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
 import { prisma } from '@/lib/prisma';
@@ -99,15 +100,32 @@ export async function createPurchaseSessionAction(
         userId = existingUser.id;
       } else {
         // Create a new user for first-time subscribers.
+        // Guard against concurrent requests racing on the unique email index
+        // (P2002) by re-fetching the user if creation fails.
         const placeholderUsername = generateUsername('', 0, 15);
-        const newUser = await prisma.user.create({
-          data: {
-            email: customerEmail,
-            emailVerified: new Date(),
-            username: placeholderUsername,
-          },
-        });
-        userId = newUser.id;
+        try {
+          const newUser = await prisma.user.create({
+            data: {
+              email: customerEmail,
+              emailVerified: new Date(),
+              username: placeholderUsername,
+            },
+          });
+          userId = newUser.id;
+        } catch (createError) {
+          if (
+            createError instanceof PrismaClientKnownRequestError &&
+            createError.code === 'P2002'
+          ) {
+            // Race condition: another request already created this user — re-fetch.
+            const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
+            if (racedUser) {
+              userId = racedUser.id;
+            }
+          } else {
+            throw createError;
+          }
+        }
       }
     }
 

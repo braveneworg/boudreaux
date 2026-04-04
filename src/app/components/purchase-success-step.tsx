@@ -46,7 +46,9 @@ export const PurchaseSuccessStep = ({
       try {
         const res = await fetch(`/api/releases/${releaseId}/digital-formats`);
         if (!res.ok) {
-          setFormats(initialFormats ?? []);
+          if (!cancelled) {
+            setFormats(initialFormats ?? []);
+          }
           return;
         }
         const data: { formats: AvailableFormat[] } = await res.json();

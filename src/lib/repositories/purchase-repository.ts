@@ -117,10 +117,21 @@ export class PurchaseRepository {
             },
             digitalFormats: {
               where: {
-                OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+                AND: [
+                  { OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }] },
+                  {
+                    OR: [
+                      { files: { some: {} } },
+                      {
+                        AND: [{ fileName: { not: null } }, { fileName: { isSet: true } }],
+                      },
+                    ],
+                  },
+                ],
               },
               select: {
                 formatType: true,
+                fileName: true,
                 files: {
                   select: { fileName: true },
                   orderBy: { trackNumber: 'asc' },

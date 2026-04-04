@@ -55,14 +55,15 @@ export const FormatBundleDownload = ({
     const formats = selectedFormats.join(',');
     const url = `/api/releases/${releaseId}/download/bundle?formats=${formats}`;
 
+    // Notify the parent (e.g. dialog) that the download has started before
+    // initiating navigation, so the parent can close/update deterministically.
+    onDownloadStarted?.();
+
     // Use window.open for reliable downloads on all platforms
     // (iOS Safari ignores the download attribute on programmatic anchors).
     // The API returns Content-Disposition: attachment, so the browser treats
     // it as a file download rather than a navigation.
     window.open(url, '_self');
-
-    // Notify the parent (e.g. dialog) that the download has started
-    onDownloadStarted?.();
 
     // Reset loading state after a reasonable delay
     // (browser handles the actual download natively)

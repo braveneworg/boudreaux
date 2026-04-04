@@ -51,10 +51,25 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+vi.mock('@prisma/client/runtime/library', () => {
+  class MockPrismaClientKnownRequestError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, opts: { code: string; clientVersion: string }) {
+      super(message);
+      this.code = opts.code;
+      this.clientVersion = opts.clientVersion;
+      this.name = 'PrismaClientKnownRequestError';
+    }
+  }
+  return { PrismaClientKnownRequestError: MockPrismaClientKnownRequestError };
+});
+
 // Must import after mocks are set up
 const { createPurchaseSessionAction } = await import('./create-purchase-session-action');
 const { prisma } = await import('@/lib/prisma');
 const { stripe } = await import('@/lib/stripe');
+const { PrismaClientKnownRequestError } = await import('@prisma/client/runtime/library');
 
 const mockUser = {
   id: 'user-123',
@@ -275,6 +290,50 @@ describe('createPurchaseSessionAction', () => {
           username: 'generated-username',
         },
       });
+    });
+
+    it('recovers from P2002 race on user creation by re-fetching the existing user', async () => {
+      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
+        status: 'complete',
+        customer_details: { email: 'race@example.com' },
+        customer_email: null,
+      } as never);
+      // First call returns null (user not found), triggering create
+      vi.mocked(PurchaseRepository.findUserByEmail)
+        .mockResolvedValueOnce(null)
+        // Second call (after P2002) returns the already-created user
+        .mockResolvedValueOnce({ id: 'raced-user-id' });
+      vi.mocked(prisma.user.create).mockRejectedValue(
+        new PrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        })
+      );
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        ...mockUser,
+        id: 'raced-user-id',
+        email: 'race@example.com',
+      } as never);
+
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_race' });
+
+      expect(result).toEqual({ success: true });
+      expect(PurchaseRepository.findUserByEmail).toHaveBeenCalledTimes(2);
+      expect(PurchaseRepository.findUserByEmail).toHaveBeenLastCalledWith('race@example.com');
+    });
+
+    it('propagates non-P2002 errors from user creation', async () => {
+      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
+        status: 'complete',
+        customer_details: { email: 'error@example.com' },
+        customer_email: null,
+      } as never);
+      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
+      vi.mocked(prisma.user.create).mockRejectedValue(new Error('Unexpected DB error'));
+
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_dberror' });
+
+      expect(result).toEqual({ success: false, error: 'server_error' });
     });
 
     it('uses customer_email fallback when customer_details.email is null', async () => {
