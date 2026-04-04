@@ -478,6 +478,7 @@ describe('ReleaseService', () => {
   describe('deleteRelease', () => {
     const existingRelease = {
       id: 'release-123',
+      coverArt: null,
       digitalFormats: [
         {
           id: 'format-1',
@@ -575,6 +576,83 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.deleteRelease('release-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to delete release' });
+    });
+
+    it('should extract S3 key from CDN domain image URLs', async () => {
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      const { deleteS3Object } = await import('../utils/s3-client');
+
+      const releaseWithCdnImages = {
+        ...existingRelease,
+        coverArt: null,
+        images: [{ id: 'img-1', src: 'https://cdn.example.com/releases/cover.jpg' }],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithCdnImages as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).toHaveBeenCalledWith('releases/cover.jpg');
+      vi.unstubAllEnvs();
+    });
+
+    it('should extract S3 key from S3-style image URLs', async () => {
+      delete process.env.CDN_DOMAIN;
+      const { deleteS3Object } = await import('../utils/s3-client');
+
+      const releaseWithS3Images = {
+        ...existingRelease,
+        coverArt: null,
+        images: [
+          {
+            id: 'img-1',
+            src: 'https://bucket-name.s3.us-east-1.amazonaws.com/releases/cover.jpg',
+          },
+        ],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithS3Images as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).toHaveBeenCalledWith('releases/cover.jpg');
+    });
+
+    it('should extract S3 key from coverArt URL during delete', async () => {
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      const { deleteS3Object } = await import('../utils/s3-client');
+
+      const releaseWithCoverArt = {
+        ...existingRelease,
+        coverArt: 'https://cdn.example.com/covers/album.jpg',
+        images: [],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithCoverArt as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).toHaveBeenCalledWith('covers/album.jpg');
+      vi.unstubAllEnvs();
+    });
+
+    it('should not extract S3 key when URL has no S3 pattern and no CDN domain', async () => {
+      delete process.env.CDN_DOMAIN;
+      const { deleteS3Object } = await import('../utils/s3-client');
+      vi.mocked(deleteS3Object).mockClear();
+
+      const releaseWithExternalImages = {
+        ...existingRelease,
+        coverArt: null,
+        images: [{ id: 'img-1', src: 'https://external.example.com/image.jpg' }],
+        digitalFormats: [],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithExternalImages as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).not.toHaveBeenCalled();
     });
   });
 
@@ -815,6 +893,18 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.getPublishedReleases();
 
       expect(result).toMatchObject({ success: false, error: 'Failed to fetch published releases' });
+    });
+
+    it('should bypass withCache in development mode', async () => {
+      const { withCache } = await import('../utils/simple-cache');
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockPublishedRelease]);
+
+      const result = await ReleaseService.getPublishedReleases();
+
+      expect(result.success).toBe(true);
+      expect(withCache).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
     });
   });
 

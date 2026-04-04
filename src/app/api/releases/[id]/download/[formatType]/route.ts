@@ -32,7 +32,13 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     // Step 1: Authentication check
-    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
+    const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
+    const token = await getToken({
+      req: request,
+      secret: process.env.AUTH_SECRET,
+      cookieName: secureCookie ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      secureCookie,
+    });
 
     if (!token?.sub) {
       return NextResponse.json(

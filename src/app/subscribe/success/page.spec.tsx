@@ -310,6 +310,52 @@ describe('SubscribeSuccessPage', () => {
     expect(mockLinkStripeCustomer).toHaveBeenCalledWith('objcus@example.com', 'cus_obj_789');
   });
 
+  it('should mask email unchanged when email has no @ sign', async () => {
+    mockSessionsRetrieve.mockResolvedValue({
+      payment_status: 'paid',
+      customer: null,
+      customer_details: { email: 'noatsign' },
+    });
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_noat' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    // maskEmail returns the email unchanged when there's no '@' (atIndex <= 0)
+    expect(screen.getByText(/A confirmation email will be sent to noatsign/)).toBeInTheDocument();
+  });
+
+  it('should handle sendConfirmationEmailFromSession when inner email check is null', async () => {
+    let emailAccessCount = 0;
+    const sessionData = {
+      payment_status: 'paid',
+      customer: null,
+      customer_details: {
+        get email() {
+          emailAccessCount++;
+          // First access (outer check) returns a truthy email
+          // Second access (inner sendConfirmationEmailFromSession) returns null
+          return emailAccessCount === 1 ? 'trick@example.com' : null;
+        },
+      },
+      subscription: null,
+    };
+    mockSessionsRetrieve.mockResolvedValue(sessionData);
+
+    const page = await SubscribeSuccessPage({
+      searchParams: Promise.resolve({ session_id: 'cs_test_trick' }),
+    });
+
+    render(page);
+
+    expect(screen.getByRole('heading', { name: 'Welcome to the Family!' })).toBeInTheDocument();
+    // The inner guard in sendConfirmationEmailFromSession should return early
+    expect(mockSendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
   it('should skip linkStripeCustomer when customer is null', async () => {
     mockSessionsRetrieve.mockResolvedValue({
       payment_status: 'paid',

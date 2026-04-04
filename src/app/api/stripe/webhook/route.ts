@@ -4,6 +4,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { generateUsername } from 'unique-username-generator';
+
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
 import { prisma } from '@/lib/prisma';
@@ -164,12 +167,45 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   // Resolve userId: prefer metadata, fall back to email lookup for guest purchases.
   let userId: string | undefined = metadataUserId;
   if (!userId && customerEmail) {
-    const user = await PurchaseRepository.findUserByEmail(customerEmail);
-    userId = user?.id;
+    const existingUser = await PurchaseRepository.findUserByEmail(customerEmail);
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      // Create a new user for first-time guest purchasers so the purchase can
+      // be linked and the auto-login flow can create a session for them.
+      // Guard against concurrent webhook deliveries racing on the unique email
+      // index (P2002) by re-fetching the user if creation fails.
+      const placeholderUsername = generateUsername('', 0, 15);
+      try {
+        const newUser = await prisma.user.create({
+          data: {
+            email: customerEmail,
+            emailVerified: new Date(),
+            username: placeholderUsername,
+          },
+        });
+        userId = newUser.id;
+      } catch (createError) {
+        if (createError instanceof PrismaClientKnownRequestError && createError.code === 'P2002') {
+          // Race condition: another webhook delivery already created this user — re-fetch.
+          const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
+          if (racedUser) {
+            userId = racedUser.id;
+          } else {
+            console.error('release_purchase webhook: P2002 race — user not found on re-fetch', {
+              sessionId: retrievedSession.id,
+              email: customerEmail,
+            });
+          }
+        } else {
+          throw createError;
+        }
+      }
+    }
   }
 
   if (!userId) {
-    console.error('release_purchase webhook: could not resolve userId', {
+    console.error('release_purchase webhook: could not resolve userId (no email available)', {
       sessionId: retrievedSession.id,
       releaseId,
     });

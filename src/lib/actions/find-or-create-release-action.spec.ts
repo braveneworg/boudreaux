@@ -734,6 +734,44 @@ describe('findOrCreateReleaseAction', () => {
       );
     });
 
+    it('should return error with specific message when createRelease returns failure with error', async () => {
+      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseServiceCreate.mockResolvedValue({
+        success: false,
+        error: 'Title cannot be empty',
+      } as never);
+
+      const result = await findOrCreateReleaseAction({ album: 'New Album' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Title cannot be empty');
+    });
+
+    it('should return fallback error message when createRelease returns failure with empty error', async () => {
+      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseServiceCreate.mockResolvedValue({
+        success: false,
+        error: '',
+      } as never);
+
+      const result = await findOrCreateReleaseAction({ album: 'New Album' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to create release');
+    });
+
+    it('should return fallback error message when createRelease returns failure with undefined error', async () => {
+      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseServiceCreate.mockResolvedValue({
+        success: false,
+      } as never);
+
+      const result = await findOrCreateReleaseAction({ album: 'New Album' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to create release');
+    });
+
     it('should not include publishedAt when creating a new release without publish option', async () => {
       mockPrismaReleaseFindFirst.mockResolvedValue(null);
 

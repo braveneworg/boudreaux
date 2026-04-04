@@ -162,6 +162,18 @@ describe('GET /api/proxy-image', () => {
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
   });
 
+  it('should skip invalid CDN_DOMAIN gracefully and still enforce allowed domains', async () => {
+    vi.stubEnv('CDN_DOMAIN', 'not-a-valid-url');
+
+    const request = createRequest('https://evil.example.com/image.png');
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Domain not allowed');
+    vi.unstubAllEnvs();
+  });
+
   it('should allow requests from CDN_DOMAIN when set', async () => {
     vi.stubEnv('CDN_DOMAIN', 'https://cdn.mysite.com');
     mockFetch.mockResolvedValue(

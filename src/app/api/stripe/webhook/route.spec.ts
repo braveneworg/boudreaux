@@ -9,6 +9,28 @@ import type Stripe from 'stripe';
 
 vi.mock('server-only', () => ({}));
 
+const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
+  class MockPrismaClientKnownRequestError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, opts: { code: string; clientVersion: string }) {
+      super(message);
+      this.code = opts.code;
+      this.clientVersion = opts.clientVersion;
+      this.name = 'PrismaClientKnownRequestError';
+    }
+  }
+  return { MockPrismaClientKnownRequestError };
+});
+
+vi.mock('@prisma/client/runtime/library', () => ({
+  PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
+}));
+
+vi.mock('unique-username-generator', () => ({
+  generateUsername: () => 'generated-username',
+}));
+
 const mockConstructEvent = vi.fn();
 const mockSubscriptionsRetrieve = vi.fn();
 const mockCheckoutSessionsRetrieve = vi.fn();
@@ -85,11 +107,15 @@ vi.mock('@/lib/email/send-purchase-confirmation', () => ({
 }));
 
 const mockPrismaReleaseFindFirst = vi.fn();
+const mockPrismaUserCreate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     release: {
       findFirst: (...args: unknown[]) => mockPrismaReleaseFindFirst(...args),
+    },
+    user: {
+      create: (...args: unknown[]) => mockPrismaUserCreate(...args),
     },
   },
 }));
@@ -1385,16 +1411,15 @@ describe('POST /api/stripe/webhook', () => {
       );
     });
 
-    it('returns early when userId cannot be resolved from metadata or email', async () => {
-      vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('creates a new user when email exists but no user is found, then creates purchase', async () => {
       const session = {
-        id: 'cs_no_resolve',
+        id: 'cs_new_user',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-nores' },
-        payment_intent: 'pi_nores',
+        metadata: { type: 'release_purchase', releaseId: 'r-newuser' },
+        payment_intent: 'pi_newuser',
         amount_total: 500,
         currency: 'usd',
-        customer_details: { email: 'unknown@example.com' },
+        customer_details: { email: 'newguest@example.com' },
         customer_email: null,
       };
       mockConstructEvent.mockReturnValue({
@@ -1403,12 +1428,180 @@ describe('POST /api/stripe/webhook', () => {
       });
       mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindUserByEmail.mockResolvedValue(null);
+      mockPrismaUserCreate.mockResolvedValue({ id: 'u-new', email: 'newguest@example.com' });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'New Release' });
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-new' });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockPrismaUserCreate).toHaveBeenCalledWith({
+        data: {
+          email: 'newguest@example.com',
+          emailVerified: expect.any(Date),
+          username: 'generated-username',
+        },
+      });
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u-new', releaseId: 'r-newuser' })
+      );
+    });
+
+    it('recovers from P2002 race on guest-user creation by re-fetching the existing user', async () => {
+      const session = {
+        id: 'cs_race',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-race' },
+        payment_intent: 'pi_race',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'race@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      // First findUserByEmail returns null → triggers create
+      mockFindUserByEmail
+        .mockResolvedValueOnce(null)
+        // Second findUserByEmail (after P2002) returns the already-created user
+        .mockResolvedValueOnce({ id: 'u-raced' });
+      mockPrismaUserCreate.mockRejectedValue(
+        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        })
+      );
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Race Release' });
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-race' });
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(mockFindUserByEmail).toHaveBeenCalledTimes(2);
+      expect(mockPurchaseCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u-raced', releaseId: 'r-race' })
+      );
+    });
+
+    it('propagates non-P2002 errors from guest-user creation and returns 500', async () => {
+      const session = {
+        id: 'cs_dberr',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-dberr' },
+        payment_intent: 'pi_dberr',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'dberr@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindUserByEmail.mockResolvedValue(null);
+      mockPrismaUserCreate.mockRejectedValue(new Error('Unexpected DB error'));
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(500);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+    });
+
+    it('returns early when no email is available and userId cannot be resolved', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_no_email',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-noemail' },
+        payment_intent: 'pi_noemail',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: null },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).not.toHaveBeenCalled();
       vi.mocked(console.error).mockRestore();
     });
+  });
+
+  // ─── Branch coverage: leading-zero IP octet is rejected by ipToNum ───
+  it('returns 403 when IP has a leading zero in an octet', async () => {
+    vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+    const headers = new Headers({
+      'content-type': 'application/json',
+      'stripe-signature': 'sig_test',
+      'x-forwarded-for': '03.18.12.63',
+    });
+    const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+      method: 'POST',
+      body: '{}',
+      headers,
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+  });
+
+  // ─── Branch coverage: no IP headers at all ───
+  it('returns 403 when neither x-forwarded-for nor x-real-ip headers are present', async () => {
+    vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+    vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+    const headers = new Headers({
+      'content-type': 'application/json',
+      'stripe-signature': 'sig_test',
+    });
+    const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+      method: 'POST',
+      body: '{}',
+      headers,
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+  });
+
+  // ─── Branch coverage: recurring is null on subscription item ───
+  it('defaults interval to "month" when recurring is null on subscription.updated', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_null_rec',
+          status: 'active',
+          customer: 'cus_null_rec',
+          items: {
+            data: [
+              {
+                price: { id: 'price_extra', recurring: null },
+                current_period_end: 1713398400,
+              },
+            ],
+          },
+        },
+      },
+    });
+    mockUpdateSubscription.mockResolvedValue({});
+    mockFindByStripeCustomerId.mockResolvedValue({
+      email: 'nullrec@example.com',
+      subscriptionTier: 'minimum',
+    });
+    const request = createRequest('{}');
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(mockSendConfirmationEmail).toHaveBeenCalledWith('nullrec@example.com', 'extra', 'month');
   });
 
   // ─── Branch coverage: unset STRIPE_WEBHOOK_IP_RANGES ───

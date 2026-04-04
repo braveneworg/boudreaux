@@ -36,6 +36,7 @@ interface ReleasePlayerProps {
   releaseTitle?: string;
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
+  purchasedAt?: Date | null;
   downloadCount?: number;
   availableFormats?: AvailableFormat[];
 }
@@ -52,6 +53,7 @@ export const ReleasePlayer = ({
   releaseTitle,
   suggestedPrice,
   hasPurchase,
+  purchasedAt,
   downloadCount,
   availableFormats,
 }: ReleasePlayerProps) => {
@@ -151,6 +153,7 @@ export const ReleasePlayer = ({
               releaseTitle={releaseTitle}
               suggestedPrice={suggestedPrice}
               hasPurchase={hasPurchase}
+              purchasedAt={purchasedAt}
               downloadCount={downloadCount}
               availableFormats={availableFormats}
             >

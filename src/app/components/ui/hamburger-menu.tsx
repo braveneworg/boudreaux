@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+import { useSession } from 'next-auth/react';
 
 import { Button } from '@/app/components/ui/button';
 import HamburgerMenuSheet from '@/app/components/ui/hamburger-menu-sheet';
@@ -13,15 +15,25 @@ import { SheetTrigger } from './sheet';
 
 export default function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const { status } = useSession();
+  const isAuthenticated = status === 'authenticated';
 
-  const menuItems = [
-    { name: 'Home', href: '/' },
-    { name: 'Releases', href: '/releases' },
-    { name: 'Tours', href: '/tours' },
-    { name: 'Merch', href: '/merch' },
-    { name: 'About', href: '/about' },
-    { name: 'Contact us', href: '/contact' },
-  ];
+  const menuItems = useMemo(() => {
+    const items = [
+      { name: 'Home', href: '/' },
+      { name: 'Releases', href: '/releases' },
+      { name: 'Tours', href: '/tours' },
+      { name: 'Merch', href: '/merch' },
+      { name: 'About', href: '/about' },
+      { name: 'Contact us', href: '/contact' },
+    ];
+
+    if (isAuthenticated) {
+      items.splice(3, 0, { name: 'My Collection', href: '/collection' });
+    }
+
+    return items;
+  }, [isAuthenticated]);
 
   return (
     <div className="flex justify-end items-center pointer-events-none">

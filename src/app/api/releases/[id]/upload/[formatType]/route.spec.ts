@@ -386,4 +386,60 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('stripped comment tag'));
     consoleSpy.mockRestore();
   });
+
+  it('should show "?" progress percentage when actualFileSize is zero', async () => {
+    const { stat } = await import('node:fs/promises');
+    vi.mocked(stat).mockResolvedValue({ size: 0 } as never);
+    mockUploadOn.mockImplementation(
+      (event: string, callback: (progress: { loaded?: number }) => void) => {
+        if (event === 'httpUploadProgress') {
+          callback({ loaded: 100 });
+        }
+      }
+    );
+    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    await PUT(makeRequest(), makeParams());
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('?%'));
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle non-Error throw during temp file cleanup', async () => {
+    const { unlink } = await import('node:fs/promises');
+    vi.mocked(unlink).mockRejectedValue('string cleanup error');
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[upload-proxy] Failed to clean up temp file',
+      expect.objectContaining({ error: 'string cleanup error' })
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('should log Error details during temp file cleanup failure', async () => {
+    const { unlink } = await import('node:fs/promises');
+    vi.mocked(unlink).mockRejectedValue(new Error('ENOENT'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[upload-proxy] Failed to clean up temp file',
+      expect.objectContaining({
+        error: expect.objectContaining({ message: 'ENOENT' }),
+      })
+    );
+
+    warnSpy.mockRestore();
+  });
 });

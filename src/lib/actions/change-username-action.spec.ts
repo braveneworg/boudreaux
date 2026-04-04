@@ -408,6 +408,35 @@ describe('changeUsernameAction', () => {
       ]);
     });
 
+    it('should handle P2002 error with array meta.target', async () => {
+      const arrayTargetError = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '4.0.0',
+        meta: { target: ['email', 'username'] },
+      });
+
+      vi.mocked(mockUpdateUser).mockRejectedValue(arrayTargetError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual([
+        'This email, username is already in use. Please choose a different one.',
+      ]);
+    });
+
+    it('should use fallback message when Error has an empty message string', async () => {
+      const emptyMessageError = new Error('');
+      vi.mocked(mockUpdateUser).mockRejectedValue(emptyMessageError);
+
+      const result = await changeUsernameAction(mockInitialState, mockFormData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.general).toEqual([
+        'Failed to update username. Please try again or contact support.',
+      ]);
+    });
+
     it('should handle other Prisma errors', async () => {
       const unknownError = new PrismaClientKnownRequestError('Database error', {
         code: 'P1000',

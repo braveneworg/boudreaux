@@ -580,6 +580,93 @@ describe('DataStoreHealthStatus', () => {
     });
   });
 
+  describe('error response with empty database field', () => {
+    it('uses fallback message when errorData.database is an empty string', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({
+            status: 'error',
+            database: '',
+            error: 'Connection refused',
+          }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      await waitFor(() => {
+        const message = screen.getByTestId('health-status-message');
+        expect(message).toHaveTextContent('Failed to fetch health status');
+      });
+    });
+  });
+
+  describe('abort via message content (not AbortError name)', () => {
+    it('retries when error message includes "aborted" but name is not AbortError', async () => {
+      const abortedError = new Error('The request was aborted');
+
+      mockFetch.mockRejectedValueOnce(abortedError).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: 'healthy',
+            database: 'Connected',
+          }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
+
+      vi.advanceTimersByTime(500);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe('exponential backoff for later server error retries', () => {
+    it('uses exponential delay for retries beyond the first 3 attempts on 500 errors', async () => {
+      // First 4 calls fail with 500, 5th succeeds
+      for (let i = 0; i < 4; i++) {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ status: 'error', database: 'Server error' }),
+        });
+      }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 'healthy', database: 'Connected' }),
+      });
+
+      render(<DataStoreHealthStatus />);
+
+      // First call
+      await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+      // Retries 1-3 at 500ms each
+      for (let i = 0; i < 3; i++) {
+        vi.advanceTimersByTime(500);
+        await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(i + 2));
+      }
+
+      // Retry 4 at 1000ms (exponential: 2^(3-3) * 1000 = 1000)
+      vi.advanceTimersByTime(1000);
+      await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(5));
+
+      // Should succeed now
+      await waitFor(() => {
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-status', 'healthy');
+      });
+    });
+  });
+
   describe('non-SSL/ERR_ error after all retries exhausted', () => {
     it('uses raw errorMessage when it does not contain SSL or ERR_', async () => {
       mockFetch.mockRejectedValue(new Error('Connection timeout'));

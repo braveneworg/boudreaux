@@ -105,6 +105,31 @@ describe('VenueRepository', () => {
     });
   });
 
+  describe('findRecent', () => {
+    it('should return recent venues ordered by createdAt desc with default limit', async () => {
+      vi.mocked(prisma.venue.findMany).mockResolvedValue([mockVenue]);
+
+      const result = await VenueRepository.findRecent();
+
+      expect(result).toEqual([mockVenue]);
+      expect(prisma.venue.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+    });
+
+    it('should use custom limit when provided', async () => {
+      vi.mocked(prisma.venue.findMany).mockResolvedValue([mockVenue]);
+
+      await VenueRepository.findRecent(10);
+
+      expect(prisma.venue.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      });
+    });
+  });
+
   describe('findById', () => {
     it('should return venue by id', async () => {
       vi.mocked(prisma.venue.findUnique).mockResolvedValue(mockVenue);
@@ -322,6 +347,17 @@ describe('VenueRepository', () => {
       expect(prisma.venue.count).toHaveBeenCalledWith({
         where: expect.objectContaining({
           OR: expect.arrayContaining([{ name: { contains: 'Theater', mode: 'insensitive' } }]),
+        }),
+      });
+    });
+    it('should apply city filter when counting', async () => {
+      vi.mocked(prisma.venue.count).mockResolvedValue(5);
+
+      await VenueRepository.count({ city: 'Los Angeles' });
+
+      expect(prisma.venue.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          city: { equals: 'Los Angeles', mode: 'insensitive' },
         }),
       });
     });

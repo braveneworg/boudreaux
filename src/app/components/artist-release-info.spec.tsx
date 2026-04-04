@@ -239,6 +239,38 @@ describe('ArtistReleaseInfo', () => {
       });
     });
 
+    it('should use getDisplayName as share title when release title is falsy', async () => {
+      const artistWithNoTitle = {
+        displayName: 'No Title Artist',
+        artists: [{ slug: 'no-title-artist' }],
+        release: { title: '' },
+      } as unknown as FeaturedArtist;
+
+      const mockShare = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      render(
+        <ArtistReleaseInfo
+          artistName="Test Artist"
+          title="Test Album"
+          selectedArtist={artistWithNoTitle}
+          featuredArtists={mockFeaturedArtists}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(mockShare).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'No Title Artist',
+        })
+      );
+    });
+
     it('should show error toast when share fails', async () => {
       const shareError = new Error('Share failed');
       const mockShare = vi.fn().mockRejectedValue(shareError);

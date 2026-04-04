@@ -102,6 +102,25 @@ describe('Featured Artists API Routes', () => {
       });
     });
 
+    it('should serialize BigInt values to numbers in the response', async () => {
+      const artistWithBigInt = {
+        ...mockFeaturedArtist,
+        position: BigInt(1),
+      };
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: [artistWithBigInt] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.featuredArtists[0].position).toBe(1);
+      expect(typeof data.featuredArtists[0].position).toBe('number');
+    });
+
     it('should return empty array when no featured artists found', async () => {
       vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
         success: true,

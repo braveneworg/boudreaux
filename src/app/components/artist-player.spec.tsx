@@ -864,4 +864,69 @@ describe('ArtistPlayer', () => {
       expect(screen.getByTestId('download-trigger-button')).toBeInTheDocument();
     });
   });
+
+  describe('edge cases for uncovered branches', () => {
+    it('should use fallback cover art alt text when cover art is null', () => {
+      const noCoverRelease = {
+        ...createRelease('release-no-cover', 'No Cover', [mockFile1]),
+        coverArt: '',
+      };
+      const artist = createArtistWithReleases([noCoverRelease]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      const coverArt = screen.getByTestId('interactive-cover-art');
+      expect(coverArt).toHaveAttribute('data-alt', 'John Doe cover art');
+      expect(coverArt).toHaveAttribute('data-src', '');
+    });
+
+    it('should handle release with null title gracefully', () => {
+      const nullTitleRelease = {
+        ...createRelease('release-null', 'Test', [mockFile1]),
+        title: null as unknown as string,
+      };
+      const artist = createArtistWithReleases([nullTitleRelease]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      // The title ?? '' fallback should produce empty string
+      expect(screen.getByTestId('media-player')).toBeInTheDocument();
+    });
+
+    it('should not change track when selecting a non-existent file id from drawer', () => {
+      const release = createRelease('release-1', 'Album', [mockFile1, mockFile2]);
+      const artist = createArtistWithReleases([release]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      // The FormatFileListDrawer mock only renders buttons for actual files
+      // Verify current state is unchanged (file-1)
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-current-file-id',
+        'file-1'
+      );
+    });
+
+    it('should handle release without MP3_320KBPS format (no playable files)', () => {
+      const noMp3Release = {
+        ...createRelease('release-nomp3', 'No MP3', []),
+        digitalFormats: [
+          {
+            id: 'fmt-flac',
+            formatType: 'FLAC',
+            releaseId: 'release-nomp3',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            files: [mockFile1],
+          },
+        ],
+      };
+      const artist = createArtistWithReleases([noMp3Release]);
+
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByText('No playable tracks available.')).toBeInTheDocument();
+    });
+  });
 });

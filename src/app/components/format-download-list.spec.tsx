@@ -176,7 +176,8 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
-      const appendChildSpy = vi.spyOn(document.body, 'appendChild');
+      const openSpy = vi.fn();
+      window.open = openSpy;
 
       const user = userEvent.setup();
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
@@ -184,15 +185,12 @@ describe('FormatDownloadList', () => {
       await user.click(screen.getByText('MP3 320kbps'));
 
       await waitFor(() => {
-        const anchorCalls = appendChildSpy.mock.calls.filter(
-          (call) => (call[0] as HTMLElement).tagName === 'A'
+        expect(openSpy).toHaveBeenCalledWith(
+          'https://s3.example.com/presigned',
+          '_blank',
+          'noopener,noreferrer'
         );
-        expect(anchorCalls.length).toBeGreaterThan(0);
-        const anchor = anchorCalls[0][0] as HTMLAnchorElement;
-        expect(anchor.click).toHaveBeenCalled();
       });
-
-      appendChildSpy.mockRestore();
     });
 
     it('should show error alert with role attribute', async () => {
@@ -536,10 +534,7 @@ describe('FormatDownloadList', () => {
   });
 
   describe('Anchor element behavior', () => {
-    it('should set correct href and download attributes on the anchor', async () => {
-      const appendChildSpy = vi.spyOn(document.body, 'appendChild');
-      const removeChildSpy = vi.spyOn(document.body, 'removeChild');
-
+    it('should open the presigned URL in a new window', async () => {
       vi.mocked(global.fetch).mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         if (urlStr === '/api/user/download-quota') {
@@ -560,30 +555,21 @@ describe('FormatDownloadList', () => {
         } as Response);
       });
 
+      const openSpy = vi.fn();
+      window.open = openSpy;
+
       const user = userEvent.setup();
       render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
 
       await user.click(screen.getByText('MP3 320kbps'));
 
       await waitFor(() => {
-        const anchorCalls = appendChildSpy.mock.calls.filter(
-          (call) => (call[0] as HTMLElement).tagName === 'A'
+        expect(openSpy).toHaveBeenCalledWith(
+          'https://s3.example.com/presigned-url',
+          '_blank',
+          'noopener,noreferrer'
         );
-        expect(anchorCalls.length).toBeGreaterThan(0);
       });
-
-      const anchorCall = appendChildSpy.mock.calls.find(
-        (call) => (call[0] as HTMLElement).tagName === 'A'
-      );
-      const appendedAnchor = anchorCall![0] as HTMLAnchorElement;
-      expect(appendedAnchor.href).toContain('https://s3.example.com/presigned-url');
-      expect(appendedAnchor.download).toBe('album.mp3');
-      expect(appendedAnchor.rel).toBe('noopener noreferrer');
-
-      expect(removeChildSpy).toHaveBeenCalledWith(appendedAnchor);
-
-      appendChildSpy.mockRestore();
-      removeChildSpy.mockRestore();
     });
   });
 

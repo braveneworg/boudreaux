@@ -95,6 +95,26 @@ describe('Logger', () => {
       expect(consoleSpy.warn).toHaveBeenCalledWith(expect.stringContaining('[WARN]'), '');
     });
 
+    it('logs info messages with data', () => {
+      const logger = createLogger('TEST');
+      logger.info('info with data', { count: 42 });
+
+      expect(consoleSpy.info).toHaveBeenCalledWith(
+        expect.stringContaining('[INFO]'),
+        expect.objectContaining({ count: 42 })
+      );
+    });
+
+    it('logs warn messages with data', () => {
+      const logger = createLogger('TEST');
+      logger.warn('warn with data', { reason: 'timeout' });
+
+      expect(consoleSpy.warn).toHaveBeenCalledWith(
+        expect.stringContaining('[WARN]'),
+        expect.objectContaining({ reason: 'timeout' })
+      );
+    });
+
     it('logs error messages', () => {
       const logger = createLogger('TEST');
       logger.error('error message');

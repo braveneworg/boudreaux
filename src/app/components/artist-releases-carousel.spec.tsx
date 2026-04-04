@@ -162,6 +162,13 @@ describe('ArtistReleasesCarousel', () => {
     expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
   });
 
+  it('should use generic aria-label when artistName is null', () => {
+    render(<ArtistReleasesCarousel releases={mockReleases} artistName={null} />);
+
+    const carousel = screen.getByTestId('carousel');
+    expect(carousel).toHaveAttribute('aria-label', 'Other releases');
+  });
+
   it('should render fallback div when release has no cover art and no images', () => {
     const noCoverRelease = [
       {

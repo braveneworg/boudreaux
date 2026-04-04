@@ -52,25 +52,25 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   const session = await auth();
   const authUserId = (session?.user as { id?: string })?.id ?? null;
 
-  const [hasPurchase, downloadRecord] = await Promise.all([
+  const [purchase, downloadRecord] = await Promise.all([
     authUserId
-      ? PurchaseRepository.findByUserAndRelease(authUserId, releaseId).then((r) => r !== null)
-      : Promise.resolve(false),
+      ? PurchaseRepository.findByUserAndRelease(authUserId, releaseId)
+      : Promise.resolve(null),
     authUserId
       ? PurchaseRepository.getDownloadRecord(authUserId, releaseId)
       : Promise.resolve(null),
   ]);
+  const hasPurchase = purchase !== null;
+  const purchasedAt = purchase?.purchasedAt ?? null;
   const downloadCount = downloadRecord?.downloadCount ?? 0;
 
   // Fetch available digital formats for this release
   const formatRepo = new ReleaseDigitalFormatRepository();
   const digitalFormats = await formatRepo.findAllByRelease(releaseId);
-  const availableFormats = digitalFormats
-    .filter((f) => f.files.length > 0 || f.fileName !== null)
-    .map((f) => ({
-      formatType: f.formatType as DigitalFormatType,
-      fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
-    }));
+  const availableFormats = digitalFormats.map((f) => ({
+    formatType: f.formatType as DigitalFormatType,
+    fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
+  }));
 
   const primaryArtist = release.artistReleases[0]?.artist;
   const primaryArtistId = primaryArtist?.id;
@@ -111,6 +111,7 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
               : null
           }
           hasPurchase={hasPurchase}
+          purchasedAt={purchasedAt}
           downloadCount={downloadCount}
           availableFormats={availableFormats}
         />

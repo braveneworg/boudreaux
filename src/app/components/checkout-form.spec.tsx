@@ -12,7 +12,13 @@ const mockVerifyTurnstile = vi.fn();
 
 vi.mock('@stripe/react-stripe-js/checkout', () => ({
   useCheckout: () => mockUseCheckout(),
-  PaymentElement: () => <div data-testid="payment-element" />,
+  PaymentElement: ({ onChange }: { onChange?: (event: { complete: boolean }) => void }) => (
+    <div data-testid="payment-element">
+      <button data-testid="mock-payment-complete" onClick={() => onChange?.({ complete: true })}>
+        Complete Payment
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
@@ -38,6 +44,11 @@ vi.mock('@/app/components/ui/turnstile-widget', () => ({
 
 vi.mock('@/lib/utils/verify-turnstile', () => ({
   verifyTurnstile: (...args: unknown[]) => mockVerifyTurnstile(...args),
+}));
+
+const mockCreatePurchaseSessionAction = vi.fn();
+vi.mock('@/lib/actions/create-purchase-session-action', () => ({
+  createPurchaseSessionAction: (...args: unknown[]) => mockCreatePurchaseSessionAction(...args),
 }));
 
 const createCheckoutSuccess = (overrides = {}) => ({
@@ -317,6 +328,67 @@ describe('CheckoutForm', () => {
       expect(
         screen.getByRole('button', { name: /Subscribe — \$14\.44\/month/i })
       ).toBeInTheDocument();
+    });
+
+    it('should call createPurchaseSessionAction after successful confirm', async () => {
+      const user = userEvent.setup();
+      mockVerifyTurnstile.mockResolvedValue({ success: true });
+      mockConfirm.mockResolvedValue({
+        type: 'success',
+        session: { id: 'cs_test_session_456' },
+      });
+      mockCreatePurchaseSessionAction.mockResolvedValue({ success: true });
+      mockUseCheckout.mockReturnValue(createCheckoutSuccess());
+
+      render(<CheckoutForm />);
+
+      await user.click(screen.getByTestId('verify-turnstile'));
+      await user.click(screen.getByRole('button', { name: /Subscribe/i }));
+
+      expect(mockCreatePurchaseSessionAction).toHaveBeenCalledWith({
+        sessionId: 'cs_test_session_456',
+      });
+    });
+
+    it('should silently continue when createPurchaseSessionAction throws', async () => {
+      const user = userEvent.setup();
+      mockVerifyTurnstile.mockResolvedValue({ success: true });
+      mockConfirm.mockResolvedValue({
+        type: 'success',
+        session: { id: 'cs_test_session_789' },
+      });
+      mockCreatePurchaseSessionAction.mockRejectedValue(new Error('Network error'));
+      mockUseCheckout.mockReturnValue(createCheckoutSuccess());
+
+      render(<CheckoutForm />);
+
+      await user.click(screen.getByTestId('verify-turnstile'));
+      await user.click(screen.getByRole('button', { name: /Subscribe/i }));
+
+      // Should not show any error — the catch is silent
+      expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+    });
+
+    it('should enable button via paymentComplete when canConfirm is false', async () => {
+      const user = userEvent.setup();
+      mockUseCheckout.mockReturnValue(createCheckoutSuccess({ canConfirm: false }));
+
+      render(<CheckoutForm />);
+
+      // Initially disabled (canConfirm false, paymentComplete false)
+      expect(screen.getByRole('button', { name: /Subscribe/i })).toBeDisabled();
+
+      // Verify Turnstile
+      await user.click(screen.getByTestId('verify-turnstile'));
+
+      // Still disabled — canConfirm is false and paymentComplete hasn't triggered
+      expect(screen.getByRole('button', { name: /Subscribe/i })).toBeDisabled();
+
+      // Trigger PaymentElement onChange with complete: true
+      await user.click(screen.getByTestId('mock-payment-complete'));
+
+      // Now paymentComplete is true, so canSubmit = canConfirm || paymentComplete = true
+      expect(screen.getByRole('button', { name: /Subscribe/i })).toBeEnabled();
     });
   });
 });

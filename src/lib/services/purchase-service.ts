@@ -3,13 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
+import { DOWNLOAD_RESET_HOURS, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 
 export interface DownloadAccess {
   allowed: boolean;
   reason: 'no_purchase' | 'download_limit_reached' | null;
   downloadCount: number;
+  lastDownloadedAt: Date | null;
+}
+
+/**
+ * Returns true if the given timestamp is more than DOWNLOAD_RESET_HOURS ago.
+ */
+function isResetWindowElapsed(lastDownloadedAt: Date | null): boolean {
+  if (!lastDownloadedAt) return false;
+  const resetMs = DOWNLOAD_RESET_HOURS * 60 * 60 * 1000;
+  return Date.now() - new Date(lastDownloadedAt).getTime() > resetMs;
 }
 
 /**
@@ -26,22 +36,31 @@ export class PurchaseService {
 
   /**
    * Determines whether the user is permitted to download the release.
-   * Checks purchase existence and download cap.
+   * Checks purchase existence, download cap, and 6-hour reset window.
+   *
+   * If the download limit is reached but more than DOWNLOAD_RESET_HOURS have
+   * passed since the last download, the counter is automatically reset to 0.
    */
   static async getDownloadAccess(userId: string, releaseId: string): Promise<DownloadAccess> {
     const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
     if (!purchase) {
-      return { allowed: false, reason: 'no_purchase', downloadCount: 0 };
+      return { allowed: false, reason: 'no_purchase', downloadCount: 0, lastDownloadedAt: null };
     }
 
     const downloadRecord = await PurchaseRepository.getDownloadRecord(userId, releaseId);
     const downloadCount = downloadRecord?.downloadCount ?? 0;
+    const lastDownloadedAt = downloadRecord?.lastDownloadedAt ?? null;
 
     if (downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT) {
-      return { allowed: false, reason: 'download_limit_reached', downloadCount };
+      // If 6+ hours have passed since last download, reset the counter
+      if (isResetWindowElapsed(lastDownloadedAt)) {
+        await PurchaseRepository.resetDownloadCount(userId, releaseId);
+        return { allowed: true, reason: null, downloadCount: 0, lastDownloadedAt };
+      }
+      return { allowed: false, reason: 'download_limit_reached', downloadCount, lastDownloadedAt };
     }
 
-    return { allowed: true, reason: null, downloadCount };
+    return { allowed: true, reason: null, downloadCount, lastDownloadedAt };
   }
 
   /**

@@ -492,6 +492,53 @@ describe('processNotificationImageAction', () => {
     });
   });
 
+  describe('metadata dimension fallbacks', () => {
+    it('should use BANNER_WIDTH fallback when metadata has no width', async () => {
+      const mockPipeline = resetSharpMock();
+      mockPipeline.metadata.mockResolvedValue({ height: 1080 });
+
+      const input = createValidInput();
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should use BANNER_HEIGHT fallback when metadata has no height', async () => {
+      const mockPipeline = resetSharpMock();
+      mockPipeline.metadata.mockResolvedValue({ width: 1920 });
+
+      const input = createValidInput();
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should use both dimension fallbacks when metadata has neither width nor height', async () => {
+      const mockPipeline = resetSharpMock();
+      mockPipeline.metadata.mockResolvedValue({});
+
+      const input = createValidInput();
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('aspect ratio crop branches', () => {
+    it('should crop top/bottom when original is taller than target aspect', async () => {
+      // Taller original: 500w x 2000h → originalAspect (0.25) < targetAspect (~1.91)
+      const mockPipeline = resetSharpMock();
+      mockPipeline.metadata.mockResolvedValue({ width: 500, height: 2000 });
+
+      const input = createValidInput();
+      const result = await processNotificationImageAction(input);
+
+      expect(result.success).toBe(true);
+      // The extract call should reflect top/bottom cropping
+      expect(mockPipeline.extract).toHaveBeenCalled();
+    });
+  });
+
   describe('output format', () => {
     it('should output JPEG with 92% quality', async () => {
       const input = createValidInput();

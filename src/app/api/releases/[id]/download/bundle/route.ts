@@ -16,6 +16,7 @@ import { prisma } from '@/lib/prisma';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { PurchaseService } from '@/lib/services/purchase-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 
@@ -47,7 +48,13 @@ export async function GET(
 ): Promise<Response> {
   try {
     // Step 1: Authentication
-    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
+    const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
+    const token = await getToken({
+      req: request,
+      secret: process.env.AUTH_SECRET,
+      cookieName: secureCookie ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      secureCookie,
+    });
 
     if (!token?.sub) {
       return Response.json(
@@ -76,21 +83,17 @@ export async function GET(
 
     const requestedFormats = parseResult.data.formats as DigitalFormatType[];
 
-    // Step 3: Verify purchase
-    const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
+    // Step 3: Verify purchase and check download limit (with 6-hour auto-reset)
+    const access = await PurchaseService.getDownloadAccess(userId, releaseId);
 
-    if (!purchase) {
+    if (!access.allowed && access.reason === 'no_purchase') {
       return Response.json(
         { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
         { status: 403 }
       );
     }
 
-    // Step 4: Check download limit
-    const downloadRecord = await PurchaseRepository.getDownloadRecord(userId, releaseId);
-    const currentCount = downloadRecord?.downloadCount ?? 0;
-
-    if (currentCount >= MAX_RELEASE_DOWNLOAD_COUNT) {
+    if (!access.allowed && access.reason === 'download_limit_reached') {
       return Response.json(
         {
           success: false,

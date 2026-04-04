@@ -467,6 +467,63 @@ describe('TourDetail', () => {
     expect(screen.getByText('Nina Simone')).toBeInTheDocument();
   });
 
+  it('sorts headliners by sortOrder descending and joins names', () => {
+    const artistA = createMockArtist({ id: 'a-1', displayName: 'Alpha Band' });
+    const artistB = createMockArtist({ id: 'a-2', displayName: 'Beta Band' });
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: artistA,
+              artistId: 'a-1',
+              sortOrder: 1,
+            }),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: artistB,
+              artistId: 'a-2',
+              sortOrder: 5,
+            }),
+          ],
+        }),
+      ],
+    });
+    render(<TourDetail tour={tour} />);
+
+    // sortOrder descending: Beta (5) before Alpha (1)
+    expect(screen.getByText('Beta Band, Alpha Band')).toBeInTheDocument();
+  });
+
+  it('filters out headliners with null artist from the display', () => {
+    const validArtist = createMockArtist({ id: 'a-1', displayName: 'Valid Artist' });
+    const tour = createMockTour({
+      tourDates: [
+        createMockTourDate({
+          headliners: [
+            createMockTourDateHeadliner({
+              id: 'th-1',
+              artist: validArtist,
+              artistId: 'a-1',
+              sortOrder: 2,
+            }),
+            createMockTourDateHeadliner({
+              id: 'th-2',
+              artist: null,
+              artistId: null,
+              sortOrder: 1,
+            }),
+          ],
+        }),
+      ],
+    });
+    render(<TourDetail tour={tour} />);
+
+    // Only the valid artist name should appear; null artist is filtered out
+    expect(screen.getByText('Valid Artist')).toBeInTheDocument();
+  });
+
   // ─── Ticket information ───────────────────────────────────────────────────────
 
   it('renders ticket price when ticketPrices is present', () => {

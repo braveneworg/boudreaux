@@ -53,6 +53,17 @@ export class PurchaseRepository {
   }
 
   /**
+   * Reset the download counter for a user+release pair back to 0.
+   * Used when the 6-hour cooldown window has elapsed.
+   */
+  static async resetDownloadCount(userId: string, releaseId: string) {
+    return prisma.releaseDownload.update({
+      where: { userId_releaseId: { userId, releaseId } },
+      data: { downloadCount: 0, lastDownloadedAt: new Date() },
+    });
+  }
+
+  /**
    * Atomically increment the download counter for a user+release pair.
    * Upserts the record if it does not yet exist.
    */
@@ -85,6 +96,77 @@ export class PurchaseRepository {
       data: { confirmationEmailSentAt: new Date() },
     });
     return result.count > 0;
+  }
+
+  /**
+   * Fetch all purchases for a given user, including release details
+   * (title, cover art, images, artists) and download info.
+   * Ordered by most recent purchase first.
+   */
+  static async findAllByUser(userId: string) {
+    return prisma.releasePurchase.findMany({
+      where: { userId },
+      orderBy: { purchasedAt: 'desc' },
+      include: {
+        release: {
+          select: {
+            id: true,
+            title: true,
+            coverArt: true,
+            images: true,
+            artistReleases: {
+              include: {
+                artist: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    surname: true,
+                    displayName: true,
+                  },
+                },
+              },
+            },
+            digitalFormats: {
+              where: {
+                AND: [
+                  { OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }] },
+                  {
+                    OR: [
+                      { files: { some: {} } },
+                      {
+                        AND: [{ fileName: { not: null } }, { fileName: { isSet: true } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+              select: {
+                formatType: true,
+                fileName: true,
+                files: {
+                  select: { fileName: true },
+                  orderBy: { trackNumber: 'asc' },
+                  take: 1,
+                },
+              },
+            },
+            releaseDownloads: {
+              where: { userId },
+              select: { downloadCount: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Delete a purchase record by its ID. Admin-only operation for testing.
+   */
+  static async deleteById(purchaseId: string) {
+    return prisma.releasePurchase.delete({
+      where: { id: purchaseId },
+    });
   }
 
   /**

@@ -214,6 +214,21 @@ describe('Release API Routes', () => {
       });
     });
 
+    it('should handle published filter parameter', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?published=true');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith(
+        expect.objectContaining({ published: true })
+      );
+    });
+
     it('should handle artistIds filter parameter', async () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: true,

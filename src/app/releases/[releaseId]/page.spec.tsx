@@ -51,11 +51,26 @@ vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
 }));
 
 vi.mock('@/app/components/release-player', () => ({
-  ReleasePlayer: ({ release, autoPlay }: { release: unknown; autoPlay?: boolean }) => (
+  ReleasePlayer: ({
+    release,
+    autoPlay,
+    hasPurchase,
+    downloadCount,
+    availableFormats,
+  }: {
+    release: unknown;
+    autoPlay?: boolean;
+    hasPurchase?: boolean;
+    downloadCount?: number;
+    availableFormats?: Array<{ formatType: string; fileName: string }>;
+  }) => (
     <div
       data-testid="release-player"
       data-release-id={(release as { id: string }).id}
       data-auto-play={autoPlay?.toString()}
+      data-has-purchase={hasPurchase?.toString()}
+      data-download-count={downloadCount?.toString()}
+      data-available-formats={JSON.stringify(availableFormats)}
     >
       Player
     </div>
@@ -86,22 +101,26 @@ vi.mock('@/app/components/release-description', () => ({
 }));
 
 // Mock auth (added for PWYW purchase feature)
+const mockAuth = vi.fn().mockResolvedValue(null);
 vi.mock('../../../../auth', () => ({
-  auth: vi.fn().mockResolvedValue(null),
+  auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
 // Mock PurchaseRepository (added for PWYW purchase feature)
+const mockFindByUserAndRelease = vi.fn().mockResolvedValue(null);
+const mockGetDownloadRecord = vi.fn().mockResolvedValue(null);
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
-    findByUserAndRelease: vi.fn().mockResolvedValue(null),
-    getDownloadRecord: vi.fn().mockResolvedValue(null),
+    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
+    getDownloadRecord: (...args: unknown[]) => mockGetDownloadRecord(...args),
   },
 }));
 
 // Mock ReleaseDigitalFormatRepository (added for digital formats feature)
+const mockFindAllByRelease = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class {
-    findAllByRelease = vi.fn().mockResolvedValue([]);
+    findAllByRelease = (...args: unknown[]) => mockFindAllByRelease(...args);
   },
 }));
 
@@ -382,5 +401,124 @@ describe('ReleasePlayerPage', () => {
     expect(screen.queryByTestId('artist-releases-carousel')).not.toBeInTheDocument();
     // Player should still render
     expect(screen.getByTestId('release-player')).toBeInTheDocument();
+  });
+
+  // ─── Authenticated user / purchase branch (line 57) ──────────────────────────
+
+  it('should check purchase status when user is authenticated', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
+    mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
+    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 3 });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    expect(mockFindByUserAndRelease).toHaveBeenCalledWith('user-123', 'release-1');
+    expect(mockGetDownloadRecord).toHaveBeenCalledWith('user-123', 'release-1');
+
+    const player = screen.getByTestId('release-player');
+    expect(player).toHaveAttribute('data-has-purchase', 'true');
+    expect(player).toHaveAttribute('data-download-count', '3');
+  });
+
+  it('should pass hasPurchase=false when authenticated user has no purchase', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-456' } });
+    mockFindByUserAndRelease.mockResolvedValue(null);
+    mockGetDownloadRecord.mockResolvedValue(null);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const player = screen.getByTestId('release-player');
+    expect(player).toHaveAttribute('data-has-purchase', 'false');
+    expect(player).toHaveAttribute('data-download-count', '0');
+  });
+
+  // ─── Digital format filter and fallback chain (lines 69-72) ───────────────────
+
+  it('should include formats with files and map fileName from files array', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        formatType: 'FLAC',
+        fileName: null,
+        files: [{ fileName: 'album-flac.zip' }],
+      },
+    ]);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const player = screen.getByTestId('release-player');
+    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
+    expect(formats).toEqual([{ formatType: 'FLAC', fileName: 'album-flac.zip' }]);
+  });
+
+  it('should include formats with fileName but no files', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        formatType: 'MP3',
+        fileName: 'album-mp3.zip',
+        files: [],
+      },
+    ]);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const player = screen.getByTestId('release-player');
+    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
+    expect(formats).toEqual([{ formatType: 'MP3', fileName: 'album-mp3.zip' }]);
+  });
+
+  it('should fall back to formatType.zip when no fileName and no files', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        formatType: 'WAV',
+        fileName: null,
+        files: [{ fileName: null }],
+      },
+    ]);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const player = screen.getByTestId('release-player');
+    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
+    expect(formats).toEqual([{ formatType: 'WAV', fileName: 'WAV.zip' }]);
+  });
+
+  it('should fall back to formatType.zip for formats with no files and no fileName', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        formatType: 'AAC',
+        fileName: null,
+        files: [],
+      },
+    ]);
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const player = screen.getByTestId('release-player');
+    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
+    expect(formats).toEqual([{ formatType: 'AAC', fileName: 'AAC.zip' }]);
   });
 });

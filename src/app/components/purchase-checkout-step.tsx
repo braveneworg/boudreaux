@@ -17,6 +17,8 @@ import { CheckCircle2Icon, Loader2Icon } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purchase-checkout-session-action';
+import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
+import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
 
@@ -24,7 +26,7 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_COUNT = 45;
 
 const SESSION_ERROR_MESSAGES: Record<string, string> = {
-  already_purchased: 'You have already purchased this release.',
+  already_purchased: ALREADY_PURCHASED_ERROR,
   amount_below_minimum: 'The minimum purchase amount is $0.50.',
   release_unavailable: 'This release is no longer available for purchase.',
   stripe_error: 'A payment error occurred. Please try again or contact support.',
@@ -210,11 +212,32 @@ export const PurchaseCheckoutStep = ({
     },
   });
 
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   useEffect(() => {
-    if (purchaseStatus?.confirmed) {
-      onConfirmed();
-    }
-  }, [purchaseStatus, onConfirmed]);
+    if (!purchaseStatus?.confirmed || !sessionId) return;
+
+    let cancelled = false;
+
+    const loginAndConfirm = async () => {
+      setIsLoggingIn(true);
+      try {
+        await createPurchaseSessionAction({ sessionId });
+      } catch {
+        // Auto-login is best-effort — proceed to the success step even if it
+        // fails. The user can still sign in manually via magic link.
+      }
+      if (!cancelled) {
+        onConfirmed();
+      }
+    };
+
+    loginAndConfirm();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [purchaseStatus, sessionId, onConfirmed]);
 
   const timedOut = paymentComplete && pollCount >= MAX_POLL_COUNT && !purchaseStatus?.confirmed;
 
@@ -261,6 +284,8 @@ export const PurchaseCheckoutStep = ({
                   support@fakefourinc.com
                 </a>
               </>
+            ) : isLoggingIn ? (
+              'Setting up your account...'
             ) : (
               'Confirming your purchase...'
             )}

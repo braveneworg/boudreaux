@@ -267,6 +267,64 @@ describe('Featured Artist by ID API Routes', () => {
         }
       );
     });
+
+    it('should reconnect artists when artistIds is provided', async () => {
+      const artistId1 = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+      const artistId2 = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+      vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
+        success: true,
+        data: { ...mockFeaturedArtist, artistIds: [artistId1, artistId2] } as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ artistIds: [artistId1, artistId2] }),
+        }
+      );
+      const response = await PATCH(request, createParams('featured-artist-123'));
+
+      expect(response.status).toBe(200);
+      expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
+        'featured-artist-123',
+        expect.objectContaining({
+          artists: {
+            set: [{ id: artistId1 }, { id: artistId2 }],
+          },
+        })
+      );
+    });
+
+    it('should convert date strings to Date objects for publishedOn, featuredOn, and featuredUntil', async () => {
+      vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
+        success: true,
+        data: mockFeaturedArtist as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            publishedOn: '2026-06-01T00:00:00.000Z',
+            featuredOn: '2026-07-01T00:00:00.000Z',
+            featuredUntil: '2026-08-01T00:00:00.000Z',
+          }),
+        }
+      );
+      const response = await PATCH(request, createParams('featured-artist-123'));
+
+      expect(response.status).toBe(200);
+      expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
+        'featured-artist-123',
+        expect.objectContaining({
+          publishedOn: new Date('2026-06-01T00:00:00.000Z'),
+          featuredOn: new Date('2026-07-01T00:00:00.000Z'),
+          featuredUntil: new Date('2026-08-01T00:00:00.000Z'),
+        })
+      );
+    });
   });
 
   describe('DELETE /api/featured-artists/[id]', () => {

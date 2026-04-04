@@ -43,3 +43,9 @@ export const ENTITIES = {
 // PWYW purchase feature (003-stripe-pwyw-purchase)
 /** Maximum number of downloads allowed per user per release after purchase. */
 export const MAX_RELEASE_DOWNLOAD_COUNT = 5;
+
+/** Hours after last download before the download counter resets to 0. */
+export const DOWNLOAD_RESET_HOURS = 6;
+
+/** Error message returned when a user attempts to purchase a release they already own. */
+export const ALREADY_PURCHASED_ERROR = 'You have already purchased this release.';

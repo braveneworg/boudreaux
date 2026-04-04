@@ -2001,4 +2001,28 @@ describe('DigitalFormatsAccordion', () => {
       });
     });
   });
+
+  describe('getStatusText intermediate upload states', () => {
+    it('should display "Finalizing upload..." during the confirming state', async () => {
+      // Make confirmDigitalFormatUploadAction hang so the component stays in 'confirming'
+      const { confirmDigitalFormatUploadAction } =
+        await import('@/lib/actions/confirm-upload-action');
+
+      vi.mocked(confirmDigitalFormatUploadAction).mockReturnValue(new Promise(() => {}));
+
+      const user = userEvent.setup();
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      // Expand FLAC accordion and upload a file
+      await user.click(screen.getByText('FLAC'));
+      const fileInput = await screen.findByLabelText(/upload flac/i);
+      const file = new File(['audio content'], 'album.flac', { type: 'audio/flac' });
+      await user.upload(fileInput, file);
+
+      // After fetch succeeds, the state transitions to 'confirming' while awaiting the confirm action
+      await waitFor(() => {
+        expect(screen.getByText('Finalizing upload...')).toBeInTheDocument();
+      });
+    });
+  });
 });

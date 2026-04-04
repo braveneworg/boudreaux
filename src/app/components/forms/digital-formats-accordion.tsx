@@ -266,6 +266,9 @@ export function DigitalFormatsAccordion({
   // File input refs per format for programmatic click
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Upload button refs per format for scroll-into-view on expand
+  const uploadButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   /**
    * Upload a single file to the server proxy and return the result.
    * Does NOT set terminal upload state or show toasts — callers handle that.
@@ -1065,6 +1068,7 @@ export function DigitalFormatsAccordion({
   const handleConfirmReupload = useCallback(async () => {
     const formatType = confirmReuploadFormat;
     if (!formatType || !releaseId) {
+      /* v8 ignore next 2 -- defensive guard: dialog is never open when formatType/releaseId are falsy */
       setConfirmReuploadFormat(null);
       return;
     }
@@ -1140,6 +1144,7 @@ export function DigitalFormatsAccordion({
       const state = getUploadState(formatType);
       switch (state.status) {
         case 'validating':
+          /* v8 ignore next -- state is synchronously overwritten by 'uploading' before render */
           return 'Validating file...';
         case 'uploading': {
           const { currentFile, totalFiles } = state;
@@ -1266,7 +1271,7 @@ export function DigitalFormatsAccordion({
             );
           })()}
 
-        <Accordion type="multiple" className="w-full">
+        <Accordion type="single" collapsible className="w-full">
           {FORMAT_CONFIGS.map((config) => {
             const state = getUploadState(config.type);
             const error = errorMessages[config.type];
@@ -1274,6 +1279,7 @@ export function DigitalFormatsAccordion({
             const uploaded = isUploaded(config.type);
             const uploading = isUploading(config.type);
             const isLocked = isLockedForOtherFormats && config.type !== 'MP3_320KBPS';
+            const isBlockedByOtherUpload = isAnyUploading && !uploading;
 
             return (
               <AccordionItem key={config.type} value={config.type}>
@@ -1290,7 +1296,14 @@ export function DigitalFormatsAccordion({
                   </div>
                 </AccordionTrigger>
 
-                <AccordionContent>
+                <AccordionContent
+                  onAnimationEnd={() => {
+                    const el = uploadButtonRefs.current[config.type];
+                    if (el && el.offsetParent !== null) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                  }}
+                >
                   <div className="space-y-4 pt-2">
                     <p className="text-sm text-muted-foreground">{config.description}</p>
 
@@ -1303,7 +1316,8 @@ export function DigitalFormatsAccordion({
                         'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6',
                         'transition-colors hover:border-primary/50',
                         dragOverFormat === config.type && 'border-primary bg-primary/5',
-                        (uploading || isLocked) && 'pointer-events-none opacity-50'
+                        (uploading || isLocked || isBlockedByOtherUpload) &&
+                          'pointer-events-none opacity-50'
                       )}
                     >
                       <Upload className="mb-3 h-8 w-8 text-muted-foreground" />
@@ -1334,7 +1348,7 @@ export function DigitalFormatsAccordion({
                           webkitdirectory=""
                           directory=""
                           onChange={(e) => handleFileInputChange(config.type, e)}
-                          disabled={uploading || isLocked}
+                          disabled={uploading || isLocked || isBlockedByOtherUpload}
                           aria-label={`Upload ${config.label} folder`}
                           className="hidden"
                         />
@@ -1342,8 +1356,13 @@ export function DigitalFormatsAccordion({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={uploading || isLocked || isDeletingFiles}
+                          disabled={
+                            uploading || isLocked || isDeletingFiles || isBlockedByOtherUpload
+                          }
                           onClick={() => handleUploadButtonClick(config.type)}
+                          ref={(el) => {
+                            uploadButtonRefs.current[config.type] = el;
+                          }}
                         >
                           {uploaded ? (
                             <>

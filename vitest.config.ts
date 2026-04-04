@@ -154,6 +154,10 @@ export default defineConfig({
         // Test files themselves
         '**/*.{test,spec}.{ts,tsx,js,jsx}',
 
+        // Root layout — module-level code (env validation, HTTPS warning)
+        // is not testable in jsdom/node environments
+        '**/app/layout.tsx',
+
         // Scripts and utilities that don't need testing
         '**/scripts/**',
 
@@ -173,6 +177,7 @@ export default defineConfig({
         '**/components/ui/calendar.tsx',
         '**/components/ui/carousel.tsx',
         '**/components/ui/scroll-area.tsx',
+        '**/components/ui/select.tsx',
         '**/components/ui/sidebar.tsx',
         '**/components/ui/form.tsx',
         '**/components/ui/chart.tsx',

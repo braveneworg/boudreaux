@@ -3,12 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { DownloadIcon, Loader2 } from 'lucide-react';
+import { CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
+import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
-import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { Progress } from '@/app/components/ui/progress';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
@@ -22,54 +23,180 @@ interface FormatBundleDownloadProps {
   releaseTitle: string;
   availableFormats: AvailableFormat[];
   downloadCount: number;
+  onDownloadComplete?: () => void;
 }
+
+/** Format bytes into a human-readable string. */
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 /**
  * FormatBundleDownload — multi-select format picker with a bundle download
- * button. Uses ToggleGroup (type="multiple") for mobile-friendly format
- * selection and triggers a ZIP download of all selected formats via the
- * bundle API route.
+ * button. Uses a multi-select combobox for format selection and triggers a
+ * ZIP download of all selected formats via the bundle API route.
+ *
+ * Downloads are streamed via fetch() so a real progress bar can track the
+ * download. When the server provides Content-Length the bar is determinate;
+ * otherwise it shows bytes received with an indeterminate animation.
+ *
+ * Fetches available formats from the API on mount to ensure fresh data,
+ * falling back to the prop value.
  */
 export const FormatBundleDownload = ({
   releaseId,
   releaseTitle,
-  availableFormats,
+  availableFormats: initialFormats,
   downloadCount,
+  onDownloadComplete,
 }: FormatBundleDownloadProps) => {
-  const allFormatTypes = availableFormats.map((f) => f.formatType);
-  const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
+  const [formats, setFormats] = useState<AvailableFormat[] | null>(
+    initialFormats.length > 0 ? initialFormats : null
+  );
+  const [isLoadingFormats, setIsLoadingFormats] = useState(initialFormats.length === 0);
+  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{
+    received: number;
+    total: number | null;
+  } | null>(null);
+  const [downloadDone, setDownloadDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    // Skip fetch if formats were provided via props
+    if (initialFormats.length > 0) return;
+
+    let cancelled = false;
+
+    const fetchFormats = async () => {
+      try {
+        const res = await fetch(`/api/releases/${releaseId}/digital-formats`);
+        if (!res.ok) {
+          if (!cancelled) setFormats([]);
+          return;
+        }
+        const data: { formats: AvailableFormat[] } = await res.json();
+        if (!cancelled) {
+          setFormats(data.formats);
+        }
+      } catch {
+        if (!cancelled) setFormats([]);
+      } finally {
+        if (!cancelled) setIsLoadingFormats(false);
+      }
+    };
+
+    fetchFormats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [releaseId, initialFormats]);
+
+  const resolvedFormats = formats ?? [];
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
 
-  const handleDownload = useCallback(() => {
+  const comboboxOptions = useMemo(
+    () =>
+      (formats ?? []).map(({ formatType }) => ({
+        value: formatType,
+        label: FORMAT_LABELS[formatType] ?? formatType,
+      })),
+    [formats]
+  );
+
+  const handleDownload = useCallback(async () => {
     if (!hasSelection || atLimit) return;
 
     setIsDownloading(true);
+    setDownloadProgress(null);
+    setDownloadDone(false);
     setError(null);
 
-    const formats = selectedFormats.join(',');
-    const url = `/api/releases/${releaseId}/download/bundle?formats=${formats}`;
+    const joined = selectedFormats.join(',');
+    const url = `/api/releases/${releaseId}/download/bundle?formats=${joined}`;
 
-    // Trigger browser download via temporary anchor
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${releaseTitle}.zip`;
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    // Reset loading state after a reasonable delay
-    // (browser handles the actual download natively)
-    setTimeout(() => {
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          (body as { message?: string } | null)?.message ?? 'Download failed. Please try again.';
+        setError(message);
+        setIsDownloading(false);
+        return;
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        setError('Download failed. Please try again.');
+        setIsDownloading(false);
+        return;
+      }
+
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        setDownloadProgress({ received, total });
+      }
+
+      // Build blob and trigger browser save
+      const blob = new Blob(chunks as unknown as Blob[], { type: 'application/zip' });
+      const blobUrl = URL.createObjectURL(blob);
+      const safeTitle = releaseTitle.replace(/[^\w\s.-]/g, '').trim() || 'release';
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `${safeTitle}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(blobUrl);
+
+      setDownloadDone(true);
+      onDownloadComplete?.();
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        setError('Download failed. Please try again.');
+      }
+    } finally {
       setIsDownloading(false);
-    }, 3000);
-  }, [hasSelection, atLimit, selectedFormats, releaseId, releaseTitle]);
+      abortRef.current = null;
+    }
+  }, [hasSelection, atLimit, selectedFormats, releaseId, releaseTitle, onDownloadComplete]);
 
-  if (availableFormats.length === 0) {
+  // Abort in-flight download if component unmounts
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  if (isLoadingFormats) {
+    return (
+      <div className="flex items-center justify-center py-4" role="status">
+        <Loader2 className="text-muted-foreground size-5 animate-spin" />
+      </div>
+    );
+  }
+
+  if (resolvedFormats.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">No digital formats available for download.</p>
     );
@@ -77,38 +204,44 @@ export const FormatBundleDownload = ({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Select formats:</p>
-        <p className="text-muted-foreground text-xs">
-          {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT} downloads used
-        </p>
-      </div>
-
-      <ToggleGroup
-        type="multiple"
-        variant="outline"
-        size="sm"
+      <MultiCombobox
+        options={comboboxOptions}
         value={selectedFormats}
         onValueChange={setSelectedFormats}
-        className="flex flex-wrap gap-2"
-      >
-        {availableFormats.map(({ formatType }) => (
-          <ToggleGroupItem
-            key={formatType}
-            value={formatType}
-            aria-label={`Select ${FORMAT_LABELS[formatType] ?? formatType}`}
-            className="rounded-md px-3"
-            disabled={atLimit}
-          >
-            {FORMAT_LABELS[formatType] ?? formatType}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+        placeholder="Select formats..."
+        emptyMessage="No formats found."
+        disabled={atLimit}
+      />
 
       {error && (
         <p className="text-destructive text-sm" role="alert">
           {error}
         </p>
+      )}
+
+      {isDownloading && downloadProgress && (
+        <div className="space-y-2" role="status" aria-label="Download progress">
+          <Progress
+            value={
+              downloadProgress.total
+                ? Math.round((downloadProgress.received / downloadProgress.total) * 100)
+                : undefined
+            }
+            className={!downloadProgress.total ? 'animate-pulse' : undefined}
+          />
+          <p className="text-muted-foreground text-center text-xs">
+            {downloadProgress.total
+              ? `${formatBytes(downloadProgress.received)} of ${formatBytes(downloadProgress.total)}`
+              : `${formatBytes(downloadProgress.received)} downloaded`}
+          </p>
+        </div>
+      )}
+
+      {downloadDone && !isDownloading && (
+        <div className="flex items-center justify-center gap-2 py-2" role="status">
+          <CheckCircle2 className="text-green-600 size-5" />
+          <span className="text-sm font-medium">Download complete</span>
+        </div>
       )}
 
       <Button
@@ -120,7 +253,7 @@ export const FormatBundleDownload = ({
         {isDownloading ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            Preparing download...
+            Downloading...
           </>
         ) : (
           <>
