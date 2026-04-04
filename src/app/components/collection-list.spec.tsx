@@ -103,7 +103,14 @@ describe('CollectionList', () => {
   it('falls back to firstName + surname when no displayName', () => {
     const purchase = buildPurchase();
     purchase.release.artistReleases = [
-      { artist: { id: 'a-1', firstName: 'John', surname: 'Doe', displayName: null } },
+      {
+        artist: {
+          id: 'a-1',
+          firstName: 'John',
+          surname: 'Doe',
+          displayName: null as unknown as string,
+        },
+      },
     ];
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />);
@@ -197,7 +204,14 @@ describe('CollectionList', () => {
   it('uses firstName only when surname is empty', () => {
     const purchase = buildPurchase();
     purchase.release.artistReleases = [
-      { artist: { id: 'a-1', firstName: 'Jane', surname: '', displayName: null } },
+      {
+        artist: {
+          id: 'a-1',
+          firstName: 'Jane',
+          surname: '',
+          displayName: null as unknown as string,
+        },
+      },
     ];
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />);

@@ -62,8 +62,8 @@ vi.mock('@/app/components/format-bundle-download', () => ({
 // ---------------------------------------------------------------------------
 
 const mockFormats = [
-  { formatType: 'FLAC', fileName: 'album-flac.zip' },
-  { formatType: 'WAV', fileName: 'album-wav.zip' },
+  { formatType: 'FLAC' as const, fileName: 'album-flac.zip' },
+  { formatType: 'WAV' as const, fileName: 'album-wav.zip' },
 ];
 
 function mockFetchFormats(formats: Array<{ formatType: string; fileName: string }>) {

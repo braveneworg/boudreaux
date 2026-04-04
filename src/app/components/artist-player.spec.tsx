@@ -883,7 +883,7 @@ describe('ArtistPlayer', () => {
     it('should handle release with null title gracefully', () => {
       const nullTitleRelease = {
         ...createRelease('release-null', 'Test', [mockFile1]),
-        title: null,
+        title: null as unknown as string,
       };
       const artist = createArtistWithReleases([nullTitleRelease]);
 

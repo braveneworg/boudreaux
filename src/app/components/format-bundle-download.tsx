@@ -33,7 +33,7 @@ interface FormatBundleDownloadProps {
  */
 export const FormatBundleDownload = ({
   releaseId,
-  _releaseTitle,
+  releaseTitle: _releaseTitle,
   availableFormats,
   downloadCount,
   onDownloadStarted,
