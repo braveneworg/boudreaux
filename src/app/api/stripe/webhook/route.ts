@@ -146,9 +146,15 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
 
   const { releaseId, userId: metadataUserId } = retrievedSession.metadata ?? {};
 
-  // Derive customerEmail early — needed for userId fallback lookup below.
+  // Derive customerEmail — check both the raw event session and the retrieved
+  // session because embedded checkout (ui_mode: 'elements') may not populate
+  // customer_details on the retrieved session.
   const customerEmail =
-    retrievedSession.customer_details?.email ?? retrievedSession.customer_email ?? null;
+    retrievedSession.customer_details?.email ??
+    retrievedSession.customer_email ??
+    session.customer_details?.email ??
+    session.customer_email ??
+    null;
 
   const paymentIntentId =
     typeof retrievedSession.payment_intent === 'string'
@@ -212,14 +218,51 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  // Idempotency: skip if already processed
-  const existing = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
-  if (existing) {
-    console.warn('Duplicate webhook event for paymentIntentId:', paymentIntentId);
-    return;
+  const amountTotal = retrievedSession.amount_total ?? 0;
+
+  // Create the purchase record, or fetch existing if this is a duplicate
+  // webhook delivery. P2002 (unique constraint on stripePaymentIntentId)
+  // is handled gracefully so the email logic below always runs — the
+  // markEmailSent guard in sendPurchaseConfirmationEmail is the real
+  // idempotency mechanism.
+  let purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+
+  if (!purchase) {
+    try {
+      purchase = await PurchaseRepository.create({
+        userId,
+        releaseId,
+        amountPaid: amountTotal,
+        currency: retrievedSession.currency ?? 'usd',
+        stripePaymentIntentId: paymentIntentId,
+        stripeSessionId: retrievedSession.id,
+      });
+    } catch (createError) {
+      if (
+        createError instanceof PrismaClientKnownRequestError &&
+        createError.code === 'P2002' &&
+        (createError.meta?.target as string[] | undefined)?.includes('stripePaymentIntentId')
+      ) {
+        // Race condition: another webhook delivery already created this purchase — re-fetch.
+        purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+        if (!purchase) {
+          // P2002 was for stripePaymentIntentId but the record is still not visible;
+          // propagate so the webhook is retried.
+          throw createError;
+        }
+      } else {
+        throw createError;
+      }
+    }
   }
 
-  const amountTotal = retrievedSession.amount_total ?? 0;
+  if (!purchase) {
+    console.error('release_purchase webhook: failed to create or find purchase', {
+      sessionId: retrievedSession.id,
+      paymentIntentId,
+    });
+    return;
+  }
 
   // Fetch release title for the confirmation email
   const release = await prisma.release.findFirst({
@@ -228,22 +271,38 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   });
   const releaseTitle = release?.title ?? 'Unknown Release';
 
-  const purchase = await PurchaseRepository.create({
-    userId,
-    releaseId,
-    amountPaid: amountTotal,
-    currency: retrievedSession.currency ?? 'usd',
-    stripePaymentIntentId: paymentIntentId,
-    stripeSessionId: retrievedSession.id,
-  });
+  // Resolve the email for the confirmation. Prefer the Stripe session email,
+  // but fall back to the user's email in the database — embedded checkout
+  // (ui_mode: 'elements') may not populate customer_details or customer_email
+  // on the session object.
+  let emailForConfirmation = customerEmail;
+  if (!emailForConfirmation) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    emailForConfirmation = user?.email ?? null;
+  }
 
-  if (customerEmail) {
-    await sendPurchaseConfirmationEmail({
+  if (emailForConfirmation) {
+    const emailSent = await sendPurchaseConfirmationEmail({
       purchaseId: purchase.id,
-      customerEmail,
+      customerEmail: emailForConfirmation,
       releaseTitle,
       amountPaidCents: amountTotal,
       releaseId,
+    });
+    if (!emailSent) {
+      console.warn('release_purchase webhook: sendPurchaseConfirmationEmail returned false', {
+        purchaseId: purchase.id,
+        customerEmail: emailForConfirmation,
+      });
+    }
+  } else {
+    console.error('release_purchase webhook: no email available for confirmation', {
+      sessionId: retrievedSession.id,
+      purchaseId: purchase.id,
+      userId,
     });
   }
 }

@@ -48,7 +48,9 @@ describe('PurchaseRepository', () => {
 
       const result = await PurchaseRepository.create(createData);
 
-      expect(prisma.releasePurchase.create).toHaveBeenCalledWith({ data: createData });
+      expect(prisma.releasePurchase.create).toHaveBeenCalledWith({
+        data: { ...createData, confirmationEmailSentAt: null },
+      });
       expect(result).toEqual(mockRecord);
     });
   });

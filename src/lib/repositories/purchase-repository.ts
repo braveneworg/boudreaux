@@ -21,7 +21,12 @@ interface CreatePurchaseData {
 export class PurchaseRepository {
   /** Create a new purchase record after webhook confirms payment. */
   static async create(data: CreatePurchaseData) {
-    return prisma.releasePurchase.create({ data });
+    return prisma.releasePurchase.create({
+      data: {
+        ...data,
+        confirmationEmailSentAt: null,
+      },
+    });
   }
 
   /** Find a purchase by its Stripe PaymentIntent ID (idempotency key). */
@@ -96,6 +101,17 @@ export class PurchaseRepository {
       data: { confirmationEmailSentAt: new Date() },
     });
     return result.count > 0;
+  }
+
+  /**
+   * Reset the confirmation email flag so the email can be retried.
+   * Called when SES dispatch fails after the flag was already set.
+   */
+  static async resetEmailSent(purchaseId: string): Promise<void> {
+    await prisma.releasePurchase.updateMany({
+      where: { id: purchaseId },
+      data: { confirmationEmailSentAt: null },
+    });
   }
 
   /**
