@@ -201,11 +201,12 @@ describe('sendPurchaseConfirmationEmail', () => {
 
     it('should reset the email sent flag when sesClient.send fails so retries can succeed', async () => {
       mockSesClientSend.mockRejectedValue(new Error('SES temporary failure'));
-      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await sendPurchaseConfirmationEmail(validInput);
 
       expect(mockResetEmailSent).toHaveBeenCalledWith('purchase-1');
+      consoleErrorSpy.mockRestore();
     });
 
     it('should not reset the email sent flag when sesClient.send succeeds', async () => {
