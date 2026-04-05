@@ -9,10 +9,12 @@ import { sendPurchaseConfirmationEmail } from './send-purchase-confirmation';
 vi.mock('server-only', () => ({}));
 
 const mockMarkEmailSent = vi.hoisted(() => vi.fn());
+const mockResetEmailSent = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
     markEmailSent: mockMarkEmailSent,
+    resetEmailSent: mockResetEmailSent,
   },
 }));
 
@@ -56,6 +58,7 @@ describe('sendPurchaseConfirmationEmail', () => {
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
     vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://example.com');
     mockMarkEmailSent.mockResolvedValue(true);
+    mockResetEmailSent.mockResolvedValue(undefined);
     mockSesClientSend.mockResolvedValue({});
     vi.mocked(buildPurchaseConfirmationEmailHtml).mockReturnValue('<html>test</html>');
     vi.mocked(buildPurchaseConfirmationEmailText).mockReturnValue('test text');
@@ -82,11 +85,16 @@ describe('sendPurchaseConfirmationEmail', () => {
   describe('markEmailSent deduplication', () => {
     it('should not call sesClient.send and return false when markEmailSent returns false (email already sent)', async () => {
       mockMarkEmailSent.mockResolvedValue(false);
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const result = await sendPurchaseConfirmationEmail(validInput);
 
       expect(result).toBe(false);
       expect(mockSesClientSend).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipped: confirmationEmailSentAt already set')
+      );
+      consoleWarnSpy.mockRestore();
     });
 
     it('should call markEmailSent with the purchaseId before sending', async () => {
@@ -189,6 +197,21 @@ describe('sendPurchaseConfirmationEmail', () => {
       expect(result).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should reset the email sent flag when sesClient.send fails so retries can succeed', async () => {
+      mockSesClientSend.mockRejectedValue(new Error('SES temporary failure'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await sendPurchaseConfirmationEmail(validInput);
+
+      expect(mockResetEmailSent).toHaveBeenCalledWith('purchase-1');
+    });
+
+    it('should not reset the email sent flag when sesClient.send succeeds', async () => {
+      await sendPurchaseConfirmationEmail(validInput);
+
+      expect(mockResetEmailSent).not.toHaveBeenCalled();
     });
   });
 });

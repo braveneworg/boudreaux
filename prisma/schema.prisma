@@ -171,7 +171,6 @@ enum Platform {
   DISCOGS
 }
 
-
 enum Format {
   DIGITAL
   MP3_320KBPS
@@ -280,8 +279,8 @@ model Artist {
   notes                 String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
   images                Image[]
   labels                ArtistLabel[] // All labels the artist is/was associated with
-  members               ArtistMember[]  @relation("ArtistMembers") // Artists who are members of this band
-  memberOf              ArtistMember[]  @relation("MemberOf") // Bands this artist belongs to
+  members               ArtistMember[]         @relation("ArtistMembers") // Artists who are members of this band
+  memberOf              ArtistMember[]         @relation("MemberOf") // Bands this artist belongs to
   releases              ArtistRelease[] // Releases associated with the artist, including Tracks released
   urls                  Url[] // Various platform URLs associated with the artist
   tags                  String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
@@ -646,17 +645,17 @@ model TourDateImage {
 // PWYW Purchase Feature (003-stripe-pwyw-purchase)
 
 model ReleasePurchase {
-  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId                  String    @db.ObjectId
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  releaseId               String    @db.ObjectId
-  release                 Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId                  String   @db.ObjectId
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releaseId               String   @db.ObjectId
+  release                 Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
   amountPaid              Int // Amount paid in cents
-  currency                String    @default("usd")
-  stripePaymentIntentId   String    @unique // Idempotency key for webhook deduplication
-  stripeSessionId         String?   @unique // Stripe Checkout Session ID — polling key
+  currency                String   @default("usd")
+  stripePaymentIntentId   String   @unique // Idempotency key for webhook deduplication
+  stripeSessionId         String?  @unique // Stripe Checkout Session ID — polling key
   confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
-  purchasedAt             DateTime  @default(now())
+  purchasedAt             DateTime @default(now())
 
   @@unique([userId, releaseId]) // One purchase per user per release
   @@index([userId])

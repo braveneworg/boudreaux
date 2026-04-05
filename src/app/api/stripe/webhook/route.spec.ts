@@ -108,6 +108,7 @@ vi.mock('@/lib/email/send-purchase-confirmation', () => ({
 
 const mockPrismaReleaseFindFirst = vi.fn();
 const mockPrismaUserCreate = vi.fn();
+const mockPrismaUserFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -116,6 +117,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     user: {
       create: (...args: unknown[]) => mockPrismaUserCreate(...args),
+      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
   },
 }));
@@ -828,7 +830,7 @@ describe('POST /api/stripe/webhook', () => {
         stripePaymentIntentId: 'pi_test_001',
       });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Test Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
     });
 
     it('calls PurchaseRepository.create and sendPurchaseConfirmationEmail for a valid purchase', async () => {
@@ -854,7 +856,7 @@ describe('POST /api/stripe/webhook', () => {
       });
     });
 
-    it('does not call PurchaseRepository.create when paymentIntentId already exists (idempotency)', async () => {
+    it('skips create but still attempts email when paymentIntentId already exists (idempotency)', async () => {
       mockFindByPaymentIntentId.mockResolvedValue({ id: 'purchase-existing' });
 
       const request = createRequest('{}');
@@ -862,7 +864,13 @@ describe('POST /api/stripe/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).not.toHaveBeenCalled();
-      expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith({
+        purchaseId: 'purchase-existing',
+        customerEmail: 'buyer@example.com',
+        releaseTitle: 'Test Release',
+        amountPaidCents: 1000,
+        releaseId: 'release-001',
+      });
     });
 
     it('retrieves payment_intent from the Stripe API when webhook payload has null payment_intent', async () => {
@@ -887,7 +895,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-null-pi' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Null PI Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
 
       const request = createRequest('{}');
       const response = await POST(request);
@@ -1218,7 +1226,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-piobj' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'PI Obj Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1266,7 +1274,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-amt' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Amt Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1292,7 +1300,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-cur' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Cur Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1318,7 +1326,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-gone' });
       mockPrismaReleaseFindFirst.mockResolvedValue(null);
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1327,7 +1335,7 @@ describe('POST /api/stripe/webhook', () => {
       );
     });
 
-    it('does not send email when no customer email is available', async () => {
+    it('falls back to user email from database when Stripe session has no customer email', async () => {
       const session = {
         id: 'cs_no_email',
         mode: 'payment',
@@ -1346,11 +1354,51 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-noem' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release' });
+      mockPrismaUserFindUnique.mockResolvedValue({ email: 'user-from-db@example.com' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).toHaveBeenCalled();
+      expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
+        where: { id: 'u-noem' },
+        select: { email: true },
+      });
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ customerEmail: 'user-from-db@example.com' })
+      );
+    });
+
+    it('logs error when no email is available from any source', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_no_email_anywhere',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-noem2', userId: 'u-noem2' },
+        payment_intent: 'pi_noem2',
+        amount_total: 100,
+        currency: 'usd',
+        customer_details: { email: null },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'p-noem2' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release 2' });
+      mockPrismaUserFindUnique.mockResolvedValue({ email: null });
+      const request = createRequest('{}');
+      const response = await POST(request);
+      expect(response.status).toBe(200);
       expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook: no email available for confirmation',
+        expect.objectContaining({ purchaseId: 'p-noem2', userId: 'u-noem2' })
+      );
+      vi.mocked(console.error).mockRestore();
     });
 
     it('falls back to customer_email for purchase when customer_details.email is null', async () => {
@@ -1372,7 +1420,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-fb' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Fallback Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1401,7 +1449,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-nouid' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Resolved Release' });
-      mockSendPurchaseConfirmationEmail.mockResolvedValue(undefined);
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
