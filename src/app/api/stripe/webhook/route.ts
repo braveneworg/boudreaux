@@ -238,8 +238,18 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
         stripeSessionId: retrievedSession.id,
       });
     } catch (createError) {
-      if (createError instanceof PrismaClientKnownRequestError && createError.code === 'P2002') {
+      if (
+        createError instanceof PrismaClientKnownRequestError &&
+        createError.code === 'P2002' &&
+        (createError.meta?.target as string[] | undefined)?.includes('stripePaymentIntentId')
+      ) {
+        // Race condition: another webhook delivery already created this purchase — re-fetch.
         purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+        if (!purchase) {
+          // P2002 was for stripePaymentIntentId but the record is still not visible;
+          // propagate so the webhook is retried.
+          throw createError;
+        }
       } else {
         throw createError;
       }

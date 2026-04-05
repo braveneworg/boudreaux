@@ -13,10 +13,15 @@ const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
   class MockPrismaClientKnownRequestError extends Error {
     code: string;
     clientVersion: string;
-    constructor(message: string, opts: { code: string; clientVersion: string }) {
+    meta?: Record<string, unknown>;
+    constructor(
+      message: string,
+      opts: { code: string; clientVersion: string; meta?: Record<string, unknown> }
+    ) {
       super(message);
       this.code = opts.code;
       this.clientVersion = opts.clientVersion;
+      this.meta = opts.meta;
       this.name = 'PrismaClientKnownRequestError';
     }
   }
@@ -1582,6 +1587,127 @@ describe('POST /api/stripe/webhook', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('recovers from P2002 race on purchase creation when target is stripePaymentIntentId', async () => {
+      const session = {
+        id: 'cs_pi_race',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-pi-race', userId: 'u-pi-race' },
+        payment_intent: 'pi_pi_race',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'pirace@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      // Initial lookup finds nothing; create races and throws P2002 on stripePaymentIntentId
+      mockFindByPaymentIntentId
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'p-pi-raced' });
+      mockPurchaseCreate.mockRejectedValue(
+        new MockPrismaClientKnownRequestError(
+          'Unique constraint failed on the fields: (`stripePaymentIntentId`)',
+          {
+            code: 'P2002',
+            clientVersion: '5.0.0',
+            meta: { target: ['stripePaymentIntentId'] },
+          }
+        )
+      );
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Race PI Release' });
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockFindByPaymentIntentId).toHaveBeenCalledTimes(2);
+      expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ purchaseId: 'p-pi-raced' })
+      );
+    });
+
+    it('returns 500 when P2002 on stripePaymentIntentId but re-fetch finds no purchase', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_pi_race_miss',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'r-pi-race-miss',
+          userId: 'u-pi-race-miss',
+        },
+        payment_intent: 'pi_pi_race_miss',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'piracemiss@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      // Both lookups find nothing
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockPurchaseCreate.mockRejectedValue(
+        new MockPrismaClientKnownRequestError(
+          'Unique constraint failed on the fields: (`stripePaymentIntentId`)',
+          {
+            code: 'P2002',
+            clientVersion: '5.0.0',
+            meta: { target: ['stripePaymentIntentId'] },
+          }
+        )
+      );
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('returns 500 when P2002 is for a constraint other than stripePaymentIntentId', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_p2002_other',
+        mode: 'payment',
+        metadata: { type: 'release_purchase', releaseId: 'r-p2002-other', userId: 'u-p2002-other' },
+        payment_intent: 'pi_p2002_other',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'p2002other@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      // P2002 on a different constraint (userId + releaseId compound unique)
+      mockPurchaseCreate.mockRejectedValue(
+        new MockPrismaClientKnownRequestError(
+          'Unique constraint failed on the fields: (`userId`, `releaseId`)',
+          {
+            code: 'P2002',
+            clientVersion: '5.0.0',
+            meta: { target: ['userId', 'releaseId'] },
+          }
+        )
+      );
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
       vi.mocked(console.error).mockRestore();
     });
   });
