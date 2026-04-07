@@ -47,7 +47,7 @@ describe('UploadService', () => {
         const fileInfo = {
           formatType: 'MP3_320KBPS' as const,
           fileName: 'album.mp3',
-          fileSize: FORMAT_SIZE_LIMITS.MP3_320KBPS + 1000, // Over 100MB
+          fileSize: FORMAT_SIZE_LIMITS.MP3_320KBPS + 1000, // Slightly over the 48MB configured limit
           mimeType: 'audio/mpeg',
         };
 
