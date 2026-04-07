@@ -38,7 +38,7 @@ const mp3V0Schema = baseDigitalFormatSchema.extend({
   fileSize: z
     .number()
     .positive()
-    .max(FORMAT_SIZE_LIMITS.MP3_V0, `MP3 V0 track file size must not exceed 50 MB`),
+    .max(FORMAT_SIZE_LIMITS.MP3_V0, `MP3 V0 track file size must not exceed 48 MB`),
   mimeType: mimeTypeSchema(
     FORMAT_MIME_TYPES.MP3_V0,
     `MIME type must be ${FORMAT_MIME_TYPES.MP3_V0.join(' or ')}`
@@ -50,7 +50,7 @@ const mp3Schema = baseDigitalFormatSchema.extend({
   fileSize: z
     .number()
     .positive()
-    .max(FORMAT_SIZE_LIMITS.MP3_320KBPS, `MP3 track file size must not exceed 50 MB`),
+    .max(FORMAT_SIZE_LIMITS.MP3_320KBPS, `MP3 track file size must not exceed 48 MB`),
   mimeType: mimeTypeSchema(
     FORMAT_MIME_TYPES.MP3_320KBPS,
     `MIME type must be ${FORMAT_MIME_TYPES.MP3_320KBPS.join(' or ')}`

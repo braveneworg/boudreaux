@@ -33,7 +33,7 @@ describe('UploadService', () => {
         const fileInfo = {
           formatType: 'MP3_320KBPS' as const,
           fileName: 'album.mp3',
-          fileSize: 50000000, // 50MB (under 100MB limit)
+          fileSize: 40000000, // 40MB (under 48MB limit)
           mimeType: 'audio/mpeg',
         };
 
@@ -54,7 +54,7 @@ describe('UploadService', () => {
         const result = service.validateFileInfo(fileInfo);
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain('50');
+        expect(result.error).toContain('48');
         expect(result.error).toContain('MB');
       });
 
@@ -62,7 +62,7 @@ describe('UploadService', () => {
         const fileInfo = {
           formatType: 'MP3_320KBPS' as const,
           fileName: 'album.mp3',
-          fileSize: 50000000,
+          fileSize: 40000000,
           mimeType: 'audio/flac', // Wrong MIME type
         };
 
@@ -185,7 +185,7 @@ describe('UploadService', () => {
         const result = service.validateFileInfo(fileInfo);
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain('50');
+        expect(result.error).toContain('48');
       });
     });
 
@@ -281,7 +281,7 @@ describe('UploadService', () => {
         const fileInfo = {
           formatType: 'MP3_320KBPS' as const,
           fileName: '',
-          fileSize: 50000000,
+          fileSize: 40000000,
           mimeType: 'audio/mpeg',
         };
 
