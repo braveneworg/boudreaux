@@ -42,14 +42,14 @@ describe('digitalFormatUploadSchema', () => {
       ).error.issues
         .map((i) => i.message)
         .join(' ');
-      expect(errorMessage).toContain('50');
+      expect(errorMessage).toContain('48');
     });
 
     it('should reject MP3 V0 with invalid MIME type', () => {
       const invalidMime = {
         formatType: 'MP3_V0',
         fileName: 'album.mp3',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: 'audio/flac',
       };
 
@@ -87,14 +87,14 @@ describe('digitalFormatUploadSchema', () => {
       ).error.issues
         .map((i) => i.message)
         .join(' ');
-      expect(errorMessage).toContain('50');
+      expect(errorMessage).toContain('48');
     });
 
     it('should reject MP3 with invalid MIME type', () => {
       const invalidMimeType = {
         formatType: 'MP3_320KBPS',
         fileName: 'album.mp3',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: 'audio/flac',
       };
 
@@ -452,7 +452,7 @@ describe('digitalFormatUploadSchema', () => {
       const emptyFileName = {
         formatType: 'MP3_320KBPS',
         fileName: '',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: 'audio/mpeg',
       };
 
@@ -464,7 +464,7 @@ describe('digitalFormatUploadSchema', () => {
       const invalidFormat = {
         formatType: 'INVALID_FORMAT',
         fileName: 'album.mp3',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: 'audio/mpeg',
       };
 
@@ -478,7 +478,7 @@ describe('digitalFormatUploadSchema', () => {
       const mismatchedData = {
         formatType: 'MP3_320KBPS',
         fileName: 'album.mp3',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: 'audio/flac',
       };
 
@@ -502,7 +502,7 @@ describe('digitalFormatUploadSchema', () => {
       const emptyMime = {
         formatType: 'MP3_V0',
         fileName: 'album.mp3',
-        fileSize: 50000000,
+        fileSize: 40000000,
         mimeType: '',
       };
 
@@ -519,7 +519,7 @@ describe('digitalFormatConfirmationSchema', () => {
       formatType: 'MP3_320KBPS',
       s3Key: 'releases/123/digital-formats/MP3_320KBPS/album.mp3',
       fileName: 'album.mp3',
-      fileSize: 50000000,
+      fileSize: 40000000,
       mimeType: 'audio/mpeg',
     };
 
@@ -532,7 +532,7 @@ describe('digitalFormatConfirmationSchema', () => {
       formatType: 'MP3_320KBPS',
       s3Key: 'releases/123/digital-formats/MP3_320KBPS/album.mp3',
       fileName: 'album.mp3',
-      fileSize: 50000000,
+      fileSize: 40000000,
       mimeType: 'audio/mpeg',
     };
 
@@ -545,7 +545,7 @@ describe('digitalFormatConfirmationSchema', () => {
       releaseId: '507f1f77bcf86cd799439011',
       formatType: 'MP3_320KBPS',
       fileName: 'album.mp3',
-      fileSize: 50000000,
+      fileSize: 40000000,
       mimeType: 'audio/mpeg',
     };
 
@@ -559,7 +559,7 @@ describe('digitalFormatConfirmationSchema', () => {
       formatType: 'MP3_320KBPS',
       s3Key: '',
       fileName: 'album.mp3',
-      fileSize: 50000000,
+      fileSize: 40000000,
       mimeType: 'audio/mpeg',
     };
 

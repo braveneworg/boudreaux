@@ -16,8 +16,8 @@
  * These are the per-track limits; the total combined limit is in FORMAT_TOTAL_SIZE_LIMITS.
  */
 export const FORMAT_SIZE_LIMITS = {
-  MP3_V0: 50 * 1024 * 1024, // 50MB per track
-  MP3_320KBPS: 50 * 1024 * 1024, // 50MB per track
+  MP3_V0: 48 * 1024 * 1024, // 48MB per track
+  MP3_320KBPS: 48 * 1024 * 1024, // 48MB per track
   AAC: 50 * 1024 * 1024, // 50MB per track
   OGG_VORBIS: 50 * 1024 * 1024, // 50MB per track
   FLAC: 150 * 1024 * 1024, // 150MB per track
