@@ -23,7 +23,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/app/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent } from '@/app/components/ui/popover';
 import { useDebounce } from '@/app/hooks/use-debounce';
 
 const MIN_SEARCH_LENGTH = 3;
@@ -103,8 +103,8 @@ export const ArtistSearchInput = () => {
 
   return (
     <Popover open={open && showDropdown} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div className="relative w-full px-2">
+      <PopoverAnchor asChild>
+        <div className="relative w-full px-2" role="group">
           <Search className="text-muted-foreground pointer-events-none absolute left-5 top-1/2 size-4 -translate-y-1/2" />
           <input
             type="search"
@@ -125,10 +125,11 @@ export const ArtistSearchInput = () => {
             aria-label="Search artists and releases"
             aria-expanded={open && showDropdown}
             aria-controls="artist-search-listbox"
+            aria-haspopup="listbox"
             role="combobox"
           />
         </div>
-      </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent
         className="w-(--radix-popover-trigger-width) p-0"
         align="start"

@@ -20,7 +20,13 @@ import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purcha
 import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
 import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+  }
+  return stripePromise;
+}
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_COUNT = 45;
@@ -307,7 +313,7 @@ export const PurchaseCheckoutStep = ({
         <DialogTitle>Purchase {releaseTitle}</DialogTitle>
         <DialogDescription>You are paying {formatCents(amountCents)}</DialogDescription>
       </DialogHeader>
-      <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
+      <CheckoutElementsProvider stripe={getStripe()} options={{ clientSecret }}>
         <PurchaseCheckoutForm
           amountCents={amountCents}
           onPaymentComplete={() => setPaymentComplete(true)}

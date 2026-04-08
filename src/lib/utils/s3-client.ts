@@ -86,6 +86,7 @@ export async function generatePresignedUploadUrl(
     Bucket: bucketName,
     Key: s3Key,
     ContentType: resolvedContentType,
+    CacheControl: 'public, max-age=31536000, immutable',
   });
 
   // Generate presigned URL with 15-minute expiration

@@ -49,13 +49,6 @@ vi.mock('../components/ui/breadcrumb-menu', () => ({
   ),
 }));
 
-vi.mock('../components/ui/card', () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="card-content">{children}</div>
-  ),
-}));
-
 vi.mock('../components/ui/content-container', () => ({
   ContentContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="content-container">{children}</div>
@@ -97,8 +90,6 @@ describe('AboutPage', () => {
 
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
-    expect(screen.getByTestId('card')).toBeInTheDocument();
-    expect(screen.getByTestId('card-content')).toBeInTheDocument();
   });
 
   it('renders breadcrumb with About link', () => {

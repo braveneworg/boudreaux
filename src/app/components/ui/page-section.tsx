@@ -5,6 +5,8 @@ import React from 'react';
 
 import { cn } from '@/lib/utils/tailwind-utils';
 
+import { Heading } from './heading';
+
 type PageSectionProps = {
   children: React.ReactNode;
   className?: string;
@@ -14,8 +16,8 @@ type PageSectionProps = {
 
 export const PageSection = ({ id, title, children, className }: PageSectionProps) => {
   return (
-    <section className={cn(className, 'mt-[4rem]')} id={id}>
-      <h2 className="text-3xl subpixel-antialiased font-semibold text-zinc-950">{title}</h2>
+    <section className={cn(className, 'mt-8')} id={id}>
+      <Heading level={2}>{title}</Heading>
       {children}
     </section>
   );

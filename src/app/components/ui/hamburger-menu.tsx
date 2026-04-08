@@ -41,7 +41,7 @@ export default function HamburgerMenu() {
         <SheetTrigger className="relative" asChild>
           <Button
             size="icon"
-            className="relative bg-transparent pointer-events-auto top-0.5 right-0.5"
+            className="relative bg-transparent pointer-events-auto top-0.5 right-2"
           >
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
             <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />

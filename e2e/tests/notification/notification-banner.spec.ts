@@ -15,12 +15,12 @@ test.describe('Notification Banner Carousel', () => {
   test('should display navigation dots for multiple banners', async ({ page }) => {
     await page.goto('/');
 
-    const tablist = page.getByRole('tablist', { name: 'Banner navigation' });
+    const tablist = page.getByRole('tablist', { name: 'Banner slides' });
     await expect(tablist).toBeVisible();
 
-    // We seeded 3 banners, so expect 3 dots
+    // There are 5 hardcoded banner slots (each with a static image)
     const tabs = tablist.getByRole('tab');
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(5);
 
     // First dot should be selected
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
@@ -69,8 +69,8 @@ test.describe('Notification Banner Carousel', () => {
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
     // Wait for auto-cycle with assertion timeout
-    // 1s interval configured in playwright.config.ts + 1s buffer = 2s timeout
-    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 2000 });
+    // Default rotation interval is 6.5s + 1.5s buffer = 8s timeout
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 8000 });
   });
 
   test('should pause auto-cycling on hover', async ({ page }) => {

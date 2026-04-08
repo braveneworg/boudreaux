@@ -13,7 +13,6 @@ import { Providers } from './components/providers';
 import type { Metadata } from 'next';
 
 import './globals.css';
-import 'video.js/dist/video-js.css';
 
 // Server-side environment validation on startup
 /* v8 ignore next 5 -- module-level server-only code; window is always defined in jsdom test env */
@@ -49,8 +48,8 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default async function RootLayout({
@@ -64,6 +63,10 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
+        <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
+      </head>
       <body
         className="antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full"
         suppressHydrationWarning

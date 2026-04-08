@@ -318,223 +318,70 @@ const createDefaultArtists = async () => {
 };
 
 /**
- * Create notification banners with various configurations
+ * Create banner notification slots with various configurations
+ * BannerNotification uses slotNumber (1-5) for carousel positioning
  * Dates are set dynamically relative to current time so they display when seeded
- * Mix of solid color backgrounds and image backgrounds
  */
 const createNotifications = async (adminUserId: string) => {
-  // Delete existing notifications first (so we get fresh dates on re-seed)
-  await prisma.notification.deleteMany({});
+  // Delete existing banner notifications first (so we get fresh dates on re-seed)
+  await prisma.bannerNotification.deleteMany({});
 
   const now = new Date();
+  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  // Sample notification data with different configurations
-  // Mix of solid backgrounds and image backgrounds using picsum.photos
-  const notifications = [
+  const bannerNotifications = [
     {
-      // Banner with background IMAGE
-      message: 'Welcome to Brave New Org',
-      secondaryMessage: 'Discover new music from independent artists',
-      notes: 'Main welcome banner with concert image',
-      imageUrl: 'https://picsum.photos/seed/concert/1920/1080',
-      originalImageUrl: 'https://picsum.photos/seed/concert/1920/1080',
-      backgroundColor: null,
-      isOverlayed: true,
-      messageFont: 'system-ui',
-      messageFontSize: 3.0,
-      messageContrast: 100,
-      messageTextColor: '#ffffff',
-      messageTextShadow: true,
-      messageTextShadowDarkness: 70,
-      messagePositionX: 50,
-      messagePositionY: 30,
-      secondaryMessageFont: 'system-ui',
-      secondaryMessageFontSize: 1.5,
-      secondaryMessageContrast: 90,
-      secondaryMessageTextColor: '#e0e0e0',
-      secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 60,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 70,
-      sortOrder: 1,
-      isActive: true,
-      publishedAt: now,
-      displayFrom: now,
-      displayUntil: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-      linkUrl: 'https://braveneworg.bandcamp.com',
-    },
-    {
-      // Banner with SOLID background
-      message: 'New Release Available',
-      secondaryMessage: 'Check out our latest album',
-      notes: 'Promotional banner with solid color',
-      imageUrl: null,
-      originalImageUrl: null,
+      slotNumber: 1,
+      content: 'Welcome to <b>Brave New Org</b> — Discover new music from independent artists',
+      textColor: '#ffffff',
       backgroundColor: '#16213e',
-      isOverlayed: true,
-      messageFont: 'Georgia',
-      messageFontSize: 2.8,
-      messageContrast: 100,
-      messageTextColor: '#ffd700',
-      messageTextShadow: true,
-      messageTextShadowDarkness: 70,
-      messagePositionX: 50,
-      messagePositionY: 35,
-      secondaryMessageFont: 'Georgia',
-      secondaryMessageFontSize: 1.8,
-      secondaryMessageContrast: 95,
-      secondaryMessageTextColor: '#ffffff',
-      secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 50,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 65,
-      sortOrder: 2,
-      isActive: true,
-      publishedAt: now,
       displayFrom: now,
-      displayUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-      linkUrl: null,
+      displayUntil: thirtyDaysLater,
     },
     {
-      // Banner with background IMAGE
-      message: 'Live Show This Weekend',
-      secondaryMessage: 'Join us for an unforgettable night',
-      notes: 'Event promotion with stage image',
-      imageUrl: 'https://picsum.photos/seed/stage/1920/1080',
-      originalImageUrl: 'https://picsum.photos/seed/stage/1920/1080',
-      backgroundColor: null,
-      isOverlayed: true,
-      messageFont: 'Impact',
-      messageFontSize: 3.5,
-      messageContrast: 100,
-      messageTextColor: '#ff6b6b',
-      messageTextShadow: true,
-      messageTextShadowDarkness: 80,
-      messagePositionX: 50,
-      messagePositionY: 30,
-      secondaryMessageFont: 'Arial',
-      secondaryMessageFontSize: 2.0,
-      secondaryMessageContrast: 90,
-      secondaryMessageTextColor: '#ffffff',
-      secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 50,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 70,
-      sortOrder: 3,
-      isActive: true,
-      publishedAt: now,
-      displayFrom: now,
-      displayUntil: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-      linkUrl: null,
-    },
-    {
-      // Banner with SOLID background (gradient-like dark purple)
-      message: 'Subscribe to Our Newsletter',
-      secondaryMessage: 'Stay updated with the latest releases',
-      notes: 'Newsletter signup prompt with solid color',
-      imageUrl: null,
-      originalImageUrl: null,
+      slotNumber: 2,
+      content: 'New Release Available — Check out our latest album',
+      textColor: '#ffd700',
       backgroundColor: '#533483',
-      isOverlayed: true,
-      messageFont: 'Helvetica',
-      messageFontSize: 2.5,
-      messageContrast: 100,
-      messageTextColor: '#ffffff',
-      messageTextShadow: false,
-      messageTextShadowDarkness: 50,
-      messagePositionX: 50,
-      messagePositionY: 40,
-      secondaryMessageFont: 'system-ui',
-      secondaryMessageFontSize: 1.8,
-      secondaryMessageContrast: 95,
-      secondaryMessageTextColor: '#e0e0e0',
-      secondaryMessageTextShadow: false,
-      secondaryMessageTextShadowDarkness: 50,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 60,
-      sortOrder: 4,
-      isActive: true,
-      publishedAt: now,
       displayFrom: now,
-      displayUntil: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
-      linkUrl: null,
+      displayUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
     },
     {
-      // Banner with background IMAGE
-      message: 'Limited Edition Vinyl',
-      secondaryMessage: 'Get yours before they are gone!',
-      notes: 'Vinyl merchandise promotion with music image',
-      imageUrl: 'https://picsum.photos/seed/vinyl/1920/1080',
-      originalImageUrl: 'https://picsum.photos/seed/vinyl/1920/1080',
-      backgroundColor: null,
-      isOverlayed: true,
-      messageFont: 'Arial Black',
-      messageFontSize: 3.0,
-      messageContrast: 100,
-      messageTextColor: '#ffffff',
-      messageTextShadow: true,
-      messageTextShadowDarkness: 90,
-      messagePositionX: 50,
-      messagePositionY: 25,
-      secondaryMessageFont: 'Arial',
-      secondaryMessageFontSize: 1.6,
-      secondaryMessageContrast: 100,
-      secondaryMessageTextColor: '#ffeb3b',
-      secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 70,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 75,
-      sortOrder: 5,
-      isActive: true,
-      publishedAt: now,
+      slotNumber: 3,
+      content: 'Live Show This Weekend — Join us for an unforgettable night',
+      textColor: '#ff6b6b',
+      backgroundColor: '#000000',
       displayFrom: now,
-      displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
-      linkUrl: null,
+      displayUntil: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
     },
     {
-      // Banner with SOLID background (inactive for testing)
-      message: 'Coming Soon',
-      secondaryMessage: 'Something big is on the horizon',
-      notes: 'Teaser banner - inactive',
-      imageUrl: null,
-      originalImageUrl: null,
+      slotNumber: 4,
+      content: 'Subscribe to Our Newsletter — Stay updated with the latest releases',
+      textColor: '#ffffff',
       backgroundColor: '#e94560',
-      isOverlayed: true,
-      messageFont: 'Georgia',
-      messageFontSize: 3.2,
-      messageContrast: 100,
-      messageTextColor: '#ffffff',
-      messageTextShadow: true,
-      messageTextShadowDarkness: 60,
-      messagePositionX: 50,
-      messagePositionY: 40,
-      secondaryMessageFont: 'Georgia',
-      secondaryMessageFontSize: 1.5,
-      secondaryMessageContrast: 85,
-      secondaryMessageTextColor: '#ffffff',
-      secondaryMessageTextShadow: true,
-      secondaryMessageTextShadowDarkness: 40,
-      secondaryMessagePositionX: 50,
-      secondaryMessagePositionY: 60,
-      sortOrder: 6,
-      isActive: false, // Inactive notification for testing
-      publishedAt: null,
       displayFrom: now,
-      displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
-      linkUrl: null,
+      displayUntil: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+    },
+    {
+      slotNumber: 5,
+      content: 'Limited Edition Vinyl — Get yours before they are gone!',
+      textColor: '#ffeb3b',
+      backgroundColor: '#1a1a2e',
+      displayFrom: now,
+      displayUntil: new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000),
     },
   ];
 
-  for (const notification of notifications) {
-    await prisma.notification.create({
+  for (const banner of bannerNotifications) {
+    await prisma.bannerNotification.create({
       data: {
-        ...notification,
+        ...banner,
         addedBy: { connect: { id: adminUserId } },
       },
     });
   }
 
-  console.info(`✅ Created ${notifications.length} notification banners.`);
+  console.info(`✅ Created ${bannerNotifications.length} banner notifications.`);
 };
 
 /**

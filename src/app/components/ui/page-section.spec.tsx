@@ -64,7 +64,7 @@ describe('PageSection', () => {
       </PageSection>
     );
 
-    expect(document.getElementById('section')).toHaveClass('mt-[4rem]');
+    expect(document.getElementById('section')).toHaveClass('mt-8');
   });
 
   it('renders multiple children', () => {

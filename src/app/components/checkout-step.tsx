@@ -14,7 +14,13 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/u
 import { createCheckoutSessionAction } from '@/lib/actions/create-checkout-session-action';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '');
+  }
+  return stripePromise;
+}
 
 interface CheckoutStepProps {
   tier: SubscriberRateTier;
@@ -86,7 +92,7 @@ export const CheckoutStep = ({ tier, customerEmail }: CheckoutStepProps) => {
         <DialogTitle>Checkout</DialogTitle>
         <DialogDescription>Complete your subscription</DialogDescription>
       </DialogHeader>
-      <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
+      <CheckoutElementsProvider stripe={getStripe()} options={{ clientSecret }}>
         <CheckoutForm />
       </CheckoutElementsProvider>
     </>

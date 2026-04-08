@@ -111,7 +111,7 @@ describe('Header', () => {
       render(<Header isMobile />);
       const image = screen.getByTestId('next-image');
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words.png');
+      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words-sans-hand.webp');
       expect(image).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
     });
 
@@ -158,7 +158,7 @@ describe('Header', () => {
       render(<Header />);
       const motionDivs = screen.getAllByTestId('motion-div');
       const bgDiv = motionDivs[0];
-      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-zinc-950');
+      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
     });
   });
 
@@ -215,13 +215,13 @@ describe('Header', () => {
     it('applies desktop height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('md:h-30.5');
+      expect(header).toHaveClass('md:h-[122px]');
     });
 
     it('applies mobile height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('h-12');
+      expect(header).toHaveClass('h-[58px]');
     });
 
     it('renders content layer with proper z-index', () => {

@@ -12,6 +12,8 @@ const config = {
 
   // Configure images for CDN
   images: {
+    // Reduce default max device size from 3840 to 1920 for better performance
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     remotePatterns: [
       {
         protocol: 'https',

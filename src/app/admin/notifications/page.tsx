@@ -1,20 +1,49 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import Link from 'next/link';
-
-import { Plus } from 'lucide-react';
-
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Button } from '@/app/components/ui/button';
 import { Heading } from '@/app/components/ui/heading';
-import { NotificationBannerService } from '@/lib/services/notification-banner-service';
+import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 
-import { NotificationBannerList } from './notification-banner-list';
+import { BannerSlotCard } from './banner-slot-card';
+import { RotationIntervalForm } from './rotation-interval-form';
+
+import type { BannerSlotFormData } from './banner-slot-card';
 
 export default async function NotificationsPage() {
-  const result = await NotificationBannerService.getAllNotificationBanners();
-  const notifications = result.success ? result.data : [];
+  const [notificationsResult, rotationInterval] = await Promise.all([
+    BannerNotificationService.getAllNotifications(),
+    BannerNotificationService.getRotationInterval(),
+  ]);
+
+  const notifications = notificationsResult.success ? notificationsResult.data : [];
+
+  const slots: BannerSlotFormData[] = BANNER_SLOTS.map((slot) => {
+    const notification = notifications.find((n) => n.slotNumber === slot.slotNumber);
+    return {
+      slotNumber: slot.slotNumber,
+      imageFilename: slot.filename,
+      notification: notification
+        ? {
+            id: notification.id,
+            content: notification.content,
+            textColor: notification.textColor,
+            backgroundColor: notification.backgroundColor,
+            displayFrom: notification.displayFrom?.toISOString() ?? null,
+            displayUntil: notification.displayUntil?.toISOString() ?? null,
+            repostedFromId: notification.repostedFromId,
+          }
+        : null,
+    };
+  });
+
+  async function handleDelete(slotNumber: number) {
+    'use server';
+    const { deleteBannerNotificationAction } =
+      await import('@/lib/actions/banner-notification-action');
+    return deleteBannerNotificationAction(slotNumber);
+  }
 
   return (
     <div className="container mx-auto">
@@ -25,23 +54,24 @@ export default async function NotificationsPage() {
         ]}
       />
 
-      <div className="mt-4">
-        <Heading level={1}>Notification Banners</Heading>
+      <div className="mt-4 mb-4">
+        <Heading level={1} className="h-auto">
+          Banner Notifications
+        </Heading>
       </div>
 
-      <p className="text-muted-foreground mt-2 mb-4">
-        Manage the notification banners displayed on the home page. Banners are shown in a carousel
-        format with auto-cycling every 10 seconds.
+      <p className="text-muted-foreground px-6 mb-4">
+        Manage the notification text strips for each banner slot. Each slot has a fixed CDN image;
+        you can optionally attach a notification strip with styled text.
       </p>
 
-      <Link href="/admin/notifications/new" className="inline-block mb-6">
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          New Banner
-        </Button>
-      </Link>
+      <RotationIntervalForm currentInterval={rotationInterval} />
 
-      <NotificationBannerList notifications={notifications} />
+      <div className="mt-8 space-y-6">
+        {slots.map((slot) => (
+          <BannerSlotCard key={slot.slotNumber} slot={slot} onDelete={handleDelete} />
+        ))}
+      </div>
     </div>
   );
 }
