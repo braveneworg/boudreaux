@@ -482,7 +482,7 @@ jobs:
 
       - name: Get runner public IP
         id: ip
-        uses: haythem/public-ip@v1.3
+        uses: haythem/public-ip@v1.4
 
       - name: Temporarily whitelist runner IP for SSH on all Security Groups
         run: |
