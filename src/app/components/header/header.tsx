@@ -39,10 +39,10 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
       {/* Animated background layer */}
       <motion.div
         animate={{
-          opacity: [0.9, 1, 0.9],
-          scale: [1, 1.02, 1],
+          opacity: [0.9, 1],
+          scale: [1, 1.02],
         }}
-        className="absolute inset-0 bg-[url('/media/particles-6.svg')] bg-zinc-950 bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none"
+        className="absolute inset-0 bg-[url('/media/particles-6.svg')] bg-black bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:pointer-events-none"
         initial={{ opacity: 0.9 }}
         transition={{
           duration: 4.4,
@@ -99,7 +99,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
       </div>
       {/* Header content layer */}
       <div className="relative mx-auto w-full max-w-480 pl-0 md:px-8 overflow-hidden z-20">
-        <header className="relative flex items-center justify-between leading-12 h-12 md:h-30.5 w-full min-w-0">
+        <header className="relative flex items-center justify-between leading-14.5 h-14.5 md:h-30.5 w-full min-w-0">
           <Logo isMobile={isMobile} />
           {isMobile && (
             <>
@@ -107,7 +107,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
                 alt="Fake Four Inc. Words"
                 className="relative right-0.5 w-50.5 h-auto"
                 priority
-                src="/media/fake-four-inc-words.png"
+                src="/media/fake-four-inc-words-sans-hand.webp"
                 width={222}
                 height={40}
               />

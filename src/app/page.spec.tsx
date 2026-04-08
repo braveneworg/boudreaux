@@ -19,11 +19,11 @@ vi.mock('@/lib/services/featured-artists-service', () => ({
   },
 }));
 
-// Mock the NotificationBannerService
-const mockGetActiveNotificationBanners = vi.fn();
-vi.mock('@/lib/services/notification-banner-service', () => ({
-  NotificationBannerService: {
-    getActiveNotificationBanners: (...args: unknown[]) => mockGetActiveNotificationBanners(...args),
+// Mock the BannerNotificationService
+const mockGetActiveBanners = vi.fn();
+vi.mock('@/lib/services/banner-notification-service', () => ({
+  BannerNotificationService: {
+    getActiveBanners: (...args: unknown[]) => mockGetActiveBanners(...args),
   },
 }));
 
@@ -72,8 +72,8 @@ vi.mock('./components/featured-artists-player', () => ({
   ),
 }));
 
-vi.mock('./components/notification-banner', () => ({
-  NotificationBanner: () => <div data-testid="notification-banner">Notification Banner</div>,
+vi.mock('./components/banner-carousel', () => ({
+  BannerCarousel: () => <div data-testid="banner-carousel">Banner Carousel</div>,
 }));
 
 describe('Home Page', () => {
@@ -104,9 +104,12 @@ describe('Home Page', () => {
         },
       ],
     });
-    mockGetActiveNotificationBanners.mockResolvedValue({
+    mockGetActiveBanners.mockResolvedValue({
       success: true,
-      data: [],
+      data: {
+        banners: [],
+        rotationInterval: 6.5,
+      },
     });
   });
 
@@ -156,8 +159,8 @@ describe('Home Page', () => {
     expect(screen.getByTestId('featured-artists-player')).toBeInTheDocument();
   });
 
-  it('should render empty array when notifications fetch fails', async () => {
-    mockGetActiveNotificationBanners.mockResolvedValue({
+  it('should render empty array when banners fetch fails', async () => {
+    mockGetActiveBanners.mockResolvedValue({
       success: false,
       error: 'Failed to fetch',
     });
@@ -167,37 +170,43 @@ describe('Home Page', () => {
 
     // Should still render without crashing
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
-    // Notification banner should not be rendered
-    expect(screen.queryByTestId('notification-banner')).not.toBeInTheDocument();
+    // Banner carousel should not be rendered
+    expect(screen.queryByTestId('banner-carousel')).not.toBeInTheDocument();
   });
 
-  it('should render notification banner when notifications exist', async () => {
-    mockGetActiveNotificationBanners.mockResolvedValue({
+  it('should render banner carousel when banners exist', async () => {
+    mockGetActiveBanners.mockResolvedValue({
       success: true,
-      data: [
-        {
-          id: 'n1',
-          message: 'Test notification',
-          type: 'info',
-        },
-      ],
+      data: {
+        banners: [
+          {
+            slotNumber: 1,
+            imageFilename: 'FFINC Banner 1_5_1920.webp',
+            notification: null,
+          },
+        ],
+        rotationInterval: 6.5,
+      },
     });
 
     const HomeComponent = await Home();
     render(HomeComponent);
 
-    expect(screen.getByTestId('notification-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('banner-carousel')).toBeInTheDocument();
   });
 
-  it('should not render notification banner when notifications array is empty', async () => {
-    mockGetActiveNotificationBanners.mockResolvedValue({
+  it('should not render banner carousel when banners array is empty', async () => {
+    mockGetActiveBanners.mockResolvedValue({
       success: true,
-      data: [],
+      data: {
+        banners: [],
+        rotationInterval: 6.5,
+      },
     });
 
     const HomeComponent = await Home();
     render(HomeComponent);
 
-    expect(screen.queryByTestId('notification-banner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('banner-carousel')).not.toBeInTheDocument();
   });
 });
