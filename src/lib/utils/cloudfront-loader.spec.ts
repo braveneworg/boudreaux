@@ -146,5 +146,41 @@ describe('cloudfrontLoader', () => {
         'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
       );
     });
+
+    it('percent-encodes spaces and special characters in the filename', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = cloudfrontLoader({
+        src: 'FFINC Banner 1_5_1920.webp',
+        width: 800,
+        quality: 75,
+      });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=800&q=75&f=webp'
+      );
+    });
+
+    it('encodes each path segment independently when src contains slashes', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = cloudfrontLoader({
+        src: 'folder name/file name.webp',
+        width: 800,
+        quality: 75,
+      });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/folder%20name/file%20name.webp?w=800&q=75&f=webp'
+      );
+    });
   });
 });

@@ -78,7 +78,7 @@ export const createOrUpdateBannerNotificationAction = async (
   logger.info(`Upsert banner notification for slot ${slotNumber}`, {
     module: 'NOTIFICATIONS',
     operation: 'upsert',
-    userId: session.user?.id,
+    userId: session.user.id,
   });
 
   const result = await BannerNotificationService.upsertNotification(slotNumber, {
@@ -88,7 +88,7 @@ export const createOrUpdateBannerNotificationAction = async (
     displayFrom: displayFrom ?? null,
     displayUntil: displayUntil ?? null,
     repostedFromId: repostedFromId ?? null,
-    addedById: session.user?.id as string,
+    addedById: session.user.id,
   });
 
   if (!result.success) {
