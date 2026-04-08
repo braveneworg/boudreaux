@@ -130,6 +130,19 @@ if (typeof window !== 'undefined') {
   // Mock window.open to prevent jsdom navigation errors from anchor clicks with target="_blank"
   window.open = vi.fn();
 
+  // Suppress jsdom "Not implemented: navigation" errors by intercepting the
+  // virtualConsole jsdomError event. jsdom fires these via _virtualConsole.emit("jsdomError"),
+  // which bypasses console.error interception since the listener was bound before our override.
+  // Instead, we suppress via process.stderr.write for these specific messages.
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((...args: Parameters<typeof process.stderr.write>) => {
+    const chunk = args[0];
+    if (typeof chunk === 'string' && chunk.includes('Not implemented: navigation')) {
+      return true;
+    }
+    return originalStderrWrite(...args);
+  }) as typeof process.stderr.write;
+
   // Mock scrollTo for scroll-based components
   Object.defineProperty(window, 'scrollTo', {
     writable: true,
