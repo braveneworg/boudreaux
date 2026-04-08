@@ -34,7 +34,6 @@ vi.mock('@/lib/config/env-validation', () => ({
 
 // Mock CSS imports (vitest has css: false, but explicit mocks prevent resolution errors)
 vi.mock('./globals.css', () => ({}));
-vi.mock('video.js/dist/video-js.css', () => ({}));
 
 // Mock child components
 vi.mock('./components/header/header', () => ({
@@ -104,11 +103,11 @@ describe('RootLayout', () => {
     });
 
     it('has correct maximum scale', () => {
-      expect(viewport.maximumScale).toBe(1);
+      expect(viewport.maximumScale).toBe(5);
     });
 
-    it('disables user scaling', () => {
-      expect(viewport.userScalable).toBe(false);
+    it('enables user scaling', () => {
+      expect(viewport.userScalable).toBe(true);
     });
   });
 
@@ -241,14 +240,20 @@ describe('RootLayout', () => {
 
     it('renders body with overflow-x-hidden class', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const body = jsx.props.children;
+      const children = jsx.props.children;
+      const body = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'body')
+        : children;
 
       expect(body.props.className).toContain('overflow-x-hidden');
     });
 
     it('renders body with layout classes', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const body = jsx.props.children;
+      const children = jsx.props.children;
+      const body = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'body')
+        : children;
 
       expect(body.props.className).toContain('antialiased');
       expect(body.props.className).toContain('flex');
@@ -258,9 +263,28 @@ describe('RootLayout', () => {
 
     it('renders body with suppressHydrationWarning', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const body = jsx.props.children;
+      const children = jsx.props.children;
+      const body = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'body')
+        : children;
 
       expect(body.props.suppressHydrationWarning).toBe(true);
+    });
+
+    it('renders preconnect link for CDN', async () => {
+      const jsx = await RootLayout({ children: <div>Test</div> });
+      const children = jsx.props.children;
+      const head = Array.isArray(children)
+        ? children.find((c: React.JSX.Element) => c.type === 'head')
+        : null;
+
+      expect(head).toBeDefined();
+      const links = head.props.children;
+      const preconnect = Array.isArray(links)
+        ? links.find((l: React.JSX.Element) => l.props?.rel === 'preconnect')
+        : null;
+      expect(preconnect).toBeDefined();
+      expect(preconnect.props.href).toBe('https://cdn.fakefourrecords.com');
     });
   });
 });

@@ -103,7 +103,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <div className="flex w-full items-center">
+          <div className="flex w-full items-center" role="group">
             <CalendarIcon className="ml-3.5 absolute size-4" />
             <Input
               id={a11yId}

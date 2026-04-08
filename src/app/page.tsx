@@ -6,7 +6,7 @@ import { FeaturedArtistsService } from '@/lib/services/featured-artists-service'
 
 import { ArtistSearchInput } from './components/artist-search-input';
 import { BannerCarousel } from './components/banner-carousel';
-import { FeaturedArtistsPlayer } from './components/featured-artists-player';
+import { FeaturedArtistsPlayerClient } from './components/featured-artists-player-client';
 import { ContentContainer } from './components/ui/content-container';
 import { Heading } from './components/ui/heading';
 import PageContainer from './components/ui/page-container';
@@ -51,7 +51,7 @@ export default async function Home() {
         <ArtistSearchInput />
         <section>
           <Heading level={1}>featured artists</Heading>
-          <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+          <FeaturedArtistsPlayerClient featuredArtists={featuredArtists} />
         </section>
       </ContentContainer>
     </PageContainer>

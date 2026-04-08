@@ -16,6 +16,9 @@ import type { ImageLoaderProps } from 'next/image';
 const CDN_DOMAIN =
   process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? 'https://cdn.fakefourrecords.com';
 
+const MAX_IMAGE_WIDTH = 1920;
+
 export const cloudfrontLoader = ({ src, width, quality }: ImageLoaderProps): string => {
-  return `${CDN_DOMAIN}/media/banners/${src}?w=${width}&q=${quality || 80}&f=webp`;
+  const cappedWidth = Math.min(width, MAX_IMAGE_WIDTH);
+  return `${CDN_DOMAIN}/media/banners/${src}?w=${cappedWidth}&q=${quality || 80}&f=webp`;
 };

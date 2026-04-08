@@ -137,7 +137,7 @@ async function seedTestDatabase() {
     await prisma.artistLabel.deleteMany({});
     await prisma.artistUrl.deleteMany({});
     await prisma.releaseUrl.deleteMany({});
-    await prisma.notification.deleteMany({});
+    await prisma.bannerNotification.deleteMany({});
     await prisma.image.deleteMany({});
     await prisma.url.deleteMany({});
     await prisma.featuredArtist.deleteMany({});
@@ -376,45 +376,36 @@ async function seedTestDatabase() {
     });
 
     await Promise.all([
-      prisma.notification.create({
+      prisma.bannerNotification.create({
         data: {
-          message: 'E2E Test Banner One',
-          secondaryMessage: 'First test notification',
-          isActive: true,
-          isOverlayed: false,
+          slotNumber: 1,
+          content: 'E2E Test Banner One — First test notification',
+          textColor: '#ffffff',
           backgroundColor: '#16213e',
-          sortOrder: 1,
           displayFrom: now,
           displayUntil: thirtyDaysLater,
-          publishedAt: now,
           addedBy: { connect: { id: adminUser.id } },
         },
       }),
-      prisma.notification.create({
+      prisma.bannerNotification.create({
         data: {
-          message: 'E2E Test Banner Two',
-          secondaryMessage: 'Second test notification',
-          isActive: true,
-          isOverlayed: false,
+          slotNumber: 2,
+          content: 'E2E Test Banner Two — Second test notification',
+          textColor: '#ffffff',
           backgroundColor: '#533483',
-          sortOrder: 2,
           displayFrom: now,
           displayUntil: thirtyDaysLater,
-          publishedAt: now,
           addedBy: { connect: { id: adminUser.id } },
         },
       }),
-      prisma.notification.create({
+      prisma.bannerNotification.create({
         data: {
-          message: 'E2E Test Banner Three',
-          secondaryMessage: 'Third test notification',
-          isActive: true,
-          isOverlayed: false,
+          slotNumber: 3,
+          content: 'E2E Test Banner Three — Third test notification',
+          textColor: '#ffffff',
           backgroundColor: '#e94560',
-          sortOrder: 3,
           displayFrom: now,
           displayUntil: thirtyDaysLater,
-          publishedAt: now,
           addedBy: { connect: { id: adminUser.id } },
         },
       }),

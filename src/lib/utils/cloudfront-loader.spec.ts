@@ -132,5 +132,19 @@ describe('cloudfrontLoader', () => {
         'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
       );
     });
+
+    it('caps width at 1920 when a larger width is requested', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = cloudfrontLoader({ src: 'hero.jpg', width: 3840, quality: 75 });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
+      );
+    });
   });
 });

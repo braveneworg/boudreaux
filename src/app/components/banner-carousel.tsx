@@ -295,7 +295,7 @@ export function BannerCarousel({
                 src={banners[prevIndex].imageFilename}
                 alt={`Banner ${banners[prevIndex].slotNumber}`}
                 fill
-                sizes="(min-width: 360px) 100vw"
+                sizes="100vw"
                 className="object-cover"
               />
             </div>
@@ -308,7 +308,7 @@ export function BannerCarousel({
               src={currentBanner.imageFilename}
               alt={`Banner ${currentBanner.slotNumber}`}
               fill
-              sizes="(min-width: 360px) 100vw"
+              sizes="100vw"
               priority={currentIndex === 0}
               className="object-cover"
             />
@@ -325,7 +325,7 @@ export function BannerCarousel({
                 src={banners[nextIndex].imageFilename}
                 alt={`Banner ${banners[nextIndex].slotNumber}`}
                 fill
-                sizes="(min-width: 360px) 100vw"
+                sizes="100vw"
                 className="object-cover"
               />
             </div>
@@ -348,12 +348,16 @@ export function BannerCarousel({
               role="tab"
               aria-selected={idx === currentIndex}
               aria-label={`Go to banner ${idx + 1}`}
-              className={cn(
-                'h-2 w-2 rounded-full transition-colors',
-                idx === currentIndex ? 'bg-foreground' : 'bg-foreground/30'
-              )}
+              className="flex items-center justify-center h-11 w-11 p-0"
               onClick={() => goToIndex(idx)}
-            />
+            >
+              <span
+                className={cn(
+                  'h-2.5 w-2.5 rounded-full transition-colors',
+                  idx === currentIndex ? 'bg-foreground' : 'bg-foreground/30'
+                )}
+              />
+            </button>
           ))}
         </div>
       )}
