@@ -28,6 +28,8 @@ const createRequest = (params: Record<string, string> = {}): Request => {
   return new Request(url.toString());
 };
 
+const routeContext = { params: Promise.resolve({}) };
+
 describe('GET /api/notification-banners/search', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -45,7 +47,7 @@ describe('GET /api/notification-banners/search', () => {
     } as never);
 
     const request = createRequest({ q: 'test', take: '10' });
-    const response = await GET(request);
+    const response = await GET(request as never, routeContext);
 
     expect(BannerNotificationService.searchNotifications).toHaveBeenCalledWith('test', 10);
     expect(response).toEqual({
@@ -61,7 +63,7 @@ describe('GET /api/notification-banners/search', () => {
     } as never);
 
     const request = createRequest();
-    const response = await GET(request);
+    const response = await GET(request as never, routeContext);
 
     expect(BannerNotificationService.searchNotifications).toHaveBeenCalledWith('', 20);
     expect(response).toEqual({
@@ -77,7 +79,7 @@ describe('GET /api/notification-banners/search', () => {
     } as never);
 
     const request = createRequest({ q: 'test' });
-    const response = await GET(request);
+    const response = await GET(request as never, routeContext);
 
     expect(response).toEqual({
       data: { error: 'Search failed' },
@@ -92,7 +94,7 @@ describe('GET /api/notification-banners/search', () => {
     } as never);
 
     const request = createRequest({ q: 'hello', take: '5' });
-    await GET(request);
+    await GET(request as never, routeContext);
 
     expect(BannerNotificationService.searchNotifications).toHaveBeenCalledWith('hello', 5);
   });

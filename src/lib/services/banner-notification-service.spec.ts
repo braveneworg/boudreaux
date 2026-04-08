@@ -68,6 +68,9 @@ const mockWithCache = vi.mocked(withCache);
 
 const now = new Date('2026-04-07T12:00:00.000Z');
 
+type FailureResult = { success: false; error: string };
+type SuccessResult<T> = { success: true; data: T };
+
 const mockNotification = {
   id: 'notif-1',
   slotNumber: 1,
@@ -102,26 +105,35 @@ describe('BannerNotificationService', () => {
 
       const result = await BannerNotificationService.getActiveBanners();
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.banners).toHaveLength(5);
-        expect(result.data.banners[0].notification).toEqual({
-          id: 'notif-1',
-          content: 'Test banner content',
-          textColor: '#ffffff',
-          backgroundColor: '#000000',
-          displayFrom: mockNotification.displayFrom.toISOString(),
-          displayUntil: mockNotification.displayUntil.toISOString(),
-        });
-        expect(result.data.banners[0].slotNumber).toBe(1);
-        expect(result.data.banners[0].imageFilename).toBe('FFINC Banner 1_5_1920.webp');
-        // Slots without notifications should have null notification
-        expect(result.data.banners[1].notification).toBeNull();
-        expect(result.data.banners[2].notification).toBeNull();
-        expect(result.data.banners[3].notification).toBeNull();
-        expect(result.data.banners[4].notification).toBeNull();
-        expect(result.data.rotationInterval).toBe(6.5);
-      }
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            banners: expect.arrayContaining([
+              expect.objectContaining({
+                slotNumber: 1,
+                imageFilename: 'FFINC Banner 1_5_1920.webp',
+                notification: {
+                  id: 'notif-1',
+                  content: 'Test banner content',
+                  textColor: '#ffffff',
+                  backgroundColor: '#000000',
+                  displayFrom: mockNotification.displayFrom.toISOString(),
+                  displayUntil: mockNotification.displayUntil.toISOString(),
+                },
+              }),
+            ]),
+            rotationInterval: 6.5,
+          }),
+        })
+      );
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect(data.banners).toHaveLength(5);
+      expect(data.banners[1].notification).toBeNull();
+      expect(data.banners[2].notification).toBeNull();
+      expect(data.banners[3].notification).toBeNull();
+      expect(data.banners[4].notification).toBeNull();
     });
 
     it('should return null notification when content is null', async () => {
@@ -132,9 +144,9 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.banners[0].notification).toBeNull();
-      }
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect(data.banners[0].notification).toBeNull();
     });
 
     it('should return null notification when displayFrom is in the future', async () => {
@@ -148,9 +160,9 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.banners[0].notification).toBeNull();
-      }
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect(data.banners[0].notification).toBeNull();
     });
 
     it('should return null notification when displayUntil is in the past', async () => {
@@ -164,9 +176,9 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.banners[0].notification).toBeNull();
-      }
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect(data.banners[0].notification).toBeNull();
     });
 
     it('should return active notification when displayFrom and displayUntil are null', async () => {
@@ -181,16 +193,16 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.banners[0].notification).toEqual({
-          id: 'notif-1',
-          content: 'Test banner content',
-          textColor: '#ffffff',
-          backgroundColor: '#000000',
-          displayFrom: null,
-          displayUntil: null,
-        });
-      }
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect(data.banners[0].notification).toEqual({
+        id: 'notif-1',
+        content: 'Test banner content',
+        textColor: '#ffffff',
+        backgroundColor: '#000000',
+        displayFrom: null,
+        displayUntil: null,
+      });
     });
 
     it('should return error on PrismaClientInitializationError', async () => {
@@ -201,9 +213,9 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database connection failed');
-      }
+      expect((result as { success: false; error: string }).error).toBe(
+        'Database connection failed'
+      );
     });
 
     it('should return error on generic error', async () => {
@@ -212,9 +224,9 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getActiveBanners();
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to fetch active banners');
-      }
+      expect((result as { success: false; error: string }).error).toBe(
+        'Failed to fetch active banners'
+      );
     });
 
     it('should call withCache with correct key and TTL', async () => {
@@ -238,9 +250,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getAllNotifications();
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([mockNotification]);
-      }
+      expect((result as SuccessResult<unknown[]>).data).toEqual([mockNotification]);
       expect(mockFindMany).toHaveBeenCalledWith({ orderBy: { slotNumber: 'asc' } });
     });
 
@@ -252,9 +262,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getAllNotifications();
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Database connection failed');
-      }
+      expect((result as FailureResult).error).toBe('Database connection failed');
     });
 
     it('should return error on generic error', async () => {
@@ -263,9 +271,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.getAllNotifications();
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to fetch notifications');
-      }
+      expect((result as FailureResult).error).toBe('Failed to fetch notifications');
     });
   });
 
@@ -288,9 +294,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.upsertNotification(1, upsertData);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.content).toBe('Updated content');
-      }
+      expect((result as SuccessResult<{ content: string }>).data.content).toBe('Updated content');
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { slotNumber: 1 },
         data: {
@@ -335,9 +339,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.upsertNotification(1, upsertData);
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to save notification');
-      }
+      expect((result as FailureResult).error).toBe('Failed to save notification');
     });
   });
 
@@ -348,9 +350,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.deleteNotification(1);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual({ deleted: true });
-      }
+      expect((result as SuccessResult<{ deleted: boolean }>).data).toEqual({ deleted: true });
       expect(mockDelete).toHaveBeenCalledWith({ where: { slotNumber: 1 } });
       expect(mockCacheDelete).toHaveBeenCalled();
     });
@@ -366,9 +366,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.deleteNotification(99);
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Notification not found');
-      }
+      expect((result as FailureResult).error).toBe('Notification not found');
     });
 
     it('should return error on generic error', async () => {
@@ -377,9 +375,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.deleteNotification(1);
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to delete notification');
-      }
+      expect((result as FailureResult).error).toBe('Failed to delete notification');
     });
   });
 
@@ -390,7 +386,12 @@ describe('BannerNotificationService', () => {
       textColor: '#ffffff',
       backgroundColor: '#000000',
       slotNumber: 1,
+      displayFrom: new Date('2026-04-01T00:00:00.000Z'),
+      displayUntil: new Date('2026-04-30T23:59:59.000Z'),
+      repostedFromId: null,
+      addedById: 'user-1',
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     };
 
     it('should search with query string', async () => {
@@ -399,9 +400,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.searchNotifications('test');
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual([searchResult]);
-      }
+      expect((result as SuccessResult<unknown[]>).data).toEqual([searchResult]);
       expect(mockFindMany).toHaveBeenCalledWith({
         where: { content: { contains: 'test', mode: 'insensitive' } },
         select: {
@@ -452,9 +451,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.searchNotifications('test');
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to search notifications');
-      }
+      expect((result as FailureResult).error).toBe('Failed to search notifications');
     });
   });
 
@@ -464,7 +461,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '8',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -489,7 +485,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: 'not-a-number',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -503,7 +498,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '2',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -517,7 +511,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '20',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -539,7 +532,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '3',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -553,7 +545,6 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '15',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
@@ -569,16 +560,13 @@ describe('BannerNotificationService', () => {
         id: 'setting-1',
         key: 'carousel-rotation-interval',
         value: '10',
-        createdAt: new Date(),
         updatedAt: new Date(),
       });
 
       const result = await BannerNotificationService.updateRotationInterval(10);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual({ interval: 10 });
-      }
+      expect((result as SuccessResult<{ interval: number }>).data).toEqual({ interval: 10 });
       expect(mockSettingsUpsert).toHaveBeenCalledWith({
         where: { key: 'carousel-rotation-interval' },
         update: { value: '10' },
@@ -593,9 +581,7 @@ describe('BannerNotificationService', () => {
       const result = await BannerNotificationService.updateRotationInterval(10);
 
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Failed to update rotation interval');
-      }
+      expect((result as FailureResult).error).toBe('Failed to update rotation interval');
     });
   });
 

@@ -321,9 +321,7 @@ describe('bannerNotificationSchema', () => {
     it('should transform empty string to null', () => {
       const result = bannerNotificationSchema.safeParse({ ...validData, content: '' });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.content).toBeNull();
-      }
+      expect((result as { success: true; data: { content: unknown } }).data.content).toBeNull();
     });
 
     it('should accept content within 500 characters', () => {
@@ -348,25 +346,21 @@ describe('bannerNotificationSchema', () => {
         content: '<script>alert("xss")</script><strong>ok</strong>',
       });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.content).toBe('alert("xss")<strong>ok</strong>');
-      }
+      expect((result as { success: true; data: { content: unknown } }).data.content).toBe(
+        'alert("xss")<strong>ok</strong>'
+      );
     });
 
     it('should accept null content', () => {
       const result = bannerNotificationSchema.safeParse({ ...validData, content: null });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.content).toBeNull();
-      }
+      expect((result as { success: true; data: { content: unknown } }).data.content).toBeNull();
     });
 
     it('should accept undefined content', () => {
       const result = bannerNotificationSchema.safeParse({ ...validData, content: undefined });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.content).toBeNull();
-      }
+      expect((result as { success: true; data: { content: unknown } }).data.content).toBeNull();
     });
   });
 
@@ -379,9 +373,7 @@ describe('bannerNotificationSchema', () => {
     it('should transform empty string to null', () => {
       const result = bannerNotificationSchema.safeParse({ ...validData, textColor: '' });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.textColor).toBeNull();
-      }
+      expect((result as { success: true; data: { textColor: unknown } }).data.textColor).toBeNull();
     });
 
     it('should reject an invalid hex color', () => {
@@ -402,9 +394,9 @@ describe('bannerNotificationSchema', () => {
     it('should transform empty string to null', () => {
       const result = bannerNotificationSchema.safeParse({ ...validData, backgroundColor: '' });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.backgroundColor).toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { backgroundColor: unknown } }).data.backgroundColor
+      ).toBeNull();
     });
 
     it('should reject an invalid hex color', () => {
@@ -433,10 +425,11 @@ describe('bannerNotificationSchema', () => {
         displayUntil: '',
       });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.displayFrom).toBeNull();
-        expect(result.data.displayUntil).toBeNull();
-      }
+      const data = (
+        result as { success: true; data: { displayFrom: unknown; displayUntil: unknown } }
+      ).data;
+      expect(data.displayFrom).toBeNull();
+      expect(data.displayUntil).toBeNull();
     });
 
     it('should accept null for date fields', () => {
@@ -457,10 +450,10 @@ describe('bannerNotificationSchema', () => {
         displayUntil: '2026-01-01T00:00:00Z',
       });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const messages = result.error.issues.map((i) => i.message);
-        expect(messages).toContain('End date must be on or after start date');
-      }
+      const messages = (
+        result as { success: false; error: { issues: { message: string }[] } }
+      ).error.issues.map((i) => i.message);
+      expect(messages).toContain('End date must be on or after start date');
     });
 
     it('should pass when displayUntil equals displayFrom', () => {
@@ -540,9 +533,9 @@ describe('bannerNotificationSchema', () => {
         repostedFromId: '',
       });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.repostedFromId).toBeNull();
-      }
+      expect(
+        (result as { success: true; data: { repostedFromId: unknown } }).data.repostedFromId
+      ).toBeNull();
     });
 
     it('should accept null', () => {
@@ -584,8 +577,6 @@ describe('rotationIntervalSchema', () => {
   it('should coerce string to number', () => {
     const result = rotationIntervalSchema.safeParse({ interval: '7' });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.interval).toBe(7);
-    }
+    expect((result as { success: true; data: { interval: number } }).data.interval).toBe(7);
   });
 });
