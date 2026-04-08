@@ -76,12 +76,14 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
   // Close the popover by clicking the trigger button again (avoids Escape propagating to the Dialog)
   await headlinerButton.click();
 
-  // Set start date: click the date input to open the calendar and select today
-  // (selecting today auto-populates the required Show Start Time to 8 PM)
+  // Set start date: type today's date directly into the input
+  // (the DatePicker uses PopoverAnchor, not PopoverTrigger, so clicking
+  // the input does not open a calendar — we type the date instead).
+  // Filling the date also auto-populates Show Start Time to 8 PM.
   const startDateInput = dialog.getByPlaceholder('mm/dd/yyyy').first();
-  await startDateInput.click();
-  // Click today's date in the calendar
-  await adminPage.locator('[data-today="true"]').first().click();
+  const today = new Date();
+  const dateString = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
+  await startDateInput.fill(dateString);
 
   // Submit the form
   await dialog.getByRole('button', { name: /Add Tour Date/i }).click();
