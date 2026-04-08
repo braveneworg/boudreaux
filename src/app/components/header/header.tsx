@@ -35,7 +35,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
   );
 
   return (
-    <div className="sticky top-0 left-0 right-0 z-40 w-full shadow-[0_0_30px_0_rgba(0,0,0,1)]">
+    <div className="sticky top-0 left-0 right-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)]">
       {/* Animated background layer */}
       <motion.div
         animate={{

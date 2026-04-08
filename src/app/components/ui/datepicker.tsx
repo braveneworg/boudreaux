@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 
 import { Input } from './input';
 
@@ -102,7 +102,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
         Use up/down arrow keys to change year, left/right to change month
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
+        <PopoverAnchor asChild>
           <div className="flex w-full items-center" role="group">
             <CalendarIcon className="ml-3.5 absolute size-4" />
             <Input
@@ -121,7 +121,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               }
             />
           </div>
-        </PopoverTrigger>
+        </PopoverAnchor>
         <PopoverContent className="w-auto overflow-hidden p-0" align="start">
           <Calendar
             onDayFocus={() => dateInputRef.current?.focus}
