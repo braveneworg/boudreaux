@@ -18,6 +18,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      upsert: vi.fn(),
       delete: vi.fn(),
     },
     siteSettings: {
@@ -57,9 +58,7 @@ vi.mock('@/lib/utils/simple-cache', () => ({
 }));
 
 const mockFindMany = vi.mocked(prisma.bannerNotification.findMany);
-const mockFindUnique = vi.mocked(prisma.bannerNotification.findUnique);
-const mockCreate = vi.mocked(prisma.bannerNotification.create);
-const mockUpdate = vi.mocked(prisma.bannerNotification.update);
+const mockBannerUpsert = vi.mocked(prisma.bannerNotification.upsert);
 const mockDelete = vi.mocked(prisma.bannerNotification.delete);
 const mockSettingsFindUnique = vi.mocked(prisma.siteSettings.findUnique);
 const mockSettingsUpsert = vi.mocked(prisma.siteSettings.upsert);
@@ -287,17 +286,26 @@ describe('BannerNotificationService', () => {
     };
 
     it('should update existing notification', async () => {
-      mockFindUnique.mockResolvedValue(mockNotification);
       const updated = { ...mockNotification, ...upsertData };
-      mockUpdate.mockResolvedValue(updated);
+      mockBannerUpsert.mockResolvedValue(updated);
 
       const result = await BannerNotificationService.upsertNotification(1, upsertData);
 
       expect(result.success).toBe(true);
       expect((result as SuccessResult<{ content: string }>).data.content).toBe('Updated content');
-      expect(mockUpdate).toHaveBeenCalledWith({
+      expect(mockBannerUpsert).toHaveBeenCalledWith({
         where: { slotNumber: 1 },
-        data: {
+        update: {
+          content: upsertData.content,
+          textColor: upsertData.textColor,
+          backgroundColor: upsertData.backgroundColor,
+          displayFrom: upsertData.displayFrom,
+          displayUntil: upsertData.displayUntil,
+          repostedFromId: upsertData.repostedFromId,
+          addedById: upsertData.addedById,
+        },
+        create: {
+          slotNumber: 1,
           content: upsertData.content,
           textColor: upsertData.textColor,
           backgroundColor: upsertData.backgroundColor,
@@ -311,15 +319,24 @@ describe('BannerNotificationService', () => {
     });
 
     it('should create new notification when none exists', async () => {
-      mockFindUnique.mockResolvedValue(null);
-      const created = { ...mockNotification, ...upsertData };
-      mockCreate.mockResolvedValue(created);
+      const created = { ...mockNotification, slotNumber: 2, ...upsertData };
+      mockBannerUpsert.mockResolvedValue(created);
 
       const result = await BannerNotificationService.upsertNotification(2, upsertData);
 
       expect(result.success).toBe(true);
-      expect(mockCreate).toHaveBeenCalledWith({
-        data: {
+      expect(mockBannerUpsert).toHaveBeenCalledWith({
+        where: { slotNumber: 2 },
+        update: {
+          content: upsertData.content,
+          textColor: upsertData.textColor,
+          backgroundColor: upsertData.backgroundColor,
+          displayFrom: upsertData.displayFrom,
+          displayUntil: upsertData.displayUntil,
+          repostedFromId: upsertData.repostedFromId,
+          addedById: upsertData.addedById,
+        },
+        create: {
           slotNumber: 2,
           content: upsertData.content,
           textColor: upsertData.textColor,
@@ -334,7 +351,7 @@ describe('BannerNotificationService', () => {
     });
 
     it('should return error on failure', async () => {
-      mockFindUnique.mockRejectedValue(new Error('DB error'));
+      mockBannerUpsert.mockRejectedValue(new Error('DB error'));
 
       const result = await BannerNotificationService.upsertNotification(1, upsertData);
 

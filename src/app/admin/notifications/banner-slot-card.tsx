@@ -18,6 +18,10 @@ import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 import { cloudfrontLoader } from '@/lib/utils/cloudfront-loader';
 import { isDarkColor } from '@/lib/utils/color';
+import {
+  addLinkAttributes,
+  sanitizeNotificationHtml,
+} from '@/lib/validation/banner-notification-schema';
 
 import { NotificationSearch } from './notification-search';
 
@@ -190,7 +194,9 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
               isDarkColor(backgroundColor) ? 'banner-strip-dark' : 'banner-strip-light'
             )}
             style={{ color: textColor, backgroundColor }}
-            dangerouslySetInnerHTML={{ __html: content }}
+            dangerouslySetInnerHTML={{
+              __html: addLinkAttributes(sanitizeNotificationHtml(content)),
+            }}
           />
         )}
 

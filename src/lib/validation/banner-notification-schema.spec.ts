@@ -114,6 +114,44 @@ describe('sanitizeNotificationHtml', () => {
       expect(result).toBe('xss</a>');
       expect(result).not.toContain('JAVASCRIPT');
     });
+
+    it('should block entity-encoded javascript: protocol (decimal encoding)', () => {
+      // &#106; decodes to 'j', forming 'javascript:'
+      const result = sanitizeNotificationHtml('<a href="&#106;avascript:alert(1)">xss</a>');
+      expect(result).toBe('xss</a>');
+    });
+
+    it('should block entity-encoded javascript: protocol (hex encoding)', () => {
+      // &#x6A; decodes to 'j', forming 'javascript:'
+      const result = sanitizeNotificationHtml('<a href="&#x6A;avascript:alert(1)">xss</a>');
+      expect(result).toBe('xss</a>');
+    });
+
+    it('should block whitespace-obfuscated protocol (embedded newline)', () => {
+      // java\nscript: collapses to javascript: after whitespace stripping
+      const result = sanitizeNotificationHtml('<a href="java\nscript:alert(1)">xss</a>');
+      expect(result).toBe('xss</a>');
+    });
+
+    it('should block whitespace-obfuscated protocol (embedded tab)', () => {
+      const result = sanitizeNotificationHtml('<a href="java\tscript:alert(1)">xss</a>');
+      expect(result).toBe('xss</a>');
+    });
+
+    it('should allow safe http: URLs', () => {
+      const result = sanitizeNotificationHtml('<a href="https://example.com">safe</a>');
+      expect(result).toBe('<a href="https://example.com">safe</a>');
+    });
+
+    it('should allow relative URLs', () => {
+      const result = sanitizeNotificationHtml('<a href="/about">relative</a>');
+      expect(result).toBe('<a href="/about">relative</a>');
+    });
+
+    it('should allow fragment links', () => {
+      const result = sanitizeNotificationHtml('<a href="#section">fragment</a>');
+      expect(result).toBe('<a href="#section">fragment</a>');
+    });
   });
 
   describe('HTML comments', () => {

@@ -11,7 +11,7 @@ export interface HeadingProps extends React.HTMLAttributes<HTMLHeadingElement> {
 }
 
 const levelStyles: Record<number, string> = {
-  1: 'text-2xl pt-4.5 px-0 h-13 mb-0 leading-tight',
+  1: 'text-2xl pt-[18px] px-0 h-[52px] mb-0 leading-tight',
   2: 'text-xl pt-3 px-0 h-11 mb-0 leading-tight',
   3: 'text-base pt-2 px-0 h-9 mb-0 leading-tight',
   4: 'text-sm pt-2 px-0 h-8 mb-0 leading-snug',

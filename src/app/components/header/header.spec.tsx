@@ -215,13 +215,13 @@ describe('Header', () => {
     it('applies desktop height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('md:h-30.5');
+      expect(header).toHaveClass('md:h-[122px]');
     });
 
     it('applies mobile height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('h-14.5');
+      expect(header).toHaveClass('h-[58px]');
     });
 
     it('renders content layer with proper z-index', () => {

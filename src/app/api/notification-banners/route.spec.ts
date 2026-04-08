@@ -22,22 +22,25 @@ describe('GET /api/notification-banners', () => {
     vi.resetAllMocks();
   });
 
-  it('should return active banners on success', async () => {
-    const mockBanners = [
-      { id: 'banner-1', slotNumber: 1, content: 'Hello' },
-      { id: 'banner-2', slotNumber: 2, content: 'World' },
-    ];
+  it('should return banners and rotationInterval on success', async () => {
+    const mockResponse = {
+      banners: [
+        { slotNumber: 1, imageFilename: 'banner1.webp', notification: null },
+        { slotNumber: 2, imageFilename: 'banner2.webp', notification: null },
+      ],
+      rotationInterval: 5,
+    };
 
     vi.mocked(BannerNotificationService.getActiveBanners).mockResolvedValue({
       success: true,
-      data: mockBanners,
+      data: mockResponse,
     } as never);
 
     const response = await GET();
 
     expect(BannerNotificationService.getActiveBanners).toHaveBeenCalled();
     expect(response).toEqual({
-      data: mockBanners,
+      data: mockResponse,
       status: 200,
     });
   });
@@ -56,16 +59,21 @@ describe('GET /api/notification-banners', () => {
     });
   });
 
-  it('should return empty array when no active banners exist', async () => {
+  it('should return empty banners array with rotationInterval when no active banners exist', async () => {
+    const mockResponse = {
+      banners: [],
+      rotationInterval: 5,
+    };
+
     vi.mocked(BannerNotificationService.getActiveBanners).mockResolvedValue({
       success: true,
-      data: [],
+      data: mockResponse,
     } as never);
 
     const response = await GET();
 
     expect(response).toEqual({
-      data: [],
+      data: mockResponse,
       status: 200,
     });
   });

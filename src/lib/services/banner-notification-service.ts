@@ -156,35 +156,28 @@ export class BannerNotificationService {
     }
   ): Promise<ServiceResponse<BannerNotificationData>> {
     try {
-      const existing = await prisma.bannerNotification.findUnique({
+      const notification = await prisma.bannerNotification.upsert({
         where: { slotNumber },
+        update: {
+          content: data.content,
+          textColor: data.textColor,
+          backgroundColor: data.backgroundColor,
+          displayFrom: data.displayFrom,
+          displayUntil: data.displayUntil,
+          repostedFromId: data.repostedFromId,
+          addedById: data.addedById,
+        },
+        create: {
+          slotNumber,
+          content: data.content,
+          textColor: data.textColor,
+          backgroundColor: data.backgroundColor,
+          displayFrom: data.displayFrom,
+          displayUntil: data.displayUntil,
+          repostedFromId: data.repostedFromId,
+          addedById: data.addedById,
+        },
       });
-
-      const notification = existing
-        ? await prisma.bannerNotification.update({
-            where: { slotNumber },
-            data: {
-              content: data.content,
-              textColor: data.textColor,
-              backgroundColor: data.backgroundColor,
-              displayFrom: data.displayFrom,
-              displayUntil: data.displayUntil,
-              repostedFromId: data.repostedFromId,
-              addedById: data.addedById,
-            },
-          })
-        : await prisma.bannerNotification.create({
-            data: {
-              slotNumber,
-              content: data.content,
-              textColor: data.textColor,
-              backgroundColor: data.backgroundColor,
-              displayFrom: data.displayFrom,
-              displayUntil: data.displayUntil,
-              repostedFromId: data.repostedFromId,
-              addedById: data.addedById,
-            },
-          });
 
       BannerNotificationService.invalidateCache();
       return { success: true, data: notification };
