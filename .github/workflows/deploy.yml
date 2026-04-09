@@ -1224,12 +1224,13 @@ jobs:
             echo "bump=major" >> "$GITHUB_OUTPUT"
           elif echo "$LABELS" | grep -q "version:minor"; then
             echo "bump=minor" >> "$GITHUB_OUTPUT"
-          elif echo "$LABELS" | grep -q "version:patch"; then
-            echo "bump=patch" >> "$GITHUB_OUTPUT"
-          else
-            echo "No version label found — skipping version bump."
+          elif echo "$LABELS" | grep -q "version:skip"; then
+            echo "version:skip label found — skipping version bump."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
+          else
+            echo "No version label found — defaulting to minor bump."
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
           fi
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
