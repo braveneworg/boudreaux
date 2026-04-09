@@ -271,7 +271,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
-    expect(body.message).toBe('S3 upload failed');
+    expect(body.message).toBe('Upload failed. Please try again.');
 
     consoleSpy.mockRestore();
   });

@@ -3,14 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import 'server-only';
+
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import type { Artist } from '@/lib/types/media-models';
+import { requireRole } from '@/lib/utils/auth/require-role';
 
 import type { Prisma } from '@prisma/client';
 
 export async function createArtistAction(artist: Artist): Promise<ServiceResponse<Artist>> {
   try {
+    await requireRole('admin');
     const { images, urls, labels: _labels, releases: _releases, ...artistData } = artist;
 
     const createInput: Prisma.ArtistCreateInput = {

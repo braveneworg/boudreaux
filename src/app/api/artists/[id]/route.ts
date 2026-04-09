@@ -6,6 +6,7 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { updateArtistSchema } from '@/lib/validation/update-schemas';
@@ -45,104 +46,107 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
  * PUT /api/artist/[id]
  * Update an artist by ID
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-    const validation = validateBody(updateArtistSchema, body);
+export const PUT = withAdmin(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
+      const body = await request.json();
+      const validation = validateBody(updateArtistSchema, body);
 
-    if (!validation.success) {
-      return validation.response;
+      if (!validation.success) {
+        return validation.response;
+      }
+
+      const result = await ArtistService.updateArtist(
+        id,
+        validation.data as unknown as Prisma.ArtistUpdateInput
+      );
+
+      if (!result.success) {
+        const status =
+          result.error === 'Artist not found'
+            ? 404
+            : result.error === 'Artist with this slug already exists'
+              ? 409
+              : result.error === 'Database unavailable'
+                ? 503
+                : 500;
+        return NextResponse.json({ error: result.error }, { status });
+      }
+
+      return NextResponse.json(result.data);
+    } catch (error) {
+      console.error('Artist PUT error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    const result = await ArtistService.updateArtist(
-      id,
-      validation.data as unknown as Prisma.ArtistUpdateInput
-    );
-
-    if (!result.success) {
-      const status =
-        result.error === 'Artist not found'
-          ? 404
-          : result.error === 'Artist with this slug already exists'
-            ? 409
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-      return NextResponse.json({ error: result.error }, { status });
-    }
-
-    return NextResponse.json(result.data);
-  } catch (error) {
-    console.error('Artist PUT error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+);
 
 /**
  * PATCH /api/artist/[id]
  * Partially update an artist by ID
  */
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-    const validation = validateBody(updateArtistSchema, body);
+export const PATCH = withAdmin(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
+      const body = await request.json();
+      const validation = validateBody(updateArtistSchema, body);
 
-    if (!validation.success) {
-      return validation.response;
+      if (!validation.success) {
+        return validation.response;
+      }
+
+      const result = await ArtistService.updateArtist(
+        id,
+        validation.data as unknown as Prisma.ArtistUpdateInput
+      );
+
+      if (!result.success) {
+        const status =
+          result.error === 'Artist not found'
+            ? 404
+            : result.error === 'Artist with this slug already exists'
+              ? 409
+              : result.error === 'Database unavailable'
+                ? 503
+                : 500;
+        return NextResponse.json({ error: result.error }, { status });
+      }
+
+      return NextResponse.json(result.data);
+    } catch (error) {
+      console.error('Artist PATCH error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    const result = await ArtistService.updateArtist(
-      id,
-      validation.data as unknown as Prisma.ArtistUpdateInput
-    );
-
-    if (!result.success) {
-      const status =
-        result.error === 'Artist not found'
-          ? 404
-          : result.error === 'Artist with this slug already exists'
-            ? 409
-            : result.error === 'Database unavailable'
-              ? 503
-              : 500;
-      return NextResponse.json({ error: result.error }, { status });
-    }
-
-    return NextResponse.json(result.data);
-  } catch (error) {
-    console.error('Artist PATCH error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+);
 
 /**
  * DELETE /api/artist/[id]
  * Delete an artist by ID (hard delete)
  */
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
+export const DELETE = withAdmin(
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
 
-    const result = await ArtistService.deleteArtist(id);
+      const result = await ArtistService.deleteArtist(id);
 
-    if (!result.success) {
-      const status =
-        result.error === 'Artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      if (!result.success) {
+        const status =
+          result.error === 'Artist not found'
+            ? 404
+            : result.error === 'Database unavailable'
+              ? 503
+              : 500;
+        return NextResponse.json({ error: result.error }, { status });
+      }
+
+      return NextResponse.json({ message: 'Artist deleted successfully', data: result.data });
+    } catch (error) {
+      console.error('Artist DELETE error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    return NextResponse.json({ message: 'Artist deleted successfully', data: result.data });
-  } catch (error) {
-    console.error('Artist DELETE error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+);

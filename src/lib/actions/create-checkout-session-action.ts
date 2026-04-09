@@ -8,10 +8,16 @@ import 'server-only';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getStripePriceId, type SubscriberRateTier } from '@/lib/subscriber-rates';
+import { rateLimit } from '@/lib/utils/rate-limit';
 
 import { auth } from '../../../auth';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
+
+const limiter = rateLimit({
+  interval: 60 * 1000, // 1 minute
+  uniqueTokenPerInterval: 500,
+});
 
 interface CreateCheckoutSessionResult {
   clientSecret: string | null;
@@ -28,6 +34,17 @@ export const createCheckoutSessionAction = async (
     // Use the server-verified email when the user is authenticated; fall back to
     // the provided email for unauthenticated (guest) checkouts.
     const verifiedEmail = authSession?.user?.email ?? customerEmail;
+
+    // Rate limit by email or tier to prevent checkout abuse
+    const rateLimitKey = verifiedEmail ?? tier;
+    try {
+      await limiter.check(5, rateLimitKey);
+    } catch {
+      return {
+        clientSecret: null,
+        error: 'Too many requests. Please try again later.',
+      };
+    }
 
     const existing = verifiedEmail ? await SubscriptionRepository.findByEmail(verifiedEmail) : null;
 

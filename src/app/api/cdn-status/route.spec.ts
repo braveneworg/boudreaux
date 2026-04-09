@@ -3,6 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { GET } from './route';
 
+vi.mock('@/lib/decorators/with-auth', () => ({
+  withAdmin: (handler: Function) => handler,
+  withAuth: (handler: Function) => handler,
+}));
+
 const mockSend = vi.fn();
 
 vi.mock('@aws-sdk/client-cloudfront', () => ({

@@ -23,6 +23,12 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({
+    check: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 vi.mock('@/lib/subscriber-rates', () => ({
   getStripePriceId: (tier: string) => {
     const map: Record<string, string> = {

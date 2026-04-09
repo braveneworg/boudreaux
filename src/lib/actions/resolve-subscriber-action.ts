@@ -10,6 +10,7 @@ import { generateUsername } from 'unique-username-generator';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { validateEmailSecurity } from '@/lib/utils/email-security';
+import { rateLimit } from '@/lib/utils/rate-limit';
 
 interface ResolveSubscriberInput {
   email: string;
@@ -18,14 +19,23 @@ interface ResolveSubscriberInput {
 
 interface ResolveSubscriberResult {
   success: boolean;
-  status?: 'existing' | 'created';
   error?: string;
 }
+
+const limiter = rateLimit({
+  interval: 60 * 1000, // 1 minute
+  uniqueTokenPerInterval: 500,
+});
 
 export const resolveSubscriberAction = async (
   input: ResolveSubscriberInput
 ): Promise<ResolveSubscriberResult> => {
   try {
+    // Rate limit to prevent abuse
+    await limiter.check(5, input.email).catch(() => {
+      throw new Error('Too many requests. Please try again later.');
+    });
+
     const { email, termsAccepted } = input;
 
     const emailValidation = validateEmailSecurity(email);
@@ -41,7 +51,8 @@ export const resolveSubscriberAction = async (
     });
 
     if (existingUser) {
-      return { success: true, status: 'existing' };
+      // Return uniform response to prevent email enumeration
+      return { success: true };
     }
 
     if (!termsAccepted) {
@@ -61,7 +72,8 @@ export const resolveSubscriberAction = async (
       username: generateUsername('', 4),
     });
 
-    return { success: true, status: 'created' };
+    // Return uniform response to prevent email enumeration
+    return { success: true };
   } catch (error: unknown) {
     console.error('Failed to resolve subscriber:', error);
     return {

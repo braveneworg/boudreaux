@@ -7,6 +7,11 @@ import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
+vi.mock('@/lib/decorators/with-auth', () => ({
+  withAdmin: (handler: Function) => handler,
+  withAuth: (handler: Function) => handler,
+}));
+
 vi.mock('next/server', async (importOriginal) => {
   const original = (await importOriginal()) as typeof NextServerModule;
   class MockNextResponse extends Response {
@@ -67,22 +72,14 @@ describe('GET /api/proxy-image', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('should return 200 and proxy image from cloudfront.net', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(new ArrayBuffer(8), {
-        headers: { 'content-type': 'image/png' },
-      })
-    );
-
+  it('should return 403 for cloudfront.net domain (removed from allowlist)', async () => {
     const request = createRequest('https://d1234.cloudfront.net/images/photo.png');
     const response = await GET(request);
+    const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('image/png');
-    expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600');
-    expect(mockFetch).toHaveBeenCalledWith('https://d1234.cloudfront.net/images/photo.png', {
-      headers: { Accept: 'image/*' },
-    });
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Domain not allowed');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('should return 200 and proxy image from s3.amazonaws.com', async () => {
@@ -120,7 +117,7 @@ describe('GET /api/proxy-image', () => {
       statusText: 'Not Found',
     });
 
-    const request = createRequest('https://d1234.cloudfront.net/missing.png');
+    const request = createRequest('https://bucket.s3.amazonaws.com/missing.png');
     const response = await GET(request);
     const data = await response.json();
 
@@ -131,7 +128,7 @@ describe('GET /api/proxy-image', () => {
   it('should return 500 when an unexpected error occurs', async () => {
     mockFetch.mockRejectedValue(new Error('Network failure'));
 
-    const request = createRequest('https://d1234.cloudfront.net/image.png');
+    const request = createRequest('https://bucket.s3.amazonaws.com/image.png');
     const response = await GET(request);
     const data = await response.json();
 
@@ -155,7 +152,7 @@ describe('GET /api/proxy-image', () => {
       })
     );
 
-    const request = createRequest('https://d1234.cloudfront.net/image.bin');
+    const request = createRequest('https://bucket.s3.amazonaws.com/image.bin');
     const response = await GET(request);
 
     expect(response.status).toBe(200);

@@ -56,6 +56,11 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
   if (process.env.AUTH_SECRET.length < 32) {
     throw new Error('AUTH_SECRET must be at least 32 characters long for security');
   }
+
+  // Security: prevent E2E_MODE from degrading cookie security in production
+  if (process.env.E2E_MODE === 'true' && process.env.NODE_ENV === 'production') {
+    throw new Error('E2E_MODE must not be enabled in production — it disables cookie security');
+  }
 }
 
 const { handlers, auth, signIn, signOut } = NextAuth({
@@ -129,7 +134,6 @@ const { handlers, auth, signIn, signOut } = NextAuth({
             // Security: Check if role has changed - force re-authentication if so
             const oldRole = (token.user as { role?: string }).role;
             if (oldRole && freshUser.role !== oldRole) {
-              // Clear token to force re-login when role changes
               if (process.env.NODE_ENV === 'development') {
                 console.warn('User role changed - re-authentication required', {
                   userId: freshUser.id,
@@ -137,7 +141,9 @@ const { handlers, auth, signIn, signOut } = NextAuth({
                   newRole: freshUser.role,
                 });
               }
-              throw new Error('Role changed - re-authentication required');
+              // Return empty token to force re-login instead of throwing
+              // (throwing inside try/catch would be swallowed and keep old role)
+              return { ...token, user: null };
             }
 
             token.user = freshUser;

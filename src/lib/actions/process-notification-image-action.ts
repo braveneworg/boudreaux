@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import 'server-only';
+
 import sharp from 'sharp';
 
 import { requireRole } from '../utils/auth/require-role';

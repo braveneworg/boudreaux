@@ -48,8 +48,12 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Redirect to private callback url route if user is authenticated and has an explicit callbackUrl
+  // Security: validate callbackUrl is same-origin to prevent open redirect attacks
   if (token && callbackUrl && callbackUrl !== pathname) {
-    return NextResponse.redirect(new URL(callbackUrl, request.url));
+    const isSameOrigin = callbackUrl.startsWith('/') && !callbackUrl.startsWith('//');
+    if (isSameOrigin) {
+      return NextResponse.redirect(new URL(callbackUrl, request.url));
+    }
   }
 
   // Redirect unauthenticated users to signin page

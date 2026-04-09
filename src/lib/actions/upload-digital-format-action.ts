@@ -4,6 +4,8 @@
 
 'use server';
 
+import 'server-only';
+
 import { z } from 'zod';
 
 import { UploadService } from '@/lib/services/upload-service';

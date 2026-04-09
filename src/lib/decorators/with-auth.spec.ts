@@ -358,7 +358,7 @@ describe('withAdmin decorator', () => {
       });
     });
 
-    it('should return 403 when session user is undefined', async () => {
+    it('should return 401 when session user is undefined', async () => {
       mockAuth.mockResolvedValue({ user: undefined });
 
       const mockHandler = createMockHandler();
@@ -372,8 +372,8 @@ describe('withAdmin decorator', () => {
       expect(mockHandler).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'json',
-        data: { error: 'Insufficient permissions', required: 'admin' },
-        init: { status: 403 },
+        data: { error: 'Authentication required' },
+        init: { status: 401 },
       });
     });
   });

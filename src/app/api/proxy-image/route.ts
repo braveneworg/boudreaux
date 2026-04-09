@@ -3,12 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { withAuth } from '@/lib/decorators/with-auth';
+
 /**
  * Proxy endpoint to fetch remote images and return them as blobs.
  * This helps bypass CORS issues when loading images from S3/CloudFront
  * for use in the image cropper.
  */
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest) => {
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {
@@ -17,7 +19,6 @@ export async function GET(request: NextRequest) {
 
   // Validate that the URL is from our allowed domains (S3/CloudFront/custom CDN)
   const allowedDomains = [
-    'cloudfront.net',
     's3.amazonaws.com',
     's3.us-east-1.amazonaws.com',
     's3.us-west-2.amazonaws.com',
@@ -73,4 +74,4 @@ export async function GET(request: NextRequest) {
     console.error('[proxy-image] Error proxying image:', error);
     return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
   }
-}
+});

@@ -4,6 +4,8 @@
 
 'use server';
 
+import 'server-only';
+
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { requireRole } from '@/lib/utils/auth/require-role';

@@ -1,8 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
@@ -10,6 +8,12 @@ import { stripe } from '@/lib/stripe';
 import { createPurchaseCheckoutSessionAction } from './create-purchase-checkout-session-action';
 
 vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({
+    check: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
 
 const mockAuth = vi.fn();
 vi.mock('../../../auth', () => ({

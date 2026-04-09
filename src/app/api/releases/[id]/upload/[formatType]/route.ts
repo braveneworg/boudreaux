@@ -233,7 +233,7 @@ export async function PUT(
       {
         success: false,
         error: 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Upload failed. Please try again.',
+        message: 'Upload failed. Please try again.',
       },
       { status: 500 }
     );

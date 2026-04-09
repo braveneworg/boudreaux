@@ -5,6 +5,12 @@ import { resolveSubscriberAction } from './resolve-subscriber-action';
 
 vi.mock('server-only', () => ({}));
 
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({
+    check: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 const mockFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
@@ -71,7 +77,7 @@ describe('resolveSubscriberAction', () => {
     });
   });
 
-  it('should return "existing" status for existing users without sending sign-in email', async () => {
+  it('should return success for existing users without sending sign-in email', async () => {
     mockFindUnique.mockResolvedValue({ id: '1', email: 'existing@example.com' });
 
     const result = await resolveSubscriberAction({
@@ -79,7 +85,7 @@ describe('resolveSubscriberAction', () => {
       termsAccepted: true,
     });
 
-    expect(result).toEqual({ success: true, status: 'existing' });
+    expect(result).toEqual({ success: true });
   });
 
   it('should return an error when terms are not accepted for new users', async () => {
@@ -106,7 +112,7 @@ describe('resolveSubscriberAction', () => {
       termsAccepted: true,
     });
 
-    expect(result).toEqual({ success: true, status: 'created' });
+    expect(result).toEqual({ success: true });
     expect(mockCreateUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'new@example.com',

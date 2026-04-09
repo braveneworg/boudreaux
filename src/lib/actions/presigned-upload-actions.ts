@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import 'server-only';
+
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -22,12 +24,14 @@ logger.info('Module loaded', {
  * S3 client configuration
  */
 const getS3Client = () => {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are required');
+  }
   return new S3Client({
     region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
+    credentials: { accessKeyId, secretAccessKey },
   });
 };
 
@@ -229,8 +233,17 @@ export const getPresignedUploadUrlsAction = async (
     const results: PresignedUrlResult[] = [];
 
     for (const file of files) {
-      // Use existing S3 key for overwrites, or generate a new one
-      const s3Key = file.existingS3Key || generateS3Key(entityType, entityId, file.fileName);
+      // Security: validate existingS3Key belongs to the expected entity path
+      let s3Key: string;
+      if (file.existingS3Key) {
+        const expectedPrefix = `media/${entityType}/${entityId}/`;
+        if (!file.existingS3Key.startsWith(expectedPrefix) || file.existingS3Key.includes('..')) {
+          throw new Error(`Invalid S3 key: must start with ${expectedPrefix}`);
+        }
+        s3Key = file.existingS3Key;
+      } else {
+        s3Key = generateS3Key(entityType, entityId, file.fileName);
+      }
 
       const putCommand = new PutObjectCommand({
         Bucket: s3Bucket,

@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
+import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
@@ -20,6 +21,16 @@ import type Stripe from 'stripe';
 export const dynamic = 'force-dynamic';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
+
+/** Zod schema for validating webhook metadata on release purchases */
+const releaseMetadataSchema = z.object({
+  releaseId: z.string().regex(/^[a-f0-9]{24}$/, 'Invalid releaseId format'),
+  userId: z
+    .string()
+    .regex(/^[a-f0-9]{24}$/, 'Invalid userId format')
+    .optional(),
+  type: z.literal('release_purchase'),
+});
 
 export async function POST(request: NextRequest) {
   // --- IP Allowlist ---
@@ -144,7 +155,17 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   // If retrieve throws, the outer try-catch in POST() returns 500.
   const retrievedSession = await stripe.checkout.sessions.retrieve(session.id);
 
-  const { releaseId, userId: metadataUserId } = retrievedSession.metadata ?? {};
+  // Security: validate webhook metadata with Zod before using in queries
+  const metadataResult = releaseMetadataSchema.safeParse(retrievedSession.metadata);
+  if (!metadataResult.success) {
+    console.error('release_purchase webhook has invalid metadata', {
+      sessionId: retrievedSession.id,
+      metadata: retrievedSession.metadata,
+      errors: metadataResult.error.issues,
+    });
+    return;
+  }
+  const { releaseId, userId: metadataUserId } = metadataResult.data;
 
   // Derive customerEmail — check both the raw event session and the retrieved
   // session because embedded checkout (ui_mode: 'elements') may not populate

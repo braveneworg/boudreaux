@@ -37,8 +37,8 @@ export function withAuth(handler: AuthenticatedHandler) {
   return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
 
-    // Check authentication
-    if (!session) {
+    // Check authentication and validate session structure
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
@@ -55,8 +55,8 @@ export function withAdmin(handler: AuthenticatedHandler) {
     const session = await auth();
     const role = 'admin';
 
-    // Check authentication first
-    if (!session) {
+    // Check authentication first and validate session structure
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 

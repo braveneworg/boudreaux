@@ -60,7 +60,7 @@ describe('confirmDigitalFormatUploadAction', () => {
   const validParams = {
     releaseId: 'release-123',
     formatType: 'MP3_320KBPS' as const,
-    s3Key: 'releases/123/digital-formats/MP3_320KBPS/file.mp3',
+    s3Key: 'releases/release-123/digital-formats/MP3_320KBPS/file.mp3',
     fileName: 'album.mp3',
     fileSize: 50000000,
     mimeType: 'audio/mpeg',
