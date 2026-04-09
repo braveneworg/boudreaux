@@ -23,9 +23,12 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+const { mockRateLimitCheck } = vi.hoisted(() => ({
+  mockRateLimitCheck: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: () => ({
-    check: vi.fn().mockResolvedValue(undefined),
+    check: mockRateLimitCheck,
   }),
 }));
 
@@ -264,6 +267,20 @@ describe('createCheckoutSessionAction', () => {
       expect(result).toEqual({
         clientSecret: null,
         error: 'You already have an active subscription at this tier.',
+      });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('should return error when rate limited', async () => {
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limited'));
+
+      const result = await createCheckoutSessionAction('minimum');
+
+      expect(result).toEqual({
+        clientSecret: null,
+        error: 'Too many requests. Please try again later.',
       });
       expect(mockSessionsCreate).not.toHaveBeenCalled();
     });

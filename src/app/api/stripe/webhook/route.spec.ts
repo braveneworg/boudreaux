@@ -1754,6 +1754,120 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(500);
       vi.mocked(console.error).mockRestore();
     });
+
+    // ─── Security: Zod webhook metadata validation ───
+
+    it('should skip purchase when releaseId has invalid format', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_bad_rid',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'invalid!',
+          userId: '507f1f77bcf86cd799439012',
+        },
+        payment_intent: 'pi_bad_rid',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'bad-rid@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_bad_rid' })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('should skip purchase when userId has invalid format', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_bad_uid',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: 'not-hex',
+        },
+        payment_intent: 'pi_bad_uid',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'bad-uid@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_bad_uid' })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('should skip purchase when type is missing from metadata', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      // The event session must have type: 'release_purchase' so the handler
+      // routes into handleReleasePurchaseCompleted. The *retrieved* session
+      // has metadata without `type`, causing Zod validation to fail.
+      const eventSession = {
+        id: 'cs_no_type',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: '507f1f77bcf86cd799439012',
+        },
+        payment_intent: 'pi_no_type',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'no-type@example.com' },
+        customer_email: null,
+      };
+      const retrievedSession = {
+        ...eventSession,
+        metadata: {
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: '507f1f77bcf86cd799439012',
+        },
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: eventSession },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(retrievedSession);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_no_type' })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
   });
 
   // ─── Branch coverage: leading-zero IP octet is rejected by ipToNum ───

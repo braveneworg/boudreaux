@@ -196,6 +196,36 @@ describe('Artist API Routes', () => {
       expect(data).toEqual({ error: 'Internal server error' });
     });
 
+    it('should cap take parameter to 100', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artist?take=500');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.getArtists).toHaveBeenCalledWith({
+        take: 100,
+      });
+    });
+
+    it('should clamp negative skip to 0', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artist?skip=-5');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.getArtists).toHaveBeenCalledWith({
+        skip: 0,
+      });
+    });
+
     it('should handle invalid numeric parameters gracefully', async () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,

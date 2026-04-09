@@ -5,9 +5,12 @@ import { resolveSubscriberAction } from './resolve-subscriber-action';
 
 vi.mock('server-only', () => ({}));
 
+const { mockRateLimitCheck } = vi.hoisted(() => ({
+  mockRateLimitCheck: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: () => ({
-    check: vi.fn().mockResolvedValue(undefined),
+    check: mockRateLimitCheck,
   }),
 }));
 
@@ -149,6 +152,23 @@ describe('resolveSubscriberAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'An unexpected error occurred',
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('should return error when rate limited', async () => {
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limited'));
+
+      const result = await resolveSubscriberAction({
+        email: 'test@example.com',
+        termsAccepted: true,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Too many requests. Please try again later.',
+      });
+      expect(mockFindUnique).not.toHaveBeenCalled();
     });
   });
 });

@@ -232,6 +232,51 @@ describe('proxy middleware', () => {
       expect(NextResponse.next).toHaveBeenCalled();
       expect(result).toEqual({ type: 'next' });
     });
+
+    // ─── Security: open redirect prevention ───
+
+    it('should redirect when callbackUrl is a valid same-origin path', async () => {
+      vi.mocked(getToken).mockResolvedValue({
+        sub: 'user-123',
+        user: { role: 'user' },
+      });
+      const request = createMockRequest('/some-page', '/dashboard');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.redirect).toHaveBeenCalled();
+      const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0][0] as URL;
+      expect(redirectCall.pathname).toBe('/dashboard');
+      expect(result).toMatchObject({ type: 'redirect' });
+    });
+
+    it('should NOT redirect when callbackUrl is an absolute URL', async () => {
+      vi.mocked(getToken).mockResolvedValue({
+        sub: 'user-123',
+        user: { role: 'user' },
+      });
+      const request = createMockRequest('/some-page', 'https://evil.com/steal');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      // Should NOT redirect to the external URL — should fall through to NextResponse.next()
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('should NOT redirect when callbackUrl starts with // (protocol-relative URL)', async () => {
+      vi.mocked(getToken).mockResolvedValue({
+        sub: 'user-123',
+        user: { role: 'user' },
+      });
+      const request = createMockRequest('/some-page', '//evil.com/steal');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      // Protocol-relative URLs are blocked — should fall through to NextResponse.next()
+      expect(NextResponse.next).toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
+    });
   });
 
   describe('admin routes', () => {

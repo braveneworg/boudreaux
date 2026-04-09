@@ -198,6 +198,36 @@ describe('Release API Routes', () => {
       expect(data).toEqual({ error: 'Internal server error' });
     });
 
+    it('should cap take parameter to 100', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?take=500');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith({
+        take: 100,
+      });
+    });
+
+    it('should clamp negative skip to 0', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?skip=-5');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith({
+        skip: 0,
+      });
+    });
+
     it('should handle invalid numeric parameters gracefully', async () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: true,

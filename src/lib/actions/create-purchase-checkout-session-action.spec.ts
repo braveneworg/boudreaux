@@ -9,9 +9,12 @@ import { createPurchaseCheckoutSessionAction } from './create-purchase-checkout-
 
 vi.mock('server-only', () => ({}));
 
+const { mockRateLimitCheck } = vi.hoisted(() => ({
+  mockRateLimitCheck: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/utils/rate-limit', () => ({
   rateLimit: () => ({
-    check: vi.fn().mockResolvedValue(undefined),
+    check: mockRateLimitCheck,
   }),
 }));
 
@@ -310,6 +313,20 @@ describe('createPurchaseCheckoutSessionAction', () => {
           return_url: 'http://localhost:3000/releases/release-123',
         })
       );
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('should return error when rate limited', async () => {
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limited'));
+
+      const result = await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Too many requests. Please try again later.',
+      });
+      expect(vi.mocked(stripe.checkout.sessions.create)).not.toHaveBeenCalled();
     });
   });
 });

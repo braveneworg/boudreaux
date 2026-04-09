@@ -151,6 +151,32 @@ describe('confirmDigitalFormatUploadAction', () => {
 
     consoleSpy.mockRestore();
   });
+
+  // ─── Security: S3 key path traversal rejection ───
+
+  it('should return error when s3Key contains path traversal (..)', async () => {
+    const result = await confirmDigitalFormatUploadAction({
+      ...validParams,
+      s3Key: 'releases/release-123/digital-formats/MP3_320KBPS/../../../etc/passwd',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid S3 key');
+    expect(mockVerifyS3ObjectExists).not.toHaveBeenCalled();
+    expect(mockRepoCreate).not.toHaveBeenCalled();
+  });
+
+  it('should return error when s3Key does not match expected prefix', async () => {
+    const result = await confirmDigitalFormatUploadAction({
+      ...validParams,
+      s3Key: 'releases/WRONG-ID/digital-formats/MP3_320KBPS/file.mp3',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid S3 key');
+    expect(mockVerifyS3ObjectExists).not.toHaveBeenCalled();
+    expect(mockRepoCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('confirmMultiTrackUploadAction', () => {
