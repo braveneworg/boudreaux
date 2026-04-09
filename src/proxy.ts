@@ -6,6 +6,8 @@ import type { NextRequest } from 'next/server';
 
 import { getToken } from 'next-auth/jwt';
 
+type TokenUser = { role?: string };
+
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -69,7 +71,7 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/signin', request.url));
     }
 
-    const userRole = (token.user as { role?: string } | null | undefined)?.role;
+    const userRole = (token.user as TokenUser | null | undefined)?.role;
     if (userRole !== 'admin') {
       // Log unauthorized access attempt (dynamic import for edge runtime compatibility)
       // Note: In production, integrate with your logging service
