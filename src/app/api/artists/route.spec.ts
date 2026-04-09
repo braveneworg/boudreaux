@@ -72,7 +72,7 @@ describe('Artist API Routes', () => {
     vi.clearAllMocks();
   });
 
-  describe('GET /api/artist', () => {
+  describe('GET /api/artists', () => {
     it('should return all artists with default parameters', async () => {
       const mockArtists = [mockArtist];
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
@@ -80,7 +80,7 @@ describe('Artist API Routes', () => {
         data: mockArtists as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist');
+      const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
       const data = await response.json();
 
@@ -98,7 +98,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?skip=10&take=5');
+      const request = new NextRequest('http://localhost:3000/api/artists?skip=10&take=5');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -114,7 +114,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?search=john');
+      const request = new NextRequest('http://localhost:3000/api/artists?search=john');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -129,7 +129,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?skip=5&take=10&search=doe');
+      const request = new NextRequest('http://localhost:3000/api/artists?skip=5&take=10&search=doe');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -146,7 +146,7 @@ describe('Artist API Routes', () => {
         data: [],
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist');
+      const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
       const data = await response.json();
 
@@ -163,7 +163,7 @@ describe('Artist API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist');
+      const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
       const data = await response.json();
 
@@ -177,7 +177,7 @@ describe('Artist API Routes', () => {
         error: 'Failed to retrieve artists',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist');
+      const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
       const data = await response.json();
 
@@ -188,7 +188,7 @@ describe('Artist API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.getArtists).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artist');
+      const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
       const data = await response.json();
 
@@ -202,7 +202,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?take=500');
+      const request = new NextRequest('http://localhost:3000/api/artists?take=500');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -217,7 +217,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?skip=-5');
+      const request = new NextRequest('http://localhost:3000/api/artists?skip=-5');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -232,7 +232,7 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist?skip=invalid&take=abc');
+      const request = new NextRequest('http://localhost:3000/api/artists?skip=invalid&take=abc');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
@@ -243,14 +243,14 @@ describe('Artist API Routes', () => {
     });
   });
 
-  describe('POST /api/artist', () => {
+  describe('POST /api/artists', () => {
     it('should create an artist successfully', async () => {
       vi.mocked(ArtistService.createArtist).mockResolvedValue({
         success: true,
         data: mockArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -274,7 +274,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should return 400 when firstName is missing', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           surname: 'Doe',
@@ -292,7 +292,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should return 400 when surname is missing', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -310,7 +310,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should return 400 when slug is missing', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -333,7 +333,7 @@ describe('Artist API Routes', () => {
         error: 'Artist with this slug already exists',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -355,7 +355,7 @@ describe('Artist API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -377,7 +377,7 @@ describe('Artist API Routes', () => {
         error: 'Failed to create artist',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -396,7 +396,7 @@ describe('Artist API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.createArtist).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -418,7 +418,7 @@ describe('Artist API Routes', () => {
         data: mockArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: 'John',
@@ -442,7 +442,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should handle empty request body', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({}),
       });
@@ -456,7 +456,7 @@ describe('Artist API Routes', () => {
     });
 
     it('should handle empty string values as invalid', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artist', {
+      const request = new NextRequest('http://localhost:3000/api/artists', {
         method: 'POST',
         body: JSON.stringify({
           firstName: '',

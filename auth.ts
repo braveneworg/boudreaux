@@ -141,9 +141,10 @@ const { handlers, auth, signIn, signOut } = NextAuth({
                   newRole: freshUser.role,
                 });
               }
-              // Return empty token to force re-login instead of throwing
-              // (throwing inside try/catch would be swallowed and keep old role)
-              return { ...token, user: null };
+              // Remove the embedded user from the JWT to force re-login without
+              // leaving a token where `token.user` is explicitly `null`.
+              const { user: _user, ...tokenWithoutUser } = token;
+              return tokenWithoutUser;
             }
 
             token.user = freshUser;

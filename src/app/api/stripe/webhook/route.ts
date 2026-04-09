@@ -24,10 +24,10 @@ const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 /** Zod schema for validating webhook metadata on release purchases */
 const releaseMetadataSchema = z.object({
-  releaseId: z.string().regex(/^[a-f0-9]{24}$/, 'Invalid releaseId format'),
+  releaseId: z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid releaseId format'),
   userId: z
     .string()
-    .regex(/^[a-f0-9]{24}$/, 'Invalid userId format')
+    .regex(/^[a-f0-9]{24}$/i, 'Invalid userId format')
     .optional(),
   type: z.literal('release_purchase'),
 });
