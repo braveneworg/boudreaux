@@ -11,7 +11,15 @@ describe('Environment Validation', () => {
   beforeEach(() => {
     // Reset environment before each test
     vi.resetModules();
-    process.env = { ...originalEnv };
+    process.env = {
+      ...originalEnv,
+      AWS_ACCESS_KEY_ID: 'test-access-key-id',
+      AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
+      AWS_REGION: 'us-east-1',
+      STRIPE_SECRET_KEY: 'sk_test_123',
+      STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',
+    };
   });
 
   afterEach(() => {
@@ -241,12 +249,13 @@ describe('Environment Validation', () => {
       expect(consoleInfoSpy).toHaveBeenCalledWith('✅ Environment validation passed');
     });
 
-    it('should skip validation when SKIP_ENV_VALIDATION is true', () => {
+    it('should skip validation when SKIP_ENV_VALIDATION is true during build phase', () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       process.env = {
         ...process.env,
         SKIP_ENV_VALIDATION: 'true',
+        NEXT_PHASE: 'phase-production-build',
         DATABASE_URL: undefined, // This would normally cause an error
       };
 
@@ -254,10 +263,7 @@ describe('Environment Validation', () => {
       expect(() => validateEnvironment()).not.toThrow();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '⚠️  Environment validation skipped (SKIP_ENV_VALIDATION=true)'
-      );
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '   Variables will be validated at runtime when container starts'
+        '⚠️  Environment validation skipped (build phase)'
       );
     });
 
@@ -272,6 +278,12 @@ describe('Environment Validation', () => {
         EMAIL_SERVER_USER: 'user@example.com',
         EMAIL_SERVER_PASSWORD: 'password',
         EMAIL_FROM: 'noreply@example.com',
+        AWS_ACCESS_KEY_ID: 'test-access-key-id',
+        AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
+        AWS_REGION: 'us-east-1',
+        STRIPE_SECRET_KEY: 'sk_test_123',
+        STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',
       };
 
       // Dynamic import forces module-level code to run with NODE_ENV='production'

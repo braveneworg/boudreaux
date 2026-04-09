@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
+import 'server-only';
+
 import { revalidatePath } from 'next/cache';
 
 import { getActionState } from '@/lib/utils/auth/get-action-state';

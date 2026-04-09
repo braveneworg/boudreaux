@@ -4,6 +4,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { withAdmin } from '@/lib/decorators/with-auth';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
@@ -46,78 +47,79 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
  * PATCH /api/featured-artists/[id]
  * Update a featured artist by ID
  */
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params;
-    const body = await request.json();
-    const validation = validateBody(updateFeaturedArtistSchema, body);
+export const PATCH = withAdmin(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
+      const body = await request.json();
+      const validation = validateBody(updateFeaturedArtistSchema, body);
 
-    if (!validation.success) {
-      return validation.response;
+      if (!validation.success) {
+        return validation.response;
+      }
+
+      // Convert date strings to Date objects for Prisma DateTime fields
+      const { artistIds, ...scalarData } = validation.data;
+      const updateData: Prisma.FeaturedArtistUpdateInput = {
+        ...(scalarData as Record<string, unknown>),
+        ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
+        ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
+        ...(scalarData.featuredUntil && {
+          featuredUntil: new Date(scalarData.featuredUntil),
+        }),
+        // Reconnect artists: clear existing connections and set the new ones
+        ...(artistIds && {
+          artists: {
+            set: artistIds.map((artistId: string) => ({ id: artistId })),
+          },
+        }),
+      };
+
+      const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
+
+      if (!result.success) {
+        const status =
+          result.error === 'Featured artist not found'
+            ? 404
+            : result.error === 'Database unavailable'
+              ? 503
+              : 500;
+        return NextResponse.json({ error: result.error }, { status });
+      }
+
+      return NextResponse.json(serializeBigInts(result.data));
+    } catch (error) {
+      console.error('FeaturedArtist PATCH error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    // Convert date strings to Date objects for Prisma DateTime fields
-    const { artistIds, ...scalarData } = validation.data;
-    const updateData: Prisma.FeaturedArtistUpdateInput = {
-      ...(scalarData as Record<string, unknown>),
-      ...(scalarData.publishedOn && { publishedOn: new Date(scalarData.publishedOn) }),
-      ...(scalarData.featuredOn && { featuredOn: new Date(scalarData.featuredOn) }),
-      ...(scalarData.featuredUntil && {
-        featuredUntil: new Date(scalarData.featuredUntil),
-      }),
-      // Reconnect artists: clear existing connections and set the new ones
-      ...(artistIds && {
-        artists: {
-          set: artistIds.map((artistId: string) => ({ id: artistId })),
-        },
-      }),
-    };
-
-    const result = await FeaturedArtistsService.updateFeaturedArtist(id, updateData);
-
-    if (!result.success) {
-      const status =
-        result.error === 'Featured artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
-    }
-
-    return NextResponse.json(serializeBigInts(result.data));
-  } catch (error) {
-    console.error('FeaturedArtist PATCH error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+);
 
 /**
  * DELETE /api/featured-artists/[id]
  * Delete a featured artist by ID
  */
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
+export const DELETE = withAdmin(
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
 
-    const result = await FeaturedArtistsService.hardDeleteFeaturedArtist(id);
+      const result = await FeaturedArtistsService.hardDeleteFeaturedArtist(id);
 
-    if (!result.success) {
-      const status =
-        result.error === 'Featured artist not found'
-          ? 404
-          : result.error === 'Database unavailable'
-            ? 503
-            : 500;
-      return NextResponse.json({ error: result.error }, { status });
+      if (!result.success) {
+        const status =
+          result.error === 'Featured artist not found'
+            ? 404
+            : result.error === 'Database unavailable'
+              ? 503
+              : 500;
+        return NextResponse.json({ error: result.error }, { status });
+      }
+
+      return NextResponse.json({ message: 'Featured artist deleted successfully' });
+    } catch (error) {
+      console.error('FeaturedArtist DELETE error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    return NextResponse.json({ message: 'Featured artist deleted successfully' });
-  } catch (error) {
-    console.error('FeaturedArtist DELETE error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+);

@@ -518,28 +518,21 @@ describe('ImageUploadService', () => {
   });
 
   describe('getS3Client fallback branches', () => {
-    it('should use fallback values when AWS env vars are missing', async () => {
+    it('should return error when AWS credentials are missing', async () => {
       delete process.env.AWS_REGION;
       delete process.env.AWS_ACCESS_KEY_ID;
       delete process.env.AWS_SECRET_ACCESS_KEY;
 
-      const mockPresignedUrl = 'https://s3.amazonaws.com/test-bucket/path?signature=abc123';
-      (getSignedUrl as ReturnType<typeof vi.fn>).mockResolvedValue(mockPresignedUrl);
-
-      await ImageUploadService.generatePresignedUploadUrl({
+      const result = await ImageUploadService.generatePresignedUploadUrl({
         tourId: 'tour123',
         fileName: 'poster.jpg',
         fileSize: 1024 * 1024,
         mimeType: 'image/jpeg',
       });
 
-      expect(S3Client).toHaveBeenCalledWith({
-        region: 'us-east-1',
-        credentials: {
-          accessKeyId: '',
-          secretAccessKey: '',
-        },
-      });
+      expect(result.success).toBe(false);
+      if (result.success) throw new Error('Expected failure');
+      expect(result.error).toContain('Failed to generate upload URL');
     });
   });
 

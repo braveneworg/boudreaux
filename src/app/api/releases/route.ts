@@ -27,9 +27,10 @@ export async function GET(request: NextRequest) {
     const artistIds = searchParams.getAll('artistIds');
     const published = searchParams.get('published');
 
+    const MAX_TAKE = 100;
     const params = {
-      ...(skip && { skip: parseInt(skip, 10) }),
-      ...(take && { take: parseInt(take, 10) }),
+      ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
+      ...(take && { take: Math.min(Math.max(1, parseInt(take, 10)), MAX_TAKE) }),
       ...(search && { search }),
       ...(artistIds.length > 0 && { artistIds }),
       ...(published !== null && { published: published === 'true' }),

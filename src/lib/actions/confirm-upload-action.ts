@@ -4,6 +4,8 @@
 
 'use server';
 
+import 'server-only';
+
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { UploadService } from '@/lib/services/upload-service';
@@ -50,6 +52,15 @@ async function confirmDigitalFormatUploadActionHandler(
     }
 
     const { releaseId, formatType, s3Key, fileName, fileSize, mimeType } = validationResult.data;
+
+    // Security: validate s3Key matches expected path pattern
+    const expectedPrefix = `releases/${releaseId}/digital-formats/${formatType}/`;
+    if (!s3Key.startsWith(expectedPrefix) || s3Key.includes('..')) {
+      return {
+        success: false,
+        error: `Invalid S3 key: must start with ${expectedPrefix}`,
+      };
+    }
 
     // Verify S3 object exists before creating DB record
     const objectExists = await verifyS3ObjectExists(s3Key);

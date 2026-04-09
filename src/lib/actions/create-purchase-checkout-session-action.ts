@@ -8,9 +8,15 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
+import { rateLimit } from '@/lib/utils/rate-limit';
 import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
 
 import { auth } from '../../../auth';
+
+const limiter = rateLimit({
+  interval: 60 * 1000, // 1 minute
+  uniqueTokenPerInterval: 500,
+});
 
 type ActionResult =
   | { success: true; clientSecret: string; sessionId: string }
@@ -30,6 +36,14 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
   }
 
   const { releaseId, amountCents, customerEmail } = parsed.data;
+
+  // Rate limit by email or releaseId to prevent checkout abuse
+  const rateLimitKey = customerEmail ?? releaseId;
+  try {
+    await limiter.check(5, rateLimitKey);
+  } catch {
+    return { success: false, error: 'Too many requests. Please try again later.' };
+  }
 
   // Resolve user identity server-side; never trust a client-supplied userId.
   const authSession = await auth();

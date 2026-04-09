@@ -23,9 +23,7 @@ function getStripe(): Stripe {
 
   const client = new Stripe(key);
 
-  if (process.env.NODE_ENV !== 'production') {
-    globalForStripe.stripe = client;
-  }
+  globalForStripe.stripe = client;
 
   return client;
 }

@@ -8,6 +8,14 @@ import { ArtistService } from '@/lib/services/artist-service';
 
 import { POST } from './route';
 
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
+
+// Mock withAdmin decorator to bypass auth in tests
+vi.mock('@/lib/decorators/with-auth', () => ({
+  withAdmin: (handler: () => unknown) => handler,
+}));
+
 vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
     archiveArtist: vi.fn(),

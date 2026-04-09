@@ -6,6 +6,8 @@ import type { NextRequest } from 'next/server';
 
 import { getToken } from 'next-auth/jwt';
 
+type TokenUser = { role?: string };
+
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -48,8 +50,12 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Redirect to private callback url route if user is authenticated and has an explicit callbackUrl
+  // Security: validate callbackUrl is same-origin to prevent open redirect attacks
   if (token && callbackUrl && callbackUrl !== pathname) {
-    return NextResponse.redirect(new URL(callbackUrl, request.url));
+    const isSameOrigin = callbackUrl.startsWith('/') && !callbackUrl.startsWith('//');
+    if (isSameOrigin) {
+      return NextResponse.redirect(new URL(callbackUrl, request.url));
+    }
   }
 
   // Redirect unauthenticated users to signin page
@@ -65,13 +71,14 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/signin', request.url));
     }
 
-    if (token.user.role !== 'admin') {
+    const userRole = (token.user as TokenUser | null | undefined)?.role;
+    if (userRole !== 'admin') {
       // Log unauthorized access attempt (dynamic import for edge runtime compatibility)
       // Note: In production, integrate with your logging service
       console.warn('Unauthorized admin access attempt:', {
         userId: token.sub,
         attemptedPath: pathname,
-        userRole: token.user.role || 'none',
+        userRole: userRole ?? 'none',
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
         timestamp: new Date().toISOString(),
       });

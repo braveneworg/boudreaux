@@ -4,13 +4,17 @@
 import { NextResponse } from 'next/server';
 
 import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ tourId: string; tourDateId: string }> }
 ) {
   try {
-    const { tourDateId } = await params;
+    const { tourId, tourDateId } = await params;
+    if (!OBJECT_ID_REGEX.test(tourId) || !OBJECT_ID_REGEX.test(tourDateId)) {
+      return NextResponse.json({ images: [] });
+    }
     const images = await TourDateImageRepository.findByTourDateId(tourDateId);
 
     return NextResponse.json({ images });

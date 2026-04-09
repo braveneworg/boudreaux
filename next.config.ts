@@ -57,7 +57,7 @@ const config = {
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   experimental: {
     serverActions: {
-      bodySizeLimit: '2048mb', // probably suitable for uploading up to 100 320 Kbps tracks, but can be adjusted as needed
+      bodySizeLimit: '50mb',
     },
   },
 

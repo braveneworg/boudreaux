@@ -113,6 +113,6 @@ declare module 'next-auth/adapters' {
 
 declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
-    user: User & AdapterUser;
+    user?: (User & AdapterUser) | null;
   }
 }

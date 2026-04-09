@@ -182,6 +182,31 @@ describe('withAuth decorator', () => {
     });
   });
 
+  describe('session user id validation', () => {
+    it('should return 401 when session user has no id', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'test@example.com', role: 'user' } });
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = withAuth(mockHandler);
+
+      const request = createMockRequest();
+      const context = createMockContext();
+
+      const result = await wrappedHandler(request, context);
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      expect(mockNextResponse.json).toHaveBeenCalledWith(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Authentication required' },
+        init: { status: 401 },
+      });
+    });
+  });
+
   describe('session data handling', () => {
     it('should handle session with complete user data', async () => {
       const mockSession = createMockSession({
@@ -358,7 +383,30 @@ describe('withAdmin decorator', () => {
       });
     });
 
-    it('should return 403 when session user is undefined', async () => {
+    it('should return 401 when session user has no id', async () => {
+      mockAuth.mockResolvedValue({ user: { email: 'admin@example.com', role: 'admin' } });
+
+      const mockHandler = createMockHandler();
+      const wrappedHandler = await withAdmin(mockHandler);
+
+      const request = createMockRequest();
+      const context = createMockContext();
+
+      const result = await wrappedHandler(request, context);
+
+      expect(mockHandler).not.toHaveBeenCalled();
+      expect(mockNextResponse.json).toHaveBeenCalledWith(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+      expect(result).toEqual({
+        type: 'json',
+        data: { error: 'Authentication required' },
+        init: { status: 401 },
+      });
+    });
+
+    it('should return 401 when session user is undefined', async () => {
       mockAuth.mockResolvedValue({ user: undefined });
 
       const mockHandler = createMockHandler();
@@ -372,8 +420,8 @@ describe('withAdmin decorator', () => {
       expect(mockHandler).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'json',
-        data: { error: 'Insufficient permissions', required: 'admin' },
-        init: { status: 403 },
+        data: { error: 'Authentication required' },
+        init: { status: 401 },
       });
     });
   });

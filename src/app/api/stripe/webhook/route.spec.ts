@@ -813,7 +813,11 @@ describe('POST /api/stripe/webhook', () => {
     const mockPaymentSession: Partial<Stripe.Checkout.Session> = {
       id: 'cs_pay_123',
       mode: 'payment',
-      metadata: { type: 'release_purchase', releaseId: 'release-001', userId: 'user-001' },
+      metadata: {
+        type: 'release_purchase',
+        releaseId: '507f1f77bcf86cd799439011',
+        userId: '507f1f77bcf86cd799439012',
+      },
       payment_intent: 'pi_test_001',
       amount_total: 1000,
       currency: 'usd',
@@ -845,8 +849,8 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(200);
       expect(mockCheckoutSessionsRetrieve).toHaveBeenCalledWith('cs_pay_123');
       expect(mockPurchaseCreate).toHaveBeenCalledWith({
-        userId: 'user-001',
-        releaseId: 'release-001',
+        userId: '507f1f77bcf86cd799439012',
+        releaseId: '507f1f77bcf86cd799439011',
         amountPaid: 1000,
         currency: 'usd',
         stripePaymentIntentId: 'pi_test_001',
@@ -857,7 +861,7 @@ describe('POST /api/stripe/webhook', () => {
         customerEmail: 'buyer@example.com',
         releaseTitle: 'Test Release',
         amountPaidCents: 1000,
-        releaseId: 'release-001',
+        releaseId: '507f1f77bcf86cd799439011',
       });
     });
 
@@ -874,7 +878,7 @@ describe('POST /api/stripe/webhook', () => {
         customerEmail: 'buyer@example.com',
         releaseTitle: 'Test Release',
         amountPaidCents: 1000,
-        releaseId: 'release-001',
+        releaseId: '507f1f77bcf86cd799439011',
       });
     });
 
@@ -882,7 +886,11 @@ describe('POST /api/stripe/webhook', () => {
       const payloadSession = {
         id: 'cs_null_pi',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-null-pi', userId: 'u-null-pi' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '607f1f77bcf86cd799439013',
+          userId: '607f1f77bcf86cd799439014',
+        },
         payment_intent: null,
         amount_total: 999,
         currency: 'usd',
@@ -1216,7 +1224,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_piobj',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-piobj', userId: 'u-piobj' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '707f1f77bcf86cd799439015',
+          userId: '707f1f77bcf86cd799439016',
+        },
         payment_intent: { id: 'pi_obj_001' },
         amount_total: 500,
         currency: 'eur',
@@ -1264,7 +1276,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_null_amt',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-amt', userId: 'u-amt' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '807f1f77bcf86cd799439017',
+          userId: '807f1f77bcf86cd799439018',
+        },
         payment_intent: 'pi_amt',
         amount_total: null,
         currency: 'usd',
@@ -1290,7 +1306,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_null_cur',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-cur', userId: 'u-cur' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '907f1f77bcf86cd799439019',
+          userId: '907f1f77bcf86cd79943901a',
+        },
         payment_intent: 'pi_cur',
         amount_total: 200,
         currency: null,
@@ -1316,7 +1336,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_no_rel',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-gone', userId: 'u-gone' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'a07f1f77bcf86cd79943901b',
+          userId: 'a07f1f77bcf86cd79943901c',
+        },
         payment_intent: 'pi_gone',
         amount_total: 100,
         currency: 'usd',
@@ -1344,7 +1368,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_no_email',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-noem', userId: 'u-noem' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'b07f1f77bcf86cd79943901d',
+          userId: 'b07f1f77bcf86cd79943901e',
+        },
         payment_intent: 'pi_noem',
         amount_total: 100,
         currency: 'usd',
@@ -1366,7 +1394,7 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).toHaveBeenCalled();
       expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
-        where: { id: 'u-noem' },
+        where: { id: 'b07f1f77bcf86cd79943901e' },
         select: { email: true },
       });
       expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
@@ -1379,7 +1407,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_no_email_anywhere',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-noem2', userId: 'u-noem2' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'c07f1f77bcf86cd79943901f',
+          userId: 'c07f1f77bcf86cd799439020',
+        },
         payment_intent: 'pi_noem2',
         amount_total: 100,
         currency: 'usd',
@@ -1401,7 +1433,7 @@ describe('POST /api/stripe/webhook', () => {
       expect(mockSendPurchaseConfirmationEmail).not.toHaveBeenCalled();
       expect(console.error).toHaveBeenCalledWith(
         'release_purchase webhook: no email available for confirmation',
-        expect.objectContaining({ purchaseId: 'p-noem2', userId: 'u-noem2' })
+        expect.objectContaining({ purchaseId: 'p-noem2', userId: 'c07f1f77bcf86cd799439020' })
       );
       vi.mocked(console.error).mockRestore();
     });
@@ -1410,7 +1442,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_fb_buy',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-fb', userId: 'u-fb' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'd07f1f77bcf86cd799439021',
+          userId: 'd07f1f77bcf86cd799439022',
+        },
         payment_intent: 'pi_fb',
         amount_total: 100,
         currency: 'usd',
@@ -1438,7 +1474,7 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_no_uid',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-nouid' },
+        metadata: { type: 'release_purchase', releaseId: 'e07f1f77bcf86cd799439023' },
         payment_intent: 'pi_nouid',
         amount_total: 700,
         currency: 'usd',
@@ -1460,7 +1496,7 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(200);
       expect(mockFindUserByEmail).toHaveBeenCalledWith('resolved@example.com');
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'u-resolved', releaseId: 'r-nouid' })
+        expect.objectContaining({ userId: 'u-resolved', releaseId: 'e07f1f77bcf86cd799439023' })
       );
     });
 
@@ -1468,7 +1504,7 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_new_user',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-newuser' },
+        metadata: { type: 'release_purchase', releaseId: 'f07f1f77bcf86cd799439024' },
         payment_intent: 'pi_newuser',
         amount_total: 500,
         currency: 'usd',
@@ -1497,7 +1533,7 @@ describe('POST /api/stripe/webhook', () => {
         },
       });
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'u-new', releaseId: 'r-newuser' })
+        expect.objectContaining({ userId: 'u-new', releaseId: 'f07f1f77bcf86cd799439024' })
       );
     });
 
@@ -1505,7 +1541,7 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_race',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-race' },
+        metadata: { type: 'release_purchase', releaseId: 'a17f1f77bcf86cd799439025' },
         payment_intent: 'pi_race',
         amount_total: 500,
         currency: 'usd',
@@ -1537,7 +1573,7 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(200);
       expect(mockFindUserByEmail).toHaveBeenCalledTimes(2);
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'u-raced', releaseId: 'r-race' })
+        expect.objectContaining({ userId: 'u-raced', releaseId: 'a17f1f77bcf86cd799439025' })
       );
     });
 
@@ -1545,7 +1581,7 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_dberr',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-dberr' },
+        metadata: { type: 'release_purchase', releaseId: 'b17f1f77bcf86cd799439026' },
         payment_intent: 'pi_dberr',
         amount_total: 500,
         currency: 'usd',
@@ -1571,7 +1607,7 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_no_email',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-noemail' },
+        metadata: { type: 'release_purchase', releaseId: 'c17f1f77bcf86cd799439027' },
         payment_intent: 'pi_noemail',
         amount_total: 500,
         currency: 'usd',
@@ -1594,7 +1630,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_pi_race',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-pi-race', userId: 'u-pi-race' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'd17f1f77bcf86cd799439028',
+          userId: 'd17f1f77bcf86cd799439029',
+        },
         payment_intent: 'pi_pi_race',
         amount_total: 500,
         currency: 'usd',
@@ -1640,8 +1680,8 @@ describe('POST /api/stripe/webhook', () => {
         mode: 'payment',
         metadata: {
           type: 'release_purchase',
-          releaseId: 'r-pi-race-miss',
-          userId: 'u-pi-race-miss',
+          releaseId: 'e17f1f77bcf86cd79943902a',
+          userId: 'e17f1f77bcf86cd79943902b',
         },
         payment_intent: 'pi_pi_race_miss',
         amount_total: 500,
@@ -1679,7 +1719,11 @@ describe('POST /api/stripe/webhook', () => {
       const session = {
         id: 'cs_p2002_other',
         mode: 'payment',
-        metadata: { type: 'release_purchase', releaseId: 'r-p2002-other', userId: 'u-p2002-other' },
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'f17f1f77bcf86cd79943902c',
+          userId: 'f17f1f77bcf86cd79943902d',
+        },
         payment_intent: 'pi_p2002_other',
         amount_total: 500,
         currency: 'usd',
@@ -1708,6 +1752,120 @@ describe('POST /api/stripe/webhook', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(500);
+      vi.mocked(console.error).mockRestore();
+    });
+
+    // ─── Security: Zod webhook metadata validation ───
+
+    it('should skip purchase when releaseId has invalid format', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_bad_rid',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: 'invalid!',
+          userId: '507f1f77bcf86cd799439012',
+        },
+        payment_intent: 'pi_bad_rid',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'bad-rid@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_bad_rid' })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('should skip purchase when userId has invalid format', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const session = {
+        id: 'cs_bad_uid',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: 'not-hex',
+        },
+        payment_intent: 'pi_bad_uid',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'bad-uid@example.com' },
+        customer_email: null,
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: session },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(session);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_bad_uid' })
+      );
+      vi.mocked(console.error).mockRestore();
+    });
+
+    it('should skip purchase when type is missing from metadata', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      // The event session must have type: 'release_purchase' so the handler
+      // routes into handleReleasePurchaseCompleted. The *retrieved* session
+      // has metadata without `type`, causing Zod validation to fail.
+      const eventSession = {
+        id: 'cs_no_type',
+        mode: 'payment',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: '507f1f77bcf86cd799439012',
+        },
+        payment_intent: 'pi_no_type',
+        amount_total: 1000,
+        currency: 'usd',
+        customer_details: { email: 'no-type@example.com' },
+        customer_email: null,
+      };
+      const retrievedSession = {
+        ...eventSession,
+        metadata: {
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: '507f1f77bcf86cd799439012',
+        },
+      };
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: { object: eventSession },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue(retrievedSession);
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPurchaseCreate).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'release_purchase webhook has invalid metadata',
+        expect.objectContaining({ sessionId: 'cs_no_type' })
+      );
       vi.mocked(console.error).mockRestore();
     });
   });

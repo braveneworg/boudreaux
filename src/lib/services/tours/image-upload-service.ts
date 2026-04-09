@@ -20,12 +20,14 @@ import type { TourDateImageUploadRequest } from '@/lib/validations/tours/tour-da
  * Get configured S3 client
  */
 const getS3Client = (): S3Client => {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are required');
+  }
   return new S3Client({
     region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
+    credentials: { accessKeyId, secretAccessKey },
   });
 };
 

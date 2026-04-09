@@ -7,22 +7,26 @@
  */
 
 export function validateEnvironment() {
-  // Skip validation during Docker build (secrets not available yet)
-  if (process.env.SKIP_ENV_VALIDATION === 'true') {
-    console.warn('⚠️  Environment validation skipped (SKIP_ENV_VALIDATION=true)');
-    console.warn('   Variables will be validated at runtime when container starts');
+  // Skip validation only during build phase (secrets not available in Docker build)
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+  if (process.env.SKIP_ENV_VALIDATION === 'true' && isBuildPhase) {
+    console.warn('⚠️  Environment validation skipped (build phase)');
     return;
   }
 
   const required = [
     'DATABASE_URL',
     'AUTH_SECRET',
-    // 'GOOGLE_CLIENT_ID',
-    // 'GOOGLE_CLIENT_SECRET',
     'EMAIL_SERVER_HOST',
     'EMAIL_SERVER_USER',
     'EMAIL_SERVER_PASSWORD',
     'EMAIL_FROM',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_REGION',
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
   ];
 
   const missing = required.filter((key) => !process.env[key]);

@@ -353,6 +353,38 @@ describe('presigned-upload-actions', () => {
       });
     });
 
+    // ─── Security: S3 key path traversal rejection ───
+
+    describe('S3 key path traversal prevention', () => {
+      it('should return error when existingS3Key contains path traversal (..)', async () => {
+        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
+          {
+            fileName: 'test.jpg',
+            contentType: 'image/jpeg',
+            fileSize: 1024,
+            existingS3Key: 'media/artists/artist-123/../../../etc/passwd',
+          },
+        ]);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Invalid S3 key');
+      });
+
+      it('should return error when existingS3Key does not match expected prefix', async () => {
+        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
+          {
+            fileName: 'test.jpg',
+            contentType: 'image/jpeg',
+            fileSize: 1024,
+            existingS3Key: 'media/artists/WRONG-ID/test.jpg',
+          },
+        ]);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Invalid S3 key');
+      });
+    });
+
     describe('error handling', () => {
       it('should handle S3 signing errors', async () => {
         mockGetSignedUrl.mockRejectedValueOnce(new Error('S3 signing failed'));

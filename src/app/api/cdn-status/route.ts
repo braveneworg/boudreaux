@@ -5,9 +5,11 @@ import { NextResponse } from 'next/server';
 
 import { CloudFrontClient, ListInvalidationsCommand } from '@aws-sdk/client-cloudfront';
 
+import { withAdmin } from '@/lib/decorators/with-auth';
+
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export const GET = withAdmin(async () => {
   try {
     const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
@@ -84,4 +86,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

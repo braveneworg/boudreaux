@@ -19,9 +19,6 @@
 [![Contributors](https://img.shields.io/github/contributors/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/graphs/contributors)
 [![GitHub Stars](https://img.shields.io/github/stars/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/network/members)
-[![Last Commit](https://img.shields.io/github/last-commit/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/commits)
-[![Commit Activity](https://img.shields.io/github/commit-activity/m/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/pulse)
-[![Open Issues](https://img.shields.io/github/issues/braveneworg/boudreaux)](https://github.com/braveneworg/boudreaux/issues)
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 

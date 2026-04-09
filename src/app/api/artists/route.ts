@@ -14,7 +14,7 @@ import type { Prisma } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/artist
+ * GET /api/artists
  * Get all artists or search for artists
  * Query params: skip, take, isActive, search
  */
@@ -25,9 +25,10 @@ export async function GET(request: NextRequest) {
     const take = searchParams.get('take');
     const search = searchParams.get('search');
 
+    const MAX_TAKE = 100;
     const params = {
-      ...(skip && { skip: parseInt(skip, 10) }),
-      ...(take && { take: parseInt(take, 10) }),
+      ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
+      ...(take && { take: Math.min(Math.max(1, parseInt(take, 10)), MAX_TAKE) }),
       ...(search && { search }),
     };
 
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/artist
+ * POST /api/artists
  * Create a new artist
  * Requires admin role
  */

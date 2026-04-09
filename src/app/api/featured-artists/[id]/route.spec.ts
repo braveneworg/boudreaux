@@ -8,6 +8,14 @@ import { FeaturedArtistsService } from '@/lib/services/featured-artists-service'
 
 import { GET, PATCH, DELETE } from './route';
 
+// Mock server-only to prevent client component error in tests
+vi.mock('server-only', () => ({}));
+
+// Mock withAdmin decorator to bypass auth in tests
+vi.mock('@/lib/decorators/with-auth', () => ({
+  withAdmin: (handler: () => unknown) => handler,
+}));
+
 vi.mock('@/lib/services/featured-artists-service', () => ({
   FeaturedArtistsService: {
     getFeaturedArtistById: vi.fn(),

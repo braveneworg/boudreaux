@@ -102,6 +102,36 @@ describe('Featured Artists API Routes', () => {
       });
     });
 
+    it('should cap take parameter to 100', async () => {
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: [mockFeaturedArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists?take=500');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
+        take: 100,
+      });
+    });
+
+    it('should clamp negative skip to 0', async () => {
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: [mockFeaturedArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists?skip=-5');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
+        skip: 0,
+      });
+    });
+
     it('should serialize BigInt values to numbers in the response', async () => {
       const artistWithBigInt = {
         ...mockFeaturedArtist,

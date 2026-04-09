@@ -1,8 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
@@ -10,6 +8,15 @@ import { stripe } from '@/lib/stripe';
 import { createPurchaseCheckoutSessionAction } from './create-purchase-checkout-session-action';
 
 vi.mock('server-only', () => ({}));
+
+const { mockRateLimitCheck } = vi.hoisted(() => ({
+  mockRateLimitCheck: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/utils/rate-limit', () => ({
+  rateLimit: () => ({
+    check: mockRateLimitCheck,
+  }),
+}));
 
 const mockAuth = vi.fn();
 vi.mock('../../../auth', () => ({
@@ -306,6 +313,20 @@ describe('createPurchaseCheckoutSessionAction', () => {
           return_url: 'http://localhost:3000/releases/release-123',
         })
       );
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('should return error when rate limited', async () => {
+      mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limited'));
+
+      const result = await createPurchaseCheckoutSessionAction(validInput);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Too many requests. Please try again later.',
+      });
+      expect(vi.mocked(stripe.checkout.sessions.create)).not.toHaveBeenCalled();
     });
   });
 });

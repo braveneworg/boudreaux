@@ -4,10 +4,14 @@
 import { NextResponse } from 'next/server';
 
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tourId: string }> }) {
   try {
     const { tourId } = await params;
+    if (!OBJECT_ID_REGEX.test(tourId)) {
+      return NextResponse.json({ error: 'Invalid tour ID' }, { status: 400 });
+    }
     const tour = await TourRepository.findById(tourId);
 
     if (!tour) {
