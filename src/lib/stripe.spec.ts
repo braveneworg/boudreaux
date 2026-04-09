@@ -44,7 +44,7 @@ describe('Stripe client caching behavior', () => {
     expect(constructorCalls).toHaveLength(1);
   });
 
-  it('should NOT cache Stripe client in development', async () => {
+  it('should also cache Stripe client in development', async () => {
     vi.resetModules();
     constructorCalls.length = 0;
     vi.stubEnv('NODE_ENV', 'development');
@@ -54,9 +54,9 @@ describe('Stripe client caching behavior', () => {
 
     // First property access — triggers getStripe() and creates a new client
     void stripe.customers;
-    // Second property access — triggers getStripe() again (no cache in dev)
+    // Second property access — should return the cached client
     void stripe.checkout;
 
-    expect(constructorCalls).toHaveLength(2);
+    expect(constructorCalls).toHaveLength(1);
   });
 });

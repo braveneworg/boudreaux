@@ -129,7 +129,9 @@ describe('Artist API Routes', () => {
         data: [mockArtist] as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists?skip=5&take=10&search=doe');
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists?skip=5&take=10&search=doe'
+      );
       const response = await GET(request);
 
       expect(response.status).toBe(200);
