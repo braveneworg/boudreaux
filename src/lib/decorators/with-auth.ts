@@ -24,16 +24,16 @@ interface Session {
   };
 }
 
-type AuthenticatedHandler = (
+type AuthenticatedHandler<TParams = unknown> = (
   request: NextRequest,
-  context: { params: Promise<unknown> },
+  context: { params: Promise<TParams> },
   session: Session
 ) => Promise<NextResponse> | NextResponse;
 
 // Authentication decorator
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
-export function withAuth(handler: AuthenticatedHandler) {
+export function withAuth<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
   return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
 
@@ -43,14 +43,14 @@ export function withAuth(handler: AuthenticatedHandler) {
     }
 
     // Call the original handler with session
-    return handler(request, context, session as Session);
+    return handler(request, context as { params: Promise<TParams> }, session as Session);
   };
 }
 
 // Admin role decorator
 // Usage: Wrap API route handlers that require admin role
 // Example: export const GET = withAdmin(async (req, res, session) => { ... });
-export function withAdmin(handler: AuthenticatedHandler) {
+export function withAdmin<TParams = unknown>(handler: AuthenticatedHandler<TParams>) {
   return async (request: NextRequest, context: { params: Promise<unknown> }) => {
     const session = await auth();
     const role = 'admin';
@@ -68,6 +68,6 @@ export function withAdmin(handler: AuthenticatedHandler) {
       );
     }
 
-    return handler(request, context, session as Session);
+    return handler(request, context as { params: Promise<TParams> }, session as Session);
   };
 }

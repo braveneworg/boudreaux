@@ -1,12 +1,19 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { NextRequest } from 'next/server';
+
 import { GET } from './route';
 
 vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: (handler: Function) => handler,
   withAuth: (handler: Function) => handler,
 }));
+
+function callGet() {
+  const request = new NextRequest('http://localhost:3000/api/cdn-status');
+  return (GET as Function)(request, { params: Promise.resolve({}) });
+}
 
 const mockSend = vi.fn();
 
@@ -38,7 +45,7 @@ describe('CDN Status API', () => {
     it('should return unknown status when CDN is not configured', async () => {
       delete process.env.CLOUDFRONT_DISTRIBUTION_ID;
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -51,7 +58,7 @@ describe('CDN Status API', () => {
         InvalidationList: { Items: [] },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -62,7 +69,7 @@ describe('CDN Status API', () => {
     it('should return ready status when InvalidationList is undefined', async () => {
       mockSend.mockResolvedValue({});
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -78,7 +85,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -97,7 +104,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('invalidating');
@@ -111,7 +118,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('invalidating');
@@ -130,7 +137,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('invalidating');
@@ -145,7 +152,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -164,7 +171,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('ready');
@@ -179,7 +186,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('ready');
@@ -196,7 +203,7 @@ describe('CDN Status API', () => {
         },
       });
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(data.status).toBe('invalidating');
@@ -207,7 +214,7 @@ describe('CDN Status API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await callGet();
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -226,7 +233,7 @@ describe('CDN Status API', () => {
 
       mockSend.mockResolvedValue({ InvalidationList: { Items: [] } });
 
-      await GET();
+      await callGet();
 
       expect(MockedClient).toHaveBeenCalledWith({
         region: 'us-east-1',

@@ -48,6 +48,8 @@ describe('GET /api/proxy-image', () => {
     vi.restoreAllMocks();
   });
 
+  const dummyContext = { params: Promise.resolve({}) };
+
   function createRequest(url?: string): NextRequest {
     const searchParams = url ? `?url=${encodeURIComponent(url)}` : '';
     return new NextRequest(`http://localhost:3000/api/proxy-image${searchParams}`);
@@ -55,7 +57,7 @@ describe('GET /api/proxy-image', () => {
 
   it('should return 400 when URL parameter is missing', async () => {
     const request = createRequest();
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -64,7 +66,7 @@ describe('GET /api/proxy-image', () => {
 
   it('should return 403 for a disallowed domain', async () => {
     const request = createRequest('https://evil.example.com/image.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -74,7 +76,7 @@ describe('GET /api/proxy-image', () => {
 
   it('should return 403 for cloudfront.net domain (removed from allowlist)', async () => {
     const request = createRequest('https://d1234.cloudfront.net/images/photo.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -90,7 +92,7 @@ describe('GET /api/proxy-image', () => {
     );
 
     const request = createRequest('https://bucket.s3.amazonaws.com/photo.jpg');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
@@ -104,7 +106,7 @@ describe('GET /api/proxy-image', () => {
     );
 
     const request = createRequest('https://cdn.fakefourrecords.com/covers/album.webp');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('image/webp');
@@ -118,7 +120,7 @@ describe('GET /api/proxy-image', () => {
     });
 
     const request = createRequest('https://bucket.s3.amazonaws.com/missing.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -129,7 +131,7 @@ describe('GET /api/proxy-image', () => {
     mockFetch.mockRejectedValue(new Error('Network failure'));
 
     const request = createRequest('https://bucket.s3.amazonaws.com/image.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -138,7 +140,7 @@ describe('GET /api/proxy-image', () => {
 
   it('should return 500 for an invalid URL format', async () => {
     const request = createRequest('not-a-valid-url');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -153,7 +155,7 @@ describe('GET /api/proxy-image', () => {
     );
 
     const request = createRequest('https://bucket.s3.amazonaws.com/image.bin');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
@@ -163,7 +165,7 @@ describe('GET /api/proxy-image', () => {
     vi.stubEnv('CDN_DOMAIN', 'not-a-valid-url');
 
     const request = createRequest('https://evil.example.com/image.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -180,7 +182,7 @@ describe('GET /api/proxy-image', () => {
     );
 
     const request = createRequest('https://cdn.mysite.com/photo.png');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     vi.unstubAllEnvs();
