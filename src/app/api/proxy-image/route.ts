@@ -67,7 +67,7 @@ export const GET = withAuth(async (request: NextRequest) => {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800', // 24h cache, 7d stale
       },
     });
   } catch (error) {

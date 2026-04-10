@@ -24,11 +24,32 @@ interface ArtistSearchResult {
 /**
  * GET /api/artists/search?q=...
  * Public endpoint — searches published, active artists by name, group, or
- * release title. Returns a lightweight payload for the combobox dropdown.
+ * release title.
+ *
+ * Query params:
+ *   q      – Search query (minimum 3 characters for combobox mode).
+ *   format – When "full", returns raw artist objects for the search results page.
+ *            Default returns lightweight combobox-optimized shape.
  */
 export async function GET(request: NextRequest) {
   try {
     const query = request.nextUrl.searchParams.get('q') ?? '';
+    const format = request.nextUrl.searchParams.get('format');
+
+    if (format === 'full') {
+      const result = query
+        ? await ArtistService.searchPublishedArtists({ search: query })
+        : { success: true as const, data: [] };
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.error === 'Database unavailable' ? 503 : 500 }
+        );
+      }
+
+      return NextResponse.json({ artists: result.data });
+    }
 
     if (query.length < 3) {
       return NextResponse.json({ results: [] });

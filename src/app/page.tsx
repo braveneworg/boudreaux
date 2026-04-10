@@ -1,8 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { BannerNotificationService } from '@/lib/services/banner-notification-service';
-import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 import { ArtistSearchInput } from './components/artist-search-input';
 import { BannerCarousel } from './components/banner-carousel';
@@ -18,29 +17,49 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_FEATURED_ARTISTS_LIMIT = 7;
 
 export default async function Home() {
-  const [featuredArtistsResult, bannersResult] = await Promise.all([
-    FeaturedArtistsService.getFeaturedArtists(new Date(), DEFAULT_FEATURED_ARTISTS_LIMIT),
-    BannerNotificationService.getActiveBanners(),
+  const [featuredArtistsUrl, bannersUrl] = await Promise.all([
+    getInternalApiUrl(`/api/featured-artists?active=true&limit=${DEFAULT_FEATURED_ARTISTS_LIMIT}`),
+    getInternalApiUrl('/api/notification-banners'),
   ]);
 
-  const featuredArtists = featuredArtistsResult.success ? featuredArtistsResult.data : [];
+  const [featuredArtistsRes, bannersRes] = await Promise.all([
+    fetch(featuredArtistsUrl, { cache: 'no-store' }),
+    fetch(bannersUrl, { cache: 'no-store' }),
+  ]);
 
-  const banners: BannerSlotData[] = bannersResult.success
-    ? bannersResult.data.banners.map((b) => ({
-        slotNumber: b.slotNumber,
-        imageFilename: b.imageFilename,
-        notification: b.notification
-          ? {
-              id: b.notification.id,
-              content: b.notification.content,
-              textColor: b.notification.textColor,
-              backgroundColor: b.notification.backgroundColor,
-            }
-          : null,
-      }))
+  const featuredArtists = featuredArtistsRes.ok
+    ? ((await featuredArtistsRes.json()).featuredArtists ?? [])
     : [];
 
-  const rotationInterval = bannersResult.success ? bannersResult.data.rotationInterval : undefined;
+  const bannersData = bannersRes.ok ? await bannersRes.json() : null;
+
+  const banners: BannerSlotData[] = bannersData?.banners
+    ? bannersData.banners.map(
+        (b: {
+          slotNumber: number;
+          imageFilename: string;
+          notification: {
+            id: string;
+            content: string;
+            textColor: string | null;
+            backgroundColor: string | null;
+          } | null;
+        }) => ({
+          slotNumber: b.slotNumber,
+          imageFilename: b.imageFilename,
+          notification: b.notification
+            ? {
+                id: b.notification.id,
+                content: b.notification.content,
+                textColor: b.notification.textColor,
+                backgroundColor: b.notification.backgroundColor,
+              }
+            : null,
+        })
+      )
+    : [];
+
+  const rotationInterval = bannersData?.rotationInterval ?? undefined;
 
   return (
     <PageContainer>

@@ -214,7 +214,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
       {/* Media player */}
       <MediaPlayer className="mb-2">
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-1">
           <div className="flex flex-col items-center">
             <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
               <div className="relative">

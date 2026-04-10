@@ -17,8 +17,8 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { Heading } from '@/app/components/ui/heading';
 import PageContainer from '@/app/components/ui/page-container';
-import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 import type { Metadata } from 'next';
 
@@ -40,12 +40,32 @@ export default async function ArtistSearchPage({ searchParams }: ArtistSearchPag
   const resolvedSearchParams = await searchParams;
   const query = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : '';
 
-  const result = query
-    ? await ArtistService.searchPublishedArtists({ search: query })
-    : { success: true as const, data: [] };
+  let hasError = false;
+  let artists: Array<{
+    id: string;
+    slug: string;
+    displayName: string | null;
+    firstName: string;
+    middleName: string | null;
+    surname: string;
+    title: string | null;
+    suffix: string | null;
+    images?: Array<{ src: string | null; altText: string | null }>;
+  }> = [];
 
-  const hasError = !result.success;
-  const artists = result.success ? result.data : [];
+  if (query) {
+    const url = await getInternalApiUrl(
+      `/api/artists/search?q=${encodeURIComponent(query)}&format=full`
+    );
+    const res = await fetch(url, { cache: 'no-store' });
+
+    if (res.ok) {
+      const data = await res.json();
+      artists = data.artists ?? [];
+    } else {
+      hasError = true;
+    }
+  }
 
   return (
     <PageContainer>

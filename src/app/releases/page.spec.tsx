@@ -9,12 +9,9 @@ import ReleasesPage from './page';
 // Mock server-only
 vi.mock('server-only', () => ({}));
 
-// Mock the ReleaseService
-const mockGetPublishedReleases = vi.fn();
-vi.mock('@/lib/services/release-service', () => ({
-  ReleaseService: {
-    getPublishedReleases: (...args: unknown[]) => mockGetPublishedReleases(...args),
-  },
+// Mock getInternalApiUrl
+vi.mock('@/lib/utils/get-internal-api-url', () => ({
+  getInternalApiUrl: vi.fn((path: string) => Promise.resolve(`http://test-host${path}`)),
 }));
 
 // Mock child components to isolate page-level logic
@@ -92,10 +89,11 @@ describe('ReleasesPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetPublishedReleases.mockResolvedValue({
-      success: true,
-      data: mockReleasesData,
-    });
+    // Default: successful fetch
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ releases: mockReleasesData }),
+    }) as unknown as typeof fetch;
   });
 
   it('should render page structure with PageContainer and ContentContainer', async () => {
@@ -141,18 +139,20 @@ describe('ReleasesPage', () => {
     expect(grid).toHaveAttribute('data-count', '1');
   });
 
-  it('should call getPublishedReleases on render', async () => {
+  it('should fetch releases via internal API', async () => {
     const Page = await ReleasesPage();
     render(Page);
 
-    expect(mockGetPublishedReleases).toHaveBeenCalledOnce();
+    expect(global.fetch).toHaveBeenCalledWith('http://test-host/api/releases?listing=published', {
+      cache: 'no-store',
+    });
   });
 
-  it('should render error message with Try again link when service fails', async () => {
-    mockGetPublishedReleases.mockResolvedValue({
-      success: false,
-      error: 'Failed to fetch',
-    });
+  it('should render error message with Try again link when fetch fails', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({}),
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasesPage();
     render(Page);
@@ -168,10 +168,10 @@ describe('ReleasesPage', () => {
   });
 
   it('should render empty grid when no releases exist', async () => {
-    mockGetPublishedReleases.mockResolvedValue({
-      success: true,
-      data: [],
-    });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ releases: [] }),
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasesPage();
     render(Page);
@@ -181,19 +181,22 @@ describe('ReleasesPage', () => {
   });
 
   it('should handle release with empty artistReleases', async () => {
-    mockGetPublishedReleases.mockResolvedValue({
-      success: true,
-      data: [
-        {
-          id: 'release-no-artist',
-          title: 'Orphan Album',
-          coverArt: '',
-          images: [],
-          artistReleases: [],
-          releaseUrls: [],
-        },
-      ],
-    });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          releases: [
+            {
+              id: 'release-no-artist',
+              title: 'Orphan Album',
+              coverArt: '',
+              images: [],
+              artistReleases: [],
+              releaseUrls: [],
+            },
+          ],
+        }),
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasesPage();
     render(Page);

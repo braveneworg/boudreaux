@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 
+import { queryKeys } from '@/lib/query-keys';
+
 const fetchReleases = async () => {
   const response = await fetch('/api/releases');
   if (!response.ok) {
@@ -11,19 +13,16 @@ const fetchReleases = async () => {
   return response.json();
 };
 
-const useReleasesQuery = () => {
+export const useReleasesQuery = () => {
   const {
     isPending,
     error = Error('Unknown error'),
     data,
     refetch,
   } = useQuery({
-    queryKey: ['releasesData'],
+    queryKey: queryKeys.releases.list(),
     queryFn: fetchReleases,
-    staleTime: 0, // Always refetch when the query is accessed
   });
 
   return { isPending, error, data, refetch };
 };
-
-export default useReleasesQuery;

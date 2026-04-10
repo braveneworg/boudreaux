@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
 
+import { queryKeys } from '@/lib/query-keys';
+
 const fetchArtists = async () => {
   const response = await fetch('/api/artists');
   if (!response.ok) {
@@ -11,19 +13,16 @@ const fetchArtists = async () => {
   return response.json();
 };
 
-const useArtistsQuery = () => {
+export const useArtistsQuery = () => {
   const {
     isPending,
     error = Error('Unknown error'),
     data,
     refetch,
   } = useQuery({
-    queryKey: ['artistsData'],
+    queryKey: queryKeys.artists.list(),
     queryFn: fetchArtists,
-    staleTime: 0, // Always refetch when the query is accessed
   });
 
   return { isPending, error, data, refetch };
 };
-
-export default useArtistsQuery;

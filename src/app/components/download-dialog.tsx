@@ -538,11 +538,12 @@ export const DownloadDialog = ({
  * Positioned absolutely — must be placed inside a `relative` container.
  */
 export const DownloadTriggerButton = ({
+  label = 'download',
   className,
   onClick,
   ref,
   ...props
-}: ComponentProps<'button'>) => (
+}: ComponentProps<'button'> & { label?: string }) => (
   <button
     ref={ref}
     type="button"
@@ -558,6 +559,6 @@ export const DownloadTriggerButton = ({
     {...props}
   >
     <Download className="size-3.5" />
-    <span className="font-['Courier_New',monospace] text-sm leading-none">download</span>
+    <span className="font-['Courier_New',monospace] text-sm leading-none">{label}</span>
   </button>
 );

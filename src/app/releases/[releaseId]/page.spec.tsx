@@ -15,14 +15,30 @@ vi.mock('next/navigation', () => ({
   notFound: () => mockNotFound(),
 }));
 
-// Mock the ReleaseService
-const mockGetReleaseWithTracks = vi.fn();
-const mockGetArtistOtherReleases = vi.fn();
-vi.mock('@/lib/services/release-service', () => ({
-  ReleaseService: {
-    getReleaseWithTracks: (...args: unknown[]) => mockGetReleaseWithTracks(...args),
-    getArtistOtherReleases: (...args: unknown[]) => mockGetArtistOtherReleases(...args),
-  },
+// Mock next/headers cookies
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({
+    toString: () => 'session-token=abc123',
+  }),
+  headers: vi.fn().mockResolvedValue(
+    new Map([
+      ['host', 'test-host'],
+      ['x-forwarded-proto', 'http'],
+    ])
+  ),
+}));
+
+// Mock getInternalApiUrl
+vi.mock('@/lib/utils/get-internal-api-url', () => ({
+  getInternalApiUrl: vi.fn((path: string) => Promise.resolve(`http://test-host${path}`)),
+}));
+
+vi.mock('@/lib/utils/get-artist-display-name', () => ({
+  getArtistDisplayName: (artist: {
+    displayName?: string | null;
+    firstName: string;
+    surname: string;
+  }) => artist.displayName ?? `${artist.firstName} ${artist.surname}`,
 }));
 
 // Mock child components
@@ -100,41 +116,17 @@ vi.mock('@/app/components/release-description', () => ({
     description ? <div data-testid="release-description">{description}</div> : null,
 }));
 
-// Mock auth (added for PWYW purchase feature)
-const mockAuth = vi.fn().mockResolvedValue(null);
-vi.mock('../../../../auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
-
-// Mock PurchaseRepository (added for PWYW purchase feature)
-const mockFindByUserAndRelease = vi.fn().mockResolvedValue(null);
-const mockGetDownloadRecord = vi.fn().mockResolvedValue(null);
-vi.mock('@/lib/repositories/purchase-repository', () => ({
-  PurchaseRepository: {
-    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
-    getDownloadRecord: (...args: unknown[]) => mockGetDownloadRecord(...args),
-  },
-}));
-
-// Mock ReleaseDigitalFormatRepository (added for digital formats feature)
-const mockFindAllByRelease = vi.fn().mockResolvedValue([]);
-vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
-  ReleaseDigitalFormatRepository: class {
-    findAllByRelease = (...args: unknown[]) => mockFindAllByRelease(...args);
-  },
-}));
-
 describe('ReleasePlayerPage', () => {
   const mockReleaseData = {
     id: 'release-1',
     title: 'Midnight Serenade',
     coverArt: 'https://cdn.example.com/cover.jpg',
     description: 'A great album',
-    publishedAt: new Date(),
-    releasedOn: new Date(),
+    publishedAt: new Date().toISOString(),
+    releasedOn: new Date().toISOString(),
     deletedOn: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     images: [],
     artistReleases: [
       {
@@ -150,8 +142,8 @@ describe('ReleasePlayerPage', () => {
           suffix: null,
           middleName: null,
           bio: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           deletedOn: null,
         },
       },
@@ -183,22 +175,53 @@ describe('ReleasePlayerPage', () => {
     },
   ];
 
+  const mockUserStatus = {
+    hasPurchase: false,
+    purchasedAt: null,
+    downloadCount: 0,
+    availableFormats: [],
+  };
+
   const defaultParams = Promise.resolve({ releaseId: 'release-1' });
   const defaultSearchParams = Promise.resolve({} as Record<string, string | string[] | undefined>);
   const autoPlaySearchParams = Promise.resolve({
     autoplay: 'true',
   } as Record<string, string | string[] | undefined>);
 
+  const createFetchMock = (overrides?: {
+    releaseResponse?: { ok: boolean; json: () => Promise<unknown> };
+    userStatusResponse?: { ok: boolean; json: () => Promise<unknown> };
+    relatedResponse?: { ok: boolean; json: () => Promise<unknown> };
+  }) =>
+    vi.fn((url: string) => {
+      if (typeof url === 'string' && url.includes('/user-status')) {
+        return Promise.resolve(
+          overrides?.userStatusResponse ?? {
+            ok: true,
+            json: () => Promise.resolve(mockUserStatus),
+          }
+        );
+      }
+      if (typeof url === 'string' && url.includes('/related')) {
+        return Promise.resolve(
+          overrides?.relatedResponse ?? {
+            ok: true,
+            json: () => Promise.resolve({ releases: mockOtherReleases }),
+          }
+        );
+      }
+      // Release with tracks (default)
+      return Promise.resolve(
+        overrides?.releaseResponse ?? {
+          ok: true,
+          json: () => Promise.resolve(mockReleaseData),
+        }
+      );
+    });
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetReleaseWithTracks.mockResolvedValue({
-      success: true,
-      data: mockReleaseData,
-    });
-    mockGetArtistOtherReleases.mockResolvedValue({
-      success: true,
-      data: mockOtherReleases,
-    });
+    global.fetch = createFetchMock() as unknown as typeof fetch;
   });
 
   it('should render page structure', async () => {
@@ -212,24 +235,30 @@ describe('ReleasePlayerPage', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('should call getReleaseWithTracks with release ID', async () => {
+  it('should fetch the release with tracks via internal API', async () => {
     const Page = await ReleasePlayerPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
     });
     render(Page);
 
-    expect(mockGetReleaseWithTracks).toHaveBeenCalledWith('release-1');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://test-host/api/releases/release-1?withTracks=true',
+      { cache: 'no-store' }
+    );
   });
 
-  it('should call getArtistOtherReleases with primary artist ID', async () => {
+  it('should fetch related releases with artist ID', async () => {
     const Page = await ReleasePlayerPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
     });
     render(Page);
 
-    expect(mockGetArtistOtherReleases).toHaveBeenCalledWith('artist-1', 'release-1');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://test-host/api/releases/release-1/related?artistId=artist-1',
+      { cache: 'no-store' }
+    );
   });
 
   it('should render BreadcrumbMenu with Home > Releases > {title}', async () => {
@@ -289,10 +318,12 @@ describe('ReleasePlayerPage', () => {
   });
 
   it('should not render ArtistReleasesCarousel when no other releases', async () => {
-    mockGetArtistOtherReleases.mockResolvedValue({
-      success: true,
-      data: [],
-    });
+    global.fetch = createFetchMock({
+      relatedResponse: {
+        ok: true,
+        json: () => Promise.resolve({ releases: [] }),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -304,10 +335,12 @@ describe('ReleasePlayerPage', () => {
   });
 
   it('should call notFound when release not found', async () => {
-    mockGetReleaseWithTracks.mockResolvedValue({
-      success: false,
-      error: 'Release not found',
-    });
+    global.fetch = createFetchMock({
+      releaseResponse: {
+        ok: false,
+        json: () => Promise.resolve({}),
+      },
+    }) as unknown as typeof fetch;
 
     await ReleasePlayerPage({ params: defaultParams, searchParams: defaultSearchParams });
 
@@ -326,10 +359,12 @@ describe('ReleasePlayerPage', () => {
   });
 
   it('should not render ReleaseDescription when description is null', async () => {
-    mockGetReleaseWithTracks.mockResolvedValue({
-      success: true,
-      data: { ...mockReleaseData, description: null },
-    });
+    global.fetch = createFetchMock({
+      releaseResponse: {
+        ok: true,
+        json: () => Promise.resolve({ ...mockReleaseData, description: null }),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -363,14 +398,16 @@ describe('ReleasePlayerPage', () => {
   });
 
   it('should handle missing artistReleases gracefully', async () => {
-    const releaseNoArtists = {
-      ...mockReleaseData,
-      artistReleases: [],
-    };
-    mockGetReleaseWithTracks.mockResolvedValue({
-      success: true,
-      data: releaseNoArtists,
-    });
+    global.fetch = createFetchMock({
+      releaseResponse: {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockReleaseData,
+            artistReleases: [],
+          }),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -378,17 +415,17 @@ describe('ReleasePlayerPage', () => {
     });
     render(Page);
 
-    // Without primaryArtistId, getArtistOtherReleases should not be called
-    expect(mockGetArtistOtherReleases).not.toHaveBeenCalled();
     // Should still render page structure
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
   });
 
-  it('should handle failed otherReleasesResult gracefully', async () => {
-    mockGetArtistOtherReleases.mockResolvedValue({
-      success: false,
-      error: 'Service error',
-    });
+  it('should handle failed related releases gracefully', async () => {
+    global.fetch = createFetchMock({
+      relatedResponse: {
+        ok: false,
+        json: () => Promise.resolve({}),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -396,19 +433,28 @@ describe('ReleasePlayerPage', () => {
     });
     render(Page);
 
-    // When otherReleasesResult.success is false, otherReleases should be []
+    // When relatedRes.ok is false, otherReleases should be []
     // So carousel should not render
     expect(screen.queryByTestId('artist-releases-carousel')).not.toBeInTheDocument();
     // Player should still render
     expect(screen.getByTestId('release-player')).toBeInTheDocument();
   });
 
-  // ─── Authenticated user / purchase branch (line 57) ──────────────────────────
+  // ─── Authenticated user / purchase branch ──────────────────────────
 
-  it('should check purchase status when user is authenticated', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
-    mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
-    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 3 });
+  it('should show purchase status when user-status returns data', async () => {
+    global.fetch = createFetchMock({
+      userStatusResponse: {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            hasPurchase: true,
+            purchasedAt: '2024-06-01T00:00:00.000Z',
+            downloadCount: 3,
+            availableFormats: [],
+          }),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -416,18 +462,18 @@ describe('ReleasePlayerPage', () => {
     });
     render(Page);
 
-    expect(mockFindByUserAndRelease).toHaveBeenCalledWith('user-123', 'release-1');
-    expect(mockGetDownloadRecord).toHaveBeenCalledWith('user-123', 'release-1');
-
     const player = screen.getByTestId('release-player');
     expect(player).toHaveAttribute('data-has-purchase', 'true');
     expect(player).toHaveAttribute('data-download-count', '3');
   });
 
-  it('should pass hasPurchase=false when authenticated user has no purchase', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-456' } });
-    mockFindByUserAndRelease.mockResolvedValue(null);
-    mockGetDownloadRecord.mockResolvedValue(null);
+  it('should pass hasPurchase=false when user is not authenticated', async () => {
+    global.fetch = createFetchMock({
+      userStatusResponse: {
+        ok: false,
+        json: () => Promise.resolve({ error: 'Unauthorized' }),
+      },
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -440,16 +486,21 @@ describe('ReleasePlayerPage', () => {
     expect(player).toHaveAttribute('data-download-count', '0');
   });
 
-  // ─── Digital format filter and fallback chain (lines 69-72) ───────────────────
+  // ─── Digital format tests ───────────────────────────────────
 
-  it('should include formats with files and map fileName from files array', async () => {
-    mockFindAllByRelease.mockResolvedValue([
-      {
-        formatType: 'FLAC',
-        fileName: null,
-        files: [{ fileName: 'album-flac.zip' }],
+  it('should pass available formats from user-status API', async () => {
+    global.fetch = createFetchMock({
+      userStatusResponse: {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            hasPurchase: false,
+            purchasedAt: null,
+            downloadCount: 0,
+            availableFormats: [{ formatType: 'FLAC', fileName: 'album-flac.zip' }],
+          }),
       },
-    ]);
+    }) as unknown as typeof fetch;
 
     const Page = await ReleasePlayerPage({
       params: defaultParams,
@@ -460,65 +511,5 @@ describe('ReleasePlayerPage', () => {
     const player = screen.getByTestId('release-player');
     const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
     expect(formats).toEqual([{ formatType: 'FLAC', fileName: 'album-flac.zip' }]);
-  });
-
-  it('should include formats with fileName but no files', async () => {
-    mockFindAllByRelease.mockResolvedValue([
-      {
-        formatType: 'MP3',
-        fileName: 'album-mp3.zip',
-        files: [],
-      },
-    ]);
-
-    const Page = await ReleasePlayerPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    const player = screen.getByTestId('release-player');
-    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
-    expect(formats).toEqual([{ formatType: 'MP3', fileName: 'album-mp3.zip' }]);
-  });
-
-  it('should fall back to formatType.zip when no fileName and no files', async () => {
-    mockFindAllByRelease.mockResolvedValue([
-      {
-        formatType: 'WAV',
-        fileName: null,
-        files: [{ fileName: null }],
-      },
-    ]);
-
-    const Page = await ReleasePlayerPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    const player = screen.getByTestId('release-player');
-    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
-    expect(formats).toEqual([{ formatType: 'WAV', fileName: 'WAV.zip' }]);
-  });
-
-  it('should fall back to formatType.zip for formats with no files and no fileName', async () => {
-    mockFindAllByRelease.mockResolvedValue([
-      {
-        formatType: 'AAC',
-        fileName: null,
-        files: [],
-      },
-    ]);
-
-    const Page = await ReleasePlayerPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    const player = screen.getByTestId('release-player');
-    const formats = JSON.parse(player.getAttribute('data-available-formats') || '[]');
-    expect(formats).toEqual([{ formatType: 'AAC', fileName: 'AAC.zip' }]);
   });
 });

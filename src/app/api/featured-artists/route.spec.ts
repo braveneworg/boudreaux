@@ -20,6 +20,7 @@ vi.mock('@/lib/decorators/with-auth', () => ({
 vi.mock('@/lib/services/featured-artists-service', () => ({
   FeaturedArtistsService: {
     getAllFeaturedArtists: vi.fn(),
+    getFeaturedArtists: vi.fn(),
     createFeaturedArtist: vi.fn(),
     getFeaturedArtistById: vi.fn(),
     updateFeaturedArtist: vi.fn(),
@@ -69,6 +70,21 @@ describe('Featured Artists API Routes', () => {
         count: 1,
       });
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({});
+    });
+
+    it('should include Cache-Control header on successful GET response', async () => {
+      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockResolvedValue({
+        success: true,
+        data: [mockFeaturedArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/featured-artists');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=60, stale-while-revalidate=300'
+      );
     });
 
     it('should handle pagination parameters', async () => {
@@ -194,6 +210,113 @@ describe('Featured Artists API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Failed to retrieve featured artists' });
+    });
+
+    describe('active mode (?active=true)', () => {
+      it('should call getFeaturedArtists with default limit when active=true', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: true,
+          data: [mockFeaturedArtist] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.featuredArtists).toHaveLength(1);
+        expect(data.count).toBe(1);
+        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(
+          expect.any(Date),
+          10
+        );
+        expect(FeaturedArtistsService.getAllFeaturedArtists).not.toHaveBeenCalled();
+      });
+
+      it('should respect custom limit parameter', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/featured-artists?active=true&limit=7'
+        );
+        await GET(request);
+
+        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 7);
+      });
+
+      it('should cap limit to 100', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/featured-artists?active=true&limit=500'
+        );
+        await GET(request);
+
+        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(
+          expect.any(Date),
+          100
+        );
+      });
+
+      it('should clamp limit to minimum of 1', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/featured-artists?active=true&limit=-5'
+        );
+        await GET(request);
+
+        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 1);
+      });
+
+      it('should include Cache-Control header on active GET response', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: true,
+          data: [mockFeaturedArtist] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
+        const response = await GET(request);
+
+        expect(response.headers.get('Cache-Control')).toBe(
+          'public, s-maxage=60, stale-while-revalidate=300'
+        );
+      });
+
+      it('should return 503 when database is unavailable in active mode', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: false,
+          error: 'Database unavailable',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
+        const response = await GET(request);
+
+        expect(response.status).toBe(503);
+      });
+
+      it('should return 500 for other errors in active mode', async () => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
+          success: false,
+          error: 'Failed to fetch artists',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data).toEqual({ error: 'Failed to fetch artists' });
+      });
     });
   });
 

@@ -188,8 +188,8 @@
     "vitest": "^4.0.18"
   },
   "lint-staged": {
-    "src/**/*.{ts,tsx}": "tsc-files --noEmit types/next-auth.d.ts types/vitest.d.ts",
-    "*.{ts,tsx}": [
+    "src/**/*.{ts,tsx}": [
+      "tsc-files --noEmit types/next-auth.d.ts types/vitest.d.ts",
       "eslint --config eslint.config.mjs --fix",
       "prettier --write"
     ],

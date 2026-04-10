@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 
-import useReleasesQuery from './use-releases-query';
+import { useReleasesQuery } from './use-releases-query';
 
 const createQueryClient = () =>
   new QueryClient({
@@ -140,7 +140,7 @@ describe('useReleasesQuery', () => {
       expect(result.current.isPending).toBe(false);
     });
 
-    // The query should be cached under 'releasesData' key
+    // The query should be cached under the releases list key
     expect(result.current.data).toBeDefined();
   });
 

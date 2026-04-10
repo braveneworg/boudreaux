@@ -19,6 +19,7 @@ vi.mock('@/lib/decorators/with-auth', () => ({
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
     getReleaseById: vi.fn(),
+    getReleaseWithTracks: vi.fn(),
     updateRelease: vi.fn(),
     deleteRelease: vi.fn(),
   },
@@ -138,6 +139,54 @@ describe('Release by ID API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal server error' });
+    });
+
+    describe('withTracks=true', () => {
+      it('should call getReleaseWithTracks when withTracks=true', async () => {
+        const releaseWithTracks = { ...mockRelease, releaseTracks: [{ id: 'track-1' }] };
+        vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValue({
+          success: true,
+          data: releaseWithTracks as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases/release-123?withTracks=true'
+        );
+        const response = await GET(request, createParams('release-123'));
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.releaseTracks).toHaveLength(1);
+        expect(ReleaseService.getReleaseWithTracks).toHaveBeenCalledWith('release-123');
+        expect(ReleaseService.getReleaseById).not.toHaveBeenCalled();
+      });
+
+      it('should call getReleaseById when withTracks is not set', async () => {
+        vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
+          success: true,
+          data: mockRelease as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases/release-123');
+        await GET(request, createParams('release-123'));
+
+        expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('release-123');
+        expect(ReleaseService.getReleaseWithTracks).not.toHaveBeenCalled();
+      });
+
+      it('should return 404 when release with tracks not found', async () => {
+        vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValue({
+          success: false,
+          error: 'Release not found',
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases/no-exist?withTracks=true'
+        );
+        const response = await GET(request, createParams('no-exist'));
+
+        expect(response.status).toBe(404);
+      });
     });
   });
 

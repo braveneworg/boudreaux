@@ -330,7 +330,7 @@ const FeaturedArtistCarousel = ({
           return (
             <CarouselItem
               key={featured.id}
-              className="pl-2 pt-1 pb-4 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
+              className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
             >
               <button
                 type="button"
@@ -1235,7 +1235,7 @@ const FormatFileListDrawer = ({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="w-full flex items-center justify-center text-sm text-zinc-600 hover:text-zinc-900 mb-0 focus-visible:ring-0 focus-visible:ring-offset-0"
         >
           <span>View all {files.length} tracks</span>
           <ChevronDown className="h-4 w-4" />

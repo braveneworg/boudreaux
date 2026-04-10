@@ -5,14 +5,16 @@ import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-import useFeaturedArtistsQuery from '@/app/hooks/use-featured-artists-query';
+import { useFeaturedArtistsQuery } from '@/app/hooks/use-featured-artists-query';
+import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 
 import { FeaturedArtistDataView } from './featured-artist-data-view';
 
 // Mock the useFeaturedArtistsQuery hook
 vi.mock('@/app/hooks/use-featured-artists-query', () => ({
-  default: vi.fn(),
+  useFeaturedArtistsQuery: vi.fn(),
 }));
 
 // Mock next/navigation
@@ -35,6 +37,11 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock publish action
+vi.mock('@/lib/actions/publish-featured-artists-action', () => ({
+  publishFeaturedArtistsToSiteAction: vi.fn(),
 }));
 
 const createQueryClient = () =>
@@ -466,6 +473,97 @@ describe('FeaturedArtistDataView', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Parent Featured Name')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Publish to Landing Page button', () => {
+    it('should render the publish button when data is loaded', () => {
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: mockFeaturedArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      expect(screen.getByRole('button', { name: /publish to landing page/i })).toBeInTheDocument();
+    });
+
+    it('should not render the publish button when loading', () => {
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: true,
+        error: null,
+        data: null,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      expect(
+        screen.queryByRole('button', { name: /publish to landing page/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('should not render the publish button when there is an error', () => {
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: false,
+        error: Error('Failed'),
+        data: null,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      expect(
+        screen.queryByRole('button', { name: /publish to landing page/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('should call the publish action and show success toast on click', async () => {
+      const user = userEvent.setup();
+      vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({ success: true });
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: mockFeaturedArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      const publishButton = screen.getByRole('button', { name: /publish to landing page/i });
+      await user.click(publishButton);
+
+      const { toast } = await import('sonner');
+      await waitFor(() => {
+        expect(publishFeaturedArtistsToSiteAction).toHaveBeenCalledOnce();
+        expect(toast.success).toHaveBeenCalledWith('Featured artists published to landing page');
+      });
+    });
+
+    it('should show error toast when publish action fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
+        success: false,
+        error: 'Failed to publish',
+      });
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: mockFeaturedArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      const publishButton = screen.getByRole('button', { name: /publish to landing page/i });
+      await user.click(publishButton);
+
+      const { toast } = await import('sonner');
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to publish');
+      });
     });
   });
 });

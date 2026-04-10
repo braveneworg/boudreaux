@@ -16,8 +16,8 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { Heading } from '@/app/components/ui/heading';
 import PageContainer from '@/app/components/ui/page-container';
-import { ReleaseService } from '@/lib/services/release-service';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 import {
   getArtistDisplayNameForRelease,
   getBandcampUrl,
@@ -54,11 +54,12 @@ const toCardRelease = (release: PublishedReleaseListing) => {
  * Releases listing page — renders all published releases in a searchable grid.
  */
 export default async function ReleasesPage() {
-  const result = await ReleaseService.getPublishedReleases();
+  const url = await getInternalApiUrl('/api/releases?listing=published');
+  const res = await fetch(url, { cache: 'no-store' });
 
-  const releases: PublishedReleaseListing[] = result.success ? result.data : [];
+  const hasError = !res.ok;
+  const releases: PublishedReleaseListing[] = res.ok ? ((await res.json()).releases ?? []) : [];
   const cardReleases = releases.map(toCardRelease);
-  const hasError = !result.success;
 
   return (
     <PageContainer>

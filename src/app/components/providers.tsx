@@ -15,8 +15,22 @@ const ThemeProvider = ({ children, ...props }: ThemeProviderProps) => {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 };
 
+const disableCache = process.env.NEXT_PUBLIC_DISABLE_QUERY_CACHE === 'true';
+
 export const Providers = ({ children }: { children: React.ReactNode }) => {
-  const [client] = useState(() => new QueryClient());
+  const [client] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: disableCache ? 0 : 60 * 1000,
+            gcTime: disableCache ? 0 : 5 * 60 * 1000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+          },
+        },
+      })
+  );
 
   return (
     <QueryClientProvider client={client}>

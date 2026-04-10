@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { notFound } from 'next/navigation';
 
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 import { TourDetail } from '../components/tour-detail';
 
@@ -20,8 +20,14 @@ export interface TourPageProps {
 export default async function TourPage({ params }: TourPageProps) {
   const { tourId } = await params;
 
-  // Fetch tour with all relations
-  const tour = await TourRepository.findById(tourId);
+  const url = await getInternalApiUrl(`/api/tours/${tourId}`);
+  const res = await fetch(url, { cache: 'no-store' });
+
+  if (!res.ok) {
+    notFound();
+  }
+
+  const { tour } = await res.json();
 
   if (!tour) {
     notFound();

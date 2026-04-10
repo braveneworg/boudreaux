@@ -22,13 +22,19 @@ function serializeRelease<T>(data: T): T {
 
 /**
  * GET /api/releases/[id]
- * Get a single release by ID
+ * Get a single release by ID.
+ *
+ * Query params:
+ *   withTracks – When "true", returns the release with tracks via `getReleaseWithTracks()`.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const withTracks = request.nextUrl.searchParams.get('withTracks') === 'true';
 
-    const result = await ReleaseService.getReleaseById(id);
+    const result = withTracks
+      ? await ReleaseService.getReleaseWithTracks(id)
+      : await ReleaseService.getReleaseById(id);
 
     if (!result.success) {
       const status =

@@ -41,7 +41,7 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
       aria-label={artistName ? `Other releases by ${artistName}` : 'Other releases'}
       opts={{ align: 'start' }}
     >
-      <CarouselContent className="-ml-2 justify-center">
+      <CarouselContent className="justify-center">
         {releases.map((release) => {
           const coverArt = getReleaseCoverArt(release);
 
@@ -57,7 +57,7 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
                     className="rounded-md object-cover"
                   />
                 ) : (
-                  <div className="flex h-[120px] w-[120px] items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-500">
+                  <div className="flex h-30 w-30 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-500">
                     {release.title}
                   </div>
                 )}

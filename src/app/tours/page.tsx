@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 import { ToursPageClient } from './components/tours-page-client';
 
@@ -10,9 +10,9 @@ import { ToursPageClient } from './components/tours-page-client';
  * Hybrid component: Server Component wrapper with Client Component for search
  */
 export default async function ToursPage() {
-  // Fetch all tours with related data, sorted by most recent first
-  // TourRepository.findAll already includes venue, headliners, artists, and images
-  const tours = await TourRepository.findAll();
+  const url = await getInternalApiUrl('/api/tours');
+  const res = await fetch(url, { cache: 'no-store' });
+  const tours = res.ok ? ((await res.json()).tours ?? []) : [];
 
   return (
     <div className="container mx-auto py-8">

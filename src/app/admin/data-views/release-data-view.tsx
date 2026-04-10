@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 
-import useReleasesQuery from '@/app/hooks/use-releases-query';
+import { useReleasesQuery } from '@/app/hooks/use-releases-query';
 import { ENTITIES } from '@/lib/constants';
 import type { Release } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';

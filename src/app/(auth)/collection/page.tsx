@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -10,19 +11,25 @@ import { CollectionList } from '@/app/components/collection-list';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-
-import { auth } from '../../../../auth';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 const CollectionPage = async () => {
-  const session = await auth();
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-  if (!session?.user?.id) {
+  const url = await getInternalApiUrl('/api/user/collection');
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: { Cookie: cookieHeader },
+  });
+
+  if (res.status === 401) {
     redirect('/signin');
   }
 
-  const purchases = await PurchaseRepository.findAllByUser(session.user.id);
-  const isAdmin = session.user.role === 'admin';
+  const data = res.ok ? await res.json() : { purchases: [], isAdmin: false };
+  const purchases = data.purchases ?? [];
+  const isAdmin = data.isAdmin ?? false;
 
   return (
     <PageContainer>

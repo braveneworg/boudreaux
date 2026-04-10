@@ -3,9 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useTransition } from 'react';
 
-import useFeaturedArtistsQuery from '@/app/hooks/use-featured-artists-query';
+import { Globe } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/app/components/ui/button';
+import { Spinner } from '@/app/components/ui/spinner/spinner';
+import { useFeaturedArtistsQuery } from '@/app/hooks/use-featured-artists-query';
+import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featured-artists-action';
 import { ENTITIES } from '@/lib/constants';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
@@ -13,6 +19,7 @@ import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-di
 import { DataView } from './data-view';
 
 export const FeaturedArtistDataView = () => {
+  const [isPublishing, startPublishTransition] = useTransition();
   const fieldsToShow = [
     'displayName',
     'featuredOn',
@@ -37,6 +44,17 @@ export const FeaturedArtistDataView = () => {
     return parts.join(' ');
   }, []);
 
+  const handlePublish = useCallback(() => {
+    startPublishTransition(async () => {
+      const result = await publishFeaturedArtistsToSiteAction();
+      if (result.success) {
+        toast.success('Featured artists published to landing page');
+      } else {
+        toast.error(result.error ?? 'Failed to publish');
+      }
+    });
+  }, []);
+
   if (error) {
     return <div>Error loading featured artists</div>;
   }
@@ -46,14 +64,28 @@ export const FeaturedArtistDataView = () => {
   }
 
   return (
-    <DataView<FeaturedArtist>
-      entity={ENTITIES.featuredArtist}
-      data={data}
-      fieldsToShow={fieldsToShow}
-      refetch={refetch}
-      isPending={isPending}
-      getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
-      getSearchableText={getSearchableText}
-    />
+    <>
+      <div className="mb-4">
+        <Button
+          className="w-full"
+          variant="outline"
+          onClick={handlePublish}
+          disabled={isPublishing}
+        >
+          <Globe className="mr-2 size-4" />
+          {isPublishing ? 'Publishing...' : 'Publish to Landing Page'}
+          {isPublishing && <Spinner className="ml-2 size-4" />}
+        </Button>
+      </div>
+      <DataView<FeaturedArtist>
+        entity={ENTITIES.featuredArtist}
+        data={data}
+        fieldsToShow={fieldsToShow}
+        refetch={refetch}
+        isPending={isPending}
+        getItemDisplayName={(item) => getFeaturedArtistDisplayName(item) ?? 'Unnamed'}
+        getSearchableText={getSearchableText}
+      />
+    </>
   );
 };

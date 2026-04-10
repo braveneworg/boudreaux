@@ -92,6 +92,21 @@ describe('Artist API Routes', () => {
       expect(ArtistService.getArtists).toHaveBeenCalledWith({});
     });
 
+    it('should include Cache-Control header on successful GET response', async () => {
+      vi.mocked(ArtistService.getArtists).mockResolvedValue({
+        success: true,
+        data: [mockArtist] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=60, stale-while-revalidate=300'
+      );
+    });
+
     it('should handle pagination parameters', async () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,

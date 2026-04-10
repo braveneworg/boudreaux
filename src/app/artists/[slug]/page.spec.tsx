@@ -15,12 +15,9 @@ vi.mock('next/navigation', () => ({
   notFound: () => mockNotFound(),
 }));
 
-// Mock ArtistService
-const mockGetArtistBySlugWithReleases = vi.fn();
-vi.mock('@/lib/services/artist-service', () => ({
-  ArtistService: {
-    getArtistBySlugWithReleases: (...args: unknown[]) => mockGetArtistBySlugWithReleases(...args),
-  },
+// Mock getInternalApiUrl
+vi.mock('@/lib/utils/get-internal-api-url', () => ({
+  getInternalApiUrl: vi.fn((path: string) => Promise.resolve(`http://test-host${path}`)),
 }));
 
 vi.mock('@/lib/utils/get-artist-display-name', () => ({
@@ -88,9 +85,9 @@ describe('ArtistDetailPage', () => {
       id,
       title,
       coverArt: `https://example.com/${id}-cover.jpg`,
-      publishedAt: new Date('2024-01-01'),
+      publishedAt: new Date('2024-01-01').toISOString(),
       deletedOn: null,
-      releasedOn,
+      releasedOn: releasedOn ? releasedOn.toISOString() : null,
       images: [],
       artistReleases: [],
       digitalFormats:
@@ -100,8 +97,8 @@ describe('ArtistDetailPage', () => {
                 id: `fmt-${id}`,
                 formatType: 'MP3_320KBPS',
                 releaseId: id,
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 files: Array.from({ length: fileCount }, (_, i) => ({
                   id: `file-${id}-${i}`,
                   trackNumber: i + 1,
@@ -113,8 +110,8 @@ describe('ArtistDetailPage', () => {
                   formatId: `fmt-${id}`,
                   duration: null,
                   checksum: null,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 })),
               },
             ]
@@ -135,8 +132,8 @@ describe('ArtistDetailPage', () => {
     isActive: true,
     shortBio: 'A talented musician',
     bio: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     deletedOn: null,
     images: [],
     labels: [],
@@ -153,10 +150,11 @@ describe('ArtistDetailPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: true,
-      data: mockArtist,
-    });
+    // Default: successful fetch returning mockArtist
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockArtist),
+    }) as unknown as typeof fetch;
   });
 
   it('should render page structure', async () => {
@@ -170,21 +168,24 @@ describe('ArtistDetailPage', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('should call getArtistBySlugWithReleases with the slug', async () => {
+  it('should fetch the artist by slug via internal API', async () => {
     const Page = await ArtistDetailPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
     });
     render(Page);
 
-    expect(mockGetArtistBySlugWithReleases).toHaveBeenCalledWith('john-doe');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://test-host/api/artists/slug/john-doe?withReleases=true',
+      { cache: 'no-store' }
+    );
   });
 
-  it('should call notFound when service returns failure', async () => {
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: false,
-      error: 'Artist not found',
-    });
+  it('should call notFound when fetch returns not ok', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({}),
+    }) as unknown as typeof fetch;
 
     await ArtistDetailPage({
       params: defaultParams,
@@ -301,10 +302,10 @@ describe('ArtistDetailPage', () => {
         createMockArtistRelease('release-2', 'Album B', 1, new Date('2024-06-01')),
       ],
     };
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: true,
-      data: allPlayableArtist,
-    });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(allPlayableArtist),
+    }) as unknown as typeof fetch;
 
     const Page = await ArtistDetailPage({
       params: defaultParams,
@@ -335,10 +336,10 @@ describe('ArtistDetailPage', () => {
     });
 
     it('should return fallback description when shortBio is missing', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: { ...mockArtist, shortBio: null },
-      });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ...mockArtist, shortBio: null }),
+      }) as unknown as typeof fetch;
 
       const metadata = await generateMetadata({
         params: defaultParams,
@@ -349,10 +350,10 @@ describe('ArtistDetailPage', () => {
     });
 
     it('should return fallback description when shortBio is empty string', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: { ...mockArtist, shortBio: '' },
-      });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ...mockArtist, shortBio: '' }),
+      }) as unknown as typeof fetch;
 
       const metadata = await generateMetadata({
         params: defaultParams,
@@ -362,11 +363,11 @@ describe('ArtistDetailPage', () => {
       expect(metadata.description).toBe('Listen to releases by John Doe.');
     });
 
-    it('should return "Artist Not Found" when service fails', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: false,
-        error: 'Artist not found',
-      });
+    it('should return "Artist Not Found" when fetch fails', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({}),
+      }) as unknown as typeof fetch;
 
       const metadata = await generateMetadata({
         params: defaultParams,
@@ -380,10 +381,10 @@ describe('ArtistDetailPage', () => {
   describe('debug logging in non-production', () => {
     it('should log warning when artist has zero releases', async () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: { ...mockArtist, releases: [] },
-      });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ...mockArtist, releases: [] }),
+      }) as unknown as typeof fetch;
 
       const Page = await ArtistDetailPage({
         params: defaultParams,
@@ -397,10 +398,6 @@ describe('ArtistDetailPage', () => {
 
     it('should log info for each release in non-production', async () => {
       const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: mockArtist,
-      });
 
       const Page = await ArtistDetailPage({
         params: defaultParams,
@@ -426,10 +423,10 @@ describe('ArtistDetailPage', () => {
           createMockArtistRelease('release-dated', 'Dated Album', 2, new Date('2024-06-01')),
         ],
       };
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: artistWithNullDate,
-      });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(artistWithNullDate),
+      }) as unknown as typeof fetch;
 
       const Page = await ArtistDetailPage({
         params: defaultParams,

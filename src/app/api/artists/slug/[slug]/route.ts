@@ -10,16 +10,20 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/artist/slug/[slug]
- * Get a single artist by slug
+ * Get a single artist by slug.
+ *
+ * Query params:
+ *   withReleases – When "true", returns the artist with published releases
+ *                  using `getArtistBySlugWithReleases()`.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
+    const withReleases = request.nextUrl.searchParams.get('withReleases') === 'true';
 
-    const result = await ArtistService.getArtistBySlug(slug);
+    const result = withReleases
+      ? await ArtistService.getArtistBySlugWithReleases(slug)
+      : await ArtistService.getArtistBySlug(slug);
 
     if (!result.success) {
       const status =

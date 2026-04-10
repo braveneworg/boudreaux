@@ -7,7 +7,7 @@ import { ArtistDataView } from './artist-data-view';
 
 const mockUseArtistsQuery = vi.fn();
 vi.mock('@/app/hooks/use-artists-query', () => ({
-  default: () => mockUseArtistsQuery(),
+  useArtistsQuery: () => mockUseArtistsQuery(),
 }));
 
 vi.mock('./data-view', () => ({

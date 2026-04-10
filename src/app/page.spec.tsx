@@ -11,20 +11,9 @@ import Home from './page';
 // Mock server-only to prevent the error
 vi.mock('server-only', () => ({}));
 
-// Mock the FeaturedArtistsService
-const mockGetFeaturedArtists = vi.fn();
-vi.mock('@/lib/services/featured-artists-service', () => ({
-  FeaturedArtistsService: {
-    getFeaturedArtists: (...args: unknown[]) => mockGetFeaturedArtists(...args),
-  },
-}));
-
-// Mock the BannerNotificationService
-const mockGetActiveBanners = vi.fn();
-vi.mock('@/lib/services/banner-notification-service', () => ({
-  BannerNotificationService: {
-    getActiveBanners: (...args: unknown[]) => mockGetActiveBanners(...args),
-  },
+// Mock getInternalApiUrl to return predictable URLs
+vi.mock('@/lib/utils/get-internal-api-url', () => ({
+  getInternalApiUrl: vi.fn((path: string) => Promise.resolve(`http://test-host${path}`)),
 }));
 
 // Mock UI components
@@ -66,51 +55,74 @@ vi.mock('./components/ui/heading', () => ({
   },
 }));
 
-vi.mock('./components/featured-artists-player', () => ({
-  FeaturedArtistsPlayer: () => (
+vi.mock('./components/featured-artists-player-client', () => ({
+  FeaturedArtistsPlayerClient: () => (
     <div data-testid="featured-artists-player">Featured Artists Player</div>
   ),
+}));
+
+vi.mock('./components/artist-search-input', () => ({
+  ArtistSearchInput: () => <div data-testid="artist-search-input">Search</div>,
 }));
 
 vi.mock('./components/banner-carousel', () => ({
   BannerCarousel: () => <div data-testid="banner-carousel">Banner Carousel</div>,
 }));
 
+const mockFeaturedArtists = [
+  {
+    id: '1',
+    displayName: 'Test Artist',
+    coverArt: 'https://example.com/cover.jpg',
+    artists: [{ id: 'a1', displayName: 'Artist One' }],
+    digitalFormat: {
+      id: 'df1',
+      files: [
+        {
+          id: 'f1',
+          trackNumber: 1,
+          title: 'Test Track',
+          fileName: 'test.mp3',
+          s3Key: 'audio/test.mp3',
+          duration: 180,
+        },
+      ],
+    },
+  },
+];
+
+const createFetchMock = (
+  featuredArtistsResponse: { ok: boolean; json: () => Promise<unknown> },
+  bannersResponse: { ok: boolean; json: () => Promise<unknown> }
+) =>
+  vi.fn((url: string) => {
+    if (typeof url === 'string' && url.includes('/api/featured-artists')) {
+      return Promise.resolve(featuredArtistsResponse);
+    }
+    if (typeof url === 'string' && url.includes('/api/notification-banners')) {
+      return Promise.resolve(bannersResponse);
+    }
+    return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+  });
+
 describe('Home Page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // Default successful mocks
-    mockGetFeaturedArtists.mockResolvedValue({
-      success: true,
-      data: [
-        {
-          id: '1',
-          displayName: 'Test Artist',
-          coverArt: 'https://example.com/cover.jpg',
-          artists: [{ id: 'a1', displayName: 'Artist One' }],
-          digitalFormat: {
-            id: 'df1',
-            files: [
-              {
-                id: 'f1',
-                trackNumber: 1,
-                title: 'Test Track',
-                fileName: 'test.mp3',
-                s3Key: 'audio/test.mp3',
-                duration: 180,
-              },
-            ],
-          },
-        },
-      ],
-    });
-    mockGetActiveBanners.mockResolvedValue({
-      success: true,
-      data: {
-        banners: [],
-        rotationInterval: 6.5,
+    // Default: successful fetch responses
+    global.fetch = createFetchMock(
+      {
+        ok: true,
+        json: () => Promise.resolve({ featuredArtists: mockFeaturedArtists }),
       },
-    });
+      {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            banners: [],
+            rotationInterval: 6.5,
+          }),
+      }
+    ) as unknown as typeof fetch;
   });
 
   it('should render page structure', async () => {
@@ -146,10 +158,13 @@ describe('Home Page', () => {
   });
 
   it('should render empty array when featuredArtists fetch fails', async () => {
-    mockGetFeaturedArtists.mockResolvedValue({
-      success: false,
-      error: 'Failed to fetch',
-    });
+    global.fetch = createFetchMock(
+      { ok: false, json: () => Promise.resolve({}) },
+      {
+        ok: true,
+        json: () => Promise.resolve({ banners: [], rotationInterval: 6.5 }),
+      }
+    ) as unknown as typeof fetch;
 
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -160,10 +175,13 @@ describe('Home Page', () => {
   });
 
   it('should render empty array when banners fetch fails', async () => {
-    mockGetActiveBanners.mockResolvedValue({
-      success: false,
-      error: 'Failed to fetch',
-    });
+    global.fetch = createFetchMock(
+      {
+        ok: true,
+        json: () => Promise.resolve({ featuredArtists: mockFeaturedArtists }),
+      },
+      { ok: false, json: () => Promise.resolve({}) }
+    ) as unknown as typeof fetch;
 
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -175,19 +193,26 @@ describe('Home Page', () => {
   });
 
   it('should render banner carousel when banners exist', async () => {
-    mockGetActiveBanners.mockResolvedValue({
-      success: true,
-      data: {
-        banners: [
-          {
-            slotNumber: 1,
-            imageFilename: 'FFINC Banner 1_5_1920.webp',
-            notification: null,
-          },
-        ],
-        rotationInterval: 6.5,
+    global.fetch = createFetchMock(
+      {
+        ok: true,
+        json: () => Promise.resolve({ featuredArtists: mockFeaturedArtists }),
       },
-    });
+      {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            banners: [
+              {
+                slotNumber: 1,
+                imageFilename: 'FFINC Banner 1_5_1920.webp',
+                notification: null,
+              },
+            ],
+            rotationInterval: 6.5,
+          }),
+      }
+    ) as unknown as typeof fetch;
 
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -196,14 +221,6 @@ describe('Home Page', () => {
   });
 
   it('should not render banner carousel when banners array is empty', async () => {
-    mockGetActiveBanners.mockResolvedValue({
-      success: true,
-      data: {
-        banners: [],
-        rotationInterval: 6.5,
-      },
-    });
-
     const HomeComponent = await Home();
     render(HomeComponent);
 

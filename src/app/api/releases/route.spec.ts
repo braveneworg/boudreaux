@@ -19,6 +19,7 @@ vi.mock('@/lib/decorators/with-auth', () => ({
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
     getReleases: vi.fn(),
+    getPublishedReleases: vi.fn(),
     createRelease: vi.fn(),
   },
 }));
@@ -90,6 +91,21 @@ describe('Release API Routes', () => {
         count: 1,
       });
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({});
+    });
+
+    it('should include Cache-Control header on successful GET response', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=60, stale-while-revalidate=300'
+      );
     });
 
     it('should handle pagination parameters', async () => {
@@ -225,6 +241,62 @@ describe('Release API Routes', () => {
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
         skip: 0,
+      });
+    });
+
+    describe('listing=published mode', () => {
+      it('should call getPublishedReleases when listing=published', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [mockRelease] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data).toEqual({ releases: [mockRelease], count: 1 });
+        expect(ReleaseService.getPublishedReleases).toHaveBeenCalled();
+        expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+      });
+
+      it('should include Cache-Control header for published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.headers.get('Cache-Control')).toBe(
+          'public, s-maxage=60, stale-while-revalidate=300'
+        );
+      });
+
+      it('should return 503 for db error in published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: false,
+          error: 'Database unavailable',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.status).toBe(503);
+      });
+
+      it('should return 500 for other errors in published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: false,
+          error: 'Failed to fetch',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.status).toBe(500);
       });
     });
 

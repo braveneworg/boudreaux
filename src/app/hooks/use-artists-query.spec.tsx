@@ -6,7 +6,7 @@ import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 
-import useArtistsQuery from './use-artists-query';
+import { useArtistsQuery } from './use-artists-query';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({

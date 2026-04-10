@@ -15,9 +15,9 @@ import { ArtistPlayer } from '@/app/components/artist-player';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
-import { ArtistService } from '@/lib/services/artist-service';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 import type { Metadata } from 'next';
 
@@ -26,18 +26,26 @@ interface ArtistDetailPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+async function fetchArtistBySlug(slug: string) {
+  const url = await getInternalApiUrl(
+    `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`
+  );
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 /**
  * Generate dynamic metadata for SEO using the artist name and bio.
  */
 export async function generateMetadata({ params }: ArtistDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const result = await ArtistService.getArtistBySlugWithReleases(slug);
+  const artist = await fetchArtistBySlug(slug);
 
-  if (!result.success) {
+  if (!artist) {
     return { title: 'Artist Not Found' };
   }
 
-  const artist = result.data;
   const displayName = getArtistDisplayName(artist);
 
   return {
@@ -55,26 +63,26 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
   const resolvedSearchParams = await searchParams;
   const initialReleaseId =
     typeof resolvedSearchParams.release === 'string' ? resolvedSearchParams.release : undefined;
-  const result = await ArtistService.getArtistBySlugWithReleases(slug);
 
-  if (!result.success) {
+  const artist = await fetchArtistBySlug(slug);
+
+  if (!artist) {
     notFound();
     return;
   }
 
-  const artist = result.data;
   const displayName = getArtistDisplayName(artist);
 
   // DEBUG: Log releases pipeline for diagnosis (disabled in production)
   if (process.env.NODE_ENV !== 'production') {
     if (artist.releases.length === 0) {
-      console.warn(`[artist-detail] ${slug}: getArtistBySlugWithReleases returned 0 releases`);
+      console.warn(`[artist-detail] ${slug}: API returned 0 releases`);
     } else {
       for (const ar of artist.releases) {
         console.info(
           `[artist-detail] ${slug}: release "${ar.release.title}" — ` +
             `publishedAt=${ar.release.publishedAt}, deletedOn=${ar.release.deletedOn}, ` +
-            `mp3Files=${ar.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files.length ?? 0}`
+            `mp3Files=${ar.release.digitalFormats.find((fmt: { formatType: string }) => fmt.formatType === 'MP3_320KBPS')?.files.length ?? 0}`
         );
       }
     }
@@ -86,8 +94,9 @@ const ArtistDetailPage = async ({ params, searchParams }: ArtistDetailPageProps)
     releases: artist.releases
       .filter(
         (ar: ArtistWithPublishedReleases['releases'][number]) =>
-          (ar.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files
-            .length ?? 0) > 0
+          (ar.release.digitalFormats.find(
+            (fmt: { formatType: string }) => fmt.formatType === 'MP3_320KBPS'
+          )?.files.length ?? 0) > 0
       )
       .sort(
         (

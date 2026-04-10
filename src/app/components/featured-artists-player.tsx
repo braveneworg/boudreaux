@@ -221,16 +221,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             onSelect={handleSelectArtist}
           />
         )}
-        {selectedArtist?.release && (
-          <ArtistReleaseInfo
-            artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-            title={selectedArtist.release.title ?? ''}
-            featuredArtists={displayableArtists}
-            selectedArtist={selectedArtist}
-            setSelectedArtist={setSelectedArtist}
-            visibleHeading
-          />
-        )}
         {showFileListDrawer && selectedArtist?.release && (
           <div className="flex flex-col items-center">
             <MediaPlayer.FormatFileListDrawer
@@ -246,7 +236,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               releaseId={selectedArtist.release.id}
               releaseTitle={selectedArtist.release.title ?? ''}
             >
-              <DownloadTriggerButton />
+              <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />
             </DownloadDialog>
           </div>
         )}
@@ -299,6 +289,16 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               )}
             </div>
           </div>
+        )}
+        {selectedArtist?.release && (
+          <ArtistReleaseInfo
+            artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+            title={selectedArtist.release.title ?? ''}
+            featuredArtists={displayableArtists}
+            selectedArtist={selectedArtist}
+            setSelectedArtist={setSelectedArtist}
+            visibleHeading
+          />
         )}
       </div>
     </MediaPlayer>

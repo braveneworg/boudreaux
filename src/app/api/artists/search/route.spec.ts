@@ -391,4 +391,70 @@ describe('GET /api/artists/search', () => {
     expect(body.results[0].releases).toHaveLength(1);
     expect(body.results[0].releases[0].title).toBe('Active Album');
   });
+
+  describe('format=full mode', () => {
+    const createFullRequest = (query: string): NextRequest =>
+      new NextRequest(
+        new URL(`http://localhost/api/artists/search?q=${encodeURIComponent(query)}&format=full`)
+      );
+
+    it('should return raw artist objects when format=full', async () => {
+      const mockArtists = [
+        {
+          id: 'artist-1',
+          firstName: 'John',
+          surname: 'Doe',
+          displayName: 'John Doe',
+          slug: 'john-doe',
+        },
+      ];
+
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: true,
+        data: mockArtists as never,
+      });
+
+      const request = createFullRequest('john');
+      const response = await GET(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ artists: mockArtists });
+      expect(ArtistService.searchPublishedArtists).toHaveBeenCalledWith({ search: 'john' });
+    });
+
+    it('should return empty artists array when query is empty and format=full', async () => {
+      const request = new NextRequest(new URL('http://localhost/api/artists/search?format=full'));
+      const response = await GET(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ artists: [] });
+      expect(ArtistService.searchPublishedArtists).not.toHaveBeenCalled();
+    });
+
+    it('should return 503 when db unavailable in full mode', async () => {
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: false,
+        error: 'Database unavailable',
+      });
+
+      const request = createFullRequest('test');
+      const response = await GET(request);
+
+      expect(response.status).toBe(503);
+    });
+
+    it('should return 500 for other errors in full mode', async () => {
+      vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValue({
+        success: false,
+        error: 'Failed to search',
+      });
+
+      const request = createFullRequest('test');
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+    });
+  });
 });

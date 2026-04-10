@@ -96,6 +96,9 @@ describe('GET /api/proxy-image', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(response.headers.get('Cache-Control')).toBe(
+      'public, max-age=86400, stale-while-revalidate=604800'
+    );
   });
 
   it('should return 200 and proxy image from fakefourrecords.com', async () => {
