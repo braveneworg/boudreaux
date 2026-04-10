@@ -3,25 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { headers } from 'next/headers';
-
 /**
  * Constructs an absolute URL for fetching internal API routes from Server Components.
- * Uses the incoming request's host header to build the URL, falling back to
- * NEXT_PUBLIC_BASE_URL or localhost:3000.
+ * Uses the NEXT_PUBLIC_BASE_URL environment variable as a trusted configuration source,
+ * falling back to localhost:3000 for local development.
+ *
+ * Relying on request headers (host, x-forwarded-proto) is intentionally avoided to
+ * prevent SSRF attacks where a forged Host header could redirect server-side requests
+ * to an attacker-controlled domain and leak cookies or sensitive data.
  */
-export async function getInternalApiUrl(path: string): Promise<string> {
-  try {
-    const headersList = await headers();
-    const host = headersList.get('host');
-    const proto = headersList.get('x-forwarded-proto') ?? 'http';
-    if (host) {
-      return `${proto}://${host}${path}`;
-    }
-  } catch {
-    // headers() may throw outside of a request context
-  }
-
+export function getInternalApiUrl(path: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000';
   return `${baseUrl}${path}`;
 }

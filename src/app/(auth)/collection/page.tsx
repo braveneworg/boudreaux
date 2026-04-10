@@ -17,7 +17,7 @@ const CollectionPage = async () => {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
-  const url = await getInternalApiUrl('/api/user/collection');
+  const url = getInternalApiUrl('/api/user/collection');
   const res = await fetch(url, {
     cache: 'no-store',
     headers: { Cookie: cookieHeader },

@@ -9,6 +9,8 @@ import { ReleaseService } from '@/lib/services/release-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
+import { auth } from '../../../../auth';
+
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +54,11 @@ export async function GET(request: NextRequest) {
     const artistIds = searchParams.getAll('artistIds');
     const published = searchParams.get('published');
 
+    const session = await auth();
+    if (!session?.user?.id || session.user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const MAX_TAKE = 100;
     const params = {
       ...(skip && { skip: Math.max(0, parseInt(skip, 10)) }),
@@ -77,7 +84,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          'Cache-Control': 'private, no-store',
         },
       }
     );

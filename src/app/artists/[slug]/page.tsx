@@ -27,9 +27,7 @@ interface ArtistDetailPageProps {
 }
 
 async function fetchArtistBySlug(slug: string) {
-  const url = await getInternalApiUrl(
-    `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`
-  );
+  const url = getInternalApiUrl(`/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`);
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) return null;
   return res.json();

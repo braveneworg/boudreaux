@@ -10,7 +10,7 @@ import { ToursPageClient } from './components/tours-page-client';
  * Hybrid component: Server Component wrapper with Client Component for search
  */
 export default async function ToursPage() {
-  const url = await getInternalApiUrl('/api/tours');
+  const url = getInternalApiUrl('/api/tours');
   const res = await fetch(url, { cache: 'no-store' });
   const tours = res.ok ? ((await res.json()).tours ?? []) : [];
 

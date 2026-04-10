@@ -54,9 +54,7 @@ export default async function ArtistSearchPage({ searchParams }: ArtistSearchPag
   }> = [];
 
   if (query) {
-    const url = await getInternalApiUrl(
-      `/api/artists/search?q=${encodeURIComponent(query)}&format=full`
-    );
+    const url = getInternalApiUrl(`/api/artists/search?q=${encodeURIComponent(query)}&format=full`);
     const res = await fetch(url, { cache: 'no-store' });
 
     if (res.ok) {

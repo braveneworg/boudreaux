@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { ReleaseService } from '@/lib/services/release-service';
 
 import { GET, POST as postHandler } from './route';
+import { auth } from '../../../../auth';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -14,6 +15,11 @@ vi.mock('server-only', () => ({}));
 // Mock withAdmin decorator to bypass auth in tests
 vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: (handler: () => unknown) => handler,
+}));
+
+// Mock auth for inline admin checks in the non-published listing path
+vi.mock('../../../../auth', () => ({
+  auth: vi.fn().mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } }),
 }));
 
 vi.mock('@/lib/services/release-service', () => ({
@@ -74,6 +80,32 @@ describe('Release API Routes', () => {
   });
 
   describe('GET /api/releases', () => {
+    it('should return 401 when not authenticated for admin listing', async () => {
+      vi.mocked(auth).mockResolvedValueOnce(null);
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when user role is not admin for admin listing', async () => {
+      vi.mocked(auth).mockResolvedValueOnce({
+        user: { id: 'user-1', role: 'user', email: 'user@example.com', name: 'User' },
+      } as never);
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+    });
+
     it('should return all releases with default parameters', async () => {
       const mockReleases = [mockRelease];
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
@@ -93,7 +125,7 @@ describe('Release API Routes', () => {
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({});
     });
 
-    it('should include Cache-Control header on successful GET response', async () => {
+    it('should include Cache-Control: private, no-store header on admin GET response', async () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: true,
         data: [mockRelease] as never,
@@ -103,9 +135,7 @@ describe('Release API Routes', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('Cache-Control')).toBe(
-        'public, s-maxage=60, stale-while-revalidate=300'
-      );
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     });
 
     it('should handle pagination parameters', async () => {

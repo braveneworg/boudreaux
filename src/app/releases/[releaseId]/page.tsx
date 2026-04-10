@@ -37,7 +37,7 @@ const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProp
   const autoPlay = resolvedSearchParams.autoplay === 'true';
 
   // Fetch the release with tracks from the API
-  const releaseUrl = await getInternalApiUrl(`/api/releases/${releaseId}?withTracks=true`);
+  const releaseUrl = getInternalApiUrl(`/api/releases/${releaseId}?withTracks=true`);
   const releaseRes = await fetch(releaseUrl, { cache: 'no-store' });
 
   if (!releaseRes.ok) {

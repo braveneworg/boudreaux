@@ -54,7 +54,7 @@ const toCardRelease = (release: PublishedReleaseListing) => {
  * Releases listing page — renders all published releases in a searchable grid.
  */
 export default async function ReleasesPage() {
-  const url = await getInternalApiUrl('/api/releases?listing=published');
+  const url = getInternalApiUrl('/api/releases?listing=published');
   const res = await fetch(url, { cache: 'no-store' });
 
   const hasError = !res.ok;

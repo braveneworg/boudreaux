@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { ArtistService } from '@/lib/services/artist-service';
 
 import { GET, POST as postHandler } from './route';
+import { auth } from '../../../../auth';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -16,6 +17,11 @@ vi.mock('server-only', () => ({}));
 // We mock it to pass through the request only since inner handlers don't use context
 vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: (handler: () => unknown) => handler,
+}));
+
+// Mock auth for inline admin checks in GET handler
+vi.mock('../../../../auth', () => ({
+  auth: vi.fn().mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } }),
 }));
 
 vi.mock('@/lib/services/artist-service', () => ({
@@ -73,6 +79,32 @@ describe('Artist API Routes', () => {
   });
 
   describe('GET /api/artists', () => {
+    it('should return 401 when not authenticated', async () => {
+      vi.mocked(auth).mockResolvedValueOnce(null);
+
+      const request = new NextRequest('http://localhost:3000/api/artists');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ArtistService.getArtists).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when user role is not admin', async () => {
+      vi.mocked(auth).mockResolvedValueOnce({
+        user: { id: 'user-1', role: 'user', email: 'user@example.com', name: 'User' },
+      } as never);
+
+      const request = new NextRequest('http://localhost:3000/api/artists');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ArtistService.getArtists).not.toHaveBeenCalled();
+    });
+
     it('should return all artists with default parameters', async () => {
       const mockArtists = [mockArtist];
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
@@ -92,7 +124,7 @@ describe('Artist API Routes', () => {
       expect(ArtistService.getArtists).toHaveBeenCalledWith({});
     });
 
-    it('should include Cache-Control header on successful GET response', async () => {
+    it('should include Cache-Control: private, no-store header on successful GET response', async () => {
       vi.mocked(ArtistService.getArtists).mockResolvedValue({
         success: true,
         data: [mockArtist] as never,
@@ -102,9 +134,7 @@ describe('Artist API Routes', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('Cache-Control')).toBe(
-        'public, s-maxage=60, stale-while-revalidate=300'
-      );
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     });
 
     it('should handle pagination parameters', async () => {

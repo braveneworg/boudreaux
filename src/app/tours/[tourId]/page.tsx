@@ -20,7 +20,7 @@ export interface TourPageProps {
 export default async function TourPage({ params }: TourPageProps) {
   const { tourId } = await params;
 
-  const url = await getInternalApiUrl(`/api/tours/${tourId}`);
+  const url = getInternalApiUrl(`/api/tours/${tourId}`);
   const res = await fetch(url, { cache: 'no-store' });
 
   if (!res.ok) {

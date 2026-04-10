@@ -34,7 +34,7 @@ vi.mock('next/link', () => ({
 
 // Mock getInternalApiUrl
 vi.mock('@/lib/utils/get-internal-api-url', () => ({
-  getInternalApiUrl: vi.fn((path: string) => Promise.resolve(`http://test-host${path}`)),
+  getInternalApiUrl: vi.fn((path: string) => `http://test-host${path}`),
 }));
 
 // Mock UI components
