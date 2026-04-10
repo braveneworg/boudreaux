@@ -81,7 +81,7 @@ describe('Release API Routes', () => {
 
   describe('GET /api/releases', () => {
     it('should return 401 when not authenticated for admin listing', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null);
+      vi.mocked(auth).mockResolvedValueOnce(null as never);
 
       const request = new NextRequest('http://localhost:3000/api/releases');
       const response = await GET(request);

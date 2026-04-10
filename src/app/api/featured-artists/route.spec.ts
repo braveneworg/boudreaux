@@ -60,7 +60,7 @@ describe('Featured Artists API Routes', () => {
 
   describe('GET /api/featured-artists', () => {
     it('should return 401 when not authenticated for admin listing', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null);
+      vi.mocked(auth).mockResolvedValueOnce(null as never);
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
       const response = await GET(request);

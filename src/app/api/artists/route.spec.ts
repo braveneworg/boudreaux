@@ -80,7 +80,7 @@ describe('Artist API Routes', () => {
 
   describe('GET /api/artists', () => {
     it('should return 401 when not authenticated', async () => {
-      vi.mocked(auth).mockResolvedValueOnce(null);
+      vi.mocked(auth).mockResolvedValueOnce(null as never);
 
       const request = new NextRequest('http://localhost:3000/api/artists');
       const response = await GET(request);
