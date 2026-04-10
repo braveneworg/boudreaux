@@ -7,6 +7,8 @@ import { render, screen } from '@testing-library/react';
 
 import TourPage from './page';
 
+vi.mock('server-only', () => ({}));
+
 // Mock notFound — must throw to stop execution like the real notFound
 const mockNotFound = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND');
@@ -15,24 +17,40 @@ vi.mock('next/navigation', () => ({
   notFound: () => mockNotFound(),
 }));
 
-// Mock getInternalApiUrl
+// Mock TanStack Query SSR utilities
+const mockSetQueryData = vi.fn();
+const mockDehydratedState = { queries: [], mutations: [] };
+vi.mock('@tanstack/react-query', () => ({
+  dehydrate: () => mockDehydratedState,
+  HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@/lib/utils/get-query-client', () => ({
+  getQueryClient: () => ({
+    setQueryData: mockSetQueryData,
+  }),
+}));
+
 vi.mock('@/lib/utils/get-internal-api-url', () => ({
-  getInternalApiUrl: vi.fn((path: string) => `http://test-host${path}`),
+  getInternalApiUrl: (path: string) => `http://localhost:3000${path}`,
 }));
 
 // Mock child component
-vi.mock('../components/tour-detail', () => ({
-  TourDetail: ({ tour }: { tour: { id: string; name: string } }) => (
-    <div data-testid="tour-detail" data-tour-id={tour.id}>
-      {tour.name}
+vi.mock('../components/tour-detail-content', () => ({
+  TourDetailContent: ({ tourId }: { tourId: string }) => (
+    <div data-testid="tour-detail-content" data-tour-id={tourId}>
+      Tour Detail Content
     </div>
   ),
 }));
 
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
 describe('TourPage', () => {
   const mockTour = {
     id: 'tour-1',
-    name: 'Summer Tour 2024',
+    title: 'Summer Tour 2024',
     tourDates: [{ id: 'td-1', venue: { name: 'The Forum' } }],
   };
 
@@ -40,57 +58,66 @@ describe('TourPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
       json: () => Promise.resolve({ tour: mockTour }),
-    }) as unknown as typeof fetch;
+    });
   });
 
-  it('should fetch tour by id via internal API', async () => {
+  it('should fetch tour from API with tourId', async () => {
     const Page = await TourPage({ params: defaultParams });
     render(Page);
 
-    expect(global.fetch).toHaveBeenCalledWith('http://test-host/api/tours/tour-1', {
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/tours/tour-1', {
       cache: 'no-store',
     });
   });
 
-  it('should render TourDetail with fetched tour', async () => {
+  it('should render TourDetailContent with tourId', async () => {
     const Page = await TourPage({ params: defaultParams });
     render(Page);
 
-    const detail = screen.getByTestId('tour-detail');
-    expect(detail).toHaveAttribute('data-tour-id', 'tour-1');
-    expect(detail).toHaveTextContent('Summer Tour 2024');
+    const content = screen.getByTestId('tour-detail-content');
+    expect(content).toHaveAttribute('data-tour-id', 'tour-1');
   });
 
-  it('should call notFound when fetch returns not ok', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+  it('should set query data on success', async () => {
+    const Page = await TourPage({ params: defaultParams });
+    render(Page);
+
+    expect(mockSetQueryData).toHaveBeenCalledWith(['tours', 'detail', 'tour-1'], mockTour);
+  });
+
+  it('should call notFound when API returns 404', async () => {
+    mockFetch.mockResolvedValue({
       ok: false,
-      json: () => Promise.resolve({}),
-    }) as unknown as typeof fetch;
+      status: 404,
+    });
 
     await expect(TourPage({ params: defaultParams })).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
-  it('should call notFound when tour is null', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ tour: null }),
-    }) as unknown as typeof fetch;
+  it('should not set query data when API returns non-OK non-404', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
 
-    await expect(TourPage({ params: defaultParams })).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(mockNotFound).toHaveBeenCalledOnce();
+    const Page = await TourPage({ params: defaultParams });
+    render(Page);
+
+    expect(mockSetQueryData).not.toHaveBeenCalled();
   });
 
-  it('should pass tourId in the URL', async () => {
-    const specialParams = Promise.resolve({ tourId: 'some-tour-id' });
+  it('should encode tourId in URL', async () => {
+    const specialParams = Promise.resolve({ tourId: 'tour/special' });
 
     const Page = await TourPage({ params: specialParams });
     render(Page);
 
-    expect(global.fetch).toHaveBeenCalledWith('http://test-host/api/tours/some-tour-id', {
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/tours/tour%2Fspecial', {
       cache: 'no-store',
     });
   });

@@ -5,6 +5,18 @@
 import { queryKeys } from './query-keys';
 
 describe('queryKeys', () => {
+  describe('banners', () => {
+    it('should return all key', () => {
+      expect(queryKeys.banners.all).toEqual(['banners']);
+    });
+
+    it('should return active key extending all', () => {
+      const key = queryKeys.banners.active();
+      expect(key).toEqual(['banners', 'active']);
+      expect(key[0]).toBe(queryKeys.banners.all[0]);
+    });
+  });
+
   describe('releases', () => {
     it('should return all key', () => {
       expect(queryKeys.releases.all).toEqual(['releases']);
@@ -14,6 +26,31 @@ describe('queryKeys', () => {
       const listKey = queryKeys.releases.list();
       expect(listKey).toEqual(['releases', 'list']);
       expect(listKey[0]).toBe(queryKeys.releases.all[0]);
+    });
+
+    it('should return published key extending all', () => {
+      const key = queryKeys.releases.published();
+      expect(key).toEqual(['releases', 'published']);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.releases.detail('r-123');
+      expect(key).toEqual(['releases', 'detail', 'r-123']);
+    });
+
+    it('should return userStatus key with id', () => {
+      const key = queryKeys.releases.userStatus('r-123');
+      expect(key).toEqual(['releases', 'userStatus', 'r-123']);
+    });
+
+    it('should return related key with id', () => {
+      const key = queryKeys.releases.related('r-123');
+      expect(key).toEqual(['releases', 'related', 'r-123']);
+    });
+
+    it('should return digitalFormats key with id', () => {
+      const key = queryKeys.releases.digitalFormats('r-123');
+      expect(key).toEqual(['releases', 'digitalFormats', 'r-123']);
     });
   });
 
@@ -27,6 +64,16 @@ describe('queryKeys', () => {
       expect(listKey).toEqual(['artists', 'list']);
       expect(listKey[0]).toBe(queryKeys.artists.all[0]);
     });
+
+    it('should return bySlug key with slug', () => {
+      const key = queryKeys.artists.bySlug('test-artist');
+      expect(key).toEqual(['artists', 'bySlug', 'test-artist']);
+    });
+
+    it('should return search key with query', () => {
+      const key = queryKeys.artists.search('rock');
+      expect(key).toEqual(['artists', 'search', 'rock']);
+    });
   });
 
   describe('featuredArtists', () => {
@@ -38,6 +85,40 @@ describe('queryKeys', () => {
       const listKey = queryKeys.featuredArtists.list();
       expect(listKey).toEqual(['featuredArtists', 'list']);
       expect(listKey[0]).toBe(queryKeys.featuredArtists.all[0]);
+    });
+
+    it('should return active key extending all', () => {
+      const key = queryKeys.featuredArtists.active();
+      expect(key).toEqual(['featuredArtists', 'active']);
+    });
+  });
+
+  describe('collection', () => {
+    it('should return all key', () => {
+      expect(queryKeys.collection.all).toEqual(['collection']);
+    });
+
+    it('should return list key extending all', () => {
+      const key = queryKeys.collection.list();
+      expect(key).toEqual(['collection', 'list']);
+      expect(key[0]).toBe(queryKeys.collection.all[0]);
+    });
+  });
+
+  describe('tours', () => {
+    it('should return all key', () => {
+      expect(queryKeys.tours.all).toEqual(['tours']);
+    });
+
+    it('should return list key extending all', () => {
+      const key = queryKeys.tours.list();
+      expect(key).toEqual(['tours', 'list']);
+      expect(key[0]).toBe(queryKeys.tours.all[0]);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.tours.detail('t-456');
+      expect(key).toEqual(['tours', 'detail', 't-456']);
     });
   });
 

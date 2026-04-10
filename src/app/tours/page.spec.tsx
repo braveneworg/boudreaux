@@ -7,32 +7,34 @@ import { render, screen } from '@testing-library/react';
 
 import ToursPage from './page';
 
-// Mock getInternalApiUrl to return predictable URLs
-vi.mock('@/lib/utils/get-internal-api-url', () => ({
-  getInternalApiUrl: vi.fn((path: string) => `http://test-host${path}`),
+vi.mock('server-only', () => ({}));
+
+// Mock TanStack Query SSR utilities
+const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
+const mockDehydratedState = { queries: [], mutations: [] };
+vi.mock('@tanstack/react-query', () => ({
+  dehydrate: () => mockDehydratedState,
+  HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@/lib/utils/get-query-client', () => ({
+  getQueryClient: () => ({
+    prefetchQuery: mockPrefetchQuery,
+  }),
+}));
+
+vi.mock('@/lib/utils/fetch-api', () => ({
+  fetchApi: vi.fn(),
 }));
 
 // Mock child component
-vi.mock('./components/tours-page-client', () => ({
-  ToursPageClient: ({ tours }: { tours: Array<{ id: string }> }) => (
-    <div data-testid="tours-page-client" data-tour-count={tours.length}>
-      Tours Client
-    </div>
-  ),
+vi.mock('./components/tours-content', () => ({
+  ToursContent: () => <div data-testid="tours-content">Tours Content</div>,
 }));
 
 describe('ToursPage', () => {
-  const mockTours = [
-    { id: 'tour-1', name: 'Summer Tour', tourDates: [] },
-    { id: 'tour-2', name: 'Winter Tour', tourDates: [] },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ tours: mockTours }),
-    }) as unknown as typeof fetch;
   });
 
   it('should render page structure with heading', async () => {
@@ -45,44 +47,21 @@ describe('ToursPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should fetch tours via internal API', async () => {
+  it('should prefetch tours data', async () => {
     const Page = await ToursPage();
     render(Page);
 
-    expect(global.fetch).toHaveBeenCalledWith('http://test-host/api/tours', { cache: 'no-store' });
+    expect(mockPrefetchQuery).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        queryKey: ['tours', 'list'],
+      })
+    );
   });
 
-  it('should pass fetched tours to ToursPageClient', async () => {
+  it('should render ToursContent within HydrationBoundary', async () => {
     const Page = await ToursPage();
     render(Page);
 
-    const client = screen.getByTestId('tours-page-client');
-    expect(client).toHaveAttribute('data-tour-count', '2');
-  });
-
-  it('should render empty tours when fetch fails', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({}),
-    }) as unknown as typeof fetch;
-
-    const Page = await ToursPage();
-    render(Page);
-
-    const client = screen.getByTestId('tours-page-client');
-    expect(client).toHaveAttribute('data-tour-count', '0');
-  });
-
-  it('should render empty tours when response has no tours key', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({}),
-    }) as unknown as typeof fetch;
-
-    const Page = await ToursPage();
-    render(Page);
-
-    const client = screen.getByTestId('tours-page-client');
-    expect(client).toHaveAttribute('data-tour-count', '0');
+    expect(screen.getByTestId('tours-content')).toBeInTheDocument();
   });
 });

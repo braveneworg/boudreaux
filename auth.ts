@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import Nodemailer from 'next-auth/providers/nodemailer';
 
+import { sendVerificationRequest } from '@/lib/email/send-verification-request';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 
@@ -79,6 +80,9 @@ const { handlers, auth, signIn, signOut } = NextAuth({
         },
       },
       from: process.env.EMAIL_FROM,
+      // Cast through `never` to bridge the type mismatch between our narrower
+      // SmtpServer type and nodemailer's AllTransportOptions union. Runtime-compatible.
+      sendVerificationRequest: sendVerificationRequest as never,
     }),
   ],
   callbacks: {

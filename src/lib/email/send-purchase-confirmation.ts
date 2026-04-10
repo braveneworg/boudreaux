@@ -3,7 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { SendEmailCommand } from '@aws-sdk/client-ses';
+import path from 'path';
+
+import { SendRawEmailCommand } from '@aws-sdk/client-ses';
+import nodemailer from 'nodemailer';
 
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { sesClient } from '@/lib/utils/ses-client';
@@ -59,25 +62,39 @@ export async function sendPurchaseConfirmationEmail(
       downloadUrl,
     };
 
-    const command = new SendEmailCommand({
+    const logoPath = path.join(process.cwd(), 'public', 'fake-four-inc-black-hand-logo.svg');
+
+    // Use nodemailer to build a multipart/related MIME message so the logo can
+    // be embedded as a CID inline attachment. SES SendRawEmailCommand then
+    // delivers the pre-built raw message.
+    const transport = nodemailer.createTransport({
+      streamTransport: true,
+      newline: 'unix',
+      buffer: true,
+    });
+
+    const info = await transport.sendMail({
+      from: fromAddress,
+      to: input.customerEmail,
+      subject: `Fake Four Inc. — Download ready: ${input.releaseTitle}`,
+      text: buildPurchaseConfirmationEmailText(emailData),
+      html: buildPurchaseConfirmationEmailHtml(emailData),
+      attachments: [
+        {
+          filename: 'fake-four-inc-black-hand-logo.svg',
+          path: logoPath,
+          cid: 'logo@fakefourrecords.com',
+          contentType: 'image/svg+xml',
+        },
+      ],
+    });
+
+    const rawMessage = (info as { message: Buffer }).message;
+
+    const command = new SendRawEmailCommand({
       Source: fromAddress,
-      Destination: { ToAddresses: [input.customerEmail] },
-      Message: {
-        Subject: {
-          Data: `Fake Four Inc. — Download ready: ${input.releaseTitle}`,
-          Charset: 'UTF-8',
-        },
-        Body: {
-          Html: {
-            Data: buildPurchaseConfirmationEmailHtml(emailData),
-            Charset: 'UTF-8',
-          },
-          Text: {
-            Data: buildPurchaseConfirmationEmailText(emailData),
-            Charset: 'UTF-8',
-          },
-        },
-      },
+      Destinations: [input.customerEmail],
+      RawMessage: { Data: rawMessage },
     });
 
     await sesClient.send(command);

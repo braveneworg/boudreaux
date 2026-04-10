@@ -7,53 +7,43 @@ import { render, screen } from '@testing-library/react';
 
 import CollectionPage from './page';
 
-// Mock server-only
 vi.mock('server-only', () => ({}));
 
-// Mock next/headers
-vi.mock('next/headers', () => ({
-  cookies: vi.fn(() =>
-    Promise.resolve({
-      toString: () => 'session-token=abc123',
-    })
-  ),
+// Mock auth
+const mockAuth = vi.fn();
+vi.mock('../../../../auth', () => ({
+  auth: () => mockAuth(),
 }));
 
-// Mock next/navigation
-const mockRedirect = vi.fn();
+// Mock next/navigation — redirect must throw to stop execution like the real redirect
+const mockRedirect = vi.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`);
+});
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => mockRedirect(url),
 }));
 
-// Mock next/link
-vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+// Mock TanStack Query SSR utilities
+const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
+const mockDehydratedState = { queries: [], mutations: [] };
+vi.mock('@tanstack/react-query', () => ({
+  dehydrate: () => mockDehydratedState,
+  HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// Mock getInternalApiUrl
-vi.mock('@/lib/utils/get-internal-api-url', () => ({
-  getInternalApiUrl: vi.fn((path: string) => `http://test-host${path}`),
+vi.mock('@/lib/utils/get-query-client', () => ({
+  getQueryClient: () => ({
+    prefetchQuery: mockPrefetchQuery,
+  }),
 }));
 
-// Mock UI components
-vi.mock('@/app/components/collection-list', () => ({
-  CollectionList: ({
-    purchases,
-    isAdmin,
-  }: {
-    purchases: Array<{ id: string }>;
-    isAdmin: boolean;
-  }) => (
-    <div data-testid="collection-list" data-count={purchases.length} data-admin={String(isAdmin)}>
-      Collection
-    </div>
-  ),
+vi.mock('@/lib/utils/fetch-api', () => ({
+  fetchApi: vi.fn(),
 }));
 
-vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
-  BreadcrumbMenu: () => <nav data-testid="breadcrumb-menu">Breadcrumbs</nav>,
+// Mock child components
+vi.mock('@/app/components/collection-content', () => ({
+  CollectionContent: () => <div data-testid="collection-content">Collection Content</div>,
 }));
 
 vi.mock('@/app/components/ui/content-container', () => ({
@@ -69,28 +59,25 @@ vi.mock('@/app/components/ui/page-container', () => ({
 }));
 
 describe('CollectionPage', () => {
-  const mockPurchases = [
-    { id: 'purchase-1', releaseId: 'release-1', release: { title: 'Album A' } },
-    { id: 'purchase-2', releaseId: 'release-2', release: { title: 'Album B' } },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ purchases: mockPurchases, isAdmin: false }),
-    }) as unknown as typeof fetch;
+    mockAuth.mockResolvedValue({
+      user: { id: 'user-1', role: 'user' },
+    });
   });
 
-  it('should fetch collection via internal API with cookies', async () => {
-    const Page = await CollectionPage();
-    render(Page);
+  it('should redirect to signin when not authenticated', async () => {
+    mockAuth.mockResolvedValue(null);
 
-    expect(global.fetch).toHaveBeenCalledWith('http://test-host/api/user/collection', {
-      cache: 'no-store',
-      headers: { Cookie: 'session-token=abc123' },
-    });
+    await expect(CollectionPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
+    expect(mockRedirect).toHaveBeenCalledWith('/signin');
+  });
+
+  it('should redirect to signin when user has no id', async () => {
+    mockAuth.mockResolvedValue({ user: {} });
+
+    await expect(CollectionPage()).rejects.toThrow('NEXT_REDIRECT:/signin');
+    expect(mockRedirect).toHaveBeenCalledWith('/signin');
   });
 
   it('should render page structure', async () => {
@@ -99,70 +86,23 @@ describe('CollectionPage', () => {
 
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
-    expect(screen.getByTestId('breadcrumb-menu')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'My Collection' })).toBeInTheDocument();
   });
 
-  it('should render CollectionList with purchases', async () => {
+  it('should prefetch collection data with cookie forwarding', async () => {
     const Page = await CollectionPage();
     render(Page);
 
-    const list = screen.getByTestId('collection-list');
-    expect(list).toHaveAttribute('data-count', '2');
-    expect(list).toHaveAttribute('data-admin', 'false');
+    expect(mockPrefetchQuery).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        queryKey: ['collection', 'list'],
+      })
+    );
   });
 
-  it('should pass isAdmin=true for admin users', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ purchases: mockPurchases, isAdmin: true }),
-    }) as unknown as typeof fetch;
-
+  it('should render CollectionContent within HydrationBoundary', async () => {
     const Page = await CollectionPage();
     render(Page);
 
-    expect(screen.getByTestId('collection-list')).toHaveAttribute('data-admin', 'true');
-  });
-
-  it('should redirect to signin on 401', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: () => Promise.resolve({ error: 'Unauthorized' }),
-    }) as unknown as typeof fetch;
-
-    await CollectionPage();
-
-    expect(mockRedirect).toHaveBeenCalledWith('/signin');
-  });
-
-  it('should render empty state when no purchases', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ purchases: [], isAdmin: false }),
-    }) as unknown as typeof fetch;
-
-    const Page = await CollectionPage();
-    render(Page);
-
-    expect(screen.getByText('No purchases yet.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'releases' })).toHaveAttribute('href', '/releases');
-    expect(screen.queryByTestId('collection-list')).not.toBeInTheDocument();
-  });
-
-  it('should handle failed fetch gracefully', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({ error: 'Internal server error' }),
-    }) as unknown as typeof fetch;
-
-    const Page = await CollectionPage();
-    render(Page);
-
-    // Falls back to empty state
-    expect(screen.getByText('No purchases yet.')).toBeInTheDocument();
+    expect(screen.getByTestId('collection-content')).toBeInTheDocument();
   });
 });

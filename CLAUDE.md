@@ -72,15 +72,16 @@ Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before co
 
 - Server Components by default — add `'use client'` only for interactive components (Stripe Elements, dialogs, etc.).
 - Server Actions for all mutations (in `lib/actions/`). Add `'use server'` directive at top of file.
-- API routes for GET queries only.
+- Never call services, prisma client or repositories directly from Client Components. User server actions for mutations but do not access prisma directly. Use api route handlers to call services or repositories. Call api route handlers for queries from Client components.
+
+````typescript
 - Always use `'server-only'` package in files meant exclusively for server-side execution to prevent accidental client-side imports.
-- Use Prisma Client in Server Components and Server Actions only — never in Client Components.
 - Use decorators for auth checks (e.g., `withAuth`, `withAdmin`) in Server Actions.
 - Data fetching in Server Components uses `fetch` with explicit cache options:
 
 ```typescript
 const res = await fetch(url, { cache: 'no-store' }); // for fresh data
-```
+````
 
 - Always validate external data (API responses, user input) with Zod.
 - Use Prisma transactions for multi-step DB operations.

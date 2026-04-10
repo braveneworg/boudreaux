@@ -7,17 +7,38 @@
  * Using a factory pattern ensures consistent, type-safe keys across the app.
  */
 export const queryKeys = {
+  banners: {
+    all: ['banners'] as const,
+    active: () => [...queryKeys.banners.all, 'active'] as const,
+  },
   releases: {
     all: ['releases'] as const,
     list: () => [...queryKeys.releases.all, 'list'] as const,
+    published: () => [...queryKeys.releases.all, 'published'] as const,
+    detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
+    userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
+    related: (id: string) => [...queryKeys.releases.all, 'related', id] as const,
+    digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
   },
   artists: {
     all: ['artists'] as const,
     list: () => [...queryKeys.artists.all, 'list'] as const,
+    bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
+    search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
   },
   featuredArtists: {
     all: ['featuredArtists'] as const,
     list: () => [...queryKeys.featuredArtists.all, 'list'] as const,
+    active: () => [...queryKeys.featuredArtists.all, 'active'] as const,
+  },
+  collection: {
+    all: ['collection'] as const,
+    list: () => [...queryKeys.collection.all, 'list'] as const,
+  },
+  tours: {
+    all: ['tours'] as const,
+    list: () => [...queryKeys.tours.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.tours.all, 'detail', id] as const,
   },
   purchaseStatus: {
     bySession: (releaseId: string, sessionId: string) =>
