@@ -7,10 +7,12 @@
  */
 
 export function validateEnvironment() {
-  // Skip validation only during build phase (secrets not available in Docker build)
-  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-  if (process.env.SKIP_ENV_VALIDATION === 'true' && isBuildPhase) {
-    console.warn('⚠️  Environment validation skipped (build phase)');
+  // Skip validation during build phase (secrets not available in Docker build)
+  // or when explicitly disabled (e.g. E2E test runs that inject stub env vars).
+  if (process.env.SKIP_ENV_VALIDATION === 'true') {
+    const reason =
+      process.env.NEXT_PHASE === 'phase-production-build' ? 'build phase' : 'SKIP_ENV_VALIDATION';
+    console.warn(`⚠️  Environment validation skipped (${reason})`);
     return;
   }
 

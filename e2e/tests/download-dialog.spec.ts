@@ -152,6 +152,8 @@ test.describe('Download Dialog — Multi-format selection', () => {
   });
 
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
+    await userPage.goto(`/releases/${e2eRelease1Id}`);
+
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();

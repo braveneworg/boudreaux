@@ -267,6 +267,23 @@ describe('Environment Validation', () => {
       );
     });
 
+    it('should skip validation when SKIP_ENV_VALIDATION is true at runtime (no build phase)', () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      process.env = {
+        ...process.env,
+        SKIP_ENV_VALIDATION: 'true',
+        // NEXT_PHASE not set — simulates E2E webServer runtime, not a build
+        DATABASE_URL: undefined, // would normally cause an error
+      };
+
+      expect(() => validateEnvironment()).not.toThrow();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '⚠️  Environment validation skipped (SKIP_ENV_VALIDATION)'
+      );
+    });
+
     it('should automatically call validateEnvironment when NODE_ENV is production', async () => {
       vi.resetModules();
       process.env = {
