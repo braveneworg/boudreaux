@@ -141,8 +141,17 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
 });
 
 test.describe('Download Dialog — Multi-format selection', () => {
+  let e2eRelease1Id: string;
+
+  test.beforeAll(async () => {
+    const release = await prisma.release.findFirstOrThrow({
+      where: { title: 'E2E Album One' },
+      select: { id: true },
+    });
+    e2eRelease1Id = release.id;
+  });
+
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });

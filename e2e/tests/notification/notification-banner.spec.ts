@@ -18,9 +18,9 @@ test.describe('Notification Banner Carousel', () => {
     const tablist = page.getByRole('tablist', { name: 'Banner slides' });
     await expect(tablist).toBeVisible();
 
-    // There are 5 hardcoded banner slots (each with a static image)
+    // 3 banner notifications are seeded in the database
     const tabs = tablist.getByRole('tab');
-    await expect(tabs).toHaveCount(5);
+    await expect(tabs).toHaveCount(3);
 
     // First dot should be selected
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');

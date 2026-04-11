@@ -21,6 +21,7 @@
     "test:shard": "vitest run --reporter=blob --coverage",
     "test:merge": "vitest --merge-reports .vitest-reports --coverage",
     "test:no-css": "mv postcss.config.mjs postcss.config.mjs.bak && vitest run && mv postcss.config.mjs.bak postcss.config.mjs",
+    "test:e2e": "playwright test",
     "mongo:dump": "pnpm exec tsx scripts/mongo-backup.ts dump",
     "mongo:restore": "pnpm exec tsx scripts/mongo-backup.ts restore",
     "s3:backup": "pnpm exec tsx scripts/s3-backup.ts backup",
