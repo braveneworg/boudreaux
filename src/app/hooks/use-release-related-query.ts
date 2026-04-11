@@ -10,23 +10,29 @@ interface ReleaseRelatedResponse {
   releases: ReleaseCarouselItem[];
 }
 
-const fetchReleaseRelated = async (releaseId: string): Promise<ReleaseRelatedResponse> => {
-  const response = await fetch(`/api/releases/${encodeURIComponent(releaseId)}/related`);
+const fetchReleaseRelated = async (
+  releaseId: string,
+  artistId: string | null
+): Promise<ReleaseRelatedResponse> => {
+  const url = artistId
+    ? `/api/releases/${encodeURIComponent(releaseId)}/related?artistId=${encodeURIComponent(artistId)}`
+    : `/api/releases/${encodeURIComponent(releaseId)}/related`;
+  const response = await fetch(url);
   if (!response.ok) {
     throw Error('Failed to fetch related releases');
   }
   return response.json() as Promise<ReleaseRelatedResponse>;
 };
 
-export const useReleaseRelatedQuery = (releaseId: string) => {
+export const useReleaseRelatedQuery = (releaseId: string, artistId: string | null = null) => {
   const {
     isPending,
     error = Error('Unknown error'),
     data,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.releases.related(releaseId),
-    queryFn: () => fetchReleaseRelated(releaseId),
+    queryKey: queryKeys.releases.related(releaseId, artistId),
+    queryFn: () => fetchReleaseRelated(releaseId, artistId),
     enabled: !!releaseId,
   });
 

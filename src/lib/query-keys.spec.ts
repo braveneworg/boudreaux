@@ -43,9 +43,14 @@ describe('queryKeys', () => {
       expect(key).toEqual(['releases', 'userStatus', 'r-123']);
     });
 
-    it('should return related key with id', () => {
+    it('should return related key with id and no artistId', () => {
       const key = queryKeys.releases.related('r-123');
-      expect(key).toEqual(['releases', 'related', 'r-123']);
+      expect(key).toEqual(['releases', 'related', 'r-123', '']);
+    });
+
+    it('should return related key with id and artistId', () => {
+      const key = queryKeys.releases.related('r-123', 'a-456');
+      expect(key).toEqual(['releases', 'related', 'r-123', 'a-456']);
     });
 
     it('should return digitalFormats key with id', () => {

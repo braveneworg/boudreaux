@@ -6,6 +6,8 @@ const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 const IS_CI = !!process.env.CI;
+const E2E_PORT = IS_CI ? '3000' : '3099';
+const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 const PLAYWRIGHT_REPORT_OUTPUT = process.env.PLAYWRIGHT_HTML_REPORT || 'e2e/playwright-report';
 const PLAYWRIGHT_TEST_OUTPUT = process.env.PLAYWRIGHT_TEST_OUTPUT || 'e2e/test-results';
 
@@ -30,11 +32,11 @@ export default defineConfig({
   outputDir: PLAYWRIGHT_TEST_OUTPUT,
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || E2E_BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    navigationTimeout: IS_CI ? 30_000 : 15_000,
+    navigationTimeout: 30_000,
   },
 
   projects: [
@@ -45,17 +47,20 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: IS_CI ? 'node .next/standalone/server.js' : 'pnpm run dev',
-    url: 'http://localhost:3000',
+    command: IS_CI
+      ? 'node .next/standalone/server.js'
+      : `rm -f .next/dev/lock && next dev --turbopack -p ${E2E_PORT}`,
+    url: E2E_BASE_URL,
     reuseExistingServer: false,
     timeout: IS_CI ? 60_000 : 120_000, // 1 min in CI (pre-built), 2 min locally
     env: {
       NODE_ENV: IS_CI ? 'production' : 'development',
-      PORT: '3000',
+      PORT: E2E_PORT,
       E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,
       AUTH_SECRET,
-      AUTH_URL: 'http://localhost:3000',
+      AUTH_URL: E2E_BASE_URL,
+      NEXT_PUBLIC_BASE_URL: E2E_BASE_URL,
       NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: '1x00000000000000000000AA',
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,

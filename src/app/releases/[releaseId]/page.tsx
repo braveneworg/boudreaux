@@ -51,6 +51,12 @@ export default async function ReleasePlayerPage({ params, searchParams }: Releas
     queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
   }
 
+  // Extract primaryArtistId from release data for related releases prefetch
+  const releaseCache = queryClient.getQueryData<{
+    artistReleases?: Array<{ artist?: { id?: string } }>;
+  }>(queryKeys.releases.detail(releaseId));
+  const primaryArtistId = releaseCache?.artistReleases?.[0]?.artist?.id ?? null;
+
   // Prefetch supplementary data in parallel (errors are swallowed by prefetchQuery)
   await Promise.all([
     queryClient.prefetchQuery({
@@ -65,8 +71,13 @@ export default async function ReleasePlayerPage({ params, searchParams }: Releas
       queryFn: () => fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/digital-formats`),
     }),
     queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.related(releaseId),
-      queryFn: () => fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/related`),
+      queryKey: queryKeys.releases.related(releaseId, primaryArtistId),
+      queryFn: () => {
+        const relatedUrl = primaryArtistId
+          ? `/api/releases/${encodeURIComponent(releaseId)}/related?artistId=${encodeURIComponent(primaryArtistId)}`
+          : `/api/releases/${encodeURIComponent(releaseId)}/related`;
+        return fetchApi(relatedUrl);
+      },
     }),
   ]);
 

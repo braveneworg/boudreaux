@@ -60,7 +60,11 @@ describe('Artist by Slug API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockArtist);
+      expect(data).toEqual({
+        ...mockArtist,
+        createdAt: mockArtist.createdAt.toISOString(),
+        updatedAt: mockArtist.updatedAt.toISOString(),
+      });
       expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-doe');
     });
 

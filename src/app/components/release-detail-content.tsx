@@ -29,7 +29,9 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
   const { isPending: releasePending, data: release } = useReleaseQuery(releaseId);
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
   const { data: formatsData } = useReleaseDigitalFormatsQuery(releaseId);
-  const { data: relatedData } = useReleaseRelatedQuery(releaseId);
+
+  const primaryArtistId = release?.artistReleases?.[0]?.artist?.id ?? null;
+  const { data: relatedData } = useReleaseRelatedQuery(releaseId, primaryArtistId);
 
   if (releasePending) {
     return (

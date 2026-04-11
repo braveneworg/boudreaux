@@ -8,6 +8,10 @@ import { ArtistService } from '@/lib/services/artist-service';
 
 export const dynamic = 'force-dynamic';
 
+function serializeBigInts<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+}
+
 /**
  * GET /api/artist/slug/[slug]
  * Get a single artist by slug.
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(serializeBigInts(result.data));
   } catch (error) {
     console.error('Artist slug GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

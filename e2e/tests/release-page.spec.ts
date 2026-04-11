@@ -81,8 +81,8 @@ test.describe('Release Page — Purchase State Awareness', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    // Should show "Download Again" heading (format-select step for returning purchasers)
-    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
+    // Should recognize user as a returning purchaser
+    await expect(userPage.getByText('You already purchased this on')).toBeVisible({
       timeout: 5_000,
     });
 

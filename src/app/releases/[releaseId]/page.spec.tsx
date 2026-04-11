@@ -24,10 +24,12 @@ vi.mock('@tanstack/react-query', () => ({
   HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+const mockGetQueryData = vi.fn();
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchQuery: mockPrefetchQuery,
     setQueryData: mockSetQueryData,
+    getQueryData: mockGetQueryData,
   }),
 }));
 
@@ -171,7 +173,7 @@ describe('ReleasePlayerPage', () => {
     );
     expect(mockPrefetchQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ['releases', 'related', 'release-1'],
+        queryKey: ['releases', 'related', 'release-1', ''],
       })
     );
   });

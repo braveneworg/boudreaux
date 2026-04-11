@@ -17,7 +17,8 @@ export const queryKeys = {
     published: () => [...queryKeys.releases.all, 'published'] as const,
     detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
-    related: (id: string) => [...queryKeys.releases.all, 'related', id] as const,
+    related: (id: string, artistId?: string | null) =>
+      [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
   },
   artists: {
