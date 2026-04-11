@@ -75,7 +75,12 @@ test.describe('Release Page — Player and Navigation', () => {
 test.describe('Release Page — Purchase State Awareness', () => {
   test('purchased release shows returning purchaser dialog', async ({ userPage }) => {
     // Regular user has purchased E2E Album One
+    // Wait for user-status API to resolve before opening dialog so hasPurchase is populated
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });

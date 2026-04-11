@@ -387,6 +387,21 @@ export const DownloadDialog = ({
                 Select formats for <strong>{releaseTitle}</strong>
               </DialogDescription>
             </DialogHeader>
+
+            <p className="text-zinc-900 text-sm">
+              You already purchased this on{' '}
+              <strong>
+                {purchasedAt
+                  ? new Date(purchasedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                  : 'a previous date'}
+              </strong>
+              .
+            </p>
+
             {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
               <>
                 <Button className="w-full" type="button" disabled>

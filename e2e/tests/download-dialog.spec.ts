@@ -30,7 +30,12 @@ test.afterAll(async () => {
 
 test.describe('Download Dialog — Purchased User', () => {
   test('opens download dialog and shows returning purchaser state', async ({ userPage }) => {
+    // Wait for user-status API to resolve before opening dialog so hasPurchase is populated
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     // Click the download trigger button
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
@@ -44,7 +49,11 @@ test.describe('Download Dialog — Purchased User', () => {
   });
 
   test('shows format options via multi-combobox', async ({ userPage }) => {
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
@@ -61,7 +70,11 @@ test.describe('Download Dialog — Purchased User', () => {
   });
 
   test('shows download button with format count after selecting formats', async ({ userPage }) => {
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
@@ -152,7 +165,11 @@ test.describe('Download Dialog — Multi-format selection', () => {
   });
 
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -177,7 +194,11 @@ test.describe('Download Dialog — Multi-format selection', () => {
   });
 
   test('shows selected format pills below combobox', async ({ userPage }) => {
+    const userStatusResponse = userPage.waitForResponse(
+      (resp) => resp.url().includes('/user-status') && resp.status() === 200
+    );
     await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await userStatusResponse;
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
     await downloadButton.click();
