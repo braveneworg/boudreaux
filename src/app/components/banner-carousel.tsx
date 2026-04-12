@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
+import { flushSync } from 'react-dom';
+
 import { DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
 import { cloudfrontLoader } from '@/lib/utils/cloudfront-loader';
@@ -89,8 +91,11 @@ export function BannerCarousel({
   /** Finish a slide transition: update index and reset track position */
   const completeTransition = useCallback(
     (toIndex: number) => {
-      currentIndexRef.current = toIndex;
-      setCurrentIndex(toIndex);
+      flushSync(() => {
+        currentIndexRef.current = toIndex;
+        setCurrentIndex(toIndex);
+      });
+      // React has synchronously committed new slide transforms — safe to snap track
       resetTrack();
       isAnimatingRef.current = false;
     },
@@ -328,52 +333,40 @@ export function BannerCarousel({
           aria-roledescription="slide"
           aria-label={`Banner ${currentIndex + 1} of ${totalSlides}`}
         >
-          {/* Previous slide — positioned at -100% of current */}
-          {totalSlides > 1 && (
-            <div
-              className="absolute inset-0 pointer-events-none select-none"
-              style={{ transform: 'translateX(-100%)' }}
-            >
-              <Image
-                loader={cloudfrontLoader}
-                src={banners[prevIndex].imageFilename}
-                alt={`Banner ${banners[prevIndex].slotNumber}`}
-                fill
-                sizes="100vw"
-                className="object-cover"
-              />
-            </div>
-          )}
+          {banners.map((banner, idx) => {
+            const isCurrentSlide = idx === currentIndex;
+            const isPrevSlide = idx === prevIndex;
+            const isNextSlide = idx === nextIndex;
+            const isVisible = isCurrentSlide || (totalSlides > 1 && (isPrevSlide || isNextSlide));
 
-          {/* Current slide — centered */}
-          <div className="absolute inset-0 pointer-events-none select-none">
-            <Image
-              loader={cloudfrontLoader}
-              src={currentBanner.imageFilename}
-              alt={`Banner ${currentBanner.slotNumber}`}
-              fill
-              sizes="100vw"
-              priority={currentIndex === 0}
-              className="object-cover"
-            />
-          </div>
-
-          {/* Next slide — positioned at +100% of current */}
-          {totalSlides > 1 && (
-            <div
-              className="absolute inset-0 pointer-events-none select-none"
-              style={{ transform: 'translateX(100%)' }}
-            >
-              <Image
-                loader={cloudfrontLoader}
-                src={banners[nextIndex].imageFilename}
-                alt={`Banner ${banners[nextIndex].slotNumber}`}
-                fill
-                sizes="100vw"
-                className="object-cover"
-              />
-            </div>
-          )}
+            return (
+              <div
+                key={banner.slotNumber}
+                className="absolute inset-0 pointer-events-none select-none"
+                style={{
+                  transform: isPrevSlide
+                    ? 'translateX(-100%)'
+                    : isNextSlide
+                      ? 'translateX(100%)'
+                      : isCurrentSlide
+                        ? 'translateX(0)'
+                        : 'translateX(-200%)',
+                  visibility: isVisible ? 'visible' : 'hidden',
+                }}
+              >
+                <Image
+                  loader={cloudfrontLoader}
+                  src={banner.imageFilename}
+                  alt={`Banner ${banner.slotNumber}`}
+                  fill
+                  sizes="100vw"
+                  priority={idx === 0}
+                  loading={idx === 0 ? undefined : 'eager'}
+                  className="object-cover"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
