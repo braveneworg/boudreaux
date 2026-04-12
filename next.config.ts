@@ -23,6 +23,12 @@ const config = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   // Empty turbopack config to allow Turbopack builds (Next.js 16+ default)

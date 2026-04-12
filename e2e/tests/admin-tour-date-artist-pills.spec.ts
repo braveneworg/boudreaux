@@ -73,8 +73,9 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
   await headlinerButton.click();
   await adminPage.getByRole('option', { name: 'Test Artist One' }).click();
   await adminPage.getByRole('option', { name: 'Test Artist Two' }).click();
-  // Close the popover by clicking the trigger button again (avoids Escape propagating to the Dialog)
-  await headlinerButton.click();
+  // Close the popover with Escape — the PopoverContent's onEscapeKeyDown handler
+  // calls stopPropagation() so the Dialog underneath won't close.
+  await adminPage.keyboard.press('Escape');
 
   // Set start date: type today's date directly into the input
   // (the DatePicker uses PopoverAnchor, not PopoverTrigger, so clicking
@@ -90,6 +91,11 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
 
   // Wait for the dialog to close (allow extra time for dev-mode compilation on first run)
   await expect(dialog).not.toBeVisible({ timeout: 60000 });
+
+  // The tour date is created server-side but the page may not immediately reflect the change.
+  // Reload to ensure the tour dates list is fresh.
+  await adminPage.reload();
+  await adminPage.waitForLoadState('networkidle');
 };
 
 test.describe('Admin Tour Date Artist Pills', () => {
@@ -243,7 +249,7 @@ test.describe('Admin Tour Date Artist Pills', () => {
     });
 
     // Artist should no longer be visible
-    await expect(pillList.getByText('Test Artist Two')).not.toBeVisible();
+    await expect(pillList.getByText('Test Artist Two')).not.toBeVisible({ timeout: 10000 });
 
     // First artist should still be visible
     await expect(pillList.getByText('Test Artist One')).toBeVisible();

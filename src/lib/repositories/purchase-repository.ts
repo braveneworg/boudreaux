@@ -25,6 +25,7 @@ export class PurchaseRepository {
       data: {
         ...data,
         confirmationEmailSentAt: null,
+        refundedAt: null,
       },
     });
   }

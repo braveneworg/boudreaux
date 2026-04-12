@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   DndContext,
@@ -84,10 +84,14 @@ export default function ArtistPillList({
   onHeadlinersChange,
 }: ArtistPillListProps) {
   const [headliners, setHeadliners] = useState(initialHeadliners);
+  const prevInitialRef = useRef(initialHeadliners);
 
   // Keep local state in sync with parent prop updates
-  // (e.g., after the parent refetches tour dates)
-  if (initialHeadliners !== headliners && initialHeadliners.length !== headliners.length) {
+  // (e.g., after the parent refetches tour dates).
+  // Compare against the previous prop reference, not local state,
+  // to avoid overriding optimistic updates before the parent refreshes.
+  if (initialHeadliners !== prevInitialRef.current) {
+    prevInitialRef.current = initialHeadliners;
     setHeadliners(initialHeadliners);
   }
 

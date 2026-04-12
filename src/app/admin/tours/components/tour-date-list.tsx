@@ -95,7 +95,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
   const fetchTourDates = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/tours/${tourId}/dates`);
+      const res = await fetch(`/api/tours/${tourId}/dates`, { cache: 'no-store' });
       if (res.ok) {
         const { tourDates: dates } = await res.json();
         setTourDates(dates || []);

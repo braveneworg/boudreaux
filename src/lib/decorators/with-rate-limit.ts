@@ -38,15 +38,18 @@ export function extractClientIp(request: NextRequest): string {
 export function withRateLimit<TParams = unknown>(limiter: RateLimiter, limit: number) {
   return (handler: RateLimitedHandler<TParams>) => {
     return async (request: NextRequest, context: { params: Promise<unknown> }) => {
-      const ip = extractClientIp(request);
+      // Skip rate limiting in E2E test mode to avoid 429 errors during test runs
+      if (process.env.E2E_MODE !== 'true') {
+        const ip = extractClientIp(request);
 
-      try {
-        await limiter.check(limit, ip);
-      } catch {
-        return NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          { status: 429 }
-        );
+        try {
+          await limiter.check(limit, ip);
+        } catch {
+          return NextResponse.json(
+            { error: 'Too many requests. Please try again later.' },
+            { status: 429 }
+          );
+        }
       }
 
       return handler(request, context as { params: Promise<TParams> });

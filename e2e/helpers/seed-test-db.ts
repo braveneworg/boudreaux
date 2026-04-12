@@ -364,6 +364,9 @@ async function seedTestDatabase() {
     });
 
     // Create a purchase record for regular user on E2E Album One (for download tests)
+    // Note: refundedAt and confirmationEmailSentAt must be explicitly set to null
+    // because Prisma with MongoDB won't match `{ refundedAt: null }` queries against
+    // documents where the field is completely absent.
     await prisma.releasePurchase.create({
       data: {
         userId: TEST_USERS.regular.id,
@@ -371,6 +374,8 @@ async function seedTestDatabase() {
         amountPaid: 799,
         stripePaymentIntentId: 'pi_e2e_test_purchase_album_one',
         stripeSessionId: 'cs_e2e_test_session_album_one',
+        refundedAt: null,
+        confirmationEmailSentAt: null,
         purchasedAt: new Date(),
       },
     });
