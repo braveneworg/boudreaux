@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
-import { test, expect } from '../fixtures/base.fixture';
+import { test } from '../fixtures/base.fixture';
 
 const prisma = new PrismaClient({
   datasourceUrl:
@@ -24,17 +24,17 @@ test('debug: check user-status API for purchased release', async ({ userPage }) 
   await userPage.goto(`/releases/${release.id}`);
 
   const statusResp = await userStatusPromise;
-  console.log('USER-STATUS HTTP STATUS:', statusResp.status());
+  console.info('USER-STATUS HTTP STATUS:', statusResp.status());
   const body = await statusResp.json();
-  console.log('USER-STATUS BODY:', JSON.stringify(body));
+  console.info('USER-STATUS BODY:', JSON.stringify(body));
 
   // Also check the session
   const session = await userPage.evaluate(async () => {
     const res = await fetch('/api/auth/session');
     return { status: res.status, body: await res.json() };
   });
-  console.log('SESSION STATUS:', session.status);
-  console.log('SESSION BODY:', JSON.stringify(session.body));
+  console.info('SESSION STATUS:', session.status);
+  console.info('SESSION BODY:', JSON.stringify(session.body));
 
   await prisma.$disconnect();
 });

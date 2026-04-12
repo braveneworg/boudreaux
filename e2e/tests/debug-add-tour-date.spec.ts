@@ -36,7 +36,7 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
 
   const dialog = adminPage.getByRole('dialog', { name: 'Add Tour Date' });
   await expect(dialog).toBeVisible();
-  console.log('STEP 1: Dialog visible');
+  console.info('STEP 1: Dialog visible');
 
   // Select venue
   const venueButton = dialog.getByRole('combobox').nth(1);
@@ -46,7 +46,7 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
     .getByRole('option', { name: new RegExp(venue.name) })
     .first()
     .click();
-  console.log('STEP 2: Venue selected');
+  console.info('STEP 2: Venue selected');
 
   // Select headliner artists
   const headlinerButton = dialog.locator('button[role="combobox"]').first();
@@ -56,7 +56,7 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
   });
   await adminPage.getByRole('option', { name: 'Test Artist One' }).click();
   await adminPage.getByRole('option', { name: 'Test Artist Two' }).click();
-  console.log('STEP 3: Artists selected');
+  console.info('STEP 3: Artists selected');
 
   // Close headliner popover with Escape
   await adminPage.keyboard.press('Escape');
@@ -64,19 +64,19 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
 
   // Verify the popover is closed (check that headliner button says "2 artists selected")
   const headlinerText = await headlinerButton.textContent();
-  console.log(`STEP 4: Headliner button text after close: "${headlinerText}"`);
+  console.info(`STEP 4: Headliner button text after close: "${headlinerText}"`);
 
   // Check if popover is still open
   const popoverContent = adminPage.locator('[data-radix-popper-content-wrapper]');
   const popoverVisible = await popoverContent.isVisible().catch(() => false);
-  console.log(`STEP 5: Popover still visible: ${popoverVisible}`);
+  console.info(`STEP 5: Popover still visible: ${popoverVisible}`);
 
   // Fill start date
   const startDateInput = dialog.getByPlaceholder('mm/dd/yyyy').first();
   const today = new Date();
   const dateString = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
   await startDateInput.fill(dateString);
-  console.log(`STEP 6: Date filled: ${dateString}`);
+  console.info(`STEP 6: Date filled: ${dateString}`);
 
   // Wait a moment for any auto-populate to happen
   await adminPage.waitForTimeout(500);
@@ -92,30 +92,30 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
 
   // Click submit
   const submitButton = dialog.getByRole('button', { name: /Add Tour Date/i });
-  console.log(`STEP 7: Submit button found, clicking...`);
+  console.info(`STEP 7: Submit button found, clicking...`);
   await submitButton.click();
 
   // Wait a bit to see response
   await adminPage.waitForTimeout(2000);
   const dialogVisible = await dialog.isVisible();
-  console.log(`STEP 8: Dialog visible after submit: ${dialogVisible}`);
+  console.info(`STEP 8: Dialog visible after submit: ${dialogVisible}`);
 
   if (dialogVisible) {
     // Check for validation errors in the dialog
-    const allText = await dialog.textContent();
+    const _allText = await dialog.textContent();
     // Find validation-related text
     const errorTexts = await dialog
       .locator('.text-destructive, [data-slot="form-message"]')
       .allTextContents();
-    console.log(`STEP 9: Error messages: ${JSON.stringify(errorTexts)}`);
+    console.info(`STEP 9: Error messages: ${JSON.stringify(errorTexts)}`);
     await adminPage.screenshot({ path: 'e2e/test-results/debug-errors-v2.png' });
   } else {
-    console.log('STEP 9: Dialog closed');
+    console.info('STEP 9: Dialog closed');
     // Check DB for tour dates
     const tourDates = await prisma.tourDate.findMany({ where: { tourId } });
-    console.log(`STEP 10: Tour dates in DB: ${tourDates.length}`);
+    console.info(`STEP 10: Tour dates in DB: ${tourDates.length}`);
     for (const td of tourDates) {
-      console.log(
+      console.info(
         `  Tour date: venueId=${td.venueId}, startDate=${td.startDate}, showStartTime=${td.showStartTime}`
       );
     }
@@ -125,7 +125,7 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
       .getByText('No Tour Dates Yet')
       .isVisible()
       .catch(() => false);
-    console.log(`STEP 11: "No Tour Dates Yet" visible: ${noTourDates}`);
+    console.info(`STEP 11: "No Tour Dates Yet" visible: ${noTourDates}`);
 
     // Maybe the page needs to reload?
     await adminPage.reload();
@@ -134,7 +134,7 @@ test('debug: add tour date step by step', async ({ adminPage }) => {
       .getByText('No Tour Dates Yet')
       .isVisible()
       .catch(() => false);
-    console.log(`STEP 12: "No Tour Dates Yet" after reload: ${noTourDatesAfterReload}`);
+    console.info(`STEP 12: "No Tour Dates Yet" after reload: ${noTourDatesAfterReload}`);
   }
 
   // Cleanup
