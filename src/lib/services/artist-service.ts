@@ -288,7 +288,6 @@ export class ArtistService {
         return { success: false, error: 'Artist not found' };
       }
 
-      const s3Client = getS3Client();
       const s3Bucket = process.env.S3_BUCKET;
       const cdnDomainRaw = process.env.CDN_DOMAIN;
       // Strip any existing protocol from CDN domain to avoid double https://
@@ -297,6 +296,8 @@ export class ArtistService {
       if (!s3Bucket) {
         return { success: false, error: 'S3 bucket not configured' };
       }
+
+      const s3Client = getS3Client();
 
       // Generate unique S3 key
       const s3Key = generateS3Key(artistId, imageData.fileName);

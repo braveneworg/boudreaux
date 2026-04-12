@@ -15,9 +15,7 @@ test('debug: check user-status API for purchased release', async ({ userPage }) 
 
   // Call the user-status API directly (SSR prefetch means the client
   // never makes this request, so waitForResponse would time out).
-  const statusResp = await userPage.request.get(
-    `/api/releases/${release.id}/user-status`
-  );
+  const statusResp = await userPage.request.get(`/api/releases/${release.id}/user-status`);
   console.info('USER-STATUS HTTP STATUS:', statusResp.status());
   const body = await statusResp.json();
   console.info('USER-STATUS BODY:', JSON.stringify(body));
