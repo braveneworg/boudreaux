@@ -226,13 +226,17 @@ export default defineConfig({
         // CSS files
         '**/*.css',
       ],
-      // Coverage thresholds
-      thresholds: {
-        lines: 95,
-        functions: 95,
-        branches: 85,
-        statements: 95,
-      },
+      // Coverage thresholds — disabled during shard runs because each shard
+      // only executes a fraction of the test suite. Thresholds are enforced
+      // in the merge step (test:merge) where full coverage is available.
+      thresholds: process.argv.some((arg) => arg.includes('--shard'))
+        ? undefined
+        : {
+            lines: 95,
+            functions: 95,
+            branches: 85,
+            statements: 95,
+          },
     },
 
     exclude: [
