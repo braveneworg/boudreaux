@@ -15,8 +15,8 @@ export const NowPlayingHeading = ({
   visibleHeading = false,
 }: NowPlayingHeadingProps) => {
   return (
-    <div className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-      <h2
+    <section className="flex flex-col justify-center text-sm gap-1 items-center px-2">
+      <h3
         className={
           visibleHeading
             ? 'text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3'
@@ -24,11 +24,8 @@ export const NowPlayingHeading = ({
         }
         aria-label={`Now playing: ${artistName} - ${title}`}
       >
-        {artistName}
-      </h2>
-      <p>
-        <em>{title}</em>
-      </p>
-    </div>
+        {artistName} - <span className="font-normal italic">{title}</span>
+      </h3>
+    </section>
   );
 };
