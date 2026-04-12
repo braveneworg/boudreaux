@@ -84,12 +84,20 @@ jobs:
       - name: Setup environment
         uses: ./.github/actions/setup
 
-      - name: Download blob reports
-        uses: actions/download-artifact@v7
+      - name: Download blob report (shard 1)
+        uses: actions/download-artifact@v8
         with:
-          pattern: vitest-blob-*
+          name: vitest-blob-1
           path: .vitest-reports
-          merge-multiple: true
+
+      - name: Download blob report (shard 2)
+        uses: actions/download-artifact@v8
+        with:
+          name: vitest-blob-2
+          path: .vitest-reports
+
+      - name: Verify blob reports
+        run: ls -la .vitest-reports/
 
       - name: Merge reports and generate coverage
         run: pnpm run test:merge
@@ -231,7 +239,7 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Download build artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: nextjs-build-e2e
           path: .
@@ -289,12 +297,23 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium
 
-      - name: Download blob reports
-        uses: actions/download-artifact@v7
+      - name: Download blob report (shard 1)
+        uses: actions/download-artifact@v8
         with:
-          pattern: playwright-blob-*
+          name: playwright-blob-1
           path: all-blob-reports
-          merge-multiple: true
+
+      - name: Download blob report (shard 2)
+        uses: actions/download-artifact@v8
+        with:
+          name: playwright-blob-2
+          path: all-blob-reports
+
+      - name: Download blob report (shard 3)
+        uses: actions/download-artifact@v8
+        with:
+          name: playwright-blob-3
+          path: all-blob-reports
 
       - name: Merge reports
         run: pnpm exec playwright merge-reports --reporter=html ./all-blob-reports
