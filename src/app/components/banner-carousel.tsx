@@ -354,16 +354,18 @@ export function BannerCarousel({
                   visibility: isVisible ? 'visible' : 'hidden',
                 }}
               >
-                <Image
-                  loader={cloudfrontLoader}
-                  src={banner.imageFilename}
-                  alt={`Banner ${banner.slotNumber}`}
-                  fill
-                  sizes="100vw"
-                  priority={idx === 0}
-                  loading={idx === 0 ? undefined : 'eager'}
-                  className="object-cover"
-                />
+                {isVisible && (
+                  <Image
+                    loader={cloudfrontLoader}
+                    src={banner.imageFilename}
+                    alt={`Banner ${banner.slotNumber}`}
+                    fill
+                    sizes="100vw"
+                    priority={isCurrentSlide}
+                    loading={isCurrentSlide ? undefined : 'lazy'}
+                    className="object-cover"
+                  />
+                )}
               </div>
             );
           })}
