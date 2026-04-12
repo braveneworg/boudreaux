@@ -21,7 +21,8 @@ const fetchVenueDetail = async (venueId: string): Promise<VenueDetail> => {
   if (!response.ok) {
     throw Error('Failed to fetch venue details');
   }
-  return response.json() as Promise<VenueDetail>;
+  const json = (await response.json()) as { venue: VenueDetail };
+  return json.venue;
 };
 
 export const useVenueDetailQuery = (venueId: string) => {

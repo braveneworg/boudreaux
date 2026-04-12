@@ -8,11 +8,9 @@ import { queryKeys } from '@/lib/query-keys';
 interface ArtistListItem {
   id: string;
   firstName: string | null;
-  lastName: string | null;
-  artistName: string | null;
-  groupName: string | null;
+  surname: string;
+  displayName: string | null;
   slug: string;
-  imageUrl: string | null;
 }
 
 interface ArtistListParams {
@@ -32,7 +30,8 @@ const fetchArtistList = async (params: ArtistListParams): Promise<ArtistListItem
   if (!response.ok) {
     throw Error('Failed to fetch artists');
   }
-  return response.json() as Promise<ArtistListItem[]>;
+  const json = (await response.json()) as { artists: ArtistListItem[] };
+  return json.artists;
 };
 
 export const useArtistListQuery = (params: ArtistListParams, enabled = true) => {

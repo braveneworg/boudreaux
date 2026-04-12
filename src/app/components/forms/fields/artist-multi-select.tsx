@@ -85,9 +85,10 @@ export default function ArtistMultiSelect<
     () =>
       (data ?? []).map((item) => ({
         id: item.id,
-        displayName: item.artistName ?? item.groupName ?? '',
+        displayName:
+          item.displayName ?? [item.firstName, item.surname].filter(Boolean).join(' ') ?? '',
         firstName: item.firstName ?? undefined,
-        surname: item.lastName ?? undefined,
+        surname: item.surname ?? undefined,
       })),
     [data]
   );

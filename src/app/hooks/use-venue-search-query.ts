@@ -10,7 +10,7 @@ interface VenueSearchItem {
   name: string;
   city: string | null;
   state: string | null;
-  country: string | null;
+  timeZone: string | null;
 }
 
 const fetchVenueSearch = async (search: string): Promise<VenueSearchItem[]> => {
@@ -24,7 +24,8 @@ const fetchVenueSearch = async (search: string): Promise<VenueSearchItem[]> => {
   if (!response.ok) {
     throw Error('Failed to fetch venues');
   }
-  return response.json() as Promise<VenueSearchItem[]>;
+  const json = (await response.json()) as { venues: VenueSearchItem[] };
+  return json.venues;
 };
 
 export const useVenueSearchQuery = (search: string, enabled = true) => {

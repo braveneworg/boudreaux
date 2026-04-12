@@ -23,7 +23,10 @@ const fetchReleaseDigitalFormats = async (
   return response.json() as Promise<ReleaseDigitalFormatsResponse>;
 };
 
-export const useReleaseDigitalFormatsQuery = (releaseId: string) => {
+export const useReleaseDigitalFormatsQuery = (
+  releaseId: string,
+  options?: { enabled?: boolean }
+) => {
   const {
     isPending,
     error = Error('Unknown error'),
@@ -32,7 +35,7 @@ export const useReleaseDigitalFormatsQuery = (releaseId: string) => {
   } = useQuery({
     queryKey: queryKeys.releases.digitalFormats(releaseId),
     queryFn: () => fetchReleaseDigitalFormats(releaseId),
-    enabled: !!releaseId,
+    enabled: (options?.enabled ?? true) && !!releaseId,
   });
 
   return { isPending, error, data, refetch };

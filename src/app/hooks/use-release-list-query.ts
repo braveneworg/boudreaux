@@ -8,8 +8,15 @@ import { queryKeys } from '@/lib/query-keys';
 interface ReleaseListItem {
   id: string;
   title: string;
-  slug: string | null;
-  artworkUrl: string | null;
+  releasedOn: string | null;
+  artistReleases?: {
+    artist: {
+      id: string;
+      firstName: string | null;
+      surname: string;
+      displayName: string | null;
+    };
+  }[];
 }
 
 interface ReleaseListParams {
@@ -35,7 +42,8 @@ const fetchReleaseList = async (params: ReleaseListParams): Promise<ReleaseListI
   if (!response.ok) {
     throw Error('Failed to fetch releases');
   }
-  return response.json() as Promise<ReleaseListItem[]>;
+  const json = (await response.json()) as { releases: ReleaseListItem[] };
+  return json.releases;
 };
 
 export const useReleaseListQuery = (params: ReleaseListParams, enabled = true) => {

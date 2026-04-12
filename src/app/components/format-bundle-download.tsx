@@ -53,8 +53,10 @@ export const FormatBundleDownload = ({
   downloadCount,
   onDownloadComplete,
 }: FormatBundleDownloadProps) => {
-  const { isPending: isLoadingFormats, data: formatsData } =
-    useReleaseDigitalFormatsQuery(releaseId);
+  const { isPending: isLoadingFormats, data: formatsData } = useReleaseDigitalFormatsQuery(
+    releaseId,
+    { enabled: initialFormats.length === 0 }
+  );
   const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);

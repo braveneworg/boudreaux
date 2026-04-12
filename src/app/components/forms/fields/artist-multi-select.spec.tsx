@@ -236,30 +236,24 @@ interface TestFormValues {
 const mockArtists = [
   {
     id: 'artist-1',
-    artistName: 'Artist One',
-    groupName: null,
+    displayName: 'Artist One',
     firstName: 'One',
-    lastName: 'Artist',
+    surname: 'Artist',
     slug: 'artist-one',
-    imageUrl: null,
   },
   {
     id: 'artist-2',
-    artistName: 'Artist Two',
-    groupName: null,
+    displayName: 'Artist Two',
     firstName: 'Two',
-    lastName: 'Artist',
+    surname: 'Artist',
     slug: 'artist-two',
-    imageUrl: null,
   },
   {
     id: 'artist-3',
-    artistName: null,
-    groupName: null,
+    displayName: null,
     firstName: 'Three',
-    lastName: 'Artist',
+    surname: 'Artist',
     slug: 'artist-three',
-    imageUrl: null,
   },
 ];
 
@@ -300,7 +294,7 @@ describe('ArtistMultiSelect', () => {
     });
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockArtists),
+      json: () => Promise.resolve({ artists: mockArtists, count: mockArtists.length }),
     });
   });
 
@@ -1226,7 +1220,7 @@ describe('ArtistMultiSelect', () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([]),
+        json: () => Promise.resolve({ artists: [], count: 0 }),
       });
 
       render(
@@ -1259,17 +1253,18 @@ describe('ArtistMultiSelect', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve([
-            {
-              id: 'artist-empty',
-              artistName: null,
-              groupName: null,
-              firstName: null,
-              lastName: null,
-              slug: 'artist-empty',
-              imageUrl: null,
-            },
-          ]),
+          Promise.resolve({
+            artists: [
+              {
+                id: 'artist-empty',
+                displayName: null,
+                firstName: null,
+                surname: '',
+                slug: 'artist-empty',
+              },
+            ],
+            count: 1,
+          }),
       });
 
       render(

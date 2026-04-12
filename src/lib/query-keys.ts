@@ -25,7 +25,7 @@ export const queryKeys = {
         ...queryKeys.releases.all,
         'filteredList',
         params.search ?? '',
-        (params.artistIds ?? []).join(','),
+        [...(params.artistIds ?? [])].sort().join(','),
         String(params.take ?? ''),
       ] as const,
   },
