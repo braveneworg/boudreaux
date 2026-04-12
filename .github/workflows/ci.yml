@@ -85,7 +85,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Download blob reports
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v7
         with:
           pattern: vitest-blob-*
           path: .vitest-reports
@@ -231,7 +231,7 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Download build artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v7
         with:
           name: nextjs-build-e2e
           path: .
@@ -290,7 +290,7 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Download blob reports
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v7
         with:
           pattern: playwright-blob-*
           path: all-blob-reports
