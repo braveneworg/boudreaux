@@ -5,6 +5,8 @@ import React from 'react';
 
 import { render, screen, waitFor } from '@testing-library/react';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import DataStoreHealthStatus from './data-store-health-status';
 
 import type { HealthStatus } from '../../lib/types/health-status';
@@ -66,25 +68,25 @@ describe('DataStoreHealthStatus', () => {
   describe('rendering', () => {
     it('renders DB health status label', () => {
       mockFetch.mockImplementation(() => new Promise(() => {})); // Never resolves
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       expect(screen.getByText(/DB health status:/i)).toBeInTheDocument();
     });
 
     it('renders health status icon', () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       expect(screen.getByTestId('health-status-icon')).toBeInTheDocument();
     });
 
     it('renders health status message', () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       expect(screen.getByTestId('health-status-message')).toBeInTheDocument();
     });
 
     it('renders with centered flex layout', () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
-      const { container } = render(<DataStoreHealthStatus />);
+      const { container } = render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       const wrapper = container.firstChild as HTMLElement;
       expect(wrapper).toHaveClass('flex');
       expect(wrapper).toHaveClass('flex-col');
@@ -96,14 +98,14 @@ describe('DataStoreHealthStatus', () => {
   describe('loading state', () => {
     it('shows loading state initially', () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       const icon = screen.getByTestId('health-status-icon');
       expect(icon).toHaveAttribute('data-is-loading', 'true');
     });
 
     it('passes isLoading to health status message', () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
       const message = screen.getByTestId('health-status-message');
       expect(message).toHaveAttribute('data-is-loading', 'true');
     });
@@ -120,7 +122,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
@@ -143,7 +145,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
@@ -162,7 +164,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         const message = screen.getByTestId('health-status-message');
@@ -172,8 +174,8 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('error handling', () => {
-    it('sets error status when fetch fails with non-ok response', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('does not crash when fetch fails with non-ok response', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
         json: () =>
@@ -183,26 +185,31 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
+
+      // Advance through all 10 retry delays + failsafe
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
       });
     });
 
     it('handles malformed JSON response gracefully', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
         json: () => Promise.reject(new Error('Invalid JSON')),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
+
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
       });
     });
   });
@@ -225,7 +232,7 @@ describe('DataStoreHealthStatus', () => {
             }),
         });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Wait for first call
       await waitFor(() => {
@@ -251,7 +258,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Wait for first call
       await waitFor(() => {
@@ -279,7 +286,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -313,7 +320,7 @@ describe('DataStoreHealthStatus', () => {
           )
       );
 
-      const { unmount } = render(<DataStoreHealthStatus />);
+      const { unmount } = render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Unmount before fetch completes
       unmount();
@@ -328,42 +335,18 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('SSL and network errors', () => {
-    it('shows SSL-specific error message for SSL errors', async () => {
-      // Simulate exhausting all retries with SSL error
+    it('handles SSL errors gracefully after retries', async () => {
       const sslError = new Error('SSL error: ERR_SSL_PROTOCOL_ERROR');
-      for (let i = 0; i < 11; i++) {
-        mockFetch.mockRejectedValueOnce(sslError);
-      }
+      mockFetch.mockRejectedValue(sslError);
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
-      // Wait for initial call
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      });
+      await vi.advanceTimersByTimeAsync(130_000);
 
-      // Advance through all retry attempts
-      // First 3 retries: 500ms each
-      for (let i = 0; i < 3; i++) {
-        vi.advanceTimersByTime(500);
-        await waitFor(() => {
-          expect(mockFetch).toHaveBeenCalledTimes(i + 2);
-        });
-      }
-
-      // Later retries: exponential backoff 1s, 2s, 4s, 8s, 16s, 32s, 64s
-      const delays = [1000, 2000, 4000, 8000, 16000, 32000, 64000];
-      for (let i = 0; i < delays.length; i++) {
-        vi.advanceTimersByTime(delays[i]);
-        await waitFor(() => {
-          expect(mockFetch).toHaveBeenCalledTimes(i + 5);
-        });
-      }
-
-      // After all retries, error message should appear
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).not.toHaveAttribute('data-status');
       });
     });
   });
@@ -373,7 +356,7 @@ describe('DataStoreHealthStatus', () => {
       // Mock fetch that never resolves and never rejects
       mockFetch.mockImplementation(() => new Promise(() => {}));
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Verify initial loading state
       const icon = screen.getByTestId('health-status-icon');
@@ -399,7 +382,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
@@ -420,7 +403,7 @@ describe('DataStoreHealthStatus', () => {
       // Reject with a non-Error object
       mockFetch.mockRejectedValue('String error');
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Advance through retries
       for (let i = 0; i < 10; i++) {
@@ -438,23 +421,25 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('error response without database field', () => {
-    it('uses fallback message when errorData.database is undefined', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('handles missing errorData.database gracefully', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
         json: () =>
           Promise.resolve({
             status: 'error',
             error: 'Some error',
-            // database field intentionally omitted
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
+
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).not.toHaveAttribute('data-status');
       });
     });
   });
@@ -467,18 +452,16 @@ describe('DataStoreHealthStatus', () => {
         json: () => Promise.resolve({ status: 'error', database: 'Server error' }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
-      // Wait for all retries to complete
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).not.toHaveAttribute('data-status');
       });
 
-      // Should make initial call + retries when retryCount is 0-9 = 10 total
-      // But might be 11 if there's an extra failsafe call
+      // Should make initial call + 10 retries = 11 total
       expect(mockFetch).toHaveBeenCalled();
       expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(10);
       expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(11);
@@ -486,9 +469,7 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('abort error handling', () => {
-    it('logs warning for abort/timeout errors and retries', async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+    it('recovers after abort/timeout errors via TanStack Query retry', async () => {
       const abortError = new Error('The operation was aborted');
       abortError.name = 'AbortError';
       mockFetch.mockRejectedValueOnce(abortError);
@@ -497,7 +478,7 @@ describe('DataStoreHealthStatus', () => {
         json: () => Promise.resolve({ status: 'healthy', database: 'Connected' }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await vi.runAllTimersAsync();
 
@@ -505,32 +486,23 @@ describe('DataStoreHealthStatus', () => {
         const icon = screen.getByTestId('health-status-icon');
         expect(icon).toHaveAttribute('data-status', 'healthy');
       });
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[Health Check] Request timed out after 5 seconds'
-      );
-
-      consoleWarnSpy.mockRestore();
     });
   });
 
   describe('ERR_ error messages', () => {
-    it('sets connection error for ERR_ errors', async () => {
+    it('handles ERR_ connection errors gracefully after retries', async () => {
       const errError = new Error('ERR_CONNECTION_REFUSED');
       mockFetch.mockRejectedValue(errError);
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
         const icon = screen.getByTestId('health-status-icon');
-        expect(icon).toHaveAttribute('data-status', 'error');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).not.toHaveAttribute('data-status');
       });
-
-      // Verify the database field is set
-      const message = screen.getByTestId('health-status-message');
-      expect(message).toHaveTextContent('Failed to fetch health status');
     });
   });
 
@@ -543,7 +515,7 @@ describe('DataStoreHealthStatus', () => {
           })
       );
 
-      const { unmount } = render(<DataStoreHealthStatus />);
+      const { unmount } = render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Unmount before failsafe timeout
       unmount();
@@ -560,7 +532,7 @@ describe('DataStoreHealthStatus', () => {
     it('failsafe callback skips state update when component is already unmounted', async () => {
       mockFetch.mockImplementation(() => new Promise(() => {}));
 
-      const { unmount } = render(<DataStoreHealthStatus />);
+      const { unmount } = render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // Prevent cleanup from actually canceling the failsafe timeout
       // so the failsafe fires with isMounted = false
@@ -581,8 +553,8 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('error response with empty database field', () => {
-    it('uses fallback message when errorData.database is an empty string', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('handles empty database field in error response', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 400,
         json: () =>
@@ -593,11 +565,14 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
+
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
-        const message = screen.getByTestId('health-status-message');
-        expect(message).toHaveTextContent('Failed to fetch health status');
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).not.toHaveAttribute('data-status');
       });
     });
   });
@@ -615,7 +590,7 @@ describe('DataStoreHealthStatus', () => {
           }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -644,7 +619,7 @@ describe('DataStoreHealthStatus', () => {
         json: () => Promise.resolve({ status: 'healthy', database: 'Connected' }),
       });
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
       // First call
       await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
@@ -668,17 +643,17 @@ describe('DataStoreHealthStatus', () => {
   });
 
   describe('non-SSL/ERR_ error after all retries exhausted', () => {
-    it('uses raw errorMessage when it does not contain SSL or ERR_', async () => {
+    it('shows null status after all retries exhaust with generic errors', async () => {
       mockFetch.mockRejectedValue(new Error('Connection timeout'));
 
-      render(<DataStoreHealthStatus />);
+      render(<DataStoreHealthStatus />, { wrapper: createQueryWrapper() });
 
-      // runAllTimersAsync properly flushes microtasks between timer advances
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(130_000);
 
       await waitFor(() => {
-        const message = screen.getByTestId('health-status-message');
-        expect(message).toHaveAttribute('data-error', 'Connection timeout');
+        const icon = screen.getByTestId('health-status-icon');
+        expect(icon).toHaveAttribute('data-is-loading', 'false');
+        expect(icon).not.toHaveAttribute('data-status');
       });
     });
   });

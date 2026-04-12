@@ -9,7 +9,7 @@
  */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -24,61 +24,19 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverAnchor, PopoverContent } from '@/app/components/ui/popover';
+import { useArtistNavSearchQuery } from '@/app/hooks/use-artist-nav-search-query';
 import { useDebounce } from '@/app/hooks/use-debounce';
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_DELAY = 400;
 
-interface SearchResult {
-  artistSlug: string;
-  artistName: string;
-  thumbnailSrc: string | null;
-  releases: Array<{ id: string; title: string }>;
-}
-
 export const ArtistSearchInput = () => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const debouncedQuery = useDebounce(query, DEBOUNCE_DELAY);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (debouncedQuery.length < MIN_SEARCH_LENGTH) {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
-      setIsLoading(false);
-      setResults([]);
-      return;
-    }
-
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setIsLoading(true);
-
-    fetch(`/api/artists/search?q=${encodeURIComponent(debouncedQuery)}`, {
-      signal: controller.signal,
-    })
-      .then((res) => res.json())
-      .then((data: { results?: SearchResult[] }) => {
-        if (!controller.signal.aborted) {
-          setResults(data.results ?? []);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setIsLoading(false);
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [debouncedQuery]);
+  const { isPending: isLoading, data } = useArtistNavSearchQuery(debouncedQuery);
+  const results = data?.results ?? [];
 
   const handleArtistSelect = useCallback(
     (slug: string) => {

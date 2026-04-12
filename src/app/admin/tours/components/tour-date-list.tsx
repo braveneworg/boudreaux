@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Calendar, MapPin, Music, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import { Card, CardContent } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TicketProviderIcon } from '@/app/components/ui/ticket-provider-icon';
+import { useTourDatesQuery } from '@/app/hooks/use-tour-dates-query';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
@@ -84,35 +85,13 @@ interface TourDateListProps {
 
 export default function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) {
   const sectionRef = useRef<HTMLElement>(null);
-  const [tourDates, setTourDates] = useState<TourDateWithRelations[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isPending: isLoading, data: tourDatesData, refetch } = useTourDatesQuery(tourId);
+  const tourDates = (tourDatesData?.tourDates ?? []) as unknown as TourDateWithRelations[];
   const [selectedTourDate, setSelectedTourDate] = useState<TourDateWithRelations | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [tourDateToDelete, setTourDateToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const fetchTourDates = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(`/api/tours/${tourId}/dates`, { cache: 'no-store' });
-      if (res.ok) {
-        const { tourDates: dates } = await res.json();
-        setTourDates(dates || []);
-      } else {
-        toast.error('Failed to load tour dates');
-      }
-    } catch (err) {
-      console.error('Error fetching tour dates:', err);
-      toast.error('Failed to load tour dates');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [tourId]);
-
-  useEffect(() => {
-    fetchTourDates();
-  }, [fetchTourDates]);
 
   // Notify the parent component when the dialog open state changes
   // so it can disable its own submit button while the dialog is open.
@@ -143,7 +122,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
       const result = await deleteTourDateAction(tourDateToDelete);
       if (result.success) {
         toast.success('Tour date deleted successfully');
-        await fetchTourDates();
+        await refetch();
         setIsDeleteDialogOpen(false);
         setTourDateToDelete(null);
       } else {
@@ -158,7 +137,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
   };
 
   const handleFormSuccess = async () => {
-    await fetchTourDates();
+    await refetch();
     setIsFormOpen(false);
     setSelectedTourDate(null);
 
@@ -271,7 +250,9 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                         <ArtistPillList
                           tourDateId={tourDate.id}
                           headliners={tourDate.headliners}
-                          onHeadlinersChange={fetchTourDates}
+                          onHeadlinersChange={async () => {
+                            await refetch();
+                          }}
                         />
                       </div>
 

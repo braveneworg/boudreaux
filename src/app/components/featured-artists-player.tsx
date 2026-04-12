@@ -13,8 +13,9 @@ import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
-import { ArtistReleaseInfo } from './artist-release-info';
 import { DownloadTriggerButton } from './download-trigger-button';
+import { NowPlayingHeading } from './now-playing-heading';
+import { ReleaseShareWidget } from './release-share-widget';
 
 const DownloadDialog = nextDynamic(
   () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
@@ -245,6 +246,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             >
               <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />
             </DownloadDialog>
+            <NowPlayingHeading
+              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+              title={selectedArtist.release.title ?? ''}
+              visibleHeading
+            />
           </div>
         )}
 
@@ -298,13 +304,10 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
           </div>
         )}
         {selectedArtist?.release && (
-          <ArtistReleaseInfo
-            artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-            title={selectedArtist.release.title ?? ''}
+          <ReleaseShareWidget
             featuredArtists={displayableArtists}
             selectedArtist={selectedArtist}
             setSelectedArtist={setSelectedArtist}
-            visibleHeading
           />
         )}
       </div>

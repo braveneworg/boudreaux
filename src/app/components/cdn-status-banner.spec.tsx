@@ -5,6 +5,8 @@ import React from 'react';
 
 import { act, render, screen, waitFor } from '@testing-library/react';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import CDNStatusBanner from './cdn-status-banner';
 
 // Mock fetch
@@ -19,7 +21,7 @@ describe('CDNStatusBanner', () => {
   it('returns null when loading', async () => {
     mockFetch.mockImplementation(() => new Promise(() => {})); // Never resolves
 
-    const { container } = render(<CDNStatusBanner />);
+    const { container } = render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     // Should not render anything while loading
     expect(container.firstChild).toBeNull();
@@ -27,10 +29,11 @@ describe('CDNStatusBanner', () => {
 
   it('returns null when status is "ready"', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ status: 'ready', message: 'CDN is ready' }),
     });
 
-    const { container } = render(<CDNStatusBanner />);
+    const { container } = render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(container.firstChild).toBeNull();
@@ -39,6 +42,7 @@ describe('CDNStatusBanner', () => {
 
   it('shows banner when status is "invalidating"', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'invalidating',
@@ -47,7 +51,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
@@ -56,6 +60,7 @@ describe('CDNStatusBanner', () => {
 
   it('shows error banner when status is "error"', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'error',
@@ -63,7 +68,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
@@ -72,6 +77,7 @@ describe('CDNStatusBanner', () => {
 
   it('shows default banner for unknown status', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'unknown',
@@ -79,7 +85,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('Site Recently Updated')).toBeInTheDocument();
@@ -88,6 +94,7 @@ describe('CDNStatusBanner', () => {
 
   it('displays estimated time remaining when available', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'invalidating',
@@ -96,7 +103,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/Estimated time remaining: ~10 minutes/)).toBeInTheDocument();
@@ -106,21 +113,17 @@ describe('CDNStatusBanner', () => {
   it('handles fetch error gracefully', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const { container } = render(<CDNStatusBanner />);
+    const { container } = render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
-      // Should not show anything on error during loading
+      // Component returns null when data is undefined (query errored)
       expect(container.firstChild).toBeNull();
     });
-
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to check CDN status:', expect.any(Error));
-    consoleSpy.mockRestore();
   });
 
   it('displays the status message', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'invalidating',
@@ -128,7 +131,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('Updating image cache across all regions')).toBeInTheDocument();
@@ -137,6 +140,7 @@ describe('CDNStatusBanner', () => {
 
   it('does not display estimated time when estimatedMinutesRemaining is 0', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'invalidating',
@@ -145,7 +149,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.queryByText(/Estimated time remaining/)).not.toBeInTheDocument();
@@ -154,6 +158,7 @@ describe('CDNStatusBanner', () => {
 
   it('does not show progress bar when estimatedMinutesRemaining is undefined', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'invalidating',
@@ -161,7 +166,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
@@ -174,6 +179,7 @@ describe('CDNStatusBanner', () => {
 
   it('does not show progress bar when status is not invalidating even with estimatedMinutesRemaining', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'error',
@@ -182,7 +188,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
@@ -195,6 +201,7 @@ describe('CDNStatusBanner', () => {
 
   it('does not show invalidation warning when status is not invalidating', async () => {
     mockFetch.mockResolvedValue({
+      ok: true,
       json: () =>
         Promise.resolve({
           status: 'unknown',
@@ -203,7 +210,7 @@ describe('CDNStatusBanner', () => {
         }),
     });
 
-    render(<CDNStatusBanner />);
+    render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText('Site Recently Updated')).toBeInTheDocument();
@@ -217,7 +224,7 @@ describe('CDNStatusBanner', () => {
 
   describe('interval polling', () => {
     beforeEach(() => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
     });
 
     afterEach(() => {
@@ -226,6 +233,7 @@ describe('CDNStatusBanner', () => {
 
     it('re-fetches CDN status every 30 seconds when status is invalidating', async () => {
       mockFetch.mockResolvedValue({
+        ok: true,
         json: () =>
           Promise.resolve({
             status: 'invalidating',
@@ -234,27 +242,26 @@ describe('CDNStatusBanner', () => {
           }),
       });
 
-      await act(async () => {
-        render(<CDNStatusBanner />);
+      render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
-
-      // useEffect re-runs when status?.status changes (null -> 'invalidating'),
-      // so checkStatus is called twice during initial render cycle
       const callsAfterRender = mockFetch.mock.calls.length;
 
-      // Advance timers by 30 seconds to trigger the interval callback
+      // Advance timers by 30 seconds to trigger TanStack Query refetchInterval
       await act(async () => {
         await vi.advanceTimersByTimeAsync(30000);
       });
 
-      // Interval should have triggered an additional fetch
+      // refetchInterval should have triggered an additional fetch
       expect(mockFetch).toHaveBeenCalledTimes(callsAfterRender + 1);
     });
 
     it('does not re-fetch when status is not invalidating', async () => {
       mockFetch.mockResolvedValue({
+        ok: true,
         json: () =>
           Promise.resolve({
             status: 'error',
@@ -262,16 +269,15 @@ describe('CDNStatusBanner', () => {
           }),
       });
 
-      await act(async () => {
-        render(<CDNStatusBanner />);
-      });
+      render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
 
-      expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('CDN Status Unknown')).toBeInTheDocument();
+      });
 
       const callsAfterRender = mockFetch.mock.calls.length;
 
-      // Advance timers — interval fires but checkStatus should NOT be called
-      // because status is 'error', not 'invalidating'
+      // Advance timers — refetchInterval should not fire because status is not 'invalidating'
       await act(async () => {
         await vi.advanceTimersByTimeAsync(30000);
       });
@@ -279,10 +285,9 @@ describe('CDNStatusBanner', () => {
       expect(mockFetch).toHaveBeenCalledTimes(callsAfterRender);
     });
 
-    it('clears the interval on unmount', async () => {
-      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
-
+    it('stops polling on unmount', async () => {
       mockFetch.mockResolvedValue({
+        ok: true,
         json: () =>
           Promise.resolve({
             status: 'invalidating',
@@ -290,18 +295,22 @@ describe('CDNStatusBanner', () => {
           }),
       });
 
-      let unmount: () => void;
-      await act(async () => {
-        const result = render(<CDNStatusBanner />);
-        unmount = result.unmount;
+      const { unmount } = render(<CDNStatusBanner />, { wrapper: createQueryWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Site Update in Progress')).toBeInTheDocument();
+      const callsBeforeUnmount = mockFetch.mock.calls.length;
 
-      unmount!();
+      unmount();
 
-      expect(clearIntervalSpy).toHaveBeenCalled();
-      clearIntervalSpy.mockRestore();
+      // Advance past a polling interval — no new fetch should occur
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(callsBeforeUnmount);
     });
   });
 });

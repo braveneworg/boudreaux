@@ -13,10 +13,13 @@ import HamburgerMenu from '../ui/hamburger-menu';
 /**
  * Deterministic pseudo-random based on index — avoids hydration mismatch
  * while producing visually varied positions/delays.
+ *
+ * Rounded to 4 decimal places so Node and browser `Math.sin` float
+ * differences don't cause mismatched style strings.
  */
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9301 + 49297) * 49979;
-  return x - Math.floor(x);
+  return Math.round((x - Math.floor(x)) * 10000) / 10000;
 }
 
 const Header = ({ isMobile = false }: { isMobile?: boolean }) => {

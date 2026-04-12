@@ -3,52 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useState } from 'react';
-
 import { AlertCircle, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/app/components/ui/alert';
 import { Progress } from '@/app/components/ui/progress';
-
-interface CDNStatus {
-  status: 'invalidating' | 'ready' | 'unknown' | 'error';
-  message: string;
-  estimatedMinutesRemaining?: number;
-  inProgress?: number;
-  startedAt?: string;
-  completedAt?: string;
-}
+import { useCdnStatusQuery } from '@/app/hooks/use-cdn-status-query';
 
 const CDNStatusBanner = () => {
-  const [status, setStatus] = useState<CDNStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/cdn-status', {
-          cache: 'no-store',
-        });
-        const data = await response.json();
-        setStatus(data);
-      } catch (error) {
-        console.error('Failed to check CDN status:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkStatus();
-
-    // Poll every 30 seconds if invalidation is in progress
-    const interval = setInterval(() => {
-      if (status?.status === 'invalidating') {
-        checkStatus();
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [status?.status]);
+  const { isPending: isLoading, data: status } = useCdnStatusQuery();
 
   if (isLoading || !status || status.status === 'ready') {
     return null;

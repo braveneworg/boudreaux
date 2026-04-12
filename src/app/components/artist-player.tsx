@@ -31,7 +31,8 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
-import { ArtistReleaseInfo } from './artist-release-info';
+import { NowPlayingHeading } from './now-playing-heading';
+import { ReleaseShareWidget } from './release-share-widget';
 
 const DownloadDialog = nextDynamic(
   () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
@@ -211,16 +212,11 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
         </Carousel>
       )}
 
-      {/* Artist + release header */}
-      {selectedRelease && (
-        <div className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-          <ArtistReleaseInfo artistName={artistName} title={selectedRelease.title ?? ''} />
-        </div>
-      )}
-
       {/* Media player */}
       <MediaPlayer className="mb-2">
         <div className="mt-2 space-y-1">
+          {/* Artist + release header */}
+          {selectedRelease && <ReleaseShareWidget />}
           <div className="flex flex-col items-center">
             <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
               <div className="relative">
@@ -238,6 +234,11 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                 >
                   <DownloadTriggerButton />
                 </DownloadDialog>
+                <NowPlayingHeading
+                  artistName={artistName}
+                  title={selectedRelease.title ?? ''}
+                  visibleHeading
+                />
               </div>
 
               {hasFiles && currentFile && selectedRelease && audioSrc ? (

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { BarChart3, Download, Users } from 'lucide-react';
 
@@ -23,17 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/components/ui/table';
-
-interface FormatBreakdown {
-  formatType: string;
-  count: number;
-}
-
-interface AnalyticsData {
-  totalDownloads: number;
-  uniqueUsers: number;
-  formatBreakdown: FormatBreakdown[];
-}
+import { useDownloadAnalyticsQuery } from '@/app/hooks/use-download-analytics-query';
 
 interface DownloadAnalyticsDashboardProps {
   releaseId: string;
@@ -57,51 +47,9 @@ const FORMAT_LABELS: Record<string, string> = {
   AIFF: 'AIFF',
 };
 
-function getDateRange(range: string): { startDate?: string; endDate?: string } {
-  if (range === 'all') return {};
-  const days = parseInt(range);
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-  return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-  };
-}
-
 export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashboardProps) {
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('all');
-
-  const fetchAnalytics = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      const range = getDateRange(dateRange);
-      if (range.startDate) params.set('startDate', range.startDate);
-      if (range.endDate) params.set('endDate', range.endDate);
-
-      const queryString = params.toString();
-      const url = `/api/releases/${releaseId}/download-analytics${queryString ? `?${queryString}` : ''}`;
-
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setAnalytics({
-          totalDownloads: data.totalDownloads,
-          uniqueUsers: data.uniqueUsers,
-          formatBreakdown: data.formatBreakdown,
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [releaseId, dateRange]);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
+  const { isPending: isLoading, data: analytics } = useDownloadAnalyticsQuery(releaseId, dateRange);
 
   const totalFormatDownloads = analytics?.formatBreakdown.reduce(
     (sum, item) => sum + item.count,

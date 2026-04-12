@@ -28,24 +28,17 @@ const hasErrorName = (error: unknown): error is { name: string } => {
   );
 };
 
-interface ArtistReleaseInfoProps {
-  artistName: string;
-  title: string;
-  /** When true, the artist name heading is visible rather than screen-reader-only. */
-  visibleHeading?: boolean;
+interface ReleaseShareWidgetProps {
   selectedArtist?: FeaturedArtist | null;
   featuredArtists?: FeaturedArtist[];
   setSelectedArtist?: (artist: FeaturedArtist | null) => void;
 }
 
-export const ArtistReleaseInfo = ({
-  artistName,
-  title,
-  visibleHeading = false,
+export const ReleaseShareWidget = ({
   selectedArtist = null,
   featuredArtists = [],
   setSelectedArtist,
-}: ArtistReleaseInfoProps) => {
+}: ReleaseShareWidgetProps) => {
   const baseUrl = process.env.NEXT_PUBLIC_HOST_NAME ?? 'https://fakefourrecords.com';
 
   const artistUrl = useMemo(() => {
@@ -86,21 +79,6 @@ export const ArtistReleaseInfo = ({
   }, [artistUrl, featuredArtists, selectedArtist, setSelectedArtist]);
   return (
     <>
-      <div className="flex flex-col justify-center text-sm gap-1 items-center px-2 -mb-1.5">
-        <h2
-          className={
-            visibleHeading
-              ? 'text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3'
-              : 'sr-only text-lg font-semibold'
-          }
-          aria-label={`Now playing: ${artistName} - ${title}`}
-        >
-          {artistName}
-        </h2>
-        <p>
-          <em>{title}</em>
-        </p>
-      </div>
       <div className="max-w-90 mx-auto mt-3 -mb-3 overflow-hidden flex justify-center items-center">
         <span className="inline-block size-10 -mb-3.25">
           <Share2Icon onClick={handleShare2IconClick} size={22} className="ml-2 opacity-60" />

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ChevronsUpDown } from 'lucide-react';
 
@@ -18,6 +18,7 @@ import {
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useDebounce } from '@/app/hooks/use-debounce';
+import { useNotificationBannerSearchQuery } from '@/app/hooks/use-notification-banner-search-query';
 
 interface SearchResult {
   id: string;
@@ -40,34 +41,9 @@ interface NotificationSearchProps {
 export function NotificationSearch({ onSelect }: NotificationSearchProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
   const debouncedSearch = useDebounce(searchValue, 300);
-
-  const fetchNotifications = useCallback(async (query: string) => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (query) params.set('q', query);
-      params.set('take', '20');
-
-      const response = await fetch(`/api/notification-banners/search?${params.toString()}`);
-      if (!response.ok) throw Error('Failed to search');
-
-      const data: { notifications: SearchResult[] } = await response.json();
-      setResults(data.notifications ?? []);
-    } catch {
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    fetchNotifications(debouncedSearch);
-  }, [debouncedSearch, open, fetchNotifications]);
+  const { isPending: isLoading, data } = useNotificationBannerSearchQuery(debouncedSearch, open);
+  const results = data?.notifications ?? [];
 
   const handleSelect = (notification: SearchResult) => {
     onSelect({

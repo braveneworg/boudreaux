@@ -5,6 +5,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import { FormatDownloadList } from './format-download-list';
 
 const mockReleaseId = '507f1f77bcf86cd799439011';
@@ -51,20 +53,26 @@ describe('FormatDownloadList', () => {
 
   describe('Rendering', () => {
     it('should render download buttons for each available format', () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(screen.getByText('MP3 320kbps')).toBeInTheDocument();
       expect(screen.getByText('FLAC')).toBeInTheDocument();
     });
 
     it('should show empty message when no formats available', () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={[]} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={[]} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(screen.getByText('No digital formats available for download.')).toBeInTheDocument();
     });
 
     it('should render format selection label', () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(screen.getByText('Choose a format:')).toBeInTheDocument();
     });
@@ -93,7 +101,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -122,7 +132,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -144,7 +156,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -180,7 +194,9 @@ describe('FormatDownloadList', () => {
       window.open = openSpy;
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -213,7 +229,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -243,7 +261,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('quota-exceeded-message')).toBeInTheDocument();
@@ -274,7 +294,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Wait for quota fetch to complete — buttons should NOT be disabled
       await waitFor(() => {
@@ -288,7 +310,9 @@ describe('FormatDownloadList', () => {
     });
 
     it('should show remaining quota count', async () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('3 free downloads remaining')).toBeInTheDocument();
@@ -296,7 +320,9 @@ describe('FormatDownloadList', () => {
     });
 
     it('should skip quota check when user has purchased', async () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Should never call the quota endpoint
       const fetchCalls = vi.mocked(global.fetch).mock.calls;
@@ -315,7 +341,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Buttons should still be enabled
       const buttons = screen.getAllByRole('button');
@@ -335,7 +363,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Buttons should still be enabled — non-OK quota response is silently ignored
       await waitFor(() => {
@@ -361,7 +391,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Buttons should still be enabled — success: false means quota data is not applied
       await waitFor(() => {
@@ -394,7 +426,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('1 free download remaining')).toBeInTheDocument();
@@ -422,7 +456,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -436,7 +472,9 @@ describe('FormatDownloadList', () => {
     it('should display raw formatType when no label exists', () => {
       const unknownFormat = [{ formatType: 'UNKNOWN_FORMAT_XYZ', fileName: 'album.xyz' }];
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={unknownFormat} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={unknownFormat} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(screen.getByText('UNKNOWN_FORMAT_XYZ')).toBeInTheDocument();
     });
@@ -461,7 +499,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -507,7 +547,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -559,7 +601,9 @@ describe('FormatDownloadList', () => {
       window.open = openSpy;
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
 
@@ -594,7 +638,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('FLAC'));
 
@@ -633,7 +679,9 @@ describe('FormatDownloadList', () => {
       });
 
       const user = userEvent.setup();
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await user.click(screen.getByText('MP3 320kbps'));
       await waitFor(() => {
@@ -649,7 +697,9 @@ describe('FormatDownloadList', () => {
 
   describe('Quota display with hasPurchased', () => {
     it('should not show remaining quota text when hasPurchased is true', async () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Give time for any async effects to settle
       await waitFor(() => {
@@ -658,7 +708,9 @@ describe('FormatDownloadList', () => {
     });
 
     it('should not show quota exceeded message when hasPurchased is true', async () => {
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} hasPurchased />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.queryByTestId('quota-exceeded-message')).not.toBeInTheDocument();
@@ -691,7 +743,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       // Should set quotaExceeded since downloadedReleaseIds?.includes returns undefined (falsy)
       await waitFor(() => {
@@ -725,7 +779,9 @@ describe('FormatDownloadList', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
       });
 
-      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />);
+      render(<FormatDownloadList releaseId={mockReleaseId} formats={mockFormats} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('quota-exceeded-message')).toBeInTheDocument();
