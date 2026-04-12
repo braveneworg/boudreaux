@@ -3,11 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Download, Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
+import { useDownloadQuotaQuery } from '@/app/hooks/use-download-quota-query';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
@@ -38,38 +39,14 @@ export const FormatDownloadList = ({
 }: FormatDownloadListProps) => {
   const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
-  const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
 
-  // Fetch quota status on mount for non-purchasers
-  useEffect(() => {
-    if (hasPurchased) return;
-
-    const fetchQuota = async () => {
-      try {
-        const response = await fetch('/api/user/download-quota');
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-
-        if (data.success) {
-          setRemainingQuota(data.remainingQuota);
-
-          // Quota is exceeded only if this release hasn't been downloaded yet
-          const alreadyDownloaded = data.downloadedReleaseIds?.includes(releaseId);
-
-          if (!alreadyDownloaded && data.remainingQuota <= 0) {
-            setQuotaExceeded(true);
-          }
-        }
-      } catch {
-        // Silently fail — quota check is a UX enhancement, not critical
-      }
-    };
-
-    fetchQuota();
-  }, [hasPurchased, releaseId]);
+  const { data: quotaData } = useDownloadQuotaQuery(!hasPurchased);
+  const remainingQuota = quotaData?.remainingQuota ?? null;
+  const quotaExceeded =
+    !hasPurchased &&
+    quotaData?.success &&
+    !quotaData.downloadedReleaseIds?.includes(releaseId) &&
+    quotaData.remainingQuota <= 0;
 
   const handleDownload = useCallback(
     async (formatType: string) => {

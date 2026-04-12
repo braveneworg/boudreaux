@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
@@ -233,10 +234,36 @@ interface TestFormValues {
 }
 
 const mockArtists = [
-  { id: 'artist-1', displayName: 'Artist One', firstName: 'One', surname: 'Artist' },
-  { id: 'artist-2', displayName: 'Artist Two', firstName: 'Two', surname: 'Artist' },
-  { id: 'artist-3', displayName: '', firstName: 'Three', surname: 'Artist' },
+  {
+    id: 'artist-1',
+    artistName: 'Artist One',
+    groupName: null,
+    firstName: 'One',
+    lastName: 'Artist',
+    slug: 'artist-one',
+    imageUrl: null,
+  },
+  {
+    id: 'artist-2',
+    artistName: 'Artist Two',
+    groupName: null,
+    firstName: 'Two',
+    lastName: 'Artist',
+    slug: 'artist-two',
+    imageUrl: null,
+  },
+  {
+    id: 'artist-3',
+    artistName: null,
+    groupName: null,
+    firstName: 'Three',
+    lastName: 'Artist',
+    slug: 'artist-three',
+    imageUrl: null,
+  },
 ];
+
+let testQueryClient: QueryClient;
 
 const TestWrapper = ({
   children,
@@ -250,9 +277,11 @@ const TestWrapper = ({
 }) => {
   const form = useForm<TestFormValues>({ defaultValues });
   return (
-    <FormProvider {...form}>
-      {children({ control: form.control, setValue: form.setValue })}
-    </FormProvider>
+    <QueryClientProvider client={testQueryClient}>
+      <FormProvider {...form}>
+        {children({ control: form.control, setValue: form.setValue })}
+      </FormProvider>
+    </QueryClientProvider>
   );
 };
 
@@ -262,9 +291,16 @@ describe('ArtistMultiSelect', () => {
     mockPopoverOpen = false;
     formFieldInitialValue = [];
     mockFetch.mockReset();
+    testQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ artists: mockArtists }),
+      json: () => Promise.resolve(mockArtists),
     });
   });
 
@@ -1185,12 +1221,12 @@ describe('ArtistMultiSelect', () => {
     });
   });
 
-  describe('fetch response with missing artists array', () => {
-    it('falls back to empty array when response has no artists field', async () => {
+  describe('fetch response with empty array', () => {
+    it('falls back to empty array when response returns no artists', async () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({}),
+        json: () => Promise.resolve([]),
       });
 
       render(
@@ -1223,9 +1259,17 @@ describe('ArtistMultiSelect', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({
-            artists: [{ id: 'artist-empty', displayName: '', firstName: '', surname: '' }],
-          }),
+          Promise.resolve([
+            {
+              id: 'artist-empty',
+              artistName: null,
+              groupName: null,
+              firstName: null,
+              lastName: null,
+              slug: 'artist-empty',
+              imageUrl: null,
+            },
+          ]),
       });
 
       render(

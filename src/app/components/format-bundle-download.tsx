@@ -10,6 +10,7 @@ import { CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
 import { Progress } from '@/app/components/ui/progress';
+import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 
@@ -52,10 +53,9 @@ export const FormatBundleDownload = ({
   downloadCount,
   onDownloadComplete,
 }: FormatBundleDownloadProps) => {
-  const [formats, setFormats] = useState<AvailableFormat[] | null>(
-    initialFormats.length > 0 ? initialFormats : null
-  );
-  const [isLoadingFormats, setIsLoadingFormats] = useState(initialFormats.length === 0);
+  const { isPending: isLoadingFormats, data: formatsData } =
+    useReleaseDigitalFormatsQuery(releaseId);
+  const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{
@@ -66,38 +66,8 @@ export const FormatBundleDownload = ({
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    // Skip fetch if formats were provided via props
-    if (initialFormats.length > 0) return;
-
-    let cancelled = false;
-
-    const fetchFormats = async () => {
-      try {
-        const res = await fetch(`/api/releases/${releaseId}/digital-formats`);
-        if (!res.ok) {
-          if (!cancelled) setFormats([]);
-          return;
-        }
-        const data: { formats: AvailableFormat[] } = await res.json();
-        if (!cancelled) {
-          setFormats(data.formats);
-        }
-      } catch {
-        if (!cancelled) setFormats([]);
-      } finally {
-        if (!cancelled) setIsLoadingFormats(false);
-      }
-    };
-
-    fetchFormats();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [releaseId, initialFormats]);
-
   const resolvedFormats = formats ?? [];
+  const isLoadingFormatsResolved = initialFormats.length > 0 ? false : isLoadingFormats;
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
 
@@ -188,7 +158,7 @@ export const FormatBundleDownload = ({
     };
   }, []);
 
-  if (isLoadingFormats) {
+  if (isLoadingFormatsResolved) {
     return (
       <div className="flex items-center justify-center py-4" role="status">
         <Loader2 className="text-muted-foreground size-5 animate-spin" />

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 
 import Link from 'next/link';
 
@@ -20,6 +20,8 @@ import {
 } from '@/app/components/ui/command';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { useDebounce } from '@/app/hooks/use-debounce';
+import { useReleaseListQuery } from '@/app/hooks/use-release-list-query';
 
 import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 
@@ -74,75 +76,22 @@ export default function ReleaseSelect<
 }: ReleaseSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const [releases, setReleases] = useState<ReleaseOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Serialize artistIds for stable dependency comparison
-  const artistIdsKey = artistIds?.join(',') ?? '';
-
-  // Fetch releases from API
-  const fetchReleases = useCallback(
-    async (search?: string) => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        if (search) {
-          params.set('search', search);
-        }
-        // Append each artistId as a separate query param
-        if (artistIdsKey) {
-          const ids = artistIdsKey.split(',');
-          for (const id of ids) {
-            params.append('artistIds', id);
-          }
-        }
-        params.set('take', '50');
-
-        const response = await fetch(`/api/releases?${params.toString()}`);
-        if (!response.ok) {
-          throw Error('Failed to fetch releases');
-        }
-
-        const data: { releases: ReleaseOption[] } = await response.json();
-        setReleases(data.releases || []);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load releases';
-        setError(errorMessage);
-        setReleases([]);
-      } finally {
-        setIsLoading(false);
-      }
+  const debouncedSearch = useDebounce(searchValue, 300);
+  const {
+    isPending: isLoading,
+    error: fetchError,
+    data,
+  } = useReleaseListQuery(
+    {
+      search: debouncedSearch || undefined,
+      artistIds: artistIds?.length ? artistIds : undefined,
+      take: 50,
     },
-    [artistIdsKey]
+    open
   );
-
-  // Initial fetch when popover opens
-  useEffect(() => {
-    if (open && releases.length === 0) {
-      fetchReleases();
-    }
-  }, [open, releases.length, fetchReleases]);
-
-  // Re-fetch when artistIds changes
-  useEffect(() => {
-    setReleases([]);
-    if (open) {
-      fetchReleases();
-    }
-  }, [artistIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Debounced search
-  useEffect(() => {
-    if (!open) return;
-
-    const timeoutId = setTimeout(() => {
-      fetchReleases(searchValue || undefined);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchValue, open, fetchReleases]);
+  const releases = data ?? [];
+  const error = fetchError?.message ?? null;
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);

@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import { DownloadAnalyticsDashboard } from './download-analytics-dashboard';
 
 // Mock Radix Select with a native <select> so jsdom can handle value changes
@@ -76,7 +78,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should display loading indicator while fetching analytics', () => {
       global.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       expect(screen.getByTestId('loading')).toBeInTheDocument();
       expect(screen.getByText('Loading analytics...')).toBeInTheDocument();
@@ -87,7 +91,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should display error message when fetch fails', async () => {
       mockFetchFailure();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('error')).toBeInTheDocument();
@@ -100,7 +106,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should display total downloads count', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('total-downloads')).toHaveTextContent('142');
@@ -110,7 +118,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should display unique users count', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('unique-users')).toHaveTextContent('38');
@@ -120,7 +130,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should display format count', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('format-count')).toHaveTextContent('3');
@@ -130,7 +142,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should render format breakdown table with all formats', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('format-row-MP3_320KBPS')).toBeInTheDocument();
@@ -142,7 +156,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should show human-readable format labels in table', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('MP3 320kbps')).toBeInTheDocument();
@@ -154,7 +170,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should calculate and display format share percentages', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         // 60/142 total format downloads = 42.3%
@@ -165,7 +183,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should not render format table when no formats available', async () => {
       mockFetchSuccess({ totalDownloads: 0, uniqueUsers: 0, formatBreakdown: [] });
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('total-downloads')).toHaveTextContent('0');
@@ -178,7 +198,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should render date range selector', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('date-range-select')).toBeInTheDocument();
@@ -188,7 +210,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should fetch analytics for all time by default', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
@@ -200,7 +224,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should render the date range select trigger with default value', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('total-downloads')).toBeInTheDocument();
@@ -215,7 +241,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should pass releaseId in the API URL', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(mockReleaseId));
@@ -225,7 +253,9 @@ describe('DownloadAnalyticsDashboard', () => {
     it('should refetch with date range params when date range is changed', async () => {
       mockFetchSuccess();
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('total-downloads')).toBeInTheDocument();
@@ -249,7 +279,9 @@ describe('DownloadAnalyticsDashboard', () => {
         formatBreakdown: [{ formatType: 'FLAC', count: 0 }],
       });
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('format-row-FLAC')).toBeInTheDocument();
@@ -264,7 +296,9 @@ describe('DownloadAnalyticsDashboard', () => {
         formatBreakdown: [{ formatType: 'UNKNOWN_FMT', count: 10 }],
       });
 
-      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />);
+      render(<DownloadAnalyticsDashboard releaseId={mockReleaseId} />, {
+        wrapper: createQueryWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('UNKNOWN_FMT')).toBeInTheDocument();

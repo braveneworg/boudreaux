@@ -77,6 +77,7 @@ Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before co
 ````typescript
 - Always use `'server-only'` package in files meant exclusively for server-side execution to prevent accidental client-side imports.
 - Use decorators for auth checks (e.g., `withAuth`, `withAdmin`) in Server Actions.
+- Prefer tanstack/react-query for client-side data fetching and caching in interactive components.
 - Data fetching in Server Components uses `fetch` with explicit cache options:
 
 ```typescript

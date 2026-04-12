@@ -500,7 +500,7 @@ const InteractiveCoverArt = ({
           alt={alt}
           fill
           className="object-cover"
-          sizes="calc(100vw - 1rem)"
+          sizes="100vw"
           onError={() => setImageError(true)}
         />
       )}

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Pencil, Plus } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
@@ -35,7 +36,10 @@ import { Input } from '@/app/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { TimezoneSelect } from '@/app/components/ui/timezone-select';
+import { useVenueDetailQuery } from '@/app/hooks/use-venue-detail-query';
+import { useVenueSearchQuery } from '@/app/hooks/use-venue-search-query';
 import { createVenueAction, updateVenueAction } from '@/lib/actions/venue-actions';
+import { queryKeys } from '@/lib/query-keys';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
 
@@ -79,9 +83,12 @@ export default function VenueSelect<
   onVenueSelect,
 }: VenueSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
-  const [venues, setVenues] = useState<VenueOption[]>([]);
   const [searchValue, setSearchValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Venue list fetching via TanStack Query
+  const { isPending: isLoading, data: venuesData } = useVenueSearchQuery(searchValue, open);
+  const venues = (venuesData ?? []) as VenueOption[];
 
   // Dialog state for inline venue creation
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -97,7 +104,6 @@ export default function VenueSelect<
 
   // Dialog state for inline venue editing
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [isLoadingVenue, setIsLoadingVenue] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [editVenueId, setEditVenueId] = useState('');
@@ -109,27 +115,21 @@ export default function VenueSelect<
   const [editVenueCountry, setEditVenueCountry] = useState('');
   const [editVenueTimeZone, setEditVenueTimeZone] = useState('');
 
-  const fetchVenues = async (search?: string) => {
-    setIsLoading(true);
-    try {
-      const query = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`/api/venues${query}`);
-      if (res.ok) {
-        const data = await res.json();
-        setVenues(data.venues || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch venues:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Venue detail fetching via TanStack Query
+  const { isPending: isLoadingVenue, data: venueDetail } = useVenueDetailQuery(editVenueId ?? '');
 
+  // Sync venue detail into edit form fields when it changes
   useEffect(() => {
-    if (open) {
-      fetchVenues(searchValue);
+    if (venueDetail) {
+      setEditVenueName(venueDetail.name || '');
+      setEditVenueAddress(venueDetail.address || '');
+      setEditVenueCity(venueDetail.city || '');
+      setEditVenueState(venueDetail.state || '');
+      setEditVenuePostalCode(venueDetail.postalCode || '');
+      setEditVenueCountry(venueDetail.country || '');
+      setEditVenueTimeZone(venueDetail.timeZone || '');
     }
-  }, [searchValue, open]);
+  }, [venueDetail]);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
@@ -164,7 +164,7 @@ export default function VenueSelect<
           state: newVenueState.trim() || null,
           timeZone: newVenueTimeZone || null,
         };
-        setVenues((prev) => [newVenue, ...prev]);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.venues.all });
         field.onChange(newVenue.id);
         onVenueSelect?.(newVenue);
 
@@ -190,32 +190,6 @@ export default function VenueSelect<
       setCreateError('An unexpected error occurred. Please try again.');
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const fetchVenueDetails = async (venueId: string) => {
-    setIsLoadingVenue(true);
-    setUpdateError(null);
-    try {
-      const res = await fetch(`/api/venues/${venueId}`);
-      if (res.ok) {
-        const { venue } = await res.json();
-        setEditVenueId(venue.id);
-        setEditVenueName(venue.name || '');
-        setEditVenueAddress(venue.address || '');
-        setEditVenueCity(venue.city || '');
-        setEditVenueState(venue.state || '');
-        setEditVenuePostalCode(venue.postalCode || '');
-        setEditVenueCountry(venue.country || '');
-        setEditVenueTimeZone(venue.timeZone || '');
-      } else {
-        setUpdateError('Failed to load venue details.');
-      }
-    } catch (err) {
-      console.error('Failed to fetch venue details:', err);
-      setUpdateError('Failed to load venue details.');
-    } finally {
-      setIsLoadingVenue(false);
     }
   };
 
@@ -245,7 +219,7 @@ export default function VenueSelect<
           state: editVenueState.trim() || null,
           timeZone: editVenueTimeZone || null,
         };
-        setVenues((prev) => prev.map((v) => (v.id === editVenueId ? updatedVenue : v)));
+        await queryClient.invalidateQueries({ queryKey: queryKeys.venues.all });
         onVenueSelect?.(updatedVenue);
         setEditDialogOpen(false);
       } else {
@@ -360,7 +334,8 @@ export default function VenueSelect<
                     size="sm"
                     disabled={disabled}
                     onClick={() => {
-                      fetchVenueDetails(selectedId);
+                      setEditVenueId(selectedId);
+                      setUpdateError(null);
                       setEditDialogOpen(true);
                     }}
                     title="Edit venue"

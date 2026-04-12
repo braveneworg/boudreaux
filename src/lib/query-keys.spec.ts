@@ -57,6 +57,20 @@ describe('queryKeys', () => {
       const key = queryKeys.releases.digitalFormats('r-123');
       expect(key).toEqual(['releases', 'digitalFormats', 'r-123']);
     });
+
+    it('should return filteredList key with all params', () => {
+      const key = queryKeys.releases.filteredList({
+        search: 'test',
+        artistIds: ['a-1', 'a-2'],
+        take: 50,
+      });
+      expect(key).toEqual(['releases', 'filteredList', 'test', 'a-1,a-2', '50']);
+    });
+
+    it('should return filteredList key with empty defaults', () => {
+      const key = queryKeys.releases.filteredList({});
+      expect(key).toEqual(['releases', 'filteredList', '', '', '']);
+    });
   });
 
   describe('artists', () => {
@@ -78,6 +92,16 @@ describe('queryKeys', () => {
     it('should return search key with query', () => {
       const key = queryKeys.artists.search('rock');
       expect(key).toEqual(['artists', 'search', 'rock']);
+    });
+
+    it('should return filteredList key with params', () => {
+      const key = queryKeys.artists.filteredList({ search: 'jazz', take: 5 });
+      expect(key).toEqual(['artists', 'filteredList', 'jazz', '5']);
+    });
+
+    it('should return filteredList key with empty defaults', () => {
+      const key = queryKeys.artists.filteredList({});
+      expect(key).toEqual(['artists', 'filteredList', '', '']);
     });
   });
 
@@ -125,6 +149,11 @@ describe('queryKeys', () => {
       const key = queryKeys.tours.detail('t-456');
       expect(key).toEqual(['tours', 'detail', 't-456']);
     });
+
+    it('should return dates key with tourId', () => {
+      const key = queryKeys.tours.dates('t-789');
+      expect(key).toEqual(['tours', 'dates', 't-789']);
+    });
   });
 
   describe('purchaseStatus', () => {
@@ -137,6 +166,77 @@ describe('queryKeys', () => {
       const key1 = queryKeys.purchaseStatus.bySession('release-1', 'session-1');
       const key2 = queryKeys.purchaseStatus.bySession('release-2', 'session-2');
       expect(key1).not.toEqual(key2);
+    });
+  });
+
+  describe('notifications', () => {
+    it('should return all key', () => {
+      expect(queryKeys.notifications.all).toEqual(['notifications']);
+    });
+
+    it('should return search key with query', () => {
+      const key = queryKeys.notifications.search('test');
+      expect(key).toEqual(['notifications', 'search', 'test']);
+    });
+  });
+
+  describe('cdn', () => {
+    it('should return all key', () => {
+      expect(queryKeys.cdn.all).toEqual(['cdn']);
+    });
+
+    it('should return status key', () => {
+      const key = queryKeys.cdn.status();
+      expect(key).toEqual(['cdn', 'status']);
+    });
+  });
+
+  describe('downloadAnalytics', () => {
+    it('should return all key', () => {
+      expect(queryKeys.downloadAnalytics.all).toEqual(['downloadAnalytics']);
+    });
+
+    it('should return byRelease key', () => {
+      const key = queryKeys.downloadAnalytics.byRelease('r-123', '30d');
+      expect(key).toEqual(['downloadAnalytics', 'r-123', '30d']);
+    });
+  });
+
+  describe('downloadQuota', () => {
+    it('should return all key', () => {
+      expect(queryKeys.downloadQuota.all).toEqual(['downloadQuota']);
+    });
+
+    it('should return user key', () => {
+      const key = queryKeys.downloadQuota.user();
+      expect(key).toEqual(['downloadQuota', 'user']);
+    });
+  });
+
+  describe('health', () => {
+    it('should return all key', () => {
+      expect(queryKeys.health.all).toEqual(['health']);
+    });
+
+    it('should return status key', () => {
+      const key = queryKeys.health.status();
+      expect(key).toEqual(['health', 'status']);
+    });
+  });
+
+  describe('venues', () => {
+    it('should return all key', () => {
+      expect(queryKeys.venues.all).toEqual(['venues']);
+    });
+
+    it('should return search key with query', () => {
+      const key = queryKeys.venues.search('madison');
+      expect(key).toEqual(['venues', 'search', 'madison']);
+    });
+
+    it('should return detail key with id', () => {
+      const key = queryKeys.venues.detail('v-123');
+      expect(key).toEqual(['venues', 'detail', 'v-123']);
     });
   });
 });

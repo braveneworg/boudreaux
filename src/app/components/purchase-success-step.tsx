@@ -3,12 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useState } from 'react';
-
 import { Loader2Icon } from 'lucide-react';
 
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
+import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 
 interface AvailableFormat {
@@ -26,7 +25,7 @@ interface PurchaseSuccessStepProps {
 
 /**
  * Final step shown after a PWYW purchase is confirmed.
- * Fetches available digital formats from the API on mount to ensure
+ * Fetches available digital formats from the API to ensure
  * fresh data, falling back to the prop value if provided.
  */
 export const PurchaseSuccessStep = ({
@@ -36,44 +35,8 @@ export const PurchaseSuccessStep = ({
   downloadCount = 0,
   onDownloadComplete,
 }: PurchaseSuccessStepProps) => {
-  const [formats, setFormats] = useState<AvailableFormat[] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchFormats = async () => {
-      try {
-        const res = await fetch(`/api/releases/${releaseId}/digital-formats`);
-        if (!res.ok) {
-          if (!cancelled) {
-            setFormats(initialFormats ?? []);
-          }
-          return;
-        }
-        const data: { formats: AvailableFormat[] } = await res.json();
-        if (!cancelled) {
-          setFormats(data.formats);
-        }
-      } catch {
-        if (!cancelled) {
-          setFormats(initialFormats ?? []);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchFormats();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [releaseId, initialFormats]);
-
-  const resolvedFormats = formats ?? initialFormats ?? [];
+  const { isPending: isLoading, data } = useReleaseDigitalFormatsQuery(releaseId);
+  const resolvedFormats = data?.formats ?? initialFormats ?? [];
 
   return (
     <>

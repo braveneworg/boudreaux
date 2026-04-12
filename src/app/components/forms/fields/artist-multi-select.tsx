@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import Link from 'next/link';
 
@@ -21,6 +21,8 @@ import {
 } from '@/app/components/ui/command';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { useArtistListQuery } from '@/app/hooks/use-artist-list-query';
+import { useDebounce } from '@/app/hooks/use-debounce';
 
 import type { Control, FieldPath, FieldValues, UseFormSetValue } from 'react-hook-form';
 
@@ -66,42 +68,30 @@ export default function ArtistMultiSelect<
 }: ArtistMultiSelectProps<TFieldValues, TName>) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [selectedArtistCache, setSelectedArtistCache] = useState<Map<string, ArtistOption>>(
     () => new Map(initialArtists.map((a) => [a.id, a]))
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch artists from API
-  const fetchArtists = useCallback(async (search?: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (search) {
-        params.set('search', search);
-        // No take limit when searching — return all matches
-      } else {
-        // No search term: show only the 5 most recently added artists
-        params.set('take', '5');
-      }
-
-      const response = await fetch(`/api/artists?${params.toString()}`);
-      if (!response.ok) {
-        throw Error('Failed to fetch artists');
-      }
-
-      const data: { artists: ArtistOption[] } = await response.json();
-      setArtists(data.artists || []);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load artists';
-      setError(errorMessage);
-      setArtists([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const debouncedSearch = useDebounce(searchValue, 300);
+  const {
+    isPending: isLoading,
+    error: fetchError,
+    data,
+  } = useArtistListQuery(
+    { search: debouncedSearch || undefined, take: debouncedSearch ? undefined : 5 },
+    open
+  );
+  const artists: ArtistOption[] = useMemo(
+    () =>
+      (data ?? []).map((item) => ({
+        id: item.id,
+        displayName: item.artistName ?? item.groupName ?? '',
+        firstName: item.firstName ?? undefined,
+        surname: item.lastName ?? undefined,
+      })),
+    [data]
+  );
+  const error = fetchError?.message ?? null;
 
   // Sync cache when initialArtists changes (e.g. dialog reused for a different tour date)
   useEffect(() => {
@@ -133,24 +123,6 @@ export default function ArtistMultiSelect<
       return changed ? next : prev;
     });
   }, [artists]);
-
-  // Initial fetch when popover opens
-  useEffect(() => {
-    if (open && artists.length === 0) {
-      fetchArtists();
-    }
-  }, [open, artists.length, fetchArtists]);
-
-  // Debounced search
-  useEffect(() => {
-    if (!open) return;
-
-    const timeoutId = setTimeout(() => {
-      fetchArtists(searchValue || undefined);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchValue, open, fetchArtists]);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);

@@ -20,12 +20,27 @@ export const queryKeys = {
     related: (id: string, artistId?: string | null) =>
       [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
+    filteredList: (params: { search?: string; artistIds?: string[]; take?: number }) =>
+      [
+        ...queryKeys.releases.all,
+        'filteredList',
+        params.search ?? '',
+        (params.artistIds ?? []).join(','),
+        String(params.take ?? ''),
+      ] as const,
   },
   artists: {
     all: ['artists'] as const,
     list: () => [...queryKeys.artists.all, 'list'] as const,
     bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
+    filteredList: (params: { search?: string; take?: number }) =>
+      [
+        ...queryKeys.artists.all,
+        'filteredList',
+        params.search ?? '',
+        String(params.take ?? ''),
+      ] as const,
   },
   featuredArtists: {
     all: ['featuredArtists'] as const,
@@ -40,9 +55,36 @@ export const queryKeys = {
     all: ['tours'] as const,
     list: () => [...queryKeys.tours.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.tours.all, 'detail', id] as const,
+    dates: (tourId: string) => [...queryKeys.tours.all, 'dates', tourId] as const,
   },
   purchaseStatus: {
     bySession: (releaseId: string, sessionId: string) =>
       ['purchaseStatus', releaseId, sessionId] as const,
+  },
+  notifications: {
+    all: ['notifications'] as const,
+    search: (query: string) => [...queryKeys.notifications.all, 'search', query] as const,
+  },
+  cdn: {
+    all: ['cdn'] as const,
+    status: () => [...queryKeys.cdn.all, 'status'] as const,
+  },
+  downloadAnalytics: {
+    all: ['downloadAnalytics'] as const,
+    byRelease: (releaseId: string, dateRange: string) =>
+      [...queryKeys.downloadAnalytics.all, releaseId, dateRange] as const,
+  },
+  downloadQuota: {
+    all: ['downloadQuota'] as const,
+    user: () => [...queryKeys.downloadQuota.all, 'user'] as const,
+  },
+  health: {
+    all: ['health'] as const,
+    status: () => [...queryKeys.health.all, 'status'] as const,
+  },
+  venues: {
+    all: ['venues'] as const,
+    search: (query: string) => [...queryKeys.venues.all, 'search', query] as const,
+    detail: (id: string) => [...queryKeys.venues.all, 'detail', id] as const,
   },
 } as const;

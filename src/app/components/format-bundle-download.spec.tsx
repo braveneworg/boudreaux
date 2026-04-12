@@ -5,6 +5,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import { FormatBundleDownload } from './format-bundle-download';
 
 /** Creates a mock body with a getReader() that yields the given chunks. */
@@ -107,7 +109,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should render a combobox with placeholder when no formats are selected', () => {
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     const combobox = screen.getByRole('combobox');
     expect(combobox).toBeInTheDocument();
@@ -115,7 +117,7 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should start with no formats selected and download button disabled', () => {
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     const downloadBtn = screen.getByRole('button', { name: /Select at least one format/ });
     expect(downloadBtn).toBeDisabled();
@@ -123,7 +125,7 @@ describe('FormatBundleDownload', () => {
 
   it('should select a single format from the combobox', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await user.click(screen.getByRole('combobox'));
     const flacOption = screen.getAllByRole('option').find((o) => o.textContent?.includes('FLAC'));
@@ -134,7 +136,7 @@ describe('FormatBundleDownload', () => {
 
   it('should select all formats via "Select all"', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
 
@@ -152,7 +154,7 @@ describe('FormatBundleDownload', () => {
 
   it('should deselect all formats via "Deselect all"', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     // Select all first
     await selectAll(user);
@@ -170,7 +172,7 @@ describe('FormatBundleDownload', () => {
 
   it('should update the download button label when a format is deselected', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
 
@@ -185,7 +187,7 @@ describe('FormatBundleDownload', () => {
 
   it('should show singular "format" when only one is selected', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     // Select just one
     await user.click(screen.getByRole('combobox'));
@@ -196,7 +198,9 @@ describe('FormatBundleDownload', () => {
   });
 
   it('should disable the download button when at download limit', () => {
-    render(<FormatBundleDownload {...defaultProps} downloadCount={5} />);
+    render(<FormatBundleDownload {...defaultProps} downloadCount={5} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     const downloadBtn = screen.getByRole('button', { name: /Select at least one format/ });
     expect(downloadBtn).toBeDisabled();
@@ -209,7 +213,9 @@ describe('FormatBundleDownload', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />);
+    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     // Initially shows loading spinner
     expect(screen.getByRole('status')).toBeInTheDocument();
@@ -232,7 +238,9 @@ describe('FormatBundleDownload', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />);
+    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     // After fetch, combobox should appear with placeholder (nothing selected)
     const combobox = await screen.findByRole('combobox');
@@ -247,7 +255,7 @@ describe('FormatBundleDownload', () => {
     const zipBytes = new Uint8Array([80, 75, 3, 4]); // PK header
     const { fetchSpy, clickSpy } = stubDownloadApis([zipBytes]);
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -268,7 +276,7 @@ describe('FormatBundleDownload', () => {
     const chunk = new Uint8Array(1024);
     stubDownloadApis([chunk, chunk]);
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -303,7 +311,7 @@ describe('FormatBundleDownload', () => {
       return originalCreateElement(tag, options as never);
     }) as typeof document.createElement);
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -317,7 +325,8 @@ describe('FormatBundleDownload', () => {
       <FormatBundleDownload
         {...defaultProps}
         availableFormats={[{ formatType: 'CUSTOM_XYZ', fileName: 'file.xyz' }]}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     // Open combobox to see the option label
@@ -330,7 +339,9 @@ describe('FormatBundleDownload', () => {
     const onDownloadComplete = vi.fn();
     stubDownloadApis();
 
-    render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />);
+    render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -343,7 +354,7 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup();
     stubDownloadApis();
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -364,7 +375,7 @@ describe('FormatBundleDownload', () => {
       )
     );
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -376,7 +387,7 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -388,7 +399,7 @@ describe('FormatBundleDownload', () => {
 
   it('should remove a format when clicking the X on its pill', async () => {
     const user = userEvent.setup();
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
@@ -406,7 +417,7 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup();
     stubDownloadApis();
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -421,7 +432,9 @@ describe('FormatBundleDownload', () => {
   it('should show fallback message when API fetch fails for empty availableFormats', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
-    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />);
+    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(
       await screen.findByText('No digital formats available for download.')
@@ -431,7 +444,9 @@ describe('FormatBundleDownload', () => {
   it('should show fallback message when API fetch throws for empty availableFormats', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
-    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />);
+    render(<FormatBundleDownload {...defaultProps} availableFormats={[]} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(
       await screen.findByText('No digital formats available for download.')
@@ -451,7 +466,7 @@ describe('FormatBundleDownload', () => {
       } as unknown as Response)
     );
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -474,7 +489,7 @@ describe('FormatBundleDownload', () => {
       } as unknown as Response)
     );
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
@@ -491,7 +506,7 @@ describe('FormatBundleDownload', () => {
     abortError.name = 'AbortError';
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError));
 
-    render(<FormatBundleDownload {...defaultProps} />);
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));

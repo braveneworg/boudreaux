@@ -6,7 +6,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
-import { ReleaseShareWidget as ArtistReleaseInfo } from './release-share-widget';
+import { ReleaseShareWidget } from './release-share-widget';
 
 const { mockToast } = vi.hoisted(() => ({
   mockToast: {
@@ -35,9 +35,9 @@ vi.mock('@/lib/utils/get-display-name', () => ({
     (item.displayName as string) || 'Mock Display Name',
 }));
 
-describe('ArtistReleaseInfo', () => {
+describe('ReleaseShareWidget', () => {
   it('should render a separator', () => {
-    const { container } = render(<ArtistReleaseInfo />, { wrapper: createQueryWrapper() });
+    const { container } = render(<ReleaseShareWidget />, { wrapper: createQueryWrapper() });
 
     const separator = container.querySelector('[data-slot="separator"]');
     expect(separator).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('ArtistReleaseInfo', () => {
     });
 
     it('should render the Share2Icon', () => {
-      render(<ArtistReleaseInfo />, {
+      render(<ReleaseShareWidget />, {
         wrapper: createQueryWrapper(),
       });
 
@@ -68,7 +68,7 @@ describe('ArtistReleaseInfo', () => {
     });
 
     it('should render the SocialShareWidget', () => {
-      render(<ArtistReleaseInfo />, {
+      render(<ReleaseShareWidget />, {
         wrapper: createQueryWrapper(),
       });
 
@@ -79,7 +79,7 @@ describe('ArtistReleaseInfo', () => {
       const setSelectedArtist = vi.fn();
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           featuredArtists={mockFeaturedArtists}
           setSelectedArtist={setSelectedArtist}
         />,
@@ -94,7 +94,7 @@ describe('ArtistReleaseInfo', () => {
     it('should not call setSelectedArtist when no selectedArtist and no featured artists', () => {
       const setSelectedArtist = vi.fn();
 
-      render(<ArtistReleaseInfo featuredArtists={[]} setSelectedArtist={setSelectedArtist} />, {
+      render(<ReleaseShareWidget featuredArtists={[]} setSelectedArtist={setSelectedArtist} />, {
         wrapper: createQueryWrapper(),
       });
 
@@ -112,7 +112,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -145,7 +145,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -168,7 +168,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -197,7 +197,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={artistWithNoTitle}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -223,7 +223,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -252,7 +252,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,
@@ -276,7 +276,7 @@ describe('ArtistReleaseInfo', () => {
       });
 
       render(
-        <ArtistReleaseInfo
+        <ReleaseShareWidget
           selectedArtist={mockSelectedArtist}
           featuredArtists={mockFeaturedArtists}
         />,

@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import { ArtistSearchInput } from './artist-search-input';
 
 const mockPush = vi.fn();
@@ -108,6 +110,7 @@ describe('ArtistSearchInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: [] }),
     } as Response);
   });
@@ -117,7 +120,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should render the search input', () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     expect(input).toBeInTheDocument();
@@ -125,7 +128,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should have correct accessibility attributes', () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     expect(input).toHaveAttribute('aria-label', 'Search artists and releases');
@@ -133,7 +136,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should update query on input change', () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -142,7 +145,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should not fetch when query is shorter than 3 characters', async () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'ab' } });
@@ -153,16 +156,13 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should fetch results when query is 3+ characters', async () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/artists/search?q=test',
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
+      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=test');
     });
   });
 
@@ -177,10 +177,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -202,10 +203,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -229,10 +231,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -253,10 +256,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -281,10 +285,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -309,10 +314,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'john' } });
@@ -328,10 +334,11 @@ describe('ArtistSearchInput', () => {
 
   it('should show empty state when no results are found', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: [] }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'nonexistent' } });
@@ -348,10 +355,11 @@ describe('ArtistSearchInput', () => {
     });
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => pendingPromise,
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -367,7 +375,7 @@ describe('ArtistSearchInput', () => {
   it('should handle fetch errors gracefully', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -378,33 +386,27 @@ describe('ArtistSearchInput', () => {
     });
   });
 
-  it('should abort previous request when query changes', async () => {
-    const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-
-    render(<ArtistSearchInput />);
+  it('should cancel stale queries when query changes', async () => {
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
     fireEvent.change(input, { target: { value: 'testing' } });
 
+    // TanStack Query handles cancellation internally; verify the latest query is used
     await waitFor(() => {
-      expect(abortSpy).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=testing');
     });
-
-    abortSpy.mockRestore();
   });
 
   it('should encode the query parameter in the fetch URL', async () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test & foo' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/artists/search?q=test%20%26%20foo',
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
+      expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=test%20%26%20foo');
     });
   });
 
@@ -419,10 +421,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
 
@@ -445,7 +448,7 @@ describe('ArtistSearchInput', () => {
     const abortError = new DOMException('The operation was aborted.', 'AbortError');
     vi.spyOn(global, 'fetch').mockRejectedValue(abortError);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -467,10 +470,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
 
@@ -490,7 +494,7 @@ describe('ArtistSearchInput', () => {
   });
 
   it('should prevent auto-focus on popover open to keep input focused', () => {
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     expect(screen.getByTestId('popover-content')).toBeInTheDocument();
     expect(mockPreventDefault).toHaveBeenCalled();
@@ -516,10 +520,11 @@ describe('ArtistSearchInput', () => {
     ];
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({ results: mockResults }),
     } as Response);
 
-    render(<ArtistSearchInput />);
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'art' } });

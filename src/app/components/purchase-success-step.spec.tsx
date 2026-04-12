@@ -5,6 +5,8 @@ import React from 'react';
 
 import { render, screen, waitFor } from '@testing-library/react';
 
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+
 import { PurchaseSuccessStep } from './purchase-success-step';
 
 // ---------------------------------------------------------------------------
@@ -89,28 +91,36 @@ describe('PurchaseSuccessStep', () => {
 
   it('renders the "Purchase Complete!" success heading', async () => {
     mockFetchFormats([]);
-    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
+    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText('Purchase Complete!')).toBeDefined();
   });
 
   it('renders the releaseTitle in the dialog description', async () => {
     mockFetchFormats([]);
-    render(<PurchaseSuccessStep releaseId="release-456" releaseTitle="Special Edition EP" />);
+    render(<PurchaseSuccessStep releaseId="release-456" releaseTitle="Special Edition EP" />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText(/Special Edition EP/)).toBeDefined();
   });
 
   it('renders a confirmation email notice', async () => {
     mockFetchFormats([]);
-    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
+    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText(/confirmation email/i)).toBeDefined();
   });
 
   it('shows loading state initially', () => {
     mockFetchFormats(mockFormats);
-    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />);
+    render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByRole('status')).toBeDefined();
   });
@@ -123,7 +133,8 @@ describe('PurchaseSuccessStep — fetches formats from API', () => {
     mockFetchFormats(mockFormats);
 
     render(
-      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />
+      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -138,7 +149,8 @@ describe('PurchaseSuccessStep — fetches formats from API', () => {
     mockFetchFormats(mockFormats);
 
     render(
-      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={3} />
+      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={3} />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -160,7 +172,8 @@ describe('PurchaseSuccessStep — fetches formats from API', () => {
         releaseTitle="Test Album"
         availableFormats={mockFormats}
         downloadCount={0}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -183,7 +196,8 @@ describe('PurchaseSuccessStep — no available formats', () => {
         releaseTitle="Test Album"
         availableFormats={[]}
         downloadCount={0}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -197,7 +211,8 @@ describe('PurchaseSuccessStep — no available formats', () => {
     mockFetchFailure();
 
     render(
-      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />
+      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -218,7 +233,8 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
         releaseTitle="Test Album"
         availableFormats={mockFormats}
         downloadCount={0}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -232,7 +248,8 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
     render(
-      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />
+      <PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" downloadCount={0} />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
@@ -256,7 +273,8 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
         releaseTitle="Test Album"
         availableFormats={mockFormats}
         downloadCount={0}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     // Unmount before fetch resolves — sets cancelled = true
@@ -285,7 +303,8 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
         releaseTitle="Test Album"
         availableFormats={mockFormats}
         downloadCount={0}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     // Unmount before fetch resolves — sets cancelled = true
@@ -310,7 +329,8 @@ describe('PurchaseSuccessStep — onDownloadComplete callback', () => {
         releaseTitle="Test Album"
         downloadCount={0}
         onDownloadComplete={onDownloadComplete}
-      />
+      />,
+      { wrapper: createQueryWrapper() }
     );
 
     await waitFor(() => {
