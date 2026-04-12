@@ -26,7 +26,7 @@ vi.mock('@/lib/services/artist-service', () => ({
 
 describe('Artist by ID API Routes', () => {
   const mockArtist = {
-    id: 'artist-123',
+    id: '507f1f77bcf86cd799439011',
     firstName: 'John',
     middleName: '',
     surname: 'Doe',
@@ -64,13 +64,13 @@ describe('Artist by ID API Routes', () => {
         data: mockArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123');
-      const response = await GET(request, createParams('artist-123'));
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockArtist);
-      expect(ArtistService.getArtistById).toHaveBeenCalledWith('artist-123');
+      expect(ArtistService.getArtistById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
     it('should return 404 when artist not found', async () => {
@@ -79,8 +79,8 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/non-existent');
-      const response = await GET(request, createParams('non-existent'));
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439012');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -93,8 +93,8 @@ describe('Artist by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123');
-      const response = await GET(request, createParams('artist-123'));
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -107,8 +107,8 @@ describe('Artist by ID API Routes', () => {
         error: 'Failed to retrieve artist',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123');
-      const response = await GET(request, createParams('artist-123'));
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -118,8 +118,8 @@ describe('Artist by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.getArtistById).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123');
-      const response = await GET(request, createParams('artist-123'));
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -135,26 +135,34 @@ describe('Artist by ID API Routes', () => {
         data: updatedArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({ firstName: 'Jane' }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ firstName: 'Jane' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(updatedArtist);
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith('artist-123', { firstName: 'Jane' });
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
+        firstName: 'Jane',
+      });
     });
 
     it('should return 400 when validation fails', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({
-          firstName: 'x'.repeat(101),
-        }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            firstName: 'x'.repeat(101),
+          }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -169,11 +177,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/non-existent', {
-        method: 'PUT',
-        body: JSON.stringify({ firstName: 'Jane' }),
-      });
-      const response = await PUT(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439012',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ firstName: 'Jane' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -186,11 +197,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist with this slug already exists',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({ slug: 'existing-slug' }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ slug: 'existing-slug' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(409);
@@ -203,11 +217,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({ firstName: 'Jane' }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ firstName: 'Jane' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -220,11 +237,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Failed to update artist',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({ firstName: 'Jane' }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ firstName: 'Jane' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -234,11 +254,14 @@ describe('Artist by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.updateArtist).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({ firstName: 'Jane' }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ firstName: 'Jane' }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -251,18 +274,21 @@ describe('Artist by ID API Routes', () => {
         data: { ...mockArtist, firstName: 'Jane', bio: 'Updated bio' } as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PUT',
-        body: JSON.stringify({
-          firstName: 'Jane',
-          bio: 'Updated bio',
-          slug: 'jane-doe',
-        }),
-      });
-      const response = await PUT(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            firstName: 'Jane',
+            bio: 'Updated bio',
+            slug: 'jane-doe',
+          }),
+        }
+      );
+      const response = await PUT(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith('artist-123', {
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         firstName: 'Jane',
         bio: 'Updated bio',
         slug: 'jane-doe',
@@ -278,28 +304,34 @@ describe('Artist by ID API Routes', () => {
         data: updatedArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ bio: 'Updated bio' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ bio: 'Updated bio' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(updatedArtist);
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith('artist-123', {
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         bio: 'Updated bio',
       });
     });
 
     it('should return 400 when validation fails', async () => {
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          slug: 'INVALID SLUG WITH SPACES',
-        }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            slug: 'INVALID SLUG WITH SPACES',
+          }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -314,11 +346,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/non-existent', {
-        method: 'PATCH',
-        body: JSON.stringify({ bio: 'Updated bio' }),
-      });
-      const response = await PATCH(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439012',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ bio: 'Updated bio' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -331,11 +366,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist with this slug already exists',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ slug: 'existing-slug' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ slug: 'existing-slug' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(409);
@@ -348,11 +386,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ bio: 'Updated bio' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ bio: 'Updated bio' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -365,11 +406,14 @@ describe('Artist by ID API Routes', () => {
         error: 'Failed to update artist',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ bio: 'Updated bio' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ bio: 'Updated bio' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -379,11 +423,14 @@ describe('Artist by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.updateArtist).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ bio: 'Updated bio' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ bio: 'Updated bio' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -396,14 +443,17 @@ describe('Artist by ID API Routes', () => {
         data: { ...mockArtist, genres: 'Rock' } as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ genres: 'Rock' }),
-      });
-      const response = await PATCH(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ genres: 'Rock' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith('artist-123', {
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         genres: 'Rock',
       });
     });
@@ -416,15 +466,18 @@ describe('Artist by ID API Routes', () => {
         data: mockArtist as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ message: 'Artist deleted successfully', data: mockArtist });
-      expect(ArtistService.deleteArtist).toHaveBeenCalledWith('artist-123');
+      expect(ArtistService.deleteArtist).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
     it('should return 404 when artist not found', async () => {
@@ -433,10 +486,13 @@ describe('Artist by ID API Routes', () => {
         error: 'Artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/non-existent', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439012',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -449,10 +505,13 @@ describe('Artist by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -465,10 +524,13 @@ describe('Artist by ID API Routes', () => {
         error: 'Failed to delete artist',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -478,10 +540,13 @@ describe('Artist by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ArtistService.deleteArtist).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/artists/artist-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('artist-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);

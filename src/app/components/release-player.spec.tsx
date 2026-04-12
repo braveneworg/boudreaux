@@ -11,6 +11,26 @@ import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 
 import { ReleasePlayer } from './release-player';
 
+// Mock next/dynamic to render synchronously in tests.
+// The real next/dynamic lazy-loads with { ssr: false }, which prevents
+// the DownloadDialog (and its DownloadTriggerButton child) from appearing
+// in the synchronous render. This mock calls the loader eagerly so the
+// dynamically-imported component is available immediately.
+vi.mock('next/dynamic', () => {
+  const dynamic = (loader: () => Promise<{ default: React.ComponentType }>) => {
+    // vi.mock is hoisted — the loader references other vi.mock'd modules
+    // which are already resolved, so we can extract synchronously via .then()
+    let Resolved: React.ComponentType | null = null;
+    loader().then((mod) => {
+      Resolved = mod.default;
+    });
+    const Wrapper = (props: Record<string, unknown>) => (Resolved ? <Resolved {...props} /> : null);
+    Wrapper.displayName = 'NextDynamic';
+    return Wrapper;
+  };
+  return { __esModule: true, default: dynamic };
+});
+
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
 }));
@@ -171,6 +191,14 @@ vi.mock('@/app/components/download-dialog', () => ({
       {children}
     </div>
   ),
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
+vi.mock('@/app/components/download-trigger-button', () => ({
   DownloadTriggerButton: () => (
     <button data-testid="download-trigger-button" aria-label="Download music">
       download

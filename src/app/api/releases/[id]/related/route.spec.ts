@@ -26,8 +26,10 @@ describe('GET /api/releases/[id]/related', () => {
   });
 
   it('should return empty releases when no artistId provided', async () => {
-    const request = new NextRequest('http://localhost:3000/api/releases/release-1/related');
-    const response = await GET(request, createParams('release-1'));
+    const request = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related'
+    );
+    const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -47,14 +49,17 @@ describe('GET /api/releases/[id]/related', () => {
     });
 
     const request = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/related?artistId=artist-1'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related?artistId=607f1f77bcf86cd799439013'
     );
-    const response = await GET(request, createParams('release-1'));
+    const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ releases: mockReleases });
-    expect(ReleaseService.getArtistOtherReleases).toHaveBeenCalledWith('artist-1', 'release-1');
+    expect(ReleaseService.getArtistOtherReleases).toHaveBeenCalledWith(
+      '607f1f77bcf86cd799439013',
+      '507f1f77bcf86cd799439011'
+    );
   });
 
   it('should return 503 when database is unavailable', async () => {
@@ -64,9 +69,9 @@ describe('GET /api/releases/[id]/related', () => {
     });
 
     const request = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/related?artistId=artist-1'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related?artistId=607f1f77bcf86cd799439013'
     );
-    const response = await GET(request, createParams('release-1'));
+    const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
 
     expect(response.status).toBe(503);
   });
@@ -78,9 +83,9 @@ describe('GET /api/releases/[id]/related', () => {
     });
 
     const request = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/related?artistId=artist-1'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related?artistId=607f1f77bcf86cd799439013'
     );
-    const response = await GET(request, createParams('release-1'));
+    const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
 
     expect(response.status).toBe(500);
   });
@@ -89,9 +94,9 @@ describe('GET /api/releases/[id]/related', () => {
     vi.mocked(ReleaseService.getArtistOtherReleases).mockRejectedValue(new Error('Unexpected'));
 
     const request = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/related?artistId=artist-1'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related?artistId=607f1f77bcf86cd799439013'
     );
-    const response = await GET(request, createParams('release-1'));
+    const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
     const data = await response.json();
 
     expect(response.status).toBe(500);

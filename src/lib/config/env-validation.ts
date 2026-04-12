@@ -19,6 +19,7 @@ export function validateEnvironment() {
   const required = [
     'DATABASE_URL',
     'AUTH_SECRET',
+    'CLOUDFLARE_SECRET',
     'EMAIL_SERVER_HOST',
     'EMAIL_SERVER_USER',
     'EMAIL_SERVER_PASSWORD',
@@ -26,6 +27,7 @@ export function validateEnvironment() {
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
     'AWS_REGION',
+    'AWS_S3_BUCKET_NAME',
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',

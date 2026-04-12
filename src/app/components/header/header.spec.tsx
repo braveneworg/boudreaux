@@ -5,28 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import Header from './header';
-
-// Mock framer-motion
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: ({
-      children,
-      className,
-      style,
-      ...props
-    }: React.PropsWithChildren<{ className?: string; style?: React.CSSProperties }>) => (
-      <div
-        className={className}
-        data-testid="motion-div"
-        style={style}
-        {...(props as React.HTMLAttributes<HTMLDivElement>)}
-      >
-        {children}
-      </div>
-    ),
-  },
-}));
+import { Header } from './header';
 
 // Mock next/image using <span> to avoid @next/next/no-img-element lint rule
 vi.mock('next/image', () => ({
@@ -148,56 +127,50 @@ describe('Header', () => {
   });
 
   describe('animated background', () => {
-    it('renders motion div for animated background', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      expect(motionDivs.length).toBeGreaterThan(0);
+    it('renders background div with CSS animation class', () => {
+      const { container } = render(<Header />);
+      const bgDiv = container.querySelector('.header-bg-pulse');
+      expect(bgDiv).toBeInTheDocument();
     });
 
     it('renders background with particles SVG class', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      const bgDiv = motionDivs[0];
+      const { container } = render(<Header />);
+      const bgDiv = container.querySelector('.header-bg-pulse');
       expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
     });
   });
 
   describe('sparkle effects', () => {
-    it('renders sparkle container with suppressHydrationWarning', () => {
+    it('renders sparkle container', () => {
       const { container } = render(<Header />);
       const sparkleContainer = container.querySelector('[class*="pointer-events-none z-10"]');
       expect(sparkleContainer).toBeInTheDocument();
     });
 
     it('generates 20 sparkles and 15 extinguish particles', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      // 1 animated background + 20 sparkles + 15 extinguish particles = 36
-      expect(motionDivs).toHaveLength(36);
+      const { container } = render(<Header />);
+      const sparkles = container.querySelectorAll('.header-sparkle');
+      const extinguish = container.querySelectorAll('.header-extinguish');
+      expect(sparkles).toHaveLength(20);
+      expect(extinguish).toHaveLength(15);
     });
 
     it('sparkles have absolute positioning', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      // Sparkle divs start at index 1 (index 0 is the background)
-      const sparkle = motionDivs[1];
+      const { container } = render(<Header />);
+      const sparkle = container.querySelector('.header-sparkle');
       expect(sparkle).toHaveClass('absolute', 'rounded-full');
     });
 
     it('sparkle elements have percentage-based positions', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      // Sparkle at index 1 has inline style with left/top percentages
-      const sparkle = motionDivs[1];
+      const { container } = render(<Header />);
+      const sparkle = container.querySelector('.header-sparkle') as HTMLElement;
       expect(sparkle.style.left).toMatch(/%$/);
       expect(sparkle.style.top).toMatch(/%$/);
     });
 
     it('extinguish particles have orange color class', () => {
-      render(<Header />);
-      const motionDivs = screen.getAllByTestId('motion-div');
-      // Extinguish particles start after background (1) + sparkles (20) = index 21
-      const extinguishParticle = motionDivs[21];
+      const { container } = render(<Header />);
+      const extinguishParticle = container.querySelector('.header-extinguish');
       expect(extinguishParticle).toHaveClass('bg-orange-400');
     });
   });

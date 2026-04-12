@@ -38,7 +38,9 @@ export const GET = withAuth(async (request: NextRequest) => {
 
   try {
     const parsedUrl = new URL(url);
-    const isAllowed = allowedDomains.some((domain) => parsedUrl.hostname.endsWith(domain));
+    const isAllowed = allowedDomains.some(
+      (domain) => parsedUrl.hostname === domain || parsedUrl.hostname.endsWith('.' + domain)
+    );
 
     if (!isAllowed) {
       console.warn('[proxy-image] Blocked request to non-allowed domain:', parsedUrl.hostname);

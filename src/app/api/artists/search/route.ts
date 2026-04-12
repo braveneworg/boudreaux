@@ -5,6 +5,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
@@ -31,14 +33,17 @@ interface ArtistSearchResult {
  *   format – When "full", returns raw artist objects for the search results page.
  *            Default returns lightweight combobox-optimized shape.
  */
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(
+  searchLimiter,
+  SEARCH_LIMIT
+)(async (request: NextRequest) => {
   try {
     const query = request.nextUrl.searchParams.get('q') ?? '';
     const format = request.nextUrl.searchParams.get('format');
 
     if (format === 'full') {
       const result = query
-        ? await ArtistService.searchPublishedArtists({ search: query })
+        ? await ArtistService.searchPublishedArtists({ search: query, take: 50 })
         : { success: true as const, data: [] };
 
       if (!result.success) {
@@ -48,11 +53,21 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({ artists: result.data });
+      return NextResponse.json(
+        { artists: result.data },
+        {
+          headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+        }
+      );
     }
 
     if (query.length < 3) {
-      return NextResponse.json({ results: [] });
+      return NextResponse.json(
+        { results: [] },
+        {
+          headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+        }
+      );
     }
 
     const result = await ArtistService.searchPublishedArtists({
@@ -95,9 +110,14 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ results });
+    return NextResponse.json(
+      { results },
+      {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+      }
+    );
   } catch (error) {
     console.error('Artist search error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

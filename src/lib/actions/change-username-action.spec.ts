@@ -46,6 +46,10 @@ vi.mock('@/lib/utils/auth/auth-utils', () => ({
 
 vi.mock('@/lib/validation/change-username-schema');
 
+vi.mock('@/lib/utils/audit-log', () => ({
+  logSecurityEvent: vi.fn(),
+}));
+
 describe('changeUsernameAction', () => {
   const mockFormData = new FormData();
   const mockInitialState: FormState = {
@@ -449,7 +453,7 @@ describe('changeUsernameAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual([
-        'Database error (P1000). Please try again or contact support.',
+        'A database error occurred. Please try again or contact support.',
       ]);
     });
 
@@ -490,7 +494,9 @@ describe('changeUsernameAction', () => {
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Something went wrong']);
+      expect(result.errors?.general).toEqual([
+        'Failed to update username. Please try again or contact support.',
+      ]);
     });
 
     it('should handle non-Error thrown values', async () => {

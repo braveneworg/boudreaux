@@ -1,8 +1,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
 
 /**
@@ -16,13 +19,16 @@ import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
  * Query params:
  *   - search?: string — filter venues by name, address, or city
  */
-export async function GET(request: Request) {
+export const GET = withRateLimit(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const search = searchParams.get('search') ?? undefined;
 
     const raw = search
-      ? await VenueRepository.findAll({ search })
+      ? await VenueRepository.findAll({ search, limit: 50 })
       : await VenueRepository.findRecent(5);
 
     const venues = raw.map((venue) => ({
@@ -33,9 +39,14 @@ export async function GET(request: Request) {
       timeZone: venue.timeZone ?? null,
     }));
 
-    return NextResponse.json({ venues });
+    return NextResponse.json(
+      { venues },
+      {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+      }
+    );
   } catch (error) {
     console.error('Failed to fetch venues:', error);
     return NextResponse.json({ error: 'Failed to fetch venues' }, { status: 500 });
   }
-}
+});

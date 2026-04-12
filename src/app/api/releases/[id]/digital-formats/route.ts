@@ -4,8 +4,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { type DigitalFormatType, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /** Convert BigInt values to Number so NextResponse.json() can serialize them. */
 function serializeBigInts<T>(data: T): T {
@@ -19,12 +22,20 @@ function serializeBigInts<T>(data: T): T {
  * Without formatType: returns all active digital formats with downloadable files.
  * With formatType: looks up a single format (with child files) for a given release.
  */
-export async function GET(
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
   try {
     const { id: releaseId } = await context.params;
+
+    if (!isValidObjectId(releaseId)) {
+      return NextResponse.json({ error: 'Invalid release ID' }, { status: 400 });
+    }
+
     const formatType = request.nextUrl.searchParams.get('formatType');
     const repo = new ReleaseDigitalFormatRepository();
 
@@ -38,7 +49,12 @@ export async function GET(
           fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
         }));
 
-      return NextResponse.json({ formats });
+      return NextResponse.json(
+        { formats },
+        {
+          headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+        }
+      );
     }
 
     // Single-format lookup (existing behavior)
@@ -55,9 +71,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ digitalFormat: serializeBigInts(format) });
+    return NextResponse.json(
+      { digitalFormat: serializeBigInts(format) },
+      {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+      }
+    );
   } catch (error) {
     console.error('Digital formats GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

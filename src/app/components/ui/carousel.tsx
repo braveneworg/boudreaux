@@ -14,7 +14,7 @@ import {
 } from 'react';
 
 import useEmblaCarousel, { type UseEmblaCarouselType } from 'embla-carousel-react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -168,7 +168,7 @@ function CarouselContent({ className, ...props }: ComponentProps<'div'>) {
   const { carouselRef, orientation } = useCarousel();
 
   return (
-    <div ref={carouselRef} className="overflow-hidden" data-slot="carousel-content">
+    <div ref={carouselRef} className="overflow-hidden min-w-0 flex-1" data-slot="carousel-content">
       <div
         className={cn('flex', orientation === 'horizontal' ? '' : '-mt-4 flex-col', className)}
         {...props}
@@ -223,7 +223,7 @@ function CarouselItem({ className, onClick, ...props }: ComponentProps<'div'>) {
 
 function CarouselPrevious({
   className,
-  variant = 'outline',
+  variant = 'ghost',
   size = 'icon',
   ...props
 }: ComponentProps<typeof Button>) {
@@ -235,7 +235,7 @@ function CarouselPrevious({
       variant={variant}
       size={size}
       className={cn(
-        'absolute z-15 size-8 rounded-full border border-solid border-zinc-800 shadow-lg bg-zinc-900! opacity-75! text-white',
+        'absolute z-15 size-8 rounded-full text-zinc-950',
         orientation === 'horizontal'
           ? 'top-1/2 left-0 -translate-y-1/2'
           : '-top-12 left-1/2 -translate-x-1/2 rotate-90',
@@ -245,7 +245,7 @@ function CarouselPrevious({
       onClick={scrollPrev}
       {...props}
     >
-      <ArrowLeft />
+      <ChevronLeft />
       <span className="sr-only">Previous slide</span>
     </Button>
   );
@@ -253,7 +253,7 @@ function CarouselPrevious({
 
 function CarouselNext({
   className,
-  variant = 'outline',
+  variant = 'ghost',
   size = 'icon',
   ...props
 }: ComponentProps<typeof Button>) {
@@ -265,7 +265,7 @@ function CarouselNext({
       variant={variant}
       size={size}
       className={cn(
-        'absolute size-8 z-15 rounded-full border border-solid border-zinc-300 shadow-lg bg-zinc-900! opacity-75! text-white',
+        'absolute z-15 size-8 rounded-full text-zinc-950',
         orientation === 'horizontal'
           ? 'top-1/2 right-0 -translate-y-1/2'
           : 'top-1/2 -mt-3 right-4 -translate-y-1/2',
@@ -275,7 +275,7 @@ function CarouselNext({
       onClick={scrollNext}
       {...props}
     >
-      <ArrowRight />
+      <ChevronRight />
       <span className="sr-only">Next slide</span>
     </Button>
   );

@@ -3,11 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { PutObjectCommand, S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { getS3Client } from '@/lib/utils/s3-client';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import { prisma } from '../prisma';
@@ -35,19 +36,6 @@ export interface ImageUploadResult {
   altText?: string;
   sortOrder: number;
 }
-
-/**
- * S3 client configuration
- */
-const getS3Client = () => {
-  return new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
-  });
-};
 
 /**
  * Generate a unique file key for S3

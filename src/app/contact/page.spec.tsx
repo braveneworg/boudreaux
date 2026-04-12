@@ -5,7 +5,6 @@ import React from 'react';
 
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks
 const mockUseSession = vi.hoisted(() => vi.fn());
@@ -43,15 +42,6 @@ vi.mock('@hookform/resolvers/zod', () => ({
     values: resolvedFormData,
     errors: {},
   }),
-}));
-
-// Mock framer-motion
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: function MockMotionDiv({ ref, ...props }: React.ComponentProps<'div'>) {
-      return <div ref={ref} {...props} />;
-    },
-  },
 }));
 
 // Capture TurnstileWidget callbacks to simulate verification

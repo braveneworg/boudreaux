@@ -4,6 +4,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 
 export const dynamic = 'force-dynamic';
@@ -20,9 +22,18 @@ function serializeBigInts<T>(data: T): T {
  *   withReleases – When "true", returns the artist with published releases
  *                  using `getArtistBySlugWithReleases()`.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export const GET = withRateLimit<{ slug: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest, { params }: { params: Promise<{ slug: string }> }) => {
   try {
     const { slug } = await params;
+
+    // Validate slug format: lowercase alphanumeric + hyphens, max 100 chars
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)) {
+      return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
+    }
+
     const withReleases = request.nextUrl.searchParams.get('withReleases') === 'true';
 
     const result = withReleases
@@ -39,9 +50,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(serializeBigInts(result.data));
+    return NextResponse.json(serializeBigInts(result.data), {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    });
   } catch (error) {
     console.error('Artist slug GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

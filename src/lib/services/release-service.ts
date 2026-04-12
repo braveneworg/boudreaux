@@ -453,6 +453,7 @@ export class ReleaseService {
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },
           orderBy: { releasedOn: 'desc' },
+          take: 200,
           include: {
             images: {
               orderBy: { sortOrder: 'asc' },

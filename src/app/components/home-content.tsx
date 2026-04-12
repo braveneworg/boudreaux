@@ -3,18 +3,42 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import nextDynamic from 'next/dynamic';
+
 import { Loader2 } from 'lucide-react';
 
 import { useActiveFeaturedArtistsQuery } from '@/app/hooks/use-active-featured-artists-query';
 import { useBannersQuery } from '@/app/hooks/use-banners-query';
 
-import { ArtistSearchInput } from './artist-search-input';
-import { BannerCarousel } from './banner-carousel';
 import { FeaturedArtistsPlayerClient } from './featured-artists-player-client';
 import { ContentContainer } from './ui/content-container';
 import { Heading } from './ui/heading';
 
 import type { BannerSlotData } from './banner-carousel';
+
+const ArtistSearchInput = nextDynamic(
+  () => import('./artist-search-input').then((mod) => ({ default: mod.ArtistSearchInput })),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        placeholder="search artists..."
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm opacity-50"
+        aria-label="Search artists"
+      />
+    ),
+  }
+);
+
+const BannerCarouselDynamic = nextDynamic(
+  () => import('./banner-carousel').then((mod) => ({ default: mod.BannerCarousel })),
+  {
+    loading: () => (
+      <div className="relative w-full bg-muted animate-pulse" style={{ paddingBottom: '61.8%' }} />
+    ),
+  }
+);
 
 /**
  * Client content wrapper for the home page.
@@ -47,7 +71,7 @@ export const HomeContent = () => {
   return (
     <>
       {banners.length > 0 && (
-        <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
+        <BannerCarouselDynamic banners={banners} rotationInterval={rotationInterval} />
       )}
       <ContentContainer>
         <ArtistSearchInput />

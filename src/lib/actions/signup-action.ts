@@ -37,7 +37,10 @@ export const signupAction = async (
 ): Promise<FormState> => {
   // Get IP address for rate limiting
   const headersList = await headers();
-  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'anonymous';
+  const ip =
+    headersList.get('x-real-ip') ||
+    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'anonymous';
 
   // Check rate limit
   try {
@@ -149,7 +152,7 @@ export const signupAction = async (
   }
 
   if (formState.success) {
-    return redirect(encodeURI(`/success/signup?email=${formState.fields.email}`));
+    return redirect(`/success/signup?email=${encodeURIComponent(formState.fields.email)}`);
   }
 
   return formState;

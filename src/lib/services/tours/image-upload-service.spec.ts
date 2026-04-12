@@ -2,20 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
+import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import type { ImageUploadRequest } from '@/lib/validations/tours/image-schema';
 
 import { ImageUploadService } from './image-upload-service';
 
+vi.mock('server-only', () => ({}));
+
+// Mock shared S3 client
+const { mockSend } = vi.hoisted(() => ({
+  mockSend: vi.fn().mockResolvedValue({}),
+}));
+vi.mock('@/lib/utils/s3-client', () => ({
+  getS3Client: vi.fn(() => ({ send: mockSend })),
+  getS3BucketName: vi.fn(() => 'test-bucket'),
+}));
+
 // Mock AWS SDK
 vi.mock('@aws-sdk/client-s3', () => ({
-  S3Client: vi.fn(function (this: unknown) {
-    // Return empty object - mocked client doesn't need real methods
-    return {};
-  }),
   PutObjectCommand: vi.fn(function (this: unknown, params: unknown) {
     // Store params on the instance for assertions
     Object.assign(this as object, params);
@@ -142,7 +150,9 @@ describe('ImageUploadService', () => {
     });
 
     it('should return error when S3 bucket is not configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.mocked(getS3BucketName).mockImplementationOnce(() => {
+        throw new Error('S3 bucket not configured');
+      });
 
       const result = await ImageUploadService.generatePresignedUploadUrl({
         tourId: 'tour123',
@@ -153,7 +163,7 @@ describe('ImageUploadService', () => {
 
       const error = expectFailure(result);
 
-      expect(error).toContain('S3 bucket not configured');
+      expect(error).toContain('Failed to generate upload URL');
     });
 
     it('should sanitize file names in S3 keys', async () => {
@@ -204,12 +214,7 @@ describe('ImageUploadService', () => {
 
   describe('deleteFromS3', () => {
     it('should delete file from S3 successfully', async () => {
-      const mockSend = vi.fn().mockResolvedValue({});
-      (S3Client as ReturnType<typeof vi.fn>).mockImplementation(function (this: unknown) {
-        return {
-          send: mockSend,
-        };
-      });
+      mockSend.mockResolvedValue({});
 
       const result = await ImageUploadService.deleteFromS3('media/tours/tour123/poster-123456.jpg');
 
@@ -222,12 +227,7 @@ describe('ImageUploadService', () => {
     });
 
     it('should handle S3 deletion errors gracefully', async () => {
-      const mockSend = vi.fn().mockRejectedValue(new Error('S3 delete failed'));
-      (S3Client as ReturnType<typeof vi.fn>).mockImplementation(function (this: unknown) {
-        return {
-          send: mockSend,
-        };
-      });
+      mockSend.mockRejectedValue(new Error('S3 delete failed'));
 
       const result = await ImageUploadService.deleteFromS3('media/tours/tour123/poster-123456.jpg');
 
@@ -237,13 +237,15 @@ describe('ImageUploadService', () => {
     });
 
     it('should return error when S3 bucket is not configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.mocked(getS3BucketName).mockImplementationOnce(() => {
+        throw new Error('S3 bucket not configured');
+      });
 
       const result = await ImageUploadService.deleteFromS3('media/tours/tour123/poster-123456.jpg');
 
       const error = expectFailure(result);
 
-      expect(error).toContain('S3 bucket not configured');
+      expect(error).toContain('Failed to delete file from S3');
     });
   });
 
@@ -372,7 +374,9 @@ describe('ImageUploadService', () => {
     });
 
     it('should return error when S3 bucket is not configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.mocked(getS3BucketName).mockImplementationOnce(() => {
+        throw new Error('S3 bucket not configured');
+      });
 
       const result = await ImageUploadService.generateTourDatePresignedUploadUrl({
         tourDateId: 'tourdate123',
@@ -383,7 +387,7 @@ describe('ImageUploadService', () => {
 
       expect(result.success).toBe(false);
       if (result.success) throw new Error('Expected failure');
-      expect(result.error).toContain('S3 bucket not configured');
+      expect(result.error).toContain('Failed to generate upload URL');
     });
 
     it('should reject files that are too large', async () => {
@@ -519,9 +523,9 @@ describe('ImageUploadService', () => {
 
   describe('getS3Client fallback branches', () => {
     it('should return error when AWS credentials are missing', async () => {
-      delete process.env.AWS_REGION;
-      delete process.env.AWS_ACCESS_KEY_ID;
-      delete process.env.AWS_SECRET_ACCESS_KEY;
+      vi.mocked(getS3Client).mockImplementationOnce(() => {
+        throw new Error('AWS credentials not configured');
+      });
 
       const result = await ImageUploadService.generatePresignedUploadUrl({
         tourId: 'tour123',
@@ -553,14 +557,14 @@ describe('ImageUploadService', () => {
   });
 
   describe('generateCdnUrl - env var fallbacks', () => {
-    it('should use fallback values when env vars are missing', () => {
+    it('should use S3 direct URL with bucket name when CDN domain is not set', () => {
       delete process.env.CDN_DOMAIN;
-      delete process.env.S3_BUCKET;
-      delete process.env.AWS_REGION;
 
       const result = ImageUploadService.generateCdnUrl('media/tours/tour123/poster.jpg');
 
-      expect(result).toBe('https://.s3.us-east-1.amazonaws.com/media/tours/tour123/poster.jpg');
+      expect(result).toBe(
+        'https://test-bucket.s3.us-east-1.amazonaws.com/media/tours/tour123/poster.jpg'
+      );
     });
   });
 

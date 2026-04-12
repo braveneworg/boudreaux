@@ -4,14 +4,20 @@
 
 import { useCallback, useMemo } from 'react';
 
+import nextDynamic from 'next/dynamic';
+
 import { Share2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { FeaturedArtist } from '@/lib/types/media-models';
 import { getDisplayName } from '@/lib/utils/get-display-name';
 
-import { SocialShareWidget } from './social-share-widget';
 import { Separator } from './ui/separator';
+
+const SocialShareWidget = nextDynamic(
+  () => import('./social-share-widget').then((mod) => ({ default: mod.SocialShareWidget })),
+  { ssr: false }
+);
 
 const hasErrorName = (error: unknown): error is { name: string } => {
   return (

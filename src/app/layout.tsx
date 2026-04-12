@@ -1,18 +1,27 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Jost } from 'next/font/google';
 import { headers } from 'next/headers';
 import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
 
 import Footer from './components/footer/footer';
-import Header from './components/header/header';
+import { Header } from './components/header/header';
 import { Providers } from './components/providers';
 
 import type { Metadata } from 'next';
 
 import './globals.css';
+
+const jost = Jost({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-jost',
+  display: 'swap',
+});
 
 // Server-side environment validation on startup
 /* v8 ignore next 5 -- module-level server-only code; window is always defined in jsdom test env */
@@ -66,9 +75,11 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
+        <link rel="preconnect" href="https://js.stripe.com" />
+        <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>
       <body
-        className="antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full"
+        className={`${jost.className} antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full`}
         suppressHydrationWarning
       >
         <Providers>

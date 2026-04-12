@@ -6,20 +6,10 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ContactForm from '@/app/components/forms/contact-form';
 import type { FormState } from '@/lib/types/form-state';
 import type { ContactFormSchemaType } from '@/lib/validation/contact-schema';
-
-// Mock framer-motion to avoid animation issues in tests
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: function MockMotionDiv({ ref, ...props }: React.ComponentProps<'div'>) {
-      return <div ref={ref} {...props} />;
-    },
-  },
-}));
 
 // Mock TurnstileWidget
 const mockTurnstileWidget = vi.fn();

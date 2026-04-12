@@ -10,6 +10,14 @@ import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
 
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  downloadLimiter: { check: vi.fn().mockResolvedValue(undefined) },
+  DOWNLOAD_LIMIT: 10,
+}));
+
 const mockGetToken = vi.fn();
 vi.mock('next-auth/jwt', () => ({
   getToken: (...args: unknown[]) => mockGetToken(...args),
@@ -75,7 +83,7 @@ vi.mock('archiver', () => ({
 
 function makeRequest(formats = 'FLAC,WAV'): NextRequest {
   return new NextRequest(
-    `http://localhost:3000/api/releases/release-1/download/bundle?formats=${formats}`,
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}`,
     {
       headers: {
         'x-forwarded-for': '127.0.0.1',
@@ -85,7 +93,7 @@ function makeRequest(formats = 'FLAC,WAV'): NextRequest {
   );
 }
 
-function makeParams(id = 'release-1') {
+function makeParams(id = '507f1f77bcf86cd799439011') {
   return { params: Promise.resolve({ id }) };
 }
 
@@ -95,7 +103,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     mockGetToken.mockResolvedValue({ sub: 'user-123' });
     mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
     mockGetDownloadRecord.mockResolvedValue({ downloadCount: 1 });
-    mockPrismaReleaseFindFirst.mockResolvedValue({ id: 'release-1', title: 'Test Album' });
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
     mockUpsertDownloadCount.mockResolvedValue(undefined);
     mockLogDownloadEvent.mockResolvedValue(undefined);
 
@@ -244,7 +255,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     await GET(makeRequest(), makeParams());
 
     expect(mockUpsertDownloadCount).toHaveBeenCalledTimes(1);
-    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', 'release-1');
+    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
   });
 
   it('should log download events per format', async () => {
@@ -278,7 +289,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
   it('should sanitize release title in filename', async () => {
     mockPrismaReleaseFindFirst.mockResolvedValue({
-      id: 'release-1',
+      id: '507f1f77bcf86cd799439011',
       title: 'Album (Special Edition) [Deluxe]',
     });
 
@@ -293,7 +304,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
   it('should use fallback filename when title sanitizes to empty', async () => {
     mockPrismaReleaseFindFirst.mockResolvedValue({
-      id: 'release-1',
+      id: '507f1f77bcf86cd799439011',
       title: '!!!???',
     });
 
@@ -305,7 +316,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
   it('should use fallback values when headers are missing', async () => {
     const req = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/download/bundle?formats=FLAC'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC'
     );
 
     await GET(req, makeParams());
@@ -374,12 +385,15 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
   it('should use fallback error message when parse issues have no message', async () => {
     // Request with no formats param at all to trigger validation failure
-    const req = new NextRequest('http://localhost:3000/api/releases/release-1/download/bundle', {
-      headers: {
-        'x-forwarded-for': '127.0.0.1',
-        'user-agent': 'test-agent',
-      },
-    });
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle',
+      {
+        headers: {
+          'x-forwarded-for': '127.0.0.1',
+          'user-agent': 'test-agent',
+        },
+      }
+    );
 
     const response = await GET(req, makeParams());
     const body = await response.json();

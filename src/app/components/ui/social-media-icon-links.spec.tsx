@@ -50,14 +50,13 @@ describe('SocialMediaIconLinks', () => {
       expect(screen.getByTestId(testId)).toHaveAttribute('title', label);
     });
 
-    it('renders images with alt text for all links', () => {
+    it('renders inline SVG icons for all links', () => {
       render(<SocialMediaIconLinks className="" />);
 
-      const images = screen.getAllByRole('img');
-      expect(images).toHaveLength(7);
-
-      SOCIAL_LINKS.forEach(({ label }) => {
-        expect(screen.getByAltText(label)).toBeInTheDocument();
+      const links = screen.getAllByRole('link');
+      links.forEach((link) => {
+        const svg = link.querySelector('svg');
+        expect(svg).toBeInTheDocument();
       });
     });
 

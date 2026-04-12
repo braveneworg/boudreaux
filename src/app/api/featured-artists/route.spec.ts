@@ -12,6 +12,18 @@ import { auth } from '../../../../auth';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
+// Mock rate limiting to pass through
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  withRateLimit:
+    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+      handler(req, ctx),
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  publicLimiter: {},
+  PUBLIC_LIMIT: 100,
+}));
+
 // Mock withAdmin decorator to bypass auth in tests
 vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: (handler: (request: Request) => Promise<Response>) =>
@@ -54,6 +66,8 @@ describe('Featured Artists API Routes', () => {
     release: null,
   };
 
+  const dummyContext = { params: Promise.resolve({}) };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -63,7 +77,7 @@ describe('Featured Artists API Routes', () => {
       vi.mocked(auth).mockResolvedValueOnce(null as never);
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -77,7 +91,7 @@ describe('Featured Artists API Routes', () => {
       } as never);
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -93,7 +107,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -111,7 +125,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Cache-Control')).toBe('private, no-store');
@@ -124,7 +138,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists?skip=10&take=5');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
@@ -140,7 +154,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists?search=featured');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
@@ -155,7 +169,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists?take=500');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
@@ -170,7 +184,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists?skip=-5');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.getAllFeaturedArtists).toHaveBeenCalledWith({
@@ -189,7 +203,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -204,7 +218,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -221,7 +235,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -235,7 +249,7 @@ describe('Featured Artists API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -250,7 +264,7 @@ describe('Featured Artists API Routes', () => {
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
-        const response = await GET(request);
+        const response = await GET(request, dummyContext);
         const data = await response.json();
 
         expect(response.status).toBe(200);
@@ -272,7 +286,7 @@ describe('Featured Artists API Routes', () => {
         const request = new NextRequest(
           'http://localhost:3000/api/featured-artists?active=true&limit=7'
         );
-        await GET(request);
+        await GET(request, dummyContext);
 
         expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 7);
       });
@@ -286,7 +300,7 @@ describe('Featured Artists API Routes', () => {
         const request = new NextRequest(
           'http://localhost:3000/api/featured-artists?active=true&limit=500'
         );
-        await GET(request);
+        await GET(request, dummyContext);
 
         expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(
           expect.any(Date),
@@ -303,7 +317,7 @@ describe('Featured Artists API Routes', () => {
         const request = new NextRequest(
           'http://localhost:3000/api/featured-artists?active=true&limit=-5'
         );
-        await GET(request);
+        await GET(request, dummyContext);
 
         expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 1);
       });
@@ -315,7 +329,7 @@ describe('Featured Artists API Routes', () => {
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
-        const response = await GET(request);
+        const response = await GET(request, dummyContext);
 
         expect(response.headers.get('Cache-Control')).toBe(
           'public, s-maxage=60, stale-while-revalidate=300'
@@ -329,7 +343,7 @@ describe('Featured Artists API Routes', () => {
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
-        const response = await GET(request);
+        const response = await GET(request, dummyContext);
 
         expect(response.status).toBe(503);
       });
@@ -341,7 +355,7 @@ describe('Featured Artists API Routes', () => {
         });
 
         const request = new NextRequest('http://localhost:3000/api/featured-artists?active=true');
-        const response = await GET(request);
+        const response = await GET(request, dummyContext);
         const data = await response.json();
 
         expect(response.status).toBe(500);
@@ -435,7 +449,7 @@ describe('Featured Artists API Routes', () => {
       );
 
       const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);

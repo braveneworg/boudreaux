@@ -104,7 +104,7 @@ export const ArtistSearchInput = () => {
   return (
     <Popover open={open && showDropdown} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
-        <div className="relative w-full px-2" role="group">
+        <div className="relative w-full" role="group">
           <Search className="text-muted-foreground pointer-events-none absolute left-5 top-1/2 size-4 -translate-y-1/2" />
           <input
             type="search"

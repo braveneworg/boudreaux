@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { motion } from 'framer-motion';
-
 export interface HamburgerPattyProps {
   isOpen?: boolean;
   /**
@@ -57,15 +55,18 @@ export default function HamburgerPatty({
   opacityOpen = 1,
   opacityClosed = 1,
 }: HamburgerPattyProps) {
+  const rotate = isOpen ? rotateOpen : rotateClosed;
+  const y = isOpen ? 0 : yOffset;
+  const opacity = isOpen ? opacityOpen : opacityClosed;
+
   return (
-    <motion.span
+    <span
       className={`absolute ${width} ${height} ${bgColor} pointer-events-none`}
-      animate={{
-        rotate: isOpen ? rotateOpen : rotateClosed,
-        y: isOpen ? 0 : yOffset,
-        opacity: isOpen ? opacityOpen : opacityClosed,
+      style={{
+        transform: `translateY(${y}px) rotate(${rotate}deg)`,
+        opacity,
+        transition: `transform ${duration}s ease, opacity ${duration}s ease`,
       }}
-      transition={{ duration }}
     />
   );
 }

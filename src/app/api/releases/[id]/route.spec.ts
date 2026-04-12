@@ -27,7 +27,7 @@ vi.mock('@/lib/services/release-service', () => ({
 
 describe('Release by ID API Routes', () => {
   const mockRelease = {
-    id: 'release-123',
+    id: '507f1f77bcf86cd799439011',
     title: 'Test Album',
     labels: ['Test Label'],
     releasedOn: new Date('2024-01-15').toISOString(),
@@ -79,13 +79,15 @@ describe('Release by ID API Routes', () => {
         data: mockRelease as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123');
-      const response = await GET(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockRelease);
-      expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('release-123');
+      expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
     it('should return 404 when release not found', async () => {
@@ -94,8 +96,10 @@ describe('Release by ID API Routes', () => {
         error: 'Release not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/non-existent');
-      const response = await GET(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439012'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -108,8 +112,10 @@ describe('Release by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123');
-      const response = await GET(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -122,8 +128,10 @@ describe('Release by ID API Routes', () => {
         error: 'Failed to retrieve release',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123');
-      const response = await GET(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -133,8 +141,10 @@ describe('Release by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ReleaseService.getReleaseById).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123');
-      const response = await GET(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -150,14 +160,16 @@ describe('Release by ID API Routes', () => {
         });
 
         const request = new NextRequest(
-          'http://localhost:3000/api/releases/release-123?withTracks=true'
+          'http://localhost:3000/api/releases/507f1f77bcf86cd799439011?withTracks=true'
         );
-        const response = await GET(request, createParams('release-123'));
+        const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
         const data = await response.json();
 
         expect(response.status).toBe(200);
         expect(data.releaseTracks).toHaveLength(1);
-        expect(ReleaseService.getReleaseWithTracks).toHaveBeenCalledWith('release-123');
+        expect(ReleaseService.getReleaseWithTracks).toHaveBeenCalledWith(
+          '507f1f77bcf86cd799439011'
+        );
         expect(ReleaseService.getReleaseById).not.toHaveBeenCalled();
       });
 
@@ -167,10 +179,12 @@ describe('Release by ID API Routes', () => {
           data: mockRelease as never,
         });
 
-        const request = new NextRequest('http://localhost:3000/api/releases/release-123');
-        await GET(request, createParams('release-123'));
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+        );
+        await GET(request, createParams('507f1f77bcf86cd799439011'));
 
-        expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('release-123');
+        expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
         expect(ReleaseService.getReleaseWithTracks).not.toHaveBeenCalled();
       });
 
@@ -181,9 +195,9 @@ describe('Release by ID API Routes', () => {
         });
 
         const request = new NextRequest(
-          'http://localhost:3000/api/releases/no-exist?withTracks=true'
+          'http://localhost:3000/api/releases/507f1f77bcf86cd799439012?withTracks=true'
         );
-        const response = await GET(request, createParams('no-exist'));
+        const response = await GET(request, createParams('507f1f77bcf86cd799439012'));
 
         expect(response.status).toBe(404);
       });
@@ -198,16 +212,19 @@ describe('Release by ID API Routes', () => {
         data: updatedRelease as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Updated Album' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Updated Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(updatedRelease);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('release-123', {
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         title: 'Updated Album',
       });
     });
@@ -218,11 +235,14 @@ describe('Release by ID API Routes', () => {
         error: 'Release not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/non-existent', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Updated Album' }),
-      });
-      const response = await PATCH(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439012',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Updated Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -235,11 +255,14 @@ describe('Release by ID API Routes', () => {
         error: 'Release with this title already exists',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Existing Album' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Existing Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(409);
@@ -252,11 +275,14 @@ describe('Release by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Updated Album' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Updated Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -269,11 +295,14 @@ describe('Release by ID API Routes', () => {
         error: 'Failed to update release',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Updated Album' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Updated Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -283,11 +312,14 @@ describe('Release by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ReleaseService.updateRelease).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ title: 'Updated Album' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Updated Album' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -300,14 +332,17 @@ describe('Release by ID API Routes', () => {
         data: { ...mockRelease, description: 'Updated description' } as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ description: 'Updated description' }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ description: 'Updated description' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('release-123', {
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         description: 'Updated description',
       });
     });
@@ -319,14 +354,17 @@ describe('Release by ID API Routes', () => {
         data: { ...mockRelease, publishedAt: publishDate } as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'PATCH',
-        body: JSON.stringify({ publishedAt: publishDate }),
-      });
-      const response = await PATCH(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ publishedAt: publishDate }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('release-123', {
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         publishedAt: publishDate,
       });
     });
@@ -339,15 +377,18 @@ describe('Release by ID API Routes', () => {
         data: mockRelease as never,
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ message: 'Release deleted successfully' });
-      expect(ReleaseService.deleteRelease).toHaveBeenCalledWith('release-123');
+      expect(ReleaseService.deleteRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
     it('should return 404 when release not found', async () => {
@@ -356,10 +397,13 @@ describe('Release by ID API Routes', () => {
         error: 'Release not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/non-existent', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439012',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -372,10 +416,13 @@ describe('Release by ID API Routes', () => {
         error: 'Database unavailable',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -388,10 +435,13 @@ describe('Release by ID API Routes', () => {
         error: 'Failed to delete release',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -401,10 +451,13 @@ describe('Release by ID API Routes', () => {
     it('should return 500 when an exception is thrown', async () => {
       vi.mocked(ReleaseService.deleteRelease).mockRejectedValue(Error('Unexpected error'));
 
-      const request = new NextRequest('http://localhost:3000/api/releases/release-123', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('release-123'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);

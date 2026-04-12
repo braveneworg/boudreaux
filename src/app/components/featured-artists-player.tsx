@@ -5,6 +5,8 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
+import nextDynamic from 'next/dynamic';
+
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
@@ -12,7 +14,12 @@ import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-di
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 import { ArtistReleaseInfo } from './artist-release-info';
-import { DownloadDialog, DownloadTriggerButton } from './download-dialog';
+import { DownloadTriggerButton } from './download-trigger-button';
+
+const DownloadDialog = nextDynamic(
+  () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
+  { ssr: false }
+);
 
 interface FeaturedArtistsPlayerProps {
   featuredArtists: FeaturedArtist[];
@@ -212,7 +219,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     : '';
 
   return (
-    <MediaPlayer className="mx-2 mb-2">
+    <MediaPlayer className="mx-0 mb-2">
       <div className="space-y-2 mt-0">
         {/* Featured Artists Carousel */}
         {displayableArtists.length >= 3 && (

@@ -8,6 +8,19 @@ import { BannerNotificationService } from '@/lib/services/banner-notification-se
 import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
+
+// Mock rate limiting to pass through
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  withRateLimit:
+    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+      handler(req, ctx),
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  publicLimiter: {},
+  PUBLIC_LIMIT: 100,
+}));
+
 vi.mock('@/lib/services/banner-notification-service', () => ({
   BannerNotificationService: {
     getActiveBanners: vi.fn(),
@@ -16,6 +29,8 @@ vi.mock('@/lib/services/banner-notification-service', () => ({
 }));
 
 describe('GET /api/notification-banners', () => {
+  const dummyContext = { params: Promise.resolve({}) };
+
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -35,7 +50,7 @@ describe('GET /api/notification-banners', () => {
     } as never);
 
     const request = new NextRequest('http://localhost:3000/api/notification-banners');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(BannerNotificationService.getActiveBanners).toHaveBeenCalled();
@@ -50,7 +65,7 @@ describe('GET /api/notification-banners', () => {
     } as never);
 
     const request = new NextRequest('http://localhost:3000/api/notification-banners');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -69,7 +84,7 @@ describe('GET /api/notification-banners', () => {
     } as never);
 
     const request = new NextRequest('http://localhost:3000/api/notification-banners');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const data = await response.json();
 
     expect(data).toEqual(mockResponse);
@@ -94,7 +109,7 @@ describe('GET /api/notification-banners', () => {
       } as never);
 
       const request = new NextRequest('http://localhost:3000/api/notification-banners?all=true');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -113,7 +128,7 @@ describe('GET /api/notification-banners', () => {
       } as never);
 
       const request = new NextRequest('http://localhost:3000/api/notification-banners?all=true');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);

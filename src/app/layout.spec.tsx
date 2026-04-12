@@ -7,8 +7,9 @@ import RootLayout, { metadata, viewport } from './layout';
 
 // Mock next/font/google
 vi.mock('next/font/google', () => ({
-  Dawning_of_a_New_Day: () => ({
-    variable: '--font-dawning-of-a-new-day',
+  Jost: () => ({
+    variable: '--font-jost',
+    className: 'font-jost',
   }),
 }));
 
@@ -37,7 +38,7 @@ vi.mock('./globals.css', () => ({}));
 
 // Mock child components
 vi.mock('./components/header/header', () => ({
-  default: ({ isMobile }: { isMobile: boolean }) => (
+  Header: ({ isMobile }: { isMobile: boolean }) => (
     <div data-testid="header" data-is-mobile={String(isMobile)}>
       Header
     </div>

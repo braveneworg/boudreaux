@@ -4,10 +4,11 @@
 
 import 'server-only';
 
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
+import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import {
   MAX_FILE_SIZE,
   SUPPORTED_IMAGE_TYPES,
@@ -15,21 +16,6 @@ import {
   type PresignedUrlResponse,
 } from '@/lib/validations/tours/image-schema';
 import type { TourDateImageUploadRequest } from '@/lib/validations/tours/tour-date-image-schema';
-
-/**
- * Get configured S3 client
- */
-const getS3Client = (): S3Client => {
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error('AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are required');
-  }
-  return new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: { accessKeyId, secretAccessKey },
-  });
-};
 
 /**
  * Service for handling tour image uploads to S3
@@ -79,7 +65,6 @@ export class ImageUploadService {
    * Generate CDN URL from S3 key
    */
   static generateCdnUrl(s3Key: string): string {
-    const s3Bucket = process.env.S3_BUCKET || '';
     const cdnDomainRaw = process.env.CDN_DOMAIN || '';
     const awsRegion = process.env.AWS_REGION || 'us-east-1';
 
@@ -91,6 +76,7 @@ export class ImageUploadService {
     }
 
     // Fallback to S3 direct URL
+    const s3Bucket = getS3BucketName();
     return `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
   }
 
@@ -129,11 +115,7 @@ export class ImageUploadService {
     request: ImageUploadRequest
   ): Promise<ServiceResponse<PresignedUrlResponse>> {
     try {
-      const s3Bucket = process.env.S3_BUCKET;
-
-      if (!s3Bucket) {
-        return { success: false, error: 'S3 bucket not configured' };
-      }
+      const s3Bucket = getS3BucketName();
 
       // Validate file
       const validation = this.validateImageFile(request.mimeType, request.fileSize);
@@ -149,6 +131,7 @@ export class ImageUploadService {
         Bucket: s3Bucket,
         Key: s3Key,
         ContentType: request.mimeType,
+        ContentLength: request.fileSize,
         CacheControl: 'public, max-age=31536000, immutable',
         Metadata: {
           tourId: request.tourId,
@@ -184,11 +167,7 @@ export class ImageUploadService {
     request: TourDateImageUploadRequest
   ): Promise<ServiceResponse<PresignedUrlResponse>> {
     try {
-      const s3Bucket = process.env.S3_BUCKET;
-
-      if (!s3Bucket) {
-        return { success: false, error: 'S3 bucket not configured' };
-      }
+      const s3Bucket = getS3BucketName();
 
       // Validate file
       const validation = this.validateImageFile(request.mimeType, request.fileSize);
@@ -204,6 +183,7 @@ export class ImageUploadService {
         Bucket: s3Bucket,
         Key: s3Key,
         ContentType: request.mimeType,
+        ContentLength: request.fileSize,
         CacheControl: 'public, max-age=31536000, immutable',
         Metadata: {
           tourDateId: request.tourDateId,
@@ -236,11 +216,7 @@ export class ImageUploadService {
    */
   static async deleteFromS3(s3Key: string): Promise<ServiceResponse<void>> {
     try {
-      const s3Bucket = process.env.S3_BUCKET;
-
-      if (!s3Bucket) {
-        return { success: false, error: 'S3 bucket not configured' };
-      }
+      const s3Bucket = getS3BucketName();
 
       const s3Client = getS3Client();
       const deleteCommand = new DeleteObjectCommand({

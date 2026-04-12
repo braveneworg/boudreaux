@@ -10,6 +10,11 @@ import { auth } from '../../../../../auth';
  * SECURITY: Requires admin authentication - session data should not be publicly accessible.
  */
 export const GET = async () => {
+  // Debug endpoints are disabled in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     const session = await auth();
 
@@ -32,11 +37,11 @@ export const GET = async () => {
       userEmail: session?.user?.email,
       userRole: session?.user?.role,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         error: 'Failed to get session',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: 'An unexpected error occurred.',
       },
       { status: 500 }
     );

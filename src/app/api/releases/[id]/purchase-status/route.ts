@@ -4,6 +4,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { POLLING_LIMIT, pollingLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +19,10 @@ export const dynamic = 'force-dynamic';
  * Returns: { confirmed: boolean }
  * Cache-Control: no-store
  */
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(
+  pollingLimiter,
+  POLLING_LIMIT
+)(async (request: NextRequest) => {
   const { searchParams } = request.nextUrl;
   const sessionId = searchParams.get('sessionId');
 
@@ -28,10 +33,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Validate Stripe checkout session ID format (cs_test_ or cs_live_ prefix)
+  if (!/^cs_(test|live)_[a-zA-Z0-9]+$/.test(sessionId)) {
+    return NextResponse.json(
+      { error: 'invalid_session_id' },
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   const purchase = await PurchaseRepository.findBySessionId(sessionId);
 
   return NextResponse.json(
     { confirmed: purchase !== null },
     { headers: { 'Cache-Control': 'no-store' } }
   );
-}
+});

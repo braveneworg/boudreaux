@@ -13,6 +13,18 @@ vi.mock('@/lib/services/artist-service', () => ({
   },
 }));
 
+// Mock rate limiting to pass through
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  withRateLimit:
+    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+      handler(req, ctx),
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  searchLimiter: {},
+  SEARCH_LIMIT: 30,
+}));
+
 vi.mock('@/lib/utils/get-artist-display-name', () => ({
   getArtistDisplayName: (artist: {
     displayName?: string | null;
@@ -24,6 +36,8 @@ vi.mock('@/lib/utils/get-artist-display-name', () => ({
 const createRequest = (query: string): NextRequest =>
   new NextRequest(new URL(`http://localhost/api/artists/search?q=${encodeURIComponent(query)}`));
 
+const dummyContext = { params: Promise.resolve({}) };
+
 describe('GET /api/artists/search', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,7 +45,7 @@ describe('GET /api/artists/search', () => {
 
   it('should return empty results when query is shorter than 3 characters', async () => {
     const request = createRequest('ab');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body).toEqual({ results: [] });
@@ -40,7 +54,7 @@ describe('GET /api/artists/search', () => {
 
   it('should return empty results when query is empty', async () => {
     const request = new NextRequest(new URL('http://localhost/api/artists/search'));
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body).toEqual({ results: [] });
@@ -53,7 +67,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('test');
-    await GET(request);
+    await GET(request, dummyContext);
 
     expect(ArtistService.searchPublishedArtists).toHaveBeenCalledWith({
       search: 'test',
@@ -89,7 +103,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results).toHaveLength(1);
@@ -137,7 +151,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].releases).toHaveLength(1);
@@ -180,7 +194,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].releases).toHaveLength(1);
@@ -206,7 +220,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].thumbnailSrc).toBeNull();
@@ -219,7 +233,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('test');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(500);
     const body = await response.json();
@@ -233,7 +247,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('test');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(503);
     const body = await response.json();
@@ -246,7 +260,7 @@ describe('GET /api/artists/search', () => {
     );
 
     const request = createRequest('test');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(500);
     const body = await response.json();
@@ -272,7 +286,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].releases).toEqual([]);
@@ -306,7 +320,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('art');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results).toHaveLength(2);
@@ -350,7 +364,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].releases).toHaveLength(1);
@@ -385,7 +399,7 @@ describe('GET /api/artists/search', () => {
     });
 
     const request = createRequest('john');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
     const body = await response.json();
 
     expect(body.results[0].releases).toHaveLength(1);
@@ -415,17 +429,20 @@ describe('GET /api/artists/search', () => {
       });
 
       const request = createFullRequest('john');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const body = await response.json();
 
       expect(response.status).toBe(200);
       expect(body).toEqual({ artists: mockArtists });
-      expect(ArtistService.searchPublishedArtists).toHaveBeenCalledWith({ search: 'john' });
+      expect(ArtistService.searchPublishedArtists).toHaveBeenCalledWith({
+        search: 'john',
+        take: 50,
+      });
     });
 
     it('should return empty artists array when query is empty and format=full', async () => {
       const request = new NextRequest(new URL('http://localhost/api/artists/search?format=full'));
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -440,7 +457,7 @@ describe('GET /api/artists/search', () => {
       });
 
       const request = createFullRequest('test');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(503);
     });
@@ -452,7 +469,7 @@ describe('GET /api/artists/search', () => {
       });
 
       const request = createFullRequest('test');
-      const response = await GET(request);
+      const response = await GET(request, dummyContext);
 
       expect(response.status).toBe(500);
     });

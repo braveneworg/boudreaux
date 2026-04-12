@@ -6,9 +6,12 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import { validateBody } from '@/lib/utils/validate-request';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
@@ -19,9 +22,16 @@ export const dynamic = 'force-dynamic';
  * GET /api/artist/[id]
  * Get a single artist by ID
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await params;
+
+    if (!isValidObjectId(id)) {
+      return NextResponse.json({ error: 'Invalid artist ID' }, { status: 400 });
+    }
 
     const result = await ArtistService.getArtistById(id);
 
@@ -35,12 +45,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(result.data, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    });
   } catch (error) {
-    console.error('Artist GET error:', error);
+    console.error('Artist GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * PUT /api/artist/[id]

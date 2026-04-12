@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { motion } from 'framer-motion';
-
 import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
 
 import SocialMediaIconLinks from './social-media-icon-links';
@@ -55,11 +53,14 @@ export default function HamburgerMenuSheet({
           <SocialMediaIconLinks className="pt-2 justify-center" />
           <ul className="-mt-4">
             {menuItems.map((item, index) => (
-              <motion.li
+              <li
                 key={item.name}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
+                className="menu-item-stagger"
+                style={{
+                  opacity: isOpen ? 1 : 0,
+                  transform: isOpen ? 'translateX(0)' : 'translateX(20px)',
+                  transition: `opacity 0.3s ease ${index * 0.1}s, transform 0.3s ease ${index * 0.1}s`,
+                }}
               >
                 <a
                   href={item.href}
@@ -72,7 +73,7 @@ export default function HamburgerMenuSheet({
                 >
                   {item.name}
                 </a>
-              </motion.li>
+              </li>
             ))}
           </ul>
         </nav>

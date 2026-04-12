@@ -4,7 +4,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,13 +15,26 @@ export const dynamic = 'force-dynamic';
  * GET /api/releases/[id]/related?artistId=...
  * Returns other published releases by the same artist, excluding the current release.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await params;
+
+    if (!isValidObjectId(id)) {
+      return NextResponse.json({ error: 'Invalid release ID' }, { status: 400 });
+    }
+
     const artistId = request.nextUrl.searchParams.get('artistId');
 
     if (!artistId) {
-      return NextResponse.json({ releases: [] });
+      return NextResponse.json(
+        { releases: [] },
+        {
+          headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+        }
+      );
     }
 
     const result = await ReleaseService.getArtistOtherReleases(artistId, id);
@@ -30,9 +46,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    return NextResponse.json({ releases: result.data });
+    return NextResponse.json(
+      { releases: result.data },
+      {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+      }
+    );
   } catch (error) {
     console.error('Related releases GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

@@ -12,7 +12,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
+import nextDynamic from 'next/dynamic';
+
+import { DownloadTriggerButton } from '@/app/components/download-trigger-button';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
@@ -20,6 +22,11 @@ import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
+
+const DownloadDialog = nextDynamic(
+  () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
+  { ssr: false }
+);
 
 interface AvailableFormat {
   formatType: DigitalFormatType;

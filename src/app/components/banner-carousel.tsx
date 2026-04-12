@@ -7,13 +7,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion';
-
 import { DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
 import { cloudfrontLoader } from '@/lib/utils/cloudfront-loader';
 import { isDarkColor } from '@/lib/utils/color';
-import { addLinkAttributes } from '@/lib/validation/banner-notification-schema';
+import {
+  addLinkAttributes,
+  sanitizeNotificationHtml,
+} from '@/lib/validation/banner-notification-schema';
 
 export interface BannerSlotData {
   slotNumber: number;
@@ -34,25 +35,11 @@ interface BannerCarouselProps {
 
 const SWIPE_THRESHOLD = 50;
 const VELOCITY_THRESHOLD = 500;
-
-const SLIDE_TRANSITION = {
-  type: 'tween' as const,
-  duration: 0.4,
-  ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
-};
-
-/** Notification strip slides opposite to banner direction */
-const stripVariants = {
-  enter: (dir: number) => ({ x: `${dir * -100}%` }),
-  center: { x: '0%' },
-  exit: (dir: number) => ({ x: `${dir * 100}%` }),
-};
+const TRANSITION_DURATION = 400; // ms — matches CSS transition
 
 /**
  * BannerCarousel displays rotating banner images with optional notification
- * strips. Uses a single-track approach: prev/current/next slides live in one
- * container driven by a shared MotionValue, guaranteeing zero gap between
- * slides during transitions and swipes.
+ * strips. Uses CSS transitions and pointer events — zero framer-motion.
  */
 export function BannerCarousel({
   banners,
@@ -62,24 +49,52 @@ export function BannerCarousel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isTabVisible, setIsTabVisible] = useState(true);
+  const [stripVisible, setStripVisible] = useState(true);
   const currentIndexRef = useRef(0);
   const isAnimatingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const totalSlides = banners.length;
 
-  /** Single motion value drives ALL slides — zero gap guaranteed */
-  const trackX = useMotionValue(0);
+  // Pointer tracking refs for drag/swipe
+  const pointerStartXRef = useRef(0);
+  const pointerStartTimeRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const currentDragXRef = useRef(0);
+
+  /** Apply a CSS transition to the track and move it */
+  const animateTrack = useCallback((targetX: number, onComplete: () => void) => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    track.style.transition = `transform ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    track.style.transform = `translateX(${targetX}px)`;
+
+    const handleEnd = () => {
+      track.removeEventListener('transitionend', handleEnd);
+      onComplete();
+    };
+    track.addEventListener('transitionend', handleEnd);
+  }, []);
+
+  /** Reset track position instantly (no transition) */
+  const resetTrack = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0px)';
+  }, []);
 
   /** Finish a slide transition: update index and reset track position */
   const completeTransition = useCallback(
     (toIndex: number) => {
       currentIndexRef.current = toIndex;
       setCurrentIndex(toIndex);
-      trackX.jump(0);
+      resetTrack();
       isAnimatingRef.current = false;
     },
-    [trackX]
+    [resetTrack]
   );
 
   /** Animate the track to show a specific adjacent slide */
@@ -89,12 +104,9 @@ export function BannerCarousel({
       isAnimatingRef.current = true;
       setDirection(dir);
       const width = containerRef.current?.offsetWidth ?? 0;
-      animate(trackX, -dir * width, {
-        ...SLIDE_TRANSITION,
-        onComplete: () => completeTransition(toIndex),
-      });
+      animateTrack(-dir * width, () => completeTransition(toIndex));
     },
-    [totalSlides, trackX, completeTransition]
+    [totalSlides, animateTrack, completeTransition]
   );
 
   const goToNext = useCallback(() => {
@@ -114,7 +126,7 @@ export function BannerCarousel({
     timerRef.current = setInterval(goToNext, rotationInterval * 1000);
   }, [goToNext, rotationInterval, totalSlides]);
 
-  // Auto-rotation timer — FR-003, FR-012
+  // Auto-rotation timer
   useEffect(() => {
     if (totalSlides <= 1) return;
     resetTimer();
@@ -123,14 +135,20 @@ export function BannerCarousel({
     };
   }, [totalSlides, resetTimer]);
 
-  // Tab visibility handling — FR-013
+  // Tab visibility handling
   useEffect(() => {
     const handleVisibility = () => setIsTabVisible(!document.hidden);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // Keyboard navigation — FR-006
+  // Update strip visibility when notification changes
+  useEffect(() => {
+    const currentBanner = banners[currentIndex];
+    setStripVisible(currentBanner?.notification !== null && isTabVisible);
+  }, [currentIndex, banners, isTabVisible]);
+
+  // Keyboard navigation
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (event.key === 'ArrowLeft') {
@@ -146,39 +164,73 @@ export function BannerCarousel({
     [goToNext, goToPrevious, resetTimer]
   );
 
-  // Swipe/drag — FR-005
-  const handleDragEnd = useCallback(
-    (
-      _event: MouseEvent | TouchEvent | PointerEvent,
-      info: { offset: { x: number }; velocity: { x: number } }
-    ) => {
+  // Pointer-based drag/swipe handlers
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (isAnimatingRef.current || totalSlides <= 1) return;
+      isDraggingRef.current = true;
+      pointerStartXRef.current = e.clientX;
+      pointerStartTimeRef.current = Date.now();
+      currentDragXRef.current = 0;
+
+      const track = trackRef.current;
+      if (track) {
+        track.style.transition = 'none';
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      }
+    },
+    [totalSlides]
+  );
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    const deltaX = e.clientX - pointerStartXRef.current;
+    // Apply elastic resistance (10% of drag distance beyond edge)
+    const width = containerRef.current?.offsetWidth ?? 1;
+    const elasticDelta =
+      Math.abs(deltaX) > width * 0.5
+        ? Math.sign(deltaX) * (width * 0.5 + (Math.abs(deltaX) - width * 0.5) * 0.1)
+        : deltaX;
+    currentDragXRef.current = elasticDelta;
+
+    const track = trackRef.current;
+    if (track) {
+      track.style.transform = `translateX(${elasticDelta}px)`;
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+
       if (isAnimatingRef.current) return;
 
+      const deltaX = currentDragXRef.current;
+      const elapsed = Date.now() - pointerStartTimeRef.current;
+      const velocity = elapsed > 0 ? (deltaX / elapsed) * 1000 : 0;
       const width = containerRef.current?.offsetWidth ?? 0;
 
-      if (info.offset.x < -SWIPE_THRESHOLD || info.velocity.x < -VELOCITY_THRESHOLD) {
+      if (deltaX < -SWIPE_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
         isAnimatingRef.current = true;
         const next = (currentIndexRef.current + 1) % totalSlides;
         setDirection(1);
-        animate(trackX, -width, {
-          ...SLIDE_TRANSITION,
-          onComplete: () => completeTransition(next),
-        });
-      } else if (info.offset.x > SWIPE_THRESHOLD || info.velocity.x > VELOCITY_THRESHOLD) {
+        animateTrack(-width, () => completeTransition(next));
+      } else if (deltaX > SWIPE_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
         isAnimatingRef.current = true;
         const prev = (currentIndexRef.current - 1 + totalSlides) % totalSlides;
         setDirection(-1);
-        animate(trackX, width, {
-          ...SLIDE_TRANSITION,
-          onComplete: () => completeTransition(prev),
-        });
+        animateTrack(width, () => completeTransition(prev));
       } else {
         // Snap back to center
-        animate(trackX, 0, SLIDE_TRANSITION);
+        animateTrack(0, () => {
+          isAnimatingRef.current = false;
+        });
       }
       resetTimer();
     },
-    [totalSlides, trackX, completeTransition, resetTimer]
+    [totalSlides, animateTrack, completeTransition, resetTimer]
   );
 
   /** Navigate to a specific dot — animate if adjacent, instant jump otherwise */
@@ -199,11 +251,11 @@ export function BannerCarousel({
         setDirection(dir);
         currentIndexRef.current = idx;
         setCurrentIndex(idx);
-        trackX.jump(0);
+        resetTrack();
       }
       resetTimer();
     },
-    [totalSlides, animateToSlide, trackX, resetTimer]
+    [totalSlides, animateToSlide, resetTrack, resetTimer]
   );
 
   if (banners.length === 0) {
@@ -226,60 +278,52 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Notification strip — FR-002, FR-011, FR-014, FR-016 */}
+      {/* Notification strip */}
       {hasAnyNotification && (
-        <AnimatePresence initial={false}>
-          {currentNotification && isTabVisible ? (
-            <motion.div
-              key="strip-container"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="relative w-full overflow-hidden py-px"
-            >
-              <AnimatePresence mode="popLayout" custom={direction}>
-                <motion.div
-                  key={`strip-${currentIndex}`}
-                  custom={direction}
-                  variants={stripVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={SLIDE_TRANSITION}
-                  className={cn(
-                    'w-full px-4 py-2 text-center text-sm',
-                    isDarkColor(currentNotification.backgroundColor)
-                      ? 'banner-strip-dark'
-                      : 'banner-strip-light'
-                  )}
-                  style={{
-                    color: currentNotification.textColor ?? undefined,
-                    backgroundColor: currentNotification.backgroundColor ?? 'transparent',
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: addLinkAttributes(currentNotification.content),
-                  }}
-                />
-              </AnimatePresence>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <div
+          className="relative w-full overflow-hidden py-px"
+          style={{
+            maxHeight: stripVisible && currentNotification ? '100px' : '0px',
+            opacity: stripVisible && currentNotification ? 1 : 0,
+            transition:
+              'max-height 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {currentNotification && (
+            <div
+              key={`strip-${currentIndex}`}
+              className={cn(
+                'w-full px-4 py-2 text-center text-sm banner-strip-slide',
+                isDarkColor(currentNotification.backgroundColor)
+                  ? 'banner-strip-dark'
+                  : 'banner-strip-light'
+              )}
+              style={{
+                color: currentNotification.textColor ?? undefined,
+                backgroundColor: currentNotification.backgroundColor ?? 'transparent',
+                animation: `banner-strip-slide-${direction > 0 ? 'left' : 'right'} ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+              }}
+              dangerouslySetInnerHTML={{
+                __html: addLinkAttributes(sanitizeNotificationHtml(currentNotification.content)),
+              }}
+            />
+          )}
+        </div>
       )}
 
-      {/* Banner image track — single MotionValue drives all slides, zero gap */}
+      {/* Banner image track */}
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden"
         style={{ paddingBottom: '61.8%' }}
       >
-        <motion.div
-          className="absolute inset-0"
-          style={{ x: trackX }}
-          drag={totalSlides > 1 ? 'x' : false}
-          dragElastic={0.1}
-          dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={handleDragEnd}
+        <div
+          ref={trackRef}
+          className="absolute inset-0 touch-pan-y"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           role="group"
           aria-roledescription="slide"
           aria-label={`Banner ${currentIndex + 1} of ${totalSlides}`}
@@ -330,7 +374,7 @@ export function BannerCarousel({
               />
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Screen-reader live region for slide announcements */}

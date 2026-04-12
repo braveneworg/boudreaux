@@ -26,7 +26,10 @@ const limiter = rateLimit({
 export const signinAction = async (_initialState: FormState, payload: FormData) => {
   // Get IP address for rate limiting
   const headersList = await headers();
-  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'anonymous';
+  const ip =
+    headersList.get('x-real-ip') ||
+    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'anonymous';
 
   // Check rate limit
   try {

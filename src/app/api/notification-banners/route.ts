@@ -6,6 +6,8 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +19,10 @@ export const dynamic = 'force-dynamic';
  * Query params:
  *   all – When "true", returns banners data + all notifications (for landing page).
  */
-export const GET = async (request: NextRequest): Promise<NextResponse> => {
+export const GET = withRateLimit(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest): Promise<NextResponse> => {
   const all = request.nextUrl.searchParams.get('all') === 'true';
 
   if (all) {
@@ -26,10 +31,17 @@ export const GET = async (request: NextRequest): Promise<NextResponse> => {
       BannerNotificationService.getAllNotifications(),
     ]);
 
-    return NextResponse.json({
-      banners: bannersResult.success ? bannersResult.data : { banners: [], rotationInterval: 5000 },
-      notifications: notificationsResult.success ? notificationsResult.data : [],
-    });
+    return NextResponse.json(
+      {
+        banners: bannersResult.success
+          ? bannersResult.data
+          : { banners: [], rotationInterval: 5000 },
+        notifications: notificationsResult.success ? notificationsResult.data : [],
+      },
+      {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+      }
+    );
   }
 
   const result = await BannerNotificationService.getActiveBanners();
@@ -38,5 +50,7 @@ export const GET = async (request: NextRequest): Promise<NextResponse> => {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json(result.data);
-};
+  return NextResponse.json(result.data, {
+    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+  });
+});

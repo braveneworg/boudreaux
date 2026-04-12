@@ -280,7 +280,7 @@ class CDNSync {
 
     // Sync non-HTML files with longer cache
     const regularFiles = this.getFilesToUpload(this.config.mediaDir, 'media', {
-      cacheControl: 'public, max-age=86400',
+      cacheControl: 'public, max-age=31536000, immutable',
       excludePatterns: ['*.html', '*.DS_Store'],
     });
 
@@ -312,7 +312,7 @@ class CDNSync {
         this.log(`Found ${dir} directory, syncing...`);
 
         const files = this.getFilesToUpload(dir, `media/${dir}`, {
-          cacheControl: 'public, max-age=86400',
+          cacheControl: 'public, max-age=31536000, immutable',
           excludePatterns: ['*.DS_Store', '*.tmp'],
         });
 

@@ -5,35 +5,16 @@
 
 import 'server-only';
 
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
+import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
 import { auth } from '../../../auth';
 
 const logger = loggers.presignedUrls;
-
-// Log at module load time for debugging
-logger.info('Module loaded', {
-  s3BucketConfigured: !!process.env.S3_BUCKET,
-});
-
-/**
- * S3 client configuration
- */
-const getS3Client = () => {
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error('AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are required');
-  }
-  return new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: { accessKeyId, secretAccessKey },
-  });
-};
 
 /**
  * Generate a unique file key for S3
@@ -172,9 +153,7 @@ export const getPresignedUploadUrlsAction = async (
 ): Promise<PresignedUrlActionResult> => {
   const operation = 'getPresignedUploadUrls';
 
-  // Log environment variables availability (not values for security)
   logger.debug('Environment check', {
-    hasS3Bucket: !!process.env.S3_BUCKET,
     hasAwsRegion: !!process.env.AWS_REGION,
     hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
     hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
@@ -209,19 +188,11 @@ export const getPresignedUploadUrlsAction = async (
     }
 
     const s3Client = getS3Client();
-    const s3Bucket = process.env.S3_BUCKET;
+    const s3Bucket = getS3BucketName();
     const cdnDomainRaw = process.env.CDN_DOMAIN;
     // Strip any existing protocol from CDN domain to avoid double https://
     const cdnDomain = cdnDomainRaw?.replace(/^https?:\/\//, '');
     const awsRegion = process.env.AWS_REGION || 'us-east-1';
-
-    if (!s3Bucket) {
-      logger.error('S3_BUCKET environment variable is not set');
-      return {
-        success: false,
-        error: 'S3 storage is not configured. Please contact an administrator.',
-      };
-    }
 
     logger.operationStart(operation, {
       entityType,
@@ -249,8 +220,7 @@ export const getPresignedUploadUrlsAction = async (
         Bucket: s3Bucket,
         Key: s3Key,
         ContentType: file.contentType,
-        // Note: Not including ContentLength in presigned URL to avoid size mismatch issues
-        // S3 will still accept the upload and determine the size from the actual content
+        ContentLength: file.fileSize,
         CacheControl: 'public, max-age=31536000, immutable',
         Metadata: {
           entityType,

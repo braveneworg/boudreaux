@@ -4,7 +4,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
@@ -30,7 +32,10 @@ function serializeBigInts<T>(data: T): T {
  *   limit   – Max items to return when active=true (default 10, max 100).
  *   skip, take, search – Pagination/search params for admin listing mode.
  */
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest) => {
   try {
     const searchParams = request.nextUrl.searchParams;
     const active = searchParams.get('active');
@@ -105,7 +110,7 @@ export async function GET(request: NextRequest) {
     console.error('FeaturedArtist GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * POST /api/featured-artists

@@ -37,7 +37,6 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
-import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
@@ -217,29 +216,32 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
 
   return (
     <Carousel aria-label="Featured Artists" orientation="horizontal">
-      <CarouselContent className="flex justify-center gap-2">
-        {numberUpSliced.map((artist) => {
-          const latestRelease = artist.releases.sort(
-            (a: Artist['releases'][number], b: Artist['releases'][number]) =>
-              b.release.releasedOn.getTime() - a.release.releasedOn.getTime()
-          )[0];
-          const latestCoverArt = latestRelease?.release.coverArt;
+      <div className="flex items-center gap-2">
+        <CarouselPrevious className="relative left-0 top-auto translate-y-0 shrink-0" />
+        <CarouselContent className="flex justify-center gap-2">
+          {numberUpSliced.map((artist) => {
+            const latestRelease = artist.releases.sort(
+              (a: Artist['releases'][number], b: Artist['releases'][number]) =>
+                b.release.releasedOn.getTime() - a.release.releasedOn.getTime()
+            )[0];
+            const latestCoverArt = latestRelease?.release.coverArt;
 
-          return (
-            <CarouselItem key={artist.id}>
-              <Image
-                className="border-radius-[0.5rem]"
-                src={latestCoverArt}
-                alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
-                width={84}
-                height={84}
-              />
-            </CarouselItem>
-          );
-        })}
-      </CarouselContent>
-      <CarouselPrevious />
-      <CarouselNext />
+            return (
+              <CarouselItem key={artist.id}>
+                <Image
+                  className="border-radius-[0.5rem]"
+                  src={latestCoverArt}
+                  alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
+                  width={144}
+                  height={144}
+                  sizes="144px"
+                />
+              </CarouselItem>
+            );
+          })}
+        </CarouselContent>
+        <CarouselNext className="relative top-auto translate-y-0 right-auto shrink-0" />
+      </div>
     </Carousel>
   );
 };
@@ -317,57 +319,61 @@ const FeaturedArtistCarousel = ({
     <Carousel
       aria-label="Featured Artists"
       orientation="horizontal"
-      className="w-full px-10 mb-0"
+      className="w-full mb-0"
       opts={{ loop: true, align: 'center' }}
       setApi={setCarouselApi}
     >
-      <CarouselContent className="-ml-2">
-        {sortedArtists.map((featured, index) => {
-          const coverArt = getCoverArt(featured);
-          const displayName = getFeaturedArtistDisplayName(featured);
-          const imageError = failedImages.has(featured.id);
+      <div className="flex items-center">
+        <CarouselPrevious className="relative left-0 top-auto translate-y-0 shrink-0" />
+        <CarouselContent className="-ml-2">
+          {sortedArtists.map((featured, index) => {
+            const coverArt = getCoverArt(featured);
+            const displayName = getFeaturedArtistDisplayName(featured);
+            const imageError = failedImages.has(featured.id);
 
-          return (
-            <CarouselItem
-              key={featured.id}
-              className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
-            >
-              <button
-                type="button"
-                onClick={() => handleSelect(featured, index)}
-                className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                aria-label={`Select ${displayName}`}
+            return (
+              <CarouselItem
+                key={featured.id}
+                className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
               >
-                <div className="absolute inset-0 overflow-hidden rounded-lg">
-                  {coverArt && !imageError ? (
-                    <Image
-                      src={coverArt}
-                      alt={displayName ?? ''}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                      sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
-                      onError={() => {
-                        setFailedImages((prev) => new Set(prev).add(featured.id));
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                      <span className="text-zinc-500 text-xs text-center px-1">{displayName}</span>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(featured, index)}
+                  className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  aria-label={`Select ${displayName}`}
+                >
+                  <div className="absolute inset-0 overflow-hidden rounded-lg">
+                    {coverArt && !imageError ? (
+                      <Image
+                        src={coverArt}
+                        alt={displayName ?? ''}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                        sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
+                        onError={() => {
+                          setFailedImages((prev) => new Set(prev).add(featured.id));
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
+                        <span className="text-zinc-500 text-xs text-center px-1">
+                          {displayName}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
+                      <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
+                        {displayName}
+                      </span>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
-                    <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
-                      {displayName}
-                    </span>
                   </div>
-                </div>
-              </button>
-            </CarouselItem>
-          );
-        })}
-      </CarouselContent>
-      <CarouselPrevious className="left-0" />
-      <CarouselNext className="right-0" />
+                </button>
+              </CarouselItem>
+            );
+          })}
+        </CarouselContent>
+        <CarouselNext className="relative top-auto translate-y-0 right-auto shrink-0" />
+      </div>
     </Carousel>
   );
 };
@@ -1189,45 +1195,6 @@ const FormatFileListDrawer = ({
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
-  // Debug: extract and log audio metadata (ID3 tags) from CDN files
-  useEffect(() => {
-    if (files.length === 0) return;
-
-    const extractMetadata = async () => {
-      try {
-        const { parseBlob } = await import('music-metadata');
-        const firstFile = files[0];
-        const cdnUrl = buildCdnUrl(firstFile.s3Key);
-        const response = await fetch(cdnUrl);
-        const blob = await response.blob();
-        const metadata = await parseBlob(blob);
-        console.info('[metadata] Extracted ID3 tags from first track:', {
-          title: metadata.common.title,
-          artist: metadata.common.artist,
-          album: metadata.common.album,
-          albumArtist: metadata.common.albumartist,
-          year: metadata.common.year,
-          genre: metadata.common.genre,
-          label: metadata.common.label,
-          trackNumber: metadata.common.track?.no,
-          trackTotal: metadata.common.track?.of,
-          duration: metadata.format.duration
-            ? `${Math.round(metadata.format.duration)}s`
-            : undefined,
-          bitrate: metadata.format.bitrate
-            ? `${Math.round(metadata.format.bitrate / 1000)}kbps`
-            : undefined,
-          codec: metadata.format.codec,
-          hasCoverArt: (metadata.common.picture?.length ?? 0) > 0,
-        });
-      } catch (err) {
-        console.info('[metadata] Could not extract metadata:', err);
-      }
-    };
-
-    extractMetadata();
-  }, [files]);
 
   return (
     <Drawer>

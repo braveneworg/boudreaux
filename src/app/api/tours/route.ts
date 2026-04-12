@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 
 export const dynamic = 'force-dynamic';
@@ -11,9 +13,12 @@ export const dynamic = 'force-dynamic';
  * GET /api/tours
  * Returns all tours with related data (venues, headliners, artists, images).
  */
-export async function GET() {
+export const GET = withRateLimit(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async () => {
   try {
-    const tours = await TourRepository.findAll();
+    const tours = await TourRepository.findAll({ limit: 100 });
 
     return NextResponse.json(
       { tours, count: tours.length },
@@ -27,4 +32,4 @@ export async function GET() {
     console.error('Tours GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

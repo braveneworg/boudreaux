@@ -43,10 +43,10 @@ export class PurchaseRepository {
     });
   }
 
-  /** Find a purchase by userId + releaseId composite key. */
+  /** Find an active (non-refunded) purchase by userId + releaseId composite key. */
   static async findByUserAndRelease(userId: string, releaseId: string) {
-    return prisma.releasePurchase.findUnique({
-      where: { userId_releaseId: { userId, releaseId } },
+    return prisma.releasePurchase.findFirst({
+      where: { userId, releaseId, refundedAt: null },
     });
   }
 
@@ -194,5 +194,18 @@ export class PurchaseRepository {
       where: { email },
       select: { id: true },
     });
+  }
+
+  /**
+   * Mark a purchase as refunded by its Stripe PaymentIntent ID.
+   * Uses updateMany with a `refundedAt: null` filter for idempotency —
+   * duplicate webhook deliveries for the same charge are no-ops.
+   */
+  static async markRefunded(paymentIntentId: string): Promise<boolean> {
+    const result = await prisma.releasePurchase.updateMany({
+      where: { stripePaymentIntentId: paymentIntentId, refundedAt: null },
+      data: { refundedAt: new Date() },
+    });
+    return result.count > 0;
   }
 }

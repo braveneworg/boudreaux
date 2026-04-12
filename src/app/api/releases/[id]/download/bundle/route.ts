@@ -10,14 +10,17 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import archiver from 'archiver';
 import { getToken } from 'next-auth/jwt';
 
+import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
+import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { prisma } from '@/lib/prisma';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 
 /**
@@ -47,6 +50,21 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   try {
+    // Rate limiting
+    const ip = extractClientIp(request);
+    try {
+      await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+    } catch {
+      return Response.json(
+        {
+          success: false,
+          error: 'RATE_LIMITED',
+          message: 'Too many requests. Please try again later.',
+        },
+        { status: 429 }
+      );
+    }
+
     // Step 1: Authentication
     const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
     const token = await getToken({
@@ -65,6 +83,14 @@ export async function GET(
 
     const userId = token.sub;
     const { id: releaseId } = await context.params;
+
+    // Validate release ID
+    if (!isValidObjectId(releaseId)) {
+      return Response.json(
+        { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
+        { status: 400 }
+      );
+    }
 
     // Step 2: Parse and validate formats query parameter
     const formatsParam = request.nextUrl.searchParams.get('formats');
