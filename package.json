@@ -18,7 +18,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:coverage:check": "vitest run --coverage && pnpm exec tsx scripts/check-coverage-regression.ts",
-    "test:shard": "vitest run --reporter=blob --coverage",
+    "test:shard": "vitest run --reporter=blob",
     "test:merge": "vitest --merge-reports .vitest-reports --coverage",
     "test:no-css": "mv postcss.config.mjs postcss.config.mjs.bak && vitest run && mv postcss.config.mjs.bak postcss.config.mjs",
     "test:e2e": "playwright test",
