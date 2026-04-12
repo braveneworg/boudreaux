@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query-keys';
 interface ReleaseListItem {
   id: string;
   title: string;
-  releasedOn: string | null;
+  releasedOn: string;
   artistReleases?: {
     artist: {
       id: string;

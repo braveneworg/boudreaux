@@ -32,9 +32,9 @@ export interface ReleaseOption {
   artistReleases?: {
     artist: {
       id: string;
-      firstName?: string;
-      surname?: string;
-      displayName?: string;
+      firstName?: string | null;
+      surname?: string | null;
+      displayName?: string | null;
     };
   }[];
 }
