@@ -58,19 +58,12 @@ jobs:
         env:
           CI: true
 
-      - name: Rename blob for unique artifact naming
-        if: always()
-        run: |
-          if [ -f .vitest-reports/blob.json ]; then
-            mv .vitest-reports/blob.json .vitest-reports/blob-${{ matrix.shard }}.json
-          fi
-
       - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vitest-blob-${{ matrix.shard }}
-          path: .vitest-reports/blob-${{ matrix.shard }}.json
+          path: .vitest-reports/
           retention-days: 1
           if-no-files-found: warn
 
