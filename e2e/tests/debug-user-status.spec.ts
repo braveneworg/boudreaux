@@ -8,33 +8,25 @@ const prisma = new PrismaClient({
 });
 
 test('debug: check user-status API for purchased release', async ({ userPage }) => {
-  test.setTimeout(60000);
-
   const release = await prisma.release.findFirstOrThrow({
     where: { title: 'E2E Album One' },
     select: { id: true },
   });
 
-  // Intercept the user-status API response
-  const userStatusPromise = userPage.waitForResponse(
-    (resp) => resp.url().includes('/user-status'),
-    { timeout: 30000 }
+  // Call the user-status API directly (SSR prefetch means the client
+  // never makes this request, so waitForResponse would time out).
+  const statusResp = await userPage.request.get(
+    `/api/releases/${release.id}/user-status`
   );
-
-  await userPage.goto(`/releases/${release.id}`);
-
-  const statusResp = await userStatusPromise;
   console.info('USER-STATUS HTTP STATUS:', statusResp.status());
   const body = await statusResp.json();
   console.info('USER-STATUS BODY:', JSON.stringify(body));
 
   // Also check the session
-  const session = await userPage.evaluate(async () => {
-    const res = await fetch('/api/auth/session');
-    return { status: res.status, body: await res.json() };
-  });
-  console.info('SESSION STATUS:', session.status);
-  console.info('SESSION BODY:', JSON.stringify(session.body));
+  const sessionResp = await userPage.request.get('/api/auth/session');
+  console.info('SESSION STATUS:', sessionResp.status());
+  const sessionBody = await sessionResp.json();
+  console.info('SESSION BODY:', JSON.stringify(sessionBody));
 
   await prisma.$disconnect();
 });
