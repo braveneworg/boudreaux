@@ -4,26 +4,21 @@
 
 /**
  * Release media player page at `/releases/[releaseId]`.
- * Server Component that fetches a single release with tracks and renders
- * the media player, artist carousel, and breadcrumb navigation.
+ * Server Component that prefetches release data for SSR,
+ * then hydrates client components for interactivity.
  */
-import 'server-only';
 
 import { notFound } from 'next/navigation';
 
-import { ArtistReleasesCarousel } from '@/app/components/artist-releases-carousel';
-import { ReleaseDescription } from '@/app/components/release-description';
-import { ReleasePlayer } from '@/app/components/release-player';
-import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
+
+import { ReleaseDetailContent } from '@/app/components/release-detail-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
-import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import { ReleaseService } from '@/lib/services/release-service';
-import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
-
-import { auth } from '../../../../auth';
+import { queryKeys } from '@/lib/query-keys';
+import { fetchApi } from '@/lib/utils/fetch-api';
+import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
+import { getQueryClient } from '@/lib/utils/get-query-client';
 
 interface ReleasePlayerPageProps {
   params: Promise<{ releaseId: string }>;
@@ -31,94 +26,68 @@ interface ReleasePlayerPageProps {
 }
 
 /**
- * Release player page — renders a single release with audio player,
- * track list, and an optional carousel of other releases by the same artist.
+ * Release player page — prefetches release, user status, digital formats,
+ * and related releases, then hydrates the client content component.
  */
-const ReleasePlayerPage = async ({ params, searchParams }: ReleasePlayerPageProps) => {
+export default async function ReleasePlayerPage({ params, searchParams }: ReleasePlayerPageProps) {
   const { releaseId } = await params;
   const resolvedSearchParams = await searchParams;
   const autoPlay = resolvedSearchParams.autoplay === 'true';
 
-  const releaseResult = await ReleaseService.getReleaseWithTracks(releaseId);
+  const queryClient = getQueryClient();
 
-  if (!releaseResult.success) {
+  // Prefetch the release with direct fetch for 404 handling
+  const releaseUrl = getInternalApiUrl(
+    `/api/releases/${encodeURIComponent(releaseId)}?withTracks=true`
+  );
+  const releaseResponse = await fetch(releaseUrl, { cache: 'no-store' });
+
+  if (releaseResponse.status === 404) {
     notFound();
-    return; // notFound() throws in production; return satisfies TypeScript narrowing
   }
 
-  const release = releaseResult.data;
+  if (releaseResponse.ok) {
+    const releaseData = await releaseResponse.json();
+    queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
+  }
 
-  // Fetch auth session and purchase status for this user/release
-  const session = await auth();
-  const authUserId = (session?.user as { id?: string })?.id ?? null;
+  // Extract primaryArtistId from release data for related releases prefetch
+  const releaseCache = queryClient.getQueryData<{
+    artistReleases?: Array<{ artist?: { id?: string } }>;
+  }>(queryKeys.releases.detail(releaseId));
+  const primaryArtistId = releaseCache?.artistReleases?.[0]?.artist?.id ?? null;
 
-  const [purchase, downloadRecord] = await Promise.all([
-    authUserId
-      ? PurchaseRepository.findByUserAndRelease(authUserId, releaseId)
-      : Promise.resolve(null),
-    authUserId
-      ? PurchaseRepository.getDownloadRecord(authUserId, releaseId)
-      : Promise.resolve(null),
+  // Prefetch supplementary data in parallel (errors are swallowed by prefetchQuery)
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.releases.userStatus(releaseId),
+      queryFn: () =>
+        fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/user-status`, {
+          forwardCookies: true,
+        }),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.releases.digitalFormats(releaseId),
+      queryFn: () => fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/digital-formats`),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.releases.related(releaseId, primaryArtistId),
+      queryFn: () => {
+        const relatedUrl = primaryArtistId
+          ? `/api/releases/${encodeURIComponent(releaseId)}/related?artistId=${encodeURIComponent(primaryArtistId)}`
+          : `/api/releases/${encodeURIComponent(releaseId)}/related`;
+        return fetchApi(relatedUrl);
+      },
+    }),
   ]);
-  const hasPurchase = purchase !== null;
-  const purchasedAt = purchase?.purchasedAt ?? null;
-  const downloadCount = downloadRecord?.downloadCount ?? 0;
-
-  // Fetch available digital formats for this release
-  const formatRepo = new ReleaseDigitalFormatRepository();
-  const digitalFormats = await formatRepo.findAllByRelease(releaseId);
-  const availableFormats = digitalFormats.map((f) => ({
-    formatType: f.formatType as DigitalFormatType,
-    fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,
-  }));
-
-  const primaryArtist = release.artistReleases[0]?.artist;
-  const primaryArtistId = primaryArtist?.id;
-
-  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
-
-  const otherReleasesResult = primaryArtistId
-    ? await ReleaseService.getArtistOtherReleases(primaryArtistId, releaseId)
-    : { success: false as const, data: [] };
-
-  const otherReleases = otherReleasesResult.success ? otherReleasesResult.data : [];
-
-  const breadcrumbItems = [
-    { anchorText: 'Releases', url: '/releases', isActive: false },
-    {
-      anchorText: release.title,
-      url: `/releases/${release.id}`,
-      isActive: true,
-      className: 'max-w-[200px] truncate sm:max-w-none sm:overflow-visible',
-    },
-  ];
 
   return (
-    <PageContainer>
-      <ContentContainer>
-        <BreadcrumbMenu items={breadcrumbItems} />
-        {otherReleases.length > 0 && (
-          <ArtistReleasesCarousel releases={otherReleases} artistName={artistName} />
-        )}
-        <ReleasePlayer
-          release={release}
-          autoPlay={autoPlay}
-          releaseId={release.id}
-          releaseTitle={release.title}
-          suggestedPrice={
-            (release as unknown as { suggestedPrice?: number | null }).suggestedPrice
-              ? (release as unknown as { suggestedPrice: number }).suggestedPrice / 100
-              : null
-          }
-          hasPurchase={hasPurchase}
-          purchasedAt={purchasedAt}
-          downloadCount={downloadCount}
-          availableFormats={availableFormats}
-        />
-        <ReleaseDescription description={release.description ?? null} />
-      </ContentContainer>
-    </PageContainer>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PageContainer>
+        <ContentContainer>
+          <ReleaseDetailContent releaseId={releaseId} autoPlay={autoPlay} />
+        </ContentContainer>
+      </PageContainer>
+    </HydrationBoundary>
   );
-};
-
-export default ReleasePlayerPage;
+}

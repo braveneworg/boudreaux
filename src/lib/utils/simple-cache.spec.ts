@@ -197,6 +197,45 @@ describe('SimpleCache (singleton: cache)', () => {
   });
 
   // -------------------------------------------------------------------------
+  describe('deleteByPrefix()', () => {
+    it('removes all entries matching the prefix and leaves others intact', () => {
+      cache.set('featured-artists:2026-04-01:7', 'data1');
+      cache.set('featured-artists:2026-04-02:7', 'data2');
+      cache.set('other-key', 'data3');
+      cache.deleteByPrefix('featured-artists:');
+      expect(cache.get('featured-artists:2026-04-01:7')).toBeNull();
+      expect(cache.get('featured-artists:2026-04-02:7')).toBeNull();
+      expect(cache.get('other-key')).toBe('data3');
+    });
+
+    it('returns the count of deleted entries', () => {
+      cache.set('prefix:a', 1);
+      cache.set('prefix:b', 2);
+      cache.set('prefix:c', 3);
+      cache.set('other', 4);
+      expect(cache.deleteByPrefix('prefix:')).toBe(3);
+    });
+
+    it('returns 0 when no keys match the prefix', () => {
+      cache.set('alpha', 1);
+      cache.set('beta', 2);
+      expect(cache.deleteByPrefix('nonexistent:')).toBe(0);
+      expect(cache.getStats().size).toBe(2);
+    });
+
+    it('is a no-op on an empty cache and returns 0', () => {
+      expect(cache.deleteByPrefix('anything:')).toBe(0);
+    });
+
+    it('does not remove keys that contain but do not start with the prefix', () => {
+      cache.set('other-featured-artists:key', 'value');
+      cache.set('featured-artists:key', 'value');
+      cache.deleteByPrefix('featured-artists:');
+      expect(cache.get('other-featured-artists:key')).toBe('value');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe('clear()', () => {
     it('removes all entries so getStats().size is 0', () => {
       cache.set('a', 1);

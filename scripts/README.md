@@ -1,14 +1,68 @@
-# Scripts Documentation
+# Scripts
 
-This directory contains utility scripts for managing various aspects of the application.
+Utility scripts for managing data, infrastructure, and deployment for the Fake Four Records platform.
 
-## MongoDB Backup/Restore Script
+## Quick Reference
 
-A TypeScript script for backing up and restoring MongoDB databases with full support for data, structure, and constraints.
+| Script                               | pnpm command                                                  | Description                                                |
+| ------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `mongo-backup.ts`                    | `pnpm run mongo:dump` / `mongo:restore`                       | Backup and restore MongoDB databases                       |
+| `s3-backup.ts`                       | `pnpm run s3:backup` / `s3:restore` / `s3:list` / `s3:upload` | Backup and restore S3 bucket contents                      |
+| `s3-apply-cache-headers.ts`          | `pnpm run s3:cache-headers`                                   | Apply Cache-Control headers to existing S3 media files     |
+| `upload-images.ts`                   | `pnpm run images:upload`                                      | Upload images to S3 with content-type detection            |
+| `sync-cdn.ts`                        | `pnpm exec tsx scripts/sync-cdn.ts`                           | Sync Next.js static assets to S3 and invalidate CloudFront |
+| `stripe-seed.ts`                     | `pnpm run stripe:seed`                                        | Seed Stripe with subscription product and pricing tiers    |
+| `check-coverage-regression.ts`       | `pnpm run test:coverage:check`                                | Compare test coverage against baseline thresholds          |
+| `fix-featured-artist-connections.ts` | `pnpm exec tsx scripts/fix-featured-artist-connections.ts`    | Backfill Artist-to-FeaturedArtist connections              |
+| `fix-stripe-customer-id-index.ts`    | `pnpm exec tsx scripts/fix-stripe-customer-id-index.ts`       | Migration: fix legacy stripeCustomerId index               |
+| `create-stardust-svg.ts`             | `pnpm exec tsx scripts/create-stardust-svg.ts`                | Generate parameterized stardust texture SVGs               |
+| `generate-stardust-svg.tsx`          | `pnpm exec tsx scripts/generate-stardust-svg.tsx`             | Generate stardust SVGs (TSX variant)                       |
+
+### Shell Scripts
+
+| Script                             | Description                                                    |
+| ---------------------------------- | -------------------------------------------------------------- |
+| `check-cloudfront-status.sh`       | Check CloudFront distribution status via AWS CLI               |
+| `detailed-deployment-check.sh`     | Verify deployment by checking S3 webpack chunks and timestamps |
+| `diagnose-cdn.sh`                  | Diagnose CloudFront and S3 configuration issues                |
+| `fix-cloudfront-origin-path.sh`    | Update CloudFront origin path to resolve 403 errors            |
+| `fix-cloudfront-s3-access.sh`      | Fix CloudFront OAC and S3 bucket policy for CDN access         |
+| `force-container-refresh.sh`       | Force-refresh Docker containers on EC2 from GHCR               |
+| `manual-deploy.sh`                 | Manual deployment to EC2 via SSH                               |
+| `manually-attach-oac.sh`           | Create and attach an OAC to a CloudFront distribution          |
+| `restart-containers.sh`            | Restart Docker containers on EC2 to pick up latest assets      |
+| `revert-cloudfront-origin-path.sh` | Revert CloudFront origin path back to root                     |
+| `verify-deployment-consistency.sh` | Verify S3 webpack chunks match what is live                    |
+
+### Other
+
+| Script            | Description                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `fix-releases.js` | MongoDB shell commands to fix releases with wrong field names and accidental soft-deletes |
+
+---
+
+## Shared Prerequisites
+
+Most TypeScript scripts that interact with AWS require these environment variables (automatically read from `.env.local` or `.env`):
+
+```bash
+S3_BUCKET="your-s3-bucket-name"
+AWS_REGION="us-east-1"                          # Default: us-east-1
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+CLOUDFRONT_DISTRIBUTION_ID="your-dist-id"       # Optional, for cache invalidation
+```
+
+---
+
+## MongoDB Backup/Restore
+
+**File:** `mongo-backup.ts`
+
+Backup and restore MongoDB databases with full support for data, structure, and constraints using `mongodump`/`mongorestore`.
 
 ### Prerequisites
-
-Install MongoDB Database Tools:
 
 ```bash
 # macOS
@@ -16,14 +70,9 @@ brew install mongodb/brew/mongodb-database-tools
 
 # Ubuntu/Debian
 sudo apt-get install mongodb-database-tools
-
-# Windows
-# Download from https://www.mongodb.com/try/download/database-tools
 ```
 
 ### Usage
-
-#### Create a Backup
 
 ```bash
 # Create backup with auto-generated filename (saved to /backups)
@@ -32,485 +81,356 @@ pnpm run mongo:dump
 # Create backup with custom filename
 pnpm run mongo:dump backups/2026-02-07T10-00-00-mongo-backup.archive
 
-# Or run directly
-pnpm exec tsx scripts/mongo-backup.ts dump [output-file]
-```
-
-#### Restore from Backup
-
-```bash
 # Restore from backup file
 pnpm run mongo:restore backups/2026-02-07T10-00-00-mongo-backup.archive
-
-# Or run directly
-pnpm exec tsx scripts/mongo-backup.ts restore <input-file>
 ```
 
 ### Features
 
-- 📦 Full database backup including data, structure, indexes, and constraints
-- 🗜️ Gzip compression for smaller backup files (no need for additional tar.gz)
-- 🔄 Complete restore with `--drop` flag to ensure clean state
-- 📁 Auto-creates backup directory if it doesn't exist
-- 🏷️ Auto-generated ISO 8601 timestamped filenames (e.g., `2026-02-07T21-45-14-mongo-backup.archive`)
-- 🗑️ Automatic cleanup - keeps only the 5 most recent backups
-- 🛡️ Connection string parsing from DATABASE_URL environment variable
-- ✅ Clear success/error messages
-
-### Backup Format
-
-Backups are saved in MongoDB's archive format (`.archive` files) with **built-in gzip compression**. This format:
-
-- Contains all collections, indexes, and metadata
-- Is already compressed by `mongodump --gzip` (no need for additional tar.gz compression)
-- Can be restored to any MongoDB version compatible with your data
-- Preserves all constraints and validation rules
-- Typically achieves 90%+ compression ratio
-
-**Note:** The archive files are already gzip-compressed by MongoDB's tools, so additional tar.gz compression would provide minimal space savings while adding complexity to the backup/restore process.
+- Full database backup including data, structure, indexes, and constraints
+- Gzip compression (built into MongoDB archive format)
+- Complete restore with `--drop` flag for clean state
+- Auto-generated ISO 8601 timestamped filenames
+- Automatic cleanup — keeps only the 5 most recent backups
+- Connection string parsing from `DATABASE_URL` environment variable
 
 ### Environment Variables
-
-The script uses `DATABASE_URL` from your environment:
 
 ```bash
 DATABASE_URL="mongodb+srv://user:password@host/database?options"
 ```
 
-This is automatically read from `.env.local` or `.env` files.
-
 ---
 
-## S3 Backup/Restore Script
+## S3 Backup/Restore
 
-A TypeScript script for backing up S3 bucket contents to your local machine and restoring them when needed.
+**File:** `s3-backup.ts`
 
-### Prerequisites
-
-Ensure you have AWS credentials configured:
-
-```bash
-# AWS credentials (via environment variables or ~/.aws/credentials)
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-
-# Or use AWS profile
-export AWS_PROFILE="your-profile-name"
-```
+Backup S3 bucket contents to your local machine and restore them when needed. Only processes media files (images, audio, video).
 
 ### Usage
 
-#### Create a Backup
-
 ```bash
-# Create backup with auto-generated directory name (e.g., backups/s3-2026-02-07T10-00-00)
+# Backup with auto-generated directory name
 pnpm run s3:backup
 
-# Create backup with custom directory
+# Backup with custom directory
 pnpm run s3:backup -- backups/my-s3-backup
 
-# Or run directly
-pnpm exec tsx scripts/s3-backup.ts backup [local-directory]
-```
-
-#### Restore from Backup
-
-```bash
 # Restore from backup directory
 pnpm run s3:restore -- backups/s3-2026-02-07T10-00-00
 
-# Restore with overwrite flag (replaces existing files in S3)
+# Restore with overwrite (replaces existing files in S3)
 pnpm run s3:restore -- backups/s3-2026-02-07T10-00-00 --overwrite
 
-# Or run directly
-pnpm exec tsx scripts/s3-backup.ts restore <local-directory> [--overwrite]
-```
+# Skip CloudFront invalidation after restore
+pnpm run s3:restore -- backups/s3-2026-02-07T10-00-00 --skip-invalidation
 
-#### List Available Backups
-
-```bash
-# List all S3 backups in the backups directory
+# List available backups
 pnpm run s3:list
 
-# List backups in a custom directory
-pnpm exec tsx scripts/s3-backup.ts list <custom-backups-directory>
+# Upload local directory directly to S3
+pnpm run s3:upload -- <local-directory>
 ```
 
 ### Features
 
-- 📦 Full S3 bucket backup including all files and metadata
-- 📁 Auto-creates timestamped backup directories
-- 🔄 Complete restore with optional overwrite protection
-- 📊 Detailed backup metadata in JSON format
-- 🏷️ Preserves content types during restore (limited metadata support)
-- 🔍 Prefix filtering support for partial backups
-- ✅ Progress tracking and clear success/error messages
-- 🛡️ Safe restore mode (skips existing files by default)
-- 📋 Pagination support for large buckets
-- 🗑️ Automatic cleanup - keeps only the 5 most recent backups (configurable)
+- Full S3 bucket backup with metadata manifest (`backup-metadata.json`)
+- Incremental detection — skips backup if nothing changed since last run
+- Safe restore mode (skips existing files by default, use `--overwrite` to replace)
+- Prefix filtering for partial backups (`S3_BACKUP_PREFIX`)
+- Pagination support for large buckets
+- Automatic cleanup — keeps only the N most recent backups
+- CloudFront cache invalidation after restore/upload
+- Path traversal protection via `sanitizeFilePath`
 
 ### Backup Format
 
-Backups are saved in a directory structure that mirrors your S3 bucket:
-
 ```
 backups/s3-2026-02-07T10-00-00/
-├── backup-metadata.json     # Backup information and file manifest
-├── folder1/
-│   ├── file1.jpg
-│   └── file2.png
-└── folder2/
-    └── file3.txt
+├── backup-metadata.json     # Timestamp, bucket, file manifest
+├── media/
+│   ├── artists/
+│   └── tracks/
 ```
-
-The `backup-metadata.json` file contains:
-
-- Timestamp of backup
-- Source bucket name and region
-- Total files and size
-- Complete file manifest with metadata
 
 ### Environment Variables
 
-Set these environment variables before running the script:
-
 ```bash
-# Required
-S3_BUCKET="your-s3-bucket-name"
-
-# Optional
-AWS_REGION="us-east-1"                    # Default: us-east-1
-S3_BACKUP_PREFIX=""                       # Default: "" (entire bucket)
-S3_MAX_BACKUPS="5"                        # Default: 5 (number of backups to keep)
-```
-
-These are automatically read from `.env.local` or `.env` files.
-
-**Automatic Cleanup**: After each successful backup, the script automatically removes old backups, keeping only the most recent `S3_MAX_BACKUPS` backups (default: 5). This prevents unlimited disk usage growth.
-
-### Examples
-
-#### Backup entire bucket
-
-```bash
-pnpm run s3:backup
-```
-
-#### Backup only media files
-
-```bash
-S3_BACKUP_PREFIX="media/" pnpm run s3:backup backups/media-only
-```
-
-#### Restore and overwrite existing files
-
-```bash
-pnpm run s3:restore backups/s3-2026-02-07T10-00-00 --overwrite
-```
-
-#### View all backups
-
-```bash
-pnpm run s3:list
+S3_BUCKET="your-bucket"                # Required
+AWS_REGION="us-east-1"                 # Default: us-east-1
+S3_BACKUP_PREFIX=""                    # Default: "" (entire bucket)
+S3_MAX_BACKUPS="5"                     # Default: 5
+CLOUDFRONT_DISTRIBUTION_ID="..."       # Optional, for cache invalidation
+SKIP_INVALIDATION="false"             # Optional, skip CloudFront invalidation
 ```
 
 ---
 
-# Image Upload Utility
+## S3 Cache Header Migration
 
-A TypeScript script that uploads images to S3 with support for single files, multiple comma-separated files, or entire directories.
+**File:** `s3-apply-cache-headers.ts`
 
-## Usage
+Applies `Cache-Control: public, max-age=31536000, immutable` to existing media files in S3 that are missing this header. Uses the S3 "copy-to-self" technique (`CopyObject` with `MetadataDirective: REPLACE`) since S3 does not support updating object metadata in place.
+
+This is a one-time migration script for files uploaded before the caching strategy was implemented. New uploads already set this header automatically.
+
+### Usage
+
+```bash
+# Dry run (default) — preview what would change
+pnpm run s3:cache-headers
+
+# Apply changes
+pnpm run s3:cache-headers -- --apply
+
+# Limit to a specific prefix
+pnpm run s3:cache-headers -- --prefix media/tracks/
+pnpm run s3:cache-headers -- --apply --prefix media/artists/artist-123/
+
+# Force update even if Cache-Control is already set
+pnpm run s3:cache-headers -- --apply --force
+```
+
+### Features
+
+- Safe by default — dry run mode shows what would change without touching S3
+- Paginates through large buckets automatically
+- Skips non-media files (only processes images and audio)
+- Skips objects that already have the correct header (unless `--force`)
+- Preserves existing object metadata (`ContentType`, custom `Metadata`, `ContentDisposition`, etc.)
+- Colored output with per-object status and summary
+
+### Command-Line Options
+
+| Option              | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `--apply`           | Actually modify S3 objects (default is dry run) |
+| `--force`           | Update even if `Cache-Control` is already set   |
+| `--prefix <prefix>` | S3 key prefix to scan (default: `media/`)       |
+| `--help`, `-h`      | Show help message                               |
 
 ### Environment Variables
 
-Set these environment variables before running the script:
-
 ```bash
-# Required
-export S3_BUCKET="your-s3-bucket-name"
-
-# Optional
-export AWS_REGION="us-east-1"  # Default: us-east-1
-export CLOUDFRONT_DISTRIBUTION_ID="your-cloudfront-distribution-id"  # For cache invalidation
+S3_BUCKET="your-bucket"     # Required
+AWS_REGION="us-east-1"      # Default: us-east-1
 ```
 
-### Upload Single Image
+---
+
+## Image Upload
+
+**File:** `upload-images.ts`
+
+Upload images to S3 with support for single files, multiple comma-separated files, or entire directories. Automatically detects content types and optionally invalidates the CloudFront cache.
+
+### Usage
 
 ```bash
+# Upload single image
 pnpm run images:upload public/media/profile.jpg
-```
 
-### Upload Multiple Images (Comma-Separated)
+# Upload multiple images (comma-separated)
+pnpm run images:upload ./images/photo1.jpg,./images/photo2.png
 
-```bash
-pnpm run images:upload ./images/photo1.jpg,./images/photo2.png,./images/photo3.webp
-```
-
-### Upload All Images from a Directory (Recursive)
-
-```bash
+# Upload all images from a directory (recursive)
 pnpm run images:upload --dir public/media/gallery
-```
 
-### Upload with Custom S3 Prefix
-
-```bash
-# Single file with prefix
+# Upload with custom S3 prefix
 pnpm run images:upload public/avatar.jpg --prefix user-content/
 
-# Directory with prefix
-pnpm run images:upload --dir ./uploads --prefix user-uploads/2026/
-```
-
-### Skip CloudFront Cache Invalidation
-
-```bash
+# Skip CloudFront cache invalidation
 pnpm run images:upload public/photo.jpg --no-invalidate
 ```
 
-### Direct Usage
+### Features
+
+- Single file, multiple files (comma-separated), or recursive directory upload
+- Automatic content-type detection via `mime`
+- Smart S3 key generation (strips `public/` prefix, normalizes paths)
+- CloudFront cache invalidation (individual paths for <=3000 files, wildcard for more)
+- Colored output with upload summary
+
+### Supported Formats
+
+`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.svg`, `.ico`, `.bmp`, `.tiff`, `.tif`, `.avif`
+
+### Command-Line Options
+
+| Option              | Alias | Description                                         |
+| ------------------- | ----- | --------------------------------------------------- |
+| `--dir <directory>` | `-d`  | Upload all images from directory (recursive)        |
+| `--prefix <prefix>` | `-p`  | S3 key prefix for uploaded files (default: `media`) |
+| `--no-invalidate`   |       | Skip CloudFront cache invalidation                  |
+| `--help`            | `-h`  | Show help message                                   |
+
+### Environment Variables
 
 ```bash
-# With tsx
-pnpm exec tsx scripts/upload-images.ts public/media/photo.jpg
-
-# Or run with Node
-chmod +x scripts/upload-images.ts
-./scripts/upload-images.ts --dir ./images
-```
-
-## Features
-
-- 📸 Upload single or multiple images
-- 📂 Recursive directory upload
-- 🔗 Support for both relative and absolute paths
-- 🌐 Automatic content type detection
-- ⚡ CloudFront cache invalidation
-- 🎨 Colored console output with progress
-- 📊 Upload summary with statistics
-- 🛡️ Error handling with detailed reporting
-
-## Supported Image Formats
-
-The script automatically filters for these image formats:
-
-- **JPEG**: `.jpg`, `.jpeg`
-- **PNG**: `.png`
-- **GIF**: `.gif`
-- **WebP**: `.webp`
-- **SVG**: `.svg`
-- **Icon**: `.ico`
-- **Bitmap**: `.bmp`
-- **TIFF**: `.tiff`, `.tif`
-- **AVIF**: `.avif`
-
-Non-image files are automatically skipped with a warning message.
-
-## Path Handling
-
-The script intelligently handles different path formats:
-
-### Relative Paths
-
-```bash
-# Current directory
-pnpm run images:upload ./photo.jpg
-
-# Subdirectories
-pnpm run images:upload images/gallery/photo.jpg
-```
-
-### Absolute Paths
-
-```bash
-pnpm run images:upload /Users/username/projects/app/public/media/photo.jpg
-```
-
-### Public Directory
-
-Files in the `public/` directory are automatically mapped correctly:
-
-```bash
-# Uploads to S3 as: media/photo.jpg (not public/media/photo.jpg)
-pnpm run images:upload public/media/photo.jpg
-```
-
-## S3 Key Generation
-
-The script generates S3 keys with smart path handling:
-
-- Removes `public/` prefix automatically
-- Removes leading slashes and `./`
-- Converts backslashes to forward slashes (Windows compatibility)
-- Applies optional prefix to all uploaded files
-
-### Examples
-
-```bash
-# Input: public/media/photo.jpg
-# S3 Key: media/photo.jpg
-
-# Input: ./images/avatar.png
-# S3 Key: images/avatar.png
-
-# Input: public/media/photo.jpg --prefix cdn/
-# S3 Key: cdn/media/photo.jpg
-```
-
-## Command-Line Options
-
-| Option              | Alias | Description                                  |
-| ------------------- | ----- | -------------------------------------------- |
-| `--dir <directory>` | `-d`  | Upload all images from directory (recursive) |
-| `--prefix <prefix>` | `-p`  | S3 key prefix for uploaded files             |
-| `--no-invalidate`   |       | Skip CloudFront cache invalidation           |
-| `--help`            | `-h`  | Show help message                            |
-
-## Examples
-
-### Upload Profile Picture
-
-```bash
-pnpm run images:upload public/media/profiles/user-123.jpg --prefix users/profiles/
-```
-
-### Upload Gallery Images
-
-```bash
-pnpm run images:upload --dir public/media/gallery --prefix gallery/2026/
-```
-
-### Upload Multiple Event Photos
-
-```bash
-pnpm run images:upload \
-  ./events/photo1.jpg,./events/photo2.jpg,./events/photo3.jpg \
-  --prefix events/conference-2026/
-```
-
-### Upload Without Cache Invalidation
-
-```bash
-pnpm run images:upload --dir ./temp-images --no-invalidate
-```
-
-## Output Example
-
-```
-[UPLOAD-IMAGES] Starting upload to S3 bucket: my-bucket
-[UPLOAD-IMAGES] Using S3 prefix: user-content/
-[UPLOAD-IMAGES] Uploading: ./photo.jpg → s3://my-bucket/user-content/photo.jpg
-[UPLOAD-IMAGES] ✓ Uploaded: user-content/photo.jpg (245.5 KB)
-[UPLOAD-IMAGES] Invalidating CloudFront cache for 1 file(s)...
-[UPLOAD-IMAGES] ✓ CloudFront cache invalidation initiated
-
-============================================================
-[UPLOAD-IMAGES] Upload Summary: 1 successful, 0 failed, 0 skipped
-============================================================
-```
-
-## Error Handling
-
-The script provides detailed error reporting:
-
-- File not found errors
-- Non-image file warnings
-- S3 upload failures
-- CloudFront invalidation errors (non-fatal)
-
-Errors are collected and displayed in a summary at the end.
-
-## Integration with CI/CD
-
-```yaml
-# GitHub Actions example
-- name: Upload media assets
-  env:
-    S3_BUCKET: ${{ secrets.S3_BUCKET }}
-    CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  run: |
-    pnpm run images:upload --dir public/media
+S3_BUCKET="your-bucket"                  # Required
+AWS_REGION="us-east-1"                   # Default: us-east-1
+CLOUDFRONT_DISTRIBUTION_ID="..."         # Optional, for cache invalidation
 ```
 
 ---
 
-# CDN Sync Script
+## CDN Sync
 
-A TypeScript script that syncs Next.js static assets to S3 and invalidates CloudFront distribution.
+**File:** `sync-cdn.ts`
 
-## Usage
+Syncs Next.js build output (`.next/static`) and public assets (`public/media`) to S3, then creates a CloudFront wildcard invalidation. Optionally builds the Next.js app first.
+
+### Usage
+
+```bash
+# Run directly (recommended)
+pnpm exec tsx scripts/sync-cdn.ts
+
+# Skip the build step
+SKIP_BUILD=true pnpm exec tsx scripts/sync-cdn.ts
+```
+
+### Pipeline
+
+1. Validates config and tests S3 access
+2. Optionally builds the Next.js app
+3. Syncs `public/media` to S3 (24h cache for media, 5min for HTML)
+4. Syncs `.next/static` to S3 under `_next/static` (1-year immutable cache, excludes `.map` files)
+5. Syncs additional media from `music/`, `images/`, `videos/` if they exist
+6. Creates CloudFront wildcard invalidation (`/*`)
+7. Tests a sample file to confirm deployment
 
 ### Environment Variables
 
-Set these environment variables before running the script:
-
 ```bash
-# Required
-export S3_BUCKET="your-s3-bucket-name"
-
-# Optional
-export CLOUDFRONT_DISTRIBUTION_ID="your-cloudfront-distribution-id"
-export CDN_DOMAIN="https://cdn.fakefourrecords.com"
-export SKIP_BUILD="false"
-export SKIP_INVALIDATION="false"
+S3_BUCKET="your-bucket"                  # Required
+CDN_DOMAIN="https://cdn.example.com"     # Required
+CLOUDFRONT_DISTRIBUTION_ID="..."         # Optional, for invalidation
+SKIP_BUILD="false"                       # Optional
+SKIP_INVALIDATION="false"               # Optional
+SKIP_CLEANUP="false"                     # Optional
 ```
 
-### pnpm Scripts
+---
+
+## Stripe Seed
+
+**File:** `stripe-seed.ts`
+
+Seeds Stripe with the subscription product ("Fake Four Inc. Subscription") and its three pricing tiers.
+
+### Usage
 
 ```bash
-# Build Next.js and sync to CDN
-pnpm run build:cdn
-
-# Just sync (skip build)
-pnpm run sync:cdn:no-build
-
-# Run sync manually
-pnpm run sync:cdn
+pnpm run stripe:seed
 ```
 
-### Direct Usage
+Creates:
+
+- **Minimum tier**: $14.44/month
+- **Extra tier**: $24.44/month
+- **Extra Extra tier**: $44.44/month
+
+---
+
+## Coverage Regression Check
+
+**File:** `check-coverage-regression.ts`
+
+Compares current test coverage metrics against the baseline in `COVERAGE_METRICS.md`. Fails if any metric decreases beyond the 2% tolerance or drops below configured thresholds.
+
+### Usage
 
 ```bash
-# With tsx (recommended)
-pnpm exec tsx scripts/sync-cdn.ts
+# Run as part of coverage check (runs tests first)
+pnpm run test:coverage:check
 
-# Make executable and run directly
-chmod +x scripts/sync-cdn.ts
-./scripts/sync-cdn.ts
+# Or run the check alone after generating coverage
+pnpm exec tsx scripts/check-coverage-regression.ts
 ```
 
-## Features
+### Thresholds
 
-- 🚀 Builds Next.js application
-- 📦 Syncs `/_next/static/` files to S3 with immutable caching
-- 🖼️ Syncs `/public/` files to S3 with appropriate caching
-- 🏷️ Sets proper content types for different file types
-- ⚡ Creates CloudFront invalidation
-- 🎨 Colored console output
-- 🛡️ Error handling and validation
-- ⚙️ Configurable via environment variables
+- Statements, functions, lines: 95%
+- Branches: 85%
+- Tolerance: 2% decrease from baseline
 
-## Content Types
+---
 
-The script automatically sets proper content types for:
+## Data Migration Scripts
 
-- **JavaScript**: `application/javascript`
-- **CSS**: `text/css`
-- **Images**: `image/png`, `image/jpeg`, `image/webp`, etc.
-- **Fonts**: `font/woff`, `font/woff2`, `font/ttf`, etc.
+### Fix Featured Artist Connections
 
-## Caching Strategy
+**File:** `fix-featured-artist-connections.ts`
 
-- **Static files** (`/_next/static/`): 1 year cache, immutable
-- **Public files**: 24 hours cache
-- **HTML files**: 5 minutes cache
+Backfill script that connects `Artist` records to `FeaturedArtist` entries via release associations. Fixes "Unknown Artist" display issues.
 
-## Integration
+```bash
+# Dry run
+pnpm exec tsx scripts/fix-featured-artist-connections.ts --dry-run
 
-This script is designed to integrate into your CI/CD pipeline:
+# Apply
+pnpm exec tsx scripts/fix-featured-artist-connections.ts
+```
+
+### Fix Stripe Customer ID Index
+
+**File:** `fix-stripe-customer-id-index.ts`
+
+One-time migration that drops the legacy non-partial unique index on `User.stripeCustomerId` in MongoDB so Prisma can recreate it as a partial unique index (allowing multiple null values).
+
+```bash
+pnpm exec tsx scripts/fix-stripe-customer-id-index.ts
+```
+
+---
+
+## SVG Generators
+
+### Create Stardust SVG
+
+**File:** `create-stardust-svg.ts`
+
+CLI utility to generate parameterized stardust texture SVGs with configurable particle shapes (dot, diamond, triangle, wedge, crescent).
+
+```bash
+pnpm exec tsx scripts/create-stardust-svg.ts
+```
+
+### Generate Stardust SVG (TSX)
+
+**File:** `generate-stardust-svg.tsx`
+
+TSX variant of the stardust SVG generator.
+
+```bash
+pnpm exec tsx scripts/generate-stardust-svg.tsx
+```
+
+---
+
+## Shell Scripts (Infrastructure)
+
+These scripts manage AWS infrastructure and EC2 deployments. Most require AWS CLI and appropriate IAM credentials.
+
+| Script                             | Usage                                        | What it does                                                        |
+| ---------------------------------- | -------------------------------------------- | ------------------------------------------------------------------- |
+| `check-cloudfront-status.sh`       | `./scripts/check-cloudfront-status.sh`       | Checks CloudFront distribution status                               |
+| `detailed-deployment-check.sh`     | `./scripts/detailed-deployment-check.sh`     | Verifies S3 webpack chunks and timestamps match the build           |
+| `diagnose-cdn.sh`                  | `./scripts/diagnose-cdn.sh`                  | Diagnoses CloudFront and S3 configuration issues                    |
+| `fix-cloudfront-origin-path.sh`    | `./scripts/fix-cloudfront-origin-path.sh`    | Updates CloudFront origin path to fix 403 errors                    |
+| `fix-cloudfront-s3-access.sh`      | `./scripts/fix-cloudfront-s3-access.sh`      | Fixes CloudFront OAC and S3 bucket policy                           |
+| `force-container-refresh.sh`       | `./scripts/force-container-refresh.sh`       | Pulls latest Docker images from GHCR and restarts containers on EC2 |
+| `manual-deploy.sh`                 | `./scripts/manual-deploy.sh`                 | Manual deployment to EC2 via SSH                                    |
+| `manually-attach-oac.sh`           | `./scripts/manually-attach-oac.sh`           | Creates and attaches an OAC to a CloudFront distribution            |
+| `restart-containers.sh`            | `./scripts/restart-containers.sh`            | Restarts Docker containers on EC2                                   |
+| `revert-cloudfront-origin-path.sh` | `./scripts/revert-cloudfront-origin-path.sh` | Reverts CloudFront origin path to root                              |
+| `verify-deployment-consistency.sh` | `./scripts/verify-deployment-consistency.sh` | Verifies S3 chunks match live deployment                            |
+
+---
+
+## CI/CD Integration
 
 ```yaml
 # GitHub Actions example
@@ -523,5 +443,13 @@ This script is designed to integrate into your CI/CD pipeline:
     CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  run: pnpm run build:cdn
+  run: pnpm exec tsx scripts/sync-cdn.ts
+
+- name: Upload media assets
+  env:
+    S3_BUCKET: ${{ secrets.S3_BUCKET }}
+    CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  run: pnpm run images:upload --dir public/media
 ```

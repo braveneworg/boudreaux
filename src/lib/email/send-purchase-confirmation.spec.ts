@@ -32,13 +32,22 @@ vi.mock('./purchase-confirmation-email-text', () => ({
   buildPurchaseConfirmationEmailText: vi.fn().mockReturnValue('test text'),
 }));
 
-const mockSendEmailParams = vi.hoisted(() => vi.fn());
+const mockSendMail = vi.hoisted(() => vi.fn());
+const mockCreateTransport = vi.hoisted(() => vi.fn());
+
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: mockCreateTransport,
+  },
+}));
+
+const mockSendRawEmailParams = vi.hoisted(() => vi.fn());
 
 vi.mock('@aws-sdk/client-ses', () => ({
-  SendEmailCommand: class MockSendEmailCommand {
+  SendRawEmailCommand: class MockSendRawEmailCommand {
     input: unknown;
     constructor(params: unknown) {
-      mockSendEmailParams(params);
+      mockSendRawEmailParams(params);
       this.input = params;
     }
   },
@@ -60,6 +69,8 @@ describe('sendPurchaseConfirmationEmail', () => {
     mockMarkEmailSent.mockResolvedValue(true);
     mockResetEmailSent.mockResolvedValue(undefined);
     mockSesClientSend.mockResolvedValue({});
+    mockSendMail.mockResolvedValue({ message: Buffer.from('raw-mime-message') });
+    mockCreateTransport.mockReturnValue({ sendMail: mockSendMail });
     vi.mocked(buildPurchaseConfirmationEmailHtml).mockReturnValue('<html>test</html>');
     vi.mocked(buildPurchaseConfirmationEmailText).mockReturnValue('test text');
   });
@@ -112,22 +123,22 @@ describe('sendPurchaseConfirmationEmail', () => {
       expect(mockSesClientSend).toHaveBeenCalledTimes(1);
     });
 
-    it('should use EMAIL_FROM as the Source address', async () => {
+    it('should use EMAIL_FROM as the Source address in the raw email command', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
-      expect(mockSendEmailParams).toHaveBeenCalledWith(
+      expect(mockSendRawEmailParams).toHaveBeenCalledWith(
         expect.objectContaining({
           Source: 'noreply@fakefourrecords.com',
         })
       );
     });
 
-    it('should send to the customerEmail as the sole ToAddress', async () => {
+    it('should send to the customerEmail as the sole Destination', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
-      expect(mockSendEmailParams).toHaveBeenCalledWith(
+      expect(mockSendRawEmailParams).toHaveBeenCalledWith(
         expect.objectContaining({
-          Destination: { ToAddresses: ['buyer@example.com'] },
+          Destinations: ['buyer@example.com'],
         })
       );
     });
@@ -135,28 +146,32 @@ describe('sendPurchaseConfirmationEmail', () => {
     it('should include the release title in the email subject', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
-      expect(mockSendEmailParams).toHaveBeenCalledWith(
+      expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          Message: expect.objectContaining({
-            Subject: expect.objectContaining({
-              Data: expect.stringContaining('Test Album'),
-            }),
-          }),
+          subject: expect.stringContaining('Test Album'),
         })
       );
     });
 
-    it('should include both HTML and text bodies in the email message', async () => {
+    it('should include both HTML and text bodies in the email', async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
-      expect(mockSendEmailParams).toHaveBeenCalledWith(
+      expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          Message: expect.objectContaining({
-            Body: expect.objectContaining({
-              Html: expect.objectContaining({ Data: '<html>test</html>' }),
-              Text: expect.objectContaining({ Data: 'test text' }),
-            }),
-          }),
+          html: '<html>test</html>',
+          text: 'test text',
+        })
+      );
+    });
+
+    it('should attach the logo with the expected CID', async () => {
+      await sendPurchaseConfirmationEmail(validInput);
+
+      expect(mockSendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: expect.arrayContaining([
+            expect.objectContaining({ cid: 'logo@fakefourrecords.com' }),
+          ]),
         })
       );
     });

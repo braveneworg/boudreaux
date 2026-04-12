@@ -11,6 +11,26 @@ import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 
 import { ReleasePlayer } from './release-player';
 
+// Mock next/dynamic to render synchronously — no Promises involved.
+// The real next/dynamic lazy-loads DownloadDialog with { ssr: false }, which
+// defers rendering via React.lazy. This mock bypasses the async loader entirely
+// and returns a synchronous component that mirrors the DownloadDialog mock's
+// output so that getByTestId assertions work without awaiting.
+vi.mock('next/dynamic', () => ({
+  __esModule: true,
+  default: () => {
+    function DynamicDownloadDialog(props: { children?: ReactNode; artistName?: string }) {
+      return (
+        <div data-testid="download-dialog" data-artist-name={props.artistName}>
+          {props.children}
+        </div>
+      );
+    }
+    DynamicDownloadDialog.displayName = 'DynamicDownloadDialog';
+    return DynamicDownloadDialog;
+  },
+}));
+
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
 }));
@@ -171,6 +191,14 @@ vi.mock('@/app/components/download-dialog', () => ({
       {children}
     </div>
   ),
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
+vi.mock('@/app/components/download-trigger-button', () => ({
   DownloadTriggerButton: () => (
     <button data-testid="download-trigger-button" aria-label="Download music">
       download

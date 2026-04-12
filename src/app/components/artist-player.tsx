@@ -11,9 +11,10 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
+import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
-import { DownloadDialog, DownloadTriggerButton } from '@/app/components/download-dialog';
+import { DownloadTriggerButton } from '@/app/components/download-trigger-button';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import {
@@ -31,6 +32,11 @@ import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 import { ArtistReleaseInfo } from './artist-release-info';
+
+const DownloadDialog = nextDynamic(
+  () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
+  { ssr: false }
+);
 
 interface ArtistPlayerProps {
   /** Artist with published releases and tracks */
@@ -214,7 +220,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
       {/* Media player */}
       <MediaPlayer className="mb-2">
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-1">
           <div className="flex flex-col items-center">
             <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
               <div className="relative">

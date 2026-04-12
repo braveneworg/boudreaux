@@ -596,6 +596,7 @@ model ReleasePurchase {
   stripePaymentIntentId   String   @unique // Idempotency key for webhook deduplication
   stripeSessionId         String?  @unique // Stripe Checkout Session ID — polling key
   confirmationEmailSentAt DateTime? // Atomic guard — non-null = email already dispatched
+  refundedAt              DateTime? // Set when charge.refunded webhook fires
   purchasedAt             DateTime @default(now())
 
   @@unique([userId, releaseId]) // One purchase per user per release

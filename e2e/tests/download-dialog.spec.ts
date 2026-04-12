@@ -37,11 +37,9 @@ test.describe('Download Dialog — Purchased User', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    // Dialog should open with "Download Again" heading for returning purchasers
-    await expect(
-      userPage.getByRole('heading', { name: 'Download Again', exact: true })
-    ).toBeVisible({
-      timeout: 5_000,
+    // Dialog should recognize the user as a returning purchaser
+    await expect(userPage.getByText('You already purchased this on')).toBeVisible({
+      timeout: 10_000,
     });
   });
 
@@ -49,14 +47,8 @@ test.describe('Download Dialog — Purchased User', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
-
-    // Wait for the dialog heading to confirm we're in the right step
-    await expect(
-      userPage.getByRole('heading', { name: 'Download Again', exact: true })
-    ).toBeVisible({
-      timeout: 5_000,
-    });
 
     // Should show a multi-combobox for format selection
     const combobox = userPage.getByRole('combobox');
@@ -73,14 +65,8 @@ test.describe('Download Dialog — Purchased User', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
-
-    // Wait for the dialog heading
-    await expect(
-      userPage.getByRole('heading', { name: 'Download Again', exact: true })
-    ).toBeVisible({
-      timeout: 5_000,
-    });
 
     // Select all formats via the multi-combobox
     const combobox = userPage.getByRole('combobox');
@@ -157,6 +143,16 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
 });
 
 test.describe('Download Dialog — Multi-format selection', () => {
+  let e2eRelease1Id: string;
+
+  test.beforeAll(async () => {
+    const release = await prisma.release.findFirstOrThrow({
+      where: { title: 'E2E Album One' },
+      select: { id: true },
+    });
+    e2eRelease1Id = release.id;
+  });
+
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
@@ -164,14 +160,9 @@ test.describe('Download Dialog — Multi-format selection', () => {
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
-    await expect(
-      userPage.getByRole('heading', { name: 'Download Again', exact: true })
-    ).toBeVisible({
-      timeout: 5_000,
-    });
-
     // Open the multi-combobox
     const combobox = userPage.getByRole('combobox');
+    await expect(combobox).toBeVisible({ timeout: 5_000 });
     await combobox.click();
 
     // Select all formats
@@ -191,16 +182,12 @@ test.describe('Download Dialog — Multi-format selection', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
-
-    await expect(
-      userPage.getByRole('heading', { name: 'Download Again', exact: true })
-    ).toBeVisible({
-      timeout: 5_000,
-    });
 
     // Open the multi-combobox and select all formats
     const combobox = userPage.getByRole('combobox');
+    await expect(combobox).toBeVisible({ timeout: 5_000 });
     await combobox.click();
     await userPage.getByRole('option', { name: 'Select all' }).click();
     await userPage.keyboard.press('Escape');

@@ -61,6 +61,22 @@ class SimpleCache {
   }
 
   /**
+   * Delete all cached entries whose keys start with the given prefix.
+   * @param prefix - The prefix to match against cache keys
+   * @returns The number of entries removed
+   */
+  deleteByPrefix(prefix: string): number {
+    let count = 0;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Clear all cached values
    */
   clear(): void {

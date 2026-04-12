@@ -16,6 +16,8 @@ describe('Environment Validation', () => {
       AWS_ACCESS_KEY_ID: 'test-access-key-id',
       AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
       AWS_REGION: 'us-east-1',
+      AWS_S3_BUCKET_NAME: 'test-bucket',
+      CLOUDFLARE_SECRET: 'test-cloudflare-secret',
       STRIPE_SECRET_KEY: 'sk_test_123',
       STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',
@@ -267,6 +269,23 @@ describe('Environment Validation', () => {
       );
     });
 
+    it('should skip validation when SKIP_ENV_VALIDATION is true at runtime (no build phase)', () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      process.env = {
+        ...process.env,
+        SKIP_ENV_VALIDATION: 'true',
+        // NEXT_PHASE not set — simulates E2E webServer runtime, not a build
+        DATABASE_URL: undefined, // would normally cause an error
+      };
+
+      expect(() => validateEnvironment()).not.toThrow();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '⚠️  Environment validation skipped (SKIP_ENV_VALIDATION)'
+      );
+    });
+
     it('should automatically call validateEnvironment when NODE_ENV is production', async () => {
       vi.resetModules();
       process.env = {
@@ -274,6 +293,7 @@ describe('Environment Validation', () => {
         NODE_ENV: 'production',
         DATABASE_URL: 'mongodb://localhost:27017/test',
         AUTH_SECRET: 'a'.repeat(32),
+        CLOUDFLARE_SECRET: 'test-cloudflare-secret',
         EMAIL_SERVER_HOST: 'smtp.example.com',
         EMAIL_SERVER_USER: 'user@example.com',
         EMAIL_SERVER_PASSWORD: 'password',
@@ -281,6 +301,7 @@ describe('Environment Validation', () => {
         AWS_ACCESS_KEY_ID: 'test-access-key-id',
         AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
         AWS_REGION: 'us-east-1',
+        AWS_S3_BUCKET_NAME: 'test-bucket',
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',

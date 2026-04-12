@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import useArtistsQuery from '@/app/hooks/use-artists-query';
+import { useArtistsQuery } from '@/app/hooks/use-artists-query';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 

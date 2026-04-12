@@ -19,14 +19,14 @@ vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
 }));
 
 function buildRequest(searchParams: Record<string, string> = {}): NextRequest {
-  const url = new URL('http://localhost/api/releases/rel-1/digital-formats');
+  const url = new URL('http://localhost/api/releases/507f1f77bcf86cd799439011/digital-formats');
   for (const [key, value] of Object.entries(searchParams)) {
     url.searchParams.set(key, value);
   }
   return new NextRequest(url);
 }
 
-function buildContext(id = 'rel-1') {
+function buildContext(id = '507f1f77bcf86cd799439011') {
   return { params: Promise.resolve({ id }) };
 }
 

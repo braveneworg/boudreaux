@@ -41,9 +41,9 @@ export class UploadService {
       };
     }
 
-    // MIME type validation (allow empty — browsers may not report MIME for some formats)
+    // MIME type validation
     const validMimeTypes: readonly string[] = FORMAT_MIME_TYPES[formatType];
-    if (mimeType !== '' && !validMimeTypes.includes(mimeType)) {
+    if (!validMimeTypes.includes(mimeType)) {
       return {
         valid: false,
         error: `Invalid MIME type. Expected: ${validMimeTypes.join(', ')}`,

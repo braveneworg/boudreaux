@@ -90,7 +90,8 @@ export const changeUsernameAction = async (
         errorType: error instanceof Error ? error.constructor.name : typeof error,
         errorMessage: error instanceof Error ? error.message : String(error),
         errorCode: error instanceof PrismaClientKnownRequestError ? error.code : undefined,
-        errorStack: error instanceof Error ? error.stack : undefined,
+        errorStack:
+          process.env.NODE_ENV !== 'production' && error instanceof Error ? error.stack : undefined,
       };
       console.error('[changeUsernameAction] Error updating username:', errorDetails);
 
@@ -147,14 +148,14 @@ export const changeUsernameAction = async (
             break;
           default:
             formState.errors.general = [
-              `Database error (${prismaError.code}). Please try again or contact support.`,
+              'A database error occurred. Please try again or contact support.',
             ];
         }
       } else if (error instanceof Error) {
         // Handle general JavaScript errors
         console.error('[changeUsernameAction] JavaScript error:', error.message);
         formState.errors.general = [
-          error.message || 'Failed to update username. Please try again or contact support.',
+          'Failed to update username. Please try again or contact support.',
         ];
       } else {
         // Unknown error type

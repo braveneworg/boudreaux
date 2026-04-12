@@ -5,8 +5,6 @@
 
 import React from 'react';
 
-import { motion } from 'framer-motion';
-
 import ComboboxField from '@/app/components/forms/fields/combobox-field';
 import TextField from '@/app/components/forms/fields/text-field';
 import { Button } from '@/app/components/ui/button';
@@ -39,12 +37,7 @@ const ContactForm = ({
   setValue,
 }: ContactFormProps) => {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-4"
-    >
+    <div className="space-y-4 animate-in fade-in duration-300">
       <ComboboxField
         control={control}
         name="reason"
@@ -134,7 +127,7 @@ const ContactForm = ({
           <FormMessage className="text-red-600">{state.errors.general[0]}</FormMessage>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 };
 

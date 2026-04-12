@@ -34,8 +34,17 @@ export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEma
           <!-- Header -->
           <tr>
             <td style="background-color: #18181b; padding: 24px 32px;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
-              <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Purchase Confirmed</p>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align: middle; padding-right: 14px;">
+                    <img src="cid:logo@fakefourrecords.com" alt="Fake Four Inc." width="40" height="45" style="display: block; border: 0;" />
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
+                    <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Purchase Confirmed</p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 

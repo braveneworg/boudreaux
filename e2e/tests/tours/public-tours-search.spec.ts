@@ -2,31 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '@playwright/test';
-import { PrismaClient } from '@prisma/client';
-
-const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
-
-const prisma = new PrismaClient({
-  datasourceUrl: E2E_DATABASE_URL,
-});
 
 test.describe('Public Tours Search', () => {
-  test.afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  test.afterEach(async () => {
-    await prisma.tour.deleteMany({
-      where: {
-        OR: [
-          { title: { startsWith: 'E2E Beatles Partial' } },
-          { title: { startsWith: 'E2E Unique Search' } },
-        ],
-      },
-    });
-  });
-
   test.beforeEach(async ({ page }) => {
     // Navigate to tours page
     await page.goto('/tours');
@@ -77,29 +54,20 @@ test.describe('Public Tours Search', () => {
   });
 
   test('performs partial match search', async ({ page }) => {
-    const uniqueSuffix = Date.now();
-    const tourTitle = `E2E Beatles Partial ${uniqueSuffix}`;
-    await prisma.tour.create({
-      data: {
-        title: tourTitle,
-      },
-    });
-    await page.goto('/tours');
-    await page.waitForLoadState('networkidle');
-
     const searchInput = page.getByLabel('Search tours by artist name');
 
-    // First, search with full artist name to get baseline result count
-    await searchInput.fill(tourTitle);
+    // Search with full tour title (seeded: "E2E Beatles Reunion Tour")
+    await searchInput.fill('E2E Beatles Reunion Tour');
     await page.waitForTimeout(500);
     const fullResults = await page.locator('[data-testid="tour-card"]').count();
+    expect(fullResults).toBeGreaterThan(0);
 
     // Clear and search with partial string
     await page.getByLabel('Clear search').click();
-    await searchInput.fill(`Beatles Partial ${uniqueSuffix}`);
+    await searchInput.fill('Beatles Reunion');
     await page.waitForTimeout(500);
 
-    // Should find tours containing "Beat" (e.g., "Beatles") and not fewer than exact search
+    // Partial search should return at least as many results as exact search
     const partialResults = await page.locator('[data-testid="tour-card"]').count();
     expect(partialResults).toBeGreaterThan(0);
     expect(partialResults).toBeGreaterThanOrEqual(fullResults);
@@ -220,23 +188,13 @@ test.describe('Public Tours Search', () => {
   });
 
   test('shows singular "1 tour found" for single result', async ({ page }) => {
-    const uniqueSuffix = Date.now();
-    const uniqueTitle = `E2E Unique Search ${uniqueSuffix}`;
-    await prisma.tour.create({
-      data: {
-        title: uniqueTitle,
-      },
-    });
-    await page.goto('/tours');
-    await page.waitForLoadState('networkidle');
-
     const searchInput = page.getByLabel('Search tours by artist name');
 
-    // Search for something specific that should return exactly 1 result
-    await searchInput.fill(uniqueTitle);
+    // Search for "Night Out" — only the seeded "E2E Test Night Out" should match
+    await searchInput.fill('Night Out');
     await page.waitForTimeout(500);
 
-    // Assert count is exactly 1, then assert singular text unconditionally
+    // Assert count is exactly 1, then assert singular text
     const count = await page.locator('[data-testid="tour-card"]').count();
     expect(count).toBe(1);
     await expect(page.getByText('1 tour found')).toBeVisible();

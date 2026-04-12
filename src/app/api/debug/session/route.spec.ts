@@ -13,6 +13,19 @@ vi.mock('../../../../../auth', () => ({
 describe('GET /api/debug/session', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NODE_ENV', 'test');
+  });
+
+  it('should return 404 in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Not found');
+
+    vi.unstubAllEnvs();
   });
 
   it('should return 200 with full session data for admin users', async () => {
@@ -78,10 +91,10 @@ describe('GET /api/debug/session', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('Failed to get session');
-    expect(data.message).toBe('Auth service unavailable');
+    expect(data.message).toBe('An unexpected error occurred.');
   });
 
-  it('should return 500 with "Unknown error" when auth throws a non-Error', async () => {
+  it('should return 500 with generic error message when auth throws a non-Error', async () => {
     mockAuth.mockRejectedValue('some string error');
 
     const response = await GET();
@@ -89,7 +102,7 @@ describe('GET /api/debug/session', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('Failed to get session');
-    expect(data.message).toBe('Unknown error');
+    expect(data.message).toBe('An unexpected error occurred.');
   });
 
   it('should return hasUsername as false when admin has no username set', async () => {

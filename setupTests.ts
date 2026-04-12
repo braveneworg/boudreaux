@@ -153,15 +153,20 @@ if (typeof window !== 'undefined') {
   Element.prototype.scrollIntoView = vi.fn();
 
   // Override HTMLFormElement.requestSubmit for jsdom (jsdom@26 defines it but throws
-  // "Not implemented" when called, so we must replace it unconditionally)
-  HTMLFormElement.prototype.requestSubmit = function (submitter?: HTMLElement) {
-    if (submitter) {
-      const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-      this.dispatchEvent(submitEvent);
-    } else {
-      this.submit();
-    }
-  };
+  // "Not implemented" when called). Use Object.defineProperty because jsdom may
+  // define the property as non-writable, making plain assignment silently fail.
+  Object.defineProperty(HTMLFormElement.prototype, 'requestSubmit', {
+    configurable: true,
+    writable: true,
+    value: function requestSubmit(submitter?: HTMLElement) {
+      if (submitter) {
+        const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+        this.dispatchEvent(submitEvent);
+      } else {
+        this.submit();
+      }
+    },
+  });
 
   // Mock HTMLCanvasElement.getContext for components that use canvas
   // (e.g., chart libraries, image processing, etc.)

@@ -3,11 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextResponse } from 'next/server';
 
+import { HEALTH_LIMIT, healthLimiter } from '@/lib/config/rate-limit-tiers';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export const GET = withRateLimit(
+  healthLimiter,
+  HEALTH_LIMIT
+)(async () => {
   try {
     const dbHealth = await checkDatabaseHealth();
 
@@ -70,4 +75,4 @@ export async function GET() {
       }
     );
   }
-}
+});

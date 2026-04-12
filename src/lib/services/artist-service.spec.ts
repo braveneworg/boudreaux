@@ -10,12 +10,16 @@ import { prisma } from '../prisma';
 vi.mock('server-only', () => ({}));
 
 // Mock S3 with proper class syntax
-const mockS3Send = vi.fn().mockResolvedValue({});
+const { mockS3Send, MockS3Client } = vi.hoisted(() => {
+  const mockS3Send = vi.fn().mockResolvedValue({});
+  const MockS3Client = class {
+    send = mockS3Send;
+  };
+  return { mockS3Send, MockS3Client };
+});
 vi.mock('@aws-sdk/client-s3', () => {
   return {
-    S3Client: class MockS3Client {
-      send = mockS3Send;
-    },
+    S3Client: MockS3Client,
     PutObjectCommand: class MockPutObjectCommand {
       constructor(public params: Record<string, unknown>) {}
     },
@@ -24,6 +28,9 @@ vi.mock('@aws-sdk/client-s3', () => {
     },
   };
 });
+vi.mock('@/lib/utils/s3-client', () => ({
+  getS3Client: () => new MockS3Client(),
+}));
 
 vi.mock('../prisma', () => ({
   prisma: {

@@ -5,6 +5,18 @@ import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
+// Mock rate limiting to pass through
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  withRateLimit:
+    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+      handler(req, ctx),
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  pollingLimiter: {},
+  POLLING_LIMIT: 60,
+}));
+
 const mockFindBySessionId = vi.fn();
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
@@ -18,12 +30,14 @@ const makeRequest = (sessionId?: string) => {
   return new NextRequest(url);
 };
 
+const dummyContext = { params: Promise.resolve({}) };
+
 describe('GET /api/releases/[id]/purchase-status', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns 400 with missing_session_id when sessionId is absent', async () => {
     const request = makeRequest();
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(400);
     const json = await response.json();
@@ -34,7 +48,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
     mockFindBySessionId.mockResolvedValue(null);
 
     const request = makeRequest('cs_test_notfound');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     const json = await response.json();
@@ -50,7 +64,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
     });
 
     const request = makeRequest('cs_test_found');
-    const response = await GET(request);
+    const response = await GET(request, dummyContext);
 
     expect(response.status).toBe(200);
     const json = await response.json();

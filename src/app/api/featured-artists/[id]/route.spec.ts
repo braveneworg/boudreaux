@@ -26,7 +26,7 @@ vi.mock('@/lib/services/featured-artists-service', () => ({
 
 describe('Featured Artist by ID API Routes', () => {
   const mockFeaturedArtist = {
-    id: 'featured-artist-123',
+    id: '507f1f77bcf86cd799439011',
     displayName: 'Test Featured Artist',
     description: 'A test featured artist description',
     coverArt: 'https://example.com/cover.jpg',
@@ -55,15 +55,15 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123'
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'
       );
-      const response = await GET(request, createParams('featured-artist-123'));
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(JSON.parse(JSON.stringify(mockFeaturedArtist)));
       expect(FeaturedArtistsService.getFeaturedArtistById).toHaveBeenCalledWith(
-        'featured-artist-123'
+        '507f1f77bcf86cd799439011'
       );
     });
 
@@ -73,8 +73,10 @@ describe('Featured Artist by ID API Routes', () => {
         error: 'Featured artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/featured-artists/non-existent');
-      const response = await GET(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439012'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -88,9 +90,9 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123'
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'
       );
-      const response = await GET(request, createParams('featured-artist-123'));
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -104,9 +106,9 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123'
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'
       );
-      const response = await GET(request, createParams('featured-artist-123'));
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -119,9 +121,9 @@ describe('Featured Artist by ID API Routes', () => {
       );
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123'
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'
       );
-      const response = await GET(request, createParams('featured-artist-123'));
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -138,19 +140,19 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ displayName: 'Updated Artist' }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(JSON.parse(JSON.stringify(updatedFeaturedArtist)));
       expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
-        'featured-artist-123',
+        '507f1f77bcf86cd799439011',
         {
           displayName: 'Updated Artist',
         }
@@ -159,7 +161,7 @@ describe('Featured Artist by ID API Routes', () => {
 
     it('should return 400 when validation fails', async () => {
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({
@@ -167,7 +169,7 @@ describe('Featured Artist by ID API Routes', () => {
           }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -182,11 +184,14 @@ describe('Featured Artist by ID API Routes', () => {
         error: 'Featured artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/featured-artists/non-existent', {
-        method: 'PATCH',
-        body: JSON.stringify({ displayName: 'Updated Artist' }),
-      });
-      const response = await PATCH(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439012',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ displayName: 'Updated Artist' }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -200,13 +205,13 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ displayName: 'Updated Artist' }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -220,13 +225,13 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ displayName: 'Updated Artist' }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -239,13 +244,13 @@ describe('Featured Artist by ID API Routes', () => {
       );
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ displayName: 'Updated Artist' }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -259,17 +264,17 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ description: 'Updated description' }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
-        'featured-artist-123',
+        '507f1f77bcf86cd799439011',
         {
           description: 'Updated description',
         }
@@ -285,17 +290,17 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({ artistIds: [artistId1, artistId2] }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
-        'featured-artist-123',
+        '507f1f77bcf86cd799439011',
         expect.objectContaining({
           artists: {
             set: [{ id: artistId1 }, { id: artistId2 }],
@@ -311,7 +316,7 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'PATCH',
           body: JSON.stringify({
@@ -321,11 +326,11 @@ describe('Featured Artist by ID API Routes', () => {
           }),
         }
       );
-      const response = await PATCH(request, createParams('featured-artist-123'));
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
       expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
-        'featured-artist-123',
+        '507f1f77bcf86cd799439011',
         expect.objectContaining({
           publishedOn: new Date('2026-06-01T00:00:00.000Z'),
           featuredOn: new Date('2026-07-01T00:00:00.000Z'),
@@ -343,18 +348,18 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'DELETE',
         }
       );
-      const response = await DELETE(request, createParams('featured-artist-123'));
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ message: 'Featured artist deleted successfully' });
       expect(FeaturedArtistsService.hardDeleteFeaturedArtist).toHaveBeenCalledWith(
-        'featured-artist-123'
+        '507f1f77bcf86cd799439011'
       );
     });
 
@@ -364,10 +369,13 @@ describe('Featured Artist by ID API Routes', () => {
         error: 'Featured artist not found',
       });
 
-      const request = new NextRequest('http://localhost:3000/api/featured-artists/non-existent', {
-        method: 'DELETE',
-      });
-      const response = await DELETE(request, createParams('non-existent'));
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439012',
+        {
+          method: 'DELETE',
+        }
+      );
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439012'));
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -381,12 +389,12 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'DELETE',
         }
       );
-      const response = await DELETE(request, createParams('featured-artist-123'));
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -400,12 +408,12 @@ describe('Featured Artist by ID API Routes', () => {
       });
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'DELETE',
         }
       );
-      const response = await DELETE(request, createParams('featured-artist-123'));
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -418,12 +426,12 @@ describe('Featured Artist by ID API Routes', () => {
       );
 
       const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/featured-artist-123',
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
         {
           method: 'DELETE',
         }
       );
-      const response = await DELETE(request, createParams('featured-artist-123'));
+      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
       const data = await response.json();
 
       expect(response.status).toBe(500);

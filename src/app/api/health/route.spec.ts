@@ -1,11 +1,25 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { NextRequest } from 'next/server';
+
 import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 
 import { GET } from './route';
 
 // Import after mocking
+
+// Mock rate limiting to pass through
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  withRateLimit:
+    (_limiter: unknown, _limit: number) => (handler: Function) => (req: unknown, ctx: unknown) =>
+      handler(req, ctx),
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  healthLimiter: {},
+  HEALTH_LIMIT: 10,
+}));
 
 // Mock the database-utils module
 vi.mock('@/lib/utils/database-utils', () => ({
@@ -13,6 +27,9 @@ vi.mock('@/lib/utils/database-utils', () => ({
 }));
 
 describe('Health Check API', () => {
+  const dummyRequest = new NextRequest('http://localhost/api/health');
+  const dummyContext = { params: Promise.resolve({}) };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -24,7 +41,7 @@ describe('Health Check API', () => {
         latency: 25,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -40,7 +57,7 @@ describe('Health Check API', () => {
         error: 'Connection timeout',
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -57,7 +74,7 @@ describe('Health Check API', () => {
         error: 'Connection refused',
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -74,7 +91,7 @@ describe('Health Check API', () => {
         error: 'Connection refused',
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -88,7 +105,7 @@ describe('Health Check API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -104,7 +121,7 @@ describe('Health Check API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -119,7 +136,7 @@ describe('Health Check API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -135,7 +152,7 @@ describe('Health Check API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -151,7 +168,7 @@ describe('Health Check API', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -167,7 +184,7 @@ describe('Health Check API', () => {
         latency: 10,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
@@ -181,7 +198,7 @@ describe('Health Check API', () => {
         latency: 15,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
 
       expect(response.status).toBe(200);
       // No authentication headers should be required
@@ -193,7 +210,7 @@ describe('Health Check API', () => {
         latency: 20,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(typeof data).toBe('object');
@@ -209,7 +226,7 @@ describe('Health Check API', () => {
         latency: testLatency,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
       const data = await response.json();
 
       expect(data.latency).toBe(testLatency);
@@ -221,7 +238,7 @@ describe('Health Check API', () => {
         latency: 25,
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
 
       expect(response.headers.get('Cache-Control')).toContain('no-store');
       expect(response.headers.get('Cache-Control')).toContain('no-cache');
@@ -235,7 +252,7 @@ describe('Health Check API', () => {
         error: 'Connection failed',
       });
 
-      const response = await GET();
+      const response = await GET(dummyRequest, dummyContext);
 
       expect(response.headers.get('Cache-Control')).toContain('no-store');
       expect(response.headers.get('Cache-Control')).toContain('no-cache');

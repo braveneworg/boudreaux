@@ -4,12 +4,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { ComponentProps, ReactElement } from 'react';
+import type { ReactElement } from 'react';
 
 import Link from 'next/link';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Download, DownloadIcon, LogInIcon, UserPlus2Icon } from 'lucide-react';
+import { DownloadIcon, LogInIcon, UserPlus2Icon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 
@@ -387,6 +387,21 @@ export const DownloadDialog = ({
                 Select formats for <strong>{releaseTitle}</strong>
               </DialogDescription>
             </DialogHeader>
+
+            <p className="text-zinc-900 text-sm">
+              You already purchased this on{' '}
+              <strong>
+                {purchasedAt
+                  ? new Date(purchasedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })
+                  : 'a previous date'}
+              </strong>
+              .
+            </p>
+
             {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
               <>
                 <Button className="w-full" type="button" disabled>
@@ -534,30 +549,6 @@ export const DownloadDialog = ({
 };
 
 /**
- * Reusable trigger button for the DownloadDialog.
- * Positioned absolutely — must be placed inside a `relative` container.
+ * Re-export DownloadTriggerButton from its standalone module for backward compatibility.
  */
-export const DownloadTriggerButton = ({
-  className,
-  onClick,
-  ref,
-  ...props
-}: ComponentProps<'button'>) => (
-  <button
-    ref={ref}
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      onClick?.(e);
-    }}
-    className={cn(
-      'flex items-center gap-1.5 rounded-sm border border-white bg-zinc-900 font-semibold opacity-90 px-2 py-1 text-white transition-opacity hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-      className
-    )}
-    aria-label="Download music"
-    {...props}
-  >
-    <Download className="size-3.5" />
-    <span className="font-['Courier_New',monospace] text-sm leading-none">download</span>
-  </button>
-);
+export { DownloadTriggerButton } from './download-trigger-button';

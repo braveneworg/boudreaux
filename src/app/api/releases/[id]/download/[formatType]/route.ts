@@ -7,11 +7,14 @@ import { NextResponse } from 'next/server';
 
 import { getToken } from 'next-auth/jwt';
 
+import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_FREE_DOWNLOAD_QUOTA, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { DownloadAuthorizationService } from '@/lib/services/download-authorization-service';
 import { QuotaEnforcementService } from '@/lib/services/quota-enforcement-service';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /**
  * GET /api/releases/[id]/download/[formatType]
@@ -31,6 +34,21 @@ export async function GET(
   context: { params: Promise<{ id: string; formatType: string }> }
 ): Promise<NextResponse> {
   try {
+    // Rate limiting
+    const ip = extractClientIp(request);
+    try {
+      await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'RATE_LIMITED',
+          message: 'Too many requests. Please try again later.',
+        },
+        { status: 429 }
+      );
+    }
+
     // Step 1: Authentication check
     const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
     const token = await getToken({
@@ -53,6 +71,14 @@ export async function GET(
 
     const userId = token.sub;
     const { id: releaseId, formatType } = await context.params;
+
+    // Validate IDs
+    if (!isValidObjectId(releaseId)) {
+      return NextResponse.json(
+        { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
+        { status: 400 }
+      );
+    }
 
     // Validate formatType
     if (!VALID_FORMAT_TYPES.includes(formatType as DigitalFormatType)) {

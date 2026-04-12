@@ -6,9 +6,12 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
 import { validateBody } from '@/lib/utils/validate-request';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
@@ -22,13 +25,27 @@ function serializeRelease<T>(data: T): T {
 
 /**
  * GET /api/releases/[id]
- * Get a single release by ID
+ * Get a single release by ID.
+ *
+ * Query params:
+ *   withTracks – When "true", returns the release with tracks via `getReleaseWithTracks()`.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await params;
 
-    const result = await ReleaseService.getReleaseById(id);
+    if (!isValidObjectId(id)) {
+      return NextResponse.json({ error: 'Invalid release ID' }, { status: 400 });
+    }
+
+    const withTracks = request.nextUrl.searchParams.get('withTracks') === 'true';
+
+    const result = withTracks
+      ? await ReleaseService.getReleaseWithTracks(id)
+      : await ReleaseService.getReleaseById(id);
 
     if (!result.success) {
       const status =
@@ -40,12 +57,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(serializeRelease(result.data));
+    return NextResponse.json(serializeRelease(result.data), {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    });
   } catch (error) {
     console.error('Release GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * PATCH /api/releases/[id]

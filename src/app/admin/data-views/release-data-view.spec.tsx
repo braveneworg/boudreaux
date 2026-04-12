@@ -6,13 +6,13 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 
-import useReleasesQuery from '@/app/hooks/use-releases-query';
+import { useReleasesQuery } from '@/app/hooks/use-releases-query';
 
 import { ReleaseDataView } from './release-data-view';
 
 // Mock the useReleasesQuery hook
 vi.mock('@/app/hooks/use-releases-query', () => ({
-  default: vi.fn(),
+  useReleasesQuery: vi.fn(),
 }));
 
 // Mock next/navigation

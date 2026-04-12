@@ -149,6 +149,7 @@ describe('createPurchaseSessionAction', () => {
         stripePaymentIntentId: 'pi_test',
         stripeSessionId: 'cs_test_123',
         confirmationEmailSentAt: null,
+        refundedAt: null,
         purchasedAt: new Date(),
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
@@ -189,6 +190,7 @@ describe('createPurchaseSessionAction', () => {
         stripePaymentIntentId: 'pi_test',
         stripeSessionId: 'cs_test_123',
         confirmationEmailSentAt: null,
+        refundedAt: null,
         purchasedAt: new Date(),
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
@@ -208,6 +210,7 @@ describe('createPurchaseSessionAction', () => {
         stripePaymentIntentId: 'pi_test',
         stripeSessionId: 'cs_test_123',
         confirmationEmailSentAt: null,
+        refundedAt: null,
         purchasedAt: new Date(),
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
@@ -371,6 +374,7 @@ describe('createPurchaseSessionAction', () => {
         stripePaymentIntentId: 'pi_test',
         stripeSessionId: 'cs_test_123',
         confirmationEmailSentAt: null,
+        refundedAt: null,
         purchasedAt: new Date(),
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);

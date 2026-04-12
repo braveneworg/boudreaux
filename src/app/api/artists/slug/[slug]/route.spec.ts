@@ -11,6 +11,7 @@ import { GET } from './route';
 vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
     getArtistBySlug: vi.fn(),
+    getArtistBySlugWithReleases: vi.fn(),
   },
 }));
 
@@ -59,7 +60,11 @@ describe('Artist by Slug API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockArtist);
+      expect(data).toEqual({
+        ...mockArtist,
+        createdAt: mockArtist.createdAt.toISOString(),
+        updatedAt: mockArtist.updatedAt.toISOString(),
+      });
       expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-doe');
     });
 
@@ -127,6 +132,58 @@ describe('Artist by Slug API Route', () => {
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-michael-doe');
+    });
+  });
+
+  describe('GET /api/artists/slug/[slug]?withReleases=true', () => {
+    const mockArtistWithReleases = {
+      ...mockArtist,
+      releases: [{ release: { id: 'release-1', title: 'Album One' } }],
+    };
+
+    it('should call getArtistBySlugWithReleases when withReleases=true', async () => {
+      vi.mocked(ArtistService.getArtistBySlugWithReleases).mockResolvedValue({
+        success: true,
+        data: mockArtistWithReleases as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/slug/john-doe?withReleases=true'
+      );
+      const response = await GET(request, createParams('john-doe'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.releases).toHaveLength(1);
+      expect(ArtistService.getArtistBySlugWithReleases).toHaveBeenCalledWith('john-doe');
+      expect(ArtistService.getArtistBySlug).not.toHaveBeenCalled();
+    });
+
+    it('should call getArtistBySlug when withReleases is not set', async () => {
+      vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
+        success: true,
+        data: mockArtist as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists/slug/john-doe');
+      await GET(request, createParams('john-doe'));
+
+      expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-doe');
+      expect(ArtistService.getArtistBySlugWithReleases).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when artist not found with releases', async () => {
+      vi.mocked(ArtistService.getArtistBySlugWithReleases).mockResolvedValue({
+        success: false,
+        error: 'Artist not found',
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/artists/slug/no-one?withReleases=true'
+      );
+      const response = await GET(request, createParams('no-one'));
+
+      expect(response.status).toBe(404);
     });
   });
 });

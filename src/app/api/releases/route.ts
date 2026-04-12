@@ -9,23 +9,55 @@ import { ReleaseService } from '@/lib/services/release-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
+import { auth } from '../../../../auth';
+
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/releases
- * Get all releases or search for releases
- * Query params: skip, take, search, artistIds, published
+ * Get all releases or search for releases.
+ *
+ * Query params:
+ *   listing    – When "published", returns public published releases via `getPublishedReleases()`.
+ *   skip, take, search, artistIds, published – Pagination/filter params for admin listing mode.
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+    const listing = searchParams.get('listing');
+
+    if (listing === 'published') {
+      const result = await ReleaseService.getPublishedReleases();
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.error === 'Database unavailable' ? 503 : 500 }
+        );
+      }
+
+      return NextResponse.json(
+        { releases: result.data, count: result.data.length },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          },
+        }
+      );
+    }
+
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
     const search = searchParams.get('search');
     const artistIds = searchParams.getAll('artistIds');
     const published = searchParams.get('published');
+
+    const session = await auth();
+    if (!session?.user?.id || session.user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
 
     const MAX_TAKE = 100;
     const params = {
@@ -45,10 +77,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      releases: result.data,
-      count: result.data.length,
-    });
+    return NextResponse.json(
+      {
+        releases: result.data,
+        count: result.data.length,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, no-store',
+        },
+      }
+    );
   } catch (error) {
     console.error('Release GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

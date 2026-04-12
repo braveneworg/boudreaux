@@ -19,6 +19,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/app/components/u
 import { createPurchaseCheckoutSessionAction } from '@/lib/actions/create-purchase-checkout-session-action';
 import { createPurchaseSessionAction } from '@/lib/actions/create-purchase-session-action';
 import { ALREADY_PURCHASED_ERROR } from '@/lib/constants';
+import { queryKeys } from '@/lib/query-keys';
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 function getStripe() {
@@ -202,7 +203,7 @@ export const PurchaseCheckoutStep = ({
   }, [releaseId, releaseTitle, amountCents, customerEmail, onError]);
 
   const { data: purchaseStatus } = useQuery<PurchaseStatusResponse>({
-    queryKey: ['purchase-status', releaseId, sessionId],
+    queryKey: queryKeys.purchaseStatus.bySession(releaseId, sessionId ?? ''),
     queryFn: async () => {
       setPollCount((prev) => prev + 1);
       const res = await fetch(`/api/releases/${releaseId}/purchase-status?sessionId=${sessionId}`);

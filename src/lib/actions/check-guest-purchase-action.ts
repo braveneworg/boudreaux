@@ -36,7 +36,10 @@ export async function checkGuestPurchaseAction(
   releaseId: string
 ): Promise<GuestPurchaseStatus> {
   const headersList = await headers();
-  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'anonymous';
+  const ip =
+    headersList.get('x-real-ip') ||
+    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'anonymous';
 
   try {
     await limiter.check(10, ip);

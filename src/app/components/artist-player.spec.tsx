@@ -180,6 +180,14 @@ vi.mock('@/app/components/download-dialog', () => ({
   ),
 }));
 
+vi.mock('@/app/components/download-trigger-button', () => ({
+  DownloadTriggerButton: () => (
+    <button data-testid="download-trigger-button" aria-label="Download music">
+      download
+    </button>
+  ),
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   default: ({

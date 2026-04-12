@@ -364,6 +364,9 @@ async function seedTestDatabase() {
     });
 
     // Create a purchase record for regular user on E2E Album One (for download tests)
+    // Note: refundedAt and confirmationEmailSentAt must be explicitly set to null
+    // because Prisma with MongoDB won't match `{ refundedAt: null }` queries against
+    // documents where the field is completely absent.
     await prisma.releasePurchase.create({
       data: {
         userId: TEST_USERS.regular.id,
@@ -371,6 +374,8 @@ async function seedTestDatabase() {
         amountPaid: 799,
         stripePaymentIntentId: 'pi_e2e_test_purchase_album_one',
         stripeSessionId: 'cs_e2e_test_session_album_one',
+        refundedAt: null,
+        confirmationEmailSentAt: null,
         purchasedAt: new Date(),
       },
     });
@@ -410,6 +415,138 @@ async function seedTestDatabase() {
         },
       }),
     ]);
+
+    // ──────────────────────────────────────────────────────────────
+    // Create Tours, Venues, TourDates, and TourDateHeadliners
+    // for the public tours search e2e tests.
+    // ──────────────────────────────────────────────────────────────
+
+    // Create a "Beatles" artist for headliner search tests
+    const beatlesArtist = await prisma.artist.create({
+      data: {
+        firstName: 'The',
+        surname: 'Beatles',
+        slug: 'the-beatles',
+        displayName: 'The Beatles',
+        publishedOn: new Date(),
+      },
+    });
+
+    // Create venues
+    const [venue1, venue2, venue3] = await Promise.all([
+      prisma.venue.create({
+        data: {
+          name: 'The Fillmore',
+          city: 'San Francisco',
+          state: 'CA',
+          country: 'US',
+        },
+      }),
+      prisma.venue.create({
+        data: {
+          name: 'Madison Square Garden',
+          city: 'New York',
+          state: 'NY',
+          country: 'US',
+        },
+      }),
+      prisma.venue.create({
+        data: {
+          name: 'The Roxy',
+          city: 'Los Angeles',
+          state: 'CA',
+          country: 'US',
+        },
+      }),
+    ]);
+
+    // Tour 1: Beatles headliner tour (matches "Beatles" search)
+    const tour1 = await prisma.tour.create({
+      data: { title: 'E2E Summer Tour 2026' },
+    });
+
+    const tourDate1 = await prisma.tourDate.create({
+      data: {
+        tourId: tour1.id,
+        venueId: venue1.id,
+        startDate: new Date('2026-07-15'),
+        showStartTime: new Date('2026-07-15T20:00:00Z'),
+      },
+    });
+
+    await prisma.tourDateHeadliner.create({
+      data: {
+        tourDateId: tourDate1.id,
+        artistId: beatlesArtist.id,
+        sortOrder: 0,
+      },
+    });
+
+    // Tour 2: Rock tour with E2E Artist headliner (matches "Rock" and "E2E Artist")
+    const tour2 = await prisma.tour.create({
+      data: { title: 'E2E Rock Festival 2026' },
+    });
+
+    const tourDate2 = await prisma.tourDate.create({
+      data: {
+        tourId: tour2.id,
+        venueId: venue2.id,
+        startDate: new Date('2026-08-20'),
+        showStartTime: new Date('2026-08-20T19:00:00Z'),
+      },
+    });
+
+    await prisma.tourDateHeadliner.create({
+      data: {
+        tourDateId: tourDate2.id,
+        artistId: e2eArtist.id,
+        sortOrder: 0,
+      },
+    });
+
+    // Tour 3: Another Beatles tour (so "Beatles" search returns multiple results)
+    const tour3 = await prisma.tour.create({
+      data: { title: 'E2E Beatles Reunion Tour' },
+    });
+
+    const tourDate3 = await prisma.tourDate.create({
+      data: {
+        tourId: tour3.id,
+        venueId: venue3.id,
+        startDate: new Date('2026-09-10'),
+        showStartTime: new Date('2026-09-10T21:00:00Z'),
+      },
+    });
+
+    await prisma.tourDateHeadliner.create({
+      data: {
+        tourDateId: tourDate3.id,
+        artistId: beatlesArtist.id,
+        sortOrder: 0,
+      },
+    });
+
+    // Tour 4: Test tour (matches "Test" search)
+    const tour4 = await prisma.tour.create({
+      data: { title: 'E2E Test Night Out' },
+    });
+
+    const tourDate4 = await prisma.tourDate.create({
+      data: {
+        tourId: tour4.id,
+        venueId: venue1.id,
+        startDate: new Date('2026-10-05'),
+        showStartTime: new Date('2026-10-05T20:30:00Z'),
+      },
+    });
+
+    await prisma.tourDateHeadliner.create({
+      data: {
+        tourDateId: tourDate4.id,
+        artistId: e2eArtist.id,
+        sortOrder: 0,
+      },
+    });
 
     console.info('E2E test database seeded successfully.');
   } finally {

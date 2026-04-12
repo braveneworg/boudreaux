@@ -9,6 +9,8 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
+import { auth } from '../../../../auth';
+
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id || session.user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const skip = searchParams.get('skip');
     const take = searchParams.get('take');
@@ -41,10 +48,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      artists: result.data,
-      count: result.data.length,
-    });
+    return NextResponse.json(
+      {
+        artists: result.data,
+        count: result.data.length,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, no-store',
+        },
+      }
+    );
   } catch (error) {
     console.error('Artist GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

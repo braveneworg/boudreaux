@@ -6,6 +6,14 @@ import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
+vi.mock('@/lib/decorators/with-rate-limit', () => ({
+  extractClientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  downloadLimiter: { check: vi.fn().mockResolvedValue(undefined) },
+  DOWNLOAD_LIMIT: 10,
+}));
+
 const mockGetToken = vi.fn();
 vi.mock('next-auth/jwt', () => ({
   getToken: (...args: unknown[]) => mockGetToken(...args),
@@ -47,23 +55,26 @@ vi.mock('@/lib/services/quota-enforcement-service', () => {
 });
 
 function makeRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/releases/release-1/download/MP3_320KBPS', {
-    headers: {
-      'x-forwarded-for': '127.0.0.1',
-      'user-agent': 'test-agent',
-    },
-  });
+  return new NextRequest(
+    'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS',
+    {
+      headers: {
+        'x-forwarded-for': '127.0.0.1',
+        'user-agent': 'test-agent',
+      },
+    }
+  );
 }
 
-function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
+function makeParams(id = '507f1f77bcf86cd799439011', formatType = 'MP3_320KBPS') {
   return { params: Promise.resolve({ id, formatType }) };
 }
 
 const mockFormat = {
   id: 'format-1',
-  releaseId: 'release-1',
+  releaseId: '507f1f77bcf86cd799439011',
   formatType: 'MP3_320KBPS',
-  s3Key: 'releases/release-1/digital-formats/MP3_320KBPS/file.mp3',
+  s3Key: 'releases/507f1f77bcf86cd799439011/digital-formats/MP3_320KBPS/file.mp3',
   fileName: 'album.mp3',
   fileSize: BigInt(50000000),
   mimeType: 'audio/mpeg',
@@ -101,7 +112,10 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
   });
 
   it('should return 400 for invalid format type', async () => {
-    const response = await GET(makeRequest(), makeParams('release-1', 'INVALID_FORMAT'));
+    const response = await GET(
+      makeRequest(),
+      makeParams('507f1f77bcf86cd799439011', 'INVALID_FORMAT')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(400);
@@ -141,7 +155,7 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(mockIncrementQuota).toHaveBeenCalledWith('user-123', 'release-1');
+    expect(mockIncrementQuota).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
   });
 
   it('should not increment quota when already downloaded', async () => {
@@ -209,7 +223,11 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     await GET(makeRequest(), makeParams());
 
     expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, userId: 'user-123', releaseId: 'release-1' })
+      expect.objectContaining({
+        success: true,
+        userId: 'user-123',
+        releaseId: '507f1f77bcf86cd799439011',
+      })
     );
   });
 
@@ -239,7 +257,7 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
   it('should use fallback values when headers are missing', async () => {
     const req = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
     );
 
     await GET(req, makeParams());
@@ -254,7 +272,7 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
   it('should use fallback header values in quota exceeded log event', async () => {
     const req = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
     );
     mockCheckPurchaseStatus.mockResolvedValue(false);
     mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
@@ -272,7 +290,7 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
   it('should use fallback header values in deleted format log event', async () => {
     const req = new NextRequest(
-      'http://localhost:3000/api/releases/release-1/download/MP3_320KBPS'
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
     );
     const deletedFormat = { ...mockFormat, deletedAt: new Date() };
     mockCheckFormatExists.mockResolvedValue(deletedFormat);

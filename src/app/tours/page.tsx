@@ -1,29 +1,39 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
-import { ToursPageClient } from './components/tours-page-client';
+import type { ToursResponse } from '@/app/hooks/use-tours-query';
+import { queryKeys } from '@/lib/query-keys';
+import { fetchApi } from '@/lib/utils/fetch-api';
+import { getQueryClient } from '@/lib/utils/get-query-client';
+
+import { ToursContent } from './components/tours-content';
 
 /**
- * Public tours listing page with search functionality
- * Hybrid component: Server Component wrapper with Client Component for search
+ * Public tours listing page with search functionality.
+ * Server Component prefetches tour data for SSR, client component handles interactivity.
  */
 export default async function ToursPage() {
-  // Fetch all tours with related data, sorted by most recent first
-  // TourRepository.findAll already includes venue, headliners, artists, and images
-  const tours = await TourRepository.findAll();
+  const queryClient = getQueryClient();
+
+  await queryClient.prefetchQuery({
+    queryKey: queryKeys.tours.list(),
+    queryFn: () => fetchApi<ToursResponse>('/api/tours'),
+  });
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight">Tours</h1>
-        <p className="text-lg text-muted-foreground">
-          Search and browse upcoming and recent tour dates
-        </p>
-      </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <div className="container mx-auto py-8">
+        <div className="mb-8 space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight">Tours</h1>
+          <p className="text-lg text-muted-foreground">
+            Search and browse upcoming and recent tour dates
+          </p>
+        </div>
 
-      <ToursPageClient tours={tours} />
-    </div>
+        <ToursContent />
+      </div>
+    </HydrationBoundary>
   );
 }

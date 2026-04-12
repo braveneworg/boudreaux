@@ -1,45 +1,62 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import Image from 'next/image';
+import type { ComponentType } from 'react';
+
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils/tailwind-utils';
 
-const menuLinks = [
+import {
+  BandcampIcon,
+  FacebookIcon,
+  InstagramIcon,
+  SpotifyIcon,
+  TikTokIcon,
+  XIcon,
+  YouTubeIcon,
+} from './social-media-icons';
+
+interface MenuLink {
+  href: string;
+  Icon: ComponentType<{ className?: string; size?: number }>;
+  label: string;
+}
+
+const menuLinks: MenuLink[] = [
   {
     href: 'https://facebook.com/fakefourinc',
-    icon: '/media/icons/social-media/facebook-icon.svg',
+    Icon: FacebookIcon,
     label: 'Facebook',
   },
   {
     href: 'https://instagram.com/fakefourinc',
-    icon: '/media/icons/social-media/instagram-icon.svg',
+    Icon: InstagramIcon,
     label: 'Instagram',
   },
   {
     href: 'https://YouTube.com/fakefourinc',
-    icon: '/media/icons/social-media/youtube-icon.svg',
+    Icon: YouTubeIcon,
     label: 'YouTube',
   },
   {
     href: 'https://fakefour.bandcamp.com',
-    icon: '/media/icons/social-media/bandcamp-icon.svg',
+    Icon: BandcampIcon,
     label: 'Bandcamp',
   },
   {
     href: 'https://x.com/fakefour',
-    icon: '/media/icons/social-media/x-icon.svg',
+    Icon: XIcon,
     label: 'X',
   },
   {
     href: 'https://tiktok.com/@fakefourinc',
-    icon: '/media/icons/social-media/tiktok-icon.svg',
+    Icon: TikTokIcon,
     label: 'TikTok',
   },
   {
     href: 'https://open.spotify.com/user/fakefourinc',
-    icon: '/media/icons/social-media/spotify-icon.svg',
+    Icon: SpotifyIcon,
     label: 'Spotify',
   },
 ];
@@ -57,7 +74,7 @@ const SocialMediaIconLinks = ({ className }: { className: string }) => (
         target="_blank"
         title={link.label}
       >
-        <Image alt={link.label} height={40} src={link.icon} width={40} />
+        <link.Icon size={24} />
         <span className="sr-only">{link.label}</span>
       </Link>
     ))}

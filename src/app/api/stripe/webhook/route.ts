@@ -90,6 +90,9 @@ export async function POST(request: NextRequest) {
       case 'invoice.payment_failed':
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
         break;
+      case 'charge.refunded':
+        await handleChargeRefunded(event.data.object as Stripe.Charge);
+        break;
       default:
         break;
     }
@@ -373,6 +376,23 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   await SubscriptionRepository.updateSubscriptionStatus(stripeCustomerId, 'past_due');
+}
+
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+
+  if (!paymentIntentId) {
+    console.error('charge.refunded missing payment_intent', { chargeId: charge.id });
+    return;
+  }
+
+  const marked = await PurchaseRepository.markRefunded(paymentIntentId);
+  if (marked) {
+    console.info('charge.refunded: purchase marked as refunded', { paymentIntentId });
+  } else {
+    console.warn('charge.refunded: no matching un-refunded purchase found', { paymentIntentId });
+  }
 }
 
 /**

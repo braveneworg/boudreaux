@@ -5,6 +5,7 @@
 import { getPresignedUploadUrlsAction } from './presigned-upload-actions';
 import { auth } from '../../../auth';
 import { requireRole } from '../utils/auth/require-role';
+import { getS3BucketName } from '../utils/s3-client';
 
 vi.mock('server-only', () => ({}));
 vi.mock('../../../auth');
@@ -23,16 +24,19 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
-// Mock AWS SDK with class-style S3Client
-const mockGetSignedUrl = vi.fn();
+// Mock shared S3 client
+const { mockSend, mockGetSignedUrl } = vi.hoisted(() => ({
+  mockSend: vi.fn().mockResolvedValue({}),
+  mockGetSignedUrl: vi.fn(),
+}));
+vi.mock('../utils/s3-client', () => ({
+  getS3Client: vi.fn(() => ({ send: mockSend })),
+  getS3BucketName: vi.fn(() => 'test-bucket'),
+}));
+
+// Mock AWS SDK
 vi.mock('@aws-sdk/client-s3', () => {
   return {
-    S3Client: class MockS3Client {
-      constructor() {}
-      send() {
-        return Promise.resolve({});
-      }
-    },
     PutObjectCommand: class MockPutObjectCommand {
       constructor(public params: Record<string, unknown>) {}
     },
@@ -227,15 +231,17 @@ describe('presigned-upload-actions', () => {
     });
 
     describe('S3 configuration', () => {
-      it('should return error when S3_BUCKET is not configured', async () => {
-        delete process.env.S3_BUCKET;
+      it('should return error when S3 bucket is not configured', async () => {
+        vi.mocked(getS3BucketName).mockImplementationOnce(() => {
+          throw new Error('S3 bucket not configured');
+        });
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
         ]);
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('S3 storage is not configured');
+        expect(result.error).toContain('S3 bucket not configured');
       });
     });
 

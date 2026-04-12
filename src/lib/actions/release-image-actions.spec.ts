@@ -47,6 +47,10 @@ vi.mock('@aws-sdk/client-s3', () => {
   };
 });
 
+vi.mock('@/lib/utils/s3-client', () => ({
+  getS3Client: () => ({ send: mockS3Send }),
+}));
+
 describe('release-image-actions', () => {
   const mockSession = {
     user: {

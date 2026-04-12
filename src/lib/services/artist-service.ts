@@ -3,11 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { PutObjectCommand, S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { getS3Client } from '@/lib/utils/s3-client';
 import { splitFullName } from '@/lib/utils/split-full-name';
 
 import { prisma } from '../prisma';
@@ -35,19 +36,6 @@ export interface ImageUploadResult {
   altText?: string;
   sortOrder: number;
 }
-
-/**
- * S3 client configuration
- */
-const getS3Client = () => {
-  return new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
-  });
-};
 
 /**
  * Generate a unique file key for S3
@@ -300,7 +288,6 @@ export class ArtistService {
         return { success: false, error: 'Artist not found' };
       }
 
-      const s3Client = getS3Client();
       const s3Bucket = process.env.S3_BUCKET;
       const cdnDomainRaw = process.env.CDN_DOMAIN;
       // Strip any existing protocol from CDN domain to avoid double https://
@@ -309,6 +296,8 @@ export class ArtistService {
       if (!s3Bucket) {
         return { success: false, error: 'S3 bucket not configured' };
       }
+
+      const s3Client = getS3Client();
 
       // Generate unique S3 key
       const s3Key = generateS3Key(artistId, imageData.fileName);

@@ -159,7 +159,7 @@ describe('signupAction', () => {
         redirectTo: '/',
       });
 
-      expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test@example.com');
+      expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
 
     it('should generate username when creating user', async () => {

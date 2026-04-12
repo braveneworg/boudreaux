@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { ReleaseService } from '@/lib/services/release-service';
 
 import { GET, POST as postHandler } from './route';
+import { auth } from '../../../../auth';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -16,9 +17,15 @@ vi.mock('@/lib/decorators/with-auth', () => ({
   withAdmin: (handler: () => unknown) => handler,
 }));
 
+// Mock auth for inline admin checks in the non-published listing path
+vi.mock('../../../../auth', () => ({
+  auth: vi.fn().mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } }),
+}));
+
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
     getReleases: vi.fn(),
+    getPublishedReleases: vi.fn(),
     createRelease: vi.fn(),
   },
 }));
@@ -73,6 +80,32 @@ describe('Release API Routes', () => {
   });
 
   describe('GET /api/releases', () => {
+    it('should return 401 when not authenticated for admin listing', async () => {
+      vi.mocked(auth).mockResolvedValueOnce(null as never);
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when user role is not admin for admin listing', async () => {
+      vi.mocked(auth).mockResolvedValueOnce({
+        user: { id: 'user-1', role: 'user', email: 'user@example.com', name: 'User' },
+      } as never);
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'Authentication required' });
+      expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+    });
+
     it('should return all releases with default parameters', async () => {
       const mockReleases = [mockRelease];
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
@@ -90,6 +123,19 @@ describe('Release API Routes', () => {
         count: 1,
       });
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({});
+    });
+
+    it('should include Cache-Control: private, no-store header on admin GET response', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     });
 
     it('should handle pagination parameters', async () => {
@@ -225,6 +271,62 @@ describe('Release API Routes', () => {
       expect(response.status).toBe(200);
       expect(ReleaseService.getReleases).toHaveBeenCalledWith({
         skip: 0,
+      });
+    });
+
+    describe('listing=published mode', () => {
+      it('should call getPublishedReleases when listing=published', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [mockRelease] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data).toEqual({ releases: [mockRelease], count: 1 });
+        expect(ReleaseService.getPublishedReleases).toHaveBeenCalled();
+        expect(ReleaseService.getReleases).not.toHaveBeenCalled();
+      });
+
+      it('should include Cache-Control header for published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.headers.get('Cache-Control')).toBe(
+          'public, s-maxage=60, stale-while-revalidate=300'
+        );
+      });
+
+      it('should return 503 for db error in published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: false,
+          error: 'Database unavailable',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.status).toBe(503);
+      });
+
+      it('should return 500 for other errors in published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: false,
+          error: 'Failed to fetch',
+        });
+
+        const request = new NextRequest('http://localhost:3000/api/releases?listing=published');
+        const response = await GET(request);
+
+        expect(response.status).toBe(500);
       });
     });
 

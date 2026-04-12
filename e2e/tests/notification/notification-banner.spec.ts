@@ -18,7 +18,8 @@ test.describe('Notification Banner Carousel', () => {
     const tablist = page.getByRole('tablist', { name: 'Banner slides' });
     await expect(tablist).toBeVisible();
 
-    // There are 5 hardcoded banner slots (each with a static image)
+    // The carousel always renders 1 dot per banner slot (5 slots total),
+    // regardless of how many notifications are seeded in the database.
     const tabs = tablist.getByRole('tab');
     await expect(tabs).toHaveCount(5);
 

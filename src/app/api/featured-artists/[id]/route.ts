@@ -4,9 +4,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { validateBody } from '@/lib/utils/validate-request';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
@@ -20,9 +23,16 @@ function serializeBigInts<T>(data: T): T {
  * GET /api/featured-artists/[id]
  * Get a single featured artist by ID
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await params;
+
+    if (!isValidObjectId(id)) {
+      return NextResponse.json({ error: 'Invalid featured artist ID' }, { status: 400 });
+    }
 
     const result = await FeaturedArtistsService.getFeaturedArtistById(id);
 
@@ -36,12 +46,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(serializeBigInts(result.data));
+    return NextResponse.json(serializeBigInts(result.data), {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    });
   } catch (error) {
     console.error('FeaturedArtist GET by ID error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * PATCH /api/featured-artists/[id]

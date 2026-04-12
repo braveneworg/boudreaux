@@ -14,6 +14,8 @@ const config = {
   images: {
     // Reduce default max device size from 3840 to 1920 for better performance
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    // Cache optimized images for 1 day (default is 60s) — images rarely change
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         protocol: 'https',
@@ -56,6 +58,7 @@ const config = {
   // the nginx config has location-specific client_max_body_size settings.
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   experimental: {
+    optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
       bodySizeLimit: '50mb',
     },
@@ -64,6 +67,8 @@ const config = {
   // Configure headers
   async headers() {
     // Build Content-Security-Policy based on environment
+    // NOTE: 'unsafe-eval' is required by Stripe.js for its iframe-based payment elements.
+    // A nonce-based CSP should replace 'unsafe-eval' and 'unsafe-inline' in a future PR.
     const cspParts = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://js.stripe.com",
@@ -89,6 +94,26 @@ const config = {
     }
 
     return [
+      // Favicon — rarely changes; 1-day cache + 7-day SWR
+      {
+        source: '/favicon.ico',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      // Media assets proxied from CDN — content-addressed, safe to cache forever
+      {
+        source: '/media/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
       {
         source: '/(.*)',
         headers: [

@@ -7,26 +7,14 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { getS3Client } from '@/lib/utils/s3-client';
 
 import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
-
-/**
- * S3 client configuration
- */
-const getS3Client = () => {
-  return new S3Client({
-    region: process.env.AWS_REGION || 'us-east-1',
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
-  });
-};
 
 /**
  * Result type for image upload actions
