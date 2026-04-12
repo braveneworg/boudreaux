@@ -54,7 +54,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Run tests (shard ${{ matrix.shard }}/2)
-        run: pnpm run test:shard -- --shard=${{ matrix.shard }}/2
+        run: pnpm run test:shard --shard=${{ matrix.shard }}/2
         env:
           CI: true
 
