@@ -331,6 +331,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24.14.1"
+          cache: 'pnpm'
 
       - name: Install dependencies for sync script
         run: pnpm install --frozen-lockfile
@@ -1246,6 +1247,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24.14.1"
+          cache: 'pnpm'
 
       - name: Bump version
         if: steps.bump-type.outputs.skip != 'true'
