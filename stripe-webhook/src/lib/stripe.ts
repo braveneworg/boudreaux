@@ -4,5 +4,13 @@
 
 import Stripe from 'stripe';
 
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+if (!stripeSecretKey) {
+  throw new Error(
+    'Missing required environment variable: STRIPE_SECRET_KEY. Configure it before initializing the Stripe client.',
+  );
+}
+
 /** Reuse across warm Lambda invocations. */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export const stripe = new Stripe(stripeSecretKey);
