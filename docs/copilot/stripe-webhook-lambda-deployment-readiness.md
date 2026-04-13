@@ -158,22 +158,23 @@ aws cloudformation describe-stacks \
 
 ### Step 7: Register the webhook in Stripe
 
-1. Go to **dashboard.stripe.com → Developers → Webhooks → Add endpoint**
-2. Set **Endpoint URL** to the `WebhookUrl` from Step 6
-3. Select these events:
+1. Go to **dashboard.stripe.com → Developers → Webhooks → Add destination**
+2. Select **Webhook** as the destination type
+3. Set **Endpoint URL** to the `WebhookUrl` from Step 6
+4. Select these events:
    - `checkout.session.completed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `invoice.payment_failed`
    - `charge.refunded`
-4. Click **Add endpoint**
-5. **Reveal** the signing secret (`whsec_...`) and update SSM:
+5. Click **Create destination**
+6. **Reveal** the signing secret (`whsec_...`) and update SSM:
 
 ```bash
 aws ssm put-parameter \
   --name /fakefour/stripe/webhook-secret \
   --value "whsec_..." \
-  --type SecureString \
+  --type String \
   --overwrite
 ```
 
