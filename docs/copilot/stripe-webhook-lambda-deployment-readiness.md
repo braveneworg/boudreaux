@@ -187,10 +187,14 @@ aws ssm put-parameter \
 stripe trigger checkout.session.completed \
   --webhook-endpoint https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/production/webhooks/stripe
 
-# Tail Lambda logs
-sam logs --name StripeWebhookFunction --stack-name fakefour-stripe-webhook --tail
+# Tail Lambda logs (sam logs has a known bug with custom StageName — use AWS CLI instead)
+aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --follow
+# To find the exact log group name:
+#   aws logs describe-log-groups --log-group-name-prefix /aws/lambda/fakefour-stripe-webhook
 # Or: AWS Console → CloudWatch → Log groups → /aws/lambda/fakefour-stripe-webhook-*
 ```
+
+---Stopped here---
 
 ### Step 9: Decide what to do with the existing Next.js webhook handler
 
@@ -203,12 +207,13 @@ The handler at `src/app/api/stripe/webhook/route.ts` still exists. Options:
 
 ## Troubleshooting
 
-| Symptom                                     | Likely cause                               | Fix                                                                                                  |
-| ------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `400 Webhook signature verification failed` | Body was parsed before `constructEvent`    | Ensure `event.body` is passed as-is (raw string)                                                     |
-| `No handler found for runtime nodejs24.x`   | SAM CLI version too old                    | `brew upgrade aws-sam-cli`                                                                           |
-| Prisma engine not found at runtime          | Wrong binary in layer                      | Confirm `linux-arm64-openssl-3.0.x` binary is in `layers/prisma/nodejs/node_modules/.prisma/client/` |
-| GitHub Actions OIDC error                   | Trust policy condition mismatch            | Check `braveneworg/boudreaux` matches exactly in the trust policy                                    |
-| `placeholder` webhook secret in SSM         | Forgot to update after Stripe registration | Run the `aws ssm put-parameter --overwrite` command from Step 7                                      |
-| SES `AccessDenied`                          | Missing IAM policy                         | Verify `template.yaml` has the `ses:SendEmail` policy on the function                                |
-| MongoDB connection refused                  | Atlas IP allowlist blocking Lambda         | Add `0.0.0.0/0` to Atlas IP Access List or use VPC                                                   |
+| Symptom                                                    | Likely cause                                     | Fix                                                                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Webhook signature verification failed`                | Body was parsed before `constructEvent`          | Ensure `event.body` is passed as-is (raw string)                                                                                                                       |
+| `No handler found for runtime nodejs24.x`                  | SAM CLI version too old                          | `brew upgrade aws-sam-cli`                                                                                                                                             |
+| Prisma engine not found at runtime                         | Wrong binary in layer                            | Confirm `linux-arm64-openssl-3.0.x` binary is in `layers/prisma/nodejs/node_modules/.prisma/client/`                                                                   |
+| GitHub Actions OIDC error                                  | Trust policy condition mismatch                  | Check `braveneworg/boudreaux` matches exactly in the trust policy                                                                                                      |
+| `placeholder` webhook secret in SSM                        | Forgot to update after Stripe registration       | Run the `aws ssm put-parameter --overwrite` command from Step 7                                                                                                        |
+| SES `AccessDenied`                                         | Missing IAM policy                               | Verify `template.yaml` has the `ses:SendEmail` policy on the function                                                                                                  |
+| MongoDB connection refused                                 | Atlas IP allowlist blocking Lambda               | Add `0.0.0.0/0` to Atlas IP Access List or use VPC                                                                                                                     |
+| `sam logs` → `NotFoundException: Invalid stage identifier` | SAM CLI bug with custom `StageName` on `HttpApi` | Use `aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --follow` or `sam logs --cw-log-group <log-group> --tail` to bypass stage resolution |
