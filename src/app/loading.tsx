@@ -19,8 +19,12 @@ export default function HomeLoading() {
         <div className="h-10 w-full rounded-md bg-muted animate-pulse mb-8" />
         {/* Featured artists heading skeleton */}
         <div className="h-10 w-48 bg-muted animate-pulse rounded mb-6" />
-        {/* Player skeleton */}
-        <div className="h-60 w-full bg-muted animate-pulse rounded" />
+        {/* Featured artists carousel skeleton */}
+        <div className="h-20 w-full bg-muted animate-pulse rounded mb-4" />
+        {/* Cover art skeleton (square aspect ratio) */}
+        <div className="aspect-square w-full max-w-xl mx-auto bg-muted animate-pulse rounded mb-2" />
+        {/* Audio controls skeleton */}
+        <div className="h-14 w-full max-w-xl mx-auto bg-muted animate-pulse rounded" />
       </div>
     </div>
   );

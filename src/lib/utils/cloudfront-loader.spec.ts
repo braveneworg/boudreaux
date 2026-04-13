@@ -183,4 +183,97 @@ describe('cloudfrontLoader', () => {
       );
     });
   });
+
+  describe('buildBannerPreloadUrl', () => {
+    it('builds a preload URL at max width with quality 80 and webp format', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('hero.jpg');
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=80&f=webp'
+      );
+    });
+
+    it('percent-encodes special characters in the filename', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('FFINC Banner 1_5_1920.webp');
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=1920&q=80&f=webp'
+      );
+    });
+
+    it('uses NEXT_PUBLIC_CDN_DOMAIN when set', async () => {
+      vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://public-cdn.example.com');
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('hero.jpg');
+
+      expect(result).toBe(
+        'https://public-cdn.example.com/media/banners/hero.jpg?w=1920&q=80&f=webp'
+      );
+    });
+  });
+
+  describe('buildBannerPreloadSrcSet', () => {
+    it('builds a responsive srcset string for all device sizes at Next.js default quality 75', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadSrcSet('hero.jpg');
+
+      expect(result).toBe(
+        [
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=640&q=75&f=webp 640w',
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=750&q=75&f=webp 750w',
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=828&q=75&f=webp 828w',
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1080&q=75&f=webp 1080w',
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1200&q=75&f=webp 1200w',
+          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp 1920w',
+        ].join(', ')
+      );
+    });
+
+    it('percent-encodes special characters in the filename', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadSrcSet('FFINC Banner 1_5_1920.webp');
+
+      expect(result).toContain('FFINC%20Banner%201_5_1920.webp');
+      expect(result).toContain('640w');
+      expect(result).toContain('1920w');
+    });
+
+    it('uses configured CDN domain', async () => {
+      vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://custom-cdn.example.com');
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadSrcSet('hero.jpg');
+
+      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero.jpg');
+    });
+  });
 });

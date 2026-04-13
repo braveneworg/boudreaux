@@ -163,7 +163,10 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
         });
         userId = newUser.id;
       } catch (createError) {
-        if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
+        if (
+          createError instanceof Prisma.PrismaClientKnownRequestError &&
+          createError.code === 'P2002'
+        ) {
           const racedUser = await prisma.user.findUnique({
             where: { email: customerEmail },
             select: { id: true },

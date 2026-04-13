@@ -27,7 +27,7 @@ const getRequiredStripePriceId = (envVarName: string): string => {
 
   if (!value) {
     throw new Error(
-      `Missing required environment variable: ${envVarName}. Stripe subscriber tier price IDs must be configured.`,
+      `Missing required environment variable: ${envVarName}. Stripe subscriber tier price IDs must be configured.`
     );
   }
 

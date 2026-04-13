@@ -64,7 +64,7 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
 };
 
 export const lambdaHandler = async (
-  event: APIGatewayProxyEventV2,
+  event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
   if (!shouldSkipStripeIpCheck()) {
     const sourceIp = getSourceIp(event);
@@ -77,7 +77,7 @@ export const lambdaHandler = async (
 
     if (allowedRanges.length === 0) {
       console.error(
-        'STRIPE_WEBHOOK_IP_RANGES must be configured when SKIP_STRIPE_IP_CHECK is not true',
+        'STRIPE_WEBHOOK_IP_RANGES must be configured when SKIP_STRIPE_IP_CHECK is not true'
       );
       return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
     }
