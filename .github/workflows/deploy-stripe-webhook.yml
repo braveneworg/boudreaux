@@ -82,3 +82,11 @@ jobs:
             --stack-name fakefour-stripe-webhook \
             --region us-east-1 \
             --parameter-overrides Environment=production
+
+      - name: Print webhook URL
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name fakefour-stripe-webhook \
+            --region us-east-1 \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebhookUrl`].OutputValue' \
+            --output text

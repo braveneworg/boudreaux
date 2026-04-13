@@ -49,9 +49,22 @@ brew install aws-sam-cli
 
 SAM CLI is **not** required for the CI/CD deploy (GitHub Actions installs it), but it allows local `sam build` / `sam local invoke` testing.
 
-### Step 2: Store all 9 SSM parameters
+### Step 2: Store all 10 SSM parameters
 
-Run these from your terminal (AWS CLI is already installed). Replace placeholder values with real ones:
+**Option A — Use the helper script (recommended):**
+
+```bash
+# Interactive mode (prompts for each value):
+./scripts/setup-ssm-params.sh
+
+# From an .env-style file:
+./scripts/setup-ssm-params.sh --file .env.lambda
+
+# Overwrite existing parameters:
+./scripts/setup-ssm-params.sh --overwrite
+```
+
+**Option B — Manual CLI commands:**
 
 ```bash
 # Already may exist (check first with: aws ssm get-parameter --name /fakefour/stripe/secret-key)
@@ -64,9 +77,10 @@ aws ssm put-parameter --name /fakefour/stripe/price-minimum     --value "price_.
 aws ssm put-parameter --name /fakefour/stripe/price-extra       --value "price_..." --type String
 aws ssm put-parameter --name /fakefour/stripe/price-extra-extra --value "price_..." --type String
 aws ssm put-parameter --name /fakefour/aws-ses-region           --value "us-east-1" --type String
+aws ssm put-parameter --name /fakefour/ses-identity-arn         --value "arn:aws:ses:us-east-1:ACCOUNT_ID:identity/fakefourrecords.com" --type String
 ```
 
-The webhook-secret is a placeholder for now — you'll get the real value from Stripe after the first deploy (Step 6).
+The webhook-secret is a placeholder for now — you'll get the real value from Stripe after the first deploy (Step 6). The SES identity ARN is used in the Lambda's IAM policy to scope `ses:SendEmail` permissions.
 
 ### Step 3: Set up GitHub OIDC in AWS (one-time per AWS account)
 
@@ -174,7 +188,7 @@ aws cloudformation describe-stacks \
 aws ssm put-parameter \
   --name /fakefour/stripe/webhook-secret \
   --value "whsec_..." \
-  --type String \
+  --type SecureString \
   --overwrite
 ```
 
@@ -196,12 +210,14 @@ aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --f
 
 ---Stopped here---
 
-### Step 9: Decide what to do with the existing Next.js webhook handler
+### Step 9: Next.js webhook route — dev-only gating (done)
 
-The handler at `src/app/api/stripe/webhook/route.ts` still exists. Options:
+The handler at `src/app/api/stripe/webhook/route.ts` is now **gated to development only**. In production (`NODE_ENV === 'production'`), it returns 404. This means:
 
-- **Keep both temporarily** — point Stripe at the Lambda, keep the Next.js route as a fallback until you're confident
-- **Remove the Next.js route** — delete `src/app/api/stripe/webhook/route.ts` once Lambda is proven in production
+- **Local dev:** The route works normally with `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+- **Production:** The route returns 404. Only the Lambda handles live Stripe webhooks.
+
+No manual action required — the code change is already applied.
 
 ---
 
