@@ -148,6 +148,8 @@ Either:
 
 Merge the `stripe-webhook/` changes into `main`. GitHub Actions will build and deploy the stack. After it succeeds, get the webhook URL:
 
+-- you are WAITING HERE for the deployment to complete before running this command --
+
 ```bash
 aws cloudformation describe-stacks \
   --stack-name fakefour-stripe-webhook \
