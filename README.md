@@ -289,3 +289,7 @@ Run `npx ncu` to check for dependency updates. Update dependencies in `package.j
 To open last HTML report run:
 
 `pnpm run e2e:report`
+
+# Caching Infrastructure Checklist
+
+See [docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md](docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md)
