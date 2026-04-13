@@ -19,13 +19,29 @@ export const TIER_LABELS: Record<SubscriberRateTier, string> = {
 export const getSubscriberRate = (tier: SubscriberRateTier): number => SUBSCRIBER_RATES[tier];
 
 /**
+ * Reads a required Stripe Price ID from the environment and fails fast when
+ * configuration is missing or blank.
+ */
+const getRequiredStripePriceId = (envVarName: string): string => {
+  const value = process.env[envVarName]?.trim();
+
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${envVarName}. Stripe subscriber tier price IDs must be configured.`,
+    );
+  }
+
+  return value;
+};
+
+/**
  * Maps each subscriber rate tier to its Stripe Price ID.
  * In the Lambda environment, these use STRIPE_PRICE_* (no NEXT_PUBLIC_ prefix).
  */
 export const SUBSCRIBER_RATE_STRIPE_PRICE_IDS: Record<SubscriberRateTier, string> = {
-  minimum: process.env.STRIPE_PRICE_MINIMUM ?? '',
-  extra: process.env.STRIPE_PRICE_EXTRA ?? '',
-  extraExtra: process.env.STRIPE_PRICE_EXTRA_EXTRA ?? '',
+  minimum: getRequiredStripePriceId('STRIPE_PRICE_MINIMUM'),
+  extra: getRequiredStripePriceId('STRIPE_PRICE_EXTRA'),
+  extraExtra: getRequiredStripePriceId('STRIPE_PRICE_EXTRA_EXTRA'),
 };
 
 /**
