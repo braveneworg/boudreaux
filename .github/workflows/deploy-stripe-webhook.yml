@@ -65,6 +65,24 @@ jobs:
         working-directory: stripe-webhook
         run: sam build
 
+      - name: Clean up failed SAM managed stack
+        run: |
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name aws-sam-cli-managed-default \
+            --region us-east-1 \
+            --query "Stacks[0].StackStatus" \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Deleting failed managed stack..."
+            aws cloudformation delete-stack \
+              --stack-name aws-sam-cli-managed-default \
+              --region us-east-1
+            aws cloudformation wait stack-delete-complete \
+              --stack-name aws-sam-cli-managed-default \
+              --region us-east-1
+          fi
+
       - name: SAM deploy
         working-directory: stripe-webhook
         run: |
@@ -75,5 +93,4 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --stack-name fakefour-stripe-webhook \
             --region us-east-1 \
-            --parameter-overrides Environment=production \
-            --debug
+            --parameter-overrides Environment=production
