@@ -18,36 +18,6 @@ Parameters:
     Type: String
     Default: production
     AllowedValues: [production, staging]
-  StripeSecretKey:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/stripe/secret-key
-  StripeWebhookSecret:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/stripe/webhook-secret
-  DatabaseUrl:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/database-url
-  EmailFrom:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/email-from
-  BaseUrl:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/base-url
-  StripePriceMinimum:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/stripe/price-minimum
-  StripePriceExtra:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/stripe/price-extra
-  StripePriceExtraExtra:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/stripe/price-extra-extra
-  AwsSesRegion:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/aws-ses-region
-  SesIdentityArn:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /fakefour/ses-identity-arn
 
 Resources:
   StripeWebhookFunction:
@@ -61,18 +31,18 @@ Resources:
             - Effect: Allow
               Action:
                 - ses:SendEmail
-              Resource: !Ref SesIdentityArn
+              Resource: '{{resolve:ssm:/fakefour/ses-identity-arn}}'
       Environment:
         Variables:
-          STRIPE_SECRET_KEY: !Ref StripeSecretKey
-          STRIPE_WEBHOOK_SECRET: !Ref StripeWebhookSecret
-          DATABASE_URL: !Ref DatabaseUrl
-          EMAIL_FROM: !Ref EmailFrom
-          BASE_URL: !Ref BaseUrl
-          STRIPE_PRICE_MINIMUM: !Ref StripePriceMinimum
-          STRIPE_PRICE_EXTRA: !Ref StripePriceExtra
-          STRIPE_PRICE_EXTRA_EXTRA: !Ref StripePriceExtraExtra
-          AWS_SES_REGION: !Ref AwsSesRegion
+          STRIPE_SECRET_KEY: '{{resolve:ssm:/fakefour/stripe/secret-key}}'
+          STRIPE_WEBHOOK_SECRET: '{{resolve:ssm:/fakefour/stripe/webhook-secret}}'
+          DATABASE_URL: '{{resolve:ssm:/fakefour/database-url}}'
+          EMAIL_FROM: '{{resolve:ssm:/fakefour/email-from}}'
+          BASE_URL: '{{resolve:ssm:/fakefour/base-url}}'
+          STRIPE_PRICE_MINIMUM: '{{resolve:ssm:/fakefour/stripe/price-minimum}}'
+          STRIPE_PRICE_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra}}'
+          STRIPE_PRICE_EXTRA_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra-extra}}'
+          AWS_SES_REGION: '{{resolve:ssm:/fakefour/aws-ses-region}}'
       Layers:
         - !Ref PrismaEngineLayer
       Events:

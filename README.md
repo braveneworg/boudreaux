@@ -293,3 +293,7 @@ To open last HTML report run:
 # Caching Infrastructure Checklist
 
 See [docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md](docs/copilot/CACHING_INFRASTRUCTURE_CHECKLIST.md)
+
+# Stripe Webhook Lambda Deployment Readiness
+
+See [docs/copilot/stripe-webhook-lambda-deployment-readiness.md](docs/copilot/stripe-webhook-lambda-deployment-readiness.md)
