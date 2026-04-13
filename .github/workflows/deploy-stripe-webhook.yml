@@ -42,6 +42,9 @@ jobs:
         working-directory: stripe-webhook
         run: npm ci
 
+      - name: Install esbuild globally
+        run: npm install -g esbuild
+
       - name: Generate Prisma client
         working-directory: stripe-webhook
         run: npx prisma generate
