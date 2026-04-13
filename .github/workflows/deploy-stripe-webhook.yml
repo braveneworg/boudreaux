@@ -69,6 +69,7 @@ jobs:
         working-directory: stripe-webhook
         run: |
           sam deploy \
+            --resolve-s3 \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --capabilities CAPABILITY_IAM \
