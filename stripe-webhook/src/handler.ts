@@ -20,11 +20,16 @@ export const lambdaHandler = async (
     return { statusCode: 400, body: 'Missing stripe-signature header' };
   }
 
+  const rawBody =
+    event.isBase64Encoded
+      ? Buffer.from(event.body ?? '', 'base64')
+      : (event.body ?? '');
+
   // Do NOT JSON.parse event.body before passing to constructEvent
   let stripeEvent: Stripe.Event;
   try {
     stripeEvent = stripe.webhooks.constructEvent(
-      event.body ?? '',
+      rawBody,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
