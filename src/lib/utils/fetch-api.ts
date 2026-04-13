@@ -9,6 +9,9 @@ import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 
 interface FetchApiOptions {
   forwardCookies?: boolean;
+  /** When set, uses Next.js ISR-style data caching instead of `no-store`.
+   *  Value is the revalidation interval in seconds. */
+  revalidate?: number;
 }
 
 /**
@@ -18,7 +21,10 @@ interface FetchApiOptions {
  */
 export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
   const url = getInternalApiUrl(path);
-  const fetchOptions: globalThis.RequestInit = { cache: 'no-store' };
+  const fetchOptions: globalThis.RequestInit =
+    options?.revalidate != null
+      ? ({ next: { revalidate: options.revalidate } } as globalThis.RequestInit)
+      : { cache: 'no-store' };
 
   if (options?.forwardCookies) {
     const headersList = await headers();

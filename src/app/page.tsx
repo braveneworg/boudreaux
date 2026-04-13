@@ -4,6 +4,7 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
+import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
@@ -20,16 +21,33 @@ export default async function Home() {
   await Promise.all([
     queryClient.prefetchQuery({
       queryKey: queryKeys.featuredArtists.active(),
-      queryFn: () => fetchApi('/api/featured-artists?active=true&limit=7'),
+      queryFn: () => fetchApi('/api/featured-artists?active=true&limit=7', { revalidate: 60 }),
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.banners.active(),
-      queryFn: () => fetchApi('/api/notification-banners'),
+      queryFn: () => fetchApi('/api/notification-banners', { revalidate: 60 }),
     }),
   ]);
 
+  // Extract the first banner's image filename for LCP preloading
+  const bannersData = queryClient.getQueryData<{
+    banners?: { imageFilename: string }[];
+  }>(queryKeys.banners.active());
+  const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
+  const preloadSrcSet = firstBannerFilename ? buildBannerPreloadSrcSet(firstBannerFilename) : null;
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
+      {preloadSrcSet && (
+        <link
+          rel="preload"
+          as="image"
+          imageSrcSet={preloadSrcSet}
+          imageSizes="100vw"
+          type="image/webp"
+          fetchPriority="high"
+        />
+      )}
       <PageContainer>
         <HomeContent />
       </PageContainer>

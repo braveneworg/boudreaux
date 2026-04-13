@@ -10,11 +10,19 @@ import { Loader2 } from 'lucide-react';
 import { useActiveFeaturedArtistsQuery } from '@/app/hooks/use-active-featured-artists-query';
 import { useBannersQuery } from '@/app/hooks/use-banners-query';
 
-import { FeaturedArtistsPlayerClient } from './featured-artists-player-client';
 import { ContentContainer } from './ui/content-container';
 import { Heading } from './ui/heading';
 
 import type { BannerSlotData } from './banner-carousel';
+
+const BannerCarouselDynamic = nextDynamic(
+  () => import('./banner-carousel').then((mod) => ({ default: mod.BannerCarousel })),
+  {
+    loading: () => (
+      <div className="relative w-full bg-muted animate-pulse" style={{ paddingBottom: '61.8%' }} />
+    ),
+  }
+);
 
 const ArtistSearchInput = nextDynamic(
   () => import('./artist-search-input').then((mod) => ({ default: mod.ArtistSearchInput })),
@@ -31,13 +39,12 @@ const ArtistSearchInput = nextDynamic(
   }
 );
 
-const BannerCarouselDynamic = nextDynamic(
-  () => import('./banner-carousel').then((mod) => ({ default: mod.BannerCarousel })),
-  {
-    loading: () => (
-      <div className="relative w-full bg-muted animate-pulse" style={{ paddingBottom: '61.8%' }} />
-    ),
-  }
+const FeaturedArtistsPlayerDynamic = nextDynamic(
+  () =>
+    import('./featured-artists-player').then((mod) => ({
+      default: mod.FeaturedArtistsPlayer,
+    })),
+  { ssr: false }
 );
 
 /**
@@ -82,7 +89,7 @@ export const HomeContent = () => {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <FeaturedArtistsPlayerClient featuredArtists={featuredArtists} />
+            <FeaturedArtistsPlayerDynamic featuredArtists={featuredArtists} />
           )}
         </section>
       </ContentContainer>

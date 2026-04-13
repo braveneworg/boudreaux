@@ -96,4 +96,35 @@ describe('fetchApi', () => {
       cache: 'no-store',
     });
   });
+
+  it('uses next revalidate option instead of no-store when revalidate is set', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: 'cached' }),
+    });
+
+    const { fetchApi } = await import('@/lib/utils/fetch-api');
+    const result = await fetchApi('/api/banners', { revalidate: 60 });
+
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/banners', {
+      next: { revalidate: 60 },
+    });
+    expect(result).toEqual({ data: 'cached' });
+  });
+
+  it('combines revalidate with forwardCookies', async () => {
+    mockHeadersGet.mockReturnValue('session-token=abc123');
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: 'ok' }),
+    });
+
+    const { fetchApi } = await import('@/lib/utils/fetch-api');
+    await fetchApi('/api/data', { revalidate: 30, forwardCookies: true });
+
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/data', {
+      next: { revalidate: 30 },
+      headers: { cookie: 'session-token=abc123' },
+    });
+  });
 });

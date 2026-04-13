@@ -8,7 +8,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
 if (!stripeSecretKey) {
   throw new Error(
-    'Missing required environment variable: STRIPE_SECRET_KEY. Configure it before initializing the Stripe client.',
+    'Missing required environment variable: STRIPE_SECRET_KEY. Configure it before initializing the Stripe client.'
   );
 }
 

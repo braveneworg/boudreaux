@@ -374,7 +374,14 @@ export const AudioPlayer = ({
     <div className="flex w-full flex-col">
       {poster && (
         <div className="responsive vjs-layout-small mx-auto w-[90%] overflow-hidden shadow-lg">
-          <Image width={380} height={10} src={poster} alt="Album cover" priority />
+          <Image
+            width={380}
+            height={380}
+            src={poster}
+            alt="Album cover"
+            priority
+            className="w-full h-auto"
+          />
         </div>
       )}
       <div ref={containerRef} className="audio-player-wrapper min-h-14" data-vjs-player />
