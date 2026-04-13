@@ -10,13 +10,19 @@ const CDN_DOMAIN =
 
 const MAX_IMAGE_WIDTH = 1920;
 
+/** Default quality Next.js passes to image loaders (must match to avoid double download) */
+const NEXT_DEFAULT_QUALITY = 75;
+
+/** Device sizes matching next.config.ts for responsive preload srcset */
+const DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920];
+
 export const cloudfrontLoader = ({ src, width, quality }: ImageLoaderProps): string => {
   const cappedWidth = Math.min(width, MAX_IMAGE_WIDTH);
   const encodedSrc = src
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  return `${CDN_DOMAIN}/media/banners/${encodedSrc}?w=${cappedWidth}&q=${quality || 80}&f=webp`;
+  return `${CDN_DOMAIN}/media/banners/${encodedSrc}?w=${cappedWidth}&q=${quality ?? NEXT_DEFAULT_QUALITY}&f=webp`;
 };
 
 /**
@@ -28,14 +34,8 @@ export const buildBannerPreloadUrl = (imageFilename: string): string => {
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  return `${CDN_DOMAIN}/media/banners/${encodedFilename}?w=${MAX_IMAGE_WIDTH}&q=80&f=webp`;
+  return `${CDN_DOMAIN}/media/banners/${encodedFilename}?w=${MAX_IMAGE_WIDTH}&q=${NEXT_DEFAULT_QUALITY}&f=webp`;
 };
-
-/** Device sizes matching next.config.ts for responsive preload srcset */
-const DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920];
-
-/** Default quality Next.js passes to image loaders (must match to avoid double download) */
-const NEXT_DEFAULT_QUALITY = 75;
 
 /**
  * Builds a responsive `imagesrcset` string for a banner image, matching

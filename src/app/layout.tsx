@@ -75,7 +75,7 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
-        <link rel="preconnect" href="https://js.stripe.com" />
+        {/* Stripe preconnect moved to pages that use Stripe (dns-prefetch is lightweight enough to keep globally) */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>
       <body

@@ -67,7 +67,7 @@ describe('cloudfrontLoader', () => {
       );
     });
 
-    it('defaults to 80 when quality is undefined', async () => {
+    it('defaults to 75 when quality is undefined', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -77,11 +77,11 @@ describe('cloudfrontLoader', () => {
       const result = cloudfrontLoader({ src: 'banner.png', width: 1200, quality: undefined });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=80&f=webp'
+        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=75&f=webp'
       );
     });
 
-    it('defaults to 80 when quality is 0', async () => {
+    it('uses explicit quality 0 when provided', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -91,7 +91,7 @@ describe('cloudfrontLoader', () => {
       const result = cloudfrontLoader({ src: 'banner.png', width: 1200, quality: 0 });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=80&f=webp'
+        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=0&f=webp'
       );
     });
   });
@@ -185,7 +185,7 @@ describe('cloudfrontLoader', () => {
   });
 
   describe('buildBannerPreloadUrl', () => {
-    it('builds a preload URL at max width with quality 80 and webp format', async () => {
+    it('builds a preload URL at max width with quality 75 and webp format', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -195,7 +195,7 @@ describe('cloudfrontLoader', () => {
       const result = buildBannerPreloadUrl('hero.jpg');
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=80&f=webp'
+        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
       );
     });
 
@@ -209,7 +209,7 @@ describe('cloudfrontLoader', () => {
       const result = buildBannerPreloadUrl('FFINC Banner 1_5_1920.webp');
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=1920&q=80&f=webp'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=1920&q=75&f=webp'
       );
     });
 
@@ -223,7 +223,7 @@ describe('cloudfrontLoader', () => {
       const result = buildBannerPreloadUrl('hero.jpg');
 
       expect(result).toBe(
-        'https://public-cdn.example.com/media/banners/hero.jpg?w=1920&q=80&f=webp'
+        'https://public-cdn.example.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
       );
     });
   });

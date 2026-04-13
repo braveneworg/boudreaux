@@ -274,6 +274,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                       isPlaying={isPlaying}
                       onTogglePlay={handleTogglePlay}
                       className="shadow-lg"
+                      priority
                     />
                   </div>
                 );
