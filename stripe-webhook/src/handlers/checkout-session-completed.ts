@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 import { generateUsername } from 'unique-username-generator';
 import { z } from 'zod';
 
@@ -45,10 +45,18 @@ export async function handleCheckoutSessionCompleted(
     return;
   }
 
-  await prisma.user.update({
+  const updateUserResult = await prisma.user.updateMany({
     where: { email: customerEmail },
     data: { stripeCustomerId },
   });
+
+  if (updateUserResult.count === 0) {
+    console.warn('checkout.session.completed user not found for email; skipping user update', {
+      customerEmail,
+      sessionId: session.id,
+      stripeCustomerId,
+    });
+  }
 
   let tier = null;
   let interval = 'month';
@@ -155,7 +163,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
         });
         userId = newUser.id;
       } catch (createError) {
-        if (createError instanceof PrismaClientKnownRequestError && createError.code === 'P2002') {
+        if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
           const racedUser = await prisma.user.findUnique({
             where: { email: customerEmail },
             select: { id: true },
@@ -208,7 +216,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
       });
     } catch (createError) {
       if (
-        createError instanceof PrismaClientKnownRequestError &&
+        createError instanceof Prisma.PrismaClientKnownRequestError &&
         createError.code === 'P2002' &&
         (createError.meta?.target as string[] | undefined)?.includes('stripePaymentIntentId')
       ) {

@@ -45,6 +45,9 @@ Parameters:
   AwsSesRegion:
     Type: AWS::SSM::Parameter::Value<String>
     Default: /fakefour/aws-ses-region
+  SesIdentityArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/ses-identity-arn
 
 Resources:
   StripeWebhookFunction:
@@ -58,7 +61,7 @@ Resources:
             - Effect: Allow
               Action:
                 - ses:SendEmail
-              Resource: "*"
+              Resource: !Ref SesIdentityArn
       Environment:
         Variables:
           STRIPE_SECRET_KEY: !Ref StripeSecretKey

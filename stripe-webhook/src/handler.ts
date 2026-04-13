@@ -2,18 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import * as ipaddr from 'ipaddr.js';
+
 import { handleChargeRefunded } from './handlers/charge-refunded.js';
 import { handleCheckoutSessionCompleted } from './handlers/checkout-session-completed.js';
 import { handleInvoicePaymentFailed } from './handlers/invoice-payment-failed.js';
 import { handleSubscriptionDeleted } from './handlers/subscription-deleted.js';
 import { handleSubscriptionUpdated } from './handlers/subscription-updated.js';
 import { stripe } from './lib/stripe.js';
-
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import type Stripe from 'stripe';
-
-export const lambdaHandler = async (
-import * as ipaddr from 'ipaddr.js';
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
@@ -44,7 +40,10 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
     if (range.includes('/')) {
       try {
         const [parsedRange, prefixLength] = ipaddr.parseCIDR(range);
-        return parsedSourceIp.kind() === parsedRange.kind() && parsedSourceIp.match([parsedRange, prefixLength]);
+        return (
+          parsedSourceIp.kind() === parsedRange.kind() &&
+          parsedSourceIp.match([parsedRange, prefixLength])
+        );
       } catch {
         console.warn(`Ignoring invalid STRIPE_WEBHOOK_IP_RANGES entry: ${range}`);
         return false;
@@ -57,12 +56,15 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
     }
 
     const parsedAllowedIp = ipaddr.parse(range);
-    return parsedSourceIp.kind() === parsedAllowedIp.kind() && parsedSourceIp.toNormalizedString() === parsedAllowedIp.toNormalizedString();
+    return (
+      parsedSourceIp.kind() === parsedAllowedIp.kind() &&
+      parsedSourceIp.toNormalizedString() === parsedAllowedIp.toNormalizedString()
+    );
   });
 };
 
 export const lambdaHandler = async (
-  event: APIGatewayProxyEventV2
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
   if (!shouldSkipStripeIpCheck()) {
     const sourceIp = getSourceIp(event);
@@ -74,7 +76,9 @@ export const lambdaHandler = async (
     }
 
     if (allowedRanges.length === 0) {
-      console.error('STRIPE_WEBHOOK_IP_RANGES must be configured when SKIP_STRIPE_IP_CHECK is not true');
+      console.error(
+        'STRIPE_WEBHOOK_IP_RANGES must be configured when SKIP_STRIPE_IP_CHECK is not true',
+      );
       return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
     }
 
@@ -95,14 +99,14 @@ export const lambdaHandler = async (
     return { statusCode: 500, body: 'Stripe webhook secret is not configured' };
   }
 
+  const rawBody = event.isBase64Encoded
+    ? Buffer.from(event.body ?? '', 'base64')
+    : (event.body ?? '');
+
   // Do NOT JSON.parse event.body before passing to constructEvent
   let stripeEvent: Stripe.Event;
   try {
-    stripeEvent = stripe.webhooks.constructEvent(
-      event.body ?? '',
-      signature,
-      webhookSecret
-    );
+    stripeEvent = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
     console.error('Stripe signature verification failed:', err);
     return { statusCode: 400, body: 'Webhook signature verification failed' };
@@ -111,9 +115,8 @@ export const lambdaHandler = async (
   try {
     await handleStripeEvent(stripeEvent);
   } catch (err) {
-    // Return 200 anyway — prevents Stripe from retrying a broken handler.
-    // Fix the bug, then manually retry from the Stripe dashboard.
     console.error(`Unhandled error processing ${stripeEvent.type}:`, err);
+    return { statusCode: 500, body: 'Internal server error' };
   }
 
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
