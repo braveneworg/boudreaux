@@ -65,29 +65,19 @@ jobs:
         working-directory: stripe-webhook
         run: sam build
 
-      - name: Clean up failed SAM managed stack
+      - name: Ensure SAM artifact bucket exists
         run: |
-          STACK_STATUS=$(aws cloudformation describe-stacks \
-            --stack-name aws-sam-cli-managed-default \
-            --region us-east-1 \
-            --query "Stacks[0].StackStatus" \
-            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
-
-          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
-            echo "Deleting failed managed stack..."
-            aws cloudformation delete-stack \
-              --stack-name aws-sam-cli-managed-default \
-              --region us-east-1
-            aws cloudformation wait stack-delete-complete \
-              --stack-name aws-sam-cli-managed-default \
-              --region us-east-1
+          BUCKET="fakefour-sam-artifacts-us-east-1"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3 mb "s3://$BUCKET" --region us-east-1
           fi
 
       - name: SAM deploy
         working-directory: stripe-webhook
         run: |
           sam deploy \
-            --resolve-s3 \
+            --s3-bucket fakefour-sam-artifacts-us-east-1 \
+            --s3-prefix fakefour-stripe-webhook \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --capabilities CAPABILITY_NAMED_IAM \
