@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [3.14.0] - 2026-04-13
+
+### Added
+
+- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n- Update capability iam and add debugging (#331)\n- Update capability iam and add debugging (#331)\n- Update capability iam and add debugging (#331)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Create and use managed s3 bucket for stripe webhook (#330)\n- Add step to install esbuild globally (#329)\n- Add step to install esbuild globally (#329)\n- Add step to install esbuild globally (#329)\n- Add npm lockfile for stripe webhook (#328)\n- Add npm lockfile for stripe webhook (#328)\n- Add npm lockfile for stripe webhook (#328)\n- Develop/fix deployment and outdated actions (#327)\n- Develop/fix deployment and outdated actions (#327)\n- Develop/fix deployment and outdated actions (#327)\n- Refactor code structure for improved readability and maintainability (#326)\n- Refactor code structure for improved readability and maintainability (#326)\n- Refactor code structure for improved readability and maintainability (#326)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#325)\n- Develop/fix deployment and outdated actions (#324)\n- Develop/fix deployment and outdated actions (#324)\n- Develop/fix deployment and outdated actions (#324)\n- Add clean up step for ROLLBACK_COMPLETE errors (#332)\n
+
 ## [3.13.0] - 2026-04-13
 
 ### Added
