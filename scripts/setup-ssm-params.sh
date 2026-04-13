@@ -92,16 +92,20 @@ read_value() {
   local var_name="$1"
   local prompt_text="$2"
   local is_secret="${3:-}"
+  local value
 
   # Check .env file first
   if [[ -n "$ENV_FILE" ]]; then
-    local value
     value=$(grep -E "^${var_name}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
     # Strip surrounding quotes if present
     value="${value#\"}"
     value="${value%\"}"
     value="${value#\'}"
     value="${value%\'}"
+    if [[ -z "$value" ]]; then
+      echo "Error: missing required key '${var_name}' in ${ENV_FILE}" >&2
+      exit 1
+    fi
     echo "$value"
     return
   fi
@@ -128,15 +132,17 @@ put_param() {
     return 1
   fi
 
-  if aws ssm put-parameter \
+  local err
+  if err=$(aws ssm put-parameter \
     --name "$name" \
     --value "$value" \
     --type "$type" \
     --region "$AWS_REGION" \
-    $OVERWRITE 2>/dev/null; then
+    $OVERWRITE 2>&1 >/dev/null); then
     echo "  OK $name ($type)"
   else
     echo "  FAILED $name — parameter may already exist (use --overwrite to update)" >&2
+    echo "  Error: $err" >&2
     return 1
   fi
 }

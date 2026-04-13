@@ -192,7 +192,7 @@ aws ssm put-parameter \
   --overwrite
 ```
 
-6. Trigger a redeploy (trivial commit or manual workflow dispatch) so Lambda picks up the real secret.
+7. Trigger a redeploy (trivial commit or manual workflow dispatch) so Lambda picks up the real secret.
 
 ### Step 8: Test end-to-end
 
@@ -207,8 +207,6 @@ aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --f
 #   aws logs describe-log-groups --log-group-name-prefix /aws/lambda/fakefour-stripe-webhook
 # Or: AWS Console → CloudWatch → Log groups → /aws/lambda/fakefour-stripe-webhook-*
 ```
-
----Stopped here---
 
 ### Step 9: Next.js webhook route — dev-only gating (done)
 
