@@ -38,6 +38,15 @@ if ! git merge-base --is-ancestor @{u} HEAD; then
   exit 0
 fi
 
+# Check if any .ts or .tsx files changed compared to the remote tracking branch
+TS_CHANGED=$(git diff --name-only @{u}..HEAD -- '*.ts' '*.tsx' 2>/dev/null | head -1)
+
+if [ -z "$TS_CHANGED" ]; then
+  echo "📦 No .ts or .tsx files changed — skipping type-check, lint, and tests."
+  echo "🚀 Pushing changes..."
+  exit 0
+fi
+
 echo "🔍 Running TypeScript type-check before push..."
 
 # Run TypeScript type-check on the entire project
