@@ -105,3 +105,4 @@ e2e/.auth/
 .windsurf/
 .zencoder/
 package-lock.json
+!stripe-webhook/package-lock.json
