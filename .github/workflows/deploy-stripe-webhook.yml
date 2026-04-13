@@ -72,7 +72,8 @@ jobs:
             --resolve-s3 \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --capabilities CAPABILITY_IAM \
+            --capabilities CAPABILITY_NAMED_IAM \
             --stack-name fakefour-stripe-webhook \
             --region us-east-1 \
-            --parameter-overrides Environment=production
+            --parameter-overrides Environment=production \
+            --debug
