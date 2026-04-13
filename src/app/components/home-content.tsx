@@ -44,7 +44,19 @@ const FeaturedArtistsPlayerDynamic = nextDynamic(
     import('./featured-artists-player').then((mod) => ({
       default: mod.FeaturedArtistsPlayer,
     })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-2">
+        {/* Artist carousel skeleton */}
+        <div className="h-20 w-full bg-muted animate-pulse rounded" />
+        {/* Cover art skeleton */}
+        <div className="aspect-square w-full max-w-xl mx-auto bg-muted animate-pulse rounded" />
+        {/* Audio controls skeleton */}
+        <div className="h-14 w-full max-w-xl mx-auto bg-muted animate-pulse rounded" />
+      </div>
+    ),
+  }
 );
 
 /**
