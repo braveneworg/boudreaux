@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Fake Four Records - Stripe webhook handler
+
+Globals:
+  Function:
+    Timeout: 29
+    MemorySize: 512
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        NODE_ENV: !Ref Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging]
+  StripeSecretKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/stripe/secret-key
+  StripeWebhookSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/stripe/webhook-secret
+  DatabaseUrl:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/database-url
+  EmailFrom:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/email-from
+  BaseUrl:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/base-url
+  StripePriceMinimum:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/stripe/price-minimum
+  StripePriceExtra:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/stripe/price-extra
+  StripePriceExtraExtra:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/stripe/price-extra-extra
+  AwsSesRegion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /fakefour/aws-ses-region
+
+Resources:
+  StripeWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handler.lambdaHandler
+      Description: Handles Stripe webhook events for Fake Four Records
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource: "*"
+      Environment:
+        Variables:
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          STRIPE_WEBHOOK_SECRET: !Ref StripeWebhookSecret
+          DATABASE_URL: !Ref DatabaseUrl
+          EMAIL_FROM: !Ref EmailFrom
+          BASE_URL: !Ref BaseUrl
+          STRIPE_PRICE_MINIMUM: !Ref StripePriceMinimum
+          STRIPE_PRICE_EXTRA: !Ref StripePriceExtra
+          STRIPE_PRICE_EXTRA_EXTRA: !Ref StripePriceExtraExtra
+          AWS_SES_REGION: !Ref AwsSesRegion
+      Layers:
+        - !Ref PrismaEngineLayer
+      Events:
+        StripeWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref StripeWebhookApi
+            Path: /webhooks/stripe
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2024
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - handler.ts
+        External:
+          - '@prisma/client'
+
+  StripeWebhookApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      Description: Stripe webhook endpoint for Fake Four Records
+
+  PrismaEngineLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: prisma-engine-arm64
+      Description: Prisma query engine binary for Lambda arm64
+      ContentUri: layers/prisma/
+      CompatibleRuntimes:
+        - nodejs24.x
+      CompatibleArchitectures:
+        - arm64
+
+Outputs:
+  WebhookUrl:
+    Description: Paste this into your Stripe dashboard webhook settings
+    Value: !Sub >-
+      https://${StripeWebhookApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhooks/stripe
+  FunctionArn:
+    Value: !GetAtt StripeWebhookFunction.Arn

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.aws-sam/
+samconfig.toml
+layers/prisma/nodejs/

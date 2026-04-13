@@ -1,0 +1,73 @@
+name: Deploy Stripe Webhook
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "stripe-webhook/**"
+      - ".github/workflows/deploy-stripe-webhook.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: stripe-webhook/package-lock.json
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Install dependencies
+        working-directory: stripe-webhook
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: stripe-webhook
+        run: npx prisma generate
+
+      - name: Copy Prisma engine binary to layer
+        working-directory: stripe-webhook
+        run: |
+          mkdir -p layers/prisma/nodejs/node_modules/.prisma/client
+          mkdir -p layers/prisma/nodejs/node_modules/@prisma/client
+
+          cp node_modules/.prisma/client/libquery_engine-linux-arm64-openssl-3.0.x.so.node \
+            layers/prisma/nodejs/node_modules/.prisma/client/
+
+          cp -r node_modules/@prisma/client/. \
+            layers/prisma/nodejs/node_modules/@prisma/client/
+
+      - name: SAM build
+        working-directory: stripe-webhook
+        run: sam build
+
+      - name: SAM deploy
+        working-directory: stripe-webhook
+        run: |
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_IAM \
+            --stack-name fakefour-stripe-webhook \
+            --region us-east-1 \
+            --parameter-overrides Environment=production
