@@ -283,15 +283,14 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Notification strip */}
+      {/* Notification strip — always reserves min-height to prevent CLS */}
       {hasAnyNotification && (
         <div
-          className="relative w-full overflow-hidden py-px"
+          className="relative w-full overflow-hidden"
           style={{
-            maxHeight: stripVisible && currentNotification ? '100px' : '0px',
+            minHeight: '2rem',
             opacity: stripVisible && currentNotification ? 1 : 0,
-            transition:
-              'max-height 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {currentNotification && (

@@ -16,7 +16,10 @@ import { Separator } from './ui/separator';
 
 const SocialShareWidget = nextDynamic(
   () => import('./social-share-widget').then((mod) => ({ default: mod.SocialShareWidget })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <div className="h-8 w-36 animate-pulse bg-muted rounded" />,
+  }
 );
 
 const hasErrorName = (error: unknown): error is { name: string } => {

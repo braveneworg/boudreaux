@@ -19,7 +19,10 @@ import { ReleaseShareWidget } from './release-share-widget';
 
 const DownloadDialog = nextDynamic(
   () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <div className="h-10 w-40 animate-pulse bg-muted rounded mb-2" />,
+  }
 );
 
 interface FeaturedArtistsPlayerProps {
