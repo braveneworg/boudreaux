@@ -49,9 +49,22 @@ brew install aws-sam-cli
 
 SAM CLI is **not** required for the CI/CD deploy (GitHub Actions installs it), but it allows local `sam build` / `sam local invoke` testing.
 
-### Step 2: Store all 9 SSM parameters
+### Step 2: Store all 10 SSM parameters
 
-Run these from your terminal (AWS CLI is already installed). Replace placeholder values with real ones:
+**Option A — Use the helper script (recommended):**
+
+```bash
+# Interactive mode (prompts for each value):
+./scripts/setup-ssm-params.sh
+
+# From an .env-style file:
+./scripts/setup-ssm-params.sh --file .env.lambda
+
+# Overwrite existing parameters:
+./scripts/setup-ssm-params.sh --overwrite
+```
+
+**Option B — Manual CLI commands:**
 
 ```bash
 # Already may exist (check first with: aws ssm get-parameter --name /fakefour/stripe/secret-key)
@@ -64,9 +77,10 @@ aws ssm put-parameter --name /fakefour/stripe/price-minimum     --value "price_.
 aws ssm put-parameter --name /fakefour/stripe/price-extra       --value "price_..." --type String
 aws ssm put-parameter --name /fakefour/stripe/price-extra-extra --value "price_..." --type String
 aws ssm put-parameter --name /fakefour/aws-ses-region           --value "us-east-1" --type String
+aws ssm put-parameter --name /fakefour/ses-identity-arn         --value "arn:aws:ses:us-east-1:ACCOUNT_ID:identity/fakefourrecords.com" --type String
 ```
 
-The webhook-secret is a placeholder for now — you'll get the real value from Stripe after the first deploy (Step 6).
+The webhook-secret is a placeholder for now — you'll get the real value from Stripe after the first deploy (Step 6). The SES identity ARN is used in the Lambda's IAM policy to scope `ses:SendEmail` permissions.
 
 ### Step 3: Set up GitHub OIDC in AWS (one-time per AWS account)
 
@@ -158,16 +172,17 @@ aws cloudformation describe-stacks \
 
 ### Step 7: Register the webhook in Stripe
 
-1. Go to **dashboard.stripe.com → Developers → Webhooks → Add endpoint**
-2. Set **Endpoint URL** to the `WebhookUrl` from Step 6
-3. Select these events:
+1. Go to **dashboard.stripe.com → Developers → Webhooks → Add destination**
+2. Select **Webhook** as the destination type
+3. Set **Endpoint URL** to the `WebhookUrl` from Step 6
+4. Select these events:
    - `checkout.session.completed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `invoice.payment_failed`
    - `charge.refunded`
-4. Click **Add endpoint**
-5. **Reveal** the signing secret (`whsec_...`) and update SSM:
+5. Click **Create destination**
+6. **Reveal** the signing secret (`whsec_...`) and update SSM:
 
 ```bash
 aws ssm put-parameter \
@@ -177,7 +192,7 @@ aws ssm put-parameter \
   --overwrite
 ```
 
-6. Trigger a redeploy (trivial commit or manual workflow dispatch) so Lambda picks up the real secret.
+7. Trigger a redeploy (trivial commit or manual workflow dispatch) so Lambda picks up the real secret.
 
 ### Step 8: Test end-to-end
 
@@ -186,28 +201,33 @@ aws ssm put-parameter \
 stripe trigger checkout.session.completed \
   --webhook-endpoint https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/production/webhooks/stripe
 
-# Tail Lambda logs
-sam logs --name StripeWebhookFunction --stack-name fakefour-stripe-webhook --tail
+# Tail Lambda logs (sam logs has a known bug with custom StageName — use AWS CLI instead)
+aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --follow
+# To find the exact log group name:
+#   aws logs describe-log-groups --log-group-name-prefix /aws/lambda/fakefour-stripe-webhook
 # Or: AWS Console → CloudWatch → Log groups → /aws/lambda/fakefour-stripe-webhook-*
 ```
 
-### Step 9: Decide what to do with the existing Next.js webhook handler
+### Step 9: Next.js webhook route — dev-only gating (done)
 
-The handler at `src/app/api/stripe/webhook/route.ts` still exists. Options:
+The handler at `src/app/api/stripe/webhook/route.ts` is now **gated to development only**. In production (`NODE_ENV === 'production'`), it returns 404. This means:
 
-- **Keep both temporarily** — point Stripe at the Lambda, keep the Next.js route as a fallback until you're confident
-- **Remove the Next.js route** — delete `src/app/api/stripe/webhook/route.ts` once Lambda is proven in production
+- **Local dev:** The route works normally with `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+- **Production:** The route returns 404. Only the Lambda handles live Stripe webhooks.
+
+No manual action required — the code change is already applied.
 
 ---
 
 ## Troubleshooting
 
-| Symptom                                     | Likely cause                               | Fix                                                                                                  |
-| ------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `400 Webhook signature verification failed` | Body was parsed before `constructEvent`    | Ensure `event.body` is passed as-is (raw string)                                                     |
-| `No handler found for runtime nodejs24.x`   | SAM CLI version too old                    | `brew upgrade aws-sam-cli`                                                                           |
-| Prisma engine not found at runtime          | Wrong binary in layer                      | Confirm `linux-arm64-openssl-3.0.x` binary is in `layers/prisma/nodejs/node_modules/.prisma/client/` |
-| GitHub Actions OIDC error                   | Trust policy condition mismatch            | Check `braveneworg/boudreaux` matches exactly in the trust policy                                    |
-| `placeholder` webhook secret in SSM         | Forgot to update after Stripe registration | Run the `aws ssm put-parameter --overwrite` command from Step 7                                      |
-| SES `AccessDenied`                          | Missing IAM policy                         | Verify `template.yaml` has the `ses:SendEmail` policy on the function                                |
-| MongoDB connection refused                  | Atlas IP allowlist blocking Lambda         | Add `0.0.0.0/0` to Atlas IP Access List or use VPC                                                   |
+| Symptom                                                    | Likely cause                                     | Fix                                                                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Webhook signature verification failed`                | Body was parsed before `constructEvent`          | Ensure `event.body` is passed as-is (raw string)                                                                                                                       |
+| `No handler found for runtime nodejs24.x`                  | SAM CLI version too old                          | `brew upgrade aws-sam-cli`                                                                                                                                             |
+| Prisma engine not found at runtime                         | Wrong binary in layer                            | Confirm `linux-arm64-openssl-3.0.x` binary is in `layers/prisma/nodejs/node_modules/.prisma/client/`                                                                   |
+| GitHub Actions OIDC error                                  | Trust policy condition mismatch                  | Check `braveneworg/boudreaux` matches exactly in the trust policy                                                                                                      |
+| `placeholder` webhook secret in SSM                        | Forgot to update after Stripe registration       | Run the `aws ssm put-parameter --overwrite` command from Step 7                                                                                                        |
+| SES `AccessDenied`                                         | Missing IAM policy                               | Verify `template.yaml` has the `ses:SendEmail` policy on the function                                                                                                  |
+| MongoDB connection refused                                 | Atlas IP allowlist blocking Lambda               | Add `0.0.0.0/0` to Atlas IP Access List or use VPC                                                                                                                     |
+| `sam logs` → `NotFoundException: Invalid stage identifier` | SAM CLI bug with custom `StageName` on `HttpApi` | Use `aws logs tail /aws/lambda/fakefour-stripe-webhook-StripeWebhookFunction-XXXX --follow` or `sam logs --cw-log-group <log-group> --tail` to bypass stage resolution |

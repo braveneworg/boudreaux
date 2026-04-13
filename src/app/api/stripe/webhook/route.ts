@@ -33,6 +33,12 @@ const releaseMetadataSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // In production, Stripe webhooks are handled by the AWS Lambda.
+  // This route is only active in development for local stripe listen testing.
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   // --- IP Allowlist ---
   const skipIpCheck = process.env.SKIP_STRIPE_IP_CHECK === 'true';
   if (!skipIpCheck) {
