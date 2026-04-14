@@ -36,27 +36,6 @@ export default async function Home() {
   const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
   const preloadSrcSet = firstBannerFilename ? buildBannerPreloadSrcSet(firstBannerFilename) : null;
 
-  // Extract the first featured artist's cover art URL for LCP preloading.
-  // Mirrors the getCoverArt resolution order in featured-artists-player.tsx.
-  const artistsData = queryClient.getQueryData<{
-    featuredArtists?: Array<{
-      coverArt?: string | null;
-      release?: {
-        coverArt?: string | null;
-        images?: Array<{ src: string }>;
-      } | null;
-      artists?: Array<{ images?: Array<{ src: string }> }>;
-    }>;
-  }>(queryKeys.featuredArtists.active());
-
-  const firstArtist = artistsData?.featuredArtists?.[0];
-  const firstCoverArtUrl =
-    firstArtist?.coverArt ??
-    firstArtist?.release?.coverArt ??
-    firstArtist?.release?.images?.[0]?.src ??
-    firstArtist?.artists?.find((a) => a.images && a.images.length > 0)?.images?.[0]?.src ??
-    null;
-
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       {preloadSrcSet && (
@@ -68,9 +47,6 @@ export default async function Home() {
           type="image/webp"
           fetchPriority="high"
         />
-      )}
-      {firstCoverArtUrl && (
-        <link rel="preload" as="image" href={firstCoverArtUrl} fetchPriority="high" />
       )}
       <PageContainer>
         <HomeContent />
