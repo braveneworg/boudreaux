@@ -44,9 +44,9 @@ export const HomeContent = () => {
 
   return (
     <>
-      {/* Always render BannerCarousel — it returns null internally when empty,
-          but keeping a single code path avoids a conditional mount that could
-          shift layout during hydration. */}
+      {/* Always render BannerCarousel — when empty it renders a placeholder
+          section to reserve space, and keeping a single code path avoids a
+          conditional mount that could shift layout during hydration. */}
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
         <ArtistSearchInput />

@@ -233,7 +233,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     <MediaPlayer className="mx-0 mb-2">
       <div className="space-y-2 mt-0">
         {/* Featured Artists Carousel — reserve stable height even when < 3 artists */}
-        <div className="min-h-19">
+        <div className="min-h-[76px]">
           {displayableArtists.length >= 3 && (
             <MediaPlayer.FeaturedArtistCarousel
               featuredArtists={displayableArtists}

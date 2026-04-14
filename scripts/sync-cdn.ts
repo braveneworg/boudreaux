@@ -6,9 +6,9 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import { existsSync, readdirSync, statSync, createReadStream, readFileSync } from 'fs';
+import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
 import { join } from 'path';
-import { gzipSync } from 'zlib';
+import { createGzip } from 'zlib';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import {
@@ -20,8 +20,6 @@ import {
 import { Upload } from '@aws-sdk/lib-storage';
 import dotenv from 'dotenv';
 import * as mime from 'mime';
-
-import type { Readable } from 'stream';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -66,7 +64,7 @@ interface SyncConfig {
 interface FileToUpload {
   localPath: string;
   s3Key: string;
-  body: Buffer | Readable;
+  shouldCompress: boolean;
   contentType: string;
   cacheControl: string;
   contentEncoding?: string;
@@ -369,7 +367,7 @@ class CDNSync {
             files.push({
               localPath: fullPath,
               s3Key,
-              body: shouldCompress ? gzipSync(readFileSync(fullPath)) : createReadStream(fullPath),
+              shouldCompress,
               contentType,
               cacheControl: options.cacheControl,
               contentEncoding: shouldCompress ? 'gzip' : undefined,
@@ -405,12 +403,15 @@ class CDNSync {
   private async uploadFiles(files: FileToUpload[]): Promise<void> {
     const uploadPromises = files.map(async (file) => {
       try {
+        const fileStream = createReadStream(file.localPath);
+        const body = file.shouldCompress ? fileStream.pipe(createGzip()) : fileStream;
+
         const upload = new Upload({
           client: this.s3Client,
           params: {
             Bucket: this.config.s3Bucket,
             Key: file.s3Key,
-            Body: file.body,
+            Body: body,
             ContentType: file.contentType,
             CacheControl: file.cacheControl,
             ...(file.contentEncoding ? { ContentEncoding: file.contentEncoding } : {}),
