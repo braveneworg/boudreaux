@@ -14,6 +14,6 @@ export const LazyControls = nextDynamic(
   () => import('./media-player-controls').then((mod) => ({ default: mod.Controls })),
   {
     ssr: false,
-    loading: () => <div className="min-h-14 w-full animate-pulse bg-zinc-800 rounded" />,
+    loading: () => <div className="min-h-14 w-full animate-pulse rounded bg-muted" />,
   }
 );

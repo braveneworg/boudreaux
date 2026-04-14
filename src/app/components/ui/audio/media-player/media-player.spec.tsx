@@ -49,10 +49,10 @@ vi.mock('video.js', () => {
   return { default: mockVideojs };
 });
 
-// Mock next/dynamic to render the loaded component synchronously.
-// LazyControls uses next/dynamic(() => import('./media-player-controls')),
-// which defers rendering via React.lazy. This mock bypasses the async loader
-// and directly renders the Controls component (which itself uses the mocked video.js).
+// Mock LazyControls to avoid async/dynamic behavior in tests.
+// Instead of loading the lazily wrapped controls module, this mock imports
+// ./media-player-controls directly and returns the real Controls component
+// so the test can render it synchronously with the mocked video.js instance.
 vi.mock('./lazy-controls', async () => {
   const controls = await import('./media-player-controls');
   return { LazyControls: controls.Controls };

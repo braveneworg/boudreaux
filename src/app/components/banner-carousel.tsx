@@ -357,7 +357,7 @@ export function BannerCarousel({
                     src={banner.imageFilename}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
-                    sizes="(max-width: 1200px) 100vw, 1200px"
+                    sizes="100vw"
                     priority={isCurrentSlide}
                     loading={isCurrentSlide ? undefined : 'lazy'}
                     className="object-cover"
