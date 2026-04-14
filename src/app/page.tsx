@@ -43,7 +43,7 @@ export default async function Home() {
           rel="preload"
           as="image"
           imageSrcSet={preloadSrcSet}
-          imageSizes="100vw"
+          imageSizes="(max-width: 1200px) 100vw, 1200px"
           type="image/webp"
           fetchPriority="high"
         />

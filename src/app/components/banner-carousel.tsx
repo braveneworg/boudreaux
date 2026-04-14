@@ -283,37 +283,35 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Notification strip — always reserves min-height to prevent CLS */}
-      {hasAnyNotification && (
-        <div
-          className="relative w-full overflow-hidden"
-          style={{
-            minHeight: '2rem',
-            opacity: stripVisible && currentNotification ? 1 : 0,
-            transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          {currentNotification && (
-            <div
-              key={`strip-${currentIndex}`}
-              className={cn(
-                'w-full px-4 py-2 text-center text-sm banner-strip-slide',
-                isDarkColor(currentNotification.backgroundColor)
-                  ? 'banner-strip-dark'
-                  : 'banner-strip-light'
-              )}
-              style={{
-                color: currentNotification.textColor ?? undefined,
-                backgroundColor: currentNotification.backgroundColor ?? 'transparent',
-                animation: `banner-strip-slide-${direction > 0 ? 'left' : 'right'} ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-              }}
-              dangerouslySetInnerHTML={{
-                __html: addLinkAttributes(sanitizeNotificationHtml(currentNotification.content)),
-              }}
-            />
-          )}
-        </div>
-      )}
+      {/* Notification strip — always rendered to reserve layout space and prevent CLS */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          minHeight: hasAnyNotification ? '2.5rem' : 0,
+          opacity: stripVisible && currentNotification ? 1 : 0,
+          transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        {currentNotification && (
+          <div
+            key={`strip-${currentIndex}`}
+            className={cn(
+              'w-full px-4 py-2 text-center text-sm banner-strip-slide',
+              isDarkColor(currentNotification.backgroundColor)
+                ? 'banner-strip-dark'
+                : 'banner-strip-light'
+            )}
+            style={{
+              color: currentNotification.textColor ?? undefined,
+              backgroundColor: currentNotification.backgroundColor ?? 'transparent',
+              animation: `banner-strip-slide-${direction > 0 ? 'left' : 'right'} ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            }}
+            dangerouslySetInnerHTML={{
+              __html: addLinkAttributes(sanitizeNotificationHtml(currentNotification.content)),
+            }}
+          />
+        )}
+      </div>
 
       {/* Banner image track */}
       <div
@@ -359,7 +357,7 @@ export function BannerCarousel({
                     src={banner.imageFilename}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
-                    sizes="100vw"
+                    sizes="(max-width: 1200px) 100vw, 1200px"
                     priority={isCurrentSlide}
                     loading={isCurrentSlide ? undefined : 'lazy'}
                     className="object-cover"
