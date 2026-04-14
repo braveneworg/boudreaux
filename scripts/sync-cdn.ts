@@ -6,8 +6,9 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
+import { existsSync, readdirSync, statSync, createReadStream, readFileSync } from 'fs';
 import { join } from 'path';
+import { gzipSync } from 'zlib';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import {
@@ -63,8 +64,10 @@ interface SyncConfig {
 interface FileToUpload {
   localPath: string;
   s3Key: string;
+  body: Buffer | NodeJS.ReadableStream;
   contentType: string;
   cacheControl: string;
+  contentEncoding?: string;
 }
 
 // Content types are now handled automatically by mime.getType() during upload
@@ -359,12 +362,15 @@ class CDNSync {
           } else {
             const s3Key = `${s3Prefix}${currentPrefix}/${item}`.replace(/\/+/g, '/');
             const contentType = mime.default.getType(fullPath) || 'application/octet-stream';
+            const shouldCompress = this.shouldCompressFile(contentType, s3Key);
 
             files.push({
               localPath: fullPath,
               s3Key,
+              body: shouldCompress ? gzipSync(readFileSync(fullPath)) : createReadStream(fullPath),
               contentType,
               cacheControl: options.cacheControl,
+              contentEncoding: shouldCompress ? 'gzip' : undefined,
             });
           }
         }
@@ -377,6 +383,23 @@ class CDNSync {
     return files;
   }
 
+  private shouldCompressFile(contentType: string, s3Key: string): boolean {
+    if (s3Key.endsWith('.map')) {
+      return false;
+    }
+
+    return (
+      contentType.startsWith('text/') ||
+      [
+        'application/javascript',
+        'application/json',
+        'application/manifest+json',
+        'application/xml',
+        'image/svg+xml',
+      ].includes(contentType)
+    );
+  }
+
   private async uploadFiles(files: FileToUpload[]): Promise<void> {
     const uploadPromises = files.map(async (file) => {
       try {
@@ -385,9 +408,10 @@ class CDNSync {
           params: {
             Bucket: this.config.s3Bucket,
             Key: file.s3Key,
-            Body: createReadStream(file.localPath),
+            Body: file.body,
             ContentType: file.contentType,
             CacheControl: file.cacheControl,
+            ...(file.contentEncoding ? { ContentEncoding: file.contentEncoding } : {}),
             // Note: ACL removed - bucket uses bucket policy for public access instead
           },
         });

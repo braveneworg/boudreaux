@@ -74,6 +74,7 @@ interface DownloadDialogProps {
   purchasedAt?: Date | null;
   downloadCount?: number;
   availableFormats?: AvailableFormat[];
+  openOnMount?: boolean;
   children: ReactElement;
 }
 
@@ -87,11 +88,12 @@ export const DownloadDialog = ({
   purchasedAt = null,
   downloadCount = 0,
   availableFormats = [],
+  openOnMount = false,
   children,
 }: DownloadDialogProps) => {
   const initialStep: DialogStep =
     hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? 'format-select' : 'download';
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(openOnMount);
   const [step, setStep] = useState<DialogStep>(initialStep);
   const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);

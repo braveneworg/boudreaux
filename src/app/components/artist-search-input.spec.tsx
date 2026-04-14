@@ -11,6 +11,59 @@ import { ArtistSearchInput } from './artist-search-input';
 
 const mockPush = vi.fn();
 
+vi.mock('./artist-search-results', () => ({
+  ArtistSearchResults: (props: {
+    isLoading?: boolean;
+    results?: Array<{
+      artistSlug: string;
+      artistName: string;
+      thumbnailSrc: string | null;
+      releases: Array<{ id: string; title: string }>;
+    }>;
+    onArtistSelect?: (slug: string) => void;
+    onReleaseSelect?: (slug: string, releaseId: string) => void;
+  }) => {
+    if (props.isLoading) {
+      return <div>Searching...</div>;
+    }
+
+    if (!props.results?.length) {
+      return <div>No artists or releases found.</div>;
+    }
+
+    return (
+      <div data-testid="command">
+        {props.results.map((artist) => (
+          <div key={artist.artistSlug} data-testid="command-group" data-heading={artist.artistName}>
+            <button
+              data-testid={`command-item-artist-${artist.artistSlug}`}
+              onClick={() => props.onArtistSelect?.(artist.artistSlug)}
+            >
+              {artist.thumbnailSrc ? (
+                <span
+                  data-testid="search-result-image"
+                  data-src={artist.thumbnailSrc}
+                  data-alt={artist.artistName}
+                />
+              ) : null}
+              <span>All releases by {artist.artistName}</span>
+            </button>
+            {artist.releases.map((release) => (
+              <button
+                key={release.id}
+                data-testid={`command-item-release-${release.id}`}
+                onClick={() => props.onReleaseSelect?.(artist.artistSlug, release.id)}
+              >
+                {release.title}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  },
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,

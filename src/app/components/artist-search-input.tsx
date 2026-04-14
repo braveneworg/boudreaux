@@ -11,24 +11,22 @@
 
 import { useCallback, useState } from 'react';
 
-import Image from 'next/image';
+import nextDynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
-import { Disc3, Search, User } from 'lucide-react';
+import { Search } from 'lucide-react';
 
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from '@/app/components/ui/command';
 import { Popover, PopoverAnchor, PopoverContent } from '@/app/components/ui/popover';
 import { useArtistNavSearchQuery } from '@/app/hooks/use-artist-nav-search-query';
 import { useDebounce } from '@/app/hooks/use-debounce';
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_DELAY = 400;
+
+const ArtistSearchResults = nextDynamic(
+  () => import('./artist-search-results').then((mod) => ({ default: mod.ArtistSearchResults })),
+  { ssr: false }
+);
 
 export const ArtistSearchInput = () => {
   const router = useRouter();
@@ -93,51 +91,15 @@ export const ArtistSearchInput = () => {
         align="start"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <Command shouldFilter={false}>
-          <CommandList id="artist-search-listbox">
-            {isLoading ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>
-            ) : !hasResults ? (
-              <CommandEmpty>No artists or releases found.</CommandEmpty>
-            ) : (
-              results.map((artist) => (
-                <CommandGroup key={artist.artistSlug} heading={artist.artistName}>
-                  <CommandItem
-                    value={`artist-${artist.artistSlug}`}
-                    onSelect={() => handleArtistSelect(artist.artistSlug)}
-                    className="flex items-center gap-3 px-2 py-1.5"
-                  >
-                    {artist.thumbnailSrc ? (
-                      <Image
-                        src={artist.thumbnailSrc}
-                        alt={artist.artistName}
-                        width={32}
-                        height={32}
-                        className="size-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-8 items-center justify-center rounded-full bg-muted">
-                        <User className="size-4 text-muted-foreground" />
-                      </div>
-                    )}
-                    <span className="text-sm font-medium">All releases by {artist.artistName}</span>
-                  </CommandItem>
-                  {artist.releases.map((release) => (
-                    <CommandItem
-                      key={release.id}
-                      value={`release-${release.id}`}
-                      onSelect={() => handleReleaseSelect(artist.artistSlug, release.id)}
-                      className="flex items-center gap-3 px-2 py-1.5 pl-6"
-                    >
-                      <Disc3 className="size-4 text-muted-foreground" />
-                      <span className="text-sm">{release.title}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              ))
-            )}
-          </CommandList>
-        </Command>
+        {showDropdown ? (
+          <ArtistSearchResults
+            id="artist-search-listbox"
+            isLoading={isLoading}
+            results={results}
+            onArtistSelect={handleArtistSelect}
+            onReleaseSelect={handleReleaseSelect}
+          />
+        ) : null}
       </PopoverContent>
     </Popover>
   );

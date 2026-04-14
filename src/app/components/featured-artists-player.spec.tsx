@@ -183,27 +183,29 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
-// Mock DownloadDialog at consumer level
-vi.mock('@/app/components/download-dialog', () => ({
-  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
-    <div data-testid="download-dialog" data-artist-name={artistName}>
-      {children}
-    </div>
-  ),
-  DownloadTriggerButton: () => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      download
-    </button>
-  ),
-}));
+vi.mock('./deferred-download-dialog', async () => {
+  const React = await vi.importActual('react');
 
-vi.mock('./download-trigger-button', () => ({
-  DownloadTriggerButton: () => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      download
-    </button>
-  ),
-}));
+  return {
+    DeferredDownloadDialog: ({ artistName }: { artistName: string }) => {
+      const [isOpen, setIsOpen] = React.useState(false);
+
+      if (isOpen) {
+        return <div data-testid="download-dialog" data-artist-name={artistName} />;
+      }
+
+      return (
+        <button
+          data-testid="download-trigger-button"
+          aria-label="Download music"
+          onClick={() => setIsOpen(true)}
+        >
+          download
+        </button>
+      );
+    },
+  };
+});
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -418,6 +420,16 @@ describe('FeaturedArtistsPlayer', () => {
     });
 
     // Check the cover art image displays the first artist name in the data-alt text
+    expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
+  });
+
+  it('should initialize the first artist when featured artists arrive after mount', () => {
+    const { rerender } = render(<FeaturedArtistsPlayer featuredArtists={[]} />, {
+      wrapper: createWrapper(),
+    });
+
+    rerender(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />);
+
     expect(screen.getByTestId('cover-art-image')).toHaveAttribute('data-alt', 'Test Artist 1');
   });
 
@@ -1192,13 +1204,17 @@ describe('FeaturedArtistsPlayer', () => {
   });
 
   describe('download dialog', () => {
-    it('should render the download dialog with the selected artist name', () => {
+    it('should render the download dialog with the selected artist name after clicking the trigger', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
 
       // Select artist with a release so download dialog renders
       fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('download-trigger-button'));
 
       const downloadDialog = screen.getByTestId('download-dialog');
       expect(downloadDialog).toBeInTheDocument();
@@ -1226,13 +1242,14 @@ describe('FeaturedArtistsPlayer', () => {
       expect(screen.queryByTestId('download-trigger-button')).not.toBeInTheDocument();
     });
 
-    it('should update the download dialog artist name when switching artists', () => {
+    it('should remove the download dialog when switching to an artist without a release', () => {
       render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
         wrapper: createWrapper(),
       });
 
       // Select first artist with a release
       fireEvent.click(screen.getByTestId('artist-featured-2'));
+      fireEvent.click(screen.getByTestId('download-trigger-button'));
       expect(screen.getByTestId('download-dialog')).toHaveAttribute(
         'data-artist-name',
         'Test Artist 2'
