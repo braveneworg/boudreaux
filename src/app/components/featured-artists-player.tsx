@@ -3,9 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-
-import nextDynamic from 'next/dynamic';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
@@ -13,17 +11,9 @@ import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
-import { DownloadTriggerButton } from './download-trigger-button';
+import { DeferredDownloadDialog } from './deferred-download-dialog';
 import { NowPlayingHeading } from './now-playing-heading';
 import { ReleaseShareWidget } from './release-share-widget';
-
-const DownloadDialog = nextDynamic(
-  () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
-  {
-    ssr: false,
-    loading: () => <div className="h-10 w-40 animate-pulse bg-muted rounded mb-2" />,
-  }
-);
 
 interface FeaturedArtistsPlayerProps {
   featuredArtists: FeaturedArtist[];
@@ -47,6 +37,23 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const [isPlaying, setIsPlaying] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
+
+  useEffect(() => {
+    if (displayableArtists.length === 0) {
+      setSelectedArtist(null);
+      setCurrentFileId(null);
+      return;
+    }
+
+    const selectedArtistStillAvailable = selectedArtist
+      ? displayableArtists.some((artist) => artist.id === selectedArtist.id)
+      : false;
+
+    if (!selectedArtistStillAvailable) {
+      setSelectedArtist(displayableArtists[0]);
+      setCurrentFileId(null);
+    }
+  }, [displayableArtists, selectedArtist]);
 
   /** Sorted format files for the selected artist's digital format */
   const sortedFiles = useMemo<FeaturedArtistFormatFile[]>(() => {
@@ -225,49 +232,51 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   return (
     <MediaPlayer className="mx-0 mb-2">
       <div className="space-y-2 mt-0">
-        {/* Featured Artists Carousel */}
-        {displayableArtists.length >= 3 && (
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={displayableArtists}
-            onSelect={handleSelectArtist}
-          />
-        )}
-        {showFileListDrawer && selectedArtist?.release && (
-          <div className="flex flex-col items-center">
-            <MediaPlayer.FormatFileListDrawer
-              files={sortedFiles}
-              currentFileId={currentFile?.id ?? null}
-              onFileSelect={handleFileSelect}
-              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-              releaseTitle={selectedArtist.release.title ?? ''}
-              featuredTrackNumber={selectedArtist.featuredTrackNumber ?? undefined}
+        {/* Featured Artists Carousel — reserve stable height even when < 3 artists */}
+        <div className="min-h-[76px]">
+          {displayableArtists.length >= 3 && (
+            <MediaPlayer.FeaturedArtistCarousel
+              featuredArtists={displayableArtists}
+              onSelect={handleSelectArtist}
             />
-            <DownloadDialog
-              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-              releaseId={selectedArtist.release.id}
-              releaseTitle={selectedArtist.release.title ?? ''}
-            >
-              <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />
-            </DownloadDialog>
-            <NowPlayingHeading
-              artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-              title={selectedArtist.release.title ?? ''}
-              visibleHeading
-            />
-          </div>
-        )}
+          )}
+        </div>
+        {/* Track list, download, now-playing heading — reserve space to prevent CLS */}
+        <div className="flex flex-col items-center min-h-10">
+          {showFileListDrawer && selectedArtist?.release && (
+            <>
+              <MediaPlayer.FormatFileListDrawer
+                files={sortedFiles}
+                currentFileId={currentFile?.id ?? null}
+                onFileSelect={handleFileSelect}
+                artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+                releaseTitle={selectedArtist.release.title ?? ''}
+                featuredTrackNumber={selectedArtist.featuredTrackNumber ?? undefined}
+              />
+              <DeferredDownloadDialog
+                artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+                releaseId={selectedArtist.release.id}
+                releaseTitle={selectedArtist.release.title ?? ''}
+              />
+              <NowPlayingHeading
+                artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+                title={selectedArtist.release.title ?? ''}
+                visibleHeading
+              />
+            </>
+          )}
+        </div>
 
-        {/* Selected Artist Details */}
+        {/* Selected Artist Details — cover art + controls + ticker */}
         {selectedArtist && (
           <div className="flex flex-col items-center">
-            {/* Cover Art with Audio Controls beneath it */}
             <div className="w-full max-w-xl mx-auto">
-              {/* Interactive Cover Art - clickable with play/pause overlay */}
-              {(() => {
-                const coverArt = getCoverArt(selectedArtist);
-                if (!coverArt) return null;
-                return (
-                  <div className="relative">
+              {/* Interactive Cover Art — aspect-square container prevents CLS */}
+              <div className="w-full aspect-square rounded-t-lg overflow-hidden bg-muted">
+                {(() => {
+                  const coverArt = getCoverArt(selectedArtist);
+                  if (!coverArt) return null;
+                  return (
                     <MediaPlayer.InteractiveCoverArt
                       src={coverArt}
                       alt={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
@@ -276,13 +285,13 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                       className="shadow-lg"
                       priority
                     />
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
 
-              {/* Audio Controls - sits directly beneath the image */}
-              {audioSrc && (
-                <div className="w-full bg-zinc-900">
+              {/* Audio Controls — stable min-height prevents CLS during Video.js lazy load */}
+              <div className="w-full bg-zinc-900 min-h-14">
+                {audioSrc && (
                   <MediaPlayer.Controls
                     audioSrc={audioSrc}
                     onPlay={handlePlay}
@@ -293,17 +302,19 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                     autoPlay={shouldAutoPlay}
                     controlsRef={setPlayerControls}
                   />
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* Info Ticker Tape - beneath the controls */}
-              {currentTrackTitle && (
-                <MediaPlayer.InfoTickerTape
-                  featuredArtist={selectedArtist}
-                  isPlaying={isPlaying}
-                  trackTitle={currentTrackTitle}
-                />
-              )}
+              {/* Info Ticker Tape — stable min-height */}
+              <div className="w-full min-h-10 bg-zinc-800 rounded-b-lg">
+                {currentTrackTitle && (
+                  <MediaPlayer.InfoTickerTape
+                    featuredArtist={selectedArtist}
+                    isPlaying={isPlaying}
+                    trackTitle={currentTrackTitle}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}

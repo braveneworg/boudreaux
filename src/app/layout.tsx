@@ -20,7 +20,7 @@ const jost = Jost({
   weight: ['400', '700'],
   style: ['normal', 'italic'],
   variable: '--font-jost',
-  display: 'swap',
+  display: 'optional',
 });
 
 // Server-side environment validation on startup

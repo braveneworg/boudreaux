@@ -264,12 +264,23 @@ export function BannerCarousel({
   );
 
   if (banners.length === 0) {
-    return null;
+    // Reserve the same vertical space as a loaded carousel to prevent CLS
+    return (
+      <section className={cn('relative w-full', className)} aria-hidden="true">
+        {/* Notification strip placeholder */}
+        <div className="w-full" style={{ minHeight: '2.5rem' }} />
+        {/* Banner aspect-ratio placeholder */}
+        <div className="relative w-full bg-muted" style={{ paddingBottom: '61.8%' }} />
+        {/* Dot indicators placeholder */}
+        <div className="flex justify-center gap-2 py-2">
+          <div className="h-11 w-11" />
+        </div>
+      </section>
+    );
   }
 
   const currentBanner = banners[currentIndex];
   const currentNotification = currentBanner?.notification;
-  const hasAnyNotification = banners.some((b) => b.notification !== null);
 
   const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
   const nextIndex = (currentIndex + 1) % totalSlides;
@@ -283,11 +294,11 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Notification strip — always rendered to reserve layout space and prevent CLS */}
+      {/* Notification strip — always reserves 2.5rem to prevent CLS */}
       <div
         className="relative w-full overflow-hidden"
         style={{
-          minHeight: hasAnyNotification ? '2.5rem' : 0,
+          minHeight: '2.5rem',
           opacity: stripVisible && currentNotification ? 1 : 0,
           transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
