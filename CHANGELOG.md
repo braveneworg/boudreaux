@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [3.19.0] - 2026-04-14
+
+### Added
+
+- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n- Develop/fix deployment and outdated actions (#338)\n
+
 ## [3.18.0] - 2026-04-13
 
 ### Added
