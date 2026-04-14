@@ -49,6 +49,15 @@ vi.mock('video.js', () => {
   return { default: mockVideojs };
 });
 
+// Mock LazyControls to avoid async/dynamic behavior in tests.
+// Instead of loading the lazily wrapped controls module, this mock imports
+// ./media-player-controls directly and returns the real Controls component
+// so the test can render it synchronously with the mocked video.js instance.
+vi.mock('./lazy-controls', async () => {
+  const controls = await import('./media-player-controls');
+  return { LazyControls: controls.Controls };
+});
+
 // Mock the audio controls
 vi.mock('../audio-controls', () => ({
   AudioRewindButton: vi.fn(),

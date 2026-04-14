@@ -5,6 +5,8 @@
 export default function HomeLoading() {
   return (
     <div className="w-full">
+      {/* Notification strip skeleton — matches banner-carousel min-height */}
+      <div className="w-full bg-muted animate-pulse" style={{ minHeight: '2.5rem' }} />
       {/* Banner skeleton */}
       <div className="relative w-full animate-pulse bg-muted" style={{ paddingBottom: '61.8%' }} />
       {/* Dot indicators skeleton */}

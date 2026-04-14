@@ -328,8 +328,11 @@ describe('UploadService', () => {
       const fileName = 'album.mp3';
       const mimeType = 'audio/mpeg';
 
+      const now = 1776130927185;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
       const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature';
-      const mockS3Key = `releases/${releaseId}/digital-formats/${formatType}/${Date.now()}-album.mp3`;
+      const mockS3Key = `releases/${releaseId}/digital-formats/${formatType}/${now}-album.mp3`;
 
       vi.mocked(s3Client.generatePresignedUploadUrl).mockResolvedValue({
         uploadUrl: mockPresignedUrl,
