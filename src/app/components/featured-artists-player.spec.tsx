@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useEffect } from 'react';
+import type ReactModule from 'react';
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -184,7 +185,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
 });
 
 vi.mock('./deferred-download-dialog', async () => {
-  const React = await vi.importActual('react');
+  const React = (await vi.importActual('react')) as typeof ReactModule;
 
   return {
     DeferredDownloadDialog: ({ artistName }: { artistName: string }) => {

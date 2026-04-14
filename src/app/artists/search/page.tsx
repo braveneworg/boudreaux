@@ -9,7 +9,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ArtistSearchInput } from '@/app/components/artist-search-input';
-import { ArtistSearchResults } from '@/app/components/artist-search-results';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { Heading } from '@/app/components/ui/heading';
@@ -56,7 +55,6 @@ export default async function ArtistSearchPage({ searchParams }: ArtistSearchPag
           <div className="px-4 py-2">
             <ArtistSearchInput />
           </div>
-          <ArtistSearchResults query={query} />
         </ContentContainer>
       </PageContainer>
     </HydrationBoundary>

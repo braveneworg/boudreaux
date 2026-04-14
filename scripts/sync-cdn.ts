@@ -21,6 +21,8 @@ import { Upload } from '@aws-sdk/lib-storage';
 import dotenv from 'dotenv';
 import * as mime from 'mime';
 
+import type { Readable } from 'stream';
+
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 dotenv.config(); // This loads .env as fallback
@@ -64,7 +66,7 @@ interface SyncConfig {
 interface FileToUpload {
   localPath: string;
   s3Key: string;
-  body: Buffer | NodeJS.ReadableStream;
+  body: Buffer | Readable;
   contentType: string;
   cacheControl: string;
   contentEncoding?: string;
