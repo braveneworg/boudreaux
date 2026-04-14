@@ -425,6 +425,7 @@ interface InteractiveCoverArtProps {
   isPlaying: boolean;
   onTogglePlay: () => void;
   className?: string;
+  priority?: boolean;
 }
 
 /**
@@ -461,6 +462,7 @@ const InteractiveCoverArt = ({
   isPlaying,
   onTogglePlay,
   className,
+  priority,
 }: InteractiveCoverArtProps) => {
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -501,6 +503,7 @@ const InteractiveCoverArt = ({
           fill
           className="object-cover"
           sizes="100vw"
+          priority={priority}
           onError={() => setImageError(true)}
         />
       )}
