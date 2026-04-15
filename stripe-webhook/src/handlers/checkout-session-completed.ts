@@ -207,7 +207,11 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
     // Check if user already owns this release (e.g. re-purchase or test retry).
     // If so, update the session ID so the polling endpoint can find it.
     const existingForUser = await prisma.releasePurchase.findFirst({
-      where: { userId, releaseId, refundedAt: null },
+      where: {
+        userId,
+        releaseId,
+        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+      },
     });
     if (existingForUser) {
       await prisma.releasePurchase.update({

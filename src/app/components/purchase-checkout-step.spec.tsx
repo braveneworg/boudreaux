@@ -764,7 +764,7 @@ describe('PurchaseCheckoutStep', () => {
   it('should not call onConfirmed if unmounted before loginAndConfirm completes', async () => {
     // Set up: payment completes and purchase is confirmed, but component unmounts
     // before createPurchaseSessionAction resolves
-    let resolvePurchaseSession: () => void;
+    let resolvePurchaseSession: (() => void) | undefined;
     mockCreatePurchaseSessionAction.mockReturnValue(
       new Promise<{ success: boolean }>((resolve) => {
         resolvePurchaseSession = () => resolve({ success: true });
@@ -799,7 +799,8 @@ describe('PurchaseCheckoutStep', () => {
     unmount();
 
     // Now resolve the pending promise
-    resolvePurchaseSession!();
+    if (!resolvePurchaseSession) throw new Error('resolvePurchaseSession was not assigned');
+    resolvePurchaseSession();
     await vi.waitFor(() => {});
 
     // onConfirmed should NOT have been called because `cancelled` was set to true

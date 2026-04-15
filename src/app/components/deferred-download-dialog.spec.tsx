@@ -14,58 +14,52 @@ vi.mock('@/app/hooks/use-release-user-status-query', () => ({
   useReleaseUserStatusQuery: (...args: unknown[]) => mockUseReleaseUserStatusQuery(...args),
 }));
 
+// Mock next/dynamic to render synchronously — no Promises involved.
+// The real next/dynamic lazy-loads DownloadDialog with { ssr: false }, which
+// defers rendering via React.lazy. This mock bypasses the async loader entirely
+// and returns a synchronous component that mirrors the DownloadDialog interface
+// so that getByTestId assertions work without awaiting.
 vi.mock('next/dynamic', () => ({
   __esModule: true,
-  default: (loader: () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>) => {
-    let Component: React.ComponentType<Record<string, unknown>> | null = null;
-    loader().then((mod) => {
-      Component = mod.default;
-    });
-    const DynamicComponent = (props: Record<string, unknown>) => {
-      if (!Component) return <div data-testid="loading-placeholder" />;
-      return <Component {...props} />;
-    };
+  default: (_loader: unknown) => {
+    const DynamicComponent = ({
+      artistName,
+      releaseId,
+      releaseTitle,
+      hasPurchase,
+      purchasedAt,
+      downloadCount,
+      availableFormats,
+      openOnMount,
+      children,
+    }: {
+      artistName: string;
+      releaseId: string;
+      releaseTitle: string;
+      hasPurchase: boolean;
+      purchasedAt: Date | null;
+      downloadCount: number;
+      availableFormats: Array<{ formatType: string; fileName: string }>;
+      openOnMount: boolean;
+      children: React.ReactNode;
+    }) => (
+      <div
+        data-testid="download-dialog"
+        data-artist={artistName}
+        data-release-id={releaseId}
+        data-release-title={releaseTitle}
+        data-has-purchase={String(hasPurchase)}
+        data-purchased-at={purchasedAt ? purchasedAt.toISOString() : ''}
+        data-download-count={String(downloadCount)}
+        data-format-count={String(availableFormats.length)}
+        data-open-on-mount={String(openOnMount)}
+      >
+        {children}
+      </div>
+    );
     DynamicComponent.displayName = 'DynamicComponent';
     return DynamicComponent;
   },
-}));
-
-vi.mock('./download-dialog', () => ({
-  DownloadDialog: ({
-    artistName,
-    releaseId,
-    releaseTitle,
-    hasPurchase,
-    purchasedAt,
-    downloadCount,
-    availableFormats,
-    openOnMount,
-    children,
-  }: {
-    artistName: string;
-    releaseId: string;
-    releaseTitle: string;
-    hasPurchase: boolean;
-    purchasedAt: Date | null;
-    downloadCount: number;
-    availableFormats: Array<{ formatType: string; fileName: string }>;
-    openOnMount: boolean;
-    children: React.ReactNode;
-  }) => (
-    <div
-      data-testid="download-dialog"
-      data-artist={artistName}
-      data-release-id={releaseId}
-      data-release-title={releaseTitle}
-      data-has-purchase={String(hasPurchase)}
-      data-purchased-at={purchasedAt ? purchasedAt.toISOString() : ''}
-      data-download-count={String(downloadCount)}
-      data-format-count={String(availableFormats.length)}
-      data-open-on-mount={String(openOnMount)}
-    >
-      {children}
-    </div>
-  ),
 }));
 
 vi.mock('./download-trigger-button', () => ({

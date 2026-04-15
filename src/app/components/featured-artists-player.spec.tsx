@@ -1498,30 +1498,5 @@ describe('FeaturedArtistsPlayer', () => {
         'file-2'
       );
     });
-
-    it('should not change track when selecting a non-existent file id', () => {
-      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
-        wrapper: createWrapper(),
-      });
-
-      // Select artist with files
-      fireEvent.click(screen.getByTestId('artist-featured-2'));
-
-      // The current file id before invalid selection
-      const drawerBefore = screen.getByTestId('format-file-list-drawer');
-      const fileIdBefore = drawerBefore.getAttribute('data-current-file-id');
-
-      // Simulate selecting a non-existent file by invoking the mock's onFileSelect with bad id
-      // The mock's FormatFileListDrawer renders buttons that call onFileSelect with the file's id,
-      // so we need to call the handler directly. We can do this by adding a button.
-      // Instead, the coverage for "file not found" branch would need a special fixture.
-      // However, since the mock calls onFileSelect with only existing file ids,
-      // we verify the current file does not change when we re-select the same file
-      fireEvent.click(screen.getByTestId('file-select-file-1'));
-      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
-        'data-current-file-id',
-        fileIdBefore === 'file-1' ? 'file-1' : 'file-1'
-      );
-    });
   });
 });
