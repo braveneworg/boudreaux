@@ -57,6 +57,7 @@ jobs:
         run: pnpm run test:shard --shard=${{ matrix.shard }}/2
         env:
           CI: true
+          DATABASE_URL: "mongodb://localhost:27017/test-placeholder"
 
       - name: Upload blob report
         if: always()
