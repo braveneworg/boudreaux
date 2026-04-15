@@ -17,6 +17,11 @@ let mockCallbacks: {
   onTimeout?: () => void;
 } = {};
 
+const mockUseMediaQuery = vi.fn().mockReturnValue(false);
+vi.mock('@/lib/utils/useMediaQuery', () => ({
+  useMediaQuery: (...args: unknown[]) => mockUseMediaQuery(...args),
+}));
+
 // Mock react-turnstile
 vi.mock('react-turnstile', () => ({
   default: ({
@@ -25,12 +30,14 @@ vi.mock('react-turnstile', () => ({
     onExpire,
     onTimeout,
     sitekey,
+    size,
   }: {
     onVerify?: (token: string) => void;
     onError?: () => void;
     onExpire?: () => void;
     onTimeout?: () => void;
     sitekey?: string;
+    size?: string;
   }) => {
     // Store callbacks so tests can trigger them
     mockCallbacks = { onVerify, onError, onExpire, onTimeout };
@@ -38,6 +45,7 @@ vi.mock('react-turnstile', () => ({
     return React.createElement('div', {
       'data-testid': 'turnstile-widget',
       'data-sitekey': sitekey,
+      'data-size': size,
       onClick: () => onVerify?.('mock-token'),
     });
   },
@@ -310,6 +318,22 @@ describe('TurnstileWidget', () => {
 
       const widget = screen.getByTestId('turnstile-widget');
       expect(widget).toHaveAttribute('data-sitekey', 'production-key');
+    });
+  });
+
+  describe('responsive size', () => {
+    it('should use flexible size when not on small mobile', () => {
+      mockUseMediaQuery.mockReturnValue(false);
+      render(<TurnstileWidget {...defaultProps} />);
+      const widget = screen.getByTestId('turnstile-widget');
+      expect(widget).toHaveAttribute('data-size', 'flexible');
+    });
+
+    it('should use compact size on small mobile viewports', () => {
+      mockUseMediaQuery.mockReturnValue(true);
+      render(<TurnstileWidget {...defaultProps} />);
+      const widget = screen.getByTestId('turnstile-widget');
+      expect(widget).toHaveAttribute('data-size', 'compact');
     });
   });
 

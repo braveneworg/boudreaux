@@ -3,9 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import nextDynamic from 'next/dynamic';
+
+import { useReleaseUserStatusQuery } from '@/app/hooks/use-release-user-status-query';
 
 import { DownloadTriggerButton } from './download-trigger-button';
 
@@ -29,6 +31,15 @@ export const DeferredDownloadDialog = ({
   releaseTitle,
 }: DeferredDownloadDialogProps) => {
   const [shouldRenderDialog, setShouldRenderDialog] = useState(false);
+  const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
+
+  const hasPurchase = userStatus?.hasPurchase ?? false;
+  const purchasedAt = useMemo(
+    () => (userStatus?.purchasedAt ? new Date(userStatus.purchasedAt) : null),
+    [userStatus?.purchasedAt]
+  );
+  const downloadCount = userStatus?.downloadCount ?? 0;
+  const availableFormats = userStatus?.availableFormats ?? [];
 
   if (!shouldRenderDialog) {
     return (
@@ -48,6 +59,10 @@ export const DeferredDownloadDialog = ({
       openOnMount
       releaseId={releaseId}
       releaseTitle={releaseTitle}
+      hasPurchase={hasPurchase}
+      purchasedAt={purchasedAt}
+      downloadCount={downloadCount}
+      availableFormats={availableFormats}
     >
       <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />
     </DownloadDialog>

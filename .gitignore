@@ -106,3 +106,5 @@ e2e/.auth/
 .zencoder/
 package-lock.json
 !stripe-webhook/package-lock.json
+music
+.playwright-mcp

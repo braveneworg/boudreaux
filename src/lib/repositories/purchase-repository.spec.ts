@@ -16,11 +16,13 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
     },
     releaseDownload: {
       findUnique: vi.fn(),
+      update: vi.fn(),
       upsert: vi.fn(),
     },
     user: {
@@ -108,7 +110,11 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.findByUserAndRelease('user-123', 'release-abc');
 
       expect(prisma.releasePurchase.findFirst).toHaveBeenCalledWith({
-        where: { userId: 'user-123', releaseId: 'release-abc', refundedAt: null },
+        where: {
+          userId: 'user-123',
+          releaseId: 'release-abc',
+          OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+        },
       });
       expect(result).toEqual(mockRecord);
     });
@@ -293,6 +299,55 @@ describe('PurchaseRepository', () => {
     });
   });
 
+  describe('resetDownloadCount', () => {
+    it('should call prisma.releaseDownload.update with count 0 and new lastDownloadedAt', async () => {
+      const mockRecord = {
+        id: 'dl-1',
+        userId: 'user-123',
+        releaseId: 'release-abc',
+        downloadCount: 0,
+        lastDownloadedAt: new Date(),
+      };
+      vi.mocked(prisma.releaseDownload.update).mockResolvedValue(mockRecord as never);
+
+      const result = await PurchaseRepository.resetDownloadCount('user-123', 'release-abc');
+
+      expect(prisma.releaseDownload.update).toHaveBeenCalledWith({
+        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
+        data: { downloadCount: 0, lastDownloadedAt: expect.any(Date) },
+      });
+      expect(result).toEqual(mockRecord);
+    });
+  });
+
+  describe('updateSessionId', () => {
+    it('should call prisma.releasePurchase.update with the new sessionId', async () => {
+      const mockRecord = { id: 'purchase-1', stripeSessionId: 'cs_new_session' };
+      vi.mocked(prisma.releasePurchase.update).mockResolvedValue(mockRecord as never);
+
+      const result = await PurchaseRepository.updateSessionId('purchase-1', 'cs_new_session');
+
+      expect(prisma.releasePurchase.update).toHaveBeenCalledWith({
+        where: { id: 'purchase-1' },
+        data: { stripeSessionId: 'cs_new_session' },
+      });
+      expect(result).toEqual(mockRecord);
+    });
+  });
+
+  describe('resetEmailSent', () => {
+    it('should call prisma.releasePurchase.updateMany to set confirmationEmailSentAt to null', async () => {
+      vi.mocked(prisma.releasePurchase.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      await PurchaseRepository.resetEmailSent('purchase-1');
+
+      expect(prisma.releasePurchase.updateMany).toHaveBeenCalledWith({
+        where: { id: 'purchase-1' },
+        data: { confirmationEmailSentAt: null },
+      });
+    });
+  });
+
   describe('markRefunded', () => {
     it('should return true when updateMany marks exactly one record as refunded', async () => {
       vi.mocked(prisma.releasePurchase.updateMany).mockResolvedValue({ count: 1 } as never);
@@ -300,7 +355,10 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markRefunded('pi_test_123');
 
       expect(prisma.releasePurchase.updateMany).toHaveBeenCalledWith({
-        where: { stripePaymentIntentId: 'pi_test_123', refundedAt: null },
+        where: {
+          stripePaymentIntentId: 'pi_test_123',
+          OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+        },
         data: { refundedAt: expect.any(Date) },
       });
       expect(result).toBe(true);

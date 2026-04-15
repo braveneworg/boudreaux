@@ -447,7 +447,7 @@ nextjs-portal {
   }
 }
 
-.header-bg-pulse {
+.header-bg-pulse::before {
   animation: header-bg-pulse 4.4s ease-in-out forwards;
 }
 

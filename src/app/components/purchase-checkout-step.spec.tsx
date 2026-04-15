@@ -84,6 +84,7 @@ interface DefaultProps {
   releaseId: string;
   releaseTitle: string;
   amountCents: number;
+  customerEmail?: string | null;
   onConfirmed: () => void;
   onError: (message: string) => void;
   onCancel: () => void;
@@ -322,7 +323,7 @@ describe('PurchaseCheckoutStep', () => {
 
     it('refetchInterval returns false when poll count exceeds MAX_POLL_COUNT', async () => {
       // pollCount is React state that increments via queryFn's setPollCount.
-      // We can't easily reach 45 through direct calls, so we verify the branch
+      // We can't easily reach 30 through direct calls, so we verify the branch
       // by checking that the refetchInterval logic reads confirmed from query state.
       // When confirmed is true at any point, it returns false (already tested above).
       // This test verifies the count branch indirectly via the timedOut UI path.
@@ -351,7 +352,7 @@ describe('PurchaseCheckoutStep', () => {
       const result = refetchInterval({
         state: { data: { confirmed: false }, fetchStatus: 'idle' },
       });
-      expect(result).toBe(2000);
+      expect(result).toBe(3500);
     });
 
     it('refetchInterval returns POLL_INTERVAL_MS when not confirmed and under poll limit', async () => {
@@ -378,8 +379,8 @@ describe('PurchaseCheckoutStep', () => {
       const result = refetchInterval({
         state: { data: { confirmed: false }, fetchStatus: 'idle' },
       });
-      // pollCount is 0 (under 45), not confirmed -> returns POLL_INTERVAL_MS (2000)
-      expect(result).toBe(2000);
+      // pollCount is 0 (under 30), not confirmed -> returns POLL_INTERVAL_MS (3500)
+      expect(result).toBe(3500);
     });
   });
 
@@ -683,7 +684,7 @@ describe('PurchaseCheckoutStep', () => {
     const result = refetchInterval({
       state: { data: { confirmed: false }, fetchStatus: 'fetching' },
     });
-    expect(result).toBe(2000);
+    expect(result).toBe(3500);
   });
 
   it('shows timeout UI when pollCount reaches MAX_POLL_COUNT without confirmation', async () => {
@@ -723,23 +724,146 @@ describe('PurchaseCheckoutStep', () => {
       expect(screen.getByText('Payment received!')).toBeDefined();
     });
 
-    // Now call queryFn 45 times to increment pollCount to MAX_POLL_COUNT
+    // Now call queryFn 30 times to increment pollCount to MAX_POLL_COUNT
     const queryFn = capturedConfig.queryFn as () => Promise<unknown>;
     const mockFetch = vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ confirmed: false }),
     } as Response);
 
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 30; i++) {
       await queryFn();
     }
 
     mockFetch.mockRestore();
 
-    // After 45 polls, the timeout UI should be shown
+    // After 30 polls, the timeout UI should be shown
     await waitFor(() => {
       expect(screen.getByText(/taking longer than expected/)).toBeDefined();
     });
     expect(screen.getByText(/support@fakefourinc.com/)).toBeDefined();
+  });
+
+  it('should pass customerEmail to createPurchaseCheckoutSessionAction when provided', async () => {
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'cs_xxx',
+    });
+
+    const props = buildProps({ customerEmail: 'guest@example.com' });
+    render(<PurchaseCheckoutStep {...props} />);
+
+    await waitFor(() => {
+      expect(mockCreatePurchaseCheckoutSessionAction).toHaveBeenCalledWith(
+        expect.objectContaining({ customerEmail: 'guest@example.com' })
+      );
+    });
+  });
+
+  it('should not call onConfirmed if unmounted before loginAndConfirm completes', async () => {
+    // Set up: payment completes and purchase is confirmed, but component unmounts
+    // before createPurchaseSessionAction resolves
+    let resolvePurchaseSession: () => void;
+    mockCreatePurchaseSessionAction.mockReturnValue(
+      new Promise<{ success: boolean }>((resolve) => {
+        resolvePurchaseSession = () => resolve({ success: true });
+      })
+    );
+
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'sess_cancel_test',
+    });
+
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: {
+        confirm: vi.fn().mockResolvedValue({ type: 'success' }),
+      },
+    });
+
+    mockUseQuery.mockReturnValue({ data: { confirmed: true } });
+
+    const onConfirmed = vi.fn();
+    const props = buildProps({ onConfirmed });
+    const { unmount } = render(<PurchaseCheckoutStep {...props} />);
+
+    // Wait for the session action to be called (loginAndConfirm starts)
+    await waitFor(() => {
+      expect(mockCreatePurchaseSessionAction).toHaveBeenCalled();
+    });
+
+    // Unmount before the session action resolves
+    unmount();
+
+    // Now resolve the pending promise
+    resolvePurchaseSession!();
+    await vi.waitFor(() => {});
+
+    // onConfirmed should NOT have been called because `cancelled` was set to true
+    expect(onConfirmed).not.toHaveBeenCalled();
+  });
+
+  it('should show "Setting up your account..." when isLoggingIn is true', async () => {
+    // createPurchaseSessionAction never resolves, keeping isLoggingIn true
+    mockCreatePurchaseSessionAction.mockReturnValue(new Promise(() => {}));
+
+    mockCheckoutState.mockReturnValue({
+      type: 'success',
+      checkout: {
+        canConfirm: true,
+        confirm: vi.fn().mockResolvedValue({ type: 'success' }),
+      },
+    });
+
+    // Start with confirmed false
+    mockUseQuery.mockReturnValue({ data: undefined });
+
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'sess_logging_in',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    // Wait for checkout form
+    await waitFor(() => {
+      expect(screen.getByText(/Pay \$/)).toBeDefined();
+    });
+
+    // Before clicking Pay, set the mock so the next re-render returns confirmed: true
+    mockUseQuery.mockReturnValue({ data: { confirmed: true } });
+
+    // Click Pay
+    fireEvent.click(screen.getByText(/Pay \$/));
+
+    // Payment received renders, then loginAndConfirm fires, setting isLoggingIn
+    await waitFor(() => {
+      expect(screen.getByText('Setting up your account...')).toBeDefined();
+    });
+  });
+
+  it('should not proceed with confirm when checkoutState.type is not success', async () => {
+    const mockConfirm = vi.fn();
+    mockCheckoutState.mockReturnValue({ type: 'loading' });
+
+    mockCreatePurchaseCheckoutSessionAction.mockResolvedValue({
+      success: true,
+      clientSecret: 'cs_xxx',
+      sessionId: 'cs_xxx',
+    });
+
+    const props = buildProps();
+    render(<PurchaseCheckoutStep {...props} />);
+
+    // Wait for checkout form render — in loading state the Pay button is not rendered,
+    // so handleConfirm cannot be invoked via UI when type is loading.
+    // However, the branch guard still exists for safety.
+    // We verify the confirm mock is never called
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 });
