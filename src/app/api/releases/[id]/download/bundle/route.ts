@@ -7,7 +7,7 @@ import { PassThrough, type Readable } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
 
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
 import { getToken } from 'next-auth/jwt';
@@ -29,6 +29,8 @@ import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-sche
  * Allow up to 5 minutes for large multi-format bundles (WAV, AIFF).
  */
 export const maxDuration = 300;
+const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
+const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
 
 /**
  * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...
@@ -66,7 +68,7 @@ export async function GET(
           error: 'RATE_LIMITED',
           message: 'Too many requests. Please try again later.',
         },
-        { status: 429 }
+        { status: 429, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -82,7 +84,7 @@ export async function GET(
     if (!token?.sub) {
       return Response.json(
         { success: false, error: 'UNAUTHORIZED', message: 'You must be logged in to download.' },
-        { status: 401 }
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -93,7 +95,7 @@ export async function GET(
     if (!isValidObjectId(releaseId)) {
       return Response.json(
         { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -108,7 +110,7 @@ export async function GET(
           error: 'INVALID_FORMATS',
           message: parseResult.error.issues[0]?.message ?? 'Invalid formats parameter.',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -120,7 +122,7 @@ export async function GET(
     if (!access.allowed && access.reason === 'no_purchase') {
       return Response.json(
         { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
-        { status: 403 }
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -131,7 +133,7 @@ export async function GET(
           error: 'DOWNLOAD_LIMIT',
           message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
         },
-        { status: 403 }
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -144,7 +146,7 @@ export async function GET(
     if (!release) {
       return Response.json(
         { success: false, error: 'NOT_FOUND', message: 'Release not found.' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -179,7 +181,7 @@ export async function GET(
     if (resolvedFormats.length === 0) {
       return Response.json(
         { success: false, error: 'NO_FILES', message: 'No downloadable files found.' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -241,41 +243,68 @@ export async function GET(
     // Wait for the full upload to complete
     await upload.done();
 
-    // Step 8: Generate a presigned download URL for the temporary ZIP
-    const downloadUrl = await generatePresignedDownloadUrl(tempS3Key, zipFileName);
+    try {
+      // Step 8: Generate a short-lived presigned download URL for the temporary ZIP
+      const downloadUrl = await generatePresignedDownloadUrl(
+        tempS3Key,
+        zipFileName,
+        TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
+      );
 
-    // Step 9: Increment download count (bundle = 1 download action)
-    await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+      // Step 9: Increment download count (bundle = 1 download action)
+      await PurchaseRepository.upsertDownloadCount(userId, releaseId);
 
-    // Step 10: Log download events per format
-    const downloadEventRepo = new DownloadEventRepository();
-    const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-    const userAgent = request.headers.get('user-agent') ?? 'unknown';
+      // Step 10: Log download events per format
+      const downloadEventRepo = new DownloadEventRepository();
+      const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+      const userAgent = request.headers.get('user-agent') ?? 'unknown';
 
-    await Promise.all(
-      resolvedFormats.map(({ formatType }) =>
-        downloadEventRepo.logDownloadEvent({
-          userId,
-          releaseId,
-          formatType,
+      await Promise.all(
+        resolvedFormats.map(({ formatType }) =>
+          downloadEventRepo.logDownloadEvent({
+            userId,
+            releaseId,
+            formatType,
+            success: true,
+            ipAddress,
+            userAgent,
+          })
+        )
+      );
+
+      return Response.json(
+        {
           success: true,
-          ipAddress,
-          userAgent,
-        })
-      )
-    );
-
-    return Response.json({
-      success: true,
-      downloadUrl,
-      fileName: zipFileName,
-    });
+          downloadUrl,
+          fileName: zipFileName,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    } catch (postUploadError) {
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: tempS3Key,
+          })
+        );
+      } catch (cleanupError) {
+        console.error('Failed to clean up temporary bundle after post-upload error', {
+          tempS3Key,
+          originalError: postUploadError,
+          cleanupError,
+        });
+      }
+      throw postUploadError;
+    }
   } catch (error) {
-    console.error('Bundle download error:', error);
+    console.error('Bundle download error', {
+      error,
+    });
 
     return Response.json(
       { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

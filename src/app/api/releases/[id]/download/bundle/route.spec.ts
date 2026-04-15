@@ -251,9 +251,15 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(body.success).toBe(true);
     expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
     expect(body.fileName).toBe('Test Album.zip');
+    expect(mockGeneratePresignedDownloadUrl).toHaveBeenCalledWith(
+      expect.any(String),
+      'Test Album.zip',
+      900
+    );
   });
 
   it('should append files to the archive for multi-track formats', async () => {
@@ -375,7 +381,59 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(body.error).toBe('INTERNAL_ERROR');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should delete temporary bundle when post-upload steps fail', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUpsertDownloadCount.mockRejectedValueOnce(new Error('Post-upload write failed'));
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+    expect(
+      mockS3Send.mock.calls.some(
+        ([command]) =>
+          (command as { constructor: { name: string } }).constructor.name === 'DeleteObjectCommand'
+      )
+    ).toBe(true);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should log cleanup failure with original error context', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const postUploadError = new Error('Post-upload write failed');
+    const cleanupError = new Error('Cleanup failed');
+
+    mockUpsertDownloadCount.mockRejectedValueOnce(postUploadError);
+    mockS3Send.mockImplementation((command: { constructor: { name: string } }) => {
+      if (command.constructor.name === 'DeleteObjectCommand') {
+        return Promise.reject(cleanupError);
+      }
+
+      return Promise.resolve({
+        Body: Readable.from(Buffer.from('fake-audio-data')),
+      });
+    });
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to clean up temporary bundle after post-upload error',
+      expect.objectContaining({
+        originalError: postUploadError,
+        cleanupError,
+      })
+    );
 
     consoleSpy.mockRestore();
   });

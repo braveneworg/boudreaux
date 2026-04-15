@@ -418,4 +418,23 @@ describe('FormatBundleDownload', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No files found.');
   });
+
+  it('should show error when response is successful but downloadUrl is missing', async () => {
+    const user = userEvent.setup();
+    const { openSpy } = stubDownloadApis({
+      ok: true,
+      status: 200,
+      body: { success: true, fileName: 'Test Album.zip' },
+    });
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Download link is unavailable. Please try again.'
+    );
+    expect(openSpy).not.toHaveBeenCalled();
+  });
 });

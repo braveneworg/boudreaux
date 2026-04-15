@@ -95,6 +95,11 @@ export const FormatBundleDownload = ({
         return;
       }
 
+      if (!data.downloadUrl) {
+        setError('Download link is unavailable. Please try again.');
+        return;
+      }
+
       // Use window.open for reliable downloads on all platforms
       // (iOS Safari ignores the download attribute on programmatic anchors).
       window.open(data.downloadUrl, '_self');
