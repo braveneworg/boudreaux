@@ -29,8 +29,8 @@ function getStripe() {
   return stripePromise;
 }
 
-const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_COUNT = 45;
+const POLL_INTERVAL_MS = 3500;
+const MAX_POLL_COUNT = 30;
 
 const SESSION_ERROR_MESSAGES: Record<string, string> = {
   already_purchased: ALREADY_PURCHASED_ERROR,
@@ -212,11 +212,10 @@ export const PurchaseCheckoutStep = ({
     },
     enabled: paymentComplete && sessionId !== null,
     refetchInterval: (query) => {
-      const confirmed = query.state.data?.confirmed;
-      const count = query.state.fetchStatus === 'idle' ? pollCount : pollCount;
-      if (confirmed || count >= MAX_POLL_COUNT) return false;
+      if (query.state.data?.confirmed || pollCount >= MAX_POLL_COUNT) return false;
       return POLL_INTERVAL_MS;
     },
+    retry: false,
   });
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);

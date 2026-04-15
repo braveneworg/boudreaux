@@ -50,7 +50,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
   return (
     <div className="sticky top-0 left-0 right-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)]">
       {/* Animated background layer — CSS animation replaces framer-motion */}
-      <div className="absolute inset-0 bg-[url('/media/particles-6.svg')] bg-black bg-cover bg-center bg-no-repeat header-bg-pulse before:content-[''] before:absolute before:inset-0 before:pointer-events-none" />
+      <div className="absolute inset-0 bg-black before:content-[''] before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:pointer-events-none header-bg-pulse" />
       {/* Sparkle overlay */}
       <div className="absolute inset-0 pointer-events-none z-10">
         {/* Main sparkles */}

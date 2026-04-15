@@ -1458,5 +1458,45 @@ describe('FeaturedArtistsPlayer', () => {
       // Empty src is falsy, so getCoverArt should return null
       expect(screen.queryByTestId('cover-art-image')).not.toBeInTheDocument();
     });
+
+    it('should return null when artist has no coverArt, no release, and empty artists', () => {
+      const bareFeaturedArtist: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        coverArt: null,
+        release: {
+          ...mockRelease,
+          coverArt: null,
+          images: [],
+        },
+        artists: [],
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[bareFeaturedArtist]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // getCoverArt returns null — no cover art rendered
+      expect(screen.queryByTestId('interactive-cover-art')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('handleFileSelect', () => {
+    it('should change the current track when a file is selected from the drawer', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      // Select artist with files
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+
+      // Select a specific file from the drawer
+      fireEvent.click(screen.getByTestId('file-select-file-2'));
+
+      // The drawer should update to show the selected file
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-current-file-id',
+        'file-2'
+      );
+    });
   });
 });

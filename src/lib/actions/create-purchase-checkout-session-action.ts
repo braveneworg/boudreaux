@@ -62,6 +62,22 @@ export async function createPurchaseCheckoutSessionAction(input: unknown): Promi
       if (alreadyPurchased) {
         return { success: false, error: 'already_purchased' };
       }
+    } else if (email) {
+      // For guest checkout, resolve the email to a userId and check for existing
+      // purchase so we don't charge them again for a release they already own.
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (existingUser) {
+        const alreadyPurchased = await PurchaseService.checkExistingPurchase(
+          existingUser.id,
+          releaseId
+        );
+        if (alreadyPurchased) {
+          return { success: false, error: 'already_purchased' };
+        }
+      }
     }
 
     // Verify release exists and is published; fetch title for Stripe product data

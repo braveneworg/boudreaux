@@ -28,6 +28,9 @@ vi.mock('@/lib/prisma', () => ({
     release: {
       findFirst: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -173,6 +176,54 @@ describe('createPurchaseCheckoutSessionAction', () => {
       const result = await createPurchaseCheckoutSessionAction(validInput);
 
       expect(result).toEqual({ success: false, error: 'already_purchased' });
+    });
+
+    it('should return "already_purchased" when a guest email resolves to a user who already purchased', async () => {
+      // No auth session → guest checkout with customerEmail
+      mockAuth.mockResolvedValue(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'existing-user-456' } as never);
+      vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(true);
+
+      const result = await createPurchaseCheckoutSessionAction({
+        ...validInput,
+        customerEmail: 'existing@example.com',
+      });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'existing@example.com' },
+        select: { id: true },
+      });
+      expect(PurchaseService.checkExistingPurchase).toHaveBeenCalledWith(
+        'existing-user-456',
+        'release-123'
+      );
+      expect(result).toEqual({ success: false, error: 'already_purchased' });
+    });
+
+    it('should allow guest checkout when email resolves to a user without existing purchase', async () => {
+      mockAuth.mockResolvedValue(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'existing-user-789' } as never);
+      vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
+
+      const result = await createPurchaseCheckoutSessionAction({
+        ...validInput,
+        customerEmail: 'new-buyer@example.com',
+      });
+
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+    });
+
+    it('should allow guest checkout when email does not resolve to any existing user', async () => {
+      mockAuth.mockResolvedValue(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+
+      const result = await createPurchaseCheckoutSessionAction({
+        ...validInput,
+        customerEmail: 'brand-new@example.com',
+      });
+
+      expect(PurchaseService.checkExistingPurchase).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ success: true }));
     });
   });
 

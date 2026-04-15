@@ -969,7 +969,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
-  it('should open to format-select step when hasPurchase=true and under limit', async () => {
+  it('should show sign-in link on download step when hasPurchase=true and not signed in', async () => {
     const user = userEvent.setup();
 
     render(
@@ -988,13 +988,50 @@ describe('DownloadDialog — hasPurchase button variants', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
-    expect(screen.getByText(/Select formats for/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByText(/already purchased/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/signin');
     // Should NOT show the radio group
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 
-  it('should show disabled "Download limit reached" button when hasPurchase=true and at limit', async () => {
+  it('should auto-advance to format-select when hasPurchase=true and signed in and under limit', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        hasPurchase
+        downloadCount={2}
+        availableFormats={[
+          { formatType: 'FLAC', fileName: 'album-flac.zip' },
+          { formatType: 'WAV', fileName: 'album-wav.zip' },
+        ]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('should show disabled "Download limit reached" button when hasPurchase=true and signed in and at limit', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1005,14 +1042,21 @@ describe('DownloadDialog — hasPurchase button variants', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    // At download limit with hasPurchase, shows the purchased view directly (no radio buttons)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
     expect(screen.getByText(/download limit for/)).toBeInTheDocument();
     expect(screen.getByText('support@fakefourinc.com')).toBeInTheDocument();
   });
 
-  it('should show disabled "Download limit reached" button when hasPurchase=true and over limit', async () => {
+  it('should show disabled "Download limit reached" button when hasPurchase=true and signed in and over limit', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1023,12 +1067,19 @@ describe('DownloadDialog — hasPurchase button variants', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    // Over limit with hasPurchase, shows the purchased view directly (no radio buttons)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
   });
 
   it('should reset to format-select step when dialog is closed and reopened with hasPurchase', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1042,9 +1093,11 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       </DownloadDialog>
     );
 
-    // Open — should show format-select
+    // Open — should auto-advance to format-select
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
 
     // Close via Escape
     await user.keyboard('{Escape}');
@@ -1052,12 +1105,19 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       expect(screen.queryByRole('heading', { name: 'Download Again' })).not.toBeInTheDocument()
     );
 
-    // Reopen — should still show format-select
+    // Reopen — should auto-advance to format-select again
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
   });
 
   it('should show "No digital formats" message when hasPurchase but no formats available', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1068,7 +1128,10 @@ describe('DownloadDialog — hasPurchase button variants', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    // Auto-advances to format-select where no formats message is shown
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
     expect(screen.getByText('No digital formats available for download.')).toBeInTheDocument();
   });
 });
@@ -1499,7 +1562,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     expect(successStep).toHaveAttribute('data-format-count', '2');
     expect(successStep).toHaveAttribute('data-download-count', '2');
   });
-  it('should show purchased download view instead of error when already_purchased error is returned', async () => {
+  it('should show purchase-confirmed step instead of error when already_purchased error is returned', async () => {
     mockUseSession.mockReturnValue({
       data: { user: { email: 'user@test.com', id: 'user-123' } },
       status: 'authenticated',
@@ -1531,11 +1594,11 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Trigger Already Purchased' }));
 
     await waitFor(() => {
-      // Should show the purchased download view, not the radio form
-      expect(screen.getByText(/You already purchased this on/)).toBeInTheDocument();
+      // Should show the purchase-confirmed step, not the radio form
+      expect(screen.getByText(/already purchased/)).toBeInTheDocument();
     });
-    // Should show format bundle download, not the error message or radio buttons
-    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+    // Should show Continue button to advance to format selection
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByText('You have already purchased this release.')).not.toBeInTheDocument();
   });
@@ -1587,8 +1650,7 @@ describe('DownloadDialog — returning-download step', () => {
 
     await navigateToReturningDownload(user, false);
 
-    expect(screen.getByText('Sign in to access your downloads.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Sign in to download/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Sign in to access your downloads/ })).toHaveAttribute(
       'href',
       '/signin'
     );
@@ -1611,8 +1673,7 @@ describe('DownloadDialog — returning-download step', () => {
 
     await navigateToReturningDownload(user, false);
 
-    expect(screen.getByText('Sign in to access your downloads.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Sign in to download/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Sign in to access your downloads/ })).toHaveAttribute(
       'href',
       '/signin'
     );
@@ -1768,7 +1829,7 @@ describe('DownloadDialog — onDownloadComplete closes dialog', () => {
   });
 });
 
-describe('DownloadDialog — onDownloadComplete in download step (effectiveHasPurchase)', () => {
+describe('DownloadDialog — onDownloadComplete via purchase-confirmed step (already_purchased error)', () => {
   const defaultProps = {
     artistName: 'Test Artist',
     premiumPrice: 8,
@@ -1781,7 +1842,7 @@ describe('DownloadDialog — onDownloadComplete in download step (effectiveHasPu
     mockCheckGuestPurchaseAction.mockReset();
   });
 
-  it('should close the dialog when onDownloadComplete is triggered from the download+effectiveHasPurchase view', async () => {
+  it('should close the dialog when onDownloadComplete is triggered after purchase-confirmed → format-select', async () => {
     mockUseSession.mockReturnValue({
       data: { user: { email: 'user@test.com', id: 'user-123' } },
       status: 'authenticated',
@@ -1810,11 +1871,18 @@ describe('DownloadDialog — onDownloadComplete in download step (effectiveHasPu
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
 
-    // Trigger "already purchased" error → sets purchaseConfirmed=true, step='download'
+    // Trigger "already purchased" error → sets purchaseConfirmed=true, step='purchase-confirmed'
     await user.click(screen.getByRole('button', { name: 'Trigger Already Purchased' }));
 
     await waitFor(() => {
-      // Now on step='download' with effectiveHasPurchase=true, showing FormatBundleDownload
+      // Now on purchase-confirmed step
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    });
+
+    // Click Continue to advance to format-select
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => {
       expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
     });
 
@@ -1841,6 +1909,11 @@ describe('DownloadDialog — onDownloadComplete in format-select step', () => {
   });
 
   it('should close the dialog when onDownloadComplete is triggered from the format-select step', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
     const user = userEvent.setup();
 
     render(
@@ -1857,8 +1930,12 @@ describe('DownloadDialog — onDownloadComplete in format-select step', () => {
       </DownloadDialog>
     );
 
-    // Opens directly to format-select step because hasPurchase=true and downloadCount < limit
+    // Opens and auto-advances to format-select because hasPurchase + signed in
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
     expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
@@ -1901,5 +1978,106 @@ describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
         screen.getByRole('button', { name: /Buy & Download for \$8\.00/ })
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('DownloadDialog — hasPurchase on download step', () => {
+  const purchaseProps = {
+    artistName: 'Test Artist',
+    premiumPrice: 8,
+    releaseId: 'release-123',
+    releaseTitle: 'Test Release',
+    hasPurchase: true,
+    purchasedAt: new Date('2025-06-15T12:00:00'),
+    downloadCount: 1,
+    availableFormats: [
+      { formatType: 'FLAC' as const, fileName: 'test.flac' },
+      { formatType: 'MP3_320KBPS' as const, fileName: 'test.mp3' },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+  });
+
+  it('should auto-advance to format-select when signed in with hasPurchase', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...purchaseProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/June 15, 2025/)).toBeInTheDocument();
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+    // Radio group should not be visible
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('should show Sign in link when not signed in with hasPurchase', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...purchaseProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    const signInLink = screen.getByRole('link', { name: /sign in/i });
+    expect(signInLink).toBeInTheDocument();
+    expect(signInLink).toHaveAttribute('href', '/signin');
+    // Radio group should not be visible
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('should still show the Subscribe CTA when hasPurchase is true and not signed in', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...purchaseProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    expect(screen.getByRole('button', { name: /Subscribe/ })).toBeInTheDocument();
+  });
+
+  it('should show download limit reached on format-select when at cap with hasPurchase', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...purchaseProps} downloadCount={5}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Continue to Download/ })).not.toBeInTheDocument();
   });
 });

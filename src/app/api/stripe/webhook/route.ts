@@ -250,12 +250,21 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
 
   const amountTotal = retrievedSession.amount_total ?? 0;
 
-  // Create the purchase record, or fetch existing if this is a duplicate
-  // webhook delivery. P2002 (unique constraint on stripePaymentIntentId)
-  // is handled gracefully so the email logic below always runs — the
-  // markEmailSent guard in sendPurchaseConfirmationEmail is the real
-  // idempotency mechanism.
+  // Look up existing purchase — first by paymentIntentId (duplicate webhook),
+  // then by userId+releaseId (re-purchase of same release). Pre-checking avoids
+  // P2002 unique constraint violations which are unreliable under Turbopack
+  // (instanceof PrismaClientKnownRequestError can fail across module contexts).
   let purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
+
+  if (!purchase) {
+    // Check if user already owns this release (e.g. re-purchase or test retry).
+    // If so, update the session ID so the polling endpoint can find it.
+    const existingForUser = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
+    if (existingForUser) {
+      await PurchaseRepository.updateSessionId(existingForUser.id, retrievedSession.id);
+      purchase = existingForUser;
+    }
+  }
 
   if (!purchase) {
     try {
@@ -268,19 +277,27 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
         stripeSessionId: retrievedSession.id,
       });
     } catch (createError) {
-      if (
-        createError instanceof PrismaClientKnownRequestError &&
-        createError.code === 'P2002' &&
-        (createError.meta?.target as string[] | undefined)?.includes('stripePaymentIntentId')
-      ) {
-        // Race condition: another webhook delivery already created this purchase — re-fetch.
-        purchase = await PurchaseRepository.findByPaymentIntentId(paymentIntentId);
-        if (!purchase) {
-          // P2002 was for stripePaymentIntentId but the record is still not visible;
-          // propagate so the webhook is retried.
-          throw createError;
+      // Race condition: a concurrent webhook delivery may have created the
+      // record between our pre-check and the insert. Re-fetch by
+      // paymentIntentId (the most specific unique key).
+      // Turbopack bundles Prisma into separate module contexts, breaking
+      // instanceof checks — use duck-type detection for the error code.
+      const isPrismaP2002 =
+        (createError instanceof PrismaClientKnownRequestError ||
+          (createError instanceof Error && 'code' in createError)) &&
+        (createError as { code?: string }).code === 'P2002';
+
+      if (isPrismaP2002) {
+        purchase =
+          (await PurchaseRepository.findByPaymentIntentId(paymentIntentId)) ??
+          (await PurchaseRepository.findByUserAndRelease(userId, releaseId));
+
+        if (purchase) {
+          await PurchaseRepository.updateSessionId(purchase.id, retrievedSession.id);
         }
-      } else {
+      }
+
+      if (!purchase) {
         throw createError;
       }
     }

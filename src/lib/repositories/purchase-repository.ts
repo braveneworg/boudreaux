@@ -47,7 +47,11 @@ export class PurchaseRepository {
   /** Find an active (non-refunded) purchase by userId + releaseId composite key. */
   static async findByUserAndRelease(userId: string, releaseId: string) {
     return prisma.releasePurchase.findFirst({
-      where: { userId, releaseId, refundedAt: null },
+      where: {
+        userId,
+        releaseId,
+        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+      },
     });
   }
 
@@ -102,6 +106,14 @@ export class PurchaseRepository {
       data: { confirmationEmailSentAt: new Date() },
     });
     return result.count > 0;
+  }
+
+  /** Update the Stripe session ID on an existing purchase (e.g. re-purchase of same release). */
+  static async updateSessionId(purchaseId: string, sessionId: string) {
+    return prisma.releasePurchase.update({
+      where: { id: purchaseId },
+      data: { stripeSessionId: sessionId },
+    });
   }
 
   /**
@@ -204,7 +216,10 @@ export class PurchaseRepository {
    */
   static async markRefunded(paymentIntentId: string): Promise<boolean> {
     const result = await prisma.releasePurchase.updateMany({
-      where: { stripePaymentIntentId: paymentIntentId, refundedAt: null },
+      where: {
+        stripePaymentIntentId: paymentIntentId,
+        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+      },
       data: { refundedAt: new Date() },
     });
     return result.count > 0;

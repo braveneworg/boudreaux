@@ -32,6 +32,14 @@ vi.mock('@/app/components/artist-search-input', () => ({
   ArtistSearchInput: () => <div data-testid="artist-search-input">Search Input</div>,
 }));
 
+vi.mock('@/app/components/artist-search-results', () => ({
+  ArtistSearchResultsPanel: ({ query }: { query: string }) => (
+    <div data-testid="artist-search-results" data-query={query}>
+      Search Results
+    </div>
+  ),
+}));
+
 vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
   BreadcrumbMenu: () => <nav data-testid="breadcrumb-menu">Breadcrumbs</nav>,
 }));
@@ -92,12 +100,24 @@ describe('ArtistSearchPage', () => {
     expect(mockPrefetchQuery).not.toHaveBeenCalled();
   });
 
-  it('should not prefetch when q is not a string', async () => {
+  it('should pass query to ArtistSearchResults', async () => {
+    const Page = await ArtistSearchPage({
+      searchParams: Promise.resolve({ q: 'john' }),
+    });
+    render(Page);
+
+    const results = screen.getByTestId('artist-search-results');
+    expect(results).toHaveAttribute('data-query', 'john');
+  });
+
+  it('should pass empty query when q is not a string', async () => {
     const Page = await ArtistSearchPage({
       searchParams: Promise.resolve({ q: ['john', 'doe'] }),
     });
     render(Page);
 
+    const results = screen.getByTestId('artist-search-results');
+    expect(results).toHaveAttribute('data-query', '');
     expect(mockPrefetchQuery).not.toHaveBeenCalled();
   });
 });

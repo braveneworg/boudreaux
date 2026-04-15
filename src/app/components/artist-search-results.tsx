@@ -3,7 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { useCallback } from 'react';
+
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 import { Disc3, User } from 'lucide-react';
 
@@ -14,6 +17,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/app/components/ui/command';
+import { useArtistNavSearchQuery } from '@/app/hooks/use-artist-nav-search-query';
 
 interface ArtistSearchResult {
   artistSlug: string;
@@ -85,5 +89,48 @@ export const ArtistSearchResults = ({
         )}
       </CommandList>
     </Command>
+  );
+};
+
+interface ArtistSearchResultsPanelProps {
+  query: string;
+}
+
+/**
+ * Container component for the `/artists/search` page. Reads pre-fetched data
+ * from the TanStack Query cache (populated server-side via HydrationBoundary)
+ * and renders search results with page-level navigation.
+ */
+export const ArtistSearchResultsPanel = ({ query }: ArtistSearchResultsPanelProps) => {
+  const router = useRouter();
+  const { isPending: isLoading, data } = useArtistNavSearchQuery(query);
+  const results = data?.results ?? [];
+
+  const handleArtistSelect = useCallback(
+    (slug: string) => {
+      router.push(`/artists/${slug}`);
+    },
+    [router]
+  );
+
+  const handleReleaseSelect = useCallback(
+    (slug: string, releaseId: string) => {
+      router.push(`/artists/${slug}?release=${releaseId}`);
+    },
+    [router]
+  );
+
+  if (!query) {
+    return null;
+  }
+
+  return (
+    <ArtistSearchResults
+      id="artist-search-results-panel"
+      isLoading={isLoading}
+      results={results}
+      onArtistSelect={handleArtistSelect}
+      onReleaseSelect={handleReleaseSelect}
+    />
   );
 };

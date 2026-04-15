@@ -190,6 +190,7 @@ export async function createPurchaseSessionAction(
 
     return { success: true };
   } catch (error) {
+    console.error(error);
     console.error(
       '[createPurchaseSession] Failed to create session:',
       error instanceof Error ? error.message : error

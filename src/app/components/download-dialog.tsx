@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
 import Link from 'next/link';
@@ -56,6 +56,7 @@ type DialogStep =
   | 'email-step'
   | 'checkout'
   | 'purchase-checkout'
+  | 'purchase-confirmed'
   | 'purchase-success'
   | 'returning-download';
 
@@ -91,8 +92,7 @@ export const DownloadDialog = ({
   openOnMount = false,
   children,
 }: DownloadDialogProps) => {
-  const initialStep: DialogStep =
-    hasPurchase && downloadCount < MAX_RELEASE_DOWNLOAD_COUNT ? 'format-select' : 'download';
+  const initialStep: DialogStep = 'download';
   const [open, setOpen] = useState(openOnMount);
   const [step, setStep] = useState<DialogStep>(initialStep);
   const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
@@ -101,10 +101,14 @@ export const DownloadDialog = ({
   const [amountCents, setAmountCents] = useState<number>(0);
   const [guestAtCap, setGuestAtCap] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [purchaseConfirmed, setPurchaseConfirmed] = useState(false);
   const { data: session } = useSession();
 
-  const effectiveHasPurchase = hasPurchase || purchaseConfirmed;
+  // Auto-advance authenticated purchasers directly to format selection
+  useEffect(() => {
+    if (open && hasPurchase && session?.user && step === 'download') {
+      setStep('format-select');
+    }
+  }, [open, hasPurchase, session, step]);
 
   const form = useForm<DownloadFormSchemaType>({
     resolver: zodResolver(downloadSchema),
@@ -165,7 +169,6 @@ export const DownloadDialog = ({
       setAmountCents(0);
       setGuestAtCap(false);
       setPurchaseError(null);
-      setPurchaseConfirmed(false);
     }
   };
 
@@ -187,17 +190,17 @@ export const DownloadDialog = ({
           if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
         }}
       >
-        {step === 'download' && effectiveHasPurchase && (
+        {step === 'purchase-confirmed' && (
           <>
             <DialogHeader>
               <DialogTitle>Download</DialogTitle>
               <DialogDescription>
-                Select formats for <strong>{releaseTitle}</strong>
+                You&apos;ve already purchased <strong>{releaseTitle}</strong>
               </DialogDescription>
             </DialogHeader>
 
             <p className="text-zinc-900 text-sm">
-              You already purchased this on{' '}
+              Purchased on{' '}
               <strong>
                 {purchasedAt
                   ? new Date(purchasedAt).toLocaleDateString('en-US', {
@@ -226,142 +229,194 @@ export const DownloadDialog = ({
                 </p>
               </>
             ) : (
-              <FormatBundleDownload
-                releaseId={releaseId}
-                releaseTitle={releaseTitle}
-                availableFormats={availableFormats}
-                downloadCount={downloadCount}
-                onDownloadComplete={() => setOpen(false)}
-              />
+              <Button className="w-full" type="button" onClick={() => setStep('format-select')}>
+                <DownloadIcon className="size-4" />
+                Continue
+              </Button>
             )}
           </>
         )}
 
-        {step === 'download' && !effectiveHasPurchase && (
+        {step === 'download' && (
           <>
             <DialogHeader>
               <DialogTitle>Download</DialogTitle>
-              <DialogDescription>Choose download format(s)</DialogDescription>
+              <DialogDescription>
+                {hasPurchase ? (
+                  <>
+                    You&apos;ve already purchased <strong>{releaseTitle}</strong>
+                  </>
+                ) : (
+                  'Choose download format(s)'
+                )}
+              </DialogDescription>
             </DialogHeader>
 
             {purchaseError && <p className="text-destructive text-sm">{purchaseError}</p>}
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                {/* Download option radio group */}
-                <FormField
-                  control={form.control}
-                  name="downloadOption"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value ?? ''}
-                          className="gap-4"
-                        >
-                          {DOWNLOAD_OPTIONS.map((option) => (
-                            <FormItem
-                              key={option.value}
-                              className="flex items-center gap-3 space-y-0"
-                            >
-                              <FormControl>
-                                <RadioGroupItem value={option.value} />
-                              </FormControl>
-                              <FormLabel className="cursor-pointer font-normal">
-                                <div className="flex flex-col gap-1">
-                                  <span className="leading-snug">{option.label}</span>
-                                  {option.value === 'premium-digital' && (
-                                    <span className="text-muted-foreground">
-                                      {' '}
-                                      or <em>pay what you want</em>
-                                    </span>
-                                  )}
-                                </div>
-                              </FormLabel>
-                            </FormItem>
-                          ))}
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {hasPurchase && session?.user ? (
+              <>
+                <p className="text-zinc-900 text-sm">
+                  Purchased on{' '}
+                  <strong>
+                    {purchasedAt
+                      ? new Date(purchasedAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : 'a previous date'}
+                  </strong>
+                  .
+                </p>
 
-                {/* Custom amount section — visible when premium is selected */}
-                {selectedOption === 'premium-digital' && (
+                {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
+                  <>
+                    <Button className="w-full" type="button" disabled>
+                      <DownloadIcon className="size-4" />
+                      Download limit reached
+                    </Button>
+                    <p className="text-muted-foreground text-sm">
+                      You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
+                      Contact{' '}
+                      <a href="mailto:support@fakefourinc.com" className="underline">
+                        support@fakefourinc.com
+                      </a>{' '}
+                      for assistance.
+                    </p>
+                  </>
+                ) : (
+                  <Button className="w-full" type="button" onClick={() => setStep('format-select')}>
+                    <DownloadIcon className="size-4" />
+                    Continue to Download
+                  </Button>
+                )}
+              </>
+            ) : hasPurchase && !session?.user ? (
+              <Button asChild className="w-full">
+                <Link href="/signin">
+                  <LogInIcon className="size-4" />
+                  Sign in to access your downloads
+                </Link>
+              </Button>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                  {/* Download option radio group */}
                   <FormField
                     control={form.control}
-                    name="finalAmount"
+                    name="downloadOption"
                     render={({ field }) => (
                       <FormItem>
-                        <div>
-                          <FormControl>
-                            <div className="flex items-center gap-2 text-sm">
-                              <span>Pay</span>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  {...field}
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder={`$${effectiveSuggestedPrice.toFixed(2)}`}
-                                  className="w-24 text-center"
-                                  aria-label="Custom amount"
-                                  onChange={(e) => {
-                                    const raw = e.target.value
-                                      .replace(/[^\d.]/g, '')
-                                      .replace(/(\..*)\./g, '$1');
-                                    const [whole, decimal] = raw.split('.');
-                                    const sanitized =
-                                      decimal !== undefined
-                                        ? `${whole}.${decimal.slice(0, 2)}`
-                                        : raw;
-                                    field.onChange(sanitized ? `$${sanitized}` : '');
-                                  }}
-                                  onFocus={(e) => {
-                                    const raw = e.target.value.replace(/[^\d.]/g, '');
-                                    field.onChange(raw ? `$${raw}` : '');
-                                  }}
-                                  onBlur={(e) => {
-                                    field.onBlur();
-                                    const raw = e.target.value.replace(/[^\d.]/g, '');
-                                    if (!raw) return;
-                                    const num = parseFloat(raw);
-                                    if (Number.isFinite(num) && num >= 0) {
-                                      field.onChange(`$${num.toFixed(2)}`);
-                                    }
-                                  }}
-                                  value={field.value ?? ''}
-                                />
-                                <em>(suggested ${effectiveSuggestedPrice})</em>
-                              </div>
-                            </div>
-                          </FormControl>
-
-                          <span className="text-sm">
-                            to extend your support for{' '}
-                            <span className="font-semibold">{artistName}</span>
-                          </span>
-                        </div>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value ?? ''}
+                            className="gap-4"
+                          >
+                            {DOWNLOAD_OPTIONS.map((option) => (
+                              <FormItem
+                                key={option.value}
+                                className="flex items-center gap-3 space-y-0"
+                              >
+                                <FormControl>
+                                  <RadioGroupItem value={option.value} />
+                                </FormControl>
+                                <FormLabel className="cursor-pointer font-normal">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="leading-snug">{option.label}</span>
+                                    {option.value === 'premium-digital' && (
+                                      <span className="text-muted-foreground">
+                                        {' '}
+                                        or <em>pay what you want</em>
+                                      </span>
+                                    )}
+                                  </div>
+                                </FormLabel>
+                              </FormItem>
+                            ))}
+                          </RadioGroup>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
 
-                {selectedOption === 'premium-digital' ? (
-                  <Button className="w-full" type="submit">
-                    <DownloadIcon className="size-4" />
-                    Buy &amp; Download for {displayAmount}
-                  </Button>
-                ) : (
-                  <Button className="w-full" type="submit">
-                    <DownloadIcon className="size-4" />
-                    Download
-                  </Button>
-                )}
-              </form>
-            </Form>
+                  {/* Custom amount section — visible when premium is selected */}
+                  {selectedOption === 'premium-digital' && (
+                    <FormField
+                      control={form.control}
+                      name="finalAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div>
+                            <FormControl>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span>Pay</span>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    {...field}
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder={`$${effectiveSuggestedPrice.toFixed(2)}`}
+                                    className="w-24 text-center"
+                                    aria-label="Custom amount"
+                                    onChange={(e) => {
+                                      const raw = e.target.value
+                                        .replace(/[^\d.]/g, '')
+                                        .replace(/(\..*)\./g, '$1');
+                                      const [whole, decimal] = raw.split('.');
+                                      const sanitized =
+                                        decimal !== undefined
+                                          ? `${whole}.${decimal.slice(0, 2)}`
+                                          : raw;
+                                      field.onChange(sanitized ? `$${sanitized}` : '');
+                                    }}
+                                    onFocus={(e) => {
+                                      const raw = e.target.value.replace(/[^\d.]/g, '');
+                                      field.onChange(raw ? `$${raw}` : '');
+                                    }}
+                                    onBlur={(e) => {
+                                      field.onBlur();
+                                      const raw = e.target.value.replace(/[^\d.]/g, '');
+                                      if (!raw) return;
+                                      const num = parseFloat(raw);
+                                      if (Number.isFinite(num) && num >= 0) {
+                                        field.onChange(`$${num.toFixed(2)}`);
+                                      }
+                                    }}
+                                    value={field.value ?? ''}
+                                  />
+                                  <em>(suggested ${effectiveSuggestedPrice})</em>
+                                </div>
+                              </div>
+                            </FormControl>
+
+                            <span className="text-sm">
+                              to extend your support for{' '}
+                              <span className="font-semibold">{artistName}</span>
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {selectedOption === 'premium-digital' ? (
+                    <Button className="w-full" type="submit">
+                      <DownloadIcon className="size-4" />
+                      Buy &amp; Download for {displayAmount}
+                    </Button>
+                  ) : (
+                    <Button className="w-full" type="submit">
+                      <DownloadIcon className="size-4" />
+                      Download
+                    </Button>
+                  )}
+                </form>
+              </Form>
+            )}
 
             {/* Subscribe CTA */}
             <div className="border-t pt-4">
@@ -490,11 +545,11 @@ export const DownloadDialog = ({
             onCancel={() => setStep('download')}
             onError={(msg) => {
               if (msg === ALREADY_PURCHASED_ERROR) {
-                setPurchaseConfirmed(true);
+                setStep('purchase-confirmed');
               } else {
                 setPurchaseError(msg);
+                setStep('download');
               }
-              setStep('download');
             }}
           />
         )}
@@ -534,11 +589,10 @@ export const DownloadDialog = ({
               </>
             ) : (
               <>
-                <p className="text-sm">Sign in to access your downloads.</p>
                 <Button asChild className="w-full">
                   <Link href="/signin">
                     <LogInIcon className="size-4" />
-                    Sign in to download
+                    Sign in to access your downloads
                   </Link>
                 </Button>
               </>

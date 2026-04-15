@@ -96,12 +96,18 @@ vi.mock('@/lib/email/send-subscription-confirmation', () => ({
 const mockFindByPaymentIntentId = vi.fn();
 const mockPurchaseCreate = vi.fn();
 const mockFindUserByEmail = vi.fn();
+const mockFindByUserAndRelease = vi.fn();
+const mockUpdateSessionId = vi.fn();
+const mockMarkRefunded = vi.fn();
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
     findByPaymentIntentId: (...args: unknown[]) => mockFindByPaymentIntentId(...args),
     create: (...args: unknown[]) => mockPurchaseCreate(...args),
     findUserByEmail: (...args: unknown[]) => mockFindUserByEmail(...args),
+    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
+    updateSessionId: (...args: unknown[]) => mockUpdateSessionId(...args),
+    markRefunded: (...args: unknown[]) => mockMarkRefunded(...args),
   },
 }));
 
@@ -1946,5 +1952,163 @@ describe('POST /api/stripe/webhook', () => {
     const request = createRequest('{}');
     const response = await POST(request);
     expect(response.status).toBe(400);
+  });
+
+  // ─── Branch coverage: sendPurchaseConfirmationEmail returns false ───
+  describe('checkout.session.completed — email send failure', () => {
+    beforeEach(() => {
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_pay_email_fail',
+            mode: 'payment',
+            metadata: {
+              type: 'release_purchase',
+              releaseId: '507f1f77bcf86cd799439011',
+              userId: '507f1f77bcf86cd799439012',
+            },
+            payment_intent: 'pi_email_fail',
+            amount_total: 500,
+            currency: 'usd',
+            customer_details: { email: 'buyer@example.com' },
+            customer_email: null,
+          },
+        },
+      });
+      mockCheckoutSessionsRetrieve.mockResolvedValue({
+        id: 'cs_pay_email_fail',
+        metadata: {
+          type: 'release_purchase',
+          releaseId: '507f1f77bcf86cd799439011',
+          userId: '507f1f77bcf86cd799439012',
+        },
+        payment_intent: 'pi_email_fail',
+        amount_total: 500,
+        currency: 'usd',
+        customer_details: { email: 'buyer@example.com' },
+        customer_email: null,
+      });
+      mockFindByPaymentIntentId.mockResolvedValue(null);
+      mockFindByUserAndRelease.mockResolvedValue(null);
+      mockPurchaseCreate.mockResolvedValue({ id: 'purchase-email-fail' });
+      mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Email Fail Release' });
+      mockPrismaUserFindUnique.mockResolvedValue({
+        id: '507f1f77bcf86cd799439012',
+        email: 'buyer@example.com',
+      });
+    });
+
+    it('logs warning when sendPurchaseConfirmationEmail returns false', async () => {
+      mockSendPurchaseConfirmationEmail.mockResolvedValue(false);
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'release_purchase webhook: sendPurchaseConfirmationEmail returned false',
+        expect.objectContaining({ purchaseId: 'purchase-email-fail' })
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // ─── Branch coverage: charge.refunded event ───
+  describe('charge.refunded', () => {
+    it('marks purchase as refunded when payment_intent is a string', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_refund_1',
+            payment_intent: 'pi_refund_123',
+          },
+        },
+      });
+      mockMarkRefunded.mockResolvedValue(true);
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkRefunded).toHaveBeenCalledWith('pi_refund_123');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'charge.refunded: purchase marked as refunded',
+        expect.objectContaining({ paymentIntentId: 'pi_refund_123' })
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('logs warning when no matching un-refunded purchase is found', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_refund_2',
+            payment_intent: 'pi_no_match',
+          },
+        },
+      });
+      mockMarkRefunded.mockResolvedValue(false);
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'charge.refunded: no matching un-refunded purchase found',
+        expect.objectContaining({ paymentIntentId: 'pi_no_match' })
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('extracts payment_intent ID from object form', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_refund_obj',
+            payment_intent: { id: 'pi_obj_form' },
+          },
+        },
+      });
+      mockMarkRefunded.mockResolvedValue(true);
+      vi.spyOn(console, 'info').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkRefunded).toHaveBeenCalledWith('pi_obj_form');
+      vi.mocked(console.info).mockRestore();
+    });
+
+    it('logs error when payment_intent is missing from charge', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_no_pi',
+            payment_intent: null,
+          },
+        },
+      });
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const request = createRequest('{}');
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockMarkRefunded).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'charge.refunded missing payment_intent',
+        expect.objectContaining({ chargeId: 'ch_no_pi' })
+      );
+      consoleSpy.mockRestore();
+    });
   });
 });

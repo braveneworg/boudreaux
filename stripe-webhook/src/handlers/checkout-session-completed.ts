@@ -196,12 +196,31 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
 
   const amountTotal = retrievedSession.amount_total ?? 0;
 
-  // Create the purchase record, or fetch existing if this is a duplicate
-  // webhook delivery. P2002 (unique constraint on stripePaymentIntentId)
-  // is handled gracefully.
+  // Look up existing purchase — first by paymentIntentId (duplicate webhook),
+  // then by userId+releaseId (re-purchase of same release). Pre-checking avoids
+  // P2002 unique constraint violations entirely for the common case.
   let purchase = await prisma.releasePurchase.findUnique({
     where: { stripePaymentIntentId: paymentIntentId },
   });
+
+  if (!purchase) {
+    // Check if user already owns this release (e.g. re-purchase or test retry).
+    // If so, update the session ID so the polling endpoint can find it.
+    const existingForUser = await prisma.releasePurchase.findFirst({
+      where: {
+        userId,
+        releaseId,
+        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+      },
+    });
+    if (existingForUser) {
+      await prisma.releasePurchase.update({
+        where: { id: existingForUser.id },
+        data: { stripeSessionId: retrievedSession.id },
+      });
+      purchase = existingForUser;
+    }
+  }
 
   if (!purchase) {
     try {
@@ -218,18 +237,29 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
         },
       });
     } catch (createError) {
+      // Race condition: a concurrent webhook delivery may have created the
+      // record between our pre-check and the insert.
       if (
         createError instanceof Prisma.PrismaClientKnownRequestError &&
-        createError.code === 'P2002' &&
-        (createError.meta?.target as string[] | undefined)?.includes('stripePaymentIntentId')
+        createError.code === 'P2002'
       ) {
-        purchase = await prisma.releasePurchase.findUnique({
-          where: { stripePaymentIntentId: paymentIntentId },
-        });
-        if (!purchase) {
-          throw createError;
+        purchase =
+          (await prisma.releasePurchase.findUnique({
+            where: { stripePaymentIntentId: paymentIntentId },
+          })) ??
+          (await prisma.releasePurchase.findFirst({
+            where: { userId, releaseId, refundedAt: null },
+          }));
+
+        if (purchase) {
+          await prisma.releasePurchase.update({
+            where: { id: purchase.id },
+            data: { stripeSessionId: retrievedSession.id },
+          });
         }
-      } else {
+      }
+
+      if (!purchase) {
         throw createError;
       }
     }

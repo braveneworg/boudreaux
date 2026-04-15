@@ -7,6 +7,8 @@ import React from 'react';
 
 import Turnstile, { useTurnstile } from 'react-turnstile';
 
+import { useMediaQuery } from '@/lib/utils/useMediaQuery';
+
 const TurnstileWidget = ({
   isVerified: _isVerified,
   setIsVerified,
@@ -17,6 +19,7 @@ const TurnstileWidget = ({
   onToken?: (token: string) => void;
 }) => {
   const turnstile = useTurnstile();
+  const isSmallMobile = useMediaQuery('(max-width: 360px)');
   const siteKey =
     process.env.NODE_ENV === 'production'
       ? process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!
@@ -40,8 +43,8 @@ const TurnstileWidget = ({
         }}
         sitekey={siteKey}
         theme="light"
-        size="flexible"
-        className="max-w-full mt-3 mb-0"
+        size={isSmallMobile ? 'compact' : 'flexible'}
+        className="mt-3 mb-0 mx-auto"
       />
     </div>
   );
