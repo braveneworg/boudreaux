@@ -53,7 +53,6 @@ export const PurchaseSuccessStep = ({
         ) : resolvedFormats.length > 0 ? (
           <FormatBundleDownload
             releaseId={releaseId}
-            releaseTitle={releaseTitle}
             availableFormats={resolvedFormats}
             downloadCount={downloadCount}
             onDownloadComplete={onDownloadComplete}

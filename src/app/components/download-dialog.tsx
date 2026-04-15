@@ -477,7 +477,6 @@ export const DownloadDialog = ({
             ) : (
               <FormatBundleDownload
                 releaseId={releaseId}
-                releaseTitle={releaseTitle}
                 availableFormats={availableFormats}
                 downloadCount={downloadCount}
                 onDownloadComplete={() => setOpen(false)}

@@ -35,7 +35,6 @@ vi.mock('@/app/components/format-bundle-download', () => ({
     onDownloadComplete,
   }: {
     releaseId: string;
-    releaseTitle: string;
     availableFormats: Array<{ formatType: string; fileName: string }>;
     downloadCount: number;
     onDownloadComplete?: () => void;

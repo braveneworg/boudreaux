@@ -9,56 +9,31 @@ import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { FormatBundleDownload } from './format-bundle-download';
 
-/** Creates a mock body with a getReader() that yields the given chunks. */
-const createMockBody = (chunks: Uint8Array[]) => {
-  let index = 0;
+/** Builds a mock fetch Response that returns JSON (matching the new bundle API shape). */
+const mockBundleJsonResponse = (overrides?: {
+  ok?: boolean;
+  status?: number;
+  body?: Record<string, unknown>;
+}): Response => {
+  const { ok = true, status = 200, body } = overrides ?? {};
+  const defaultBody = ok
+    ? {
+        success: true,
+        downloadUrl: 'https://s3.example.com/presigned-bundle',
+        fileName: 'Test Album.zip',
+      }
+    : { success: false, message: 'Error' };
   return {
-    getReader: () => ({
-      read: async (): Promise<{ done: boolean; value: Uint8Array | undefined }> => {
-        if (index < chunks.length) {
-          const value = chunks[index];
-          index++;
-          return { done: false, value };
-        }
-        return { done: true, value: undefined };
-      },
-    }),
-  };
-};
-
-/** Builds a mock fetch Response with an optional Content-Length header. */
-const mockStreamResponse = (
-  chunks: Uint8Array[],
-  options?: { contentLength?: number; ok?: boolean; status?: number; jsonBody?: unknown }
-): Response => {
-  const { contentLength, ok = true, status = 200, jsonBody } = options ?? {};
-
-  if (!ok) {
-    return {
-      ok: false,
-      status,
-      headers: new Headers(),
-      json: async () => jsonBody ?? { message: 'Error' },
-    } as unknown as Response;
-  }
-
-  const headers = new Headers({ 'Content-Type': 'application/zip' });
-  if (contentLength !== undefined) {
-    headers.set('Content-Length', String(contentLength));
-  }
-
-  return {
-    ok: true,
+    ok,
     status,
-    headers,
-    body: createMockBody(chunks),
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json: async () => body ?? defaultBody,
   } as unknown as Response;
 };
 
 describe('FormatBundleDownload', () => {
   const defaultProps = {
     releaseId: 'release-123',
-    releaseTitle: 'Test Album',
     availableFormats: [
       { formatType: 'FLAC', fileName: 'album-flac.zip' },
       { formatType: 'WAV', fileName: 'album-wav.zip' },
@@ -77,30 +52,15 @@ describe('FormatBundleDownload', () => {
     await user.click(selectAllOption as HTMLElement);
   };
 
-  /** Stubs fetch, URL.createObjectURL, URL.revokeObjectURL, and anchor click. */
-  const stubDownloadApis = (chunks: Uint8Array[] = [new Uint8Array([1, 2, 3])]) => {
-    const fetchSpy = vi.fn().mockResolvedValue(mockStreamResponse(chunks));
+  /** Stubs fetch and window.open for bundle download tests. */
+  const stubDownloadApis = (responseOverrides?: Parameters<typeof mockBundleJsonResponse>[0]) => {
+    const fetchSpy = vi.fn().mockResolvedValue(mockBundleJsonResponse(responseOverrides));
     vi.stubGlobal('fetch', fetchSpy);
 
-    const blobUrl = 'blob:http://localhost/fake';
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn().mockReturnValue(blobUrl),
-      revokeObjectURL: vi.fn(),
-    });
+    const openSpy = vi.fn();
+    vi.stubGlobal('open', openSpy);
 
-    // Create a real anchor so appendChild works in jsdom, but spy on click
-    const fakeAnchor = document.createElement('a');
-    const clickSpy = vi.fn();
-    fakeAnchor.click = clickSpy;
-
-    const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation(((tag: string, options?: unknown) => {
-      if (tag === 'a') return fakeAnchor;
-      return originalCreateElement(tag, options as never);
-    }) as typeof document.createElement);
-
-    return { fetchSpy, clickSpy, blobUrl };
+    return { fetchSpy, openSpy };
   };
 
   afterEach(() => {
@@ -250,10 +210,9 @@ describe('FormatBundleDownload', () => {
     expect(screen.getByRole('button', { name: /Select at least one format/ })).toBeDisabled();
   });
 
-  it('should stream-download and save the file when the button is clicked', async () => {
+  it('should fetch bundle URL and open presigned URL via window.open', async () => {
     const user = userEvent.setup();
-    const zipBytes = new Uint8Array([80, 75, 3, 4]); // PK header
-    const { fetchSpy, clickSpy } = stubDownloadApis([zipBytes]);
+    const { fetchSpy, openSpy } = stubDownloadApis();
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
@@ -266,57 +225,9 @@ describe('FormatBundleDownload', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
 
-    // After stream completes, anchor click triggers the browser save
+    // After the server responds, window.open triggers the browser download
     await screen.findByText('Download complete');
-    expect(clickSpy).toHaveBeenCalledOnce();
-  });
-
-  it('should show progress during download', async () => {
-    const user = userEvent.setup();
-    const chunk = new Uint8Array(1024);
-    stubDownloadApis([chunk, chunk]);
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    // Wait for the download to complete
-    await screen.findByText('Download complete');
-
-    // The "Downloading..." state was shown (button disabled)
-    // and the progress region appeared at some point
-    expect(screen.getByText('Download complete')).toBeInTheDocument();
-  });
-
-  it('should show progress with Content-Length when provided', async () => {
-    const user = userEvent.setup();
-    const chunk = new Uint8Array(512);
-    const totalSize = 1024;
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(mockStreamResponse([chunk, chunk], { contentLength: totalSize }))
-    );
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn().mockReturnValue('blob:fake'),
-      revokeObjectURL: vi.fn(),
-    });
-    const fakeAnchor = document.createElement('a');
-    fakeAnchor.click = vi.fn();
-    const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation(((tag: string, options?: unknown) => {
-      if (tag === 'a') return fakeAnchor;
-      return originalCreateElement(tag, options as never);
-    }) as typeof document.createElement);
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByText('Download complete')).toBeInTheDocument();
+    expect(openSpy).toHaveBeenCalledWith('https://s3.example.com/presigned-bundle', '_self');
   });
 
   it('should display unknown formatType when no label is found', async () => {
@@ -364,16 +275,11 @@ describe('FormatBundleDownload', () => {
 
   it('should show error message when fetch response is not ok', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        mockStreamResponse([], {
-          ok: false,
-          status: 403,
-          jsonBody: { message: 'Purchase required to download.' },
-        })
-      )
-    );
+    stubDownloadApis({
+      ok: false,
+      status: 403,
+      body: { success: false, message: 'Purchase required to download.' },
+    });
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
@@ -453,30 +359,7 @@ describe('FormatBundleDownload', () => {
     ).toBeInTheDocument();
   });
 
-  it('should show error when download response body is null', async () => {
-    const user = userEvent.setup();
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'Content-Type': 'application/zip' }),
-        body: null,
-      } as unknown as Response)
-    );
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Download failed. Please try again.'
-    );
-  });
-
-  it('should show generic error when non-ok response json() throws', async () => {
+  it('should show generic error when response json() throws', async () => {
     const user = userEvent.setup();
 
     vi.stubGlobal(
@@ -518,5 +401,40 @@ describe('FormatBundleDownload', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     // No "Download complete" either — it was aborted
     expect(screen.queryByText('Download complete')).not.toBeInTheDocument();
+  });
+
+  it('should show error when response is ok but success is false', async () => {
+    const user = userEvent.setup();
+    stubDownloadApis({
+      ok: true,
+      status: 200,
+      body: { success: false, message: 'No files found.' },
+    });
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No files found.');
+  });
+
+  it('should show error when response is successful but downloadUrl is missing', async () => {
+    const user = userEvent.setup();
+    const { openSpy } = stubDownloadApis({
+      ok: true,
+      status: 200,
+      body: { success: true, fileName: 'Test Album.zip' },
+    });
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Download link is unavailable. Please try again.'
+    );
+    expect(openSpy).not.toHaveBeenCalled();
   });
 });

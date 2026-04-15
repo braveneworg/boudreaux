@@ -102,7 +102,8 @@ export async function generatePresignedUploadUrl(
  *
  * @param s3Key - S3 object key (path within bucket)
  * @param fileName - Suggested filename for Content-Disposition header
- * @returns Presigned URL valid for 24 hours
+ * @param expiresInSeconds - URL expiration in seconds (defaults to 24 hours)
+ * @returns Presigned URL valid for the requested expiration (24 hours by default)
  *
  * @example
  * ```ts
@@ -114,7 +115,8 @@ export async function generatePresignedUploadUrl(
  */
 export async function generatePresignedDownloadUrl(
   s3Key: string,
-  fileName: string
+  fileName: string,
+  expiresInSeconds: number = PRESIGNED_URL_EXPIRATION.DOWNLOAD
 ): Promise<string> {
   const s3Client = getS3Client();
   const bucketName = getS3BucketName();
@@ -125,9 +127,9 @@ export async function generatePresignedDownloadUrl(
     ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileName)}"`, // Force download with friendly filename
   });
 
-  // Generate presigned URL with 24-hour expiration
+  // Generate presigned URL with configurable expiration (24 hours by default)
   const downloadUrl = await getSignedUrl(s3Client, getCommand, {
-    expiresIn: PRESIGNED_URL_EXPIRATION.DOWNLOAD, // 86400 seconds = 24 hours
+    expiresIn: expiresInSeconds,
   });
 
   return downloadUrl;
