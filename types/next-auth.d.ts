@@ -35,7 +35,7 @@ declare module 'next-auth' {
       id: string;
       username?: string;
       email: string;
-      emailVerified?: Date;
+      emailVerified?: Date | null;
       role?: string;
 
       // Profile fields
@@ -61,7 +61,7 @@ declare module 'next-auth' {
     id: string;
     username?: string;
     email: string;
-    emailVerified?: Date;
+    emailVerified?: Date | null;
     role?: string;
 
     // Profile fields

@@ -2,11 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Readable } from 'node:stream';
+import { randomUUID } from 'node:crypto';
+import { PassThrough, type Readable } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
 
 import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
 import { getToken } from 'next-auth/jwt';
 
@@ -19,7 +21,7 @@ import { DownloadEventRepository } from '@/lib/repositories/download-event-repos
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
-import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { generatePresignedDownloadUrl, getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 
@@ -31,19 +33,22 @@ export const maxDuration = 300;
 /**
  * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...
  *
- * Bundle multiple digital format files into a single ZIP and stream it
- * directly to the client. Audio files are stored (level 0) since they
- * are already compressed.
+ * Bundle multiple digital format files into a single ZIP, upload it to S3
+ * as a temporary object, and return a presigned download URL. This approach
+ * works reliably on all platforms including iOS Safari, which silently
+ * ignores blob: URL downloads triggered by programmatic anchor clicks.
  *
  * Authorization:
  * 1. Authenticate user
  * 2. Validate formats query parameter
  * 3. Verify purchase exists
  * 4. Check download limit (< MAX_RELEASE_DOWNLOAD_COUNT)
- * 5. Fetch format records with child files from DB
- * 6. Stream files from S3 into archiver → Web ReadableStream
- * 7. Increment download count once (bundle = 1 download)
- * 8. Log download event per format
+ * 5. Fetch release title for ZIP filename
+ * 6. Resolve requested format records with child files from DB
+ * 7. Stream files from S3 into archiver → Upload to S3 temp object
+ * 8. Generate presigned download URL
+ * 9. Increment download count once (bundle = 1 download)
+ * 10. Log download event per format
  */
 export async function GET(
   request: NextRequest,
@@ -109,7 +114,7 @@ export async function GET(
 
     const requestedFormats = parseResult.data.formats as DigitalFormatType[];
 
-    // Step 3: Verify purchase and check download limit (with 6-hour auto-reset)
+    // Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset)
     const access = await PurchaseService.getDownloadAccess(userId, releaseId);
 
     if (!access.allowed && access.reason === 'no_purchase') {
@@ -178,11 +183,16 @@ export async function GET(
       );
     }
 
-    // Step 7: Create ZIP archive and stream S3 files into it
+    // Step 7: Create ZIP archive and upload to S3 as a temporary object
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
 
     const archive = archiver('zip', { zlib: { level: 0 } }); // store mode (no compression)
+    const passThrough = new PassThrough();
+    archive.pipe(passThrough);
+
+    // Abort the S3 upload if archiver encounters an error
+    archive.on('error', (err) => passThrough.destroy(err));
 
     // Pipe S3 objects into the archive
     for (const { formatType, files } of resolvedFormats) {
@@ -205,20 +215,39 @@ export async function GET(
       }
     }
 
-    // Finalize the archive (no more entries)
-    archive.finalize();
-
-    // Convert Node.js Readable to Web ReadableStream
-    const webStream = Readable.toWeb(archive) as ReadableStream<Uint8Array>;
-
     // Sanitize filename for Content-Disposition
     const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
     const zipFileName = `${safeTitle}.zip`;
 
-    // Step 8: Increment download count (bundle = 1 download action)
+    // Upload the archive stream to a temporary S3 object
+    const tempS3Key = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+    const upload = new Upload({
+      client: s3Client,
+      params: {
+        Bucket: bucketName,
+        Key: tempS3Key,
+        Body: passThrough,
+        ContentType: 'application/zip',
+        ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+      },
+      partSize: 10 * 1024 * 1024, // 10 MB
+      queueSize: 4,
+      leavePartsOnError: false,
+    });
+
+    // Finalize the archive (no more entries) — starts emitting data
+    archive.finalize();
+
+    // Wait for the full upload to complete
+    await upload.done();
+
+    // Step 8: Generate a presigned download URL for the temporary ZIP
+    const downloadUrl = await generatePresignedDownloadUrl(tempS3Key, zipFileName);
+
+    // Step 9: Increment download count (bundle = 1 download action)
     await PurchaseRepository.upsertDownloadCount(userId, releaseId);
 
-    // Step 9: Log download events per format
+    // Step 10: Log download events per format
     const downloadEventRepo = new DownloadEventRepository();
     const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
     const userAgent = request.headers.get('user-agent') ?? 'unknown';
@@ -236,13 +265,10 @@ export async function GET(
       )
     );
 
-    return new Response(webStream, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(zipFileName)}"`,
-        'Cache-Control': 'no-store',
-      },
+    return Response.json({
+      success: true,
+      downloadUrl,
+      fileName: zipFileName,
     });
   } catch (error) {
     console.error('Bundle download error:', error);

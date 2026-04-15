@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 import { NextRequest } from 'next/server';
 
@@ -23,13 +23,16 @@ vi.mock('next-auth/jwt', () => ({
   getToken: (...args: unknown[]) => mockGetToken(...args),
 }));
 
-const mockFindByUserAndRelease = vi.fn();
-const mockGetDownloadRecord = vi.fn();
+const mockGetDownloadAccess = vi.fn();
+vi.mock('@/lib/services/purchase-service', () => ({
+  PurchaseService: {
+    getDownloadAccess: (...args: unknown[]) => mockGetDownloadAccess(...args),
+  },
+}));
+
 const mockUpsertDownloadCount = vi.fn();
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
-    findByUserAndRelease: (...args: unknown[]) => mockFindByUserAndRelease(...args),
-    getDownloadRecord: (...args: unknown[]) => mockGetDownloadRecord(...args),
     upsertDownloadCount: (...args: unknown[]) => mockUpsertDownloadCount(...args),
   },
 }));
@@ -49,9 +52,20 @@ vi.mock('@/lib/repositories/download-event-repository', () => ({
 }));
 
 const mockS3Send = vi.fn();
+const mockGeneratePresignedDownloadUrl = vi
+  .fn()
+  .mockResolvedValue('https://s3.example.com/presigned-bundle-url');
 vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => ({ send: mockS3Send }),
   getS3BucketName: () => 'test-bucket',
+  generatePresignedDownloadUrl: (...args: unknown[]) => mockGeneratePresignedDownloadUrl(...args),
+}));
+
+const mockUploadDone = vi.fn().mockResolvedValue(undefined);
+vi.mock('@aws-sdk/lib-storage', () => ({
+  Upload: vi.fn().mockImplementation(function () {
+    return { done: mockUploadDone };
+  }),
 }));
 
 const mockPrismaReleaseFindFirst = vi.fn();
@@ -68,16 +82,16 @@ const mockAppend = vi.fn();
 const mockFinalize = vi.fn();
 vi.mock('archiver', () => ({
   default: () => {
-    const readable = new Readable({ read() {} });
+    const passThrough = new PassThrough();
     // Attach mock methods
-    (readable as Readable & { append: typeof mockAppend }).append = mockAppend;
-    (readable as Readable & { finalize: (...args: unknown[]) => void }).finalize = (
+    (passThrough as PassThrough & { append: typeof mockAppend }).append = mockAppend;
+    (passThrough as PassThrough & { finalize: (...args: unknown[]) => void }).finalize = (
       ...args: unknown[]
     ) => {
       mockFinalize(...args);
-      readable.push(null); // End the stream
+      passThrough.end(); // End the stream
     };
-    return readable;
+    return passThrough;
   },
 }));
 
@@ -101,8 +115,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetToken.mockResolvedValue({ sub: 'user-123' });
-    mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
-    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 1 });
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: true,
+      reason: null,
+      downloadCount: 1,
+      lastDownloadedAt: null,
+    });
     mockPrismaReleaseFindFirst.mockResolvedValue({
       id: '507f1f77bcf86cd799439011',
       title: 'Test Album',
@@ -179,7 +197,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should return 403 when no purchase exists', async () => {
-    mockFindByUserAndRelease.mockResolvedValue(null);
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: false,
+      reason: 'no_purchase',
+      downloadCount: 0,
+      lastDownloadedAt: null,
+    });
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -189,7 +212,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should return 403 when download limit is reached', async () => {
-    mockGetDownloadRecord.mockResolvedValue({ downloadCount: 5 });
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: false,
+      reason: 'download_limit_reached',
+      downloadCount: 5,
+      lastDownloadedAt: null,
+    });
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -218,13 +246,14 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(body.error).toBe('NO_FILES');
   });
 
-  it('should stream a ZIP file on success', async () => {
+  it('should return a presigned download URL on success', async () => {
     const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('application/zip');
-    expect(response.headers.get('Content-Disposition')).toContain('Test%20Album.zip');
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(body.success).toBe(true);
+    expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
+    expect(body.fileName).toBe('Test Album.zip');
   });
 
   it('should append files to the archive for multi-track formats', async () => {
@@ -271,18 +300,27 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should handle download count of 0 (first download)', async () => {
-    mockGetDownloadRecord.mockResolvedValue(null);
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: true,
+      reason: null,
+      downloadCount: 0,
+      lastDownloadedAt: null,
+    });
 
     const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
   });
 
   it('should skip unavailable formats silently', async () => {
     // Request 3 formats but only 2 exist
     const response = await GET(makeRequest('FLAC,WAV,AIFF'), makeParams());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
     // Only FLAC and WAV should be appended (AIFF returns null)
     expect(mockAppend).toHaveBeenCalledTimes(3); // 2 FLAC tracks + 1 WAV file
   });
@@ -294,12 +332,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
 
     const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
 
-    const disposition = response.headers.get('Content-Disposition') ?? '';
     // Special chars like () and [] should be stripped
-    expect(disposition).toContain('.zip');
-    expect(disposition).not.toContain('(');
-    expect(disposition).not.toContain('[');
+    expect(body.fileName).toContain('.zip');
+    expect(body.fileName).not.toContain('(');
+    expect(body.fileName).not.toContain('[');
   });
 
   it('should use fallback filename when title sanitizes to empty', async () => {
@@ -309,9 +347,9 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
 
     const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
 
-    const disposition = response.headers.get('Content-Disposition') ?? '';
-    expect(disposition).toContain('release.zip');
+    expect(body.fileName).toBe('release.zip');
   });
 
   it('should use fallback values when headers are missing', async () => {
@@ -331,7 +369,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
   it('should return 500 on unexpected error', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockFindByUserAndRelease.mockRejectedValue(new Error('DB error'));
+    mockGetDownloadAccess.mockRejectedValue(new Error('DB error'));
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -346,8 +384,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     mockS3Send.mockResolvedValue({ Body: null });
 
     const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
     expect(mockAppend).not.toHaveBeenCalled();
   });
 
@@ -476,11 +516,26 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
 
     const response = await GET(makeRequest('FLAC'), makeParams());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ name: 'FLAC/legacy.flac' })
     );
+  });
+
+  it('should return 500 when S3 upload fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUploadDone.mockRejectedValueOnce(new Error('S3 upload failed'));
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+
+    consoleSpy.mockRestore();
   });
 });
