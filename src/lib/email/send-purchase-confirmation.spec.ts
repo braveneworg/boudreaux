@@ -63,7 +63,6 @@ describe('sendPurchaseConfirmationEmail', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
     vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://example.com');
     mockMarkEmailSent.mockResolvedValue(true);

@@ -74,11 +74,6 @@ describe('ReleaseSearchCombobox', () => {
       releaseUrls: [],
     },
   ] as unknown as PublishedReleaseListing[];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render search trigger button', () => {
     render(<ReleaseSearchCombobox releases={mockReleases} />);
 

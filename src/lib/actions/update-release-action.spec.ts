@@ -60,7 +60,6 @@ describe('updateReleaseAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });

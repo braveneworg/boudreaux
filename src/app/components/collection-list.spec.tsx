@@ -6,6 +6,9 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { deletePurchaseAction } from '@/lib/actions/collection-actions';
+import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
+
 import { CollectionList } from './collection-list';
 
 vi.mock('@/lib/actions/collection-actions', () => ({
@@ -26,9 +29,6 @@ vi.mock('next/link', () => ({
     <a {...props}>{children}</a>
   ),
 }));
-
-const { deletePurchaseAction } = await import('@/lib/actions/collection-actions');
-const { getReleaseCoverArt } = await import('@/lib/utils/release-helpers');
 
 function buildPurchase(overrides: Record<string, unknown> = {}) {
   return {
@@ -65,7 +65,6 @@ describe('CollectionList', () => {
   const user = userEvent.setup();
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
@@ -224,7 +223,6 @@ describe('CollectionDownloadDialog', () => {
   const user = userEvent.setup();
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',

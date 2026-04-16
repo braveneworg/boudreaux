@@ -75,7 +75,6 @@ vi.mock('@/lib/utils/console-logger', () => ({
 
 describe('AuthToolbar', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockLog.mockClear();
     mockUsePathname.mockReturnValue('/');
   });

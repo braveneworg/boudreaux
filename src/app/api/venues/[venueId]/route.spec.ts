@@ -35,11 +35,6 @@ describe('GET /api/venues/[venueId]', () => {
   const createParams = (venueId: string) => ({
     params: Promise.resolve({ venueId }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should return a venue by ID', async () => {
     vi.mocked(VenueRepository.findById).mockResolvedValue(mockVenue as never);
 

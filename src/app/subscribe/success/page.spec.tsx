@@ -50,7 +50,6 @@ vi.mock('@/lib/email/send-subscription-confirmation', () => ({
 
 describe('SubscribeSuccessPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockLinkStripeCustomer.mockResolvedValue({});
     mockResetConfirmationEmailSent.mockResolvedValue(undefined);
     mockSendConfirmationEmail.mockResolvedValue(true);

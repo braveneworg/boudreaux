@@ -14,7 +14,6 @@ describe('GET /api/debug', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     process.env = {
       ...originalEnv,
       S3_BUCKET: 'test-bucket',

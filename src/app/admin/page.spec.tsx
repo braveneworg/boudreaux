@@ -69,11 +69,6 @@ vi.mock('./data-views/featured-artist-data-view', () => ({
 
 describe('AdminPage', () => {
   const user = userEvent.setup();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders breadcrumb with Admin link', () => {
     render(<AdminPage />);
 

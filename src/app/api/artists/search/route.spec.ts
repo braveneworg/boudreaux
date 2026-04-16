@@ -39,10 +39,6 @@ const createRequest = (query: string): NextRequest =>
 const dummyContext = { params: Promise.resolve({}) };
 
 describe('GET /api/artists/search', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should return empty results when query is shorter than 3 characters', async () => {
     const request = createRequest('ab');
     const response = await GET(request, dummyContext);

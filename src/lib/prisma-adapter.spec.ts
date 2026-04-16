@@ -79,8 +79,6 @@ describe('CustomPrismaAdapter', () => {
   let adapter: RequiredAdapter;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
     mockPrisma = {
       user: {
         create: vi.fn(),

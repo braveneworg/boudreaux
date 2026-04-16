@@ -281,7 +281,6 @@ const TestWrapper = ({
 
 describe('ArtistMultiSelect', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockPopoverOpen = false;
     formFieldInitialValue = [];
     mockFetch.mockReset();
@@ -297,11 +296,6 @@ describe('ArtistMultiSelect', () => {
       json: () => Promise.resolve({ artists: mockArtists, count: mockArtists.length }),
     });
   });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('rendering', () => {
     it('renders the component with label', () => {
       render(

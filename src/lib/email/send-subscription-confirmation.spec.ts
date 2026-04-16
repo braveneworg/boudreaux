@@ -47,7 +47,6 @@ vi.mock('./subscription-confirmation-email-text', () => ({
 
 describe('sendSubscriptionConfirmationEmail', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockMarkConfirmationEmailSent.mockResolvedValue(true);
     mockSesSend.mockResolvedValue({});
   });

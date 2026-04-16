@@ -134,7 +134,6 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockAuth.mockResolvedValue({
       user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
     });

@@ -53,10 +53,6 @@ const mockTourDate = {
 };
 
 describe('TourDateRepository', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   // ─── findByTourId ────────────────────────────────────────────────────────────
 
   describe('findByTourId', () => {

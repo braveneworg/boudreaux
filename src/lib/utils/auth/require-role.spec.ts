@@ -13,10 +13,6 @@ vi.mock('../../../../auth', () => ({
 }));
 
 describe('requireRole', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('when user has required role', () => {
     it('should resolve successfully for admin role', async () => {
       mockAuth.mockResolvedValue({

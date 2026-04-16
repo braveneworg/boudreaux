@@ -20,7 +20,6 @@ describe('UploadService', () => {
 
   beforeEach(() => {
     service = new UploadService();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {

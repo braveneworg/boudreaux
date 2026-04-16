@@ -66,7 +66,6 @@ describe('ImageUploadService', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     // Set up environment variables
     Object.entries(mockEnv).forEach(([key, value]) => {
       process.env[key] = value;

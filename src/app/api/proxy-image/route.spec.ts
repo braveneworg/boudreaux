@@ -37,7 +37,6 @@ const mockFetch = vi.fn();
 
 describe('GET /api/proxy-image', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubGlobal('fetch', mockFetch);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});

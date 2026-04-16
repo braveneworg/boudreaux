@@ -33,8 +33,6 @@ const makeRequest = (sessionId?: string) => {
 const dummyContext = { params: Promise.resolve({}) };
 
 describe('GET /api/releases/[id]/purchase-status', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('returns 400 with missing_session_id when sessionId is absent', async () => {
     const request = makeRequest();
     const response = await GET(request, dummyContext);

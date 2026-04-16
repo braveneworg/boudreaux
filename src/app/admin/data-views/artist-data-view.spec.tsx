@@ -23,10 +23,6 @@ vi.mock('./data-view', () => ({
 }));
 
 describe('ArtistDataView', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders loading state when isPending is true', () => {
     mockUseArtistsQuery.mockReturnValue({
       isPending: true,

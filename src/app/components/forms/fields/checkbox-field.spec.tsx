@@ -98,11 +98,6 @@ describe('CheckboxField', () => {
     label: <span>Test Checkbox</span>,
     id: 'test-checkbox',
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders with correct label and id', () => {
     render(
       <TestWrapper>

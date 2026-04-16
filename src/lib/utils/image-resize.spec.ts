@@ -90,7 +90,6 @@ afterAll(() => {
 
 describe('image-resize', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Reset mock image dimensions
     mockImageWidth = 1920;
     mockImageHeight = 1080;

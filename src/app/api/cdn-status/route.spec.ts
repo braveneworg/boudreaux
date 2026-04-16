@@ -28,7 +28,6 @@ describe('CDN Status API', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     process.env = {
       ...originalEnv,
       CLOUDFRONT_DISTRIBUTION_ID: 'test-distribution-id',

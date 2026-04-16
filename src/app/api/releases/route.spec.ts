@@ -74,11 +74,6 @@ describe('Release API Routes', () => {
     featuredArtists: [],
     tagId: null,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/releases', () => {
     it('should return 401 when not authenticated for admin listing', async () => {
       vi.mocked(auth).mockResolvedValueOnce(null as never);

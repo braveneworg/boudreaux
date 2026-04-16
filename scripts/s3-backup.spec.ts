@@ -127,8 +127,6 @@ describe('S3 Backup Script', () => {
   const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
     // Restore default implementations after clearAllMocks
     sanitizeFilePathMock.mockImplementation((pathKey: string) => pathKey);
     pipelineMock.mockResolvedValue(undefined);

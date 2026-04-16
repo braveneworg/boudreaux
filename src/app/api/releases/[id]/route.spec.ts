@@ -67,11 +67,6 @@ describe('Release by ID API Routes', () => {
   const createParams = (id: string) => ({
     params: Promise.resolve({ id }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/releases/[id]', () => {
     it('should return a release by ID', async () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({

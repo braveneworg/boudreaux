@@ -6,6 +6,8 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import ContactPage from '@/app/contact/page';
+
 // Hoisted mocks
 const mockUseSession = vi.hoisted(() => vi.fn());
 const mockContactAction = vi.hoisted(() => vi.fn());
@@ -89,7 +91,6 @@ vi.mock('@/app/components/ui/status-indicator', () => ({
 
 describe('ContactPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({
       data: null,
       status: 'unauthenticated',
@@ -103,8 +104,7 @@ describe('ContactPage', () => {
     vi.restoreAllMocks();
   });
 
-  async function importAndRender() {
-    const { default: ContactPage } = await import('@/app/contact/page');
+  function importAndRender() {
     const user = userEvent.setup();
     const result = render(<ContactPage />);
     return { ...result, user };

@@ -30,10 +30,6 @@ const mockParseBuffer = vi.mocked(mm.parseBuffer);
 const mockParseStream = vi.mocked(mm.parseStream);
 
 describe('AudioMetadataService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('extractMetadata', () => {
     it('should extract basic metadata from an audio buffer', async () => {
       const mockMetadata = {

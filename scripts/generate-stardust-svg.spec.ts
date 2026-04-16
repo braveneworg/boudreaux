@@ -11,11 +11,6 @@ describe('generate-stardust-svg', () => {
 
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'info').mockImplementation(() => {});
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('defaultConfig', () => {
     it('should have correct default output filename (stardust.svg)', () => {
       expect(defaultConfig.output).toBe('stardust.svg');

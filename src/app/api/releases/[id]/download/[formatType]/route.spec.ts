@@ -83,7 +83,6 @@ const mockFormat = {
 
 describe('GET /api/releases/[id]/download/[formatType]', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetToken.mockResolvedValue({ sub: 'user-123' });
     mockCheckFormatExists.mockResolvedValue(mockFormat);
     mockCheckPurchaseStatus.mockResolvedValue(true);

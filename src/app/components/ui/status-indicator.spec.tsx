@@ -27,10 +27,6 @@ vi.mock('lucide-react', () => ({
 }));
 
 describe('StatusIndicator', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('pending state', () => {
     it('should render loading spinner when isPending is true', () => {
       render(<StatusIndicator isPending />);

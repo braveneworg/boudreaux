@@ -65,10 +65,6 @@ vi.mock('@/app/components/releases-content', () => ({
 }));
 
 describe('ReleasesPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render page structure with PageContainer and ContentContainer', async () => {
     const Page = await ReleasesPage();
     render(Page);

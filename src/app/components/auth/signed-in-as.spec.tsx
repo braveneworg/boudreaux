@@ -63,10 +63,6 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 describe('SignedInAs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('when user has username', () => {
     beforeEach(() => {
       mockUseSession.mockReturnValue({

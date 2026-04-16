@@ -37,11 +37,6 @@ describe('Tour by ID API Route', () => {
   const createParams = (tourId: string) => ({
     params: Promise.resolve({ tourId }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/tours/[tourId]', () => {
     it('should return 400 for invalid tour ID format', async () => {
       const request = new NextRequest('http://localhost:3000/api/tours/not-valid');

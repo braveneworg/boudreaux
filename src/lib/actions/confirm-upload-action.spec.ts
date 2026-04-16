@@ -67,7 +67,6 @@ describe('confirmDigitalFormatUploadAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     mockVerifyS3ObjectExists.mockResolvedValue(true);
     mockCreateFormatMetadata.mockReturnValue({
@@ -206,7 +205,6 @@ describe('confirmMultiTrackUploadAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     mockVerifyS3ObjectExists.mockResolvedValue(true);
     mockRepoUpsertParent.mockResolvedValue({ id: 'format-1' });

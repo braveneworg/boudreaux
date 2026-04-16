@@ -45,7 +45,6 @@ describe('useReleasesQuery', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     global.fetch = vi.fn();
   });
 

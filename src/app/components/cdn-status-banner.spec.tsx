@@ -14,10 +14,6 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe('CDNStatusBanner', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns null when loading', async () => {
     mockFetch.mockImplementation(() => new Promise(() => {})); // Never resolves
 

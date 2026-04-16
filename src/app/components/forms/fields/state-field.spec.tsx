@@ -82,11 +82,6 @@ describe('StateField', () => {
   const defaultProps = {
     control: {} as Control<FieldValues>,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders ComboboxField with correct props', () => {
     render(
       <TestWrapper>

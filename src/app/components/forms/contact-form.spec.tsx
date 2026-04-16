@@ -99,10 +99,6 @@ function renderContactForm(overrides?: Partial<React.ComponentProps<typeof Conta
 }
 
 describe('ContactForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('rendering', () => {
     it('should render the reason combobox', () => {
       renderContactForm();

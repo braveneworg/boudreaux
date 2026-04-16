@@ -39,11 +39,6 @@ describe('VenueService', () => {
     createdBy: 'user-123',
     updatedBy: null,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('findAll', () => {
     it('should return paginated venues', async () => {
       vi.mocked(VenueRepository.findAll).mockResolvedValue([mockVenue]);

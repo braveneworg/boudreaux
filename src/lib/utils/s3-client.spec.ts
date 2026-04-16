@@ -54,7 +54,6 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 
 describe('s3-client', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     s3ClientCalls.length = 0;
     putCommandCalls.length = 0;
     getCommandCalls.length = 0;

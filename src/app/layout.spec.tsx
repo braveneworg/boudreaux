@@ -65,7 +65,6 @@ vi.mock('@/components/ui/sonner', () => ({
 
 describe('RootLayout', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Default: desktop user agent
     mockHeadersGet.mockImplementation((key: string) => {
       if (key === 'user-agent') return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';

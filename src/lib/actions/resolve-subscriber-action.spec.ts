@@ -44,7 +44,6 @@ vi.mock('@/lib/utils/email-security', () => ({
 
 describe('resolveSubscriberAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockValidateEmailSecurity.mockReturnValue({ isValid: true });
   });
 

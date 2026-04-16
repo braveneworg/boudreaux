@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { DownloadDialog, DownloadTriggerButton } from './download-dialog';
@@ -150,7 +150,6 @@ describe('DownloadDialog', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -376,7 +375,6 @@ describe('DownloadDialog — dialog lifecycle', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -516,11 +514,6 @@ describe('DownloadTriggerButton', () => {
 
 describe('DownloadDialog — custom amount input behavior', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should show the placeholder with the premium price', async () => {
     const user = userEvent.setup();
 
@@ -729,7 +722,6 @@ describe('DownloadDialog — subscription multi-step flow', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -964,7 +956,6 @@ describe('DownloadDialog — hasPurchase button variants', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1144,7 +1135,6 @@ describe('DownloadDialog — premium-digital submit paths', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1165,11 +1155,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
-    });
-
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1189,11 +1175,7 @@ describe('DownloadDialog — premium-digital submit paths', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
-    });
-
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1299,7 +1281,6 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
     mockCheckGuestPurchaseAction.mockReset();
   });
@@ -1307,10 +1288,8 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   const openAndSubmitPremium = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => {
-      expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
-    });
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    const amountInput = screen.getByLabelText('Custom amount');
+    fireEvent.change(amountInput, { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => {
       expect(screen.getByTestId('email-step')).toBeInTheDocument();
@@ -1394,7 +1373,6 @@ describe('DownloadDialog — purchase-checkout step', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockCheckGuestPurchaseAction.mockReset();
   });
 
@@ -1414,8 +1392,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1442,7 +1419,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1474,7 +1451,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1507,7 +1484,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
 
     await waitFor(() => {
@@ -1547,7 +1524,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
 
@@ -1585,7 +1562,7 @@ describe('DownloadDialog — purchase-checkout step', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
 
@@ -1612,7 +1589,6 @@ describe('DownloadDialog — returning-download step', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
     mockCheckGuestPurchaseAction.mockReset();
   });
@@ -1628,8 +1604,8 @@ describe('DownloadDialog — returning-download step', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    const amountInput = screen.getByLabelText('Custom amount');
+    fireEvent.change(amountInput, { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('email-step')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
@@ -1697,7 +1673,6 @@ describe('DownloadDialog — returning-download step', () => {
 
 describe('DownloadDialog — suggestedPrice prop', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1753,7 +1728,6 @@ describe('DownloadDialog — onBlur with empty input', () => {
   const defaultProps = { artistName: 'Test Artist', premiumPrice: 8, releaseId: 'release-123' };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1786,7 +1760,6 @@ describe('DownloadDialog — onBlur with empty input', () => {
 
 describe('DownloadDialog — onDownloadComplete closes dialog', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockCheckGuestPurchaseAction.mockReset();
   });
 
@@ -1813,7 +1786,7 @@ describe('DownloadDialog — onDownloadComplete closes dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Confirm Purchase' }));
@@ -1837,7 +1810,6 @@ describe('DownloadDialog — onDownloadComplete via purchase-confirmed step (alr
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockCheckGuestPurchaseAction.mockReset();
   });
 
@@ -1866,7 +1838,7 @@ describe('DownloadDialog — onDownloadComplete via purchase-confirmed step (alr
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await user.click(screen.getByRole('radio', { name: /premium/i }));
     await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Custom amount'), '10');
+    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
     await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
 
@@ -1903,7 +1875,6 @@ describe('DownloadDialog — onDownloadComplete in format-select step', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1951,7 +1922,6 @@ describe('DownloadDialog — onDownloadComplete in format-select step', () => {
 
 describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
@@ -1996,7 +1966,6 @@ describe('DownloadDialog — hasPurchase on download step', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 

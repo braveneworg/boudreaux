@@ -29,11 +29,6 @@ vi.mock('@/lib/utils/database-utils', () => ({
 describe('Health Check API', () => {
   const dummyRequest = new NextRequest('http://localhost/api/health');
   const dummyContext = { params: Promise.resolve({}) };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/health', () => {
     it('should return healthy status when database is connected', async () => {
       vi.mocked(checkDatabaseHealth).mockResolvedValue({

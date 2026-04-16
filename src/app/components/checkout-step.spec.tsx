@@ -30,10 +30,6 @@ vi.mock('@/app/components/checkout-form', () => ({
 const renderInDialog = (ui: React.ReactElement) => render(<Dialog open>{ui}</Dialog>);
 
 describe('CheckoutStep', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should show a loading spinner while the session is being created', () => {
     mockCreateCheckoutSessionAction.mockImplementation(
       () => new Promise(() => {}) // never resolves

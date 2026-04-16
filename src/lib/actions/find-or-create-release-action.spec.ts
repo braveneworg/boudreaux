@@ -42,8 +42,6 @@ const mockReleaseServiceCreate = vi.mocked(ReleaseService.createRelease);
 
 describe('findOrCreateReleaseAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-
     // Default auth setup - admin user
     mockAuth.mockResolvedValue({
       user: {

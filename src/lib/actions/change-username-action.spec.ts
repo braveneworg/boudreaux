@@ -59,7 +59,6 @@ describe('changeUsernameAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFormData.set('username', 'newusername');
     mockFormData.set('confirmUsername', 'newusername');
   });

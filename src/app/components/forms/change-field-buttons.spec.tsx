@@ -64,11 +64,6 @@ describe('ChangeFieldButtons', () => {
     isPending: false,
     isTransitionPending: false,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('Rendering', () => {
     it('should render both Cancel/Change and Update buttons', () => {
       render(<ChangeFieldButtons {...defaultProps} />);

@@ -106,11 +106,6 @@ describe('ArtistService', () => {
     releases: [],
     urls: [],
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('createArtist', () => {
     const createInput: Prisma.ArtistCreateInput = {
       firstName: 'John',

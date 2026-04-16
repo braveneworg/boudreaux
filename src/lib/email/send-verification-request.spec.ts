@@ -50,7 +50,6 @@ describe('sendVerificationRequest', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
     mockFindUnique.mockResolvedValue({ id: 'user-1' });
     mockSendMail.mockResolvedValue({});

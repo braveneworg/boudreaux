@@ -35,7 +35,6 @@ describe('GET /api/releases/[id]/user-status', () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFindAllByRelease.mockResolvedValue([]);
   });
 

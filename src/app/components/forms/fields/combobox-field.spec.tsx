@@ -237,7 +237,6 @@ describe('ComboboxField', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     comboboxFieldInitialValue = '';
   });
 

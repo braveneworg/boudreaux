@@ -27,7 +27,6 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 
 describe('PurchaseService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-04T12:00:00Z'));
   });

@@ -29,7 +29,6 @@ vi.mock('@/lib/services/purchase-service', () => ({
 
 describe('checkGuestPurchaseAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockHeaders.mockReturnValue({
       get: (name: string) => (name === 'x-forwarded-for' ? '127.0.0.1' : null),
     });

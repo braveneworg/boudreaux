@@ -74,11 +74,6 @@ describe('ReleaseDataView', () => {
     ],
     count: 1,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render loading state when pending', () => {
     vi.mocked(useReleasesQuery).mockReturnValue({
       isPending: true,

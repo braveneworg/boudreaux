@@ -92,10 +92,6 @@ vi.mock('../ui/datepicker', () => ({
 }));
 
 describe('ReleaseForm — suggestedPrice field', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render the suggested price input field', async () => {
     render(<ReleaseForm />);
 

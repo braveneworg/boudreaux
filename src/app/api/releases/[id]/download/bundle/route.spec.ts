@@ -113,7 +113,6 @@ function makeParams(id = '507f1f77bcf86cd799439011') {
 
 describe('GET /api/releases/[id]/download/bundle', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetToken.mockResolvedValue({ sub: 'user-123' });
     mockGetDownloadAccess.mockResolvedValue({
       allowed: true,

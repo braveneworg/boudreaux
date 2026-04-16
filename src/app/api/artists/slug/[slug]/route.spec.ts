@@ -43,11 +43,6 @@ describe('Artist by Slug API Route', () => {
   const createParams = (slug: string) => ({
     params: Promise.resolve({ slug }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/artists/slug/[slug]', () => {
     it('should return an artist by slug', async () => {
       vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({

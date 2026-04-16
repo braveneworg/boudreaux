@@ -57,7 +57,6 @@ describe('createReleaseAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
@@ -597,7 +596,6 @@ describe('createReleaseAction', () => {
       ];
 
       for (const errorMessage of errorMessages) {
-        vi.clearAllMocks();
         vi.mocked(requireRole).mockResolvedValue(mockSession as never);
 
         vi.mocked(getActionState).mockReturnValue({

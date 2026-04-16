@@ -20,8 +20,6 @@ describe('QuotaEnforcementService', () => {
   const releaseId = 'release-456';
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
     mockQuotaRepo = {
       findOrCreateByUserId: vi.fn(),
       addUniqueRelease: vi.fn(),

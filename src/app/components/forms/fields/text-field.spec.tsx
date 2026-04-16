@@ -64,11 +64,6 @@ describe('TextField', () => {
     label: 'Test Field',
     placeholder: 'Enter test value',
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders with correct label and placeholder', () => {
     render(
       <TestWrapper>

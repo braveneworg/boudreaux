@@ -106,7 +106,6 @@ const buildProps = (overrides: Partial<DefaultProps> = {}): DefaultProps => ({
 
 describe('PurchaseCheckoutStep', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Default: useQuery returns no data so onConfirmed is not triggered
     mockUseQuery.mockReturnValue({ data: undefined });
     // Default: useCheckout in loading state (form not yet ready)

@@ -37,7 +37,6 @@ describe('uploadDigitalFormatAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     mockValidateFileInfo.mockReturnValue({ valid: true });
     mockGeneratePresignedUploadUrl.mockResolvedValue({

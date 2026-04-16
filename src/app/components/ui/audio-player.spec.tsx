@@ -71,7 +71,6 @@ vi.mock('next/image', () => ({
 
 describe('AudioPlayer', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockPlayer.isDisposed.mockReturnValue(false);
     mockPlayer.ready.mockImplementation((cb: () => void) => cb());
   });

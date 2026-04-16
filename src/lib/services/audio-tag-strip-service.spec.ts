@@ -30,7 +30,6 @@ vi.mock('node:fs/promises', () => ({
 
 describe('AudioTagStripService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockTag.comment = undefined;
     mockStat.mockResolvedValue({ size: 5_000_000 });
   });

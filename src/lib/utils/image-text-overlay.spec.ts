@@ -108,7 +108,6 @@ describe('addTextOverlayToImage', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     // Reset canvas context mock values
     mockToBlob.mockImplementation((callback: (blob: Blob | null) => void, type: string) => {
       callback(new Blob(['test-image-data'], { type }));

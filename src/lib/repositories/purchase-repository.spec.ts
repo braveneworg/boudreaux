@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 
@@ -32,10 +32,6 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('PurchaseRepository', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('create', () => {
     it('should call prisma.releasePurchase.create with the provided data', async () => {
       const createData = {

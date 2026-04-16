@@ -21,10 +21,6 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('account-lockout', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('checkAccountLockout', () => {
     it('should return not locked when user does not exist', async () => {
       vi.mocked(prisma.user.findUnique).mockResolvedValue(null);

@@ -34,7 +34,6 @@ vi.mock('embla-carousel-react', () => ({
 // Reset mock functions before each test to ensure test isolation
 beforeEach(() => {
   // Reset all mock function calls and implementations
-  vi.clearAllMocks();
 
   // Reset mockApi to default return values
   mockApi.canScrollPrev.mockReturnValue(true);

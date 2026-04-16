@@ -321,10 +321,6 @@ const createMockFeaturedArtist = (
   }) as unknown as FeaturedArtist;
 
 describe('MediaPlayer', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('MediaPlayer container', () => {
     it('should render children', () => {
       render(

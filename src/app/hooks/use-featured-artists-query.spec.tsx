@@ -46,7 +46,6 @@ describe('useFeaturedArtistsQuery', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     global.fetch = vi.fn();
   });
 

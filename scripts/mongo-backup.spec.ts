@@ -42,15 +42,6 @@ describe('mongo-backup', () => {
     .mockImplementation((code: number | string | null | undefined) => {
       throw new Error(`Process exited with code ${code}`);
     }) as unknown as typeof process.exit;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('parseMongoUri', () => {
     it('should parse a standard MongoDB URI', () => {
       const uri = 'mongodb://user:pass@localhost:27017/mydb';

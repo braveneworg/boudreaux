@@ -49,7 +49,6 @@ vi.mock('./components/home-content', () => ({
 
 describe('Home Page', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetQueryData.mockReturnValue(undefined);
   });
 

@@ -98,7 +98,6 @@ describe('ArtistDetailPage', () => {
   const defaultSearchParams = Promise.resolve({} as Record<string, string | string[] | undefined>);
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,

@@ -22,10 +22,6 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('SubscriptionRepository', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('linkStripeCustomer', () => {
     it('should update user with stripeCustomerId by email', async () => {
       mockUpdate.mockResolvedValue({ id: '1', stripeCustomerId: 'cus_123' });

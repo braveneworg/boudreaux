@@ -11,11 +11,6 @@ describe('create-stardust-svg', () => {
 
   const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   const mockConsoleInfo = vi.spyOn(console, 'info').mockImplementation(() => {});
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('defaultConfig', () => {
     it('should have correct default dimensions', () => {
       expect(defaultConfig.width).toBe(500);

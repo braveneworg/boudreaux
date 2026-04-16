@@ -17,11 +17,6 @@ describe('RateSelectStep', () => {
     onCancel: vi.fn(),
     onConfirm: vi.fn(),
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render with heading and description', () => {
     renderInDialog(<RateSelectStep {...defaultProps} />);
 
