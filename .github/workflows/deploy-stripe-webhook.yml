@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "stripe-webhook/**"
+      - "prisma/**"
       - ".github/workflows/deploy-stripe-webhook.yml"
   workflow_dispatch:
 
@@ -45,7 +46,7 @@ jobs:
 
       - name: Generate Prisma client
         working-directory: stripe-webhook
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate --schema=../prisma/schema.prisma
 
       - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
