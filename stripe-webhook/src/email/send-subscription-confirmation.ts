@@ -5,7 +5,7 @@
 import { SendEmailCommand } from '@aws-sdk/client-ses';
 
 import { sesClient } from './ses-client.js';
-import { prisma } from '../lib/prisma.js';
+import { getPrisma } from '../lib/prisma.js';
 import { getSubscriberRate, TIER_LABELS } from '../lib/subscriber-rates.js';
 import { buildSubscriptionConfirmationEmailHtml } from './templates/subscription-confirmation-html.js';
 import { buildSubscriptionConfirmationEmailText } from './templates/subscription-confirmation-text.js';
@@ -32,7 +32,7 @@ export async function sendSubscriptionConfirmationEmail(
   }
 
   // Acquire the idempotency lock.
-  const result = await prisma.user.updateMany({
+  const result = await getPrisma().user.updateMany({
     where: { email: customerEmail, confirmationEmailSentAt: null },
     data: { confirmationEmailSentAt: new Date() },
   });
@@ -71,7 +71,7 @@ export async function sendSubscriptionConfirmationEmail(
     return true;
   } catch (error) {
     console.error(`Failed to send subscription confirmation email to ${customerEmail}:`, error);
-    await prisma.user.updateMany({
+    await getPrisma().user.updateMany({
       where: { email: customerEmail },
       data: { confirmationEmailSentAt: null },
     });

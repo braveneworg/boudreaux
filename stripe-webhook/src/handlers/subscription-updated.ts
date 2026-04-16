@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { sendSubscriptionConfirmationEmail } from '../email/send-subscription-confirmation.js';
-import { prisma } from '../lib/prisma.js';
+import { getPrisma } from '../lib/prisma.js';
 import { getTierByPriceId } from '../lib/subscriber-rates.js';
 
 import type Stripe from 'stripe';
@@ -19,7 +19,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
   const newTier = priceId ? getTierByPriceId(priceId) : null;
   const interval = firstItem?.price.recurring?.interval ?? 'month';
 
-  const existing = await prisma.user.findFirst({
+  const existing = await getPrisma().user.findFirst({
     where: { stripeCustomerId },
     select: {
       id: true,
@@ -32,7 +32,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
     throw new Error(`No user found with stripeCustomerId: ${stripeCustomerId}`);
   }
 
-  await prisma.user.update({
+  await getPrisma().user.update({
     where: { id: existing.id },
     data: {
       subscriptionId: subscription.id,
@@ -49,7 +49,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
     ACTIVE_STATUSES.has(subscription.status) &&
     newTier !== existing.subscriptionTier
   ) {
-    await prisma.user.updateMany({
+    await getPrisma().user.updateMany({
       where: { email: existing.email },
       data: { confirmationEmailSentAt: null },
     });

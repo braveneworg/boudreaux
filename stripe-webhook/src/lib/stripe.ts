@@ -4,13 +4,19 @@
 
 import Stripe from 'stripe';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-if (!stripeSecretKey) {
-  throw new Error(
-    'Missing required environment variable: STRIPE_SECRET_KEY. Configure it before initializing the Stripe client.'
-  );
-}
+import { getSecrets } from './secrets.js';
 
 /** Reuse across warm Lambda invocations. */
-export const stripe = new Stripe(stripeSecretKey);
+let stripeClient: Stripe | null = null;
+
+/**
+ * Returns the Stripe client, creating it lazily on first call.
+ * Requires `initSecrets()` to have been called beforehand.
+ */
+export function getStripe(): Stripe {
+  if (!stripeClient) {
+    const { stripeSecretKey } = getSecrets();
+    stripeClient = new Stripe(stripeSecretKey);
+  }
+  return stripeClient;
+}

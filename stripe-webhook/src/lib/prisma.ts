@@ -5,4 +5,16 @@
 import { PrismaClient } from '@prisma/client';
 
 /** Reuse across warm Lambda invocations. */
-export const prisma = new PrismaClient();
+let prismaClient: PrismaClient | null = null;
+
+/**
+ * Returns the Prisma client, creating it lazily on first call.
+ * Requires `initSecrets()` to have been called beforehand so that
+ * `process.env.DATABASE_URL` is set.
+ */
+export function getPrisma(): PrismaClient {
+  if (!prismaClient) {
+    prismaClient = new PrismaClient();
+  }
+  return prismaClient;
+}

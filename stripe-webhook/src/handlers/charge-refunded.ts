@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { prisma } from '../lib/prisma.js';
+import { getPrisma } from '../lib/prisma.js';
 
 import type Stripe from 'stripe';
 
@@ -15,7 +15,7 @@ export async function handleChargeRefunded(charge: Stripe.Charge): Promise<void>
     return;
   }
 
-  const result = await prisma.releasePurchase.updateMany({
+  const result = await getPrisma().releasePurchase.updateMany({
     where: { stripePaymentIntentId: paymentIntentId, refundedAt: null },
     data: { refundedAt: new Date() },
   });

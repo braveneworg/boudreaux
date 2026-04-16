@@ -8,8 +8,8 @@ import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '../email/send-purchase-confirmation.js';
 import { sendSubscriptionConfirmationEmail } from '../email/send-subscription-confirmation.js';
-import { prisma } from '../lib/prisma.js';
-import { stripe } from '../lib/stripe.js';
+import { getPrisma } from '../lib/prisma.js';
+import { getStripe } from '../lib/stripe.js';
 import { getTierByPriceId } from '../lib/subscriber-rates.js';
 
 import type Stripe from 'stripe';
@@ -45,7 +45,7 @@ export async function handleCheckoutSessionCompleted(
     return;
   }
 
-  const updateUserResult = await prisma.user.updateMany({
+  const updateUserResult = await getPrisma().user.updateMany({
     where: { email: customerEmail },
     data: { stripeCustomerId },
   });
@@ -65,19 +65,19 @@ export async function handleCheckoutSessionCompleted(
     const subscriptionId =
       typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
 
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
     const firstItem = subscription.items.data[0];
     const priceId = firstItem?.price.id;
     tier = priceId ? getTierByPriceId(priceId) : null;
     interval = firstItem?.price.recurring?.interval ?? 'month';
 
-    const user = await prisma.user.findFirst({
+    const user = await getPrisma().user.findFirst({
       where: { stripeCustomerId },
       select: { id: true },
     });
 
     if (user) {
-      await prisma.user.update({
+      await getPrisma().user.update({
         where: { id: user.id },
         data: {
           subscriptionId: subscription.id,
@@ -92,7 +92,7 @@ export async function handleCheckoutSessionCompleted(
   }
 
   // Reset the flag so the email is sent even if this is a re-subscription
-  await prisma.user.updateMany({
+  await getPrisma().user.updateMany({
     where: { email: customerEmail },
     data: { confirmationEmailSentAt: null },
   });
@@ -101,7 +101,7 @@ export async function handleCheckoutSessionCompleted(
 
 async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session): Promise<void> {
   // Always retrieve the full session — webhook payload may have payment_intent: null.
-  const retrievedSession = await stripe.checkout.sessions.retrieve(session.id);
+  const retrievedSession = await getStripe().checkout.sessions.retrieve(session.id);
 
   // Security: validate webhook metadata with Zod before using in queries
   const metadataResult = releaseMetadataSchema.safeParse(retrievedSession.metadata);
@@ -142,7 +142,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
   // Resolve userId: prefer metadata, fall back to email lookup for guest purchases.
   let userId: string | undefined = metadataUserId;
   if (!userId && customerEmail) {
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await getPrisma().user.findUnique({
       where: { email: customerEmail },
       select: { id: true },
     });
@@ -154,7 +154,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
       // index (P2002) by re-fetching the user if creation fails.
       const placeholderUsername = generateUsername('', 0, 15);
       try {
-        const newUser = await prisma.user.create({
+        const newUser = await getPrisma().user.create({
           data: {
             email: customerEmail,
             emailVerified: new Date(),
@@ -167,7 +167,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
           createError instanceof Prisma.PrismaClientKnownRequestError &&
           createError.code === 'P2002'
         ) {
-          const racedUser = await prisma.user.findUnique({
+          const racedUser = await getPrisma().user.findUnique({
             where: { email: customerEmail },
             select: { id: true },
           });
@@ -199,14 +199,14 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
   // Look up existing purchase — first by paymentIntentId (duplicate webhook),
   // then by userId+releaseId (re-purchase of same release). Pre-checking avoids
   // P2002 unique constraint violations entirely for the common case.
-  let purchase = await prisma.releasePurchase.findUnique({
+  let purchase = await getPrisma().releasePurchase.findUnique({
     where: { stripePaymentIntentId: paymentIntentId },
   });
 
   if (!purchase) {
     // Check if user already owns this release (e.g. re-purchase or test retry).
     // If so, update the session ID so the polling endpoint can find it.
-    const existingForUser = await prisma.releasePurchase.findFirst({
+    const existingForUser = await getPrisma().releasePurchase.findFirst({
       where: {
         userId,
         releaseId,
@@ -214,7 +214,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
       },
     });
     if (existingForUser) {
-      await prisma.releasePurchase.update({
+      await getPrisma().releasePurchase.update({
         where: { id: existingForUser.id },
         data: { stripeSessionId: retrievedSession.id },
       });
@@ -224,7 +224,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
 
   if (!purchase) {
     try {
-      purchase = await prisma.releasePurchase.create({
+      purchase = await getPrisma().releasePurchase.create({
         data: {
           userId,
           releaseId,
@@ -244,15 +244,15 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
         createError.code === 'P2002'
       ) {
         purchase =
-          (await prisma.releasePurchase.findUnique({
+          (await getPrisma().releasePurchase.findUnique({
             where: { stripePaymentIntentId: paymentIntentId },
           })) ??
-          (await prisma.releasePurchase.findFirst({
+          (await getPrisma().releasePurchase.findFirst({
             where: { userId, releaseId, refundedAt: null },
           }));
 
         if (purchase) {
-          await prisma.releasePurchase.update({
+          await getPrisma().releasePurchase.update({
             where: { id: purchase.id },
             data: { stripeSessionId: retrievedSession.id },
           });
@@ -274,7 +274,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
   }
 
   // Fetch release title for the confirmation email
-  const release = await prisma.release.findFirst({
+  const release = await getPrisma().release.findFirst({
     where: { id: releaseId },
     select: { title: true },
   });
@@ -283,7 +283,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
   // Resolve the email for the confirmation.
   let emailForConfirmation = customerEmail;
   if (!emailForConfirmation) {
-    const user = await prisma.user.findUnique({
+    const user = await getPrisma().user.findUnique({
       where: { id: userId },
       select: { email: true },
     });

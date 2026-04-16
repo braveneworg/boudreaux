@@ -32,11 +32,22 @@ Resources:
               Action:
                 - ses:SendEmail
               Resource: '{{resolve:ssm:/fakefour/ses-identity-arn}}'
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/secret-key'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/webhook-secret'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/database-url'
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
       Environment:
         Variables:
-          STRIPE_SECRET_KEY: '{{resolve:ssm:/fakefour/stripe/secret-key}}'
-          STRIPE_WEBHOOK_SECRET: '{{resolve:ssm:/fakefour/stripe/webhook-secret}}'
-          DATABASE_URL: '{{resolve:ssm:/fakefour/database-url}}'
+          SSM_PATH_STRIPE_SECRET_KEY: '/fakefour/stripe/secret-key'
+          SSM_PATH_STRIPE_WEBHOOK_SECRET: '/fakefour/stripe/webhook-secret'
+          SSM_PATH_DATABASE_URL: '/fakefour/database-url'
           EMAIL_FROM: '{{resolve:ssm:/fakefour/email-from}}'
           BASE_URL: '{{resolve:ssm:/fakefour/base-url}}'
           STRIPE_PRICE_MINIMUM: '{{resolve:ssm:/fakefour/stripe/price-minimum}}'
