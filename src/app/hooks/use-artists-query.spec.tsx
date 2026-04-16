@@ -23,10 +23,6 @@ const createWrapper = () => {
 };
 
 describe('useArtistsQuery', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns isPending true initially', () => {
     global.fetch = vi.fn().mockImplementation(
       () =>

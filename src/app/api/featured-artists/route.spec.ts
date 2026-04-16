@@ -67,11 +67,6 @@ describe('Featured Artists API Routes', () => {
   };
 
   const dummyContext = { params: Promise.resolve({}) };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/featured-artists', () => {
     it('should return 401 when not authenticated for admin listing', async () => {
       vi.mocked(auth).mockResolvedValueOnce(null as never);

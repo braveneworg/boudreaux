@@ -21,10 +21,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('SubscribeButton', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render the subscribe message', () => {
     render(<SubscribeButton subscribeMessage="Subscribe" />);
 

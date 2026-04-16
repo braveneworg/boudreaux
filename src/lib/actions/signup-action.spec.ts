@@ -101,7 +101,6 @@ describe('signupAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFormData.set('email', 'test@example.com');
     mockFormData.set('termsAndConditions', 'true');
     mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
@@ -512,7 +511,6 @@ describe('signupAction', () => {
       ];
 
       for (const error of timeoutErrors) {
-        vi.clearAllMocks();
         const mockFormState: FormState = {
           fields: { email: 'test@example.com', termsAndConditions: true },
           success: false,

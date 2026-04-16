@@ -51,7 +51,6 @@ describe('DataStoreHealthStatus', () => {
   const mockFetch = vi.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     global.fetch = mockFetch;
     // Mock console methods to reduce noise

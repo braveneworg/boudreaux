@@ -81,7 +81,6 @@ describe('GenerateUsernameButton', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.clearAllMocks();
 
     // Reset mockGenerateUsername to clear any mockReturnValueOnce calls
     mockGenerateUsername.mockReset();

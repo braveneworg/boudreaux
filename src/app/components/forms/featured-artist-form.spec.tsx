@@ -141,7 +141,6 @@ describe('FeaturedArtistForm', () => {
   const mockFetch = vi.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockSetValue.mockClear();
     mockFetch.mockReset();
     capturedReleaseSelectSetValue = undefined;

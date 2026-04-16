@@ -46,7 +46,6 @@ describe('DownloadEventRepository', () => {
 
   beforeEach(() => {
     repository = new DownloadEventRepository();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {

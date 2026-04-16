@@ -22,10 +22,6 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 }));
 
 describe('GET /api/user/collection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should return 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 

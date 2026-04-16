@@ -33,10 +33,6 @@ vi.mock('@aws-sdk/client-s3', () => ({
 }));
 
 describe('s3-apply-cache-headers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('parseArgs', () => {
     it('should default to dry run with media/ prefix', () => {
       const result = parseArgs([]);

@@ -50,11 +50,6 @@ describe('Artist Archive API Route', () => {
   const createParams = (id: string) => ({
     params: Promise.resolve({ id }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('POST /api/artists/[id]/archive', () => {
     it('should archive an artist successfully', async () => {
       vi.mocked(ArtistService.archiveArtist).mockResolvedValue({

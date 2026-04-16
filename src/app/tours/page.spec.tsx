@@ -33,10 +33,6 @@ vi.mock('./components/tours-content', () => ({
 }));
 
 describe('ToursPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render page structure with heading', async () => {
     const Page = await ToursPage();
     render(Page);

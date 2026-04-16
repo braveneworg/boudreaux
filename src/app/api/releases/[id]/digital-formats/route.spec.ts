@@ -31,10 +31,6 @@ function buildContext(id = '507f1f77bcf86cd799439011') {
 }
 
 describe('GET /api/releases/[id]/digital-formats', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('without formatType (list all)', () => {
     it('returns all available formats with files', async () => {
       mockFindAllByRelease.mockResolvedValue([

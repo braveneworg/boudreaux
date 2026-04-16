@@ -118,11 +118,6 @@ describe('TourService', () => {
     ],
     images: [],
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('findAll', () => {
     it('should return paginated tours with artist display names', async () => {
       vi.mocked(TourRepository.findAll).mockResolvedValue([mockTour] as never);

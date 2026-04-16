@@ -73,10 +73,6 @@ const mockFeaturedArtist = {
 };
 
 describe('FeaturedArtistsService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('createFeaturedArtist', () => {
     it('should create a featured artist and return success', async () => {
       mockCreate.mockResolvedValue(mockFeaturedArtist as never);

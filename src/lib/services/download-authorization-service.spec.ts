@@ -61,7 +61,6 @@ describe('DownloadAuthorizationService', () => {
 
   beforeEach(() => {
     service = new DownloadAuthorizationService();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {

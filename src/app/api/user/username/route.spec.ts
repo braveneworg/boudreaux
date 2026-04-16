@@ -50,10 +50,6 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 }
 
 describe('POST /api/user/username', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should update username successfully and return 200 with available:true', async () => {
     mockPrismaUpdate.mockResolvedValue({ id: 'user-123', username: 'newuser' });
 

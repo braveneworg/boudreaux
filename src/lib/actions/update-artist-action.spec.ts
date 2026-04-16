@@ -51,7 +51,6 @@ describe('updateArtistAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(auth).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});

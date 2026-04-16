@@ -67,7 +67,6 @@ describe('processNotificationImageAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockRequireRole.mockResolvedValue(mockSession as never);
     resetSharpMock();
   });

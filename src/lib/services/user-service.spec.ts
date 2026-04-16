@@ -14,10 +14,6 @@ vi.mock('../prisma', () => ({
 }));
 
 describe('UserService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('ensureAdminUser', () => {
     const adminData = {
       firstName: 'Admin',

@@ -86,7 +86,6 @@ vi.mock('@/lib/utils/tailwind-utils', () => ({
 
 describe('SignedinToolbar', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Setup default session mock
     mockUseSession.mockReturnValue({
       data: {

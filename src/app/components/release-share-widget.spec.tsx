@@ -54,11 +54,6 @@ describe('ReleaseShareWidget', () => {
       artists: [{ slug: 'selected-artist' }],
       release: { title: 'Selected Release' },
     } as unknown as FeaturedArtist;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
     it('should render the Share2Icon', () => {
       render(<ReleaseShareWidget />, {
         wrapper: createQueryWrapper(),

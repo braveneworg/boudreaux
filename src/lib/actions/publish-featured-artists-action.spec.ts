@@ -20,10 +20,6 @@ vi.mock('@/lib/utils/simple-cache', () => ({
 }));
 
 describe('publishFeaturedArtistsToSiteAction', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns unauthorized when requireRole rejects', async () => {
     const { requireRole } = await import('../utils/auth/require-role');
     vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));

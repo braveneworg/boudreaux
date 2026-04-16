@@ -73,11 +73,6 @@ describe('Artist API Routes', () => {
     trackId: null,
     featuredArtistId: null,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/artists', () => {
     it('should return 401 when not authenticated', async () => {
       vi.mocked(auth).mockResolvedValueOnce(null as never);

@@ -42,11 +42,6 @@ describe('Featured Artist by ID API Routes', () => {
   const createParams = (id: string) => ({
     params: Promise.resolve({ id }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/featured-artists/[id]', () => {
     it('should return a featured artist by ID', async () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({

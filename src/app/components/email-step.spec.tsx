@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { Dialog } from '@/app/components/ui/dialog';
@@ -44,7 +44,7 @@ const renderInDialog = (ui: React.ReactElement) => render(<Dialog open>{ui}</Dia
 
 /** Fill the form and verify Turnstile so the submit button is enabled. */
 const fillFormAndVerify = async (user: ReturnType<typeof userEvent.setup>, email: string) => {
-  await user.type(screen.getByLabelText('Email'), email);
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } });
   await user.click(screen.getByRole('switch'));
   await user.click(screen.getByTestId('verify-turnstile'));
 };
@@ -56,13 +56,7 @@ describe('EmailStep', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     mockVerifyTurnstile.mockResolvedValue({ success: true });
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('should render the email form with heading and description', () => {
@@ -110,7 +104,7 @@ describe('EmailStep', () => {
   });
 
   it('should enable Continue to Checkout after Turnstile verification', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -120,7 +114,7 @@ describe('EmailStep', () => {
   });
 
   it('should call onCancel when Back button is clicked', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -130,7 +124,7 @@ describe('EmailStep', () => {
   });
 
   it('should show validation error when submitting without email', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
@@ -145,11 +139,11 @@ describe('EmailStep', () => {
   });
 
   it('should show validation error when terms are not accepted', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     renderInDialog(<EmailStep {...defaultProps} />);
 
-    await user.type(screen.getByLabelText('Email'), 'valid@example.com');
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'valid@example.com' } });
     await user.click(screen.getByTestId('verify-turnstile'));
     await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
 
@@ -159,7 +153,7 @@ describe('EmailStep', () => {
   });
 
   it('should call resolveSubscriberAction and onConfirm for a new user', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockResolveSubscriberAction.mockResolvedValue({ success: true, status: 'created' });
 
     renderInDialog(<EmailStep {...defaultProps} />);
@@ -178,6 +172,7 @@ describe('EmailStep', () => {
   });
 
   it('should show "Checking..." while the action is pending', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockVerifyTurnstile.mockImplementation(() => new Promise(() => {}));
 
@@ -197,10 +192,12 @@ describe('EmailStep', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Checking...' })).toBeDisabled();
     });
+
+    vi.useRealTimers();
   });
 
   it('should call onConfirm immediately for existing users', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockResolveSubscriberAction.mockResolvedValue({ success: true, status: 'existing' });
 
     renderInDialog(<EmailStep {...defaultProps} />);
@@ -214,7 +211,7 @@ describe('EmailStep', () => {
   });
 
   it('should display a server error when the action fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockResolveSubscriberAction.mockResolvedValue({
       success: false,
       error: 'Disposable email addresses are not allowed',
@@ -233,7 +230,7 @@ describe('EmailStep', () => {
   });
 
   it('should display a generic server error when no error message is returned', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockResolveSubscriberAction.mockResolvedValue({ success: false });
 
     renderInDialog(<EmailStep {...defaultProps} />);
@@ -247,7 +244,7 @@ describe('EmailStep', () => {
   });
 
   it('should show error and not call resolveSubscriberAction when Turnstile verification fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockVerifyTurnstile.mockResolvedValue({
       success: false,
       error: 'Turnstile verification failed',
@@ -267,7 +264,7 @@ describe('EmailStep', () => {
   });
 
   it('should show default error message when Turnstile verification fails without error string', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     mockVerifyTurnstile.mockResolvedValue({ success: false });
 
     renderInDialog(<EmailStep {...defaultProps} />);

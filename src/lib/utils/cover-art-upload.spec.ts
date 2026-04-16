@@ -19,10 +19,6 @@ const mockGetPresignedUploadUrlsAction = vi.mocked(getPresignedUploadUrlsAction)
 const mockUploadFileToS3 = vi.mocked(uploadFileToS3);
 
 describe('cover-art-upload', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('uploadCoverArtToS3', () => {
     const sampleBase64Jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD';
     const sampleBase64Png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';

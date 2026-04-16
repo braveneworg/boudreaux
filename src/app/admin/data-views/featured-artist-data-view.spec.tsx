@@ -84,11 +84,6 @@ describe('FeaturedArtistDataView', () => {
     ],
     count: 1,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render loading state when pending', () => {
     vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
       isPending: true,

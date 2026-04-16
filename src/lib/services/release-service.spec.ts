@@ -99,11 +99,6 @@ describe('ReleaseService', () => {
     tagId: null,
     suggestedPrice: null,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('createRelease', () => {
     const createInput: Prisma.ReleaseCreateInput = {
       title: 'Test Album',

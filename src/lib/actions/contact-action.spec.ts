@@ -115,7 +115,6 @@ describe('contactAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
     vi.stubEnv('CONTACT_EMAIL', 'contact@fakefourrecords.com');
     mockVerifyTurnstile.mockResolvedValue({ success: true });

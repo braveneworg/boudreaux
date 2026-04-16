@@ -62,7 +62,6 @@ describe('updateProfileAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFormData.set('firstName', 'John');
     mockFormData.set('lastName', 'Doe');
     mockFormData.set('phone', '555-1234');

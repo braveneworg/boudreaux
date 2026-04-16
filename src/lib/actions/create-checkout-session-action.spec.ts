@@ -55,7 +55,6 @@ vi.mock('@/lib/repositories/subscription-repository', () => ({
 
 describe('createCheckoutSessionAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('AUTH_URL', 'https://fakefourrecords.com');
     mockAuth.mockResolvedValue(null);
     mockFindByEmail.mockResolvedValue(null);

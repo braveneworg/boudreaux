@@ -40,11 +40,6 @@ describe('getFeaturedArtistsAction', () => {
       release: null,
     },
   ];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should return featured artists with default limit', async () => {
     vi.mocked(FeaturedArtistsService.getFeaturedArtists).mockResolvedValue({
       success: true,

@@ -35,7 +35,6 @@ function createRequest(url: string): NextRequest {
 
 describe('GET /api/releases/[id]/download-analytics', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetAnalyticsByRelease.mockResolvedValue([
       { formatType: 'MP3_320KBPS', count: 100 },
       { formatType: 'FLAC', count: 50 },

@@ -30,11 +30,6 @@ describe('Tour Images API Route', () => {
   const createParams = (tourId: string) => ({
     params: Promise.resolve({ tourId }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('GET /api/tours/[tourId]/images', () => {
     it('should return empty images array for invalid tour ID format', async () => {
       const request = new NextRequest('http://localhost:3000/api/tours/not-valid/images');

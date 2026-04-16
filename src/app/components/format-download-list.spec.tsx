@@ -29,7 +29,6 @@ describe('FormatDownloadList', () => {
   const originalCreateElement = document.createElement.bind(document);
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
       const el = originalCreateElement(tagName);
       if (tagName === 'a') {

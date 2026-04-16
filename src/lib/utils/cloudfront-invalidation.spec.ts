@@ -24,7 +24,6 @@ vi.mock('@aws-sdk/client-cloudfront', () => ({
 
 describe('invalidateCloudFrontPaths', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('CLOUDFRONT_DISTRIBUTION_ID', 'E1234567890');
     vi.stubEnv('AWS_REGION', 'us-east-1');
   });

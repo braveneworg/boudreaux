@@ -77,7 +77,6 @@ describe('signinAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFormData.set('email', 'test@example.com');
     mockFormData.set('cf-turnstile-response', 'test-turnstile-token');
     // Default to passing Turnstile verification

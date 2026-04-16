@@ -39,7 +39,6 @@ describe('useIsMobile', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
     listeners = [];
   });
 

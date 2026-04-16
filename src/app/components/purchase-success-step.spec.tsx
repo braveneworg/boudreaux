@@ -86,8 +86,6 @@ function mockFetchFailure() {
 // ---------------------------------------------------------------------------
 
 describe('PurchaseSuccessStep', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('renders the "Purchase Complete!" success heading', async () => {
     mockFetchFormats([]);
     render(<PurchaseSuccessStep releaseId="release-123" releaseTitle="Test Album" />, {
@@ -126,8 +124,6 @@ describe('PurchaseSuccessStep', () => {
 });
 
 describe('PurchaseSuccessStep — fetches formats from API', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('fetches formats from the API on mount', async () => {
     mockFetchFormats(mockFormats);
 
@@ -184,8 +180,6 @@ describe('PurchaseSuccessStep — fetches formats from API', () => {
 });
 
 describe('PurchaseSuccessStep — no available formats', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('renders fallback message when API returns empty formats', async () => {
     mockFetchFormats([]);
 
@@ -221,8 +215,6 @@ describe('PurchaseSuccessStep — no available formats', () => {
 });
 
 describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('falls back to prop formats when fetch throws a network error', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
@@ -316,8 +308,6 @@ describe('PurchaseSuccessStep — fetch network error (catch branch)', () => {
 });
 
 describe('PurchaseSuccessStep — onDownloadComplete callback', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   it('passes onDownloadComplete through to FormatBundleDownload', async () => {
     mockFetchFormats(mockFormats);
     const onDownloadComplete = vi.fn();

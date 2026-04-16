@@ -56,10 +56,6 @@ const mockAnalyticsData = {
 };
 
 describe('DownloadAnalyticsDashboard', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   function mockFetchSuccess(data = mockAnalyticsData) {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

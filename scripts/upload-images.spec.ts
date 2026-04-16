@@ -267,10 +267,6 @@ describe('upload-images', () => {
   });
 
   describe('collectImagesFromDirectory', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
     it('should throw error if directory does not exist', () => {
       existsSyncMock.mockReturnValue(false);
 
@@ -404,7 +400,6 @@ describe('upload-images', () => {
 
   describe('uploadImages', () => {
     beforeEach(() => {
-      vi.clearAllMocks();
       s3ClientSendMock.mockResolvedValue({});
       cloudFrontSendMock.mockResolvedValue({});
     });

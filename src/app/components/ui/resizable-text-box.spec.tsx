@@ -17,11 +17,6 @@ describe('ResizableTextBox', () => {
     rotation: 0,
     children: 'Test content',
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('rendering', () => {
     it('renders the children content', () => {
       render(<ResizableTextBox {...defaultProps} />);

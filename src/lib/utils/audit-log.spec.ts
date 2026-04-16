@@ -6,7 +6,6 @@ import { logSecurityEvent, extractRequestMetadata, type AuditEvent } from './aud
 
 describe('Audit Log', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'info').mockImplementation(() => {});
   });

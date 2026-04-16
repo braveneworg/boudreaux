@@ -149,7 +149,6 @@ function createRequest(body: string, signature: string | null = 'sig_test'): Nex
 
 describe('POST /api/stripe/webhook', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', WEBHOOK_SECRET);
     vi.stubEnv('SKIP_STRIPE_IP_CHECK', 'true');
     mockResetConfirmationEmailSent.mockResolvedValue(undefined);

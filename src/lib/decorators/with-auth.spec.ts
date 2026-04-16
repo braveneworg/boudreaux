@@ -31,11 +31,6 @@ describe('withAuth decorator', () => {
   const mockNextResponse = NextResponse as unknown as {
     json: ReturnType<typeof vi.fn>;
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   const createMockRequest = (url = 'https://example.com/api/test') =>
     ({
       url,
@@ -256,11 +251,6 @@ describe('withAdmin decorator', () => {
   const mockNextResponse = NextResponse as unknown as {
     json: ReturnType<typeof vi.fn>;
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   const createMockRequest = (url = 'https://example.com/api/admin/test') =>
     ({
       url,

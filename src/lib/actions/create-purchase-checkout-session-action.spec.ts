@@ -57,7 +57,6 @@ describe('createPurchaseCheckoutSessionAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     // Default: authenticated user
     mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);

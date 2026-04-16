@@ -20,11 +20,6 @@ describe('GET /api/releases/[id]/related', () => {
   const createParams = (id: string) => ({
     params: Promise.resolve({ id }),
   });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should return empty releases when no artistId provided', async () => {
     const request = new NextRequest(
       'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/related'

@@ -12,7 +12,6 @@ vi.mock('../../../../../auth', () => ({
 
 describe('GET /api/debug/session', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.stubEnv('NODE_ENV', 'test');
   });
 

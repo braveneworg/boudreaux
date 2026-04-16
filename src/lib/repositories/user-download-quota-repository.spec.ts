@@ -39,7 +39,6 @@ describe('UserDownloadQuotaRepository', () => {
   const mockQuota = createMockQuota();
 
   beforeEach(() => {
-    vi.clearAllMocks();
     repo = new UserDownloadQuotaRepository();
   });
 

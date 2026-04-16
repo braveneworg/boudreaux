@@ -80,7 +80,6 @@ describe('ReleasePlayerPage', () => {
   const mockReleaseData = { id: 'release-1', title: 'Test Album' };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,

@@ -61,10 +61,6 @@ vi.mock('@/app/components/ui/page-container', () => ({
 }));
 
 describe('ArtistSearchPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render page structure', async () => {
     const Page = await ArtistSearchPage({
       searchParams: Promise.resolve({ q: 'john' }),

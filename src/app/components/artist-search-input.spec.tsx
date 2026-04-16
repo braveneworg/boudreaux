@@ -161,7 +161,6 @@ vi.mock('@/app/components/ui/popover', () => ({
 
 describe('ArtistSearchInput', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ results: [] }),

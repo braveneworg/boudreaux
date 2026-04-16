@@ -15,7 +15,6 @@ describe('verifyTurnstile', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     process.env = { ...originalEnv, CLOUDFLARE_SECRET: 'test-secret-key' };
   });
 

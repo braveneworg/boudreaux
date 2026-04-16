@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { Prisma } from '@prisma/client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ImageRepository } from './image-repository';
 
@@ -33,10 +33,6 @@ vi.mock('@/lib/prisma', () => ({
 const { prisma } = await import('@/lib/prisma');
 
 describe('ImageRepository', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('findByTourId', () => {
     it('should return all images for a tour sorted by displayOrder', async () => {
       const mockImages = [

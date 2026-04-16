@@ -63,7 +63,6 @@ function createMockRequest(
 
 describe('proxy middleware', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 

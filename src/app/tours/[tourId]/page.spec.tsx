@@ -57,7 +57,6 @@ describe('TourPage', () => {
   const defaultParams = Promise.resolve({ tourId: 'tour-1' });
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,

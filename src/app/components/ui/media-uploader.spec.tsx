@@ -22,7 +22,6 @@ describe('MediaUploader', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     // Mock URL.createObjectURL
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();

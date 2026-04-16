@@ -38,11 +38,6 @@ describe('VenueRepository', () => {
     createdBy: 'user-123',
     updatedBy: null,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('findAll', () => {
     it('should return all venues sorted by name', async () => {
       vi.mocked(prisma.venue.findMany).mockResolvedValue([mockVenue]);

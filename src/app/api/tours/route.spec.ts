@@ -31,11 +31,6 @@ vi.mock('@/lib/repositories/tours/tour-repository', () => ({
 describe('GET /api/tours', () => {
   const dummyRequest = new NextRequest('http://localhost/api/tours');
   const dummyContext = { params: Promise.resolve({}) };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   const mockTours = [
     { id: 'tour-1', name: 'Summer Tour', tourDates: [] },
     { id: 'tour-2', name: 'Winter Tour', tourDates: [] },

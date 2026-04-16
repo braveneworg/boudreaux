@@ -214,11 +214,6 @@ describe('SignupSigninForm', () => {
       success: false,
     } as FormState,
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('email field', () => {
     it('should render email input field', () => {
       render(<SignupSigninForm {...defaultProps} />);

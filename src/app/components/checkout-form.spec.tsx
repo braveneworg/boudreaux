@@ -82,10 +82,6 @@ const createCheckoutSuccess = (overrides = {}) => ({
 });
 
 describe('CheckoutForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('loading state', () => {
     it('should render a loading spinner when checkout is loading', () => {
       mockUseCheckout.mockReturnValue({ type: 'loading' });

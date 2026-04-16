@@ -57,7 +57,6 @@ describe('ReleaseDigitalFormatRepository', () => {
 
   beforeEach(() => {
     repository = new ReleaseDigitalFormatRepository();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {

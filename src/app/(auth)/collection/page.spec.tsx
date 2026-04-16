@@ -60,7 +60,6 @@ vi.mock('@/app/components/ui/page-container', () => ({
 
 describe('CollectionPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockAuth.mockResolvedValue({
       user: { id: 'user-1', role: 'user' },
     });

@@ -56,7 +56,6 @@ describe('presigned-upload-actions', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(auth).mockResolvedValue(mockSession as never);
     mockGetSignedUrl.mockResolvedValue('https://s3.amazonaws.com/presigned-url?signature=abc');

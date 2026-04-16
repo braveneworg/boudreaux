@@ -28,7 +28,6 @@ function makeRequest(): NextRequest {
 
 describe('GET /api/user/download-quota', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetToken.mockResolvedValue({ sub: 'user-123' });
     mockGetQuotaStatus.mockResolvedValue({
       remainingDownloads: 3,

@@ -36,11 +36,6 @@ describe('TourRepository', () => {
     images: [],
     tourDates: [],
   };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('findAll', () => {
     it('returns tours sorted by createdAt descending with nested relations', async () => {
       vi.mocked(prisma.tour.findMany).mockResolvedValue([mockTour] as never);
