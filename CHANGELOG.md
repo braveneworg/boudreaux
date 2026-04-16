@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.9.0] - 2026-04-16
+
+### Added
+
+- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n- fix: add STRIPE_WEBHOOK_IP_RANGES environment variable to Stripe webh… (#353)\n
+
 ## [4.8.0] - 2026-04-16
 
 ### Added
