@@ -66,6 +66,7 @@ Resources:
           - handler.ts
         External:
           - '@prisma/client'
+          - '@aws-sdk/*'
 
   StripeWebhookApi:
     Type: AWS::Serverless::HttpApi
