@@ -47,13 +47,13 @@ jobs:
         working-directory: stripe-webhook
         run: npx prisma generate
 
-      - name: Copy Prisma engine binary to layer
+      - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
         run: |
           mkdir -p layers/prisma/nodejs/node_modules/.prisma/client
           mkdir -p layers/prisma/nodejs/node_modules/@prisma/client
 
-          cp node_modules/.prisma/client/libquery_engine-linux-arm64-openssl-3.0.x.so.node \
+          cp -r node_modules/.prisma/client/. \
             layers/prisma/nodejs/node_modules/.prisma/client/
 
           cp -r node_modules/@prisma/client/. \
