@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "stripe-webhook/**"
+      - "prisma/**"
       - ".github/workflows/deploy-stripe-webhook.yml"
   workflow_dispatch:
 
