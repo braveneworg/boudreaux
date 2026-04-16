@@ -59,6 +59,10 @@ describe('EmailStep', () => {
     mockVerifyTurnstile.mockResolvedValue({ success: true });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should render the email form with heading and description', () => {
     renderInDialog(<EmailStep {...defaultProps} />);
 
