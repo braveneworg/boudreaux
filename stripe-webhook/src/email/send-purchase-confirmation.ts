@@ -5,7 +5,7 @@
 import { SendEmailCommand } from '@aws-sdk/client-ses';
 
 import { sesClient } from './ses-client.js';
-import { prisma } from '../lib/prisma.js';
+import { getPrisma } from '../lib/prisma.js';
 import { buildPurchaseConfirmationEmailHtml } from './templates/purchase-confirmation-html.js';
 import { buildPurchaseConfirmationEmailText } from './templates/purchase-confirmation-text.js';
 
@@ -35,7 +35,7 @@ export async function sendPurchaseConfirmationEmail(
   }
 
   // Acquire the idempotency lock — prevents concurrent sends for the same purchase.
-  const result = await prisma.releasePurchase.updateMany({
+  const result = await getPrisma().releasePurchase.updateMany({
     where: { id: input.purchaseId, confirmationEmailSentAt: null },
     data: { confirmationEmailSentAt: new Date() },
   });
@@ -86,7 +86,7 @@ export async function sendPurchaseConfirmationEmail(
     return true;
   } catch (error) {
     // SES send failed — reset the flag so a retry can attempt the email again.
-    await prisma.releasePurchase.updateMany({
+    await getPrisma().releasePurchase.updateMany({
       where: { id: input.purchaseId },
       data: { confirmationEmailSentAt: null },
     });

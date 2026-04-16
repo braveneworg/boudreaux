@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1013.0",
+    "@aws-sdk/client-ssm": "^3.1030.0",
     "@prisma/client": "^6.16.3",
     "ipaddr.js": "^2.2.0",
     "stripe": "^21.0.1",

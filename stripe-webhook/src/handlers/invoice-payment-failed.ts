@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { prisma } from '../lib/prisma.js';
+import { getPrisma } from '../lib/prisma.js';
 
 import type Stripe from 'stripe';
 
@@ -15,7 +15,7 @@ export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promi
     return;
   }
 
-  const user = await prisma.user.findFirst({
+  const user = await getPrisma().user.findFirst({
     where: { stripeCustomerId },
     select: { id: true },
   });
@@ -24,7 +24,7 @@ export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promi
     throw new Error(`No user found with stripeCustomerId: ${stripeCustomerId}`);
   }
 
-  await prisma.user.update({
+  await getPrisma().user.update({
     where: { id: user.id },
     data: { subscriptionStatus: 'past_due' },
   });

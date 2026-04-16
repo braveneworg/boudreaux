@@ -9,7 +9,8 @@ import { handleCheckoutSessionCompleted } from './handlers/checkout-session-comp
 import { handleInvoicePaymentFailed } from './handlers/invoice-payment-failed.js';
 import { handleSubscriptionDeleted } from './handlers/subscription-deleted.js';
 import { handleSubscriptionUpdated } from './handlers/subscription-updated.js';
-import { stripe } from './lib/stripe.js';
+import { initSecrets, getSecrets } from './lib/secrets.js';
+import { getStripe } from './lib/stripe.js';
 
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
@@ -93,10 +94,13 @@ export const lambdaHandler = async (
     return { statusCode: 400, body: 'Missing stripe-signature header' };
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('Missing STRIPE_WEBHOOK_SECRET');
-    return { statusCode: 500, body: 'Stripe webhook secret is not configured' };
+  let stripeWebhookSecret: string;
+  try {
+    await initSecrets();
+    ({ stripeWebhookSecret } = getSecrets());
+  } catch (err) {
+    console.error('Failed to initialize Stripe webhook secrets:', err);
+    return { statusCode: 500, body: 'Internal server error' };
   }
 
   const rawBody = event.isBase64Encoded
@@ -106,7 +110,7 @@ export const lambdaHandler = async (
   // Do NOT JSON.parse event.body before passing to constructEvent
   let stripeEvent: Stripe.Event;
   try {
-    stripeEvent = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    stripeEvent = getStripe().webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
   } catch (err) {
     console.error('Stripe signature verification failed:', err);
     return { statusCode: 400, body: 'Webhook signature verification failed' };

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { lambdaHandler } from './handler.js';
+import { initSecrets } from './lib/secrets.js';
 
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
@@ -36,12 +37,25 @@ vi.mock('ipaddr.js', () => ({
 
 const mockConstructEvent = vi.fn();
 
+vi.mock('./lib/secrets.js', () => ({
+  initSecrets: vi.fn().mockResolvedValue({
+    stripeSecretKey: 'sk_test_fake',
+    stripeWebhookSecret: 'whsec_test',
+    databaseUrl: 'mongodb://localhost:27017/test',
+  }),
+  getSecrets: vi.fn().mockReturnValue({
+    stripeSecretKey: 'sk_test_fake',
+    stripeWebhookSecret: 'whsec_test',
+    databaseUrl: 'mongodb://localhost:27017/test',
+  }),
+}));
+
 vi.mock('./lib/stripe.js', () => ({
-  stripe: {
+  getStripe: () => ({
     webhooks: {
       constructEvent: (...args: unknown[]) => mockConstructEvent(...args),
     },
-  },
+  }),
 }));
 
 const mockHandleCheckoutSessionCompleted = vi.fn();
@@ -73,7 +87,6 @@ vi.mock('./handlers/charge-refunded.js', () => ({
 
 const ALLOWED_IP = '3.18.12.63';
 const DISALLOWED_IP = '1.2.3.4';
-const WEBHOOK_SECRET = 'whsec_test';
 const FAKE_SIG = 'v1=abc123';
 
 const makeEvent = (overrides: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 =>
@@ -124,30 +137,23 @@ const mockStripeEvent = (type = 'checkout.session.completed') =>
 describe('lambdaHandler', () => {
   beforeEach(() => {
     process.env.SKIP_STRIPE_IP_CHECK = 'true';
-    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
     mockConstructEvent.mockReturnValue(mockStripeEvent());
     mockHandleCheckoutSessionCompleted.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     delete process.env.SKIP_STRIPE_IP_CHECK;
-    delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_WEBHOOK_IP_RANGES;
   });
 
   // ── Signature validation ─────────────────────────────────────────────────
 
   it('returns 400 when stripe-signature header is missing', async () => {
+    const initSecretsMock = vi.mocked(initSecrets);
     const event = makeEvent({ headers: {} });
     const result = await lambdaHandler(event);
     expect(result).toEqual({ statusCode: 400, body: 'Missing stripe-signature header' });
-  });
-
-  it('returns 500 when STRIPE_WEBHOOK_SECRET env var is missing', async () => {
-    delete process.env.STRIPE_WEBHOOK_SECRET;
-    const event = makeEvent();
-    const result = await lambdaHandler(event);
-    expect(result).toEqual({ statusCode: 500, body: 'Stripe webhook secret is not configured' });
+    expect(initSecretsMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when constructEvent throws (bad signature)', async () => {
@@ -241,6 +247,22 @@ describe('lambdaHandler', () => {
     mockHandleCheckoutSessionCompleted.mockRejectedValue(new Error('DB connection lost'));
     const result = await lambdaHandler(makeEvent());
     expect(result).toEqual({ statusCode: 500, body: 'Internal server error' });
+  });
+
+  it('returns 500 when secrets initialization fails', async () => {
+    const initSecretsMock = vi.mocked(initSecrets);
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    initSecretsMock.mockRejectedValueOnce(new Error('SSM unavailable'));
+
+    const result = await lambdaHandler(makeEvent());
+
+    expect(result).toEqual({ statusCode: 500, body: 'Internal server error' });
+    expect(initSecretsMock).toHaveBeenCalledOnce();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Failed to initialize Stripe webhook secrets:',
+      expect.any(Error)
+    );
   });
 
   // ── IP filtering ─────────────────────────────────────────────────────────
