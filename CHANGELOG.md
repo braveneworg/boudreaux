@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.12.0] - 2026-04-16
+
+### Added
+
+- Update package-lock.json for webhook (#356)\n- Update package-lock.json for webhook (#356)\n- Update package-lock.json for webhook (#356)\n
+
 ## [4.11.0] - 2026-04-16
 
 ### Added
