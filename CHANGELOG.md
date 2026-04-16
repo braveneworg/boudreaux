@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.6.0] - 2026-04-16
+
+### Added
+
+- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: update Prisma client copying process and add schema path in pack… (#350)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: update Prisma client copying process and add schema path in pack… (#350)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n- fix: patch transitive dependency vulnerabilities via pnpm overrides (#349)\n
+
 ## [4.5.0] - 2026-04-16
 
 ### Added
