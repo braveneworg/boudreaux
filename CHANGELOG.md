@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.10.0] - 2026-04-16
+
+### Added
+
+- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n- Add external dependencies to webhook template (#354)\n
+
 ## [4.9.0] - 2026-04-16
 
 ### Added
