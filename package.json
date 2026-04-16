@@ -211,7 +211,9 @@
       "@typescript-eslint/utils": "^8.58.0",
       "@typescript-eslint/typescript-estree": "^8.58.0",
       "@typescript-eslint/tsconfig-utils": "^8.58.0",
-      "@typescript-eslint/project-service": "^8.58.0"
+      "@typescript-eslint/project-service": "^8.58.0",
+      "@xmldom/xmldom": ">=0.8.12",
+      "lodash": ">=4.18.0"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",
