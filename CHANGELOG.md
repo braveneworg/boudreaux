@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.11.0] - 2026-04-16
+
+### Added
+
+- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n- feat: refactor to use lazy-loaded Prisma and Stripe clients; add secr… (#355)\n
+
 ## [4.10.0] - 2026-04-16
 
 ### Added
