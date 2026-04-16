@@ -67,8 +67,6 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
 export const lambdaHandler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
-  await initSecrets();
-
   if (!shouldSkipStripeIpCheck()) {
     const sourceIp = getSourceIp(event);
     const allowedRanges = getStripeWebhookIpRanges();
@@ -96,7 +94,14 @@ export const lambdaHandler = async (
     return { statusCode: 400, body: 'Missing stripe-signature header' };
   }
 
-  const { stripeWebhookSecret } = getSecrets();
+  let stripeWebhookSecret: string;
+  try {
+    await initSecrets();
+    ({ stripeWebhookSecret } = getSecrets());
+  } catch (err) {
+    console.error('Failed to initialize Stripe webhook secrets:', err);
+    return { statusCode: 500, body: 'Internal server error' };
+  }
 
   const rawBody = event.isBase64Encoded
     ? Buffer.from(event.body ?? '', 'base64')
