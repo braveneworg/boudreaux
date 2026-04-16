@@ -369,8 +369,8 @@ export function BannerCarousel({
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"
-                    priority={isCurrentSlide}
-                    loading={isCurrentSlide ? undefined : 'lazy'}
+                    priority={idx === 0}
+                    loading={idx === 0 ? undefined : 'lazy'}
                     className="object-cover"
                   />
                 )}
