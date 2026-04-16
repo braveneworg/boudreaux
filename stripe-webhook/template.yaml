@@ -43,6 +43,7 @@ Resources:
           STRIPE_PRICE_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra}}'
           STRIPE_PRICE_EXTRA_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra-extra}}'
           AWS_SES_REGION: '{{resolve:ssm:/fakefour/aws-ses-region}}'
+          STRIPE_WEBHOOK_IP_RANGES: '{{resolve:ssm:/fakefour/stripe/webhook-ip-ranges}}'
       Layers:
         - !Ref PrismaEngineLayer
       Events:
