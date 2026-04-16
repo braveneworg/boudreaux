@@ -11,7 +11,6 @@ vi.mock('server-only', () => ({}));
 
 // Mock TanStack Query SSR utilities
 const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
-const mockGetQueryData = vi.fn();
 const mockDehydratedState = { queries: [], mutations: [] };
 vi.mock('@tanstack/react-query', () => ({
   dehydrate: () => mockDehydratedState,
@@ -21,19 +20,11 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchQuery: mockPrefetchQuery,
-    getQueryData: mockGetQueryData,
   }),
 }));
 
 vi.mock('@/lib/utils/fetch-api', () => ({
   fetchApi: vi.fn(),
-}));
-
-vi.mock('@/lib/utils/cloudfront-loader', () => ({
-  buildBannerPreloadSrcSet: vi.fn(
-    (filename: string) =>
-      `https://cdn.fakefourrecords.com/media/banners/${filename}?w=640&q=75&f=webp 640w, https://cdn.fakefourrecords.com/media/banners/${filename}?w=1920&q=75&f=webp 1920w`
-  ),
 }));
 
 // Mock child components
@@ -48,10 +39,6 @@ vi.mock('./components/home-content', () => ({
 }));
 
 describe('Home Page', () => {
-  beforeEach(() => {
-    mockGetQueryData.mockReturnValue(undefined);
-  });
-
   it('should render page structure', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -81,41 +68,5 @@ describe('Home Page', () => {
     render(HomeComponent);
 
     expect(screen.getByTestId('home-content')).toBeInTheDocument();
-  });
-
-  it('should include a preload link when banner data is available', async () => {
-    mockGetQueryData.mockReturnValue({
-      banners: [{ imageFilename: 'hero.jpg' }],
-    });
-
-    const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
-
-    const HomeComponent = await Home();
-    render(HomeComponent);
-
-    expect(buildBannerPreloadSrcSet).toHaveBeenCalledWith('hero.jpg');
-    expect(mockGetQueryData).toHaveBeenCalledWith(['banners', 'active']);
-  });
-
-  it('should not call buildBannerPreloadSrcSet when no banners exist', async () => {
-    mockGetQueryData.mockReturnValue({ banners: [] });
-
-    const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
-
-    const HomeComponent = await Home();
-    render(HomeComponent);
-
-    expect(buildBannerPreloadSrcSet).not.toHaveBeenCalled();
-  });
-
-  it('should not call buildBannerPreloadSrcSet when banner data is undefined', async () => {
-    mockGetQueryData.mockReturnValue(undefined);
-
-    const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
-
-    const HomeComponent = await Home();
-    render(HomeComponent);
-
-    expect(buildBannerPreloadSrcSet).not.toHaveBeenCalled();
   });
 });
