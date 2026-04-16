@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.5.0] - 2026-04-16
+
+### Added
+
+- Develop/improve lcp (#348)\n- Develop/improve lcp (#348)\n- Bump next from 16.2.1 to 16.2.3 (#344)\n- Develop/improve lcp (#348)\n- Develop/improve lcp (#348)\n- Bump next from 16.2.1 to 16.2.3 (#344)\n- Develop/improve lcp (#348)\n
+
 ## [4.4.0] - 2026-04-16
 
 ### Added
