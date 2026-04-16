@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.7.0] - 2026-04-16
+
+### Added
+
+- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n- Update prisma configuration (#351)\n
+
 ## [4.6.0] - 2026-04-16
 
 ### Added
