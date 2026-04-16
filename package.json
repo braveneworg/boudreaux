@@ -218,10 +218,10 @@
       "hono": ">=4.12.14",
       "@hono/node-server": ">=1.19.13",
       "vite": "~7.3.2",
-      "defu": ">=6.1.5",
-      "picomatch": ">=4.0.4",
-      "effect": ">=3.20.0",
-      "flatted": ">=3.4.2"
+      "defu": "^6.1.5",
+      "picomatch": "^4.0.4",
+      "effect": "^3.20.0",
+      "flatted": "^3.4.2"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",
