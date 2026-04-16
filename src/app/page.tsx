@@ -4,7 +4,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
-import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
@@ -14,6 +13,9 @@ import PageContainer from './components/ui/page-container';
 /**
  * Home page — Server Component that prefetches banners and featured artists,
  * then hydrates client components for interactivity.
+ *
+ * Note: The LCP image preload lives in layout.tsx (outside the Suspense
+ * boundary from loading.tsx) so it's included in the initial HTML response.
  */
 export default async function Home() {
   const queryClient = getQueryClient();
@@ -29,25 +31,8 @@ export default async function Home() {
     }),
   ]);
 
-  // Extract the first banner's image filename for LCP preloading
-  const bannersData = queryClient.getQueryData<{
-    banners?: { imageFilename: string }[];
-  }>(queryKeys.banners.active());
-  const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
-  const preloadSrcSet = firstBannerFilename ? buildBannerPreloadSrcSet(firstBannerFilename) : null;
-
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      {preloadSrcSet && (
-        <link
-          rel="preload"
-          as="image"
-          imageSrcSet={preloadSrcSet}
-          imageSizes="100vw"
-          type="image/webp"
-          fetchPriority="high"
-        />
-      )}
       <PageContainer>
         <HomeContent />
       </PageContainer>
