@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { lambdaHandler } from './handler.js';
-import { getSecrets, initSecrets } from './lib/secrets.js';
+import { initSecrets } from './lib/secrets.js';
 
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
@@ -149,11 +149,11 @@ describe('lambdaHandler', () => {
   // ── Signature validation ─────────────────────────────────────────────────
 
   it('returns 400 when stripe-signature header is missing', async () => {
-    const initSecretsSpy = vi.mocked(initSecrets);
+    const initSecretsMock = vi.mocked(initSecrets);
     const event = makeEvent({ headers: {} });
     const result = await lambdaHandler(event);
     expect(result).toEqual({ statusCode: 400, body: 'Missing stripe-signature header' });
-    expect(initSecretsSpy).not.toHaveBeenCalled();
+    expect(initSecretsMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when constructEvent throws (bad signature)', async () => {
@@ -250,18 +250,16 @@ describe('lambdaHandler', () => {
   });
 
   it('returns 500 when secrets initialization fails', async () => {
-    const initSecretsSpy = vi.mocked(initSecrets);
-    const getSecretsSpy = vi.mocked(getSecrets);
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const initSecretsMock = vi.mocked(initSecrets);
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    initSecretsSpy.mockRejectedValueOnce(new Error('SSM unavailable'));
+    initSecretsMock.mockRejectedValueOnce(new Error('SSM unavailable'));
 
     const result = await lambdaHandler(makeEvent());
 
     expect(result).toEqual({ statusCode: 500, body: 'Internal server error' });
-    expect(initSecretsSpy).toHaveBeenCalledOnce();
-    expect(getSecretsSpy).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(
+    expect(initSecretsMock).toHaveBeenCalledOnce();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Failed to initialize Stripe webhook secrets:',
       expect.any(Error)
     );
