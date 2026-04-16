@@ -124,7 +124,8 @@ export async function generatePresignedDownloadUrl(
   const getCommand = new GetObjectCommand({
     Bucket: bucketName,
     Key: s3Key,
-    ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileName)}"`, // Force download with friendly filename
+    ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
+    ResponseContentType: 'application/octet-stream', // Force binary download — prevents iOS Safari from appending .download extension
   });
 
   // Generate presigned URL with configurable expiration (24 hours by default)

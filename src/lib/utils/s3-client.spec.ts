@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 import {
   getS3Client,
@@ -189,6 +188,7 @@ describe('s3-client', () => {
         expect.objectContaining({
           Bucket: 'test-bucket',
           Key: 'releases/123/digital-formats/MP3_320KBPS/file.mp3',
+          ResponseContentType: 'application/octet-stream',
         })
       );
       expect(getSignedUrl).toHaveBeenCalledWith(
