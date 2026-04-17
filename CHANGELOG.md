@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.14.0] - 2026-04-17
+
+### Added
+
+- Fix pnpm for stripe webhook lambda (#359)\n- Fix pnpm for stripe webhook lambda (#359)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Develop/fix vulnerabilities (#358)\n- Fix pnpm for stripe webhook lambda (#359)\n
+
 ## [4.13.0] - 2026-04-17
 
 ### Added
