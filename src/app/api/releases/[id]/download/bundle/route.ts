@@ -14,7 +14,11 @@ import { getToken } from 'next-auth/jwt';
 
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
+import {
+  FORMAT_LABELS,
+  PRESIGNED_URL_EXPIRATION,
+  type DigitalFormatType,
+} from '@/lib/constants/digital-formats';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { prisma } from '@/lib/prisma';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
@@ -45,9 +49,10 @@ const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
  *
  * Response contract:
  * - Default: 302 redirect to the short-lived presigned ZIP URL
- * - respond=json: returns `{ success: true, downloadUrl }` and leaves
- *   navigation to the caller (used by clients that pre-open a window/tab
- *   during the click gesture before async work completes)
+ * - respond=json: returns per-format presigned download URLs (no ZIP,
+ *   no download count increment). The client triggers individual downloads
+ *   and then calls POST /api/releases/[id]/download/confirm to record
+ *   the download event and increment the count.
  *
  * Authorization:
  * 1. Authenticate user
@@ -198,6 +203,31 @@ export async function GET(
       );
     }
 
+    // JSON response path: return per-format presigned URLs without ZIP bundling.
+    // Download count increment and event logging are deferred to the
+    // POST /api/releases/[id]/download/confirm endpoint, called by the client
+    // after all downloads have been triggered.
+    if (respondJson) {
+      const downloads = await Promise.all(
+        resolvedFormats.map(async ({ formatType, files }) => ({
+          formatType,
+          label: FORMAT_LABELS[formatType] ?? formatType,
+          files: await Promise.all(
+            files.map(async (file) => ({
+              downloadUrl: await generatePresignedDownloadUrl(
+                file.s3Key,
+                file.fileName,
+                PRESIGNED_URL_EXPIRATION.DOWNLOAD
+              ),
+              fileName: file.fileName,
+            }))
+          ),
+        }))
+      );
+
+      return Response.json({ success: true, downloads }, { headers: NO_STORE_HEADERS });
+    }
+
     // Step 7: Create ZIP archive and upload to S3 as a temporary object
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
@@ -282,10 +312,6 @@ export async function GET(
           })
         )
       );
-
-      if (respondJson) {
-        return Response.json({ success: true, downloadUrl }, { headers: NO_STORE_HEADERS });
-      }
 
       return new Response(null, {
         status: 302,

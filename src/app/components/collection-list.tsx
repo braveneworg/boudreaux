@@ -30,7 +30,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/app/components/ui/dialog';
-import { Progress } from '@/app/components/ui/progress';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
@@ -221,6 +220,29 @@ interface CollectionDownloadDialogProps {
   downloadCount: number;
 }
 
+type FormatDownloadStatus = 'pending' | 'downloading' | 'complete';
+
+interface FormatProgress {
+  formatType: string;
+  label: string;
+  fileCount: number;
+  filesCompleted: number;
+  status: FormatDownloadStatus;
+}
+
+interface DownloadFile {
+  downloadUrl: string;
+  fileName: string;
+}
+
+interface DownloadEntry {
+  formatType: string;
+  label: string;
+  files: DownloadFile[];
+}
+
+const DOWNLOAD_DELAY_MS = 500;
+
 const CollectionDownloadDialog = ({
   releaseId,
   releaseTitle,
@@ -229,70 +251,118 @@ const CollectionDownloadDialog = ({
 }: CollectionDownloadDialogProps) => {
   const allFormatTypes = availableFormats.map((f) => f.formatType);
   const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
-  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
+  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'downloading' | 'complete' | 'error'>(
     'idle'
   );
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [formatProgress, setFormatProgress] = useState<FormatProgress[]>([]);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
   const noFormats = availableFormats.length === 0;
-  const isPreparing = downloadPhase === 'preparing';
+  const isDownloading = downloadPhase === 'downloading';
+
+  const delay = useCallback(
+    (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    []
+  );
 
   const handleDownload = async () => {
-    if (!hasSelection || atLimit || isPreparing) return;
+    if (!hasSelection || atLimit || isDownloading) return;
 
     const joined = selectedFormats.join(',');
     const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
 
-    setDownloadPhase('preparing');
-    setDownloadProgress(10);
+    setDownloadPhase('downloading');
     setDownloadError(null);
-    const progressInterval = window.setInterval(() => {
-      setDownloadProgress((value) => (value >= 90 ? value : value + 10));
-    }, 300);
 
     try {
       const response = await fetch(apiUrl);
       const data = await response.json();
-      window.clearInterval(progressInterval);
 
       if (!response.ok || !data.success) {
         setDownloadPhase('error');
-        setDownloadProgress(0);
+        setFormatProgress([]);
         setDownloadError(data.message ?? 'Download failed. Please try again.');
         return;
       }
 
-      window.open(data.downloadUrl, '_self');
+      const downloads: DownloadEntry[] = data.downloads;
+
+      // Initialize per-format progress
+      setFormatProgress(
+        downloads.map((d) => ({
+          formatType: d.formatType,
+          label: d.label,
+          fileCount: d.files.length,
+          filesCompleted: 0,
+          status: 'pending',
+        }))
+      );
+
+      // Trigger downloads sequentially with delays
+      for (let i = 0; i < downloads.length; i++) {
+        const entry = downloads[i];
+
+        setFormatProgress((prev) =>
+          prev.map((fp) =>
+            fp.formatType === entry.formatType ? { ...fp, status: 'downloading' } : fp
+          )
+        );
+
+        for (let j = 0; j < entry.files.length; j++) {
+          window.open(entry.files[j].downloadUrl, '_self');
+          if (j < entry.files.length - 1 || i < downloads.length - 1) {
+            await delay(DOWNLOAD_DELAY_MS);
+          }
+
+          setFormatProgress((prev) =>
+            prev.map((fp) =>
+              fp.formatType === entry.formatType ? { ...fp, filesCompleted: j + 1 } : fp
+            )
+          );
+        }
+
+        setFormatProgress((prev) =>
+          prev.map((fp) =>
+            fp.formatType === entry.formatType ? { ...fp, status: 'complete' } : fp
+          )
+        );
+      }
+
+      // Confirm download — increments count once
+      await fetch(`/api/releases/${releaseId}/download/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formats: downloads.map((d) => d.formatType) }),
+      });
+
       setDownloadPhase('complete');
-      setDownloadProgress(100);
 
       setTimeout(() => {
         setDownloadPhase('idle');
-        setDownloadProgress(0);
-      }, 2000);
+        setFormatProgress([]);
+      }, 3000);
     } catch {
-      window.clearInterval(progressInterval);
       setDownloadPhase('error');
-      setDownloadProgress(0);
+      setFormatProgress([]);
       setDownloadError('Something went wrong. Please try again.');
     }
   };
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && isPreparing) return;
+      if (!nextOpen && isDownloading) return;
       setOpen(nextOpen);
       if (nextOpen) {
         setSelectedFormats(allFormatTypes);
         setDownloadPhase('idle');
         setDownloadError(null);
+        setFormatProgress([]);
       }
     },
-    [allFormatTypes, isPreparing]
+    [allFormatTypes, isDownloading]
   );
 
   return (
@@ -305,10 +375,10 @@ const CollectionDownloadDialog = ({
       <DialogContent
         className="sm:max-w-md"
         onInteractOutside={(e) => {
-          if (isPreparing) e.preventDefault();
+          if (isDownloading) e.preventDefault();
         }}
         onEscapeKeyDown={(e) => {
-          if (isPreparing) e.preventDefault();
+          if (isDownloading) e.preventDefault();
         }}
       >
         <DialogHeader>
@@ -352,7 +422,7 @@ const CollectionDownloadDialog = ({
               value={selectedFormats}
               onValueChange={setSelectedFormats}
               className="flex flex-wrap gap-2"
-              disabled={isPreparing}
+              disabled={isDownloading}
             >
               {availableFormats.map(({ formatType }) => (
                 <ToggleGroupItem
@@ -366,11 +436,28 @@ const CollectionDownloadDialog = ({
               ))}
             </ToggleGroup>
 
-            {(isPreparing || downloadPhase === 'complete') && (
-              <div className="space-y-2">
-                <div className="text-muted-foreground text-xs">{downloadProgress}%</div>
-                <Progress value={downloadProgress} className="h-2" />
-              </div>
+            {formatProgress.length > 0 && (
+              <ul className="space-y-1" role="status">
+                {formatProgress.map((fp) => (
+                  <li key={fp.formatType} className="flex items-center gap-2 text-sm">
+                    {fp.status === 'complete' ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                    ) : fp.status === 'downloading' ? (
+                      <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
+                    ) : (
+                      <span className="text-muted-foreground size-4 shrink-0 text-center">
+                        &bull;
+                      </span>
+                    )}
+                    <span className={fp.status === 'complete' ? 'text-emerald-600' : ''}>
+                      {fp.label}
+                      {fp.fileCount > 1 && fp.status === 'downloading'
+                        ? ` (${fp.filesCompleted}/${fp.fileCount})`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
 
             {downloadPhase === 'error' && downloadError && (
@@ -383,19 +470,19 @@ const CollectionDownloadDialog = ({
             {downloadPhase === 'complete' ? (
               <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
                 <CheckCircle2 className="size-4" />
-                Download started!
+                Downloads started!
               </div>
             ) : (
               <Button
                 className="w-full"
                 type="button"
-                disabled={!hasSelection || isPreparing}
+                disabled={!hasSelection || isDownloading}
                 onClick={handleDownload}
               >
-                {isPreparing ? (
+                {isDownloading ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Preparing download...
+                    Downloading...
                   </>
                 ) : (
                   <>

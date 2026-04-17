@@ -253,7 +253,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
   });
 
-  it('should return JSON with downloadUrl when respond=json is set', async () => {
+  it('should return JSON with per-format download URLs when respond=json is set', async () => {
+    mockGeneratePresignedDownloadUrl
+      .mockResolvedValueOnce('https://s3.example.com/01-Intro.flac')
+      .mockResolvedValueOnce('https://s3.example.com/02-Main.flac')
+      .mockResolvedValueOnce('https://s3.example.com/album.wav');
+
     const req = new NextRequest(
       'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC,WAV&respond=json',
       {
@@ -270,7 +275,55 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(body.success).toBe(true);
-    expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
+    expect(body.downloads).toHaveLength(2);
+    expect(body.downloads[0]).toEqual({
+      formatType: 'FLAC',
+      label: 'FLAC',
+      files: [
+        { downloadUrl: 'https://s3.example.com/01-Intro.flac', fileName: '01 - Intro.flac' },
+        { downloadUrl: 'https://s3.example.com/02-Main.flac', fileName: '02 - Main.flac' },
+      ],
+    });
+    expect(body.downloads[1]).toEqual({
+      formatType: 'WAV',
+      label: 'WAV',
+      files: [{ downloadUrl: 'https://s3.example.com/album.wav', fileName: 'album.wav' }],
+    });
+  });
+
+  it('should not create ZIP when respond=json is set', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC&respond=json',
+      {
+        headers: {
+          'x-forwarded-for': '127.0.0.1',
+          'user-agent': 'test-agent',
+        },
+      }
+    );
+
+    await GET(req, makeParams());
+
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockFinalize).not.toHaveBeenCalled();
+    expect(mockUploadDone).not.toHaveBeenCalled();
+  });
+
+  it('should not increment download count when respond=json is set', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC&respond=json',
+      {
+        headers: {
+          'x-forwarded-for': '127.0.0.1',
+          'user-agent': 'test-agent',
+        },
+      }
+    );
+
+    await GET(req, makeParams());
+
+    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+    expect(mockLogDownloadEvent).not.toHaveBeenCalled();
   });
 
   it('should append files to the archive for multi-track formats', async () => {
