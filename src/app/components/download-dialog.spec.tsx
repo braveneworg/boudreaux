@@ -1758,14 +1758,14 @@ describe('DownloadDialog — onBlur with empty input', () => {
   });
 });
 
-describe('DownloadDialog — onDownloadComplete closes dialog', () => {
+describe('DownloadDialog — dialog stays open after download', () => {
   beforeEach(() => {
     mockCheckGuestPurchaseAction.mockReset();
   });
 
-  it('should close the dialog when onDownloadComplete is triggered from purchase-success step', async () => {
+  it('should keep the dialog open on the format-select step (no auto-close)', async () => {
     mockUseSession.mockReturnValue({
-      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
       status: 'authenticated',
     });
 
@@ -1777,118 +1777,6 @@ describe('DownloadDialog — onDownloadComplete closes dialog', () => {
         premiumPrice={8}
         releaseId="release-123"
         releaseTitle="Test Release"
-      >
-        <button>Open Download</button>
-      </DownloadDialog>
-    );
-
-    // Navigate to purchase-checkout → purchase-success
-    await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
-    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
-    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Confirm Purchase' }));
-    await waitFor(() => expect(screen.getByTestId('purchase-success-step')).toBeInTheDocument());
-
-    // Click the mock download button that triggers onDownloadComplete → setOpen(false)
-    await user.click(screen.getByTestId('mock-success-download-btn'));
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('purchase-success-step')).not.toBeInTheDocument();
-    });
-  });
-});
-
-describe('DownloadDialog — onDownloadComplete via purchase-confirmed step (already_purchased error)', () => {
-  const defaultProps = {
-    artistName: 'Test Artist',
-    premiumPrice: 8,
-    releaseId: 'release-123',
-    releaseTitle: 'Test Release',
-  };
-
-  beforeEach(() => {
-    mockCheckGuestPurchaseAction.mockReset();
-  });
-
-  it('should close the dialog when onDownloadComplete is triggered after purchase-confirmed → format-select', async () => {
-    mockUseSession.mockReturnValue({
-      data: { user: { email: 'user@test.com', id: 'user-123' } },
-      status: 'authenticated',
-    });
-
-    const user = userEvent.setup();
-
-    render(
-      <DownloadDialog
-        {...defaultProps}
-        availableFormats={[
-          { formatType: 'FLAC', fileName: 'album-flac.zip' },
-          { formatType: 'WAV', fileName: 'album-wav.zip' },
-        ]}
-        downloadCount={2}
-      >
-        <button>Open Download</button>
-      </DownloadDialog>
-    );
-
-    // Navigate to purchase-checkout step
-    await user.click(screen.getByRole('button', { name: 'Open Download' }));
-    await user.click(screen.getByRole('radio', { name: /premium/i }));
-    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Custom amount'), { target: { value: '10' } });
-    await user.click(screen.getByRole('button', { name: /Buy & Download/ }));
-    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
-
-    // Trigger "already purchased" error → sets purchaseConfirmed=true, step='purchase-confirmed'
-    await user.click(screen.getByRole('button', { name: 'Trigger Already Purchased' }));
-
-    await waitFor(() => {
-      // Now on purchase-confirmed step
-      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
-    });
-
-    // Click Continue to advance to format-select
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
-    });
-
-    // Click the mock download button that triggers onDownloadComplete → setOpen(false)
-    await user.click(screen.getByTestId('mock-format-download-btn'));
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('format-bundle-download')).not.toBeInTheDocument();
-    });
-  });
-});
-
-describe('DownloadDialog — onDownloadComplete in format-select step', () => {
-  const defaultProps = {
-    artistName: 'Test Artist',
-    premiumPrice: 8,
-    releaseId: 'release-123',
-    releaseTitle: 'Test Release',
-  };
-
-  beforeEach(() => {
-    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
-  });
-
-  it('should close the dialog when onDownloadComplete is triggered from the format-select step', async () => {
-    mockUseSession.mockReturnValue({
-      data: { user: { email: 'authed@example.com', id: 'user-1' } },
-      status: 'authenticated',
-    });
-
-    const user = userEvent.setup();
-
-    render(
-      <DownloadDialog
-        {...defaultProps}
         hasPurchase
         downloadCount={2}
         availableFormats={[
@@ -1900,23 +1788,14 @@ describe('DownloadDialog — onDownloadComplete in format-select step', () => {
       </DownloadDialog>
     );
 
-    // Opens and auto-advances to format-select because hasPurchase + signed in
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
     });
-    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
 
+    // Dialog and FormatBundleDownload remain visible — no onDownloadComplete auto-close
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
-    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
-
-    // Click the mock download button that triggers onDownloadComplete → setOpen(false)
-    await user.click(screen.getByTestId('mock-format-download-btn'));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Download Again' })).not.toBeInTheDocument();
-      expect(screen.queryByTestId('format-bundle-download')).not.toBeInTheDocument();
-    });
   });
 });
 

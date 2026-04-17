@@ -253,6 +253,26 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
   });
 
+  it('should return JSON with downloadUrl when respond=json is set', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC,WAV&respond=json',
+      {
+        headers: {
+          'x-forwarded-for': '127.0.0.1',
+          'user-agent': 'test-agent',
+        },
+      }
+    );
+
+    const response = await GET(req, makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(body.success).toBe(true);
+    expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
+  });
+
   it('should append files to the archive for multi-track formats', async () => {
     await GET(makeRequest(), makeParams());
 

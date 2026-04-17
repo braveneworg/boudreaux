@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
@@ -269,10 +269,6 @@ describe('CollectionList', () => {
 });
 
 describe('CollectionDownloadDialog', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.mocked(getReleaseCoverArt).mockReturnValue({
@@ -284,6 +280,7 @@ describe('CollectionDownloadDialog', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('opens download dialog when download button is clicked', async () => {
@@ -337,9 +334,13 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByText(/no digital formats/i)).toBeInTheDocument();
   });
 
-  it('navigates to the bundle API URL synchronously on submit', async () => {
+  it('calls fetch with respond=json on submit', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -348,16 +349,38 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/releases\/rel-1\/download\/bundle\?formats=FLAC,WAV/),
-      '_self'
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\/api\/releases\/rel-1\/download\/bundle\?formats=FLAC,WAV&respond=json/
+        )
+      );
+    });
+  });
+
+  it('shows Preparing download while fetch is in flight', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
+  });
+
+  it('shows Download started and re-enables the download button after timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+      })
     );
-  });
-
-  it('shows Preparing download while navigation is in flight', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -366,24 +389,10 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
-  });
-
-  it('re-enables the download button after the preparing timeout', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.spyOn(window, 'open').mockImplementation(() => null);
-
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createQueryWrapper(),
-    });
-
-    await user.click(screen.getByRole('button', { name: /download test album/i }));
-    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-
-    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(2000);
     });
 
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
@@ -446,9 +455,15 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByRole('button', { name: /select at least one format/i })).toBeDisabled();
   });
 
-  it('resets the preparing state when dialog reopens', async () => {
+  it('resets the download state when dialog reopens', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.spyOn(window, 'open').mockImplementation(() => null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+      })
+    );
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -456,12 +471,46 @@ describe('CollectionDownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
 
-    // Close and reopen dialog — should not still show "Preparing..."
+    // Close and reopen dialog — should reset to idle
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
+  });
+
+  it('shows error message when download fetch fails', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ success: false, message: 'Download failed. Please try again.' }),
+      })
+    );
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download failed');
+  });
+
+  it('shows error message when download fetch throws', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
   });
 });

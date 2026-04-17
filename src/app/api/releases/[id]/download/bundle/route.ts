@@ -104,6 +104,7 @@ export async function GET(
 
     // Step 2: Parse and validate formats query parameter
     const formatsParam = request.nextUrl.searchParams.get('formats');
+    const respondJson = request.nextUrl.searchParams.get('respond') === 'json';
     const parseResult = bundleDownloadQuerySchema.safeParse({ formats: formatsParam });
 
     if (!parseResult.success) {
@@ -275,6 +276,10 @@ export async function GET(
           })
         )
       );
+
+      if (respondJson) {
+        return Response.json({ success: true, downloadUrl }, { headers: NO_STORE_HEADERS });
+      }
 
       return new Response(null, {
         status: 302,

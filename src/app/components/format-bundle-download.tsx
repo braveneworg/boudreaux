@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { DownloadIcon, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
@@ -50,12 +50,16 @@ export const FormatBundleDownload = ({
   );
   const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
+    'idle'
+  );
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const resolvedFormats = formats ?? [];
   const isLoadingFormatsResolved = initialFormats.length > 0 ? false : isLoadingFormats;
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
+  const isPreparing = downloadPhase === 'preparing';
 
   const comboboxOptions = useMemo(
     () =>
@@ -66,19 +70,36 @@ export const FormatBundleDownload = ({
     [formats]
   );
 
-  const handleDownload = () => {
-    if (!hasSelection || atLimit || isDownloading) return;
+  const handleDownload = async () => {
+    if (!hasSelection || atLimit || isPreparing) return;
 
     const joined = selectedFormats.join(',');
-    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}`;
+    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
 
-    setIsDownloading(true);
-    window.open(apiUrl, '_self');
+    setDownloadPhase('preparing');
+    setDownloadError(null);
 
-    setTimeout(() => {
-      setIsDownloading(false);
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setDownloadPhase('error');
+        setDownloadError(data.message ?? 'Download failed. Please try again.');
+        return;
+      }
+
+      window.location.href = data.downloadUrl;
+      setDownloadPhase('complete');
       onDownloadComplete?.();
-    }, 3000);
+
+      setTimeout(() => {
+        setDownloadPhase('idle');
+      }, 2000);
+    } catch {
+      setDownloadPhase('error');
+      setDownloadError('Something went wrong. Please try again.');
+    }
   };
 
   if (isLoadingFormatsResolved) {
@@ -103,29 +124,43 @@ export const FormatBundleDownload = ({
         onValueChange={setSelectedFormats}
         placeholder="Select formats..."
         emptyMessage="No formats found."
-        disabled={atLimit}
+        disabled={atLimit || isPreparing}
       />
 
-      <Button
-        className="w-full"
-        type="button"
-        disabled={!hasSelection || atLimit || isDownloading}
-        onClick={handleDownload}
-      >
-        {isDownloading ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Preparing download...
-          </>
-        ) : (
-          <>
-            <DownloadIcon className="size-4" />
-            {hasSelection
-              ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
-              : 'Select at least one format'}
-          </>
-        )}
-      </Button>
+      {downloadPhase === 'error' && downloadError && (
+        <div className="flex items-center gap-2 text-destructive text-sm" role="alert">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
+
+      {downloadPhase === 'complete' ? (
+        <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
+          <CheckCircle2 className="size-4" />
+          Download started!
+        </div>
+      ) : (
+        <Button
+          className="w-full"
+          type="button"
+          disabled={!hasSelection || atLimit || isPreparing}
+          onClick={handleDownload}
+        >
+          {isPreparing ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Preparing download...
+            </>
+          ) : (
+            <>
+              <DownloadIcon className="size-4" />
+              {hasSelection
+                ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
+                : 'Select at least one format'}
+            </>
+          )}
+        </Button>
+      )}
     </div>
   );
 };
