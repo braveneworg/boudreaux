@@ -16,11 +16,43 @@
  * active fetch streams.
  */
 export function triggerDownload(url: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+
+  const normalizedUrl = normalizeDownloadUrl(url);
+  if (!normalizedUrl) {
+    return;
+  }
+
+  const parentElement = document.body ?? document.documentElement;
+  if (!parentElement) {
+    return;
+  }
+
   const iframe = document.createElement('iframe');
   iframe.style.display = 'none';
-  iframe.src = url;
-  document.body.appendChild(iframe);
+  iframe.src = normalizedUrl;
+  parentElement.appendChild(iframe);
 
   // Clean up the iframe after the download has had time to register
   setTimeout(() => iframe.remove(), 60_000);
+}
+
+function normalizeDownloadUrl(url: string): string | null {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedUrl, window.location.origin);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return null;
+    }
+
+    return parsedUrl.toString();
+  } catch {
+    return null;
+  }
 }
