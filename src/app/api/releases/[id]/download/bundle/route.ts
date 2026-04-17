@@ -153,15 +153,18 @@ export async function GET(
       );
     }
 
-    // Step 6: Resolve all requested format records with their files
+    // Step 6: Resolve all requested format records with their files (single query)
     const formatRepo = new ReleaseDigitalFormatRepository();
+    const allFormats = await formatRepo.findAllByRelease(releaseId);
+    const formatMap = new Map(allFormats.map((f) => [f.formatType, f]));
+
     const resolvedFormats: Array<{
       formatType: DigitalFormatType;
       files: Array<{ s3Key: string; fileName: string }>;
     }> = [];
 
     for (const formatType of requestedFormats) {
-      const format = await formatRepo.findByReleaseAndFormat(releaseId, formatType);
+      const format = formatMap.get(formatType);
 
       if (!format) {
         continue; // skip unavailable formats silently
@@ -199,24 +202,25 @@ export async function GET(
     // Abort the S3 upload if archiver encounters an error
     archive.on('error', (err) => passThrough.destroy(err));
 
-    // Pipe S3 objects into the archive
-    for (const { formatType, files } of resolvedFormats) {
+    // Pipe S3 objects into the archive (fetch all files concurrently)
+    const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
       const folderName = FORMAT_LABELS[formatType] ?? formatType;
+      return files.map((file) => ({
+        archivePath: `${folderName}/${file.fileName}`,
+        s3Key: file.s3Key,
+      }));
+    });
 
-      for (const file of files) {
-        const command = new GetObjectCommand({
-          Bucket: bucketName,
-          Key: file.s3Key,
-        });
+    const s3Responses = await Promise.all(
+      fileEntries.map(({ s3Key }) =>
+        s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: s3Key }))
+      )
+    );
 
-        const s3Response = await s3Client.send(command);
-
-        if (s3Response.Body) {
-          // S3 SDK v3 returns a Readable-compatible stream
-          archive.append(s3Response.Body as Readable, {
-            name: `${folderName}/${file.fileName}`,
-          });
-        }
+    for (let i = 0; i < fileEntries.length; i++) {
+      const body = s3Responses[i].Body;
+      if (body) {
+        archive.append(body as Readable, { name: fileEntries[i].archivePath });
       }
     }
 
