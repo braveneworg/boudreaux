@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
@@ -30,14 +30,12 @@ describe('FormatBundleDownload', () => {
     await user.click(selectAllOption as HTMLElement);
   };
 
-  const stubWindowOpen = () => {
-    const openSpy = vi.fn();
-    vi.stubGlobal('open', openSpy);
-    return openSpy;
-  };
-
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(window, 'open').mockReturnValue({
+      close: vi.fn(),
+      location: { href: '' },
+    } as unknown as Window);
   });
 
   afterEach(() => {
@@ -178,58 +176,77 @@ describe('FormatBundleDownload', () => {
     expect(screen.getByRole('button', { name: /Select at least one format/ })).toBeDisabled();
   });
 
-  it('should navigate to the bundle API URL synchronously on click', async () => {
+  it('should call fetch with respond=json on click', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const openSpy = stubWindowOpen();
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\/api\/releases\/release-123\/download\/bundle\?formats=FLAC,WAV,MP3_320KBPS/
-      ),
-      '_self'
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\/api\/releases\/release-123\/download\/bundle\?formats=FLAC,WAV,MP3_320KBPS&respond=json/
+        )
+      );
+    });
+  });
+
+  it('should show "Preparing download..." while the fetch is in flight', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
+  });
+
+  it('should show Download started and re-enable the download button after timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+      })
     );
-  });
-
-  it('should show "Preparing download..." while the navigation is in flight', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    stubWindowOpen();
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
-  });
-
-  it('should re-enable the download button after the preparing timeout', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    stubWindowOpen();
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(2000);
     });
 
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
   });
 
-  it('should call onDownloadComplete after the preparing timeout', async () => {
+  it('should call onDownloadComplete when download completes', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onDownloadComplete = vi.fn();
-    stubWindowOpen();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+      })
+    );
 
     render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />, {
       wrapper: createQueryWrapper(),
@@ -238,29 +255,57 @@ describe('FormatBundleDownload', () => {
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(onDownloadComplete).not.toHaveBeenCalled();
-
-    act(() => {
-      vi.advanceTimersByTime(3000);
+    await waitFor(() => {
+      expect(onDownloadComplete).toHaveBeenCalledOnce();
     });
-
-    expect(onDownloadComplete).toHaveBeenCalledOnce();
   });
 
   it('should not error when onDownloadComplete is not provided', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    stubWindowOpen();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
+      })
+    );
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(() =>
-      act(() => {
-        vi.advanceTimersByTime(3000);
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
+  });
+
+  it('should show error message when download fetch fails', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ success: false, message: 'Download failed. Please try again.' }),
       })
-    ).not.toThrow();
+    );
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download failed');
+  });
+
+  it('should show error message when download fetch throws', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
   });
 
   it('should display unknown formatType when no label is found', async () => {

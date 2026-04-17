@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { DownloadIcon, Loader2, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, DownloadIcon, Loader2, Trash2 } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/app/components/ui/dialog';
+import { Progress } from '@/app/components/ui/progress';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
@@ -228,40 +229,80 @@ const CollectionDownloadDialog = ({
 }: CollectionDownloadDialogProps) => {
   const allFormatTypes = availableFormats.map((f) => f.formatType);
   const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
+    'idle'
+  );
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
   const noFormats = availableFormats.length === 0;
+  const isPreparing = downloadPhase === 'preparing';
 
-  // Navigate synchronously during the click gesture so iOS Safari honors the
-  // download. The bundle API responds with a 302 redirect to a presigned S3
-  // URL that carries Content-Disposition: attachment, so the browser pulls
-  // the ZIP without leaving the page.
-  const handleDownload = () => {
-    if (!hasSelection || atLimit || isDownloading) return;
+  const handleDownload = async () => {
+    if (!hasSelection || atLimit || isPreparing) return;
 
     const joined = selectedFormats.join(',');
-    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}`;
+    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
+    const downloadWindow = window.open('', '_blank', 'noopener,noreferrer');
 
-    setIsDownloading(true);
-    window.open(apiUrl, '_self');
+    if (!downloadWindow) {
+      setDownloadPhase('error');
+      setDownloadProgress(0);
+      setDownloadError('Please allow pop-ups to start your download.');
+      return;
+    }
 
-    setTimeout(() => {
-      setIsDownloading(false);
-    }, 3000);
+    setDownloadPhase('preparing');
+    setDownloadProgress(10);
+    setDownloadError(null);
+    const progressInterval = window.setInterval(() => {
+      setDownloadProgress((value) => (value >= 90 ? value : value + 10));
+    }, 300);
+
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+      window.clearInterval(progressInterval);
+
+      if (!response.ok || !data.success) {
+        downloadWindow.close();
+        setDownloadPhase('error');
+        setDownloadProgress(0);
+        setDownloadError(data.message ?? 'Download failed. Please try again.');
+        return;
+      }
+
+      downloadWindow.location.href = data.downloadUrl;
+      setDownloadPhase('complete');
+      setDownloadProgress(100);
+
+      setTimeout(() => {
+        setDownloadPhase('idle');
+        setDownloadProgress(0);
+      }, 2000);
+    } catch {
+      window.clearInterval(progressInterval);
+      downloadWindow.close();
+      setDownloadPhase('error');
+      setDownloadProgress(0);
+      setDownloadError('Something went wrong. Please try again.');
+    }
   };
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
+      if (!nextOpen && isPreparing) return;
       setOpen(nextOpen);
       if (nextOpen) {
         setSelectedFormats(allFormatTypes);
-        setIsDownloading(false);
+        setDownloadPhase('idle');
+        setDownloadError(null);
       }
     },
-    [allFormatTypes]
+    [allFormatTypes, isPreparing]
   );
 
   return (
@@ -271,7 +312,15 @@ const CollectionDownloadDialog = ({
           <DownloadIcon className="size-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onInteractOutside={(e) => {
+          if (isPreparing) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isPreparing) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Download</DialogTitle>
           <DialogDescription>
@@ -313,6 +362,7 @@ const CollectionDownloadDialog = ({
               value={selectedFormats}
               onValueChange={setSelectedFormats}
               className="flex flex-wrap gap-2"
+              disabled={isPreparing}
             >
               {availableFormats.map(({ formatType }) => (
                 <ToggleGroupItem
@@ -326,26 +376,47 @@ const CollectionDownloadDialog = ({
               ))}
             </ToggleGroup>
 
-            <Button
-              className="w-full"
-              type="button"
-              disabled={!hasSelection || isDownloading}
-              onClick={handleDownload}
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Preparing download...
-                </>
-              ) : (
-                <>
-                  <DownloadIcon className="size-4" />
-                  {hasSelection
-                    ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
-                    : 'Select at least one format'}
-                </>
-              )}
-            </Button>
+            {(isPreparing || downloadPhase === 'complete') && (
+              <div className="space-y-2">
+                <div className="text-muted-foreground text-xs">{downloadProgress}%</div>
+                <Progress value={downloadProgress} className="h-2" />
+              </div>
+            )}
+
+            {downloadPhase === 'error' && downloadError && (
+              <div className="flex items-center gap-2 text-destructive text-sm" role="alert">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{downloadError}</span>
+              </div>
+            )}
+
+            {downloadPhase === 'complete' ? (
+              <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
+                <CheckCircle2 className="size-4" />
+                Download started!
+              </div>
+            ) : (
+              <Button
+                className="w-full"
+                type="button"
+                disabled={!hasSelection || isPreparing}
+                onClick={handleDownload}
+              >
+                {isPreparing ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Preparing download...
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="size-4" />
+                    {hasSelection
+                      ? `Download ${selectedFormats.length} ${selectedFormats.length === 1 ? 'format' : 'formats'}`
+                      : 'Select at least one format'}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </DialogContent>
