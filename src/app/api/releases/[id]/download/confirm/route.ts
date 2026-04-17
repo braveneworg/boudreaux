@@ -98,8 +98,12 @@ export async function POST(
       );
     }
 
-    const validFormats = body.formats.filter((f): f is DigitalFormatType =>
-      VALID_FORMAT_TYPES.includes(f as DigitalFormatType)
+    const validFormats = Array.from(
+      new Set(
+        body.formats.filter((f): f is DigitalFormatType =>
+          VALID_FORMAT_TYPES.includes(f as DigitalFormatType)
+        )
+      )
     );
 
     if (validFormats.length === 0) {

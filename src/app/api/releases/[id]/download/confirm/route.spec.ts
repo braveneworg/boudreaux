@@ -199,8 +199,8 @@ describe('POST /api/releases/[id]/download/confirm', () => {
     );
   });
 
-  it('should filter out invalid format types from body', async () => {
-    await POST(makeRequest({ formats: ['FLAC', 'INVALID', 'WAV'] }), makeParams());
+  it('should filter invalid format types and de-duplicate valid formats from body', async () => {
+    await POST(makeRequest({ formats: ['FLAC', 'INVALID', 'WAV', 'FLAC'] }), makeParams());
 
     expect(mockLogDownloadEvent).toHaveBeenCalledTimes(2);
     expect(mockLogDownloadEvent).toHaveBeenCalledWith(
@@ -235,7 +235,7 @@ describe('POST /api/releases/[id]/download/confirm', () => {
     );
   });
 
-  it('should use fallback values when headers are missing', async () => {
+  it('should use fallback user-agent when header is missing', async () => {
     const req = new NextRequest(
       'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/confirm',
       {
@@ -249,7 +249,7 @@ describe('POST /api/releases/[id]/download/confirm', () => {
 
     expect(mockLogDownloadEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        ipAddress: 'unknown',
+        ipAddress: '127.0.0.1',
         userAgent: 'unknown',
       })
     );
