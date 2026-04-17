@@ -37,10 +37,10 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
-const mockFindByReleaseAndFormat = vi.fn();
+const mockFindAllByRelease = vi.fn();
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class MockRepo {
-    findByReleaseAndFormat = mockFindByReleaseAndFormat;
+    findAllByRelease = mockFindAllByRelease;
   },
 }));
 
@@ -128,30 +128,25 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     mockLogDownloadEvent.mockResolvedValue(undefined);
 
     // Default: return format records with child files
-    mockFindByReleaseAndFormat.mockImplementation((releaseId: string, formatType: string) => {
-      if (formatType === 'FLAC') {
-        return Promise.resolve({
-          id: 'format-flac',
-          formatType: 'FLAC',
-          s3Key: null,
-          fileName: null,
-          files: [
-            { s3Key: 'releases/r1/FLAC/01.flac', fileName: '01 - Intro.flac' },
-            { s3Key: 'releases/r1/FLAC/02.flac', fileName: '02 - Main.flac' },
-          ],
-        });
-      }
-      if (formatType === 'WAV') {
-        return Promise.resolve({
-          id: 'format-wav',
-          formatType: 'WAV',
-          s3Key: 'releases/r1/WAV/album.wav',
-          fileName: 'album.wav',
-          files: [],
-        });
-      }
-      return Promise.resolve(null);
-    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/01.flac', fileName: '01 - Intro.flac' },
+          { s3Key: 'releases/r1/FLAC/02.flac', fileName: '02 - Main.flac' },
+        ],
+      },
+      {
+        id: 'format-wav',
+        formatType: 'WAV',
+        s3Key: 'releases/r1/WAV/album.wav',
+        fileName: 'album.wav',
+        files: [],
+      },
+    ]);
 
     // Mock S3 response stream
     mockS3Send.mockResolvedValue({
@@ -236,7 +231,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should return 404 when no downloadable files are found', async () => {
-    mockFindByReleaseAndFormat.mockResolvedValue(null);
+    mockFindAllByRelease.mockResolvedValue([]);
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -441,13 +436,15 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should skip format with null files and no legacy s3Key', async () => {
-    mockFindByReleaseAndFormat.mockResolvedValue({
-      id: 'format-empty',
-      formatType: 'FLAC',
-      s3Key: null,
-      fileName: null,
-      files: null,
-    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-empty',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: null,
+      },
+    ]);
 
     const response = await GET(makeRequest('FLAC'), makeParams());
     const body = await response.json();
@@ -457,13 +454,15 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should skip format with s3Key but no fileName', async () => {
-    mockFindByReleaseAndFormat.mockResolvedValue({
-      id: 'format-partial',
-      formatType: 'FLAC',
-      s3Key: 'releases/r1/FLAC/file.flac',
-      fileName: null,
-      files: [],
-    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-partial',
+        formatType: 'FLAC',
+        s3Key: 'releases/r1/FLAC/file.flac',
+        fileName: null,
+        files: [],
+      },
+    ]);
 
     const response = await GET(makeRequest('FLAC'), makeParams());
     const body = await response.json();
@@ -496,6 +495,50 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     await GET(makeRequest(), makeParams());
 
     expect(mockFinalize).toHaveBeenCalledTimes(1);
+  });
+
+  it('should fetch and append S3 objects just-in-time', async () => {
+    interface Deferred<T> {
+      promise: Promise<T>;
+      resolve: (value: T) => void;
+    }
+
+    const createDeferred = <T>(): Deferred<T> => {
+      const { promise, resolve } = Promise.withResolvers<T>();
+      return { promise, resolve };
+    };
+
+    const first = createDeferred<{ Body: Readable }>();
+    const second = createDeferred<{ Body: Readable }>();
+    const third = createDeferred<{ Body: Readable }>();
+    const deferredResponses = [first, second, third];
+    let callIndex = 0;
+
+    mockS3Send.mockImplementation(() => deferredResponses[callIndex++].promise);
+
+    const requestPromise = GET(makeRequest(), makeParams());
+    await vi.waitFor(() => {
+      expect(mockS3Send).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAppend).not.toHaveBeenCalled();
+
+    first.resolve({ Body: Readable.from(Buffer.from('file-1')) });
+    await vi.waitFor(() => {
+      expect(mockAppend).toHaveBeenCalledTimes(1);
+      expect(mockS3Send).toHaveBeenCalledTimes(2);
+    });
+
+    second.resolve({ Body: Readable.from(Buffer.from('file-2')) });
+    await vi.waitFor(() => {
+      expect(mockAppend).toHaveBeenCalledTimes(2);
+      expect(mockS3Send).toHaveBeenCalledTimes(3);
+    });
+
+    third.resolve({ Body: Readable.from(Buffer.from('file-3')) });
+
+    const response = await requestPromise;
+    expect(response.status).toBe(302);
+    expect(mockAppend).toHaveBeenCalledTimes(3);
   });
 
   it('should use secure cookie name when NODE_ENV is production and E2E_MODE is not true', async () => {
@@ -531,19 +574,16 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should fall back to formatType as folder name when FORMAT_LABELS has no entry', async () => {
-    // Mock a format type that is not in FORMAT_LABELS
-    mockFindByReleaseAndFormat.mockImplementation((releaseId: string, formatType: string) => {
-      if (formatType === 'FLAC') {
-        return Promise.resolve({
-          id: 'format-flac',
-          formatType: 'FLAC',
-          s3Key: null,
-          fileName: null,
-          files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '01.flac' }],
-        });
-      }
-      return Promise.resolve(null);
-    });
+    // Mock a format that only has FLAC
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '01.flac' }],
+      },
+    ]);
 
     // Override FORMAT_LABELS by checking the archive.append call
     await GET(makeRequest('FLAC'), makeParams());
@@ -556,13 +596,15 @@ describe('GET /api/releases/[id]/download/bundle', () => {
   });
 
   it('should use legacy s3Key when format has no files array (null)', async () => {
-    mockFindByReleaseAndFormat.mockResolvedValue({
-      id: 'format-legacy',
-      formatType: 'FLAC',
-      s3Key: 'releases/r1/FLAC/legacy.flac',
-      fileName: 'legacy.flac',
-      files: null,
-    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-legacy',
+        formatType: 'FLAC',
+        s3Key: 'releases/r1/FLAC/legacy.flac',
+        fileName: 'legacy.flac',
+        files: null,
+      },
+    ]);
 
     const response = await GET(makeRequest('FLAC'), makeParams());
 
