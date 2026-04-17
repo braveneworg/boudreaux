@@ -123,18 +123,20 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     return null;
   };
 
-  const handleSelectArtist = (artist: FeaturedArtist) => {
-    // If clicking the already-selected artist, toggle play/pause
+  const handleSelectArtist = (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => {
+    // If this is a click-initiated reselect of the current artist, toggle play/pause
     if (selectedArtist?.id === artist.id) {
-      if (isPlaying) {
-        playerControls?.pause();
-      } else {
-        playerControls?.play();
+      if (options?.autoPlay) {
+        if (isPlaying) {
+          playerControls?.pause();
+        } else {
+          playerControls?.play();
+        }
       }
       return;
     }
 
-    setShouldAutoPlay(true); // Auto-play when selecting a new artist from carousel
+    setShouldAutoPlay(options?.autoPlay ?? false);
     setSelectedArtist(artist);
     // Reset to the featured track if set, otherwise the first file
     const files = artist.digitalFormat?.files ?? [];

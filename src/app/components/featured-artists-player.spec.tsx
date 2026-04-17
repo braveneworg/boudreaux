@@ -29,14 +29,14 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     onSelect,
   }: {
     featuredArtists: FeaturedArtist[];
-    onSelect?: (artist: FeaturedArtist) => void;
+    onSelect?: (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
   }) => (
     <div data-testid="featured-artist-carousel">
       {featuredArtists.map((artist) => (
         <button
           key={artist.id}
           data-testid={`artist-${artist.id}`}
-          onClick={() => onSelect?.(artist)}
+          onClick={() => onSelect?.(artist, { autoPlay: true })}
         >
           {artist.displayName || 'Unknown'}
         </button>

@@ -4,7 +4,7 @@
 'use client';
 
 import type React from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -129,17 +129,50 @@ const FeaturedArtistCarousel = ({
   onSelect,
 }: {
   featuredArtists: FeaturedArtist[];
-  onSelect?: (featuredArtist: FeaturedArtist) => void;
+  onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
 }) => {
   // Sort by position (lower numbers first)
-  const sortedArtists = [...featuredArtists].sort((a, b) => a.position - b.position);
+  const sortedArtists = useMemo(
+    () => [...featuredArtists].sort((a, b) => a.position - b.position),
+    [featuredArtists]
+  );
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const clickInitiatedRef = useRef(false);
 
   const handleSelect = (featured: FeaturedArtist, index: number) => {
-    carouselApi?.scrollTo(index);
-    onSelect?.(featured);
+    if (!carouselApi) {
+      onSelect?.(featured, { autoPlay: true });
+      return;
+    }
+
+    clickInitiatedRef.current = true;
+    carouselApi.scrollTo(index);
+    // If already on this slide, settle won't fire — call onSelect directly
+    if (carouselApi.selectedScrollSnap() === index) {
+      onSelect?.(featured, { autoPlay: true });
+      clickInitiatedRef.current = false;
+    }
   };
+
+  /** Sync player state when the carousel settles on a new slide */
+  const handleSettle = useCallback(() => {
+    if (!carouselApi) return;
+    const index = carouselApi.selectedScrollSnap();
+    const artist = sortedArtists[index];
+    if (!artist) return;
+    const autoPlay = clickInitiatedRef.current;
+    clickInitiatedRef.current = false;
+    onSelect?.(artist, { autoPlay });
+  }, [carouselApi, sortedArtists, onSelect]);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+    carouselApi.on('settle', handleSettle);
+    return () => {
+      carouselApi.off('settle', handleSettle);
+    };
+  }, [carouselApi, handleSettle]);
 
   /**
    * Get the cover art URL for a featured artist
