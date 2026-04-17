@@ -9,36 +9,57 @@ import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { FormatBundleDownload } from './format-bundle-download';
 
-const mockDownloads = [
+function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
+  return events.map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`).join('');
+}
+
+const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
+  { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
   {
-    formatType: 'FLAC',
-    label: 'FLAC',
-    files: [{ downloadUrl: 'https://s3.example.com/01-Intro.flac', fileName: '01 - Intro.flac' }],
+    event: 'ready',
+    data: {
+      formatType: 'FLAC',
+      label: 'FLAC',
+      downloadUrl: 'https://s3.example.com/flac.zip',
+      fileName: 'Test Album - FLAC.zip',
+    },
+  },
+  { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'zipping' } },
+  {
+    event: 'ready',
+    data: {
+      formatType: 'WAV',
+      label: 'WAV',
+      downloadUrl: 'https://s3.example.com/wav.zip',
+      fileName: 'Test Album - WAV.zip',
+    },
   },
   {
-    formatType: 'WAV',
-    label: 'WAV',
-    files: [{ downloadUrl: 'https://s3.example.com/album.wav', fileName: 'album.wav' }],
+    event: 'progress',
+    data: { formatType: 'MP3_320KBPS', label: 'MP3 320kbps', status: 'zipping' },
   },
   {
-    formatType: 'MP3_320KBPS',
-    label: 'MP3 320kbps',
-    files: [{ downloadUrl: 'https://s3.example.com/album.mp3', fileName: 'album.mp3' }],
+    event: 'ready',
+    data: {
+      formatType: 'MP3_320KBPS',
+      label: 'MP3 320kbps',
+      downloadUrl: 'https://s3.example.com/mp3.zip',
+      fileName: 'Test Album - MP3 320kbps.zip',
+    },
   },
+  { event: 'complete', data: {} },
 ];
 
-function makeBundleResponse(formats = mockDownloads) {
-  return {
-    ok: true,
-    json: async () => ({ success: true, downloads: formats }),
-  };
+function makeSSEResponse(events = defaultSSEEvents) {
+  return new Response(makeSSEBody(events), {
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
 }
 
 function makeConfirmResponse() {
-  return {
-    ok: true,
-    json: async () => ({ success: true }),
-  };
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 describe('FormatBundleDownload', () => {
@@ -207,7 +228,7 @@ describe('FormatBundleDownload', () => {
 
   it('should call fetch with respond=json on click', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const mockFetch = vi.fn().mockResolvedValue(makeBundleResponse());
+    const mockFetch = vi.fn().mockResolvedValue(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
@@ -224,7 +245,7 @@ describe('FormatBundleDownload', () => {
     });
   });
 
-  it('should show "Downloading..." while downloads are in progress', async () => {
+  it('should show "Preparing..." while downloads are in progress', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
@@ -233,14 +254,14 @@ describe('FormatBundleDownload', () => {
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    expect(screen.getByRole('button', { name: /Downloading/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Preparing/ })).toBeDisabled();
   });
 
   it('should show per-format progress and "Downloads started!" on completion', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -258,11 +279,11 @@ describe('FormatBundleDownload', () => {
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
   });
 
-  it('should call window.open for each format file', async () => {
+  it('should call window.open for each format ZIP', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -272,9 +293,9 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/01-Intro.flac', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/album.wav', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/album.mp3', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/flac.zip', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/wav.zip', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/mp3.zip', '_self');
       expect(window.open).toHaveBeenCalledTimes(3);
     });
   });
@@ -283,7 +304,7 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -310,7 +331,7 @@ describe('FormatBundleDownload', () => {
     const onDownloadComplete = vi.fn();
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -330,7 +351,7 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -344,13 +365,7 @@ describe('FormatBundleDownload', () => {
 
   it('should show error message when download fetch fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ success: false, message: 'Download failed. Please try again.' }),
-      })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 

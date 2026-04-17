@@ -269,31 +269,46 @@ describe('CollectionList', () => {
 });
 
 describe('CollectionDownloadDialog', () => {
-  const mockDownloads = [
+  function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
+    return events
+      .map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
+      .join('');
+  }
+
+  const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
+    { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
     {
-      formatType: 'FLAC',
-      label: 'FLAC',
-      files: [{ downloadUrl: 'https://s3.example.com/track.flac', fileName: 'track.flac' }],
+      event: 'ready',
+      data: {
+        formatType: 'FLAC',
+        label: 'FLAC',
+        downloadUrl: 'https://s3.example.com/flac.zip',
+        fileName: 'Test Album - FLAC.zip',
+      },
     },
+    { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'zipping' } },
     {
-      formatType: 'WAV',
-      label: 'WAV',
-      files: [{ downloadUrl: 'https://s3.example.com/track.wav', fileName: 'track.wav' }],
+      event: 'ready',
+      data: {
+        formatType: 'WAV',
+        label: 'WAV',
+        downloadUrl: 'https://s3.example.com/wav.zip',
+        fileName: 'Test Album - WAV.zip',
+      },
     },
+    { event: 'complete', data: {} },
   ];
 
-  function makeBundleResponse(formats = mockDownloads) {
-    return {
-      ok: true,
-      json: async () => ({ success: true, downloads: formats }),
-    };
+  function makeSSEResponse(events = defaultSSEEvents) {
+    return new Response(makeSSEBody(events), {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
   }
 
   function makeConfirmResponse() {
-    return {
-      ok: true,
-      json: async () => ({ success: true }),
-    };
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   beforeEach(() => {
@@ -366,7 +381,7 @@ describe('CollectionDownloadDialog', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -386,7 +401,7 @@ describe('CollectionDownloadDialog', () => {
     });
   });
 
-  it('shows Downloading while fetch is in flight', async () => {
+  it('shows Preparing while fetch is in flight', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
@@ -397,14 +412,14 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(screen.getByRole('button', { name: /downloading/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeDisabled();
   });
 
   it('shows Downloads started and re-enables the download button after timeout', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -424,11 +439,11 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
   });
 
-  it('calls window.open for each format file', async () => {
+  it('calls window.open for each format ZIP', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -440,8 +455,8 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/track.flac', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/track.wav', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/flac.zip', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/wav.zip', '_self');
       expect(window.open).toHaveBeenCalledTimes(2);
     });
   });
@@ -450,7 +465,7 @@ describe('CollectionDownloadDialog', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -534,7 +549,7 @@ describe('CollectionDownloadDialog', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
-      .mockResolvedValueOnce(makeBundleResponse())
+      .mockResolvedValueOnce(makeSSEResponse())
       .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
@@ -555,13 +570,7 @@ describe('CollectionDownloadDialog', () => {
 
   it('shows error message when download fetch fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ success: false, message: 'Download failed. Please try again.' }),
-      })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),

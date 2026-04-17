@@ -14,11 +14,7 @@ import { getToken } from 'next-auth/jwt';
 
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-import {
-  FORMAT_LABELS,
-  PRESIGNED_URL_EXPIRATION,
-  type DigitalFormatType,
-} from '@/lib/constants/digital-formats';
+import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { prisma } from '@/lib/prisma';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
@@ -49,10 +45,11 @@ const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
  *
  * Response contract:
  * - Default: 302 redirect to the short-lived presigned ZIP URL
- * - respond=json: returns per-format presigned download URLs (no ZIP,
- *   no download count increment). The client triggers individual downloads
- *   and then calls POST /api/releases/[id]/download/confirm to record
- *   the download event and increment the count.
+ * - respond=json: streams SSE events as each format is zipped into its own
+ *   archive and uploaded to S3. Events: progress (zipping), ready (download URL),
+ *   error (per-format failure), complete. No download count increment — the
+ *   client calls POST /api/releases/[id]/download/confirm after triggering
+ *   the downloads.
  *
  * Authorization:
  * 1. Authenticate user
@@ -203,29 +200,89 @@ export async function GET(
       );
     }
 
-    // JSON response path: return per-format presigned URLs without ZIP bundling.
+    // SSE streaming path: create a per-format ZIP for each requested format,
+    // streaming progress events to the client as each ZIP completes.
     // Download count increment and event logging are deferred to the
     // POST /api/releases/[id]/download/confirm endpoint, called by the client
     // after all downloads have been triggered.
     if (respondJson) {
-      const downloads = await Promise.all(
-        resolvedFormats.map(async ({ formatType, files }) => ({
-          formatType,
-          label: FORMAT_LABELS[formatType] ?? formatType,
-          files: await Promise.all(
-            files.map(async (file) => ({
-              downloadUrl: await generatePresignedDownloadUrl(
-                file.s3Key,
-                file.fileName,
-                PRESIGNED_URL_EXPIRATION.DOWNLOAD
-              ),
-              fileName: file.fileName,
-            }))
-          ),
-        }))
-      );
+      const s3ClientForZip = getS3Client();
+      const bucketForZip = getS3BucketName();
+      const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
 
-      return Response.json({ success: true, downloads }, { headers: NO_STORE_HEADERS });
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const send = (event: string, data: Record<string, unknown>) => {
+            controller.enqueue(
+              encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+            );
+          };
+
+          for (const { formatType, files } of resolvedFormats) {
+            const label = FORMAT_LABELS[formatType] ?? formatType;
+            send('progress', { formatType, label, status: 'zipping' });
+
+            try {
+              const formatArchive = archiver('zip', { zlib: { level: 0 } });
+              const formatPassThrough = new PassThrough();
+              formatArchive.pipe(formatPassThrough);
+              formatArchive.on('error', (err) => formatPassThrough.destroy(err));
+
+              for (const file of files) {
+                const s3Response = await s3ClientForZip.send(
+                  new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
+                );
+                if (s3Response.Body) {
+                  formatArchive.append(s3Response.Body as Readable, { name: file.fileName });
+                }
+              }
+
+              const zipName = `${safeTitle} - ${label}.zip`;
+              const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+
+              const formatUpload = new Upload({
+                client: s3ClientForZip,
+                params: {
+                  Bucket: bucketForZip,
+                  Key: tempZipKey,
+                  Body: formatPassThrough,
+                  ContentType: 'application/zip',
+                  ContentDisposition: `attachment; filename="${encodeURIComponent(zipName)}"`,
+                },
+                partSize: 10 * 1024 * 1024,
+                queueSize: 4,
+                leavePartsOnError: false,
+              });
+
+              formatArchive.finalize();
+              await formatUpload.done();
+
+              const downloadUrl = await generatePresignedDownloadUrl(
+                tempZipKey,
+                zipName,
+                TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
+              );
+
+              send('ready', { formatType, label, downloadUrl, fileName: zipName });
+            } catch (formatError) {
+              console.error(`Failed to create ZIP for format ${formatType}`, { formatError });
+              send('error', { formatType, message: 'Failed to prepare download.' });
+            }
+          }
+
+          send('complete', {});
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'private, no-store',
+          'X-Accel-Buffering': 'no',
+        },
+      });
     }
 
     // Step 7: Create ZIP archive and upload to S3 as a temporary object
