@@ -135,7 +135,7 @@ export async function POST(
 
     // Step 5: Log download events per format
     const downloadEventRepo = new DownloadEventRepository();
-    const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+    const ipAddress = extractClientIp(request) ?? 'unknown';
     const userAgent = request.headers.get('user-agent') ?? 'unknown';
 
     await Promise.all(
