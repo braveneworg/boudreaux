@@ -36,6 +36,7 @@ import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 import { parseSSEBuffer } from '@/lib/utils/parse-sse';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
+import { triggerDownload } from '@/lib/utils/trigger-download';
 
 interface CollectionPurchase {
   id: string;
@@ -303,7 +304,7 @@ const CollectionDownloadDialog = ({
               )
             );
           } else if (evt.event === 'ready') {
-            window.open(data.downloadUrl as string, '_self');
+            triggerDownload(data.downloadUrl as string);
             completedFormats.push(data.formatType as string);
             setFormatProgress((prev) =>
               prev.map((fp) =>
