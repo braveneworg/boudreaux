@@ -131,6 +131,7 @@ const mockCarouselApi = {
   off: mockCarouselOff,
   selectedScrollSnap: mockSelectedScrollSnap,
 };
+let shouldProvideCarouselApi = true;
 
 vi.mock('@/components/ui/carousel', () => ({
   Carousel: ({
@@ -144,7 +145,9 @@ vi.mock('@/components/ui/carousel', () => ({
   }) => {
     // Use useEffect to avoid setState-during-render warning
     React.useEffect(() => {
-      setApi?.(mockCarouselApi);
+      if (shouldProvideCarouselApi) {
+        setApi?.(mockCarouselApi);
+      }
     }, [setApi]);
     return (
       <div data-testid="carousel" data-align={opts?.align} data-loop={opts?.loop?.toString()}>
@@ -874,6 +877,15 @@ describe('MediaPlayer', () => {
       }),
     ];
 
+    beforeEach(() => {
+      shouldProvideCarouselApi = true;
+      mockCarouselOn.mockClear();
+      mockCarouselOff.mockClear();
+      mockScrollTo.mockClear();
+      mockSelectedScrollSnap.mockReset();
+      mockSelectedScrollSnap.mockReturnValue(0);
+    });
+
     it('should render carousel with featured artists', () => {
       render(
         <MediaPlayer>
@@ -1019,6 +1031,27 @@ describe('MediaPlayer', () => {
 
       expect(mockScrollTo).toHaveBeenCalledWith(0);
       expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0], { autoPlay: true });
+    });
+
+    it('should call onSelect directly when carousel api is unavailable', () => {
+      shouldProvideCarouselApi = false;
+      const onSelect = vi.fn();
+
+      render(
+        <MediaPlayer>
+          <MediaPlayer.FeaturedArtistCarousel
+            featuredArtists={mockFeaturedArtists}
+            onSelect={onSelect}
+          />
+        </MediaPlayer>
+      );
+
+      const carouselItems = screen.getAllByTestId('carousel-item');
+      const secondItemButton = within(carouselItems[1]).getByRole('button');
+      fireEvent.click(secondItemButton);
+
+      expect(mockScrollTo).not.toHaveBeenCalled();
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: true });
     });
 
     it('should call onSelect on settle event from carousel navigation', async () => {

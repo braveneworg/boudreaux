@@ -124,7 +124,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   };
 
   const handleSelectArtist = (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => {
-    // If clicking the already-selected artist, toggle play/pause
+    // If this is a click-initiated reselect of the current artist, toggle play/pause
     if (selectedArtist?.id === artist.id) {
       if (options?.autoPlay) {
         if (isPlaying) {
