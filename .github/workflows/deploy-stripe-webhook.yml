@@ -54,13 +54,17 @@ jobs:
       - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
         run: |
+          # Resolve pnpm's symlinked node_modules to find the real paths
+          PRISMA_CLIENT_REAL=$(readlink -f node_modules/@prisma/client)
+          PRISMA_NM=$(dirname "$(dirname "$PRISMA_CLIENT_REAL")")
+
           mkdir -p layers/prisma/nodejs/node_modules/.prisma/client
           mkdir -p layers/prisma/nodejs/node_modules/@prisma/client
 
-          cp -rL node_modules/.prisma/client/. \
+          cp -rL "$PRISMA_NM/.prisma/client/." \
             layers/prisma/nodejs/node_modules/.prisma/client/
 
-          cp -rL node_modules/@prisma/client/. \
+          cp -rL "$PRISMA_CLIENT_REAL/." \
             layers/prisma/nodejs/node_modules/@prisma/client/
 
       - name: SAM build
