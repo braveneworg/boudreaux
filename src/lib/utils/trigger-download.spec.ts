@@ -29,12 +29,24 @@ describe('triggerDownload', () => {
   });
 
   it('falls back to documentElement when body is unavailable', () => {
-    vi.spyOn(document, 'body', 'get').mockReturnValue(null as unknown as HTMLBodyElement);
+    const bodyDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'body');
+    expect(bodyDescriptor?.get).toBeDefined();
 
-    triggerDownload('https://example.com/download.zip');
+    Object.defineProperty(Document.prototype, 'body', {
+      configurable: true,
+      get: () => null,
+    });
 
-    const iframe = document.documentElement.querySelector('iframe');
-    expect(iframe).toBeInTheDocument();
+    try {
+      triggerDownload('https://example.com/download.zip');
+
+      const iframe = document.documentElement.querySelector('iframe');
+      expect(iframe).toBeInTheDocument();
+    } finally {
+      if (bodyDescriptor) {
+        Object.defineProperty(Document.prototype, 'body', bodyDescriptor);
+      }
+    }
   });
 
   it('removes the iframe after timeout', () => {
