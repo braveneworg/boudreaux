@@ -5,9 +5,14 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { triggerDownload } from '@/lib/utils/trigger-download';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { FormatBundleDownload } from './format-bundle-download';
+
+vi.mock('@/lib/utils/trigger-download', () => ({
+  triggerDownload: vi.fn(),
+}));
 
 function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
   return events.map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`).join('');
@@ -85,7 +90,6 @@ describe('FormatBundleDownload', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.spyOn(window, 'open').mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -279,7 +283,7 @@ describe('FormatBundleDownload', () => {
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
   });
 
-  it('should call window.open for each format ZIP', async () => {
+  it('should trigger a download for each format ZIP', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
@@ -293,10 +297,10 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/flac.zip', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/wav.zip', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/mp3.zip', '_self');
-      expect(window.open).toHaveBeenCalledTimes(3);
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/flac.zip');
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/wav.zip');
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/mp3.zip');
+      expect(triggerDownload).toHaveBeenCalledTimes(3);
     });
   });
 

@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
+import { triggerDownload } from '@/lib/utils/trigger-download';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { CollectionList } from './collection-list';
@@ -18,6 +19,10 @@ vi.mock('@/lib/actions/collection-actions', () => ({
 
 vi.mock('@/lib/utils/release-helpers', () => ({
   getReleaseCoverArt: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/trigger-download', () => ({
+  triggerDownload: vi.fn(),
 }));
 
 vi.mock('next/image', () => ({
@@ -313,7 +318,6 @@ describe('CollectionDownloadDialog', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.spyOn(window, 'open').mockReturnValue(null);
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
@@ -439,7 +443,7 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
   });
 
-  it('calls window.open for each format ZIP', async () => {
+  it('triggers a download for each format ZIP', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const mockFetch = vi
       .fn()
@@ -455,9 +459,9 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     await waitFor(() => {
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/flac.zip', '_self');
-      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/wav.zip', '_self');
-      expect(window.open).toHaveBeenCalledTimes(2);
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/flac.zip');
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/wav.zip');
+      expect(triggerDownload).toHaveBeenCalledTimes(2);
     });
   });
 
