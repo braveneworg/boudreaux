@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import videojs from 'video.js';
 
 import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
@@ -122,8 +122,14 @@ vi.mock('@/components/ui/drawer', () => ({
 
 // Mock Carousel components
 const mockScrollTo = vi.fn();
+const mockCarouselOn = vi.fn();
+const mockCarouselOff = vi.fn();
+const mockSelectedScrollSnap = vi.fn().mockReturnValue(0);
 const mockCarouselApi = {
   scrollTo: mockScrollTo,
+  on: mockCarouselOn,
+  off: mockCarouselOff,
+  selectedScrollSnap: mockSelectedScrollSnap,
 };
 
 vi.mock('@/components/ui/carousel', () => ({
@@ -906,7 +912,7 @@ describe('MediaPlayer', () => {
       const firstItemButton = within(carouselItems[0]).getByRole('button');
       fireEvent.click(firstItemButton);
 
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0]);
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0], { autoPlay: true });
     });
 
     it('should sort artists by position', () => {
@@ -940,7 +946,9 @@ describe('MediaPlayer', () => {
       fireEvent.click(firstItemButton);
 
       // The artist with position 1 should be first
-      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }));
+      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }), {
+        autoPlay: true,
+      });
     });
 
     it('should use center alignment for carousel', () => {
@@ -953,18 +961,23 @@ describe('MediaPlayer', () => {
       expect(screen.getByTestId('carousel')).toHaveAttribute('data-align', 'center');
     });
 
-    it('should scroll to the selected artist index on click', () => {
+    it('should scroll to the selected artist index on click', async () => {
       const onSelect = vi.fn();
       mockScrollTo.mockClear();
+      mockCarouselOn.mockClear();
+      // Carousel is currently at index 0, clicking index 1 triggers scrollTo
+      mockSelectedScrollSnap.mockReturnValue(0);
 
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={mockFeaturedArtists}
-            onSelect={onSelect}
-          />
-        </MediaPlayer>
-      );
+      await act(async () => {
+        render(
+          <MediaPlayer>
+            <MediaPlayer.FeaturedArtistCarousel
+              featuredArtists={mockFeaturedArtists}
+              onSelect={onSelect}
+            />
+          </MediaPlayer>
+        );
+      });
 
       // Click on the second carousel item
       const carouselItems = screen.getAllByTestId('carousel-item');
@@ -972,12 +985,24 @@ describe('MediaPlayer', () => {
       fireEvent.click(secondItemButton);
 
       expect(mockScrollTo).toHaveBeenCalledWith(1);
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1]);
+
+      // Simulate the settle event firing after scroll completes
+      const settleHandler = mockCarouselOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'settle'
+      )?.[1] as (() => void) | undefined;
+      mockSelectedScrollSnap.mockReturnValue(1);
+      act(() => {
+        settleHandler?.();
+      });
+
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: true });
     });
 
-    it('should scroll to index 0 when first artist is clicked', () => {
+    it('should call onSelect directly when clicking the already-selected slide', () => {
       const onSelect = vi.fn();
       mockScrollTo.mockClear();
+      // Carousel is at index 0, clicking index 0 fires onSelect immediately
+      mockSelectedScrollSnap.mockReturnValue(0);
 
       render(
         <MediaPlayer>
@@ -993,10 +1018,41 @@ describe('MediaPlayer', () => {
       fireEvent.click(firstItemButton);
 
       expect(mockScrollTo).toHaveBeenCalledWith(0);
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0], { autoPlay: true });
+    });
+
+    it('should call onSelect on settle event from carousel navigation', async () => {
+      const onSelect = vi.fn();
+      mockCarouselOn.mockClear();
+      mockSelectedScrollSnap.mockReturnValue(0);
+
+      await act(async () => {
+        render(
+          <MediaPlayer>
+            <MediaPlayer.FeaturedArtistCarousel
+              featuredArtists={mockFeaturedArtists}
+              onSelect={onSelect}
+            />
+          </MediaPlayer>
+        );
+      });
+
+      // Simulate carousel navigating via arrows/drag (settle without click)
+      const settleHandler = mockCarouselOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'settle'
+      )?.[1] as (() => void) | undefined;
+      mockSelectedScrollSnap.mockReturnValue(1);
+      act(() => {
+        settleHandler?.();
+      });
+
+      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: false });
     });
 
     it('should work without onSelect callback', () => {
       mockScrollTo.mockClear();
+      mockCarouselOn.mockClear();
+      mockSelectedScrollSnap.mockReturnValue(0);
 
       render(
         <MediaPlayer>
