@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.18.0] - 2026-04-17
+
+### Added
+
+- test: add fake timers for soft delete grace period boundary check (#364)\n- test: add fake timers for soft delete grace period boundary check (#364)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- feat: implement bundle download endpoint with rate limiting and optim… (#363)\n- test: add fake timers for soft delete grace period boundary check (#364)\n
+
 ## [4.17.0] - 2026-04-17
 
 ### Added
