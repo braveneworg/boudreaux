@@ -211,16 +211,13 @@ export async function GET(
       }));
     });
 
-    const s3Responses = await Promise.all(
-      fileEntries.map(({ s3Key }) =>
-        s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: s3Key }))
-      )
-    );
-
-    for (let i = 0; i < fileEntries.length; i++) {
-      const body = s3Responses[i].Body;
+    for (const fileEntry of fileEntries) {
+      const s3Response = await s3Client.send(
+        new GetObjectCommand({ Bucket: bucketName, Key: fileEntry.s3Key })
+      );
+      const body = s3Response.Body;
       if (body) {
-        archive.append(body as Readable, { name: fileEntries[i].archivePath });
+        archive.append(body as Readable, { name: fileEntry.archivePath });
       }
     }
 

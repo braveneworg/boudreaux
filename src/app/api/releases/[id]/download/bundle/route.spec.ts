@@ -497,25 +497,54 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(mockFinalize).toHaveBeenCalledTimes(1);
   });
 
-  it('should fetch all S3 objects before appending to archive', async () => {
-    const callOrder: string[] = [];
+  it('should fetch and append S3 objects just-in-time', async () => {
+    interface Deferred<T> {
+      promise: Promise<T>;
+      resolve: (value: T) => void;
+    }
 
-    mockS3Send.mockImplementation(() => {
-      callOrder.push('s3-fetch');
-      return Promise.resolve({
-        Body: Readable.from(Buffer.from('fake-audio-data')),
+    const createDeferred = <T>(): Deferred<T> => {
+      let resolve: ((value: T) => void) | undefined;
+      const promise = new Promise<T>((res) => {
+        resolve = res;
       });
+      if (!resolve) {
+        throw new Error('Failed to create deferred resolver.');
+      }
+      return { promise, resolve };
+    };
+
+    const first = createDeferred<{ Body: Readable }>();
+    const second = createDeferred<{ Body: Readable }>();
+    const third = createDeferred<{ Body: Readable }>();
+    const deferredResponses = [first, second, third];
+    let callIndex = 0;
+
+    mockS3Send.mockImplementation(() => deferredResponses[callIndex++].promise);
+
+    const requestPromise = GET(makeRequest(), makeParams());
+    await vi.waitFor(() => {
+      expect(mockS3Send).toHaveBeenCalledTimes(1);
     });
-    mockAppend.mockImplementation(() => {
-      callOrder.push('archive-append');
+    expect(mockAppend).not.toHaveBeenCalled();
+
+    first.resolve({ Body: Readable.from(Buffer.from('file-1')) });
+    await vi.waitFor(() => {
+      expect(mockAppend).toHaveBeenCalledTimes(1);
+      expect(mockS3Send).toHaveBeenCalledTimes(2);
     });
 
-    await GET(makeRequest(), makeParams());
+    second.resolve({ Body: Readable.from(Buffer.from('file-2')) });
+    await vi.waitFor(() => {
+      expect(mockAppend).toHaveBeenCalledTimes(2);
+      expect(mockS3Send).toHaveBeenCalledTimes(3);
+    });
 
-    // All S3 fetches should complete before any archive appends
-    const lastFetchIndex = callOrder.lastIndexOf('s3-fetch');
-    const firstAppendIndex = callOrder.indexOf('archive-append');
-    expect(lastFetchIndex).toBeLessThan(firstAppendIndex);
+    third.resolve({ Body: Readable.from(Buffer.from('file-3')) });
+
+    const response = await requestPromise;
+    expect(response.status).toBe(302);
+    expect(mockAppend).toHaveBeenCalledTimes(3);
   });
 
   it('should use secure cookie name when NODE_ENV is production and E2E_MODE is not true', async () => {
