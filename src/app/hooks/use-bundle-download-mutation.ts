@@ -26,11 +26,14 @@ const fetchBundleDownload = async ({
   releaseId,
   formats,
 }: BundleDownloadParams): Promise<string> => {
-  const joined = formats.join(',');
+  const encodedReleaseId = encodeURIComponent(releaseId);
+  const encodedFormats = formats.map((format) => encodeURIComponent(format)).join(',');
 
   let response: Response;
   try {
-    response = await fetch(`/api/releases/${releaseId}/download/bundle?formats=${joined}`);
+    response = await fetch(
+      `/api/releases/${encodedReleaseId}/download/bundle?formats=${encodedFormats}`
+    );
   } catch {
     throw new Error(GENERIC_ERROR);
   }

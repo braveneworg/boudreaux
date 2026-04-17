@@ -43,7 +43,7 @@ export const GET = withRateLimit<{ id: string }>(
     if (!formatType) {
       const allFormats = await repo.findAllByRelease(releaseId);
       const formats = allFormats
-        .filter((f) => f.files.length > 0 || (f.s3Key !== null && f.fileName !== null))
+        .filter((f) => f.files.length > 0 || (f.s3Key != null && f.fileName != null))
         .map((f) => ({
           formatType: f.formatType as DigitalFormatType,
           fileName: f.fileName ?? f.files[0]?.fileName ?? `${f.formatType}.zip`,

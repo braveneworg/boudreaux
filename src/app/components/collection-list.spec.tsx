@@ -3,23 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react';
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { CollectionList } from './collection-list';
-
-function createWrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-  };
-}
 
 vi.mock('@/lib/actions/collection-actions', () => ({
   deletePurchaseAction: vi.fn(),
@@ -83,7 +74,7 @@ describe('CollectionList', () => {
 
   it('renders purchase list with title, artist, and price', () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     expect(screen.getByText('Test Album')).toBeInTheDocument();
@@ -93,7 +84,7 @@ describe('CollectionList', () => {
 
   it('renders cover art image when available', () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     expect(screen.getByAltText('Cover')).toBeInTheDocument();
@@ -103,7 +94,7 @@ describe('CollectionList', () => {
     vi.mocked(getReleaseCoverArt).mockReturnValue(null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     expect(screen.getByText('No art')).toBeInTheDocument();
@@ -111,7 +102,7 @@ describe('CollectionList', () => {
 
   it('shows artist displayName when available', () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     expect(screen.getByText('JDoe')).toBeInTheDocument();
@@ -130,7 +121,9 @@ describe('CollectionList', () => {
       },
     ];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
@@ -139,21 +132,25 @@ describe('CollectionList', () => {
     const purchase = buildPurchase();
     purchase.release.artistReleases = [];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
   });
 
   it('does not show delete button when not admin', () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     expect(screen.queryByRole('button', { name: /delete purchase/i })).not.toBeInTheDocument();
   });
 
   it('shows delete button for admin users', () => {
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(
       screen.getByRole('button', { name: /delete purchase for test album/i })
@@ -163,7 +160,9 @@ describe('CollectionList', () => {
   it('calls deletePurchaseAction on delete confirmation', async () => {
     vi.mocked(deletePurchaseAction).mockResolvedValue({ success: true });
 
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /delete purchase for test album/i }));
     await user.click(screen.getByRole('button', { name: /delete$/i }));
@@ -178,7 +177,9 @@ describe('CollectionList', () => {
     });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /delete purchase for test album/i }));
     await user.click(screen.getByRole('button', { name: /delete$/i }));
@@ -191,7 +192,9 @@ describe('CollectionList', () => {
     vi.mocked(deletePurchaseAction).mockRejectedValue(new Error('Network error'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /delete purchase for test album/i }));
     await user.click(screen.getByRole('button', { name: /delete$/i }));
@@ -204,7 +207,9 @@ describe('CollectionList', () => {
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByRole('button', { name: /download test album/i })).toBeInTheDocument();
   });
@@ -216,7 +221,9 @@ describe('CollectionList', () => {
       { formatType: 'WAV', files: [{ fileName: 'track.wav' }] },
     ];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -231,7 +238,9 @@ describe('CollectionList', () => {
       { formatType: 'WAV', files: [] },
     ];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -251,7 +260,9 @@ describe('CollectionList', () => {
       },
     ];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     expect(screen.getByText('Jane')).toBeInTheDocument();
   });
@@ -279,9 +290,13 @@ describe('CollectionDownloadDialog', () => {
     );
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('opens download dialog when download button is clicked', async () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -291,7 +306,7 @@ describe('CollectionDownloadDialog', () => {
 
   it('shows all format toggle buttons', async () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -304,7 +319,9 @@ describe('CollectionDownloadDialog', () => {
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [{ downloadCount: 5 }];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -315,7 +332,9 @@ describe('CollectionDownloadDialog', () => {
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -326,7 +345,7 @@ describe('CollectionDownloadDialog', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -343,7 +362,7 @@ describe('CollectionDownloadDialog', () => {
     vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -365,7 +384,7 @@ describe('CollectionDownloadDialog', () => {
     );
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -378,7 +397,7 @@ describe('CollectionDownloadDialog', () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -396,7 +415,7 @@ describe('CollectionDownloadDialog', () => {
     );
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -411,7 +430,7 @@ describe('CollectionDownloadDialog', () => {
     );
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -424,7 +443,9 @@ describe('CollectionDownloadDialog', () => {
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -433,7 +454,7 @@ describe('CollectionDownloadDialog', () => {
 
   it('shows download count usage', async () => {
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
@@ -447,7 +468,9 @@ describe('CollectionDownloadDialog', () => {
       { formatType: 'CUSTOM_XYZ', files: [{ fileName: 'custom.zip' }] },
     ];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
@@ -458,7 +481,9 @@ describe('CollectionDownloadDialog', () => {
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
-    render(<CollectionList purchases={[purchase]} isAdmin={false} />, { wrapper: createWrapper() });
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     // Deselect the only format
@@ -471,7 +496,7 @@ describe('CollectionDownloadDialog', () => {
     vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+      wrapper: createQueryWrapper(),
     });
 
     // First attempt — triggers error
