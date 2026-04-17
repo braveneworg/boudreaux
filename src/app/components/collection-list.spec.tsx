@@ -271,6 +271,10 @@ describe('CollectionList', () => {
 describe('CollectionDownloadDialog', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(window, 'open').mockReturnValue({
+      close: vi.fn(),
+      location: { href: '' },
+    } as unknown as Window);
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
@@ -370,6 +374,8 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
   });
 
   it('shows Download started and re-enables the download button after timeout', async () => {
@@ -390,6 +396,7 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     expect(await screen.findByText('Download started!')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2000);

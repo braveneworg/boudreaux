@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/app/components/ui/dialog';
+import { Progress } from '@/app/components/ui/progress';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
@@ -231,6 +232,7 @@ const CollectionDownloadDialog = ({
   const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
     'idle'
   );
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -244,28 +246,48 @@ const CollectionDownloadDialog = ({
 
     const joined = selectedFormats.join(',');
     const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
+    const downloadWindow = window.open('', '_blank', 'noopener,noreferrer');
+
+    if (!downloadWindow) {
+      setDownloadPhase('error');
+      setDownloadProgress(0);
+      setDownloadError('Please allow pop-ups to start your download.');
+      return;
+    }
 
     setDownloadPhase('preparing');
+    setDownloadProgress(10);
     setDownloadError(null);
+    const progressInterval = window.setInterval(() => {
+      setDownloadProgress((value) => (value >= 90 ? value : value + 10));
+    }, 300);
 
     try {
       const response = await fetch(apiUrl);
       const data = await response.json();
+      window.clearInterval(progressInterval);
 
       if (!response.ok || !data.success) {
+        downloadWindow.close();
         setDownloadPhase('error');
+        setDownloadProgress(0);
         setDownloadError(data.message ?? 'Download failed. Please try again.');
         return;
       }
 
-      window.location.href = data.downloadUrl;
+      downloadWindow.location.href = data.downloadUrl;
       setDownloadPhase('complete');
+      setDownloadProgress(100);
 
       setTimeout(() => {
         setDownloadPhase('idle');
+        setDownloadProgress(0);
       }, 2000);
     } catch {
+      window.clearInterval(progressInterval);
+      downloadWindow.close();
       setDownloadPhase('error');
+      setDownloadProgress(0);
       setDownloadError('Something went wrong. Please try again.');
     }
   };
@@ -353,6 +375,13 @@ const CollectionDownloadDialog = ({
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+
+            {(isPreparing || downloadPhase === 'complete') && (
+              <div className="space-y-2">
+                <div className="text-muted-foreground text-xs">{downloadProgress}%</div>
+                <Progress value={downloadProgress} className="h-2" />
+              </div>
+            )}
 
             {downloadPhase === 'error' && downloadError && (
               <div className="flex items-center gap-2 text-destructive text-sm" role="alert">

@@ -9,6 +9,7 @@ import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
+import { Progress } from '@/app/components/ui/progress';
 import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
@@ -53,6 +54,7 @@ export const FormatBundleDownload = ({
   const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
     'idle'
   );
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const resolvedFormats = formats ?? [];
@@ -75,29 +77,49 @@ export const FormatBundleDownload = ({
 
     const joined = selectedFormats.join(',');
     const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
+    const downloadWindow = window.open('', '_blank', 'noopener,noreferrer');
+
+    if (!downloadWindow) {
+      setDownloadPhase('error');
+      setDownloadProgress(0);
+      setDownloadError('Please allow pop-ups to start your download.');
+      return;
+    }
 
     setDownloadPhase('preparing');
+    setDownloadProgress(10);
     setDownloadError(null);
+    const progressInterval = window.setInterval(() => {
+      setDownloadProgress((value) => (value >= 90 ? value : value + 10));
+    }, 300);
 
     try {
       const response = await fetch(apiUrl);
       const data = await response.json();
+      window.clearInterval(progressInterval);
 
       if (!response.ok || !data.success) {
+        downloadWindow.close();
         setDownloadPhase('error');
+        setDownloadProgress(0);
         setDownloadError(data.message ?? 'Download failed. Please try again.');
         return;
       }
 
-      window.location.href = data.downloadUrl;
+      downloadWindow.location.href = data.downloadUrl;
       setDownloadPhase('complete');
+      setDownloadProgress(100);
       onDownloadComplete?.();
 
       setTimeout(() => {
         setDownloadPhase('idle');
+        setDownloadProgress(0);
       }, 2000);
     } catch {
+      window.clearInterval(progressInterval);
+      downloadWindow.close();
       setDownloadPhase('error');
+      setDownloadProgress(0);
       setDownloadError('Something went wrong. Please try again.');
     }
   };
@@ -126,6 +148,13 @@ export const FormatBundleDownload = ({
         emptyMessage="No formats found."
         disabled={atLimit || isPreparing}
       />
+
+      {(isPreparing || downloadPhase === 'complete') && (
+        <div className="space-y-2">
+          <div className="text-muted-foreground text-xs">{downloadProgress}%</div>
+          <Progress value={downloadProgress} className="h-2" />
+        </div>
+      )}
 
       {downloadPhase === 'error' && downloadError && (
         <div className="flex items-center gap-2 text-destructive text-sm" role="alert">

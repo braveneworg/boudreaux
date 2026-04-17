@@ -33,7 +33,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
 const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
 
 /**
- * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...
+ * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...[&respond=json]
  *
  * Bundle multiple digital format files into a single ZIP, upload it to S3
  * as a temporary object, and respond with a 302 redirect to a short-lived
@@ -42,6 +42,12 @@ const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
  * inside the user's click gesture — the only pattern iOS Safari honors for
  * downloads. The presigned URL sets Content-Disposition: attachment so the
  * browser downloads the ZIP without leaving the current page.
+ *
+ * Response contract:
+ * - Default: 302 redirect to the short-lived presigned ZIP URL
+ * - respond=json: returns `{ success: true, downloadUrl }` and leaves
+ *   navigation to the caller (used by clients that pre-open a window/tab
+ *   during the click gesture before async work completes)
  *
  * Authorization:
  * 1. Authenticate user

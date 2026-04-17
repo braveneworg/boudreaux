@@ -32,6 +32,10 @@ describe('FormatBundleDownload', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(window, 'open').mockReturnValue({
+      close: vi.fn(),
+      location: { href: '' },
+    } as unknown as Window);
   });
 
   afterEach(() => {
@@ -204,6 +208,8 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
   });
 
   it('should show Download started and re-enable the download button after timeout', async () => {
@@ -222,6 +228,7 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     expect(await screen.findByText('Download started!')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2000);
