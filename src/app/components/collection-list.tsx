@@ -246,14 +246,6 @@ const CollectionDownloadDialog = ({
 
     const joined = selectedFormats.join(',');
     const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
-    const downloadWindow = window.open('', '_blank', 'noopener,noreferrer');
-
-    if (!downloadWindow) {
-      setDownloadPhase('error');
-      setDownloadProgress(0);
-      setDownloadError('Please allow pop-ups to start your download.');
-      return;
-    }
 
     setDownloadPhase('preparing');
     setDownloadProgress(10);
@@ -268,14 +260,13 @@ const CollectionDownloadDialog = ({
       window.clearInterval(progressInterval);
 
       if (!response.ok || !data.success) {
-        downloadWindow.close();
         setDownloadPhase('error');
         setDownloadProgress(0);
         setDownloadError(data.message ?? 'Download failed. Please try again.');
         return;
       }
 
-      downloadWindow.location.href = data.downloadUrl;
+      window.open(data.downloadUrl, '_self');
       setDownloadPhase('complete');
       setDownloadProgress(100);
 
@@ -285,7 +276,6 @@ const CollectionDownloadDialog = ({
       }, 2000);
     } catch {
       window.clearInterval(progressInterval);
-      downloadWindow.close();
       setDownloadPhase('error');
       setDownloadProgress(0);
       setDownloadError('Something went wrong. Please try again.');
