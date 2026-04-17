@@ -221,8 +221,7 @@ describe('FormatBundleDownload', () => {
 
     // fetch was called with the bundle URL
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/api/releases/release-123/download/bundle?formats='),
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      expect.stringContaining('/api/releases/release-123/download/bundle?formats=')
     );
 
     // After the server responds, window.open triggers the browser download
@@ -380,27 +379,6 @@ describe('FormatBundleDownload', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Download failed. Please try again.'
     );
-  });
-
-  it('should silently ignore AbortError without showing an error message', async () => {
-    const user = userEvent.setup();
-
-    const abortError = new Error('The operation was aborted');
-    abortError.name = 'AbortError';
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError));
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    // Wait for isDownloading to become false — the button should re-enable
-    await screen.findByRole('button', { name: /Download 3 formats/ });
-
-    // No error alert should be present
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    // No "Download complete" either — it was aborted
-    expect(screen.queryByText('Download complete')).not.toBeInTheDocument();
   });
 
   it('should show error when response is ok but success is false', async () => {

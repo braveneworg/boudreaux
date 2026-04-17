@@ -3,12 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
+import { useBundleDownloadMutation } from '@/app/hooks/use-bundle-download-mutation';
 import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
@@ -50,10 +51,8 @@ export const FormatBundleDownload = ({
   );
   const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadDone, setDownloadDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+
+  const download = useBundleDownloadMutation({ onSuccess: onDownloadComplete });
 
   const resolvedFormats = formats ?? [];
   const isLoadingFormatsResolved = initialFormats.length > 0 ? false : isLoadingFormats;
@@ -69,59 +68,10 @@ export const FormatBundleDownload = ({
     [formats]
   );
 
-  const handleDownload = useCallback(async () => {
+  const handleDownload = () => {
     if (!hasSelection || atLimit) return;
-
-    setIsDownloading(true);
-    setDownloadDone(false);
-    setError(null);
-
-    const joined = selectedFormats.join(',');
-    const url = `/api/releases/${releaseId}/download/bundle?formats=${joined}`;
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      const data = (await response.json().catch(() => null)) as {
-        success?: boolean;
-        downloadUrl?: string;
-        message?: string;
-      } | null;
-
-      if (!response.ok || !data?.success) {
-        setError(data?.message ?? 'Download failed. Please try again.');
-        return;
-      }
-
-      if (!data.downloadUrl) {
-        setError('Download link is unavailable. Please try again.');
-        return;
-      }
-
-      // Use window.open for reliable downloads on all platforms
-      // (iOS Safari ignores the download attribute on programmatic anchors).
-      window.open(data.downloadUrl, '_self');
-
-      setDownloadDone(true);
-      onDownloadComplete?.();
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        setError('Download failed. Please try again.');
-      }
-    } finally {
-      setIsDownloading(false);
-      abortRef.current = null;
-    }
-  }, [hasSelection, atLimit, selectedFormats, releaseId, onDownloadComplete]);
-
-  // Abort in-flight request if component unmounts
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+    download.mutate({ releaseId, formats: selectedFormats });
+  };
 
   if (isLoadingFormatsResolved) {
     return (
@@ -148,13 +98,13 @@ export const FormatBundleDownload = ({
         disabled={atLimit}
       />
 
-      {error && (
+      {download.error && (
         <p className="text-destructive text-sm" role="alert">
-          {error}
+          {download.error.message}
         </p>
       )}
 
-      {downloadDone && !isDownloading && (
+      {download.isSuccess && !download.isPending && (
         <div className="flex items-center justify-center gap-2 py-2" role="status">
           <CheckCircle2 className="text-green-600 size-5" />
           <span className="text-sm font-medium">Download complete</span>
@@ -164,10 +114,10 @@ export const FormatBundleDownload = ({
       <Button
         className="w-full"
         type="button"
-        disabled={!hasSelection || atLimit || isDownloading}
+        disabled={!hasSelection || atLimit || download.isPending}
         onClick={handleDownload}
       >
-        {isDownloading ? (
+        {download.isPending ? (
           <>
             <Loader2 className="size-4 animate-spin" />
             Preparing download...
