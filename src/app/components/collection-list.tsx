@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { DownloadIcon, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle2, DownloadIcon, Loader2, Trash2 } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from '@/app/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { useBundleDownloadMutation } from '@/app/hooks/use-bundle-download-mutation';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
@@ -111,10 +112,12 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
         const artistName = getArtistName(purchase);
         const coverArt = getReleaseCoverArt(purchase.release);
         const downloadCount = purchase.release.releaseDownloads[0]?.downloadCount ?? 0;
-        const availableFormats = purchase.release.digitalFormats.map((f) => ({
-          formatType: f.formatType,
-          fileName: f.files[0]?.fileName ?? '',
-        }));
+        const availableFormats = purchase.release.digitalFormats
+          .filter((f) => f.files.length > 0)
+          .map((f) => ({
+            formatType: f.formatType,
+            fileName: f.files[0]?.fileName ?? '',
+          }));
 
         return (
           <div
@@ -226,38 +229,28 @@ const CollectionDownloadDialog = ({
 }: CollectionDownloadDialogProps) => {
   const allFormatTypes = availableFormats.map((f) => f.formatType);
   const [selectedFormats, setSelectedFormats] = useState<string[]>(allFormatTypes);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const download = useBundleDownloadMutation();
 
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
   const noFormats = availableFormats.length === 0;
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = () => {
     if (!hasSelection || atLimit) return;
-
-    setIsDownloading(true);
-
-    const formats = selectedFormats.join(',');
-    const url = `/api/releases/${releaseId}/download/bundle?formats=${formats}`;
-
-    // Use window.open for reliable downloads on all platforms
-    // (iOS Safari ignores the download attribute on programmatic anchors).
-    window.open(url, '_self');
-
-    setTimeout(() => {
-      setIsDownloading(false);
-    }, 3000);
-  }, [hasSelection, atLimit, selectedFormats, releaseId]);
+    download.mutate({ releaseId, formats: selectedFormats });
+  };
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
       if (nextOpen) {
         setSelectedFormats(allFormatTypes);
+        download.reset();
       }
     },
-    [allFormatTypes]
+    [allFormatTypes, download]
   );
 
   return (
@@ -322,13 +315,26 @@ const CollectionDownloadDialog = ({
               ))}
             </ToggleGroup>
 
+            {download.error && (
+              <p className="text-destructive text-sm" role="alert">
+                {download.error.message}
+              </p>
+            )}
+
+            {download.isSuccess && !download.isPending && (
+              <div className="flex items-center justify-center gap-2 py-2" role="status">
+                <CheckCircle2 className="text-green-600 size-5" />
+                <span className="text-sm font-medium">Download complete</span>
+              </div>
+            )}
+
             <Button
               className="w-full"
               type="button"
-              disabled={!hasSelection || isDownloading}
+              disabled={!hasSelection || download.isPending}
               onClick={handleDownload}
             >
-              {isDownloading ? (
+              {download.isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   Preparing download...

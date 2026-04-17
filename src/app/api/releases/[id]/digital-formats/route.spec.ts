@@ -36,11 +36,13 @@ describe('GET /api/releases/[id]/digital-formats', () => {
       mockFindAllByRelease.mockResolvedValue([
         {
           formatType: 'MP3_320KBPS',
+          s3Key: null,
           fileName: null,
           files: [{ fileName: '01-intro.mp3' }],
         },
         {
           formatType: 'FLAC',
+          s3Key: 'releases/r1/FLAC/album.flac',
           fileName: 'album-flac.zip',
           files: [],
         },
@@ -58,8 +60,13 @@ describe('GET /api/releases/[id]/digital-formats', () => {
 
     it('filters out formats with no files and no fileName', async () => {
       mockFindAllByRelease.mockResolvedValue([
-        { formatType: 'MP3_320KBPS', fileName: null, files: [{ fileName: 'track.mp3' }] },
-        { formatType: 'WAV', fileName: null, files: [] },
+        {
+          formatType: 'MP3_320KBPS',
+          s3Key: null,
+          fileName: null,
+          files: [{ fileName: 'track.mp3' }],
+        },
+        { formatType: 'WAV', s3Key: null, fileName: null, files: [] },
       ]);
 
       const res = await GET(buildRequest(), buildContext());
@@ -67,6 +74,19 @@ describe('GET /api/releases/[id]/digital-formats', () => {
 
       expect(body.formats).toHaveLength(1);
       expect(body.formats[0].formatType).toBe('MP3_320KBPS');
+    });
+
+    it('excludes legacy format with fileName but no s3Key', async () => {
+      mockFindAllByRelease.mockResolvedValue([
+        { formatType: 'FLAC', s3Key: null, fileName: 'album.flac', files: [] },
+        { formatType: 'WAV', s3Key: 'releases/r1/WAV/album.wav', fileName: 'album.wav', files: [] },
+      ]);
+
+      const res = await GET(buildRequest(), buildContext());
+      const body = await res.json();
+
+      expect(body.formats).toHaveLength(1);
+      expect(body.formats[0].formatType).toBe('WAV');
     });
 
     it('returns empty array when no formats exist', async () => {
@@ -80,7 +100,9 @@ describe('GET /api/releases/[id]/digital-formats', () => {
     });
 
     it('uses formatType.zip fallback when no fileName exists', async () => {
-      mockFindAllByRelease.mockResolvedValue([{ formatType: 'FLAC', fileName: null, files: [{}] }]);
+      mockFindAllByRelease.mockResolvedValue([
+        { formatType: 'FLAC', s3Key: null, fileName: null, files: [{}] },
+      ]);
 
       const res = await GET(buildRequest(), buildContext());
       const body = await res.json();
