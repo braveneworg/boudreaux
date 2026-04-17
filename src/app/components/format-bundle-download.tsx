@@ -5,11 +5,10 @@
 
 import { useMemo, useState } from 'react';
 
-import { CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
+import { DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
-import { useBundleDownloadMutation } from '@/app/hooks/use-bundle-download-mutation';
 import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
@@ -28,16 +27,16 @@ interface FormatBundleDownloadProps {
 
 /**
  * FormatBundleDownload — multi-select format picker with a bundle download
- * button. Uses a multi-select combobox for format selection and triggers a
- * ZIP download of all selected formats via the bundle API route.
+ * button. Clicking the button navigates the current tab to the bundle API,
+ * which streams back a 302 redirect to a presigned S3 URL with
+ * Content-Disposition: attachment so the browser downloads the ZIP without
+ * leaving the page.
  *
- * The server builds the ZIP and uploads it to S3, then returns a presigned
- * download URL. The client opens the URL via window.open to trigger the
- * browser's native download — this works reliably on all platforms including
- * iOS Safari, which silently ignores blob: URL downloads.
- *
- * Fetches available formats from the API on mount to ensure fresh data,
- * falling back to the prop value.
+ * Why synchronous navigation (not fetch → open):
+ * iOS Safari only honors `window.open` / `location` changes triggered
+ * directly by a user gesture. Any navigation that runs after `await` is
+ * treated as programmatic and silently blocked, so the download button
+ * must navigate within the click handler itself — no async in between.
  */
 export const FormatBundleDownload = ({
   releaseId,
@@ -51,8 +50,7 @@ export const FormatBundleDownload = ({
   );
   const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-
-  const download = useBundleDownloadMutation({ onSuccess: onDownloadComplete });
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const resolvedFormats = formats ?? [];
   const isLoadingFormatsResolved = initialFormats.length > 0 ? false : isLoadingFormats;
@@ -69,8 +67,18 @@ export const FormatBundleDownload = ({
   );
 
   const handleDownload = () => {
-    if (!hasSelection || atLimit) return;
-    download.mutate({ releaseId, formats: selectedFormats });
+    if (!hasSelection || atLimit || isDownloading) return;
+
+    const joined = selectedFormats.join(',');
+    const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}`;
+
+    setIsDownloading(true);
+    window.open(apiUrl, '_self');
+
+    setTimeout(() => {
+      setIsDownloading(false);
+      onDownloadComplete?.();
+    }, 3000);
   };
 
   if (isLoadingFormatsResolved) {
@@ -98,26 +106,13 @@ export const FormatBundleDownload = ({
         disabled={atLimit}
       />
 
-      {download.error && (
-        <p className="text-destructive text-sm" role="alert">
-          {download.error.message}
-        </p>
-      )}
-
-      {download.isSuccess && !download.isPending && (
-        <div className="flex items-center justify-center gap-2 py-2" role="status">
-          <CheckCircle2 className="text-green-600 size-5" />
-          <span className="text-sm font-medium">Download complete</span>
-        </div>
-      )}
-
       <Button
         className="w-full"
         type="button"
-        disabled={!hasSelection || atLimit || download.isPending}
+        disabled={!hasSelection || atLimit || isDownloading}
         onClick={handleDownload}
       >
-        {download.isPending ? (
+        {isDownloading ? (
           <>
             <Loader2 className="size-4 animate-spin" />
             Preparing download...

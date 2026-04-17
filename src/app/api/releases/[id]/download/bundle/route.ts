@@ -36,9 +36,12 @@ const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
  * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...
  *
  * Bundle multiple digital format files into a single ZIP, upload it to S3
- * as a temporary object, and return a presigned download URL. This approach
- * works reliably on all platforms including iOS Safari, which silently
- * ignores blob: URL downloads triggered by programmatic anchor clicks.
+ * as a temporary object, and respond with a 302 redirect to a short-lived
+ * presigned download URL. Redirecting (rather than returning JSON) lets the
+ * client trigger the request with a synchronous `window.open(url, '_self')`
+ * inside the user's click gesture — the only pattern iOS Safari honors for
+ * downloads. The presigned URL sets Content-Disposition: attachment so the
+ * browser downloads the ZIP without leaving the current page.
  *
  * Authorization:
  * 1. Authenticate user
@@ -272,14 +275,13 @@ export async function GET(
         )
       );
 
-      return Response.json(
-        {
-          success: true,
-          downloadUrl,
-          fileName: zipFileName,
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: downloadUrl,
+          ...NO_STORE_HEADERS,
         },
-        { headers: NO_STORE_HEADERS }
-      );
+      });
     } catch (postUploadError) {
       try {
         await s3Client.send(

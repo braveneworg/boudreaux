@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
@@ -258,28 +258,21 @@ describe('CollectionList', () => {
 });
 
 describe('CollectionDownloadDialog', () => {
-  const user = userEvent.setup();
-  const mockPresignedUrl = 'https://s3.example.com/presigned-bundle-url';
-
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
     });
+  });
 
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          downloadUrl: mockPresignedUrl,
-          fileName: 'Test Album.zip',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('opens download dialog when download button is clicked', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createWrapper(),
     });
@@ -290,6 +283,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows all format toggle buttons', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createWrapper(),
     });
@@ -301,6 +295,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows download limit message when at limit', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.releaseDownloads = [{ downloadCount: 5 }];
 
@@ -312,6 +307,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows no formats message when no digital formats', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [];
 
@@ -322,7 +318,8 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByText(/no digital formats/i)).toBeInTheDocument();
   });
 
-  it('fetches presigned URL and opens it via window.open on submit', async () => {
+  it('navigates to the bundle API URL synchronously on submit', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -332,14 +329,15 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/releases/rel-1/download/bundle?formats=')
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/releases\/rel-1\/download\/bundle\?formats=FLAC,WAV/),
+      '_self'
     );
-    expect(openSpy).toHaveBeenCalledWith(mockPresignedUrl, '_self');
-    openSpy.mockRestore();
   });
 
-  it('shows download complete state on success', async () => {
+  it('shows Preparing download while navigation is in flight', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -349,20 +347,12 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(screen.getByText('Download complete')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
   });
 
-  it('shows error message when fetch returns non-ok response', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: false,
-          error: 'NO_FILES',
-          message: 'No downloadable files found.',
-        }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+  it('re-enables the download button after the preparing timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createWrapper(),
@@ -371,56 +361,17 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('No downloadable files found.');
-  });
+    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
 
-  it('shows generic error when fetch throws', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
-
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
+    act(() => {
+      vi.advanceTimersByTime(3000);
     });
 
-    await user.click(screen.getByRole('button', { name: /download test album/i }));
-    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Download failed. Please try again.');
-  });
-
-  it('shows error when response has no downloadUrl', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
-
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
-    });
-
-    await user.click(screen.getByRole('button', { name: /download test album/i }));
-    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Download link is unavailable.');
-  });
-
-  it('shows fallback error when response body is not JSON', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response('Internal Server Error', { status: 500 })
-    );
-
-    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
-      wrapper: createWrapper(),
-    });
-
-    await user.click(screen.getByRole('button', { name: /download test album/i }));
-    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Download failed. Please try again.');
+    expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
   });
 
   it('shows singular "format" for single selection', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
@@ -432,6 +383,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows download count usage', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createWrapper(),
     });
@@ -442,6 +394,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('shows raw formatType when no label mapping exists', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [
       { formatType: 'CUSTOM_XYZ', files: [{ fileName: 'custom.zip' }] },
@@ -455,6 +408,7 @@ describe('CollectionDownloadDialog', () => {
   });
 
   it('disables download button when all formats are deselected', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
     purchase.release.digitalFormats = [{ formatType: 'FLAC', files: [{ fileName: 'track.flac' }] }];
 
@@ -467,22 +421,22 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByRole('button', { name: /select at least one format/i })).toBeDisabled();
   });
 
-  it('clears error and download state when dialog reopens', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+  it('resets the preparing state when dialog reopens', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.spyOn(window, 'open').mockImplementation(() => null);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createWrapper(),
     });
 
-    // First attempt — triggers error
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
 
-    // Close and reopen dialog
+    // Close and reopen dialog — should not still show "Preparing..."
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
   });
 });

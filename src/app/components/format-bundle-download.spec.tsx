@@ -2,34 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { FormatBundleDownload } from './format-bundle-download';
-
-/** Builds a mock fetch Response that returns JSON (matching the new bundle API shape). */
-const mockBundleJsonResponse = (overrides?: {
-  ok?: boolean;
-  status?: number;
-  body?: Record<string, unknown>;
-}): Response => {
-  const { ok = true, status = 200, body } = overrides ?? {};
-  const defaultBody = ok
-    ? {
-        success: true,
-        downloadUrl: 'https://s3.example.com/presigned-bundle',
-        fileName: 'Test Album.zip',
-      }
-    : { success: false, message: 'Error' };
-  return {
-    ok,
-    status,
-    headers: new Headers({ 'Content-Type': 'application/json' }),
-    json: async () => body ?? defaultBody,
-  } as unknown as Response;
-};
 
 describe('FormatBundleDownload', () => {
   const defaultProps = {
@@ -52,18 +30,18 @@ describe('FormatBundleDownload', () => {
     await user.click(selectAllOption as HTMLElement);
   };
 
-  /** Stubs fetch and window.open for bundle download tests. */
-  const stubDownloadApis = (responseOverrides?: Parameters<typeof mockBundleJsonResponse>[0]) => {
-    const fetchSpy = vi.fn().mockResolvedValue(mockBundleJsonResponse(responseOverrides));
-    vi.stubGlobal('fetch', fetchSpy);
-
+  const stubWindowOpen = () => {
     const openSpy = vi.fn();
     vi.stubGlobal('open', openSpy);
-
-    return { fetchSpy, openSpy };
+    return openSpy;
   };
 
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -100,11 +78,9 @@ describe('FormatBundleDownload', () => {
 
     await selectAll(user);
 
-    // Trigger shows count
     const combobox = screen.getByRole('combobox');
     expect(combobox).toHaveTextContent('3 formats selected');
 
-    // Pills rendered below combobox
     const pills = screen.getByRole('list', { name: /Selected formats/ });
     expect(within(pills).getByText('FLAC')).toBeInTheDocument();
     expect(within(pills).getByText('WAV')).toBeInTheDocument();
@@ -116,11 +92,9 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup();
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
-    // Select all first
     await selectAll(user);
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
 
-    // Now deselect all
     const deselectOption = screen
       .getAllByRole('option')
       .find((o) => /Deselect all/i.test(o.textContent ?? ''));
@@ -136,7 +110,6 @@ describe('FormatBundleDownload', () => {
 
     await selectAll(user);
 
-    // Deselect FLAC
     const flacOption = screen
       .getAllByRole('option')
       .find((opt) => opt.textContent?.includes('FLAC'));
@@ -149,7 +122,6 @@ describe('FormatBundleDownload', () => {
     const user = userEvent.setup();
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
-    // Select just one
     await user.click(screen.getByRole('combobox'));
     const wavOption = screen.getAllByRole('option').find((o) => o.textContent?.includes('WAV'));
     await user.click(wavOption as HTMLElement);
@@ -177,10 +149,8 @@ describe('FormatBundleDownload', () => {
       wrapper: createQueryWrapper(),
     });
 
-    // Initially shows loading spinner
     expect(screen.getByRole('status')).toBeInTheDocument();
 
-    // After fetch resolves, shows empty message
     expect(
       await screen.findByText('No digital formats available for download.')
     ).toBeInTheDocument();
@@ -202,31 +172,95 @@ describe('FormatBundleDownload', () => {
       wrapper: createQueryWrapper(),
     });
 
-    // After fetch, combobox should appear with placeholder (nothing selected)
     const combobox = await screen.findByRole('combobox');
     expect(combobox).toHaveTextContent('Select formats...');
 
-    // Download button disabled until user selects
     expect(screen.getByRole('button', { name: /Select at least one format/ })).toBeDisabled();
   });
 
-  it('should fetch bundle URL and open presigned URL via window.open', async () => {
-    const user = userEvent.setup();
-    const { fetchSpy, openSpy } = stubDownloadApis();
+  it('should navigate to the bundle API URL synchronously on click', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const openSpy = stubWindowOpen();
 
     render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
 
     await selectAll(user);
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
-    // fetch was called with the bundle URL
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/api/releases/release-123/download/bundle?formats=')
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /\/api\/releases\/release-123\/download\/bundle\?formats=FLAC,WAV,MP3_320KBPS/
+      ),
+      '_self'
     );
+  });
 
-    // After the server responds, window.open triggers the browser download
-    await screen.findByText('Download complete');
-    expect(openSpy).toHaveBeenCalledWith('https://s3.example.com/presigned-bundle', '_self');
+  it('should show "Preparing download..." while the navigation is in flight', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    stubWindowOpen();
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
+  });
+
+  it('should re-enable the download button after the preparing timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    stubWindowOpen();
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(screen.getByRole('button', { name: /Preparing download/ })).toBeDisabled();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
+  });
+
+  it('should call onDownloadComplete after the preparing timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onDownloadComplete = vi.fn();
+    stubWindowOpen();
+
+    render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(onDownloadComplete).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(onDownloadComplete).toHaveBeenCalledOnce();
+  });
+
+  it('should not error when onDownloadComplete is not provided', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    stubWindowOpen();
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(() =>
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      })
+    ).not.toThrow();
   });
 
   it('should display unknown formatType when no label is found', async () => {
@@ -239,67 +273,8 @@ describe('FormatBundleDownload', () => {
       { wrapper: createQueryWrapper() }
     );
 
-    // Open combobox to see the option label
     await user.click(screen.getByRole('combobox'));
     expect(screen.getByText('CUSTOM_XYZ')).toBeInTheDocument();
-  });
-
-  it('should call onDownloadComplete after the download finishes', async () => {
-    const user = userEvent.setup();
-    const onDownloadComplete = vi.fn();
-    stubDownloadApis();
-
-    render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />, {
-      wrapper: createQueryWrapper(),
-    });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    await screen.findByText('Download complete');
-    expect(onDownloadComplete).toHaveBeenCalledOnce();
-  });
-
-  it('should not error when onDownloadComplete is not provided', async () => {
-    const user = userEvent.setup();
-    stubDownloadApis();
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByText('Download complete')).toBeInTheDocument();
-  });
-
-  it('should show error message when fetch response is not ok', async () => {
-    const user = userEvent.setup();
-    stubDownloadApis({
-      ok: false,
-      status: 403,
-      body: { success: false, message: 'Purchase required to download.' },
-    });
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Purchase required to download.');
-  });
-
-  it('should show generic error when fetch throws', async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Download failed. Please try again.'
-    );
   });
 
   it('should remove a format when clicking the X on its pill', async () => {
@@ -309,29 +284,12 @@ describe('FormatBundleDownload', () => {
     await selectAll(user);
     expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
 
-    // Click the remove button on the FLAC pill
     const removeFlac = screen.getByRole('button', { name: /Remove FLAC/ });
     await user.click(removeFlac);
 
     expect(screen.getByRole('button', { name: /Download 2 formats/ })).toBeInTheDocument();
     const pills = screen.getByRole('list', { name: /Selected formats/ });
     expect(within(pills).queryByText('FLAC')).not.toBeInTheDocument();
-  });
-
-  it('should re-enable the download button after completion', async () => {
-    const user = userEvent.setup();
-    stubDownloadApis();
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    // Wait for completion
-    await screen.findByText('Download complete');
-
-    // Button should be re-enabled
-    expect(screen.getByRole('button', { name: /Download 3 formats/ })).toBeEnabled();
   });
 
   it('should show fallback message when API fetch fails for empty availableFormats', async () => {
@@ -356,63 +314,5 @@ describe('FormatBundleDownload', () => {
     expect(
       await screen.findByText('No digital formats available for download.')
     ).toBeInTheDocument();
-  });
-
-  it('should show generic error when response json() throws', async () => {
-    const user = userEvent.setup();
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        headers: new Headers(),
-        json: vi.fn().mockRejectedValue(new Error('invalid json')),
-      } as unknown as Response)
-    );
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Download failed. Please try again.'
-    );
-  });
-
-  it('should show error when response is ok but success is false', async () => {
-    const user = userEvent.setup();
-    stubDownloadApis({
-      ok: true,
-      status: 200,
-      body: { success: false, message: 'No files found.' },
-    });
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('No files found.');
-  });
-
-  it('should show error when response is successful but downloadUrl is missing', async () => {
-    const user = userEvent.setup();
-    const { openSpy } = stubDownloadApis({
-      ok: true,
-      status: 200,
-      body: { success: true, fileName: 'Test Album.zip' },
-    });
-
-    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
-
-    await selectAll(user);
-    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Download link is unavailable. Please try again.'
-    );
-    expect(openSpy).not.toHaveBeenCalled();
   });
 });
