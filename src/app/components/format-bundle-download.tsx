@@ -9,10 +9,10 @@ import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
 import { MultiCombobox } from '@/app/components/forms/fields/multi-combobox';
 import { Button } from '@/app/components/ui/button';
-import { Progress } from '@/app/components/ui/progress';
 import { useReleaseDigitalFormatsQuery } from '@/app/hooks/use-release-digital-formats-query';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
+import { parseSSEBuffer } from '@/lib/utils/parse-sse';
 
 interface AvailableFormat {
   formatType: string;
@@ -26,14 +26,19 @@ interface FormatBundleDownloadProps {
   onDownloadComplete?: () => void;
 }
 
+type FormatDownloadStatus = 'pending' | 'zipping' | 'complete' | 'error';
+
+interface FormatProgress {
+  formatType: string;
+  label: string;
+  status: FormatDownloadStatus;
+}
+
 /**
- * FormatBundleDownload — multi-select format picker with a bundle download
- * button. Clicking the button fetches a presigned S3 URL via the bundle API
- * (with `respond=json`), then triggers the download with
- * `window.open(url, '_self')`. The response's `Content-Disposition: attachment`
- * header causes the browser to download the ZIP without leaving the page.
- *
- * A progress bar is shown while the bundle is being prepared on the server.
+ * FormatBundleDownload — multi-select format picker that streams per-format
+ * ZIP creation from the bundle API via SSE. Each format is zipped server-side
+ * and downloaded as it becomes ready. After all downloads are triggered, a POST
+ * to the confirm endpoint increments the download count.
  */
 export const FormatBundleDownload = ({
   releaseId,
@@ -47,17 +52,17 @@ export const FormatBundleDownload = ({
   );
   const formats = initialFormats.length > 0 ? initialFormats : (formatsData?.formats ?? null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'preparing' | 'complete' | 'error'>(
+  const [downloadPhase, setDownloadPhase] = useState<'idle' | 'downloading' | 'complete' | 'error'>(
     'idle'
   );
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [formatProgress, setFormatProgress] = useState<FormatProgress[]>([]);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const resolvedFormats = formats ?? [];
   const isLoadingFormatsResolved = initialFormats.length > 0 ? false : isLoadingFormats;
   const atLimit = downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT;
   const hasSelection = selectedFormats.length > 0;
-  const isPreparing = downloadPhase === 'preparing';
+  const isDownloading = downloadPhase === 'downloading';
 
   const comboboxOptions = useMemo(
     () =>
@@ -69,43 +74,94 @@ export const FormatBundleDownload = ({
   );
 
   const handleDownload = async () => {
-    if (!hasSelection || atLimit || isPreparing) return;
+    if (!hasSelection || atLimit || isDownloading) return;
 
     const joined = selectedFormats.join(',');
     const apiUrl = `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=json`;
 
-    setDownloadPhase('preparing');
-    setDownloadProgress(10);
+    setDownloadPhase('downloading');
     setDownloadError(null);
-    const progressInterval = window.setInterval(() => {
-      setDownloadProgress((value) => (value >= 90 ? value : value + 10));
-    }, 300);
+
+    // Initialize all selected formats as pending
+    setFormatProgress(
+      selectedFormats.map((ft) => ({
+        formatType: ft,
+        label: FORMAT_LABELS[ft] ?? ft,
+        status: 'pending' as const,
+      }))
+    );
 
     try {
       const response = await fetch(apiUrl);
-      const data = await response.json();
-      window.clearInterval(progressInterval);
 
-      if (!response.ok || !data.success) {
+      if (!response.ok || !response.body) {
         setDownloadPhase('error');
-        setDownloadProgress(0);
-        setDownloadError(data.message ?? 'Download failed. Please try again.');
+        setFormatProgress([]);
+        setDownloadError('Download failed. Please try again.');
         return;
       }
 
-      window.open(data.downloadUrl, '_self');
-      setDownloadPhase('complete');
-      setDownloadProgress(100);
-      onDownloadComplete?.();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const completedFormats: string[] = [];
 
-      setTimeout(() => {
-        setDownloadPhase('idle');
-        setDownloadProgress(0);
-      }, 2000);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { events, remaining } = parseSSEBuffer(buffer);
+        buffer = remaining;
+
+        for (const evt of events) {
+          const data = JSON.parse(evt.data) as Record<string, unknown>;
+
+          if (evt.event === 'progress') {
+            setFormatProgress((prev) =>
+              prev.map((fp) =>
+                fp.formatType === data.formatType ? { ...fp, status: 'zipping' as const } : fp
+              )
+            );
+          } else if (evt.event === 'ready') {
+            window.open(data.downloadUrl as string, '_self');
+            completedFormats.push(data.formatType as string);
+            setFormatProgress((prev) =>
+              prev.map((fp) =>
+                fp.formatType === data.formatType ? { ...fp, status: 'complete' as const } : fp
+              )
+            );
+          } else if (evt.event === 'error') {
+            setFormatProgress((prev) =>
+              prev.map((fp) =>
+                fp.formatType === data.formatType ? { ...fp, status: 'error' as const } : fp
+              )
+            );
+          }
+        }
+      }
+
+      if (completedFormats.length > 0) {
+        await fetch(`/api/releases/${releaseId}/download/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formats: completedFormats }),
+        });
+
+        setDownloadPhase('complete');
+        onDownloadComplete?.();
+
+        setTimeout(() => {
+          setDownloadPhase('idle');
+          setFormatProgress([]);
+        }, 3000);
+      } else {
+        setDownloadPhase('error');
+        setDownloadError('No formats could be prepared. Please try again.');
+      }
     } catch {
-      window.clearInterval(progressInterval);
       setDownloadPhase('error');
-      setDownloadProgress(0);
+      setFormatProgress([]);
       setDownloadError('Something went wrong. Please try again.');
     }
   };
@@ -132,14 +188,36 @@ export const FormatBundleDownload = ({
         onValueChange={setSelectedFormats}
         placeholder="Select formats..."
         emptyMessage="No formats found."
-        disabled={atLimit || isPreparing}
+        disabled={atLimit || isDownloading}
       />
 
-      {(isPreparing || downloadPhase === 'complete') && (
-        <div className="space-y-2">
-          <div className="text-muted-foreground text-xs">{downloadProgress}%</div>
-          <Progress value={downloadProgress} className="h-2" />
-        </div>
+      {formatProgress.length > 0 && (
+        <ul className="space-y-1" role="status">
+          {formatProgress.map((fp) => (
+            <li key={fp.formatType} className="flex items-center gap-2 text-sm">
+              {fp.status === 'complete' ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+              ) : fp.status === 'zipping' ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
+              ) : fp.status === 'error' ? (
+                <AlertCircle className="text-destructive size-4 shrink-0" />
+              ) : (
+                <span className="text-muted-foreground size-4 shrink-0 text-center">&bull;</span>
+              )}
+              <span
+                className={
+                  fp.status === 'complete'
+                    ? 'text-emerald-600'
+                    : fp.status === 'error'
+                      ? 'text-destructive'
+                      : ''
+                }
+              >
+                {fp.label}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {downloadPhase === 'error' && downloadError && (
@@ -152,19 +230,19 @@ export const FormatBundleDownload = ({
       {downloadPhase === 'complete' ? (
         <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
           <CheckCircle2 className="size-4" />
-          Download started!
+          Downloads started!
         </div>
       ) : (
         <Button
           className="w-full"
           type="button"
-          disabled={!hasSelection || atLimit || isPreparing}
+          disabled={!hasSelection || atLimit || isDownloading}
           onClick={handleDownload}
         >
-          {isPreparing ? (
+          {isDownloading ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Preparing download...
+              Preparing...
             </>
           ) : (
             <>

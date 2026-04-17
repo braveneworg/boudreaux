@@ -269,12 +269,51 @@ describe('CollectionList', () => {
 });
 
 describe('CollectionDownloadDialog', () => {
+  function makeSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>): string {
+    return events
+      .map((evt) => `event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
+      .join('');
+  }
+
+  const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
+    { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
+    {
+      event: 'ready',
+      data: {
+        formatType: 'FLAC',
+        label: 'FLAC',
+        downloadUrl: 'https://s3.example.com/flac.zip',
+        fileName: 'Test Album - FLAC.zip',
+      },
+    },
+    { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'zipping' } },
+    {
+      event: 'ready',
+      data: {
+        formatType: 'WAV',
+        label: 'WAV',
+        downloadUrl: 'https://s3.example.com/wav.zip',
+        fileName: 'Test Album - WAV.zip',
+      },
+    },
+    { event: 'complete', data: {} },
+  ];
+
+  function makeSSEResponse(events = defaultSSEEvents) {
+    return new Response(makeSSEBody(events), {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  }
+
+  function makeConfirmResponse() {
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.spyOn(window, 'open').mockReturnValue({
-      close: vi.fn(),
-      location: { href: '' },
-    } as unknown as Window);
+    vi.spyOn(window, 'open').mockReturnValue(null);
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
@@ -340,10 +379,10 @@ describe('CollectionDownloadDialog', () => {
 
   it('calls fetch with respond=json on submit', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
-    });
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeConfirmResponse());
     vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -362,7 +401,7 @@ describe('CollectionDownloadDialog', () => {
     });
   });
 
-  it('shows Preparing download while fetch is in flight', async () => {
+  it('shows Preparing while fetch is in flight', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal('fetch', () => new Promise(() => {}));
 
@@ -373,20 +412,16 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(screen.getByRole('button', { name: /preparing download/i })).toBeDisabled();
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
-    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeDisabled();
   });
 
-  it('shows Download started and re-enables the download button after timeout', async () => {
+  it('shows Downloads started and re-enables the download button after timeout', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
-      })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeConfirmResponse());
+    vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -395,14 +430,62 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
-    expect(await screen.findByText('Download started!')).toBeInTheDocument();
-    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(3000);
     });
 
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
+  });
+
+  it('calls window.open for each format ZIP', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeConfirmResponse());
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/flac.zip', '_self');
+      expect(window.open).toHaveBeenCalledWith('https://s3.example.com/wav.zip', '_self');
+      expect(window.open).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('POSTs to confirm endpoint after all downloads', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeConfirmResponse());
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        '/api/releases/rel-1/download/confirm',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ formats: ['FLAC', 'WAV'] }),
+        })
+      );
+    });
   });
 
   it('shows singular "format" for single selection', async () => {
@@ -464,13 +547,11 @@ describe('CollectionDownloadDialog', () => {
 
   it('resets the download state when dialog reopens', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true, downloadUrl: 'https://s3.example.com/url' }),
-      })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(makeSSEResponse())
+      .mockResolvedValueOnce(makeConfirmResponse());
+    vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -478,7 +559,7 @@ describe('CollectionDownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /download test album/i }));
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
-    expect(await screen.findByText('Download started!')).toBeInTheDocument();
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
 
     // Close and reopen dialog — should reset to idle
     await user.keyboard('{Escape}');
@@ -489,13 +570,7 @@ describe('CollectionDownloadDialog', () => {
 
   it('shows error message when download fetch fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ success: false, message: 'Download failed. Please try again.' }),
-      })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),

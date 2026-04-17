@@ -107,8 +107,41 @@ function makeRequest(formats = 'FLAC,WAV'): NextRequest {
   );
 }
 
+function makeJsonRequest(formats = 'FLAC,WAV'): NextRequest {
+  return new NextRequest(
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&respond=json`,
+    {
+      headers: {
+        'x-forwarded-for': '127.0.0.1',
+        'user-agent': 'test-agent',
+      },
+    }
+  );
+}
+
 function makeParams(id = '507f1f77bcf86cd799439011') {
   return { params: Promise.resolve({ id }) };
+}
+
+async function readSSEEvents(
+  response: Response
+): Promise<Array<{ event: string; data: Record<string, unknown> }>> {
+  const text = await response.text();
+  const events: Array<{ event: string; data: Record<string, unknown> }> = [];
+  const blocks = text.split('\n\n');
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    let event = 'message';
+    let data = '';
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event: ')) event = line.slice(7);
+      else if (line.startsWith('data: ')) data = line.slice(6);
+    }
+    if (data) {
+      events.push({ event, data: JSON.parse(data) as Record<string, unknown> });
+    }
+  }
+  return events;
 }
 
 describe('GET /api/releases/[id]/download/bundle', () => {
@@ -253,24 +286,130 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
   });
 
-  it('should return JSON with downloadUrl when respond=json is set', async () => {
-    const req = new NextRequest(
-      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC,WAV&respond=json',
-      {
-        headers: {
-          'x-forwarded-for': '127.0.0.1',
-          'user-agent': 'test-agent',
-        },
-      }
-    );
+  // ─── SSE streaming path (respond=json) ──────────────────────────────────
 
-    const response = await GET(req, makeParams());
-    const body = await response.json();
+  it('should return SSE stream with correct headers when respond=json', async () => {
+    const response = await GET(makeJsonRequest(), makeParams());
 
-    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    expect(body.success).toBe(true);
-    expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
+    expect(response.headers.get('X-Accel-Buffering')).toBe('no');
+  });
+
+  it('should stream progress and ready events for each format', async () => {
+    mockGeneratePresignedDownloadUrl
+      .mockResolvedValueOnce('https://s3.example.com/flac-bundle.zip')
+      .mockResolvedValueOnce('https://s3.example.com/wav-bundle.zip');
+
+    const response = await GET(makeJsonRequest(), makeParams());
+    const events = await readSSEEvents(response);
+
+    // progress(FLAC), ready(FLAC), progress(WAV), ready(WAV), complete
+    expect(events).toHaveLength(5);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'FLAC', status: 'zipping' }),
+      })
+    );
+    expect(events[1]).toEqual(
+      expect.objectContaining({
+        event: 'ready',
+        data: expect.objectContaining({
+          formatType: 'FLAC',
+          downloadUrl: 'https://s3.example.com/flac-bundle.zip',
+        }),
+      })
+    );
+    expect(events[2]).toEqual(
+      expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'WAV', status: 'zipping' }),
+      })
+    );
+    expect(events[3]).toEqual(
+      expect.objectContaining({
+        event: 'ready',
+        data: expect.objectContaining({
+          formatType: 'WAV',
+          downloadUrl: 'https://s3.example.com/wav-bundle.zip',
+        }),
+      })
+    );
+    expect(events[4]).toEqual(expect.objectContaining({ event: 'complete' }));
+  });
+
+  it('should include fileName in ready events', async () => {
+    mockGeneratePresignedDownloadUrl.mockResolvedValueOnce('https://s3.example.com/bundle.zip');
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    const readyEvent = events.find((e) => e.event === 'ready');
+    expect(readyEvent?.data).toEqual(
+      expect.objectContaining({
+        fileName: expect.stringContaining('Test Album - FLAC.zip'),
+      })
+    );
+  });
+
+  it('should create per-format ZIPs via archiver when respond=json', async () => {
+    const response = await GET(makeJsonRequest(), makeParams());
+    await response.text(); // consume the stream to trigger all async work
+
+    // FLAC has 2 files + WAV has 1 file = 3 total appends, 2 formats = 2 finalize + 2 uploads
+    expect(mockAppend).toHaveBeenCalledTimes(3);
+    expect(mockFinalize).toHaveBeenCalledTimes(2);
+    expect(mockUploadDone).toHaveBeenCalledTimes(2);
+  });
+
+  it('should not increment download count when respond=json', async () => {
+    const response = await GET(makeJsonRequest(), makeParams());
+    await response.text(); // consume the stream
+
+    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+    expect(mockLogDownloadEvent).not.toHaveBeenCalled();
+  });
+
+  it('should send error event for a failed format and continue with others', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUploadDone
+      .mockRejectedValueOnce(new Error('Upload failed'))
+      .mockResolvedValueOnce(undefined);
+    mockGeneratePresignedDownloadUrl.mockResolvedValue('https://s3.example.com/wav-bundle.zip');
+
+    const response = await GET(makeJsonRequest(), makeParams());
+    const events = await readSSEEvents(response);
+
+    // progress(FLAC), error(FLAC), progress(WAV), ready(WAV), complete
+    expect(events).toHaveLength(5);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'FLAC' }),
+      })
+    );
+    expect(events[1]).toEqual(
+      expect.objectContaining({
+        event: 'error',
+        data: expect.objectContaining({ formatType: 'FLAC' }),
+      })
+    );
+    expect(events[2]).toEqual(
+      expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'WAV' }),
+      })
+    );
+    expect(events[3]).toEqual(
+      expect.objectContaining({
+        event: 'ready',
+        data: expect.objectContaining({ formatType: 'WAV' }),
+      })
+    );
+    expect(events[4]).toEqual(expect.objectContaining({ event: 'complete' }));
+
+    consoleSpy.mockRestore();
   });
 
   it('should append files to the archive for multi-track formats', async () => {
