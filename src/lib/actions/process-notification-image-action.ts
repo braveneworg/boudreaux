@@ -78,6 +78,11 @@ const BANNER_HEIGHT = 544;
 // Base pixel size for 1rem (used to convert rem to px)
 const BASE_FONT_SIZE = 16;
 
+// Upper bound on the decoded-pixel count sharp will accept. A ~30 KB JPEG can
+// expand into gigabytes of raw pixels; capping at 50 MP prevents OOM from
+// malicious "decompression bomb" images. 50 MP covers 8K (33 MP) with headroom.
+const SHARP_MAX_INPUT_PIXELS = 50_000_000;
+
 /**
  * Process a notification banner image with text overlay on the server
  * Uses Sharp for high-quality image processing
@@ -119,13 +124,15 @@ export async function processNotificationImageAction(
     const imageBuffer = Buffer.from(imageBase64, 'base64');
 
     // Get original image dimensions
-    const originalMetadata = await sharp(imageBuffer).metadata();
+    const originalMetadata = await sharp(imageBuffer, {
+      limitInputPixels: SHARP_MAX_INPUT_PIXELS,
+    }).metadata();
     const originalWidth = originalMetadata.width || BANNER_WIDTH;
     const originalHeight = originalMetadata.height || BANNER_HEIGHT;
 
     // If overlay is not enabled or no message, just resize and return
     if (!isOverlayed || !message) {
-      const outputBuffer = await sharp(imageBuffer)
+      const outputBuffer = await sharp(imageBuffer, { limitInputPixels: SHARP_MAX_INPUT_PIXELS })
         .resize(width, height, {
           fit: 'cover',
           position: 'center',
@@ -174,7 +181,7 @@ export async function processNotificationImageAction(
     });
 
     // First, crop the image to the target aspect ratio (at original resolution)
-    const croppedBuffer = await sharp(imageBuffer)
+    const croppedBuffer = await sharp(imageBuffer, { limitInputPixels: SHARP_MAX_INPUT_PIXELS })
       .extract({ left: cropLeft, top: cropTop, width: cropWidth, height: cropHeight })
       .toBuffer();
 
@@ -260,14 +267,45 @@ interface TextOverlaySvgOptions {
 }
 
 /**
- * Get the font stack for a given font family
+ * Allowed font families for overlay rendering. Restricting to a known set
+ * prevents SVG attribute injection via a crafted font-family string (e.g.,
+ * `a" onerror="…`), because the value is interpolated into `font-family="…"`
+ * in the generated SVG markup.
+ */
+const ALLOWED_FONT_FAMILIES = new Set<string>([
+  'system-ui',
+  'Roboto',
+  'Open Sans',
+  'Lato',
+  'Oswald',
+  'Playfair Display',
+]);
+
+/**
+ * Get the font stack for a given font family. Falls back to system-ui for any
+ * family not in the allowlist.
  */
 function getFontStack(fontFamily: string): string {
-  if (fontFamily === 'system-ui') {
+  const safe = ALLOWED_FONT_FAMILIES.has(fontFamily) ? fontFamily : 'system-ui';
+  if (safe === 'system-ui') {
     return "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   }
-  // Wrap font name in quotes and add fallbacks
-  return `'${fontFamily}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+  return `'${safe}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+}
+
+/**
+ * Normalize a hex color to a canonical `#rrggbb` form. Rejects any value that
+ * is not a valid 3- or 6-digit hex color and falls back to white so the SVG
+ * attribute cannot be broken out of.
+ */
+function normalizeHexColor(hex: string, fallback = '#ffffff'): string {
+  return /^#([a-f\d]{3}|[a-f\d]{6})$/i.test(hex) ? hex : fallback;
+}
+
+/** Clamp a numeric input to the closed range [min, max]. */
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
 }
 
 /**
@@ -306,18 +344,25 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
   const plainSecondaryMessage = secondaryMessage ? stripHtmlTags(secondaryMessage) : undefined;
 
   // Convert rem to pixels (scaled for image dimensions)
-  // Scale factor accounts for typical 880px width banner
+  // Scale factor accounts for typical 880px width banner.
+  // All numeric inputs are clamped to sane ranges to prevent SVG resource
+  // exhaustion (e.g., absurd font sizes, rotation values) and to guarantee
+  // the rendered output stays inside the banner bounds.
   const scaleFactor = width / 880;
-  const messageFontSizePx = Math.round(messageFontSize * BASE_FONT_SIZE * scaleFactor);
-  const secondaryFontSizePx = Math.round(secondaryMessageFontSize * BASE_FONT_SIZE * scaleFactor);
+  const messageFontSizePx = Math.round(
+    clampNumber(messageFontSize, 0.5, 20) * BASE_FONT_SIZE * scaleFactor
+  );
+  const secondaryFontSizePx = Math.round(
+    clampNumber(secondaryMessageFontSize, 0.5, 20) * BASE_FONT_SIZE * scaleFactor
+  );
 
-  // Get font stacks
+  // Get font stacks (allowlist-enforced to prevent attribute injection)
   const messageFontStack = getFontStack(messageFont);
   const secondaryFontStack = getFontStack(secondaryMessageFont);
 
   // Convert contrast percentage to opacity (0-1)
-  const messageOpacity = messageContrast / 100;
-  const secondaryOpacity = secondaryMessageContrast / 100;
+  const messageOpacity = clampNumber(messageContrast, 0, 100) / 100;
+  const secondaryOpacity = clampNumber(secondaryMessageContrast, 0, 100) / 100;
 
   // Convert hex color to RGB values
   const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
@@ -331,14 +376,15 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
       : { r: 255, g: 255, b: 255 };
   };
 
-  // Get RGB values for text colors
-  const messageRgb = hexToRgb(messageTextColor);
-  const secondaryRgb = hexToRgb(secondaryMessageTextColor);
+  // Get RGB values for text colors (normalize first so invalid hex cannot slip through)
+  const messageRgb = hexToRgb(normalizeHexColor(messageTextColor));
+  const secondaryRgb = hexToRgb(normalizeHexColor(secondaryMessageTextColor));
 
   // Convert shadow darkness (0-100) to opacity value (0.3 to 0.9)
   // 0% darkness = 0.3 opacity (light shadow), 100% darkness = 0.9 opacity (dark shadow)
-  const messageShadowOpacity = 0.3 + (messageTextShadowDarkness / 100) * 0.6;
-  const secondaryShadowOpacity = 0.3 + (secondaryMessageTextShadowDarkness / 100) * 0.6;
+  const messageShadowOpacity = 0.3 + (clampNumber(messageTextShadowDarkness, 0, 100) / 100) * 0.6;
+  const secondaryShadowOpacity =
+    0.3 + (clampNumber(secondaryMessageTextShadowDarkness, 0, 100) / 100) * 0.6;
 
   // Word wrap the plain text messages
   const maxCharsPerLine = Math.floor(width / (messageFontSizePx * 0.55));
@@ -353,8 +399,14 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
 
   // Calculate X positions based on percentage (0-100)
   // Convert percentage to pixel position
-  const messageX = Math.round((messagePositionX / 100) * width);
-  const secondaryX = Math.round((secondaryMessagePositionX / 100) * width);
+  const clampedMessagePositionX = clampNumber(messagePositionX, 0, 100);
+  const clampedSecondaryPositionX = clampNumber(secondaryMessagePositionX, 0, 100);
+  const clampedMessagePositionY = clampNumber(messagePositionY, 0, 100);
+  const clampedSecondaryPositionY = clampNumber(secondaryMessagePositionY, 0, 100);
+  const clampedMessageRotation = clampNumber(messageRotation, -360, 360);
+  const clampedSecondaryRotation = clampNumber(secondaryMessageRotation, -360, 360);
+  const messageX = Math.round((clampedMessagePositionX / 100) * width);
+  const secondaryX = Math.round((clampedSecondaryPositionX / 100) * width);
 
   // Determine text-anchor based on X position
   // Left third = start, middle third = middle, right third = end
@@ -363,12 +415,12 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
     if (xPercent > 67) return 'end';
     return 'middle';
   };
-  const messageTextAnchor = getTextAnchor(messagePositionX);
-  const secondaryTextAnchor = getTextAnchor(secondaryMessagePositionX);
+  const messageTextAnchor = getTextAnchor(clampedMessagePositionX);
+  const secondaryTextAnchor = getTextAnchor(clampedSecondaryPositionX);
 
   // Calculate Y positions based on percentage (0-100)
-  const messageBaseY = Math.round((messagePositionY / 100) * height);
-  const secondaryBaseY = Math.round((secondaryMessagePositionY / 100) * height);
+  const messageBaseY = Math.round((clampedMessagePositionY / 100) * height);
+  const secondaryBaseY = Math.round((clampedSecondaryPositionY / 100) * height);
 
   // Build the SVG with text overlay
   // Simple styling: font-family, font-size, and opacity only
@@ -393,7 +445,9 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
       const y = messageBaseY + offsetFromCenter;
       const filterAttr = messageTextShadow ? ' filter="url(#message-shadow)"' : '';
       const transformAttr =
-        messageRotation !== 0 ? ` transform="rotate(${messageRotation}, ${messageX}, ${y})"` : '';
+        clampedMessageRotation !== 0
+          ? ` transform="rotate(${clampedMessageRotation}, ${messageX}, ${y})"`
+          : '';
       return `
     <text x="${messageX}" y="${y}" text-anchor="${messageTextAnchor}" dominant-baseline="middle"
       font-family="${messageFontStack}"
@@ -412,8 +466,8 @@ function createTextOverlaySvg(options: TextOverlaySvgOptions): string {
       const y = secondaryBaseY + offsetFromCenter;
       const filterAttr = secondaryMessageTextShadow ? ' filter="url(#secondary-shadow)"' : '';
       const transformAttr =
-        secondaryMessageRotation !== 0
-          ? ` transform="rotate(${secondaryMessageRotation}, ${secondaryX}, ${y})"`
+        clampedSecondaryRotation !== 0
+          ? ` transform="rotate(${clampedSecondaryRotation}, ${secondaryX}, ${y})"`
           : '';
       return `
     <text x="${secondaryX}" y="${y}" text-anchor="${secondaryTextAnchor}" dominant-baseline="middle"

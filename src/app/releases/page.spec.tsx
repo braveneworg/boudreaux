@@ -10,7 +10,9 @@ import ReleasesPage from './page';
 vi.mock('server-only', () => ({}));
 
 // Mock TanStack Query SSR utilities
-const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
+const mockPrefetchQuery = vi.fn().mockImplementation(async (opts: { queryFn?: () => unknown }) => {
+  if (opts.queryFn) opts.queryFn();
+});
 const mockDehydratedState = { queries: [], mutations: [] };
 vi.mock('@tanstack/react-query', () => ({
   dehydrate: () => mockDehydratedState,

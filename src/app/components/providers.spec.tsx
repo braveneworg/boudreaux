@@ -39,4 +39,21 @@ describe('Providers', () => {
     expect(screen.getByText('Component with session')).toBeInTheDocument();
     expect(useSession).toHaveBeenCalled();
   });
+
+  it('renders with cache disabled when NEXT_PUBLIC_DISABLE_QUERY_CACHE is true', async () => {
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_DISABLE_QUERY_CACHE', 'true');
+
+    const { Providers: DisabledCacheProviders } = await import('./providers');
+
+    render(
+      <DisabledCacheProviders>
+        <div>Cache Disabled Child</div>
+      </DisabledCacheProviders>
+    );
+
+    expect(screen.getByText('Cache Disabled Child')).toBeInTheDocument();
+
+    vi.unstubAllEnvs();
+  });
 });

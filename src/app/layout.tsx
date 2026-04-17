@@ -45,8 +45,8 @@ if (typeof window === 'undefined') {
 
 // Client-side: Detect and warn about HTTPS/HTTP mismatch in development
 /* v8 ignore next 7 -- development-only HTTPS localhost warning; requires specific window.location mock */
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  if (window.location.protocol === 'https:' && window.location.hostname === 'localhost') {
+if (typeof globalThis !== 'undefined' && process.env.NODE_ENV === 'development') {
+  if (globalThis.location.protocol === 'https:' && globalThis.location.hostname === 'localhost') {
     console.error(
       '🚨 HTTPS DETECTED: You are accessing localhost via HTTPS. ' +
         'This will cause authentication and API issues. ' +
@@ -104,9 +104,7 @@ export default async function RootLayout({
       >
         <Providers>
           <Header isMobile={isMobile} />
-          <main className="flex flex-col flex-grow w-full max-w-full overflow-x-hidden">
-            {children}
-          </main>
+          <main className="flex flex-col grow w-full max-w-full overflow-x-hidden">{children}</main>
           <Footer />
         </Providers>
         <Toaster position="bottom-center" />

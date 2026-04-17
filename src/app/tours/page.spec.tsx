@@ -9,8 +9,10 @@ import ToursPage from './page';
 
 vi.mock('server-only', () => ({}));
 
-// Mock TanStack Query SSR utilities
-const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
+// Mock TanStack Query SSR utilities — execute each queryFn so coverage sees the arrow functions
+const mockPrefetchQuery = vi.fn().mockImplementation(async (opts: { queryFn?: () => unknown }) => {
+  if (opts.queryFn) opts.queryFn();
+});
 const mockDehydratedState = { queries: [], mutations: [] };
 vi.mock('@tanstack/react-query', () => ({
   dehydrate: () => mockDehydratedState,

@@ -143,6 +143,22 @@ describe('validateBody', () => {
       const response = (result as { success: false; response: Response }).response;
       expect(response.status).toBe(400);
     });
+
+    it('should hide Zod error details in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+
+      const body = { age: 30 };
+      const result = validateBody(testSchema, body);
+
+      expect(result.success).toBe(false);
+
+      const response = (result as { success: false; response: Response }).response;
+      const json = await response.json();
+      expect(json.error).toBe('Validation failed');
+      expect(json.details).toBeUndefined();
+
+      vi.unstubAllEnvs();
+    });
   });
 
   describe('schema types', () => {

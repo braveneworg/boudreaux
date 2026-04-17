@@ -302,5 +302,39 @@ describe('lambdaHandler', () => {
       const result = await lambdaHandler(event);
       expect(result).toEqual({ statusCode: 200, body: JSON.stringify({ received: true }) });
     });
+
+    it('returns 403 for an invalid IP format', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const event = makeEvent();
+      (event.requestContext.http as Record<string, unknown>).sourceIp = 'not-an-ip';
+      const result = await lambdaHandler(event);
+      expect(result).toEqual({ statusCode: 403, body: 'Forbidden' });
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning for invalid CIDR entries and rejects non-matching IP', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      process.env.STRIPE_WEBHOOK_IP_RANGES = '192.168.1.0/24';
+      const event = makeEvent();
+      const result = await lambdaHandler(event);
+      // parseCIDR mock throws, so it logs a warning and falls through to reject
+      expect(result).toEqual({ statusCode: 403, body: 'Forbidden' });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring invalid STRIPE_WEBHOOK_IP_RANGES entry')
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning for invalid individual IP range entries', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      process.env.STRIPE_WEBHOOK_IP_RANGES = 'not-valid-ip';
+      const event = makeEvent();
+      const result = await lambdaHandler(event);
+      expect(result).toEqual({ statusCode: 403, body: 'Forbidden' });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring invalid STRIPE_WEBHOOK_IP_RANGES entry')
+      );
+      warnSpy.mockRestore();
+    });
   });
 });

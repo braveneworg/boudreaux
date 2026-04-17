@@ -87,12 +87,35 @@ const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      // Handle session updates (when user profile is updated)
+      // Handle session updates (when user profile is updated).
+      // Security: whitelist fields that the client may update via `useSession().update()`.
+      // Never allow `role`, `id`, `email`, or `emailVerified` to be written from the client —
+      // those are authoritative only via DB re-fetch below.
       if (trigger === 'update' && session) {
-        // Merge the updated session data into the token
+        const ALLOWED_UPDATE_FIELDS = [
+          'name',
+          'username',
+          'image',
+          'firstName',
+          'lastName',
+          'phone',
+          'addressLine1',
+          'addressLine2',
+          'city',
+          'state',
+          'zipCode',
+          'country',
+          'allowSmsNotifications',
+        ] as const;
+        const sessionObj = (session ?? {}) as Record<string, unknown>;
+        const safeUpdates = Object.fromEntries(
+          Object.entries(sessionObj).filter(([key]) =>
+            (ALLOWED_UPDATE_FIELDS as readonly string[]).includes(key)
+          )
+        );
         token.user = {
           ...((token.user as object) || {}),
-          ...((session as object) || {}),
+          ...safeUpdates,
         };
         return token;
       }

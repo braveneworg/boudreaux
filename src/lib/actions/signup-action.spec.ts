@@ -399,7 +399,7 @@ describe('signupAction', () => {
       });
     });
 
-    it('should handle duplicate email errors', async () => {
+    it('should silently send magic-link and redirect on duplicate email (no enumeration)', async () => {
       const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '4.0.0',
@@ -407,44 +407,21 @@ describe('signupAction', () => {
       });
 
       mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
-
-      const result = await signupAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.email).toEqual(['Account with this email already exists']);
-    });
-
-    it('should handle duplicate email errors when formState.errors is undefined', async () => {
-      const duplicateEmailError = new PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '4.0.0',
-        meta: { target: 'User_email_key' },
+      vi.mocked(mockSignIn).mockResolvedValue(undefined);
+      mockRedirect.mockImplementation(() => {
+        throw new Error('NEXT_REDIRECT');
       });
 
-      const mockFormState: FormState = {
-        fields: { email: 'test@example.com', termsAndConditions: true },
-        success: false,
-        hasTimeout: false,
-        // errors property is undefined
-      };
+      await expect(signupAction(mockInitialState, mockFormData)).rejects.toThrow('NEXT_REDIRECT');
 
-      const mockParsed = {
-        success: true,
-        data: { email: 'test@example.com', termsAndConditions: true },
-      };
-
-      vi.mocked(mockGetActionState).mockReturnValue({
-        formState: mockFormState,
-        parsed: mockParsed,
+      // Magic-link flow should be triggered for the duplicate email too
+      expect(mockSignIn).toHaveBeenCalledWith('nodemailer', {
+        email: 'test@example.com',
+        redirect: false,
+        redirectTo: '/',
       });
-
-      mockAdapter.createUser.mockRejectedValue(duplicateEmailError);
-
-      const result = await signupAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toBeDefined();
-      expect(result.errors?.email).toEqual(['Account with this email already exists']);
+      // Should redirect to the same success page as a new signup
+      expect(mockRedirect).toHaveBeenCalledWith('/success/signup?email=test%40example.com');
     });
 
     it('should handle P2002 error with different target (not email)', async () => {
