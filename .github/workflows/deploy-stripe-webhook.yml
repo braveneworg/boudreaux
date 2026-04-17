@@ -45,7 +45,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install esbuild globally
-        run: pnpm add -g esbuild
+        run: npm install -g esbuild
 
       - name: Generate Prisma client
         working-directory: stripe-webhook
