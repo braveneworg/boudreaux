@@ -504,13 +504,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     }
 
     const createDeferred = <T>(): Deferred<T> => {
-      let resolve: ((value: T) => void) | undefined;
-      const promise = new Promise<T>((res) => {
-        resolve = res;
-      });
-      if (!resolve) {
-        throw new Error('Failed to create deferred resolver.');
-      }
+      const { promise, resolve } = Promise.withResolvers<T>();
       return { promise, resolve };
     };
 
