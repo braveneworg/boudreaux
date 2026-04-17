@@ -245,15 +245,12 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(body.error).toBe('NO_FILES');
   });
 
-  it('should return a presigned download URL on success', async () => {
+  it('should redirect to the presigned download URL on success', async () => {
     const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(302);
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    expect(body.success).toBe(true);
-    expect(body.downloadUrl).toBe('https://s3.example.com/presigned-bundle-url');
-    expect(body.fileName).toBe('Test Album.zip');
+    expect(response.headers.get('Location')).toBe('https://s3.example.com/presigned-bundle-url');
     expect(mockGeneratePresignedDownloadUrl).toHaveBeenCalledWith(
       expect.any(String),
       'Test Album.zip',
@@ -313,19 +310,16 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
 
     const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://s3.example.com/presigned-bundle-url');
   });
 
   it('should skip unavailable formats silently', async () => {
     // Request 3 formats but only 2 exist
     const response = await GET(makeRequest('FLAC,WAV,AIFF'), makeParams());
-    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(response.status).toBe(302);
     // Only FLAC and WAV should be appended (AIFF returns null)
     expect(mockAppend).toHaveBeenCalledTimes(3); // 2 FLAC tracks + 1 WAV file
   });
@@ -336,13 +330,13 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       title: 'Album (Special Edition) [Deluxe]',
     });
 
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
+    await GET(makeRequest(), makeParams());
 
+    const [, fileName] = mockGeneratePresignedDownloadUrl.mock.calls[0] ?? [];
     // Special chars like () and [] should be stripped
-    expect(body.fileName).toContain('.zip');
-    expect(body.fileName).not.toContain('(');
-    expect(body.fileName).not.toContain('[');
+    expect(fileName).toContain('.zip');
+    expect(fileName).not.toContain('(');
+    expect(fileName).not.toContain('[');
   });
 
   it('should use fallback filename when title sanitizes to empty', async () => {
@@ -351,10 +345,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       title: '!!!???',
     });
 
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
+    await GET(makeRequest(), makeParams());
 
-    expect(body.fileName).toBe('release.zip');
+    const [, fileName] = mockGeneratePresignedDownloadUrl.mock.calls[0] ?? [];
+    expect(fileName).toBe('release.zip');
   });
 
   it('should use fallback values when headers are missing', async () => {
@@ -441,10 +435,8 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     mockS3Send.mockResolvedValue({ Body: null });
 
     const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(response.status).toBe(302);
     expect(mockAppend).not.toHaveBeenCalled();
   });
 
@@ -573,10 +565,8 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
 
     const response = await GET(makeRequest('FLAC'), makeParams());
-    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(response.status).toBe(302);
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ name: 'FLAC/legacy.flac' })
