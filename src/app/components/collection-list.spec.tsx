@@ -272,6 +272,10 @@ describe('CollectionDownloadDialog', () => {
   const user = userEvent.setup();
   const mockPresignedUrl = 'https://s3.example.com/presigned-bundle-url';
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.mocked(getReleaseCoverArt).mockReturnValue({
       src: 'https://example.com/cover.jpg',
@@ -288,10 +292,6 @@ describe('CollectionDownloadDialog', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     );
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it('opens download dialog when download button is clicked', async () => {
