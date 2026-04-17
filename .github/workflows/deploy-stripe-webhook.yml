@@ -42,14 +42,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: stripe-webhook
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install esbuild globally
         run: npm install -g esbuild
 
       - name: Generate Prisma client
         working-directory: stripe-webhook
-        run: ./node_modules/.bin/prisma generate --schema=../prisma/schema.prisma
+        run: pnpm exec prisma generate --schema=../prisma/schema.prisma
 
       - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
@@ -57,10 +57,10 @@ jobs:
           mkdir -p layers/prisma/nodejs/node_modules/.prisma/client
           mkdir -p layers/prisma/nodejs/node_modules/@prisma/client
 
-          cp -r node_modules/.prisma/client/. \
+          cp -rL node_modules/.prisma/client/. \
             layers/prisma/nodejs/node_modules/.prisma/client/
 
-          cp -r node_modules/@prisma/client/. \
+          cp -rL node_modules/@prisma/client/. \
             layers/prisma/nodejs/node_modules/@prisma/client/
 
       - name: SAM build
