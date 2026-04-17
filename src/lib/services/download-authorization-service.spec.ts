@@ -172,6 +172,8 @@ describe('DownloadAuthorizationService', () => {
     });
 
     it('should return true on grace period boundary (exactly 90 days)', async () => {
+      vi.useFakeTimers();
+
       // Deleted exactly 90 days ago
       const deletedDate = new Date();
       deletedDate.setDate(deletedDate.getDate() - SOFT_DELETE_GRACE_PERIOD_DAYS);
@@ -181,6 +183,8 @@ describe('DownloadAuthorizationService', () => {
       const result = await service.checkSoftDeleteGracePeriod(mockFormat);
 
       expect(result).toBe(true);
+
+      vi.useRealTimers();
     });
   });
 
