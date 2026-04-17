@@ -29,7 +29,7 @@ describe('triggerDownload', () => {
   });
 
   it('falls back to documentElement when body is unavailable', () => {
-    vi.spyOn(document, 'body', 'get').mockReturnValue(null);
+    vi.spyOn(document, 'body', 'get').mockReturnValue(null as unknown as HTMLBodyElement);
 
     triggerDownload('https://example.com/download.zip');
 
