@@ -26,9 +26,6 @@ export function triggerDownload(url: string): void {
   }
 
   const parentElement = document.body ?? document.documentElement;
-  if (!parentElement) {
-    return;
-  }
 
   const iframe = document.createElement('iframe');
   iframe.style.display = 'none';

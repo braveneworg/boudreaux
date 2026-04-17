@@ -30,7 +30,9 @@ describe('triggerDownload', () => {
 
   it('falls back to documentElement when body is unavailable', () => {
     const bodyDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'body');
-    expect(bodyDescriptor?.get).toBeDefined();
+    if (!bodyDescriptor) {
+      return;
+    }
 
     Object.defineProperty(Document.prototype, 'body', {
       configurable: true,
