@@ -98,17 +98,18 @@ RUN apk add --no-cache fontconfig ttf-dejavu \
     && apk add --no-cache --virtual .font-build-deps curl unzip \
     && mkdir -p /usr/share/fonts/google \
     && cd /usr/share/fonts/google \
+    && set -e \
     && for pair in \
          "Roboto:roboto" \
          "Open%20Sans:opensans" \
          "Lato:lato" \
          "Oswald:oswald" \
          "Playfair%20Display:playfair"; do \
-       family="${pair%%:*}"; dir="${pair##*:}"; \
-       curl -sSL --fail --retry 3 --retry-delay 2 \
-         "https://fonts.google.com/download?family=${family}" -o "${dir}.zip" \
-         && unzip -qo "${dir}.zip" -d "${dir}"; \
-       done \
+        family="${pair%%:*}"; dir="${pair##*:}"; \
+        curl -sSL --fail --retry 3 --retry-delay 2 \
+          "https://fonts.google.com/download?family=${family}" -o "${dir}.zip"; \
+        unzip -qo "${dir}.zip" -d "${dir}"; \
+        done \
     && rm -f ./*.zip \
     && fc-cache -fv \
     && apk del .font-build-deps

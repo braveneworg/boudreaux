@@ -299,7 +299,18 @@ function getFontStack(fontFamily: string): string {
  * attribute cannot be broken out of.
  */
 function normalizeHexColor(hex: string, fallback = '#ffffff'): string {
-  return /^#([a-f\d]{3}|[a-f\d]{6})$/i.test(hex) ? hex : fallback;
+  const normalizedHex = hex.trim().toLowerCase();
+
+  if (!/^#([a-f\d]{3}|[a-f\d]{6})$/.test(normalizedHex)) {
+    return fallback;
+  }
+
+  if (normalizedHex.length === 4) {
+    const [, r, g, b] = normalizedHex;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+
+  return normalizedHex;
 }
 
 /** Clamp a numeric input to the closed range [min, max]. */

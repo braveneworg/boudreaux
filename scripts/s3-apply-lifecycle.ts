@@ -41,8 +41,6 @@
  * Environment Variables:
  *   AWS_S3_BUCKET_NAME / S3_BUCKET - S3 bucket name (required)
  *   AWS_REGION                     - AWS region (default: us-east-1)
- *   AWS_ACCESS_KEY_ID              - AWS credentials (required)
- *   AWS_SECRET_ACCESS_KEY          - AWS credentials (required)
  */
 
 import {
@@ -198,10 +196,6 @@ async function main(): Promise<void> {
 
   if (!BUCKET_NAME) {
     fail('AWS_S3_BUCKET_NAME (or S3_BUCKET) is not set.');
-  }
-
-  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-    fail('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set.');
   }
 
   const client = new S3Client({ region: AWS_REGION });
