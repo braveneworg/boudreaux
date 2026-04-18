@@ -302,7 +302,7 @@ describe('CollectionDownloadDialog', () => {
     });
   }
 
-  function makeThrowAfterReadyResponse(events = defaultSSEEvents): Pick<Response, 'ok' | 'body'> {
+  function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
     const encoder = new TextEncoder();
     const chunk = encoder.encode(makeSSEBody(events));
     const read = vi
@@ -316,8 +316,8 @@ describe('CollectionDownloadDialog', () => {
         getReader: () => ({
           read,
         }),
-      } as ReadableStream<Uint8Array>,
-    };
+      },
+    } as unknown as Response;
   }
 
   function makeConfirmResponse() {

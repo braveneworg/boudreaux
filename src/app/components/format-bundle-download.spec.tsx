@@ -45,7 +45,7 @@ function makeSSEResponse(events = defaultSSEEvents) {
   });
 }
 
-function makeThrowAfterReadyResponse(events = defaultSSEEvents): Pick<Response, 'ok' | 'body'> {
+function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
   const encoder = new TextEncoder();
   const chunk = encoder.encode(makeSSEBody(events));
   const read = vi
@@ -59,8 +59,8 @@ function makeThrowAfterReadyResponse(events = defaultSSEEvents): Pick<Response, 
       getReader: () => ({
         read,
       }),
-    } as ReadableStream<Uint8Array>,
-  };
+    },
+  } as unknown as Response;
 }
 
 describe('FormatBundleDownload', () => {
