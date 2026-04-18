@@ -28,7 +28,8 @@ export function triggerDownload(url: string, fileName?: string): void {
     anchor.download = fileName;
   }
   anchor.style.display = 'none';
-  document.body.appendChild(anchor);
+  const container = document.body ?? document.documentElement;
+  container.appendChild(anchor);
   anchor.click();
   anchor.remove();
 }
