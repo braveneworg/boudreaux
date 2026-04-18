@@ -5,15 +5,13 @@
 /**
  * Triggers a file download without navigating the current page away.
  *
- * Creates a temporary anchor element and programmatically clicks it.
- * When the server responds with `Content-Disposition: attachment`, the
- * browser intercepts the response as a download rather than navigating.
- * This works cross-browser including iOS Safari 26+, which blocks
- * downloads from hidden iframes — especially cross-origin ones like S3
- * presigned URLs.
+ * Fetches the file as a blob and creates an object URL so that the
+ * download is same-origin. This lets the `download` attribute control
+ * the filename on iOS Safari, which ignores it for cross-origin URLs
+ * (e.g. S3 presigned URLs) and appends `.download` instead.
  */
-export function triggerDownload(url: string, fileName?: string): void {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
+export async function triggerDownload(url: string, fileName?: string): Promise<void> {
+  if (typeof globalThis.window === 'undefined' || typeof globalThis.document === 'undefined') {
     return;
   }
 
@@ -22,8 +20,12 @@ export function triggerDownload(url: string, fileName?: string): void {
     return;
   }
 
+  const response = await fetch(normalizedUrl);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
   const anchor = document.createElement('a');
-  anchor.href = normalizedUrl;
+  anchor.href = objectUrl;
   if (fileName) {
     anchor.download = fileName;
   }
@@ -32,6 +34,8 @@ export function triggerDownload(url: string, fileName?: string): void {
   container.appendChild(anchor);
   anchor.click();
   anchor.remove();
+
+  URL.revokeObjectURL(objectUrl);
 }
 
 function normalizeDownloadUrl(url: string): string | null {
@@ -41,7 +45,7 @@ function normalizeDownloadUrl(url: string): string | null {
   }
 
   try {
-    const parsedUrl = new URL(trimmedUrl, window.location.origin);
+    const parsedUrl = new URL(trimmedUrl, globalThis.window.location.origin);
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return null;
     }
