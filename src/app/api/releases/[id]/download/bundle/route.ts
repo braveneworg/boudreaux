@@ -252,6 +252,26 @@ export async function GET(
             combinedArchive.pipe(combinedPassThrough);
             combinedArchive.on('error', (err) => combinedPassThrough.destroy(err));
 
+            // Start the S3 upload immediately so it consumes the archive
+            // stream concurrently — otherwise the PassThrough buffer fills,
+            // backpressure stalls the archiver, and the entry event never fires.
+            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+            const combinedUpload = new Upload({
+              client: s3ClientForZip,
+              params: {
+                Bucket: bucketForZip,
+                Key: tempZipKey,
+                Body: combinedPassThrough,
+                ContentType: 'application/zip',
+                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+              },
+              partSize: 10 * 1024 * 1024,
+              queueSize: 4,
+              leavePartsOnError: false,
+            });
+
+            const uploadPromise = combinedUpload.done();
+
             // Append files for each format into a subfolder
             for (const { formatType, files } of resolvedFormats) {
               const label = FORMAT_LABELS[formatType] ?? formatType;
@@ -289,26 +309,10 @@ export async function GET(
               return;
             }
 
-            // Finalize archive and upload to S3
+            // Finalize archive and wait for upload to complete
             send('progress', { status: 'uploading' });
-
-            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
-            const combinedUpload = new Upload({
-              client: s3ClientForZip,
-              params: {
-                Bucket: bucketForZip,
-                Key: tempZipKey,
-                Body: combinedPassThrough,
-                ContentType: 'application/zip',
-                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
-              },
-              partSize: 10 * 1024 * 1024,
-              queueSize: 4,
-              leavePartsOnError: false,
-            });
-
             combinedArchive.finalize();
-            await combinedUpload.done();
+            await uploadPromise;
 
             // Generate presigned URL
             const downloadUrl = await generatePresignedDownloadUrl(
@@ -376,6 +380,29 @@ export async function GET(
     // Abort the S3 upload if archiver encounters an error
     archive.on('error', (err) => passThrough.destroy(err));
 
+    // Sanitize filename for Content-Disposition
+    const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
+    const zipFileName = `${safeTitle}.zip`;
+
+    // Start the S3 upload immediately so it consumes the archive stream
+    // concurrently — otherwise the PassThrough buffer fills and deadlocks.
+    const tempS3Key = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+    const upload = new Upload({
+      client: s3Client,
+      params: {
+        Bucket: bucketName,
+        Key: tempS3Key,
+        Body: passThrough,
+        ContentType: 'application/zip',
+        ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+      },
+      partSize: 10 * 1024 * 1024, // 10 MB
+      queueSize: 4,
+      leavePartsOnError: false,
+    });
+
+    const uploadPromise = upload.done();
+
     // Pipe S3 objects into the archive (fetch all files concurrently)
     const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
       const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
@@ -399,31 +426,11 @@ export async function GET(
       }
     }
 
-    // Sanitize filename for Content-Disposition
-    const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
-    const zipFileName = `${safeTitle}.zip`;
-
-    // Upload the archive stream to a temporary S3 object
-    const tempS3Key = `tmp/bundles/${userId}/${randomUUID()}.zip`;
-    const upload = new Upload({
-      client: s3Client,
-      params: {
-        Bucket: bucketName,
-        Key: tempS3Key,
-        Body: passThrough,
-        ContentType: 'application/zip',
-        ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
-      },
-      partSize: 10 * 1024 * 1024, // 10 MB
-      queueSize: 4,
-      leavePartsOnError: false,
-    });
-
     // Finalize the archive (no more entries) — starts emitting data
     archive.finalize();
 
     // Wait for the full upload to complete
-    await upload.done();
+    await uploadPromise;
 
     try {
       // Step 8: Generate a short-lived presigned download URL for the temporary ZIP
