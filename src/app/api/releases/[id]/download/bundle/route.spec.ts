@@ -78,16 +78,17 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 // Mock archiver to avoid actual ZIP creation in tests
-const mockAppend = vi.fn();
+let mockArchiverPassThrough: PassThrough;
+const mockAppend = vi.fn().mockImplementation(() => {
+  queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
+});
 const mockFinalize = vi.fn();
 vi.mock('archiver', () => ({
   default: () => {
     const passThrough = new PassThrough();
+    mockArchiverPassThrough = passThrough;
     // Attach mock methods — emit 'entry' after append so awaited promises resolve
-    (passThrough as PassThrough & { append: typeof mockAppend }).append = (...args: unknown[]) => {
-      mockAppend(...args);
-      queueMicrotask(() => passThrough.emit('entry'));
-    };
+    (passThrough as PassThrough & { append: typeof mockAppend }).append = mockAppend;
     (passThrough as PassThrough & { finalize: (...args: unknown[]) => void }).finalize = (
       ...args: unknown[]
     ) => {
