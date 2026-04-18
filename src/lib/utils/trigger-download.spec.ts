@@ -5,6 +5,14 @@
 
 import { triggerDownload } from './trigger-download';
 
+function requireCapturedAnchor(anchor: HTMLAnchorElement | null): HTMLAnchorElement {
+  if (!anchor) {
+    throw new Error('expected anchor click to capture element');
+  }
+
+  return anchor;
+}
+
 describe('triggerDownload', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -49,10 +57,8 @@ describe('triggerDownload', () => {
     triggerDownload('https://example.com/uuid.zip', 'my-release.zip');
 
     expect(capturedAnchor).not.toBeNull();
-    if (!capturedAnchor) {
-      throw new Error('expected anchor click to capture element');
-    }
-    expect(capturedAnchor.download).toBe('my-release.zip');
+    const anchor = requireCapturedAnchor(capturedAnchor);
+    expect(anchor.download).toBe('my-release.zip');
   });
 
   it('omits the download attribute when fileName is not provided', () => {
@@ -66,9 +72,7 @@ describe('triggerDownload', () => {
     triggerDownload('https://example.com/uuid.zip');
 
     expect(capturedAnchor).not.toBeNull();
-    if (!capturedAnchor) {
-      throw new Error('expected anchor click to capture element');
-    }
-    expect(capturedAnchor.download).toBe('');
+    const anchor = requireCapturedAnchor(capturedAnchor);
+    expect(anchor.download).toBe('');
   });
 });
