@@ -264,8 +264,12 @@ export async function GET(
                     new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
                   );
                   if (s3Response.Body) {
-                    combinedArchive.append(s3Response.Body as Readable, {
-                      name: `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`,
+                    await new Promise<void>((resolve, reject) => {
+                      combinedArchive.once('entry', () => resolve());
+                      combinedArchive.once('error', reject);
+                      combinedArchive.append(s3Response.Body as Readable, {
+                        name: `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`,
+                      });
                     });
                   }
                 }
@@ -387,7 +391,11 @@ export async function GET(
       );
       const body = s3Response.Body;
       if (body) {
-        archive.append(body as Readable, { name: fileEntry.archivePath });
+        await new Promise<void>((resolve, reject) => {
+          archive.once('entry', () => resolve());
+          archive.once('error', reject);
+          archive.append(body as Readable, { name: fileEntry.archivePath });
+        });
       }
     }
 

@@ -83,8 +83,11 @@ const mockFinalize = vi.fn();
 vi.mock('archiver', () => ({
   default: () => {
     const passThrough = new PassThrough();
-    // Attach mock methods
-    (passThrough as PassThrough & { append: typeof mockAppend }).append = mockAppend;
+    // Attach mock methods — emit 'entry' after append so awaited promises resolve
+    (passThrough as PassThrough & { append: typeof mockAppend }).append = (...args: unknown[]) => {
+      mockAppend(...args);
+      queueMicrotask(() => passThrough.emit('entry'));
+    };
     (passThrough as PassThrough & { finalize: (...args: unknown[]) => void }).finalize = (
       ...args: unknown[]
     ) => {
