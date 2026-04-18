@@ -302,6 +302,24 @@ describe('CollectionDownloadDialog', () => {
     });
   }
 
+  function makeThrowAfterReadyResponse(events = defaultSSEEvents): Pick<Response, 'ok' | 'body'> {
+    const encoder = new TextEncoder();
+    const chunk = encoder.encode(makeSSEBody(events));
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({ done: false, value: chunk })
+      .mockRejectedValueOnce(new Error('Reader interrupted after ready'));
+
+    return {
+      ok: true,
+      body: {
+        getReader: () => ({
+          read,
+        }),
+      } as ReadableStream<Uint8Array>,
+    };
+  }
+
   function makeConfirmResponse() {
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
@@ -582,5 +600,20 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+
+  it('treats SSE read errors after ready as success', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(makeThrowAfterReadyResponse()));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
@@ -47,6 +47,7 @@ export const FormatBundleDownload = ({
   downloadCount,
   onDownloadComplete,
 }: FormatBundleDownloadProps) => {
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isPending: isLoadingFormats, data: formatsData } = useReleaseDigitalFormatsQuery(
     releaseId,
     { enabled: initialFormats.length === 0 }
@@ -73,6 +74,26 @@ export const FormatBundleDownload = ({
       })),
     [formats]
   );
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleReset = () => {
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+    }
+
+    resetTimeoutRef.current = setTimeout(() => {
+      setDownloadPhase('idle');
+      setFormatProgress([]);
+      resetTimeoutRef.current = null;
+    }, 3000);
+  };
 
   const handleDownload = async () => {
     if (!hasSelection || atLimit || isDownloading) return;
@@ -156,11 +177,7 @@ export const FormatBundleDownload = ({
       if (downloadTriggered) {
         setDownloadPhase('complete');
         onDownloadComplete?.();
-
-        setTimeout(() => {
-          setDownloadPhase('idle');
-          setFormatProgress([]);
-        }, 3000);
+        scheduleReset();
       } else {
         setDownloadPhase('error');
         setDownloadError('No formats could be prepared. Please try again.');
@@ -172,11 +189,7 @@ export const FormatBundleDownload = ({
       if (downloadTriggered) {
         setDownloadPhase('complete');
         onDownloadComplete?.();
-
-        setTimeout(() => {
-          setDownloadPhase('idle');
-          setFormatProgress([]);
-        }, 3000);
+        scheduleReset();
       } else {
         setDownloadPhase('error');
         setFormatProgress([]);
