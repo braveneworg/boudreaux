@@ -234,6 +234,10 @@ export async function GET(
       const bucketForZip = getS3BucketName();
       const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
       const zipFileName = `${safeTitle}.zip`;
+      let combinedArchive: ReturnType<typeof archiver> | null = null;
+      let combinedPassThrough: PassThrough | null = null;
+      let combinedUpload: Upload | null = null;
+      let uploadPromise: Promise<unknown> | null = null;
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -245,12 +249,44 @@ export async function GET(
           };
 
           const completedFormats: DigitalFormatType[] = [];
+          const abortSseUpload = async () => {
+            combinedArchive?.abort();
+            if (combinedPassThrough && !combinedPassThrough.destroyed) {
+              combinedPassThrough.destroy();
+            }
+            combinedUpload?.abort();
+            if (uploadPromise) {
+              await uploadPromise.catch(() => undefined);
+            }
+          };
 
           try {
-            const combinedArchive = archiver('zip', { zlib: { level: 0 } });
-            const combinedPassThrough = new PassThrough();
-            combinedArchive.pipe(combinedPassThrough);
-            combinedArchive.on('error', (err) => combinedPassThrough.destroy(err));
+            const archiveForSse = archiver('zip', { zlib: { level: 0 } });
+            const passThroughForSse = new PassThrough();
+            combinedArchive = archiveForSse;
+            combinedPassThrough = passThroughForSse;
+            archiveForSse.pipe(passThroughForSse);
+            archiveForSse.on('error', (err) => passThroughForSse.destroy(err));
+
+            // Start the S3 upload immediately so it consumes the archive
+            // stream concurrently — otherwise the PassThrough buffer fills,
+            // backpressure stalls the archiver, and the entry event never fires.
+            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+            combinedUpload = new Upload({
+              client: s3ClientForZip,
+              params: {
+                Bucket: bucketForZip,
+                Key: tempZipKey,
+                Body: passThroughForSse,
+                ContentType: 'application/zip',
+                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+              },
+              partSize: 10 * 1024 * 1024,
+              queueSize: 4,
+              leavePartsOnError: false,
+            });
+
+            uploadPromise = combinedUpload.done();
 
             // Append files for each format into a subfolder
             for (const { formatType, files } of resolvedFormats) {
@@ -265,9 +301,9 @@ export async function GET(
                   );
                   if (s3Response.Body) {
                     await new Promise<void>((resolve, reject) => {
-                      combinedArchive.once('entry', () => resolve());
-                      combinedArchive.once('error', reject);
-                      combinedArchive.append(s3Response.Body as Readable, {
+                      archiveForSse.once('entry', () => resolve());
+                      archiveForSse.once('error', reject);
+                      archiveForSse.append(s3Response.Body as Readable, {
                         name: `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`,
                       });
                     });
@@ -283,32 +319,17 @@ export async function GET(
             }
 
             if (completedFormats.length === 0) {
+              await abortSseUpload();
               send('error', { message: 'No formats could be prepared.' });
               send('complete', {});
               controller.close();
               return;
             }
 
-            // Finalize archive and upload to S3
+            // Finalize archive and wait for upload to complete
             send('progress', { status: 'uploading' });
-
-            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
-            const combinedUpload = new Upload({
-              client: s3ClientForZip,
-              params: {
-                Bucket: bucketForZip,
-                Key: tempZipKey,
-                Body: combinedPassThrough,
-                ContentType: 'application/zip',
-                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
-              },
-              partSize: 10 * 1024 * 1024,
-              queueSize: 4,
-              leavePartsOnError: false,
-            });
-
-            combinedArchive.finalize();
-            await combinedUpload.done();
+            archiveForSse.finalize();
+            await uploadPromise;
 
             // Generate presigned URL
             const downloadUrl = await generatePresignedDownloadUrl(
@@ -347,6 +368,7 @@ export async function GET(
               });
             }
           } catch (streamError) {
+            await abortSseUpload();
             console.error('Bundle SSE stream error', { streamError });
             send('error', { message: 'An unexpected error occurred.' });
           }
@@ -376,34 +398,12 @@ export async function GET(
     // Abort the S3 upload if archiver encounters an error
     archive.on('error', (err) => passThrough.destroy(err));
 
-    // Pipe S3 objects into the archive (fetch all files concurrently)
-    const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
-      const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
-      return files.map((file) => ({
-        archivePath: `${folderName}/${safeArchiveEntryName(file.fileName)}`,
-        s3Key: file.s3Key,
-      }));
-    });
-
-    for (const fileEntry of fileEntries) {
-      const s3Response = await s3Client.send(
-        new GetObjectCommand({ Bucket: bucketName, Key: fileEntry.s3Key })
-      );
-      const body = s3Response.Body;
-      if (body) {
-        await new Promise<void>((resolve, reject) => {
-          archive.once('entry', () => resolve());
-          archive.once('error', reject);
-          archive.append(body as Readable, { name: fileEntry.archivePath });
-        });
-      }
-    }
-
     // Sanitize filename for Content-Disposition
     const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
     const zipFileName = `${safeTitle}.zip`;
 
-    // Upload the archive stream to a temporary S3 object
+    // Start the S3 upload immediately so it consumes the archive stream
+    // concurrently — otherwise the PassThrough buffer fills and deadlocks.
     const tempS3Key = `tmp/bundles/${userId}/${randomUUID()}.zip`;
     const upload = new Upload({
       client: s3Client,
@@ -419,11 +419,46 @@ export async function GET(
       leavePartsOnError: false,
     });
 
-    // Finalize the archive (no more entries) — starts emitting data
-    archive.finalize();
+    const uploadPromise = upload.done();
 
-    // Wait for the full upload to complete
-    await upload.done();
+    // Pipe S3 objects into the archive (fetch all files concurrently)
+    const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
+      const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
+      return files.map((file) => ({
+        archivePath: `${folderName}/${safeArchiveEntryName(file.fileName)}`,
+        s3Key: file.s3Key,
+      }));
+    });
+
+    try {
+      for (const fileEntry of fileEntries) {
+        const s3Response = await s3Client.send(
+          new GetObjectCommand({ Bucket: bucketName, Key: fileEntry.s3Key })
+        );
+        const body = s3Response.Body;
+        if (body) {
+          await new Promise<void>((resolve, reject) => {
+            archive.once('entry', () => resolve());
+            archive.once('error', reject);
+            archive.append(body as Readable, { name: fileEntry.archivePath });
+          });
+        }
+      }
+
+      // Finalize the archive (no more entries) — starts emitting data
+      archive.finalize();
+
+      // Wait for the full upload to complete
+      await uploadPromise;
+    } catch (archiveError) {
+      archive.abort();
+      if (!passThrough.destroyed) {
+        passThrough.destroy();
+      }
+      upload.abort();
+      await uploadPromise.catch(() => undefined);
+      throw archiveError;
+    }
 
     try {
       // Step 8: Generate a short-lived presigned download URL for the temporary ZIP
