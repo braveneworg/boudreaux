@@ -62,9 +62,10 @@ vi.mock('@/lib/utils/s3-client', () => ({
 }));
 
 const mockUploadDone = vi.fn().mockResolvedValue(undefined);
+const mockUploadAbort = vi.fn();
 vi.mock('@aws-sdk/lib-storage', () => ({
   Upload: vi.fn().mockImplementation(function () {
-    return { done: mockUploadDone };
+    return { done: mockUploadDone, abort: mockUploadAbort };
   }),
 }));
 
@@ -83,6 +84,7 @@ const mockAppend = vi.fn().mockImplementation(() => {
   queueMicrotask(() => mockArchiverPassThrough.emit('entry'));
 });
 const mockFinalize = vi.fn();
+const mockArchiveAbort = vi.fn();
 vi.mock('archiver', () => ({
   default: () => {
     const passThrough = new PassThrough();
@@ -94,6 +96,11 @@ vi.mock('archiver', () => ({
     ) => {
       mockFinalize(...args);
       passThrough.end(); // End the stream
+    };
+    (passThrough as PassThrough & { abort: (...args: unknown[]) => void }).abort = (
+      ...args: unknown[]
+    ) => {
+      mockArchiveAbort(...args);
     };
     return passThrough;
   },
@@ -441,6 +448,25 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
     // WAV should still succeed
     expect(events.find((e) => e.event === 'ready')).toBeDefined();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should abort SSE upload when no formats can be appended', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockS3Send.mockRejectedValue(new Error('S3 fetch failed'));
+
+    const response = await GET(makeJsonRequest(), makeParams());
+    const events = await readSSEEvents(response);
+
+    expect(events.find((event) => event.event === 'ready')).toBeUndefined();
+    expect(
+      events.some(
+        (event) => event.event === 'error' && event.data.message === 'No formats could be prepared.'
+      )
+    ).toBe(true);
+    expect(mockUploadAbort).toHaveBeenCalled();
+    expect(mockArchiveAbort).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
   });
@@ -816,6 +842,21 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('should abort upload and archive when file append fails in redirect flow', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockS3Send.mockRejectedValueOnce(new Error('S3 fetch failed'));
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('INTERNAL_ERROR');
+    expect(mockUploadAbort).toHaveBeenCalled();
+    expect(mockArchiveAbort).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
   });
