@@ -366,6 +366,42 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(mockUploadDone).toHaveBeenCalledTimes(1);
   });
 
+  it('should sanitize archive entry names in SSE path to prevent zip-slip traversal', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/a', fileName: '../../../etc/passwd' },
+          { s3Key: 'releases/r1/FLAC/b', fileName: '/absolute/path/song.wav' },
+          { s3Key: 'releases/r1/FLAC/c', fileName: 'null\0byte.mp3' },
+        ],
+      },
+    ]);
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    await response.text();
+
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/passwd' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/song.wav' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/null_byte.mp3' })
+    );
+
+    const archiveEntryNames = mockAppend.mock.calls.map(([, options]) => options.name as string);
+    expect(archiveEntryNames.every((name) => !name.includes('..'))).toBe(true);
+    expect(archiveEntryNames.every((name) => !name.startsWith('/'))).toBe(true);
+  });
+
   it('should increment download count and log events when respond=json', async () => {
     const response = await GET(makeJsonRequest(), makeParams());
     await response.text(); // consume the stream

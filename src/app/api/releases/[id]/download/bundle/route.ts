@@ -335,12 +335,11 @@ export async function GET(
                   })
                 )
               );
-            } catch (loggingError) {
+            } catch (error) {
               console.error('Failed to record bundle download analytics', {
                 completedFormats,
-                loggingError,
+                error,
                 releaseId,
-                userId,
               });
             }
           } catch (streamError) {
