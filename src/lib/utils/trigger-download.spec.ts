@@ -7,57 +7,62 @@ import { triggerDownload } from './trigger-download';
 
 describe('triggerDownload', () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
-    document.querySelectorAll('iframe').forEach((iframe) => iframe.remove());
   });
 
-  it('appends a hidden iframe for valid https URLs', () => {
+  it('creates and clicks a hidden anchor for valid https URLs', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
     triggerDownload('https://example.com/download.zip');
 
-    const iframe = document.querySelector('iframe');
-    expect(iframe).toBeInTheDocument();
-    expect(iframe?.getAttribute('src')).toBe('https://example.com/download.zip');
-    expect(iframe).toHaveStyle({ display: 'none' });
+    expect(clickSpy).toHaveBeenCalledOnce();
+    // Anchor should be removed after click
+    expect(document.querySelector('a[href="https://example.com/download.zip"]')).toBeNull();
   });
 
   it('rejects unsafe protocols', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
     triggerDownload('javascript:alert(1)');
     triggerDownload('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==');
 
-    expect(document.querySelector('iframe')).not.toBeInTheDocument();
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 
-  it('falls back to documentElement when body is unavailable', () => {
-    const bodyDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'body');
-    if (!bodyDescriptor) {
-      return;
-    }
+  it('does nothing for empty or whitespace-only URLs', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
-    Object.defineProperty(Document.prototype, 'body', {
-      configurable: true,
-      get: () => null,
+    triggerDownload('');
+    triggerDownload('   ');
+
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it('sets the download attribute when fileName is provided', () => {
+    let capturedAnchor: HTMLAnchorElement | null = null;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      capturedAnchor = this;
     });
 
-    try {
-      triggerDownload('https://example.com/download.zip');
+    triggerDownload('https://example.com/uuid.zip', 'my-release.zip');
 
-      const iframe = document.documentElement.querySelector('iframe');
-      expect(iframe).toBeInTheDocument();
-    } finally {
-      if (bodyDescriptor) {
-        Object.defineProperty(Document.prototype, 'body', bodyDescriptor);
-      }
-    }
+    expect(capturedAnchor).not.toBeNull();
+    expect(capturedAnchor!.download).toBe('my-release.zip');
   });
 
-  it('removes the iframe after timeout', () => {
-    vi.useFakeTimers();
-    triggerDownload('https://example.com/download.zip');
-    expect(document.querySelector('iframe')).toBeInTheDocument();
+  it('omits the download attribute when fileName is not provided', () => {
+    let capturedAnchor: HTMLAnchorElement | null = null;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      capturedAnchor = this;
+    });
 
-    vi.advanceTimersByTime(60_000);
+    triggerDownload('https://example.com/uuid.zip');
 
-    expect(document.querySelector('iframe')).not.toBeInTheDocument();
+    expect(capturedAnchor).not.toBeNull();
+    expect(capturedAnchor!.download).toBe('');
   });
 });
