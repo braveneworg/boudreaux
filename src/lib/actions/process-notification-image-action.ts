@@ -306,7 +306,9 @@ function normalizeHexColor(hex: string, fallback = '#ffffff'): string {
   }
 
   if (normalizedHex.length === 4) {
-    const [, r, g, b] = normalizedHex;
+    const r = normalizedHex[1];
+    const g = normalizedHex[2];
+    const b = normalizedHex[3];
     return `#${r}${r}${g}${g}${b}${b}`;
   }
 
