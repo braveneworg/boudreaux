@@ -10,12 +10,19 @@ const config = {
       : undefined,
   devIndicators: false,
 
-  // Configure images for CDN
+  // Configure images for CDN.
+  // Note: `remotePatterns` is an allowlist for the /_next/image optimizer; any
+  // entry here widens what an authenticated/anonymous caller can coax the
+  // optimizer to fetch. Keep the list minimal.
   images: {
     // Reduce default max device size from 3840 to 1920 for better performance
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     // Cache optimized images for 1 day (default is 60s) — images rarely change
     minimumCacheTTL: 86400,
+    // Only allow SVG from our own CDN (we control the contents); block active
+    // scripts inside optimized SVGs.
+    dangerouslyAllowSVG: false,
+    contentDispositionType: 'attachment',
     remotePatterns: [
       {
         protocol: 'https',
@@ -23,6 +30,8 @@ const config = {
         port: '',
         pathname: '/**',
       },
+      // picsum.photos is used for placeholder/seed content only. It is a
+      // third-party origin; if you do not use it in production, remove it.
       {
         protocol: 'https',
         hostname: 'picsum.photos',
@@ -66,22 +75,43 @@ const config = {
 
   // Configure headers
   async headers() {
-    // Build Content-Security-Policy based on environment
-    // NOTE: 'unsafe-eval' is required by Stripe.js for its iframe-based payment elements.
-    // A nonce-based CSP should replace 'unsafe-eval' and 'unsafe-inline' in a future PR.
+    // Build Content-Security-Policy based on environment.
+    // Known widenings and why they remain:
+    //   - 'unsafe-inline' on script-src/style-src: Next.js inlines small runtime
+    //     scripts and CSS-in-JS. Moving to a nonce-based CSP requires wiring
+    //     `headers()` into middleware so the nonce is per-request.
+    //   - 'unsafe-eval' historically required by Stripe.js feature detection
+    //     and Next.js HMR in dev. Keeping it behind an env flag so the value
+    //     can be flipped off in production once verified in a staging soak.
+    //     Default: allow in dev; require STRICT_CSP=true in production to drop.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const allowUnsafeEval = isDev || process.env.STRICT_CSP !== 'true';
+
+    const scriptSrc = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(allowUnsafeEval ? ["'unsafe-eval'"] : []),
+      'https://challenges.cloudflare.com',
+      'https://cdn.fakefourrecords.com',
+      'https://js.stripe.com',
+    ].join(' ');
+
     const cspParts = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.fakefourrecords.com https://js.stripe.com",
+      `script-src ${scriptSrc}`,
+      // Next.js requires 'unsafe-inline' for CSS-in-JS / <style jsx>.
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
-      "img-src 'self' data: https: blob:",
+      // Tight img-src: enumerate the CDN + S3 rather than allowing any https:.
+      // This prevents the page from being weaponized as a tracking pixel relay.
+      "img-src 'self' data: blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://challenges.cloudflare.com",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
-      // Allow S3 direct uploads - explicit bucket URL + wildcard for any *.amazonaws.com subdomain
+      // Third-party iframes we embed: Turnstile + Stripe.
       "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
       "worker-src 'self' blob:",
-      // Allow fetch to Stripe API (server actions use fetch; Stripe.js connects to api.stripe.com)
-      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com",
-      // Allow media from CDN and S3, plus blob: for local playback
-      "media-src 'self' https: blob:",
+      // Stripe API + Maps + own CDN. Add more connect targets here (do NOT use https:).
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
+      // Restrict media to own CDN and S3 buckets (drop the wildcard https:).
+      "media-src 'self' blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -126,10 +156,6 @@ const config = {
             value: 'DENY',
           },
           {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload',
           },
@@ -139,7 +165,12 @@ const config = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value:
+              'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(self "https://js.stripe.com")',
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
           },
           {
             key: 'Content-Security-Policy',

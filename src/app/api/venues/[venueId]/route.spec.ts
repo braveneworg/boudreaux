@@ -69,4 +69,14 @@ describe('GET /api/venues/[venueId]', () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe('Failed to fetch venue');
   });
+
+  it('should return 400 for an invalid venue ID', async () => {
+    const request = new NextRequest('http://localhost:3000/api/venues/not-a-valid-id');
+    const response = await GET(request, createParams('not-a-valid-id'));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid venue ID');
+    expect(VenueRepository.findById).not.toHaveBeenCalled();
+  });
 });

@@ -16,7 +16,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock TanStack Query SSR utilities
-const mockPrefetchQuery = vi.fn().mockResolvedValue(undefined);
+const mockPrefetchQuery = vi
+  .fn()
+  .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
+    if (opts.queryFn) {
+      await Promise.resolve(opts.queryFn());
+    }
+  });
 const mockSetQueryData = vi.fn();
 const mockDehydratedState = { queries: [], mutations: [] };
 vi.mock('@tanstack/react-query', () => ({

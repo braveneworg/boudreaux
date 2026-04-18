@@ -4,8 +4,6 @@
 
 import { NextRequest } from 'next/server';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
 import { GET } from './route';
 
 const mockGetToken = vi.fn();
@@ -83,5 +81,43 @@ describe('GET /api/user/download-quota', () => {
     expect(body.error).toBe('INTERNAL_ERROR');
 
     consoleSpy.mockRestore();
+  });
+
+  it('should use secure cookie name in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.E2E_MODE;
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(mockGetToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cookieName: '__Secure-next-auth.session-token',
+        secureCookie: true,
+      })
+    );
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should use non-secure cookie name in E2E mode even in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', 'true');
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(mockGetToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cookieName: 'next-auth.session-token',
+        secureCookie: false,
+      })
+    );
+
+    vi.unstubAllEnvs();
   });
 });

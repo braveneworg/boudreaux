@@ -30,7 +30,10 @@ export function validateBody<T>(schema: ZodType<T>, body: unknown): ValidationRe
       response: NextResponse.json(
         {
           error: 'Validation failed',
-          details: result.error.issues,
+          // Hide the full Zod issue tree in production to avoid leaking schema
+          // shape to attackers. Callers that need user-facing field messages
+          // should build their own response from a whitelisted view.
+          details: process.env.NODE_ENV !== 'production' ? result.error.issues : undefined,
         },
         { status: 400 }
       ),

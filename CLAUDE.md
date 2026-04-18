@@ -90,6 +90,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ## Components
 
+- Prefer globalThis to window for client-only globals to avoid SSR issues.
 - Prefer function declarations; use `React.FC` only when necessary.
 - Prefer arrow functions for inline component definitions.
 - Never create class components.
