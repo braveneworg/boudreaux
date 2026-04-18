@@ -86,12 +86,6 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install fonts for Sharp SVG text rendering.
-# - fontconfig is needed for font discovery.
-# - ttf-dejavu gives us a solid default when requested families are missing.
-RUN apk add --no-cache fontconfig ttf-dejavu \
-    && fc-cache -fv
-
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
 RUN adduser --system --uid 1001 appuser
