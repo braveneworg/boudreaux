@@ -1,42 +1,112 @@
 # Dependencies (installed fresh in Docker)
 node_modules
+stripe-webhook/node_modules
+**/node_modules
 
 # Build output (injected via artifact, not build context)
 .next
 dist
+out
+build
 
 # CI/CD and tooling
 .github
 .husky
 .vscode
 .claude
+.agent
+.agents
+.adal
+.augment
+.codebuddy
+.commandcode
+.continue
+.cortex
+.crush
+.factory
+.goose
+.iflow
+.junie
+.kilocode
+.kiro
+.kode
+.mcpjam
+.mux
+.neovate
+.openhands
+.pi
+.playwright-mcp
+.pochi
+.qoder
+.qwen
+.roo
+.trae
+.vibe
+.windsurf
+.zencoder
+.specify
+.specify/memory
+.specify/scripts
 
 # Tests
 e2e
 coverage
+.vitest-reports
 **/*.test.*
 **/*.spec.*
 vitest.config.*
 playwright.config.*
+test-results
+test-results.xml
+setupTests.ts
+
+# Local backups and music fixtures that are not shipped to the container
+backups
+music
 
 # Linting/formatting config
 eslint.config.*
 .eslintrc*
 .prettierrc*
 .prettierignore
+.editorconfig
 
 # Documentation
 docs
 *.md
+!README.md
 LICENSE*
 HEADER.txt
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+COVERAGE_METRICS.md
 
 # Scripts not needed in container
 scripts
+stripe-webhook
+specs
+
+# TypeScript build caches — these grow to GB-scale and change on every build
+tsconfig.*.json
+tsconfig.*.tsbuildinfo
+*.tsbuildinfo
+
+# Prisma build artifacts (schema is copied explicitly by the Dockerfile)
+prisma/migrations
 
 # Environment files (secrets injected at runtime)
 .env*
 !.env.example
+
+# Private keys and certificates — must NEVER be baked into images
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+certificate.pem
+private_key.pem
 
 # OS files
 .DS_Store
@@ -46,3 +116,5 @@ scripts
 docker
 docker-compose*.yml
 Dockerfile
+**/Dockerfile
+nginx/Dockerfile

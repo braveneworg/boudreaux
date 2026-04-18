@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { PassThrough, type Readable } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
@@ -31,6 +32,28 @@ import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-sche
 export const maxDuration = 300;
 const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
 const TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS = 15 * 60;
+/**
+ * Temp bundle ZIPs are written to `tmp/bundles/{userId}/{uuid}.zip`.
+ * Cleanup contract: an S3 lifecycle rule expires anything under that prefix
+ * after 1 day (see `scripts/s3-apply-lifecycle.ts`, rule
+ * `tmp-bundles-expire-after-1-day`). We cannot delete synchronously here —
+ * the client must still follow the 302 to the presigned URL — and the
+ * presigned URL is only valid for 15 minutes, so the lifecycle rule is the
+ * authoritative janitor. If you move this code or rename the prefix, update
+ * the lifecycle script.
+ */
+
+/**
+ * Defense-in-depth against zip-slip: force every archive entry to a
+ * path.basename without slashes, backslashes, or `..`. Upload-time validation
+ * should already guarantee safe names, but an archive with `../../etc/passwd`
+ * would escape on server-side extraction (backups, scanners, admin review).
+ */
+function safeArchiveEntryName(fileName: string): string {
+  const base = path.basename(fileName).replace(/[\\/]/g, '_');
+  const sanitized = base.replace(/[^A-Za-z0-9._\- ]/g, '_').replace(/\.{2,}/g, '_');
+  return sanitized.length > 0 ? sanitized : 'file';
+}
 
 /**
  * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...[&respond=json]
@@ -342,9 +365,9 @@ export async function GET(
 
     // Pipe S3 objects into the archive (fetch all files concurrently)
     const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
-      const folderName = FORMAT_LABELS[formatType] ?? formatType;
+      const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
       return files.map((file) => ({
-        archivePath: `${folderName}/${file.fileName}`,
+        archivePath: `${folderName}/${safeArchiveEntryName(file.fileName)}`,
         s3Key: file.s3Key,
       }));
     });

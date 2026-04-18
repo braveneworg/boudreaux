@@ -59,4 +59,16 @@ describe('Stripe client caching behavior', () => {
 
     expect(constructorCalls).toHaveLength(1);
   });
+
+  it('should throw when STRIPE_SECRET_KEY is not set', async () => {
+    vi.resetModules();
+    constructorCalls.length = 0;
+    delete process.env.STRIPE_SECRET_KEY;
+
+    const { stripe } = await import('./stripe');
+
+    expect(() => void stripe.customers).toThrow(
+      'STRIPE_SECRET_KEY environment variable is not set'
+    );
+  });
 });

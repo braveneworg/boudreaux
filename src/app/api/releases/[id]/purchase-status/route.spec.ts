@@ -69,4 +69,24 @@ describe('GET /api/releases/[id]/purchase-status', () => {
     expect(json).toEqual({ confirmed: true });
     expect(mockFindBySessionId).toHaveBeenCalledWith('cs_test_found');
   });
+
+  it('returns 400 with invalid_session_id when sessionId has invalid format', async () => {
+    const request = makeRequest('invalid-session-id');
+    const response = await GET(request, dummyContext);
+
+    expect(response.status).toBe(400);
+    const json = await response.json();
+    expect(json).toEqual({ error: 'invalid_session_id' });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(mockFindBySessionId).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for session ID with SQL injection attempt', async () => {
+    const request = makeRequest("cs_test_'; DROP TABLE purchases; --");
+    const response = await GET(request, dummyContext);
+
+    expect(response.status).toBe(400);
+    const json = await response.json();
+    expect(json).toEqual({ error: 'invalid_session_id' });
+  });
 });

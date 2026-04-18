@@ -3,6 +3,26 @@ services:
     image: "${NEXT_APP_WEBSITE_IMAGE}"
     container_name: website
     restart: unless-stopped
+    # ─── Runtime hardening ──────────────────────────────────────────────────
+    # - no-new-privileges blocks in-container privilege escalation via suid.
+    # - read_only filesystem forces any writes through an explicit tmpfs mount
+    #   (required for upload temp files, see /tmp below).
+    # - cap_drop ALL + targeted cap_add prevents container processes from
+    #   acquiring kernel capabilities they don't need.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=1024m,mode=1777
+    # Constrain resource usage to prevent a single container from exhausting
+    # host CPU/memory under abuse. Tune to the host.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
@@ -45,6 +65,26 @@ services:
     restart: always
     networks:
       - app-network
+    # nginx needs to write its pid file, cache files, and tmp uploads to disk.
+    # Keep a read-only root FS and selectively mount tmpfs for writable paths.
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/run:mode=1777
+      - /var/cache/nginx:mode=1777
+      - /tmp:mode=1777
+    # nginx must bind :80/:443 as a non-root user; alpine's nginx runs master
+    # as root by default. Drop everything except NET_BIND_SERVICE so the
+    # master can open privileged ports but nothing else.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
     volumes:
       - ./certbot-webroot:/var/www/certbot:rw
     secrets:

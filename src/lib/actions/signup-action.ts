@@ -137,11 +137,27 @@ export const signupAction = async (
         const duplicateKeyError = error as PrismaClientKnownRequestError;
 
         if (duplicateKeyError?.meta?.target === 'User_email_key') {
-          if (!formState.errors) {
-            formState.errors = {};
+          // Account enumeration defense: do NOT reveal that the email is
+          // already registered. Trigger the magic-link flow instead and
+          // return the same success state as a brand-new signup. An attacker
+          // probing for registered emails cannot distinguish the two cases.
+          try {
+            await signIn('nodemailer', {
+              email: parsed.data.email,
+              redirect: false,
+              redirectTo: '/',
+            });
+          } catch (sendError) {
+            // Log but do not surface — we must not reveal duplicate-email state.
+            console.error('Failed to send sign-in magic link on duplicate email', sendError);
           }
 
-          formState.errors.email = ['Account with this email already exists'];
+          await logSecurityEvent({
+            event: 'user.signup.duplicate_email_silent_signin',
+            metadata: { email: parsed.data.email },
+          });
+
+          formState.success = true;
         } else {
           setUnknownError(formState);
         }

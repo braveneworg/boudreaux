@@ -229,4 +229,18 @@ describe('sendPurchaseConfirmationEmail', () => {
       expect(mockResetEmailSent).not.toHaveBeenCalled();
     });
   });
+
+  describe('NEXT_PUBLIC_BASE_URL fallback', () => {
+    it('should fall back to https://fakefourrecords.com when NEXT_PUBLIC_BASE_URL is not set', async () => {
+      delete process.env.NEXT_PUBLIC_BASE_URL;
+
+      await sendPurchaseConfirmationEmail(validInput);
+
+      expect(vi.mocked(buildPurchaseConfirmationEmailHtml)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          downloadUrl: 'https://fakefourrecords.com/releases/release-abc',
+        })
+      );
+    });
+  });
 });

@@ -53,6 +53,7 @@ export type AuditEvent =
   | 'user.username.changed'
   | 'user.profile.updated'
   | 'user.created'
+  | 'user.signup.duplicate_email_silent_signin'
   | 'admin.access'
   | 'api.rate_limit.exceeded'
   | 'api.unauthorized_access'

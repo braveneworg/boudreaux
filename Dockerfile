@@ -86,25 +86,34 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install fonts for Sharp SVG text rendering
-# fontconfig is needed for font discovery, curl for downloading Google Fonts
-RUN apk add --no-cache fontconfig ttf-dejavu curl \
+# Install fonts for Sharp SVG text rendering.
+# - fontconfig is needed for font discovery.
+# - ttf-dejavu gives us a solid default when requested families are missing.
+# - Google Fonts are downloaded over HTTPS inside a --no-cache APK transaction.
+#   curl --fail aborts the build if any font download returns a non-2xx, so
+#   silent supply-chain swaps get caught at image build time. curl and unzip
+#   are removed from the final image after the build step to minimise the
+#   runtime attack surface.
+RUN set -e \
+    && apk add --no-cache fontconfig ttf-dejavu \
+    && apk add --no-cache --virtual .font-build-deps curl unzip \
     && mkdir -p /usr/share/fonts/google \
     && cd /usr/share/fonts/google \
-    # Download Google Fonts used in banner overlays
-    && curl -sL "https://fonts.google.com/download?family=Roboto" -o roboto.zip \
-    && curl -sL "https://fonts.google.com/download?family=Open%20Sans" -o opensans.zip \
-    && curl -sL "https://fonts.google.com/download?family=Lato" -o lato.zip \
-    && curl -sL "https://fonts.google.com/download?family=Oswald" -o oswald.zip \
-    && curl -sL "https://fonts.google.com/download?family=Playfair%20Display" -o playfair.zip \
-    && unzip -o roboto.zip -d roboto 2>/dev/null || true \
-    && unzip -o opensans.zip -d opensans 2>/dev/null || true \
-    && unzip -o lato.zip -d lato 2>/dev/null || true \
-    && unzip -o oswald.zip -d oswald 2>/dev/null || true \
-    && unzip -o playfair.zip -d playfair 2>/dev/null || true \
-    && rm -f *.zip \
+    && for pair in \
+         "Roboto:roboto" \
+         "Open%20Sans:opensans" \
+         "Lato:lato" \
+         "Oswald:oswald" \
+         "Playfair%20Display:playfair"; do \
+        family="${pair%%:*}"; dir="${pair##*:}"; \
+        curl -sSL --fail --retry 3 --retry-delay 2 \
+          "https://fonts.google.com/download?family=${family}" -o "${dir}.zip" \
+          && unzip -qo "${dir}.zip" -d "${dir}" \
+          || exit 1; \
+        done \
+    && rm -f ./*.zip \
     && fc-cache -fv \
-    && apk del curl
+    && apk del .font-build-deps
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
