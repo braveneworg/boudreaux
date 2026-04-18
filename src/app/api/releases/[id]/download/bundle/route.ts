@@ -200,15 +200,17 @@ export async function GET(
       );
     }
 
-    // SSE streaming path: create a per-format ZIP for each requested format,
-    // streaming progress events to the client as each ZIP completes.
-    // Download count increment and event logging are deferred to the
-    // POST /api/releases/[id]/download/confirm endpoint, called by the client
-    // after all downloads have been triggered.
+    // SSE streaming path: create a single combined ZIP containing all
+    // requested formats as subfolders, streaming progress events to the
+    // client as each format is appended. A single presigned download URL
+    // is emitted once the archive upload completes — this ensures iOS
+    // Safari (which cannot handle multiple concurrent downloads) receives
+    // exactly one file.
     if (respondJson) {
       const s3ClientForZip = getS3Client();
       const bucketForZip = getS3BucketName();
       const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
+      const zipFileName = `${safeTitle}.zip`;
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -219,56 +221,98 @@ export async function GET(
             );
           };
 
-          for (const { formatType, files } of resolvedFormats) {
-            const label = FORMAT_LABELS[formatType] ?? formatType;
-            send('progress', { formatType, label, status: 'zipping' });
+          const completedFormats: string[] = [];
 
-            try {
-              const formatArchive = archiver('zip', { zlib: { level: 0 } });
-              const formatPassThrough = new PassThrough();
-              formatArchive.pipe(formatPassThrough);
-              formatArchive.on('error', (err) => formatPassThrough.destroy(err));
+          try {
+            const combinedArchive = archiver('zip', { zlib: { level: 0 } });
+            const combinedPassThrough = new PassThrough();
+            combinedArchive.pipe(combinedPassThrough);
+            combinedArchive.on('error', (err) => combinedPassThrough.destroy(err));
 
-              for (const file of files) {
-                const s3Response = await s3ClientForZip.send(
-                  new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
-                );
-                if (s3Response.Body) {
-                  formatArchive.append(s3Response.Body as Readable, { name: file.fileName });
+            // Append files for each format into a subfolder
+            for (const { formatType, files } of resolvedFormats) {
+              const label = FORMAT_LABELS[formatType] ?? formatType;
+              send('progress', { formatType, label, status: 'zipping' });
+
+              try {
+                for (const file of files) {
+                  const s3Response = await s3ClientForZip.send(
+                    new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
+                  );
+                  if (s3Response.Body) {
+                    combinedArchive.append(s3Response.Body as Readable, {
+                      name: `${label}/${file.fileName}`,
+                    });
+                  }
                 }
+
+                completedFormats.push(formatType);
+                send('progress', { formatType, label, status: 'done' });
+              } catch (formatError) {
+                console.error(`Failed to append format ${formatType} to archive`, { formatError });
+                send('error', { formatType, message: 'Failed to prepare download.' });
               }
-
-              const zipName = `${safeTitle} - ${label}.zip`;
-              const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
-
-              const formatUpload = new Upload({
-                client: s3ClientForZip,
-                params: {
-                  Bucket: bucketForZip,
-                  Key: tempZipKey,
-                  Body: formatPassThrough,
-                  ContentType: 'application/zip',
-                  ContentDisposition: `attachment; filename="${encodeURIComponent(zipName)}"`,
-                },
-                partSize: 10 * 1024 * 1024,
-                queueSize: 4,
-                leavePartsOnError: false,
-              });
-
-              formatArchive.finalize();
-              await formatUpload.done();
-
-              const downloadUrl = await generatePresignedDownloadUrl(
-                tempZipKey,
-                zipName,
-                TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
-              );
-
-              send('ready', { formatType, label, downloadUrl, fileName: zipName });
-            } catch (formatError) {
-              console.error(`Failed to create ZIP for format ${formatType}`, { formatError });
-              send('error', { formatType, message: 'Failed to prepare download.' });
             }
+
+            if (completedFormats.length === 0) {
+              send('error', { message: 'No formats could be prepared.' });
+              send('complete', {});
+              controller.close();
+              return;
+            }
+
+            // Finalize archive and upload to S3
+            send('progress', { status: 'uploading' });
+
+            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
+            const combinedUpload = new Upload({
+              client: s3ClientForZip,
+              params: {
+                Bucket: bucketForZip,
+                Key: tempZipKey,
+                Body: combinedPassThrough,
+                ContentType: 'application/zip',
+                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+              },
+              partSize: 10 * 1024 * 1024,
+              queueSize: 4,
+              leavePartsOnError: false,
+            });
+
+            combinedArchive.finalize();
+            await combinedUpload.done();
+
+            // Generate presigned URL
+            const downloadUrl = await generatePresignedDownloadUrl(
+              tempZipKey,
+              zipFileName,
+              TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
+            );
+
+            // Increment download count and log events server-side
+            await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+
+            const downloadEventRepo = new DownloadEventRepository();
+            const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+            const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+            await Promise.all(
+              completedFormats.map((formatType) =>
+                downloadEventRepo.logDownloadEvent({
+                  userId,
+                  releaseId,
+                  formatType,
+                  success: true,
+                  ipAddress,
+                  userAgent,
+                })
+              )
+            );
+
+            send('ready', { downloadUrl, fileName: zipFileName });
+          } catch (streamError) {
+            console.error('Bundle SSE stream error', { streamError });
+            send('error', { message: 'An unexpected error occurred.' });
           }
 
           send('complete', {});

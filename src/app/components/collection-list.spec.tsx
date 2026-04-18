@@ -282,23 +282,15 @@ describe('CollectionDownloadDialog', () => {
 
   const defaultSSEEvents: Array<{ event: string; data: Record<string, unknown> }> = [
     { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
-    {
-      event: 'ready',
-      data: {
-        formatType: 'FLAC',
-        label: 'FLAC',
-        downloadUrl: 'https://s3.example.com/flac.zip',
-        fileName: 'Test Album - FLAC.zip',
-      },
-    },
+    { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'done' } },
     { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'zipping' } },
+    { event: 'progress', data: { formatType: 'WAV', label: 'WAV', status: 'done' } },
+    { event: 'progress', data: { status: 'uploading' } },
     {
       event: 'ready',
       data: {
-        formatType: 'WAV',
-        label: 'WAV',
-        downloadUrl: 'https://s3.example.com/wav.zip',
-        fileName: 'Test Album - WAV.zip',
+        downloadUrl: 'https://s3.example.com/bundle.zip',
+        fileName: 'Test Album.zip',
       },
     },
     { event: 'complete', data: {} },
@@ -443,12 +435,9 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.getByRole('button', { name: /download 2 formats/i })).toBeEnabled();
   });
 
-  it('triggers a download for each format ZIP', async () => {
+  it('triggers a single download for the combined ZIP', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce(makeSSEResponse())
-      .mockResolvedValueOnce(makeConfirmResponse());
+    const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -459,18 +448,14 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     await waitFor(() => {
-      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/flac.zip');
-      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/wav.zip');
-      expect(triggerDownload).toHaveBeenCalledTimes(2);
+      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/bundle.zip');
+      expect(triggerDownload).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('POSTs to confirm endpoint after all downloads', async () => {
+  it('does not POST to confirm endpoint (server handles count)', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce(makeSSEResponse())
-      .mockResolvedValueOnce(makeConfirmResponse());
+    const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
     vi.stubGlobal('fetch', mockFetch);
 
     render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
@@ -481,15 +466,11 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(mockFetch).toHaveBeenLastCalledWith(
-        '/api/releases/rel-1/download/confirm',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ formats: ['FLAC', 'WAV'] }),
-        })
-      );
+      expect(triggerDownload).toHaveBeenCalledTimes(1);
     });
+
+    // Only the SSE fetch should have been called, no confirm POST
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows singular "format" for single selection', async () => {

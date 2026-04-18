@@ -27,7 +27,7 @@ interface FormatBundleDownloadProps {
   onDownloadComplete?: () => void;
 }
 
-type FormatDownloadStatus = 'pending' | 'zipping' | 'complete' | 'error';
+type FormatDownloadStatus = 'pending' | 'zipping' | 'done' | 'uploading' | 'complete' | 'error';
 
 interface FormatProgress {
   formatType: string;
@@ -105,7 +105,7 @@ export const FormatBundleDownload = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      const completedFormats: string[] = [];
+      let downloadTriggered = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -119,36 +119,40 @@ export const FormatBundleDownload = ({
           const data = JSON.parse(evt.data) as Record<string, unknown>;
 
           if (evt.event === 'progress') {
-            setFormatProgress((prev) =>
-              prev.map((fp) =>
-                fp.formatType === data.formatType ? { ...fp, status: 'zipping' as const } : fp
-              )
-            );
+            const status = data.status as FormatDownloadStatus;
+
+            if (data.formatType) {
+              setFormatProgress((prev) =>
+                prev.map((fp) => (fp.formatType === data.formatType ? { ...fp, status } : fp))
+              );
+            } else if (status === 'uploading') {
+              setFormatProgress((prev) =>
+                prev.map((fp) =>
+                  fp.status !== 'error' ? { ...fp, status: 'uploading' as const } : fp
+                )
+              );
+            }
           } else if (evt.event === 'ready') {
             triggerDownload(data.downloadUrl as string);
-            completedFormats.push(data.formatType as string);
+            downloadTriggered = true;
             setFormatProgress((prev) =>
               prev.map((fp) =>
-                fp.formatType === data.formatType ? { ...fp, status: 'complete' as const } : fp
+                fp.status !== 'error' ? { ...fp, status: 'complete' as const } : fp
               )
             );
           } else if (evt.event === 'error') {
-            setFormatProgress((prev) =>
-              prev.map((fp) =>
-                fp.formatType === data.formatType ? { ...fp, status: 'error' as const } : fp
-              )
-            );
+            if (data.formatType) {
+              setFormatProgress((prev) =>
+                prev.map((fp) =>
+                  fp.formatType === data.formatType ? { ...fp, status: 'error' as const } : fp
+                )
+              );
+            }
           }
         }
       }
 
-      if (completedFormats.length > 0) {
-        await fetch(`/api/releases/${releaseId}/download/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ formats: completedFormats }),
-        });
-
+      if (downloadTriggered) {
         setDownloadPhase('complete');
         onDownloadComplete?.();
 
@@ -196,9 +200,9 @@ export const FormatBundleDownload = ({
         <ul className="space-y-1" role="status">
           {formatProgress.map((fp) => (
             <li key={fp.formatType} className="flex items-center gap-2 text-sm">
-              {fp.status === 'complete' ? (
+              {fp.status === 'complete' || fp.status === 'done' ? (
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-              ) : fp.status === 'zipping' ? (
+              ) : fp.status === 'zipping' || fp.status === 'uploading' ? (
                 <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
               ) : fp.status === 'error' ? (
                 <AlertCircle className="text-destructive size-4 shrink-0" />
@@ -207,7 +211,7 @@ export const FormatBundleDownload = ({
               )}
               <span
                 className={
-                  fp.status === 'complete'
+                  fp.status === 'complete' || fp.status === 'done'
                     ? 'text-emerald-600'
                     : fp.status === 'error'
                       ? 'text-destructive'
@@ -231,7 +235,7 @@ export const FormatBundleDownload = ({
       {downloadPhase === 'complete' ? (
         <div className="flex items-center justify-center gap-2 py-2 text-sm text-emerald-600">
           <CheckCircle2 className="size-4" />
-          Downloads started!
+          Download started!
         </div>
       ) : (
         <Button
