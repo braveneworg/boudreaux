@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.23.0] - 2026-04-18
+
+### Added
+
+- Remove google fonts and unnecessary sharp dependencies (#371)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- Develop/feature/improve security and test coverage (#370)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- Develop/feature/improve security and test coverage (#370)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- feat(api): enhance proxy image handling with security checks and size… (#369)\n- Remove google fonts and unnecessary sharp dependencies (#371)\n
+
 ## [4.22.0] - 2026-04-17
 
 ### Added
