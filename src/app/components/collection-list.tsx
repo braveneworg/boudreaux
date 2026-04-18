@@ -334,7 +334,7 @@ const CollectionDownloadDialog = ({
               );
             }
           } else if (evt.event === 'ready') {
-            await triggerDownload(data.downloadUrl as string, data.fileName as string);
+            triggerDownload(data.downloadUrl as string, data.fileName as string);
             downloadTriggered = true;
             setFormatProgress((prev) =>
               prev.map((fp) =>

@@ -13,42 +13,40 @@ function requireCapturedAnchor(anchor: HTMLAnchorElement | null): HTMLAnchorElem
   return anchor;
 }
 
-const FAKE_BLOB = new Blob(['zip-content'], { type: 'application/zip' });
-
 describe('triggerDownload', () => {
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ blob: () => Promise.resolve(FAKE_BLOB) }));
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
-  it('fetches the URL as a blob and clicks a hidden anchor', async () => {
+  it('creates a hidden anchor, clicks it, and removes it', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const removeSpy = vi.spyOn(HTMLAnchorElement.prototype, 'remove');
+
+    triggerDownload('https://example.com/download.zip');
+
+    expect(clickSpy).toHaveBeenCalledOnce();
+    expect(removeSpy).toHaveBeenCalledOnce();
+  });
+
+  it('rejects unsafe protocols', () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
-    await triggerDownload('https://example.com/download.zip');
+    triggerDownload('javascript:alert(1)');
+    triggerDownload('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==');
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/download.zip');
-    expect(clickSpy).toHaveBeenCalledOnce();
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 
-  it('rejects unsafe protocols', async () => {
-    await triggerDownload('javascript:alert(1)');
-    await triggerDownload('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==');
+  it('does nothing for empty or whitespace-only URLs', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    triggerDownload('');
+    triggerDownload('   ');
+
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 
-  it('does nothing for empty or whitespace-only URLs', async () => {
-    await triggerDownload('');
-    await triggerDownload('   ');
-
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('sets the download attribute when fileName is provided', async () => {
+  it('sets the download attribute when fileName is provided', () => {
     let capturedAnchor: HTMLAnchorElement | null = null;
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement
@@ -56,14 +54,13 @@ describe('triggerDownload', () => {
       capturedAnchor = this;
     });
 
-    await triggerDownload('https://example.com/uuid.zip', 'my-release.zip');
+    triggerDownload('https://example.com/uuid.zip', 'my-release.zip');
 
-    expect(capturedAnchor).not.toBeNull();
     const anchor = requireCapturedAnchor(capturedAnchor);
     expect(anchor.download).toBe('my-release.zip');
   });
 
-  it('omits the download attribute when fileName is not provided', async () => {
+  it('omits the download attribute when fileName is not provided', () => {
     let capturedAnchor: HTMLAnchorElement | null = null;
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement
@@ -71,15 +68,13 @@ describe('triggerDownload', () => {
       capturedAnchor = this;
     });
 
-    await triggerDownload('https://example.com/uuid.zip');
+    triggerDownload('https://example.com/uuid.zip');
 
-    expect(capturedAnchor).not.toBeNull();
     const anchor = requireCapturedAnchor(capturedAnchor);
     expect(anchor.download).toBe('');
   });
 
-  it('uses a blob object URL for same-origin download', async () => {
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL');
+  it('sets the anchor href to the normalized URL', () => {
     let capturedAnchor: HTMLAnchorElement | null = null;
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement
@@ -87,10 +82,9 @@ describe('triggerDownload', () => {
       capturedAnchor = this;
     });
 
-    await triggerDownload('https://example.com/file.zip', 'release.zip');
+    triggerDownload('https://example.com/file.zip', 'release.zip');
 
     const anchor = requireCapturedAnchor(capturedAnchor);
-    expect(anchor.href).toMatch(/^blob:/);
-    expect(revokeObjectURL).toHaveBeenCalledOnce();
+    expect(anchor.href).toBe('https://example.com/file.zip');
   });
 });

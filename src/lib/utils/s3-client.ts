@@ -98,6 +98,22 @@ export async function generatePresignedUploadUrl(
 }
 
 /**
+ * Build an RFC 6266 Content-Disposition header value.
+ *
+ * - `filename` — ASCII-safe fallback (quotes and backslashes escaped).
+ * - `filename*` — RFC 5987 UTF-8 encoded form for non-ASCII characters.
+ *
+ * Using `encodeURIComponent` inside the quoted `filename` parameter is
+ * incorrect per the RFC and causes Safari to misidentify the file
+ * extension (appending `.download` instead of `.zip`).
+ */
+export function buildContentDisposition(fileName: string): string {
+  const asciiSafe = fileName.replace(/[\\"/]/g, '_');
+  const encoded = encodeURIComponent(fileName).replace(/%20/g, '+');
+  return `attachment; filename="${asciiSafe}"; filename*=UTF-8''${encoded}`;
+}
+
+/**
  * Generate presigned GET URL for downloading digital audio files from S3
  *
  * @param s3Key - S3 object key (path within bucket)
@@ -124,7 +140,7 @@ export async function generatePresignedDownloadUrl(
   const getCommand = new GetObjectCommand({
     Bucket: bucketName,
     Key: s3Key,
-    ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
+    ResponseContentDisposition: buildContentDisposition(fileName),
     ResponseContentType: 'application/octet-stream', // Force binary download — prevents iOS Safari from appending .download extension
   });
 

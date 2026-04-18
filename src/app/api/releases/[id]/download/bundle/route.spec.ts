@@ -59,6 +59,7 @@ vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => ({ send: mockS3Send }),
   getS3BucketName: () => 'test-bucket',
   generatePresignedDownloadUrl: (...args: unknown[]) => mockGeneratePresignedDownloadUrl(...args),
+  buildContentDisposition: (fileName: string) => `attachment; filename="${fileName}"`,
 }));
 
 const mockUploadDone = vi.fn().mockResolvedValue(undefined);
