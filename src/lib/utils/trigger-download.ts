@@ -5,12 +5,16 @@
 /**
  * Triggers a file download without navigating the current page away.
  *
- * Fetches the file as a blob and creates an object URL so that the
- * download is same-origin. This lets the `download` attribute control
- * the filename on iOS Safari, which ignores it for cross-origin URLs
- * (e.g. S3 presigned URLs) and appends `.download` instead.
+ * Creates a temporary anchor element and programmatically clicks it.
+ * When the server responds with `Content-Disposition: attachment`, the
+ * browser intercepts the response as a download rather than navigating.
+ *
+ * The `download` attribute is set as a hint for browsers that support
+ * it, but the authoritative filename comes from the S3 presigned URL's
+ * `ResponseContentDisposition` header (built with RFC 6266 compliant
+ * `filename` / `filename*` parameters).
  */
-export async function triggerDownload(url: string, fileName?: string): Promise<void> {
+export function triggerDownload(url: string, fileName?: string): void {
   if (typeof globalThis.window === 'undefined' || typeof globalThis.document === 'undefined') {
     return;
   }
@@ -20,12 +24,8 @@ export async function triggerDownload(url: string, fileName?: string): Promise<v
     return;
   }
 
-  const response = await fetch(normalizedUrl);
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-
   const anchor = document.createElement('a');
-  anchor.href = objectUrl;
+  anchor.href = normalizedUrl;
   if (fileName) {
     anchor.download = fileName;
   }
@@ -34,8 +34,6 @@ export async function triggerDownload(url: string, fileName?: string): Promise<v
   container.appendChild(anchor);
   anchor.click();
   anchor.remove();
-
-  URL.revokeObjectURL(objectUrl);
 }
 
 function normalizeDownloadUrl(url: string): string | null {

@@ -22,7 +22,12 @@ import { DownloadEventRepository } from '@/lib/repositories/download-event-repos
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
-import { generatePresignedDownloadUrl, getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import {
+  buildContentDisposition,
+  generatePresignedDownloadUrl,
+  getS3BucketName,
+  getS3Client,
+} from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 
@@ -279,7 +284,7 @@ export async function GET(
                 Key: tempZipKey,
                 Body: passThroughForSse,
                 ContentType: 'application/zip',
-                ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+                ContentDisposition: buildContentDisposition(zipFileName),
               },
               partSize: 10 * 1024 * 1024,
               queueSize: 4,
@@ -412,7 +417,7 @@ export async function GET(
         Key: tempS3Key,
         Body: passThrough,
         ContentType: 'application/zip',
-        ContentDisposition: `attachment; filename="${encodeURIComponent(zipFileName)}"`,
+        ContentDisposition: buildContentDisposition(zipFileName),
       },
       partSize: 10 * 1024 * 1024, // 10 MB
       queueSize: 4,
