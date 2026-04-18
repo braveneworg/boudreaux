@@ -244,7 +244,7 @@ export async function GET(
             );
           };
 
-          const completedFormats: string[] = [];
+          const completedFormats: DigitalFormatType[] = [];
 
           try {
             const combinedArchive = archiver('zip', { zlib: { level: 0 } });
