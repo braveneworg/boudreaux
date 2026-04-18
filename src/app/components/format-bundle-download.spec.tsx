@@ -45,6 +45,24 @@ function makeSSEResponse(events = defaultSSEEvents) {
   });
 }
 
+function makeThrowAfterReadyResponse(events = defaultSSEEvents): Response {
+  const encoder = new TextEncoder();
+  const chunk = encoder.encode(makeSSEBody(events));
+  const read = vi
+    .fn()
+    .mockResolvedValueOnce({ done: false, value: chunk })
+    .mockRejectedValueOnce(new Error('Reader interrupted after ready'));
+
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read,
+      }),
+    },
+  } as unknown as Response;
+}
+
 describe('FormatBundleDownload', () => {
   const defaultProps = {
     releaseId: 'release-123',
@@ -348,6 +366,23 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+
+  it('treats SSE read errors after ready as success', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onDownloadComplete = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(makeThrowAfterReadyResponse()));
+
+    render(<FormatBundleDownload {...defaultProps} onDownloadComplete={onDownloadComplete} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByText('Download started!')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onDownloadComplete).toHaveBeenCalledOnce();
   });
 
   it('should display unknown formatType when no label is found', async () => {

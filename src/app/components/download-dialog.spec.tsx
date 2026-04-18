@@ -1758,12 +1758,12 @@ describe('DownloadDialog — onBlur with empty input', () => {
   });
 });
 
-describe('DownloadDialog — dialog stays open after download', () => {
+describe('DownloadDialog — dialog auto-dismiss after download', () => {
   beforeEach(() => {
     mockCheckGuestPurchaseAction.mockReset();
   });
 
-  it('should keep the dialog open on the format-select step (no auto-close)', async () => {
+  it('closes on format-select download completion', async () => {
     mockUseSession.mockReturnValue({
       data: { user: { email: 'authed@example.com', id: 'user-1' } },
       status: 'authenticated',
@@ -1793,9 +1793,42 @@ describe('DownloadDialog — dialog stays open after download', () => {
       expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
     });
 
-    // Dialog and FormatBundleDownload remain visible — no onDownloadComplete auto-close
-    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    await user.click(screen.getByTestId('mock-format-download-btn'));
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Download Again' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes on purchase-success download completion', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog artistName="Test Artist" premiumPrice={8} releaseId="release-123">
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await user.click(screen.getByRole('button', { name: /Buy & Download for \$8\.00/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Confirm Purchase' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('purchase-success-step')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('mock-success-download-btn'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('purchase-success-step')).not.toBeInTheDocument();
+    });
   });
 });
 

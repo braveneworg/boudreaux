@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
 import Link from 'next/link';
@@ -158,19 +158,26 @@ export const DownloadDialog = ({
     }
   };
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (!nextOpen) {
-      form.reset();
-      setStep(initialStep);
-      setSelectedTier(null);
-      setCustomerEmail(null);
-      setPurchaseMode(false);
-      setAmountCents(0);
-      setGuestAtCap(false);
-      setPurchaseError(null);
-    }
-  };
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (!nextOpen) {
+        form.reset();
+        setStep(initialStep);
+        setSelectedTier(null);
+        setCustomerEmail(null);
+        setPurchaseMode(false);
+        setAmountCents(0);
+        setGuestAtCap(false);
+        setPurchaseError(null);
+      }
+    },
+    [form, initialStep]
+  );
+
+  const handleDialogDownloadComplete = useCallback(() => {
+    handleOpenChange(false);
+  }, [handleOpenChange]);
 
   const handleSubscribe = () => {
     setStep('rate-select');
@@ -479,6 +486,7 @@ export const DownloadDialog = ({
                 releaseId={releaseId}
                 availableFormats={availableFormats}
                 downloadCount={downloadCount}
+                onDownloadComplete={handleDialogDownloadComplete}
               />
             )}
           </>
@@ -558,6 +566,7 @@ export const DownloadDialog = ({
             releaseTitle={releaseTitle}
             availableFormats={availableFormats}
             downloadCount={downloadCount}
+            onDownloadComplete={handleDialogDownloadComplete}
           />
         )}
 

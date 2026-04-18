@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AlertCircle, CheckCircle2, DownloadIcon, Loader2 } from 'lucide-react';
 
@@ -47,6 +47,7 @@ export const FormatBundleDownload = ({
   downloadCount,
   onDownloadComplete,
 }: FormatBundleDownloadProps) => {
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isPending: isLoadingFormats, data: formatsData } = useReleaseDigitalFormatsQuery(
     releaseId,
     { enabled: initialFormats.length === 0 }
@@ -74,6 +75,26 @@ export const FormatBundleDownload = ({
     [formats]
   );
 
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleReset = () => {
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+    }
+
+    resetTimeoutRef.current = setTimeout(() => {
+      setDownloadPhase('idle');
+      setFormatProgress([]);
+      resetTimeoutRef.current = null;
+    }, 3000);
+  };
+
   const handleDownload = async () => {
     if (!hasSelection || atLimit || isDownloading) return;
 
@@ -92,6 +113,8 @@ export const FormatBundleDownload = ({
       }))
     );
 
+    let downloadTriggered = false;
+
     try {
       const response = await fetch(apiUrl);
 
@@ -105,7 +128,6 @@ export const FormatBundleDownload = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let downloadTriggered = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -133,7 +155,7 @@ export const FormatBundleDownload = ({
               );
             }
           } else if (evt.event === 'ready') {
-            triggerDownload(data.downloadUrl as string, data.fileName as string);
+            await triggerDownload(data.downloadUrl as string, data.fileName as string);
             downloadTriggered = true;
             setFormatProgress((prev) =>
               prev.map((fp) =>
@@ -155,19 +177,24 @@ export const FormatBundleDownload = ({
       if (downloadTriggered) {
         setDownloadPhase('complete');
         onDownloadComplete?.();
-
-        setTimeout(() => {
-          setDownloadPhase('idle');
-          setFormatProgress([]);
-        }, 3000);
+        scheduleReset();
       } else {
         setDownloadPhase('error');
         setDownloadError('No formats could be prepared. Please try again.');
       }
     } catch {
-      setDownloadPhase('error');
-      setFormatProgress([]);
-      setDownloadError('Something went wrong. Please try again.');
+      // The anchor-based download may tear down the active SSE stream,
+      // causing reader.read() to throw. If the download was already
+      // triggered, treat it as success — the file is downloading.
+      if (downloadTriggered) {
+        setDownloadPhase('complete');
+        onDownloadComplete?.();
+        scheduleReset();
+      } else {
+        setDownloadPhase('error');
+        setFormatProgress([]);
+        setDownloadError('Something went wrong. Please try again.');
+      }
     }
   };
 

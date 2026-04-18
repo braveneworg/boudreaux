@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -236,6 +236,7 @@ const CollectionDownloadDialog = ({
   availableFormats,
   downloadCount,
 }: CollectionDownloadDialogProps) => {
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allFormatTypes = useMemo(
     () => availableFormats.map((f) => f.formatType),
     [availableFormats]
@@ -252,6 +253,26 @@ const CollectionDownloadDialog = ({
   const hasSelection = selectedFormats.length > 0;
   const noFormats = availableFormats.length === 0;
   const isDownloading = downloadPhase === 'downloading';
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleReset = () => {
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+    }
+
+    resetTimeoutRef.current = setTimeout(() => {
+      setDownloadPhase('idle');
+      setFormatProgress([]);
+      resetTimeoutRef.current = null;
+    }, 3000);
+  };
 
   const handleDownload = async () => {
     if (!hasSelection || atLimit || isDownloading) return;
@@ -271,6 +292,8 @@ const CollectionDownloadDialog = ({
       }))
     );
 
+    let downloadTriggered = false;
+
     try {
       const response = await fetch(apiUrl);
 
@@ -284,7 +307,6 @@ const CollectionDownloadDialog = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let downloadTriggered = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -312,7 +334,7 @@ const CollectionDownloadDialog = ({
               );
             }
           } else if (evt.event === 'ready') {
-            triggerDownload(data.downloadUrl as string, data.fileName as string);
+            await triggerDownload(data.downloadUrl as string, data.fileName as string);
             downloadTriggered = true;
             setFormatProgress((prev) =>
               prev.map((fp) =>
@@ -333,19 +355,20 @@ const CollectionDownloadDialog = ({
 
       if (downloadTriggered) {
         setDownloadPhase('complete');
-
-        setTimeout(() => {
-          setDownloadPhase('idle');
-          setFormatProgress([]);
-        }, 3000);
+        scheduleReset();
       } else {
         setDownloadPhase('error');
         setDownloadError('No formats could be prepared. Please try again.');
       }
     } catch {
-      setDownloadPhase('error');
-      setFormatProgress([]);
-      setDownloadError('Something went wrong. Please try again.');
+      if (downloadTriggered) {
+        setDownloadPhase('complete');
+        scheduleReset();
+      } else {
+        setDownloadPhase('error');
+        setFormatProgress([]);
+        setDownloadError('Something went wrong. Please try again.');
+      }
     }
   };
 
