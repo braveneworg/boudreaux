@@ -37,9 +37,9 @@ interface FormatProgress {
 
 /**
  * FormatBundleDownload — multi-select format picker that streams per-format
- * ZIP creation from the bundle API via SSE. Each format is zipped server-side
- * and downloaded as it becomes ready. After all downloads are triggered, a POST
- * to the confirm endpoint increments the download count.
+ * progress from the bundle API via SSE while a single combined ZIP is prepared
+ * server-side. Once ready is emitted, the client triggers one download URL and
+ * the server records download count/events.
  */
 export const FormatBundleDownload = ({
   releaseId,

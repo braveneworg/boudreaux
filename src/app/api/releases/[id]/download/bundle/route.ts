@@ -68,11 +68,11 @@ function safeArchiveEntryName(fileName: string): string {
  *
  * Response contract:
  * - Default: 302 redirect to the short-lived presigned ZIP URL
- * - respond=json: streams SSE events as each format is zipped into its own
- *   archive and uploaded to S3. Events: progress (zipping), ready (download URL),
- *   error (per-format failure), complete. No download count increment — the
- *   client calls POST /api/releases/[id]/download/confirm after triggering
- *   the downloads.
+ * - respond=json: streams SSE events while one combined ZIP is prepared and
+ *   uploaded to S3. Events: progress (per-format zipping + uploading), ready
+ *   (single download URL), error (per-format/global failure), complete.
+ *   Download count increment and per-format download-event logging happen
+ *   server-side on a best-effort basis after ready is emitted.
  *
  * Authorization:
  * 1. Authenticate user
@@ -255,6 +255,7 @@ export async function GET(
             // Append files for each format into a subfolder
             for (const { formatType, files } of resolvedFormats) {
               const label = FORMAT_LABELS[formatType] ?? formatType;
+              const safeFolderName = safeArchiveEntryName(label);
               send('progress', { formatType, label, status: 'zipping' });
 
               try {
@@ -264,7 +265,7 @@ export async function GET(
                   );
                   if (s3Response.Body) {
                     combinedArchive.append(s3Response.Body as Readable, {
-                      name: `${label}/${file.fileName}`,
+                      name: `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`,
                     });
                   }
                 }
@@ -312,27 +313,36 @@ export async function GET(
               TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
             );
 
-            // Increment download count and log events server-side
-            await PurchaseRepository.upsertDownloadCount(userId, releaseId);
-
-            const downloadEventRepo = new DownloadEventRepository();
-            const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-            const userAgent = request.headers.get('user-agent') ?? 'unknown';
-
-            await Promise.all(
-              completedFormats.map((formatType) =>
-                downloadEventRepo.logDownloadEvent({
-                  userId,
-                  releaseId,
-                  formatType,
-                  success: true,
-                  ipAddress,
-                  userAgent,
-                })
-              )
-            );
-
             send('ready', { downloadUrl, fileName: zipFileName });
+
+            // Increment download count and log events server-side on a best-effort basis.
+            try {
+              await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+
+              const downloadEventRepo = new DownloadEventRepository();
+              const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+              const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+              await Promise.all(
+                completedFormats.map((formatType) =>
+                  downloadEventRepo.logDownloadEvent({
+                    userId,
+                    releaseId,
+                    formatType,
+                    success: true,
+                    ipAddress,
+                    userAgent,
+                  })
+                )
+              );
+            } catch (loggingError) {
+              console.error('Failed to record bundle download analytics', {
+                completedFormats,
+                loggingError,
+                releaseId,
+                userId,
+              });
+            }
           } catch (streamError) {
             console.error('Bundle SSE stream error', { streamError });
             send('error', { message: 'An unexpected error occurred.' });
