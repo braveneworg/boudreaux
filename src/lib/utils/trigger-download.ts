@@ -5,17 +5,14 @@
 /**
  * Triggers a file download without navigating the current page away.
  *
- * Uses a hidden iframe whose `src` is set to the download URL. When the
- * server responds with `Content-Disposition: attachment`, the browser
- * intercepts the response as a download rather than rendering it in the
- * iframe. This keeps the parent page — and any active connections such as
- * SSE streams — alive.
- *
- * This approach works cross-browser including iOS Safari, where
- * `window.open(url, '_self')` would navigate the page and tear down
- * active fetch streams.
+ * Creates a temporary anchor element and programmatically clicks it.
+ * When the server responds with `Content-Disposition: attachment`, the
+ * browser intercepts the response as a download rather than navigating.
+ * This works cross-browser including iOS Safari 26+, which blocks
+ * downloads from hidden iframes — especially cross-origin ones like S3
+ * presigned URLs.
  */
-export function triggerDownload(url: string): void {
+export function triggerDownload(url: string, fileName?: string): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
   }
@@ -25,15 +22,16 @@ export function triggerDownload(url: string): void {
     return;
   }
 
-  const parentElement = document.body ?? document.documentElement;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = normalizedUrl;
-  parentElement.appendChild(iframe);
-
-  // Clean up the iframe after the download has had time to register
-  setTimeout(() => iframe.remove(), 60_000);
+  const anchor = document.createElement('a');
+  anchor.href = normalizedUrl;
+  if (fileName) {
+    anchor.download = fileName;
+  }
+  anchor.style.display = 'none';
+  const container = document.body ?? document.documentElement;
+  container.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 function normalizeDownloadUrl(url: string): string | null {

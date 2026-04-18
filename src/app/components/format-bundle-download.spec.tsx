@@ -269,7 +269,10 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
 
     await waitFor(() => {
-      expect(triggerDownload).toHaveBeenCalledWith('https://s3.example.com/bundle.zip');
+      expect(triggerDownload).toHaveBeenCalledWith(
+        'https://s3.example.com/bundle.zip',
+        'Test Album.zip'
+      );
       expect(triggerDownload).toHaveBeenCalledTimes(1);
     });
   });
