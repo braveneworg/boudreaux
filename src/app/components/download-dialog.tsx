@@ -479,6 +479,7 @@ export const DownloadDialog = ({
                 releaseId={releaseId}
                 availableFormats={availableFormats}
                 downloadCount={downloadCount}
+                onDownloadComplete={() => handleOpenChange(false)}
               />
             )}
           </>
@@ -558,6 +559,7 @@ export const DownloadDialog = ({
             releaseTitle={releaseTitle}
             availableFormats={availableFormats}
             downloadCount={downloadCount}
+            onDownloadComplete={() => handleOpenChange(false)}
           />
         )}
 

@@ -92,6 +92,8 @@ export const FormatBundleDownload = ({
       }))
     );
 
+    let downloadTriggered = false;
+
     try {
       const response = await fetch(apiUrl);
 
@@ -105,7 +107,6 @@ export const FormatBundleDownload = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let downloadTriggered = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -165,9 +166,22 @@ export const FormatBundleDownload = ({
         setDownloadError('No formats could be prepared. Please try again.');
       }
     } catch {
-      setDownloadPhase('error');
-      setFormatProgress([]);
-      setDownloadError('Something went wrong. Please try again.');
+      // The anchor-based download may tear down the active SSE stream,
+      // causing reader.read() to throw. If the download was already
+      // triggered, treat it as success — the file is downloading.
+      if (downloadTriggered) {
+        setDownloadPhase('complete');
+        onDownloadComplete?.();
+
+        setTimeout(() => {
+          setDownloadPhase('idle');
+          setFormatProgress([]);
+        }, 3000);
+      } else {
+        setDownloadPhase('error');
+        setFormatProgress([]);
+        setDownloadError('Something went wrong. Please try again.');
+      }
     }
   };
 

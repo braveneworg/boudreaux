@@ -271,6 +271,8 @@ const CollectionDownloadDialog = ({
       }))
     );
 
+    let downloadTriggered = false;
+
     try {
       const response = await fetch(apiUrl);
 
@@ -284,7 +286,6 @@ const CollectionDownloadDialog = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let downloadTriggered = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -343,9 +344,18 @@ const CollectionDownloadDialog = ({
         setDownloadError('No formats could be prepared. Please try again.');
       }
     } catch {
-      setDownloadPhase('error');
-      setFormatProgress([]);
-      setDownloadError('Something went wrong. Please try again.');
+      if (downloadTriggered) {
+        setDownloadPhase('complete');
+
+        setTimeout(() => {
+          setDownloadPhase('idle');
+          setFormatProgress([]);
+        }, 3000);
+      } else {
+        setDownloadPhase('error');
+        setFormatProgress([]);
+        setDownloadError('Something went wrong. Please try again.');
+      }
     }
   };
 
