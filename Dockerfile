@@ -89,31 +89,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Install fonts for Sharp SVG text rendering.
 # - fontconfig is needed for font discovery.
 # - ttf-dejavu gives us a solid default when requested families are missing.
-# - Google Fonts are fetched from the google/fonts GitHub repo, which is the
-#   canonical open-source mirror and far more stable than the fonts.google.com
-#   download endpoint (which rate-limits CI and changes URLs without notice).
-#   curl --fail aborts the build if any font download returns a non-2xx, so
-#   silent supply-chain swaps get caught at image build time. curl is removed
-#   from the final image after the build step to minimise the runtime attack
-#   surface.
-RUN set -e \
-    && apk add --no-cache fontconfig ttf-dejavu \
-    && apk add --no-cache --virtual .font-build-deps curl \
-    && mkdir -p /usr/share/fonts/google \
-    && REPO="https://github.com/google/fonts/raw/main" \
-    && for entry in \
-         "ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf:Roboto.ttf" \
-         "ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf:OpenSans.ttf" \
-         "ofl/lato/Lato%5Bwght%5D.ttf:Lato.ttf" \
-         "ofl/oswald/Oswald%5Bwght%5D.ttf:Oswald.ttf" \
-         "ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf:PlayfairDisplay.ttf"; do \
-        src="${entry%%:*}"; dest="${entry##*:}"; \
-        curl -sSL --fail --retry 3 --retry-delay 2 \
-          "${REPO}/${src}" -o "/usr/share/fonts/google/${dest}" \
-          || exit 1; \
-        done \
-    && fc-cache -fv \
-    && apk del .font-build-deps
+RUN apk add --no-cache fontconfig ttf-dejavu \
+    && fc-cache -fv
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodegroup
