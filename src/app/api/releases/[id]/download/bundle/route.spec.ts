@@ -296,16 +296,13 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(response.headers.get('X-Accel-Buffering')).toBe('no');
   });
 
-  it('should stream progress and ready events for each format', async () => {
-    mockGeneratePresignedDownloadUrl
-      .mockResolvedValueOnce('https://s3.example.com/flac-bundle.zip')
-      .mockResolvedValueOnce('https://s3.example.com/wav-bundle.zip');
-
+  it('should stream progress and ready events for combined ZIP', async () => {
     const response = await GET(makeJsonRequest(), makeParams());
     const events = await readSSEEvents(response);
 
-    // progress(FLAC), ready(FLAC), progress(WAV), ready(WAV), complete
-    expect(events).toHaveLength(5);
+    // progress(FLAC,zipping), progress(FLAC,done), progress(WAV,zipping), progress(WAV,done),
+    // progress(uploading), ready(url), complete
+    expect(events).toHaveLength(7);
     expect(events[0]).toEqual(
       expect.objectContaining({
         event: 'progress',
@@ -314,11 +311,8 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
     expect(events[1]).toEqual(
       expect.objectContaining({
-        event: 'ready',
-        data: expect.objectContaining({
-          formatType: 'FLAC',
-          downloadUrl: 'https://s3.example.com/flac-bundle.zip',
-        }),
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'FLAC', status: 'done' }),
       })
     );
     expect(events[2]).toEqual(
@@ -329,85 +323,120 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     );
     expect(events[3]).toEqual(
       expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ formatType: 'WAV', status: 'done' }),
+      })
+    );
+    expect(events[4]).toEqual(
+      expect.objectContaining({
+        event: 'progress',
+        data: expect.objectContaining({ status: 'uploading' }),
+      })
+    );
+    expect(events[5]).toEqual(
+      expect.objectContaining({
         event: 'ready',
         data: expect.objectContaining({
-          formatType: 'WAV',
-          downloadUrl: 'https://s3.example.com/wav-bundle.zip',
+          downloadUrl: 'https://s3.example.com/presigned-bundle-url',
         }),
       })
     );
-    expect(events[4]).toEqual(expect.objectContaining({ event: 'complete' }));
+    expect(events[6]).toEqual(expect.objectContaining({ event: 'complete' }));
   });
 
-  it('should include fileName in ready events', async () => {
-    mockGeneratePresignedDownloadUrl.mockResolvedValueOnce('https://s3.example.com/bundle.zip');
-
+  it('should include fileName in ready event', async () => {
     const response = await GET(makeJsonRequest('FLAC'), makeParams());
     const events = await readSSEEvents(response);
 
     const readyEvent = events.find((e) => e.event === 'ready');
     expect(readyEvent?.data).toEqual(
       expect.objectContaining({
-        fileName: expect.stringContaining('Test Album - FLAC.zip'),
+        fileName: 'Test Album.zip',
       })
     );
   });
 
-  it('should create per-format ZIPs via archiver when respond=json', async () => {
+  it('should create a single combined ZIP via archiver when respond=json', async () => {
     const response = await GET(makeJsonRequest(), makeParams());
     await response.text(); // consume the stream to trigger all async work
 
-    // FLAC has 2 files + WAV has 1 file = 3 total appends, 2 formats = 2 finalize + 2 uploads
+    // FLAC has 2 files + WAV has 1 file = 3 total appends, 1 combined archive = 1 finalize + 1 upload
     expect(mockAppend).toHaveBeenCalledTimes(3);
-    expect(mockFinalize).toHaveBeenCalledTimes(2);
-    expect(mockUploadDone).toHaveBeenCalledTimes(2);
+    expect(mockFinalize).toHaveBeenCalledTimes(1);
+    expect(mockUploadDone).toHaveBeenCalledTimes(1);
   });
 
-  it('should not increment download count when respond=json', async () => {
+  it('should sanitize archive entry names in SSE path to prevent zip-slip traversal', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/a', fileName: '../../../etc/passwd' },
+          { s3Key: 'releases/r1/FLAC/b', fileName: '/absolute/path/song.wav' },
+          { s3Key: 'releases/r1/FLAC/c', fileName: 'null\0byte.mp3' },
+        ],
+      },
+    ]);
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    await response.text();
+
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/passwd' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/song.wav' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/null_byte.mp3' })
+    );
+
+    const archiveEntryNames = mockAppend.mock.calls.map(([, options]) => options.name as string);
+    expect(archiveEntryNames.every((name) => !name.includes('..'))).toBe(true);
+    expect(archiveEntryNames.every((name) => !name.startsWith('/'))).toBe(true);
+  });
+
+  it('should increment download count and log events when respond=json', async () => {
     const response = await GET(makeJsonRequest(), makeParams());
     await response.text(); // consume the stream
 
-    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
-    expect(mockLogDownloadEvent).not.toHaveBeenCalled();
+    expect(mockUpsertDownloadCount).toHaveBeenCalledTimes(1);
+    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
+    expect(mockLogDownloadEvent).toHaveBeenCalledTimes(2);
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ formatType: 'FLAC', success: true })
+    );
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ formatType: 'WAV', success: true })
+    );
   });
 
-  it('should send error event for a failed format and continue with others', async () => {
+  it('should send error event for a failed format and still bundle remaining', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockUploadDone
-      .mockRejectedValueOnce(new Error('Upload failed'))
-      .mockResolvedValueOnce(undefined);
-    mockGeneratePresignedDownloadUrl.mockResolvedValue('https://s3.example.com/wav-bundle.zip');
+    // Make the first S3 fetch fail (FLAC track 1)
+    mockS3Send
+      .mockRejectedValueOnce(new Error('S3 fetch failed'))
+      .mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
 
     const response = await GET(makeJsonRequest(), makeParams());
     const events = await readSSEEvents(response);
 
-    // progress(FLAC), error(FLAC), progress(WAV), ready(WAV), complete
-    expect(events).toHaveLength(5);
-    expect(events[0]).toEqual(
-      expect.objectContaining({
-        event: 'progress',
-        data: expect.objectContaining({ formatType: 'FLAC' }),
-      })
-    );
-    expect(events[1]).toEqual(
+    // progress(FLAC,zipping), error(FLAC), progress(WAV,zipping), progress(WAV,done),
+    // progress(uploading), ready(url), complete
+    expect(events.find((e) => e.event === 'error')).toEqual(
       expect.objectContaining({
         event: 'error',
         data: expect.objectContaining({ formatType: 'FLAC' }),
       })
     );
-    expect(events[2]).toEqual(
-      expect.objectContaining({
-        event: 'progress',
-        data: expect.objectContaining({ formatType: 'WAV' }),
-      })
-    );
-    expect(events[3]).toEqual(
-      expect.objectContaining({
-        event: 'ready',
-        data: expect.objectContaining({ formatType: 'WAV' }),
-      })
-    );
-    expect(events[4]).toEqual(expect.objectContaining({ event: 'complete' }));
+    // WAV should still succeed
+    expect(events.find((e) => e.event === 'ready')).toBeDefined();
 
     consoleSpy.mockRestore();
   });
