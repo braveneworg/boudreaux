@@ -44,10 +44,12 @@ vi.mock('@aws-sdk/lib-storage', () => {
   };
 });
 
-// Mock writeComment
+// Mock audio-metadata
 const mockWriteComment = vi.fn();
+const mockSupportsComment = vi.fn();
 vi.mock('@/lib/audio-metadata', () => ({
   writeComment: (...args: unknown[]) => mockWriteComment(...args),
+  supportsComment: (...args: unknown[]) => mockSupportsComment(...args),
 }));
 
 // Mock node:stream/promises (pipeline)
@@ -135,6 +137,7 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 }
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
+  const originalHostName = process.env.NEXT_PUBLIC_HOST_NAME;
   const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
   beforeEach(() => {
@@ -147,10 +150,13 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockUploadDone.mockResolvedValue({});
     mockUploadOn.mockReturnValue(undefined);
     mockWriteComment.mockResolvedValue(undefined);
-    process.env.NEXT_PUBLIC_BASE_URL = 'https://example.com';
+    mockSupportsComment.mockReturnValue(true);
+    process.env.NEXT_PUBLIC_HOST_NAME = 'https://example.com';
+    process.env.NEXT_PUBLIC_BASE_URL = 'https://fallback.example.com';
   });
 
   afterEach(() => {
+    process.env.NEXT_PUBLIC_HOST_NAME = originalHostName;
     process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
   });
 
@@ -360,13 +366,46 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   it('should call writeComment during upload', async () => {
     await PUT(makeRequest(), makeParams());
 
+    expect(mockSupportsComment).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.mp3');
     expect(mockWriteComment).toHaveBeenCalledWith(
       '/tmp/upload-test-uuid-1234.mp3',
       'Visit https://example.com/'
     );
   });
 
-  it('should return 500 when NEXT_PUBLIC_BASE_URL is missing', async () => {
+  it('should skip writeComment for formats that do not support comments (e.g. WAV)', async () => {
+    mockSupportsComment.mockReturnValue(false);
+
+    const response = await PUT(
+      makeRequest({
+        headers: {
+          'x-file-name': encodeURIComponent('album.wav'),
+          'content-type': 'audio/wav',
+        },
+      }),
+      makeParams('release-1', 'WAV')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(mockSupportsComment).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.wav');
+    expect(mockWriteComment).not.toHaveBeenCalled();
+  });
+
+  it('should use NEXT_PUBLIC_BASE_URL when NEXT_PUBLIC_HOST_NAME is missing', async () => {
+    delete process.env.NEXT_PUBLIC_HOST_NAME;
+
+    await PUT(makeRequest(), makeParams());
+
+    expect(mockWriteComment).toHaveBeenCalledWith(
+      '/tmp/upload-test-uuid-1234.mp3',
+      'Visit https://fallback.example.com/'
+    );
+  });
+
+  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are missing', async () => {
+    delete process.env.NEXT_PUBLIC_HOST_NAME;
     delete process.env.NEXT_PUBLIC_BASE_URL;
 
     const response = await PUT(makeRequest(), makeParams());
@@ -374,11 +413,14 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
-    expect(body.message).toBe('Server configuration is invalid: NEXT_PUBLIC_BASE_URL is not set.');
+    expect(body.message).toBe(
+      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.'
+    );
   });
 
-  it('should return 500 when NEXT_PUBLIC_BASE_URL is invalid', async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = 'not-a-url';
+  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are invalid', async () => {
+    process.env.NEXT_PUBLIC_HOST_NAME = 'not-a-url';
+    process.env.NEXT_PUBLIC_BASE_URL = 'also-not-a-url';
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
@@ -386,7 +428,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(response.status).toBe(500);
     expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
     expect(body.message).toBe(
-      'Server configuration is invalid: NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
+      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
     );
   });
 

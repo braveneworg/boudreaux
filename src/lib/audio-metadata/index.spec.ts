@@ -2,12 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { detectFormat, writeComment } from './index';
+import { detectFormat, supportsComment, writeComment } from './index';
 
 const mockWriteOggComment = vi.fn();
 const mockWriteFlacComment = vi.fn();
 const mockWriteAacComment = vi.fn();
 const mockWriteMp3Comment = vi.fn();
+const mockWriteAiffComment = vi.fn();
 
 vi.mock('./ogg', () => ({
   writeOggComment: (...args: unknown[]) => mockWriteOggComment(...args),
@@ -23,6 +24,10 @@ vi.mock('./aac', () => ({
 
 vi.mock('./mp3', () => ({
   writeMp3Comment: (...args: unknown[]) => mockWriteMp3Comment(...args),
+}));
+
+vi.mock('./aiff', () => ({
+  writeAiffComment: (...args: unknown[]) => mockWriteAiffComment(...args),
 }));
 
 describe('audio-metadata/index', () => {
@@ -51,12 +56,24 @@ describe('audio-metadata/index', () => {
       expect(detectFormat('/path/to/file.mp3')).toBe('mp3');
     });
 
+    it('should detect .aiff as aiff', () => {
+      expect(detectFormat('/path/to/file.aiff')).toBe('aiff');
+    });
+
+    it('should detect .aif as aiff', () => {
+      expect(detectFormat('/path/to/file.aif')).toBe('aiff');
+    });
+
     it('should handle uppercase extensions', () => {
       expect(detectFormat('/path/to/file.OGG')).toBe('ogg');
     });
 
     it('should handle mixed-case extensions', () => {
       expect(detectFormat('/path/to/file.FlAc')).toBe('flac');
+    });
+
+    it('should handle uppercase .AIFF extension', () => {
+      expect(detectFormat('/path/to/file.AIFF')).toBe('aiff');
     });
 
     it('should throw for unsupported extension', () => {
@@ -72,12 +89,47 @@ describe('audio-metadata/index', () => {
     });
   });
 
+  describe('supportsComment', () => {
+    it('should return true for .ogg files', () => {
+      expect(supportsComment('/path/to/file.ogg')).toBe(true);
+    });
+
+    it('should return true for .flac files', () => {
+      expect(supportsComment('/path/to/file.flac')).toBe(true);
+    });
+
+    it('should return true for .mp3 files', () => {
+      expect(supportsComment('/path/to/file.mp3')).toBe(true);
+    });
+
+    it('should return true for .aac files', () => {
+      expect(supportsComment('/path/to/file.aac')).toBe(true);
+    });
+
+    it('should return true for .aiff files', () => {
+      expect(supportsComment('/path/to/file.aiff')).toBe(true);
+    });
+
+    it('should return false for .wav files', () => {
+      expect(supportsComment('/path/to/file.wav')).toBe(false);
+    });
+
+    it('should handle uppercase .WAV extension', () => {
+      expect(supportsComment('/path/to/file.WAV')).toBe(false);
+    });
+
+    it('should return false for unknown extensions', () => {
+      expect(supportsComment('/path/to/file.xyz')).toBe(false);
+    });
+  });
+
   describe('writeComment', () => {
     beforeEach(() => {
       mockWriteOggComment.mockResolvedValue(undefined);
       mockWriteFlacComment.mockResolvedValue(undefined);
       mockWriteAacComment.mockResolvedValue(undefined);
       mockWriteMp3Comment.mockResolvedValue(undefined);
+      mockWriteAiffComment.mockResolvedValue(undefined);
     });
 
     it('should route .ogg files to writeOggComment', async () => {
@@ -112,6 +164,26 @@ describe('audio-metadata/index', () => {
       await writeComment('/tmp/track.mp3', 'test comment');
 
       expect(mockWriteMp3Comment).toHaveBeenCalledWith('/tmp/track.mp3', 'test comment', undefined);
+    });
+
+    it('should route .aiff files to writeAiffComment', async () => {
+      await writeComment('/tmp/track.aiff', 'test comment');
+
+      expect(mockWriteAiffComment).toHaveBeenCalledWith(
+        '/tmp/track.aiff',
+        'test comment',
+        undefined
+      );
+    });
+
+    it('should route .aif files to writeAiffComment', async () => {
+      await writeComment('/tmp/track.aif', 'test comment');
+
+      expect(mockWriteAiffComment).toHaveBeenCalledWith(
+        '/tmp/track.aif',
+        'test comment',
+        undefined
+      );
     });
 
     it('should pass options through to the format writer', async () => {

@@ -15,7 +15,7 @@ import { NextResponse } from 'next/server';
 
 import { Upload } from '@aws-sdk/lib-storage';
 
-import { writeComment } from '@/lib/audio-metadata';
+import { supportsComment, writeComment } from '@/lib/audio-metadata';
 import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { UploadService } from '@/lib/services/upload-service';
@@ -146,16 +146,18 @@ export async function PUT(
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+    const baseUrl =
+      process.env.NEXT_PUBLIC_HOST_NAME?.trim() || process.env.NEXT_PUBLIC_BASE_URL?.trim();
     if (!baseUrl) {
       console.error(
-        '[upload-proxy] Missing NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
+        '[upload-proxy] Missing NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
         {
           success: false,
           error: 'SERVER_CONFIGURATION_ERROR',
-          message: 'Server configuration is invalid: NEXT_PUBLIC_BASE_URL is not set.',
+          message:
+            'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.',
         },
         { status: 500 }
       );
@@ -166,14 +168,14 @@ export async function PUT(
       validatedBaseUrl = new URL(baseUrl).toString();
     } catch {
       console.error(
-        '[upload-proxy] Invalid NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
+        '[upload-proxy] Invalid NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
         {
           success: false,
           error: 'SERVER_CONFIGURATION_ERROR',
           message:
-            'Server configuration is invalid: NEXT_PUBLIC_BASE_URL must be a valid absolute URL.',
+            'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL must be a valid absolute URL.',
         },
         { status: 500 }
       );
@@ -188,8 +190,10 @@ export async function PUT(
       const nodeStream = Readable.fromWeb(request.body as NodeReadableStream);
       await pipeline(nodeStream, createWriteStream(tempFilePath));
 
-      // Read actual file size from disk (may differ after tag modification)
-      await writeComment(tempFilePath, `Visit ${validatedBaseUrl}`);
+      // Write comment tag if the format supports metadata (WAV does not)
+      if (supportsComment(tempFilePath)) {
+        await writeComment(tempFilePath, `Visit ${validatedBaseUrl}`);
+      }
       const fileStat = await stat(tempFilePath);
       const actualFileSize = fileStat.size;
 
