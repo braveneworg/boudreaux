@@ -25,6 +25,18 @@ const EXT_TO_FORMAT: Record<string, AudioFormat> = {
   '.aif': 'aiff',
 };
 
+/** Format extensions that do not support metadata comment tags. */
+const COMMENTLESS_EXTENSIONS = new Set(['.wav']);
+
+/**
+ * Returns true if the file format supports writing comment metadata.
+ * WAV files have no standard tag container, so comment writing is skipped.
+ */
+export function supportsComment(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return !COMMENTLESS_EXTENSIONS.has(ext);
+}
+
 /**
  * Detects the audio format from the file extension.
  * Throws if the extension is not recognised.
