@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.29.0] - 2026-04-19
+
+### Added
+
+- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n- feat(audio-metadata): implement audio metadata reading and writing fu… (#378)\n
+
 ## [4.28.0] - 2026-04-18
 
 ### Added
