@@ -81,6 +81,10 @@ vi.mock('node:os', () => ({
 // Mock node:path (join)
 vi.mock('node:path', () => ({
   join: vi.fn((...parts: string[]) => parts.join('/')),
+  extname: vi.fn((filePath: string) => {
+    const dotIndex = filePath.lastIndexOf('.');
+    return dotIndex >= 0 ? filePath.slice(dotIndex) : '';
+  }),
 }));
 
 // Mock node:crypto (randomUUID)
@@ -131,6 +135,8 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 }
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
+  const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
   beforeEach(() => {
     mockAuth.mockResolvedValue({
       user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
@@ -141,6 +147,11 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockUploadDone.mockResolvedValue({});
     mockUploadOn.mockReturnValue(undefined);
     mockWriteComment.mockResolvedValue(undefined);
+    process.env.NEXT_PUBLIC_BASE_URL = 'https://example.com';
+  });
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
   });
 
   it('should return 401 when user is not authenticated', async () => {
@@ -350,8 +361,32 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     await PUT(makeRequest(), makeParams());
 
     expect(mockWriteComment).toHaveBeenCalledWith(
-      '/tmp/upload-test-uuid-1234.tmp',
-      expect.stringContaining('Visit')
+      '/tmp/upload-test-uuid-1234.mp3',
+      'Visit https://example.com/'
+    );
+  });
+
+  it('should return 500 when NEXT_PUBLIC_BASE_URL is missing', async () => {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
+    expect(body.message).toBe('Server configuration is invalid: NEXT_PUBLIC_BASE_URL is not set.');
+  });
+
+  it('should return 500 when NEXT_PUBLIC_BASE_URL is invalid', async () => {
+    process.env.NEXT_PUBLIC_BASE_URL = 'not-a-url';
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
+    expect(body.message).toBe(
+      'Server configuration is invalid: NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
     );
   });
 

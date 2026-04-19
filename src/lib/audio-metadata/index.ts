@@ -2,10 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import 'server-only';
+
 import path from 'node:path';
 
 import { writeAacComment } from './aac';
-import { writeAlacComment } from './alac';
 import { writeFlacComment } from './flac';
 import { writeMp3Comment } from './mp3';
 import { writeOggComment } from './ogg';
@@ -39,7 +40,7 @@ export function detectFormat(filePath: string): AudioFormat {
 /**
  * Writes or replaces the comment/description metadata field in an audio file.
  *
- * Supports: Ogg Vorbis, FLAC, AAC (M4A), ALAC (M4A), MP3 (CBR and VBR).
+ * Supports: Ogg Vorbis, FLAC, AAC/M4A, MP3 (CBR and VBR).
  *
  * Format is detected automatically from the file extension. Pass
  * `options.language` to control the ID3 COMM frame language for MP3 files
@@ -63,12 +64,10 @@ export async function writeComment(
       return writeFlacComment(filePath, comment, options);
     case 'aac':
       return writeAacComment(filePath, comment, options);
-    case 'alac':
-      return writeAlacComment(filePath, comment, options);
     case 'mp3':
       return writeMp3Comment(filePath, comment, options);
   }
 }
 
-export { writeOggComment, writeFlacComment, writeAacComment, writeAlacComment, writeMp3Comment };
+export { writeOggComment, writeFlacComment, writeAacComment, writeMp3Comment };
 export type { AudioFormat, WriteCommentOptions };

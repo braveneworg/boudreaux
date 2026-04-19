@@ -28,6 +28,7 @@ vi.mock('node:child_process', () => ({
 
 function createMockProcess(): ChildProcess {
   const proc = new EventEmitter() as ChildProcess;
+  proc.stderr = new EventEmitter();
   return proc;
 }
 
@@ -46,20 +47,24 @@ describe('writeTagViaFfmpeg', () => {
 
     await promise;
 
-    expect(mockSpawn).toHaveBeenCalledWith('ffmpeg', [
-      '-y',
-      '-i',
-      '/tmp/track.flac',
-      '-map',
-      '0',
-      '-map_metadata',
-      '0',
-      '-codec',
-      'copy',
-      '-metadata',
-      'COMMENT=Hello',
-      expect.stringContaining('.__tmp_'),
-    ]);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'ffmpeg',
+      [
+        '-y',
+        '-i',
+        '/tmp/track.flac',
+        '-map',
+        '0',
+        '-map_metadata',
+        '0',
+        '-codec',
+        'copy',
+        '-metadata',
+        'COMMENT=Hello',
+        expect.stringContaining('.__tmp_'),
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] }
+    );
   });
 
   it('should rename temp file over original on success', async () => {
@@ -82,6 +87,17 @@ describe('writeTagViaFfmpeg', () => {
     proc.emit('close', 1);
 
     await expect(promise).rejects.toThrow('ffmpeg exited with code 1');
+  });
+
+  it('should include ffmpeg stderr output on non-zero exit code', async () => {
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+
+    const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
+    proc.stderr?.emit('data', Buffer.from('invalid metadata key'));
+    proc.emit('close', 1);
+
+    await expect(promise).rejects.toThrow('invalid metadata key');
   });
 
   it('should clean up temp file on ffmpeg failure', async () => {

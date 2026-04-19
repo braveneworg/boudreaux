@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stat, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
@@ -146,8 +146,42 @@ export async function PUT(
       );
     }
 
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+    if (!baseUrl) {
+      console.error(
+        '[upload-proxy] Missing NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'SERVER_CONFIGURATION_ERROR',
+          message: 'Server configuration is invalid: NEXT_PUBLIC_BASE_URL is not set.',
+        },
+        { status: 500 }
+      );
+    }
+
+    let validatedBaseUrl: string;
+    try {
+      validatedBaseUrl = new URL(baseUrl).toString();
+    } catch {
+      console.error(
+        '[upload-proxy] Invalid NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'SERVER_CONFIGURATION_ERROR',
+          message:
+            'Server configuration is invalid: NEXT_PUBLIC_BASE_URL must be a valid absolute URL.',
+        },
+        { status: 500 }
+      );
+    }
+
     // Step 7: Stream request body to temp file, then upload to S3
-    const tempFilePath = join(tmpdir(), `upload-${randomUUID()}.tmp`);
+    const fileExtension = extname(fileName).toLowerCase();
+    const tempFilePath = join(tmpdir(), `upload-${randomUUID()}${fileExtension}`);
 
     try {
       // Write incoming stream to a temp file
@@ -155,7 +189,7 @@ export async function PUT(
       await pipeline(nodeStream, createWriteStream(tempFilePath));
 
       // Read actual file size from disk (may differ after tag modification)
-      await writeComment(tempFilePath, `Visit ${process.env.NEXT_PUBLIC_SITE_URL}`);
+      await writeComment(tempFilePath, `Visit ${validatedBaseUrl}`);
       const fileStat = await stat(tempFilePath);
       const actualFileSize = fileStat.size;
 

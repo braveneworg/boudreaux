@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -23,7 +24,7 @@ export async function writeTagViaFfmpeg(
 ): Promise<void> {
   const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
-  const tmpPath = path.join(dir, `.__tmp_${Date.now()}${ext}`);
+  const tmpPath = path.join(dir, `.__tmp_${randomUUID()}${ext}`);
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -42,11 +43,33 @@ export async function writeTagViaFfmpeg(
         tmpPath,
       ];
 
-      const proc = spawn('ffmpeg', args);
+      const stderrChunks: string[] = [];
+      const maxStderrLength = 8_192;
+      const proc = spawn('ffmpeg', args, {
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+
+      proc.stderr?.on('data', (chunk: Buffer | string) => {
+        const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        stderrChunks.push(text);
+
+        const combined = stderrChunks.join('');
+        if (combined.length > maxStderrLength) {
+          stderrChunks.splice(0, stderrChunks.length, combined.slice(-maxStderrLength));
+        }
+      });
 
       proc.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`ffmpeg exited with code ${code} processing "${filePath}"`));
+        if (code === 0) {
+          resolve();
+          return;
+        }
+
+        const stderrOutput = stderrChunks.join('').trim();
+        const stderrSuffix = stderrOutput ? `: ${stderrOutput}` : '';
+        reject(
+          new Error(`ffmpeg exited with code ${code} processing "${filePath}"${stderrSuffix}`)
+        );
       });
 
       proc.on('error', (err) => {

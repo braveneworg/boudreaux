@@ -7,7 +7,6 @@ import { detectFormat, writeComment } from './index';
 const mockWriteOggComment = vi.fn();
 const mockWriteFlacComment = vi.fn();
 const mockWriteAacComment = vi.fn();
-const mockWriteAlacComment = vi.fn();
 const mockWriteMp3Comment = vi.fn();
 
 vi.mock('./ogg', () => ({
@@ -20,10 +19,6 @@ vi.mock('./flac', () => ({
 
 vi.mock('./aac', () => ({
   writeAacComment: (...args: unknown[]) => mockWriteAacComment(...args),
-}));
-
-vi.mock('./alac', () => ({
-  writeAlacComment: (...args: unknown[]) => mockWriteAlacComment(...args),
 }));
 
 vi.mock('./mp3', () => ({
@@ -82,7 +77,6 @@ describe('audio-metadata/index', () => {
       mockWriteOggComment.mockResolvedValue(undefined);
       mockWriteFlacComment.mockResolvedValue(undefined);
       mockWriteAacComment.mockResolvedValue(undefined);
-      mockWriteAlacComment.mockResolvedValue(undefined);
       mockWriteMp3Comment.mockResolvedValue(undefined);
     });
 
