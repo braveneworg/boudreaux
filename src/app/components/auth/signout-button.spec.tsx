@@ -1,24 +1,14 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import SignedinToolbar from './signout-button';
 
 // Mock next-auth
-const mockSignOut = vi.fn();
 const mockUseSession = vi.fn();
 vi.mock('next-auth/react', () => ({
-  signOut: (options?: { redirect?: boolean }) => mockSignOut(options),
   useSession: () => mockUseSession(),
-}));
-
-// Mock next/navigation
-const mockPush = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
 }));
 
 // Mock use-mobile hook
@@ -29,7 +19,13 @@ vi.mock('@/app/hooks/use-mobile', () => ({
 
 // Mock child components
 vi.mock('./signed-in-as', () => ({
-  default: () => <div data-testid="signed-in-as">Signed In As Component</div>,
+  default: ({ onClick }: { onClick?: () => void }) => (
+    <div data-testid="signed-in-as">
+      <button data-testid="signed-in-as-action" onClick={onClick}>
+        Signed In As
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('./edit-profile-button', () => ({
@@ -37,32 +33,44 @@ vi.mock('./edit-profile-button', () => ({
 }));
 
 vi.mock('./admin-link', () => ({
-  default: () => <div data-testid="admin-link">Admin Link</div>,
+  default: ({ onClick }: { onClick?: () => void }) => (
+    <button data-testid="admin-link" onClick={onClick}>
+      Admin Link
+    </button>
+  ),
+}));
+
+vi.mock('./sign-out-button', () => ({
+  SignOutButton: ({ onNavigate }: { onNavigate?: () => void }) => (
+    <button data-testid="sign-out-button" onClick={onNavigate}>
+      Sign Out
+    </button>
+  ),
 }));
 
 vi.mock('../ui/vertical-separator', () => ({
   default: () => <div data-testid="vertical-separator">|</div>,
 }));
 
-vi.mock('../ui/button', () => ({
-  Button: ({
-    children,
-    onClick,
-    variant,
+vi.mock('../gravatar-avatar', () => ({
+  GravatarAvatar: ({
+    email,
+    firstName,
+    surname,
   }: {
-    children: React.ReactNode;
-    onClick?: () => void;
-    variant?: string;
+    email: string;
+    firstName?: string;
+    surname?: string;
   }) => (
-    <button onClick={onClick} data-variant={variant}>
-      {children}
-    </button>
+    <div
+      data-testid="gravatar-avatar"
+      data-email={email}
+      data-first={firstName}
+      data-last={surname}
+    >
+      Avatar
+    </div>
   ),
-}));
-
-// Mock lucide-react
-vi.mock('lucide-react', () => ({
-  LogOutIcon: () => <div data-testid="logout-icon">LogOutIcon</div>,
 }));
 
 // Mock utils
@@ -86,7 +94,6 @@ vi.mock('@/lib/utils/tailwind-utils', () => ({
 
 describe('SignedinToolbar', () => {
   beforeEach(() => {
-    // Setup default session mock
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -102,60 +109,40 @@ describe('SignedinToolbar', () => {
   });
 
   describe('rendering', () => {
-    it('renders all components on desktop', () => {
+    it('renders all child components on desktop', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedinToolbar />);
 
+      expect(screen.getByTestId('gravatar-avatar')).toBeInTheDocument();
       expect(screen.getByTestId('signed-in-as')).toBeInTheDocument();
+      expect(screen.getByTestId('sign-out-button')).toBeInTheDocument();
       expect(screen.getByTestId('edit-profile-button')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
-      expect(screen.getAllByTestId('vertical-separator')).toHaveLength(2);
     });
 
-    it('renders without vertical separators on mobile', () => {
+    it('renders gravatar avatar with session data', () => {
+      render(<SignedinToolbar />);
+
+      const avatar = screen.getByTestId('gravatar-avatar');
+      expect(avatar).toHaveAttribute('data-email', 'test@example.com');
+      expect(avatar).toHaveAttribute('data-first', 'Test');
+      expect(avatar).toHaveAttribute('data-last', 'User');
+    });
+
+    it('renders vertical separator on desktop', () => {
+      mockUseIsMobile.mockReturnValue(false);
+      render(<SignedinToolbar />);
+
+      expect(screen.getByTestId('vertical-separator')).toBeInTheDocument();
+    });
+
+    it('hides vertical separator on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
       render(<SignedinToolbar />);
 
-      expect(screen.getByTestId('signed-in-as')).toBeInTheDocument();
-      expect(screen.getByTestId('edit-profile-button')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
-      // Mobile has 1 separator (after SignedInAs), not 2
-      expect(screen.queryAllByTestId('vertical-separator')).toHaveLength(1);
+      expect(screen.queryByTestId('vertical-separator')).not.toBeInTheDocument();
     });
 
-    it('renders logout icon', () => {
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      expect(screen.getByTestId('logout-icon')).toBeInTheDocument();
-    });
-
-    it('applies flex layout on desktop', () => {
-      mockUseIsMobile.mockReturnValue(false);
-      const { container } = render(<SignedinToolbar />);
-
-      // Get the inner div with flex classes (child of the wrapper)
-      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
-      expect(wrapper).toHaveClass('flex');
-      expect(wrapper).toHaveClass('items-center');
-      expect(wrapper).toHaveClass('justify-center');
-      expect(wrapper).toHaveClass('gap-2');
-    });
-
-    it('applies flex layout with additional classes on mobile', () => {
-      mockUseIsMobile.mockReturnValue(true);
-      const { container } = render(<SignedinToolbar />);
-
-      // Get the inner div with flex classes (child of the wrapper)
-      const wrapper = container.querySelector('div[class*="flex"]') as HTMLElement;
-      expect(wrapper).toHaveClass('flex');
-      expect(wrapper).toHaveClass('items-center');
-      expect(wrapper).toHaveClass('justify-center');
-      expect(wrapper).toHaveClass('gap-4');
-    });
-
-    it('applies custom className when provided', () => {
-      mockUseIsMobile.mockReturnValue(false);
+    it('applies custom className', () => {
       const { container } = render(<SignedinToolbar className="custom-class" />);
 
       const wrapper = container.querySelector('.custom-class');
@@ -163,83 +150,8 @@ describe('SignedinToolbar', () => {
     });
   });
 
-  describe('sign out functionality', () => {
-    it('calls signOut with redirect: false and callbackUrl when sign out button is clicked', async () => {
-      mockUseIsMobile.mockReturnValue(false);
-      mockSignOut.mockResolvedValue({ url: '/' });
-      render(<SignedinToolbar />);
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i });
-      fireEvent.click(signOutButton);
-
-      // Wait for async signOut to be called
-      await vi.waitFor(() => {
-        expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
-      });
-    });
-
-    it('navigates to URL returned from signOut', async () => {
-      mockUseIsMobile.mockReturnValue(false);
-      mockSignOut.mockResolvedValue({ url: '/custom-url' });
-      render(<SignedinToolbar />);
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i });
-      fireEvent.click(signOutButton);
-
-      // Wait for async operations to complete
-      await vi.waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/custom-url');
-      });
-    });
-
-    it('handles sign out click on mobile', async () => {
-      mockUseIsMobile.mockReturnValue(true);
-      mockSignOut.mockResolvedValue({ url: '/' });
-      render(<SignedinToolbar />);
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i });
-      fireEvent.click(signOutButton);
-
-      await vi.waitFor(() => {
-        expect(mockSignOut).toHaveBeenCalledWith({ redirect: false, callbackUrl: '/' });
-        expect(mockPush).toHaveBeenCalledWith('/');
-      });
-    });
-  });
-
-  describe('button variant', () => {
-    it('applies link:narrow variant to sign out button', () => {
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i });
-      expect(signOutButton).toHaveAttribute('data-variant', 'link:narrow');
-    });
-  });
-
-  describe('mobile responsiveness', () => {
-    it('hides vertical separator on mobile', () => {
-      mockUseIsMobile.mockReturnValue(true);
-      render(<SignedinToolbar />);
-
-      // On mobile, vertical separator after the button should not be rendered
-      const separators = screen.queryAllByTestId('vertical-separator');
-      // Only one separator should remain (before AdminLink if admin)
-      expect(separators.length).toBeLessThan(2);
-    });
-
-    it('shows vertical separator on desktop', () => {
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
-
-      const separators = screen.getAllByTestId('vertical-separator');
-      // At least one separator should be visible
-      expect(separators.length).toBeGreaterThan(0);
-    });
-  });
-
   describe('admin functionality', () => {
-    it('shows admin link and separator when user is admin', () => {
+    it('shows admin link when user is admin', () => {
       mockUseSession.mockReturnValue({
         data: {
           user: {
@@ -251,32 +163,52 @@ describe('SignedinToolbar', () => {
         },
         status: 'authenticated',
       });
-      mockUseIsMobile.mockReturnValue(false);
       render(<SignedinToolbar />);
 
-      // Should have 3 separators on desktop for admin (after SignedInAs, after EditProfile, before AdminLink)
-      const separators = screen.getAllByTestId('vertical-separator');
-      expect(separators).toHaveLength(3);
+      expect(screen.getByTestId('admin-link')).toBeInTheDocument();
     });
 
     it('hides admin link when user is not admin', () => {
+      render(<SignedinToolbar />);
+
+      expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('navigation callbacks', () => {
+    it('passes onNavigate to SignOutButton', () => {
+      const onNavigate = vi.fn();
+      render(<SignedinToolbar onNavigate={onNavigate} />);
+
+      screen.getByTestId('sign-out-button').click();
+      expect(onNavigate).toHaveBeenCalledOnce();
+    });
+
+    it('passes onNavigate to SignedInAs', () => {
+      const onNavigate = vi.fn();
+      render(<SignedinToolbar onNavigate={onNavigate} />);
+
+      screen.getByTestId('signed-in-as-action').click();
+      expect(onNavigate).toHaveBeenCalledOnce();
+    });
+
+    it('passes onNavigate to AdminLink when admin', () => {
+      const onNavigate = vi.fn();
       mockUseSession.mockReturnValue({
         data: {
           user: {
             id: '1',
-            name: 'Regular User',
-            email: 'user@example.com',
-            role: 'user',
+            name: 'Admin User',
+            email: 'admin@example.com',
+            role: 'admin',
           },
         },
         status: 'authenticated',
       });
-      mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
+      render(<SignedinToolbar onNavigate={onNavigate} />);
 
-      // Should only have 2 separators on desktop for non-admin (after SignedInAs, after EditProfile)
-      const separators = screen.getAllByTestId('vertical-separator');
-      expect(separators).toHaveLength(2);
+      screen.getByTestId('admin-link').click();
+      expect(onNavigate).toHaveBeenCalledOnce();
     });
   });
 });

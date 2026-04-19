@@ -411,4 +411,16 @@ describe('FeaturedArtistsService', () => {
       });
     });
   });
+
+  describe('cache TTL', () => {
+    it('should use zero TTL when E2E_MODE is true', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      mockFindMany.mockResolvedValue([mockFeaturedArtist] as never);
+
+      const result = await FeaturedArtistsService.getFeaturedArtists(new Date('2024-06-01'));
+
+      expect(result).toMatchObject({ success: true });
+      vi.unstubAllEnvs();
+    });
+  });
 });

@@ -85,6 +85,18 @@ describe('GET /api/releases/[id]/related', () => {
     expect(response.status).toBe(500);
   });
 
+  it('should return 400 for an invalid release ID', async () => {
+    const request = new NextRequest(
+      'http://localhost:3000/api/releases/invalid-id/related?artistId=607f1f77bcf86cd799439013'
+    );
+    const response = await GET(request, createParams('invalid-id'));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Invalid release ID' });
+    expect(ReleaseService.getArtistOtherReleases).not.toHaveBeenCalled();
+  });
+
   it('should return 500 when an exception is thrown', async () => {
     vi.mocked(ReleaseService.getArtistOtherReleases).mockRejectedValue(new Error('Unexpected'));
 

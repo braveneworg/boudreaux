@@ -104,7 +104,7 @@ const config = {
       "style-src 'self' 'unsafe-inline' https://cdn.fakefourrecords.com",
       // Tight img-src: enumerate the CDN + S3 rather than allowing any https:.
       // This prevents the page from being weaponized as a tracking pixel relay.
-      "img-src 'self' data: blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://challenges.cloudflare.com",
+      "img-src 'self' data: blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://challenges.cloudflare.com https://www.gravatar.com",
       "font-src 'self' data: https://cdn.fakefourrecords.com",
       // Third-party iframes we embed: Turnstile + Stripe.
       "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",

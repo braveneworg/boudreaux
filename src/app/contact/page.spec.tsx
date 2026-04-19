@@ -261,6 +261,28 @@ describe('ContactPage', () => {
       expect(screen.getByTestId('field-lastName')).not.toBeDisabled();
       expect(screen.getByTestId('field-email')).not.toBeDisabled();
     });
+
+    it('should handle session with empty firstName and email', async () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'user-4',
+            firstName: '',
+            lastName: 'Smith',
+            email: '',
+            phone: '+1 555-000-9999',
+          },
+          expires: new Date(Date.now() + 86400000).toISOString(),
+        },
+        status: 'authenticated',
+        update: vi.fn(),
+      });
+
+      await importAndRender();
+
+      expect(screen.getByTestId('field-firstName')).not.toBeDisabled();
+      expect(screen.getByTestId('field-email')).not.toBeDisabled();
+    });
   });
 
   describe('form submission — unverified', () => {

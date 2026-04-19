@@ -4,14 +4,18 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { isDarkColor } from '@/lib/utils/color';
+
 import { BannerCarousel, type BannerSlotData } from './banner-carousel';
+
+const mockIsDarkColor = vi.mocked(isDarkColor);
 
 vi.mock('@/lib/utils/cloudfront-loader', () => ({
   cloudfrontLoader: ({ src }: { src: string }) => src,
 }));
 
 vi.mock('@/lib/utils/color', () => ({
-  isDarkColor: () => false,
+  isDarkColor: vi.fn(() => false),
 }));
 
 vi.mock('@/lib/validation/banner-notification-schema', () => ({
@@ -59,6 +63,27 @@ function fireTransitionEnd() {
 function stubPointerCapture() {
   HTMLElement.prototype.setPointerCapture = vi.fn();
   HTMLElement.prototype.releasePointerCapture = vi.fn();
+}
+
+/** Fire pointer events with correct clientX values (jsdom lacks PointerEvent constructor) */
+function firePointerDown(el: HTMLElement, clientX: number) {
+  const event = new MouseEvent('pointerdown', { clientX, bubbles: true });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  el.dispatchEvent(event);
+}
+function firePointerMove(el: HTMLElement, clientX: number) {
+  const event = new MouseEvent('pointermove', { clientX, bubbles: true });
+  el.dispatchEvent(event);
+}
+function firePointerUp(el: HTMLElement, clientX: number) {
+  const event = new MouseEvent('pointerup', { clientX, bubbles: true });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  el.dispatchEvent(event);
+}
+function firePointerCancel(el: HTMLElement, clientX: number) {
+  const event = new MouseEvent('pointercancel', { clientX, bubbles: true });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  el.dispatchEvent(event);
 }
 
 /* ---------- tests ---------- */
@@ -376,6 +401,366 @@ describe('BannerCarousel', () => {
       const strip = screen.getByText('Colored strip');
       expect(strip.style.color).toBe('rgb(255, 0, 0)');
       expect(strip.style.backgroundColor).toBe('rgb(0, 255, 0)');
+    });
+
+    it('uses fallback styles when textColor and backgroundColor are null', () => {
+      const banner = makeBanner(1, {
+        id: 'no-colors',
+        content: 'No color strip',
+        textColor: null,
+        backgroundColor: null,
+      });
+      render(<BannerCarousel banners={[banner]} />);
+
+      const strip = screen.getByText('No color strip');
+      // textColor null → undefined (no color set), backgroundColor null → 'transparent'
+      expect(strip.style.color).toBe('');
+      expect(strip.style.backgroundColor).toBe('transparent');
+    });
+
+    it('applies banner-strip-dark class when isDarkColor returns true', () => {
+      mockIsDarkColor.mockReturnValue(true);
+
+      const banner = makeBanner(1, makeNotification('dark', 'Dark strip'));
+      render(<BannerCarousel banners={[banner]} />);
+
+      const strip = screen.getByText('Dark strip');
+      expect(strip.className).toContain('banner-strip-dark');
+
+      mockIsDarkColor.mockReturnValue(false);
+    });
+
+    it('applies banner-strip-dark on outgoing strip during transition', () => {
+      mockIsDarkColor.mockReturnValue(true);
+
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      const outgoingStrip = screen.getByText('Notification 1');
+      expect(outgoingStrip.className).toContain('banner-strip-dark');
+
+      mockIsDarkColor.mockReturnValue(false);
+    });
+
+    it('uses fallback colors on outgoing strip when textColor/backgroundColor are null', () => {
+      const nullColorBanners: BannerSlotData[] = [
+        makeBanner(1, { id: 'n1', content: 'Null colors', textColor: null, backgroundColor: null }),
+        makeBanner(2, makeNotification('n2', 'Next slide')),
+      ];
+      render(<BannerCarousel banners={nullColorBanners} />);
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      // Outgoing strip should use fallback values
+      const outgoingStrip = screen.getByText('Null colors');
+      expect(outgoingStrip.style.backgroundColor).toBe('transparent');
+    });
+  });
+
+  /* ---- pointer / swipe navigation ---- */
+
+  describe('pointer / swipe navigation', () => {
+    /** Get the track element used for pointer events */
+    function getTrack() {
+      return document.querySelector('[role="group"]') as HTMLElement;
+    }
+
+    /** Mock offsetWidth on the container so width-based calculations work in jsdom */
+    function mockContainerWidth(width = 800) {
+      const container = document.querySelector('[role="group"]')?.parentElement;
+      if (container) {
+        Object.defineProperty(container, 'offsetWidth', { value: width, configurable: true });
+      }
+    }
+
+    it('swipes left (negative deltaX) to navigate to the next slide', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const track = getTrack();
+
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 200);
+        firePointerUp(track, 200);
+      });
+
+      // incomingIndex is set → incoming notification appears during transition
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
+    });
+
+    it('swipes right (positive deltaX) to navigate to the previous slide', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+
+      // First go to slide 2 via keyboard and complete
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+      act(() => fireTransitionEnd());
+
+      const track = getTrack();
+
+      // Swipe right to go back
+      act(() => {
+        firePointerDown(track, 100);
+        firePointerMove(track, 250);
+        firePointerUp(track, 250);
+      });
+
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+    });
+
+    it('snaps back when swipe does not exceed threshold', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const track = getTrack();
+
+      // Small drag that doesn't exceed SWIPE_THRESHOLD (50px)
+      act(() => {
+        firePointerDown(track, 200);
+        firePointerMove(track, 180);
+        firePointerUp(track, 180);
+      });
+
+      act(() => fireTransitionEnd());
+
+      // Should remain on slide 1
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+    });
+
+    it('applies elastic resistance on large drags', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const track = getTrack();
+
+      firePointerDown(track, 500);
+      // Move far to simulate elastic resistance (deltaX > width * 0.5)
+      firePointerMove(track, 0);
+
+      // Track should have been translated
+      expect(track.style.transform).toContain('translateX(');
+    });
+
+    it('does not start drag when animating', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+
+      // Start an animation via keyboard
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      const track = getTrack();
+
+      // Try to swipe during animation — should be ignored
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 100);
+        firePointerUp(track, 100);
+      });
+
+      // Complete the original keyboard animation
+      act(() => fireTransitionEnd());
+
+      // Should end up on slide 2 (from keyboard), not slide 3
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
+    });
+
+    it('ignores drag on a single banner', () => {
+      const banner = makeBanner(1, makeNotification('n1', 'Only one'));
+      render(<BannerCarousel banners={[banner]} />);
+
+      const track = getTrack();
+
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 100);
+        firePointerUp(track, 100);
+      });
+
+      expect(screen.getByText('Only one')).toBeInTheDocument();
+    });
+
+    it('handles pointerCancel like pointerUp', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const track = getTrack();
+
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 280);
+        firePointerCancel(track, 280);
+      });
+
+      act(() => fireTransitionEnd());
+
+      // Small drag snaps back — still on slide 1
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+    });
+
+    it('ignores pointerMove when not dragging', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      const track = getTrack();
+
+      // Move without pointerDown — should be no-op
+      firePointerMove(track, 100);
+
+      expect(track.style.transform).toBe('');
+    });
+
+    it('ignores pointerUp when not dragging', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      const track = getTrack();
+
+      // Up without down — should not crash
+      firePointerUp(track, 100);
+
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+    });
+
+    it('releases pointer but skips navigation when animation starts mid-drag', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      const track = getTrack();
+
+      // Start drag
+      firePointerDown(track, 300);
+      firePointerMove(track, 200);
+
+      // Trigger keyboard animation while dragging — sets isAnimatingRef
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      // Release pointer — isDraggingRef is true but isAnimatingRef is also true → early return
+      firePointerUp(track, 200);
+
+      // Complete the keyboard animation
+      act(() => fireTransitionEnd());
+
+      // Should be on slide 2 from keyboard nav
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
+    });
+
+    it('calculates velocity when time elapses between pointerDown and pointerUp', () => {
+      // Use a large rotation interval to avoid timer interference
+      render(<BannerCarousel banners={THREE_BANNERS} rotationInterval={999} />);
+      mockContainerWidth();
+
+      const track = getTrack();
+
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 240);
+        // Advance time so elapsed > 0 in pointerUp velocity calculation
+        vi.advanceTimersByTime(50);
+        firePointerUp(track, 240);
+      });
+
+      // deltaX = -60 exceeds SWIPE_THRESHOLD (50), navigate to next
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
+    });
+  });
+
+  /* ---- tab visibility ---- */
+
+  describe('tab visibility', () => {
+    it('hides notification strip when tab becomes hidden', () => {
+      const { container } = render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      // Simulate tab becoming hidden
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+      fireEvent(document, new Event('visibilitychange'));
+
+      const stripContainer = container.querySelector(
+        '[style*="min-height: 2.5rem"]'
+      ) as HTMLElement;
+      expect(stripContainer.style.opacity).toBe('0');
+
+      // Restore
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      fireEvent(document, new Event('visibilitychange'));
+    });
+
+    it('shows notification strip when tab becomes visible again', () => {
+      const { container } = render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      // Hide
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+      fireEvent(document, new Event('visibilitychange'));
+
+      // Show again
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+      fireEvent(document, new Event('visibilitychange'));
+
+      const stripContainer = container.querySelector(
+        '[style*="min-height: 2.5rem"]'
+      ) as HTMLElement;
+      expect(stripContainer.style.opacity).toBe('1');
+    });
+  });
+
+  /* ---- auto-rotation timer reset ---- */
+
+  describe('auto-rotation timer interactions', () => {
+    it('resets auto-rotation timer on keyboard navigation', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} rotationInterval={3} />);
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+
+      // Advance 2.5s (not enough to trigger auto-rotation)
+      act(() => vi.advanceTimersByTime(2500));
+
+      // Navigate manually — should reset the timer
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+      act(() => fireTransitionEnd());
+
+      // Advance another 2.5s — should NOT trigger auto-rotation since timer was reset
+      act(() => vi.advanceTimersByTime(2500));
+
+      // Should still be on slide 2 (from keyboard nav)
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
+    });
+
+    it('resets auto-rotation timer on swipe', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} rotationInterval={3} />);
+
+      const track = document.querySelector('[role="group"]') as HTMLElement;
+      const container = track?.parentElement;
+      if (container) {
+        Object.defineProperty(container, 'offsetWidth', { value: 800, configurable: true });
+      }
+
+      // Advance 2.5s
+      act(() => vi.advanceTimersByTime(2500));
+
+      // Swipe to next slide — resets timer
+      act(() => {
+        firePointerDown(track, 300);
+        firePointerMove(track, 200);
+        firePointerUp(track, 200);
+      });
+      act(() => fireTransitionEnd());
+
+      // Advance 2.5s — timer was reset so no auto-rotation yet
+      act(() => vi.advanceTimersByTime(2500));
+
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
     });
   });
 

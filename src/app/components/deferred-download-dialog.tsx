@@ -45,7 +45,7 @@ export const DeferredDownloadDialog = ({
     return (
       <DownloadTriggerButton
         className="mb-2 min-h-10"
-        label="Download release"
+        label="Download"
         onClick={() => {
           setShouldRenderDialog(true);
         }}

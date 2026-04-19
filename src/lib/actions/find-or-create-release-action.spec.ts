@@ -281,6 +281,42 @@ describe('findOrCreateReleaseAction', () => {
       });
     });
 
+    it('should include pre-generated id in creation data when provided', async () => {
+      const createdRelease = {
+        id: 'pre-gen-id-abc',
+        title: 'Album With Id',
+        formats: ['DIGITAL'],
+        labels: [],
+        releasedOn: new Date(),
+        coverArt: '',
+      };
+
+      mockReleaseServiceCreate.mockResolvedValue({
+        success: true,
+        data: createdRelease as unknown as never,
+      });
+
+      const metadata: ReleaseMetadata = {
+        album: 'Album With Id',
+        id: 'pre-gen-id-abc',
+      };
+
+      const result = await findOrCreateReleaseAction(metadata);
+
+      expect(result).toEqual({
+        success: true,
+        releaseId: 'pre-gen-id-abc',
+        releaseTitle: 'Album With Id',
+        created: true,
+      });
+
+      expect(mockReleaseServiceCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'pre-gen-id-abc',
+        })
+      );
+    });
+
     it('should include label in creation data', async () => {
       const createdRelease = {
         id: 'new-release-123',

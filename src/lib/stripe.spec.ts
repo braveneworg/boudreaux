@@ -14,6 +14,7 @@ vi.mock('stripe', () => {
     default: class FakeStripe {
       customers = { create: vi.fn() };
       checkout = { sessions: { create: vi.fn() } };
+      apiVersion = '2025-04-30.basil';
       constructor(...args: unknown[]) {
         constructorCalls.push(args);
       }
@@ -70,5 +71,17 @@ describe('Stripe client caching behavior', () => {
     expect(() => void stripe.customers).toThrow(
       'STRIPE_SECRET_KEY environment variable is not set'
     );
+  });
+
+  it('should return non-function properties without binding', async () => {
+    vi.resetModules();
+    constructorCalls.length = 0;
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_prop_key');
+
+    const { stripe } = await import('./stripe');
+
+    // Access a scalar property (not a function) — should be returned as-is
+    const version = (stripe as unknown as Record<string, unknown>).apiVersion;
+    expect(version).toBe('2025-04-30.basil');
   });
 });

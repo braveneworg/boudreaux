@@ -94,7 +94,7 @@ describe('DeferredDownloadDialog', () => {
 
     const trigger = screen.getByTestId('download-trigger');
     expect(trigger).toBeInTheDocument();
-    expect(trigger).toHaveTextContent('Download release');
+    expect(trigger).toHaveTextContent('Download');
   });
 
   it('should call useReleaseUserStatusQuery with the releaseId', () => {

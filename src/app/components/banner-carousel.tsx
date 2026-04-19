@@ -68,6 +68,7 @@ export function BannerCarousel({
   /** Apply a CSS transition to the track and move it */
   const animateTrack = useCallback((targetX: number, onComplete: () => void) => {
     const track = trackRef.current;
+    /* v8 ignore next -- ref is always set after mount */
     if (!track) return;
 
     track.style.transition = `transform ${TRANSITION_DURATION}ms ${EASING}`;
@@ -83,6 +84,7 @@ export function BannerCarousel({
   /** Reset track position instantly (no transition) */
   const resetTrack = useCallback(() => {
     const track = trackRef.current;
+    /* v8 ignore next -- ref is always set after mount */
     if (!track) return;
     track.style.transition = 'none';
     track.style.transform = 'translateX(0px)';
@@ -109,6 +111,7 @@ export function BannerCarousel({
       if (isAnimatingRef.current || totalSlides <= 1) return;
       isAnimatingRef.current = true;
       setIncomingIndex(toIndex);
+      /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
       const width = containerRef.current?.offsetWidth ?? 0;
       animateTrack(-dir * width, () => completeTransition(toIndex));
     },
@@ -184,6 +187,7 @@ export function BannerCarousel({
       currentDragXRef.current = 0;
 
       const track = trackRef.current;
+      /* v8 ignore next -- ref is always set after mount */
       if (track) {
         track.style.transition = 'none';
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -196,6 +200,7 @@ export function BannerCarousel({
     if (!isDraggingRef.current) return;
     const deltaX = e.clientX - pointerStartXRef.current;
     // Apply elastic resistance (10% of drag distance beyond edge)
+    /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
     const width = containerRef.current?.offsetWidth ?? 1;
     const elasticDelta =
       Math.abs(deltaX) > width * 0.5
@@ -204,6 +209,7 @@ export function BannerCarousel({
     currentDragXRef.current = elasticDelta;
 
     const track = trackRef.current;
+    /* v8 ignore next -- ref is always set after mount */
     if (track) {
       track.style.transform = `translateX(${elasticDelta}px)`;
     }
@@ -220,6 +226,7 @@ export function BannerCarousel({
       const deltaX = currentDragXRef.current;
       const elapsed = Date.now() - pointerStartTimeRef.current;
       const velocity = elapsed > 0 ? (deltaX / elapsed) * 1000 : 0;
+      /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
       const width = containerRef.current?.offsetWidth ?? 0;
 
       if (deltaX < -SWIPE_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {

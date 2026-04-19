@@ -139,7 +139,7 @@ describe('HamburgerMenuSheet', () => {
     expect(authToolbar).toHaveClass('text-zinc-50');
   });
 
-  it('renders social media links after auth toolbar', () => {
+  it('renders social media links before auth toolbar', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
@@ -147,9 +147,20 @@ describe('HamburgerMenuSheet', () => {
     );
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(nav).toBeInTheDocument();
-    // Social media links are rendered within the nav
-    expect(nav.querySelector('[data-testid="facebook-icon"]')).toBeInTheDocument();
+    const socialIcon = nav.querySelector('[data-testid="facebook-icon"]');
+    const authToolbar = nav.querySelector('[data-testid="auth-toolbar"]');
+    expect(socialIcon).toBeInTheDocument();
+    expect(authToolbar).toBeInTheDocument();
+
+    // Social icons should appear before auth toolbar in DOM order
+    const allElements = Array.from(nav.querySelectorAll('[data-testid]'));
+    const socialIndex = allElements.findIndex(
+      (el) => el.getAttribute('data-testid') === 'facebook-icon'
+    );
+    const authIndex = allElements.findIndex(
+      (el) => el.getAttribute('data-testid') === 'auth-toolbar'
+    );
+    expect(socialIndex).toBeLessThan(authIndex);
   });
 
   it('renders empty menu list when no items provided', () => {

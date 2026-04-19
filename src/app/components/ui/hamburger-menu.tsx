@@ -25,7 +25,7 @@ export default function HamburgerMenu() {
       { name: 'Tours', href: '/tours' },
       { name: 'Merch', href: '/merch' },
       { name: 'About', href: '/about' },
-      { name: 'Contact us', href: '/contact' },
+      { name: 'Contact Us', href: '/contact' },
     ];
 
     if (isAuthenticated) {

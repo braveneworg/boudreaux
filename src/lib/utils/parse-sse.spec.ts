@@ -84,4 +84,13 @@ describe('parseSSEBuffer', () => {
     expect(result2.events[1]).toEqual({ event: 'complete', data: '{}' });
     expect(result2.remaining).toBe('');
   });
+
+  it('should ignore lines that do not start with event: or data:', () => {
+    const buffer = 'id: 123\nevent: update\nretry: 5000\ndata: {"ok":true}\n\n';
+
+    const { events } = parseSSEBuffer(buffer);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ event: 'update', data: '{"ok":true}' });
+  });
 });

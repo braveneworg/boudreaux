@@ -105,7 +105,6 @@
     @apply bg-zinc-50! text-zinc-900! placeholder:text-zinc-800!;
   }
 
-  a,
   h1,
   h2,
   h3,
@@ -151,6 +150,16 @@
     @apply text-base tracking-normal leading-normal mb-2 mt-2;
   }
   a {
+    font-family:
+      'Jost',
+      sans-serif,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
     @apply text-blue-700 underline-offset-4;
     &:hover {
       @apply underline;
