@@ -66,7 +66,7 @@ const SocialMediaIconLinks = ({ className }: { className: string }) => (
     {menuLinks.map((link) => (
       <Link
         aria-label={link.label}
-        className="text-zinc-50 w-10 h-10 px-2 transition-transform md:hover:scale-[107.5%]"
+        className="text-zinc-50 h-10 px-2 transition-transform md:hover:scale-[107.5%]"
         data-testid={`${link.label.toLowerCase()}-icon`}
         href={link.href}
         key={link.href}
@@ -74,7 +74,7 @@ const SocialMediaIconLinks = ({ className }: { className: string }) => (
         target="_blank"
         title={link.label}
       >
-        <link.Icon size={24} />
+        <link.Icon size={26} />
         <span className="sr-only">{link.label}</span>
       </Link>
     ))}

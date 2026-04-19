@@ -608,5 +608,26 @@ describe('createArtistAction', () => {
         expect.objectContaining({ publishedOn: new Date('2024-06-01') })
       );
     });
+
+    it('should convert formedOn string to Date when provided', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'The',
+            surname: 'Band',
+            slug: 'the-band-formed',
+            formedOn: '2020-03-15',
+          },
+        },
+      } as never);
+
+      await createArtistAction(initialFormState, mockFormData);
+
+      expect(ArtistService.createArtist).toHaveBeenCalledWith(
+        expect.objectContaining({ formedOn: new Date('2020-03-15') })
+      );
+    });
   });
 });

@@ -98,4 +98,16 @@ describe('GET /api/notification-banners/search', () => {
 
     expect(BannerNotificationService.searchNotifications).toHaveBeenCalledWith('hello', 5);
   });
+
+  it('should fall back to default take when take param is not a valid positive integer', async () => {
+    vi.mocked(BannerNotificationService.searchNotifications).mockResolvedValue({
+      success: true,
+      data: [],
+    } as never);
+
+    const request = createRequest({ q: 'test', take: 'abc' });
+    await GET(request as never, routeContext);
+
+    expect(BannerNotificationService.searchNotifications).toHaveBeenCalledWith('test', 20);
+  });
 });

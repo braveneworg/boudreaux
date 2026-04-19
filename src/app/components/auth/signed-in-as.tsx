@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { KeyIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
@@ -28,15 +27,13 @@ const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
 
   return (
     <>
-      <div className={cn('flex items-center gap-2 underline text-zinc-50')}>
+      <div className={cn('flex items-center gap-2 text-zinc-50')}>
         {!isMobile && (
           <div className="flex flex-row gap-2">
-            <KeyIcon size={16} />
-            <span className="text-sm">Signed in as: </span>
+            <span className="text-xl">Signed in as: </span>
           </div>
         )}
-        <KeyIcon size={16} className="md:hidden" />
-        <Link className="text-sm text-zinc-50" href="/profile" onClick={onClick}>
+        <Link className="text-xl text-zinc-50 underline" href="/profile" onClick={onClick}>
           {username ? `@${username}` : displayName}
         </Link>
       </div>

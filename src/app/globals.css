@@ -150,6 +150,16 @@
     @apply text-base tracking-normal leading-normal mb-2 mt-2;
   }
   a {
+    font-family:
+      'Jost',
+      sans-serif,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
     @apply text-blue-700 underline-offset-4;
     &:hover {
       @apply underline;
@@ -341,6 +351,15 @@ nextjs-portal {
   }
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes banner-strip-exit-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
   }
 }
 

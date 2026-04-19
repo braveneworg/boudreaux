@@ -50,11 +50,11 @@ describe('AdminLink', () => {
       expect(link).toHaveClass('gap-2');
     });
 
-    it('should have text-sm class', () => {
+    it('should have text-xl class', () => {
       render(<AdminLink />);
 
       const link = screen.getByRole('link', { name: /admin/i });
-      expect(link).toHaveClass('text-sm');
+      expect(link).toHaveClass('text-xl');
     });
 
     it('should have underline-offset-4 class', () => {
@@ -84,7 +84,7 @@ describe('AdminLink', () => {
       const { container } = render(<AdminLink />);
 
       const icon = container.querySelector('svg');
-      expect(icon).toHaveClass('h-4', 'w-4');
+      expect(icon).toHaveClass('h-6', 'w-6');
     });
   });
 

@@ -83,13 +83,12 @@ describe('SignedInAs', () => {
       expect(screen.getByText('Signed in as:')).toBeInTheDocument();
     });
 
-    it('renders the key icon with correct size', () => {
+    it('renders the username link with correct size', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
-      const icons = screen.getAllByTestId('key-icon');
-      expect(icons.length).toBeGreaterThan(0);
-      expect(icons[0]).toHaveAttribute('data-size', '16');
+      const link = screen.getByRole('link', { name: /@testuser/i });
+      expect(link).toHaveClass('text-xl');
     });
 
     it('renders the username link with @ prefix', () => {
@@ -111,13 +110,12 @@ describe('SignedInAs', () => {
       expect(wrapper).toHaveClass('gap-2');
     });
 
-    it('applies underline and text-zinc-50 classes', () => {
+    it('applies text-zinc-50 class to wrapper', () => {
       mockUseIsMobile.mockReturnValue(false);
       const { container } = render(<SignedInAs />);
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('underline');
-      expect(wrapper).toHaveClass('text-zinc-50');
+      const wrapper = container.querySelector('.text-zinc-50');
+      expect(wrapper).toBeInTheDocument();
     });
 
     it('hides "Signed in as:" text on mobile', () => {
@@ -127,23 +125,19 @@ describe('SignedInAs', () => {
       expect(screen.queryByText('Signed in as:')).not.toBeInTheDocument();
     });
 
-    it('shows mobile key icon with md:hidden class', () => {
+    it('does not render key icon on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
       render(<SignedInAs />);
 
-      const icons = screen.getAllByTestId('key-icon');
-      const mobileIcon = icons.find((icon) => icon.className.includes('md:hidden'));
-      expect(mobileIcon).toBeDefined();
+      expect(screen.queryByTestId('key-icon')).not.toBeInTheDocument();
     });
 
-    it('shows desktop key icon and signed-in text on desktop', () => {
+    it('renders signed-in text on desktop without key icon', () => {
       mockUseIsMobile.mockReturnValue(false);
       render(<SignedInAs />);
 
       expect(screen.getByText('Signed in as:')).toBeInTheDocument();
-      // Desktop shows both icons: one in the flex-row section, one with md:hidden
-      const icons = screen.getAllByTestId('key-icon');
-      expect(icons).toHaveLength(2);
+      expect(screen.queryByTestId('key-icon')).not.toBeInTheDocument();
     });
   });
 
@@ -310,7 +304,7 @@ describe('SignedInAs', () => {
       render(<SignedInAs />);
 
       const link = screen.getByRole('link');
-      expect(link).toHaveClass('text-sm');
+      expect(link).toHaveClass('text-xl');
       expect(link).toHaveClass('text-zinc-50');
     });
 

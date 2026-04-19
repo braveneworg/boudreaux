@@ -1,10 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useRouter } from 'next/navigation';
-
-import { LogOutIcon } from 'lucide-react';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { CONSTANTS } from '@/lib/constants';
@@ -12,8 +9,9 @@ import { cn } from '@/lib/utils/tailwind-utils';
 
 import AdminLink from './admin-link';
 import EditProfileButton from './edit-profile-button';
+import { SignOutButton } from './sign-out-button';
 import SignedInAs from './signed-in-as';
-import { Button } from '../ui/button';
+import { GravatarAvatar } from '../gravatar-avatar';
 import VerticalSeparator from '../ui/vertical-separator';
 
 // Use in hamburger menu on mobile
@@ -27,39 +25,24 @@ const SignedinToolbar = ({
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
-  const router = useRouter();
 
   return (
-    <div className={cn('h-3 mt-3 mb-5', className)}>
-      <div
-        className={cn(
-          'flex h-3 items-center relative justify-center gap-2',
-          { 'gap-4': isMobile },
-          className
-        )}
-      >
-        <SignedInAs onClick={onNavigate} />
-        <VerticalSeparator />
-        <Button
-          className="text-zinc-50 underline"
-          variant="link:narrow"
-          onClick={async () => {
-            onNavigate?.();
-            const { url } = await signOut({ redirect: false, callbackUrl: '/' });
-            router.push(url);
-          }}
-        >
-          <LogOutIcon />
-          Sign Out
-        </Button>
-        {!isMobile && <VerticalSeparator />}
-        <EditProfileButton />
-        {isAdmin && (
-          <>
-            <VerticalSeparator />
-            <AdminLink onClick={onNavigate} />
-          </>
-        )}
+    <div className={cn('mt-3', className)}>
+      <div className="flex align-center gap-4 mb-3">
+        <GravatarAvatar
+          email={session?.user?.email || ''}
+          firstName={session?.user?.name?.split(' ')[0]}
+          surname={session?.user?.name?.split(' ')[1]}
+        />
+        <div className="flex flex-col gap-1">
+          <SignedInAs onClick={onNavigate} />
+          <div className="flex items-center gap-2">
+            <SignOutButton onNavigate={onNavigate} />
+            {!isMobile && <VerticalSeparator className="h-6! -mt-1 mx-2 self-stretch w-0.5!" />}
+            <EditProfileButton />
+            {isAdmin && <AdminLink onClick={onNavigate} />}
+          </div>
+        </div>
       </div>
     </div>
   );

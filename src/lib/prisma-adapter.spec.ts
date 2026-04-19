@@ -361,6 +361,76 @@ describe('CustomPrismaAdapter', () => {
         username: 'existinguser',
       });
     });
+
+    it('should convert null username to undefined for existing user without update', async () => {
+      const verificationDate = new Date('2024-01-01');
+      const userData = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        username: null,
+      } as unknown as AdapterUser;
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        image: null,
+        username: null,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+
+      const result = await adapter.createUser(userData);
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: verificationDate,
+        image: null,
+        username: undefined,
+      });
+    });
+
+    it('should convert null username to undefined for updated existing user', async () => {
+      const newVerificationDate = new Date('2024-06-15');
+      const userData = {
+        id: '1',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        username: null,
+      } as unknown as AdapterUser;
+
+      const existingUser = {
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: null,
+        image: null,
+        username: null,
+      };
+
+      const updatedUser = {
+        ...existingUser,
+        emailVerified: newVerificationDate,
+      };
+
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await adapter.createUser(userData);
+
+      expect(result).toEqual({
+        id: 'existing-id',
+        name: 'Existing User',
+        email: 'existing@example.com',
+        emailVerified: newVerificationDate,
+        image: null,
+        username: undefined,
+      });
+    });
   });
 
   describe('getUser', () => {

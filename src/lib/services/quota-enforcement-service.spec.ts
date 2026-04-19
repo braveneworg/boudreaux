@@ -214,4 +214,11 @@ describe('QuotaEnforcementService', () => {
       });
     });
   });
+
+  describe('default repository', () => {
+    it('should use default UserDownloadQuotaRepository when none provided', () => {
+      const service = new QuotaEnforcementService();
+      expect(service).toBeDefined();
+    });
+  });
 });

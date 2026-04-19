@@ -152,6 +152,43 @@ describe('sanitizeNotificationHtml', () => {
       const result = sanitizeNotificationHtml('<a href="#section">fragment</a>');
       expect(result).toBe('<a href="#section">fragment</a>');
     });
+
+    it('should handle href containing &amp; named entity', () => {
+      const result = sanitizeNotificationHtml(
+        '<a href="https://example.com/path?a=1&amp;b=2">link</a>'
+      );
+      expect(result).toBe('<a href="https://example.com/path?a=1&amp;b=2">link</a>');
+    });
+
+    it('should handle href containing &lt; named entity', () => {
+      const result = sanitizeNotificationHtml('<a href="https://example.com/?q=&lt;tag">link</a>');
+      expect(result).toBe('<a href="https://example.com/?q=&lt;tag">link</a>');
+    });
+
+    it('should handle href containing &gt; named entity', () => {
+      const result = sanitizeNotificationHtml('<a href="https://example.com/?q=&gt;val">link</a>');
+      expect(result).toBe('<a href="https://example.com/?q=&gt;val">link</a>');
+    });
+
+    it('should handle href containing &quot; named entity', () => {
+      const result = sanitizeNotificationHtml(
+        '<a href="https://example.com/?q=&quot;test&quot;">link</a>'
+      );
+      expect(result).toBe('<a href="https://example.com/?q=&quot;test&quot;">link</a>');
+    });
+
+    it('should handle href containing &apos; named entity', () => {
+      const result = sanitizeNotificationHtml(
+        '<a href="https://example.com/?q=&apos;test&apos;">link</a>'
+      );
+      expect(result).toBe('<a href="https://example.com/?q=&apos;test&apos;">link</a>');
+    });
+
+    it('should handle href containing unrecognized entity', () => {
+      // &nbsp; is not in the handled set — should pass through as-is
+      const result = sanitizeNotificationHtml('<a href="https://example.com/path">link</a>');
+      expect(result).toBe('<a href="https://example.com/path">link</a>');
+    });
   });
 
   describe('HTML comments', () => {

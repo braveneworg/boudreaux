@@ -87,4 +87,21 @@ describe('triggerDownload', () => {
     const anchor = requireCapturedAnchor(capturedAnchor);
     expect(anchor.href).toBe('https://example.com/file.zip');
   });
+
+  it('falls back to documentElement when document.body is null', () => {
+    const originalBody = document.body;
+    const appendChildSpy = vi.spyOn(document.documentElement, 'appendChild');
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'remove').mockImplementation(() => {});
+
+    // Temporarily set body to null
+    Object.defineProperty(document, 'body', { value: null, configurable: true });
+
+    triggerDownload('https://example.com/file.zip');
+
+    expect(appendChildSpy).toHaveBeenCalled();
+
+    // Restore
+    Object.defineProperty(document, 'body', { value: originalBody, configurable: true });
+  });
 });
