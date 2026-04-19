@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.32.0] - 2026-04-19
+
+### Added
+
+- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n- Develop/fix admin release uploads (#381)\n
+
 ## [4.31.0] - 2026-04-19
 
 ### Added
