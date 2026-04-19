@@ -172,7 +172,7 @@ describe('HamburgerMenuSheet', () => {
 
     const homeLink = screen.getByRole('link', { name: 'Home' });
     expect(homeLink).toHaveClass('text-zinc-50');
-    expect(homeLink).toHaveClass('text-xl');
+    expect(homeLink).toHaveClass('text-2xl');
   });
 
   it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {

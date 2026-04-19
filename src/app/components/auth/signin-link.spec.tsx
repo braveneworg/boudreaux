@@ -51,7 +51,7 @@ describe('SignInLink', () => {
 
     const icon = screen.getByTestId('login-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveAttribute('data-size', '16');
+    expect(icon).toHaveAttribute('data-size', '24');
   });
 
   it('applies the correct CSS classes', () => {
@@ -64,7 +64,7 @@ describe('SignInLink', () => {
       'underline',
       'items-center',
       'gap-2',
-      'text-sm'
+      'text-xl'
     );
   });
 });

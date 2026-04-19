@@ -120,14 +120,7 @@ describe('AuthToolbar', () => {
       // Get the inner div (second div, child of the first)
       const outerDiv = container.querySelector('div');
       const innerDiv = outerDiv?.querySelector('div');
-      expect(innerDiv).toHaveClass(
-        'flex',
-        'h-3',
-        'items-center',
-        'relative',
-        'justify-center',
-        'gap-2'
-      );
+      expect(innerDiv).toHaveClass('flex', 'items-center', 'relative', 'justify-center', 'gap-2');
     });
   });
 

@@ -38,6 +38,7 @@ interface BannerCarouselProps {
 const SWIPE_THRESHOLD = 50;
 const VELOCITY_THRESHOLD = 500;
 const TRANSITION_DURATION = 400; // ms — matches CSS transition
+const EASING = 'cubic-bezier(0.42, 0, 0.58, 1)'; // ease-in-out
 
 /**
  * BannerCarousel displays rotating banner images with optional notification
@@ -49,9 +50,8 @@ export function BannerCarousel({
   className,
 }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(1);
   const [isTabVisible, setIsTabVisible] = useState(true);
-  const [stripVisible, setStripVisible] = useState(true);
+  const [incomingIndex, setIncomingIndex] = useState<number | null>(null);
   const currentIndexRef = useRef(0);
   const isAnimatingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,7 +70,7 @@ export function BannerCarousel({
     const track = trackRef.current;
     if (!track) return;
 
-    track.style.transition = `transform ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    track.style.transition = `transform ${TRANSITION_DURATION}ms ${EASING}`;
     track.style.transform = `translateX(${targetX}px)`;
 
     const handleEnd = () => {
@@ -94,6 +94,7 @@ export function BannerCarousel({
       flushSync(() => {
         currentIndexRef.current = toIndex;
         setCurrentIndex(toIndex);
+        setIncomingIndex(null);
       });
       // React has synchronously committed new slide transforms — safe to snap track
       resetTrack();
@@ -107,7 +108,7 @@ export function BannerCarousel({
     (toIndex: number, dir: number) => {
       if (isAnimatingRef.current || totalSlides <= 1) return;
       isAnimatingRef.current = true;
-      setDirection(dir);
+      setIncomingIndex(toIndex);
       const width = containerRef.current?.offsetWidth ?? 0;
       animateTrack(-dir * width, () => completeTransition(toIndex));
     },
@@ -147,11 +148,15 @@ export function BannerCarousel({
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // Update strip visibility when notification changes
-  useEffect(() => {
-    const currentBanner = banners[currentIndex];
-    setStripVisible(currentBanner?.notification !== null && isTabVisible);
-  }, [currentIndex, banners, isTabVisible]);
+  // Derive outgoing and incoming notification strips for seamless crossfade
+  const isTransitioning = incomingIndex !== null;
+  const outgoingNotification = banners[currentIndex]?.notification ?? null;
+  const incomingNotification = isTransitioning
+    ? (banners[incomingIndex]?.notification ?? null)
+    : null;
+  // Show the strip container when either the static notification or incoming notification exists
+  const activeNotification = isTransitioning ? incomingNotification : outgoingNotification;
+  const stripVisible = activeNotification !== null && isTabVisible;
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
@@ -220,12 +225,12 @@ export function BannerCarousel({
       if (deltaX < -SWIPE_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
         isAnimatingRef.current = true;
         const next = (currentIndexRef.current + 1) % totalSlides;
-        setDirection(1);
+        setIncomingIndex(next);
         animateTrack(-width, () => completeTransition(next));
       } else if (deltaX > SWIPE_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
         isAnimatingRef.current = true;
         const prev = (currentIndexRef.current - 1 + totalSlides) % totalSlides;
-        setDirection(-1);
+        setIncomingIndex(prev);
         animateTrack(width, () => completeTransition(prev));
       } else {
         // Snap back to center
@@ -252,8 +257,6 @@ export function BannerCarousel({
         animateToSlide(idx, -1);
       } else {
         // Non-adjacent: instant jump
-        const dir = idx > currentIndexRef.current ? 1 : -1;
-        setDirection(dir);
         currentIndexRef.current = idx;
         setCurrentIndex(idx);
         resetTrack();
@@ -279,9 +282,6 @@ export function BannerCarousel({
     );
   }
 
-  const currentBanner = banners[currentIndex];
-  const currentNotification = currentBanner?.notification;
-
   const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
   const nextIndex = (currentIndex + 1) % totalSlides;
 
@@ -299,26 +299,51 @@ export function BannerCarousel({
         className="relative w-full overflow-hidden"
         style={{
           minHeight: '2.5rem',
-          opacity: stripVisible && currentNotification ? 1 : 0,
-          transition: 'opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          opacity: stripVisible ? 1 : 0,
+          transition: `opacity 300ms ${EASING}`,
         }}
       >
-        {currentNotification && (
+        {/* Outgoing strip — slides out to the right during transitions */}
+        {isTransitioning && outgoingNotification && (
           <div
-            key={`strip-${currentIndex}`}
+            key={`strip-out-${currentIndex}`}
             className={cn(
-              'w-full px-4 py-2 text-center text-sm banner-strip-slide',
-              isDarkColor(currentNotification.backgroundColor)
+              'absolute inset-0 w-full px-4 py-2 text-center text-sm banner-strip-slide',
+              isDarkColor(outgoingNotification.backgroundColor)
                 ? 'banner-strip-dark'
                 : 'banner-strip-light'
             )}
             style={{
-              color: currentNotification.textColor ?? undefined,
-              backgroundColor: currentNotification.backgroundColor ?? 'transparent',
-              animation: `banner-strip-slide-${direction > 0 ? 'left' : 'right'} ${TRANSITION_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+              color: outgoingNotification.textColor ?? undefined,
+              backgroundColor: outgoingNotification.backgroundColor ?? 'transparent',
+              animation: `banner-strip-exit-right ${TRANSITION_DURATION}ms ${EASING} forwards`,
             }}
             dangerouslySetInnerHTML={{
-              __html: addLinkAttributes(sanitizeNotificationHtml(currentNotification.content)),
+              __html: addLinkAttributes(sanitizeNotificationHtml(outgoingNotification.content)),
+            }}
+          />
+        )}
+        {/* Incoming strip — slides in from the left; static strip when not transitioning */}
+        {activeNotification && (
+          <div
+            key={`strip-${isTransitioning ? `in-${incomingIndex}` : currentIndex}`}
+            className={cn(
+              'w-full px-4 py-2 text-center text-sm banner-strip-slide',
+              isDarkColor(activeNotification.backgroundColor)
+                ? 'banner-strip-dark'
+                : 'banner-strip-light'
+            )}
+            style={{
+              color: activeNotification.textColor ?? undefined,
+              backgroundColor: activeNotification.backgroundColor ?? 'transparent',
+              ...(isTransitioning
+                ? {
+                    animation: `banner-strip-slide-right ${TRANSITION_DURATION}ms ${EASING}`,
+                  }
+                : {}),
+            }}
+            dangerouslySetInnerHTML={{
+              __html: addLinkAttributes(sanitizeNotificationHtml(activeNotification.content)),
             }}
           />
         )}

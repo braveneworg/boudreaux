@@ -35,6 +35,6 @@ export const DownloadTriggerButton = ({
     {...props}
   >
     <Download className="size-3.5" />
-    <span className="font-['Courier_New',monospace] text-sm leading-none">{label}</span>
+    {label}
   </button>
 );

@@ -51,7 +51,7 @@ describe('SignUpLink', () => {
 
     const icon = screen.getByTestId('user-plus-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveAttribute('data-size', '16');
+    expect(icon).toHaveAttribute('data-size', '24');
   });
 
   it('applies the correct CSS classes', () => {
@@ -64,7 +64,7 @@ describe('SignUpLink', () => {
       'underline',
       'items-center',
       'gap-2',
-      'text-sm'
+      'text-xl'
     );
   });
 });
