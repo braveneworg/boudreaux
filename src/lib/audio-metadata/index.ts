@@ -7,6 +7,7 @@ import 'server-only';
 import path from 'node:path';
 
 import { writeAacComment } from './aac';
+import { writeAiffComment } from './aiff';
 import { writeFlacComment } from './flac';
 import { writeMp3Comment } from './mp3';
 import { writeOggComment } from './ogg';
@@ -20,6 +21,8 @@ const EXT_TO_FORMAT: Record<string, AudioFormat> = {
   '.m4a': 'aac', // covers both AAC and ALAC — tag handling is identical
   '.aac': 'aac',
   '.mp3': 'mp3',
+  '.aiff': 'aiff',
+  '.aif': 'aiff',
 };
 
 /**
@@ -66,8 +69,10 @@ export async function writeComment(
       return writeAacComment(filePath, comment, options);
     case 'mp3':
       return writeMp3Comment(filePath, comment, options);
+    case 'aiff':
+      return writeAiffComment(filePath, comment, options);
   }
 }
 
-export { writeOggComment, writeFlacComment, writeAacComment, writeMp3Comment };
+export { writeOggComment, writeFlacComment, writeAacComment, writeMp3Comment, writeAiffComment };
 export type { AudioFormat, WriteCommentOptions };
