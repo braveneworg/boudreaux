@@ -263,11 +263,38 @@ Open the Docker Desktop application and ensure it is running. You should see the
 
 # Running the development server
 
-First install stripe-cli:
+## Prerequisites
+
+### FFmpeg
+
+FFmpeg is required at runtime for writing metadata tags to audio files (FLAC, OGG, AAC, ALAC). It is invoked as a system binary via Node.js `spawn()`.
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# Windows
+# Download from https://ffmpeg.org/download.html and add to PATH
+```
+
+Verify the installation:
+
+```bash
+ffmpeg -version
+```
+
+> **Note:** The production Docker image installs FFmpeg automatically via `apk add ffmpeg`.
+
+### Stripe CLI
+
+Install stripe-cli:
 
 ```bash
 # macOS with Homebrew
-brew install stripe-cli so
+brew install stripe/stripe-cli/stripe
 ```
 
 Then, run the development server:

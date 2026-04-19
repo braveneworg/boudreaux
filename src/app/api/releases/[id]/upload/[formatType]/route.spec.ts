@@ -44,12 +44,10 @@ vi.mock('@aws-sdk/lib-storage', () => {
   };
 });
 
-// Mock AudioTagStripService
-const mockStripCommentTag = vi.fn();
-vi.mock('@/lib/services/audio-tag-strip-service', () => ({
-  AudioTagStripService: {
-    stripCommentTag: (...args: unknown[]) => mockStripCommentTag(...args),
-  },
+// Mock writeComment
+const mockWriteComment = vi.fn();
+vi.mock('@/lib/audio-metadata', () => ({
+  writeComment: (...args: unknown[]) => mockWriteComment(...args),
 }));
 
 // Mock node:stream/promises (pipeline)
@@ -83,6 +81,10 @@ vi.mock('node:os', () => ({
 // Mock node:path (join)
 vi.mock('node:path', () => ({
   join: vi.fn((...parts: string[]) => parts.join('/')),
+  extname: vi.fn((filePath: string) => {
+    const dotIndex = filePath.lastIndexOf('.');
+    return dotIndex >= 0 ? filePath.slice(dotIndex) : '';
+  }),
 }));
 
 // Mock node:crypto (randomUUID)
@@ -133,6 +135,8 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 }
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
+  const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
   beforeEach(() => {
     mockAuth.mockResolvedValue({
       user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
@@ -142,10 +146,12 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockGetS3BucketName.mockReturnValue('test-bucket');
     mockUploadDone.mockResolvedValue({});
     mockUploadOn.mockReturnValue(undefined);
-    mockStripCommentTag.mockResolvedValue({
-      success: true,
-      data: { commentFound: false, finalFileSize: 50_000_000 },
-    });
+    mockWriteComment.mockResolvedValue(undefined);
+    process.env.NEXT_PUBLIC_BASE_URL = 'https://example.com';
+  });
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
   });
 
   it('should return 401 when user is not authenticated', async () => {
@@ -351,39 +357,47 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should call stripCommentTag during upload', async () => {
+  it('should call writeComment during upload', async () => {
     await PUT(makeRequest(), makeParams());
 
-    expect(mockStripCommentTag).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.tmp');
+    expect(mockWriteComment).toHaveBeenCalledWith(
+      '/tmp/upload-test-uuid-1234.mp3',
+      'Visit https://example.com/'
+    );
   });
 
-  it('should upload successfully even when stripCommentTag fails', async () => {
-    mockStripCommentTag.mockResolvedValue({
-      success: false,
-      error: 'Unsupported format',
-    });
+  it('should return 500 when NEXT_PUBLIC_BASE_URL is missing', async () => {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
+    expect(body.message).toBe('Server configuration is invalid: NEXT_PUBLIC_BASE_URL is not set.');
   });
 
-  it('should log stripped comment info when comment was found', async () => {
-    mockStripCommentTag.mockResolvedValue({
-      success: true,
-      data: {
-        commentFound: true,
-        finalFileSize: 49_999_500,
-      },
-    });
-    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+  it('should return 500 when NEXT_PUBLIC_BASE_URL is invalid', async () => {
+    process.env.NEXT_PUBLIC_BASE_URL = 'not-a-url';
 
-    await PUT(makeRequest(), makeParams());
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('stripped comment tag'));
-    consoleSpy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
+    expect(body.message).toBe(
+      'Server configuration is invalid: NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
+    );
+  });
+
+  it('should return 500 when writeComment throws', async () => {
+    mockWriteComment.mockRejectedValue(new Error('Unsupported format'));
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.success).toBe(false);
   });
 
   it('should show "?" progress percentage when actualFileSize is zero', async () => {
