@@ -364,12 +364,12 @@ describe('CustomPrismaAdapter', () => {
 
     it('should convert null username to undefined for existing user without update', async () => {
       const verificationDate = new Date('2024-01-01');
-      const userData: AdapterUser = {
+      const userData = {
         id: '1',
         email: 'existing@example.com',
         emailVerified: verificationDate,
         username: null,
-      };
+      } as unknown as AdapterUser;
 
       const existingUser = {
         id: 'existing-id',
@@ -396,12 +396,12 @@ describe('CustomPrismaAdapter', () => {
 
     it('should convert null username to undefined for updated existing user', async () => {
       const newVerificationDate = new Date('2024-06-15');
-      const userData: AdapterUser = {
+      const userData = {
         id: '1',
         email: 'existing@example.com',
         emailVerified: newVerificationDate,
         username: null,
-      };
+      } as unknown as AdapterUser;
 
       const existingUser = {
         id: 'existing-id',

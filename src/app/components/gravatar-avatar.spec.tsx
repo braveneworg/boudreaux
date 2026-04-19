@@ -12,7 +12,7 @@ vi.mock('@/components/ui/avatar', () => ({
     </div>
   ),
   AvatarImage: ({ src, alt }: { src: string; alt: string }) => (
-    <img data-testid="avatar-image" src={src} alt={alt} />
+    <div data-testid="avatar-image" data-src={src} data-alt={alt} />
   ),
   AvatarFallback: ({ children }: { children: React.ReactNode }) => (
     <span data-testid="avatar-fallback">{children}</span>
@@ -28,8 +28,11 @@ describe('GravatarAvatar', () => {
     render(<GravatarAvatar email="test@example.com" />);
 
     const img = screen.getByTestId('avatar-image');
-    expect(img).toHaveAttribute('src', expect.stringContaining('https://www.gravatar.com/avatar/'));
-    expect(img).toHaveAttribute('src', expect.stringContaining('?d=retro'));
+    expect(img).toHaveAttribute(
+      'data-src',
+      expect.stringContaining('https://www.gravatar.com/avatar/')
+    );
+    expect(img).toHaveAttribute('data-src', expect.stringContaining('?d=retro'));
   });
 
   it('renders with default size-18 class', () => {
@@ -66,10 +69,10 @@ describe('GravatarAvatar', () => {
 
   it('normalizes email for hash (trims and lowercases)', () => {
     const { rerender } = render(<GravatarAvatar email="Test@Example.com" />);
-    const src1 = screen.getByTestId('avatar-image').getAttribute('src');
+    const src1 = screen.getByTestId('avatar-image').getAttribute('data-src');
 
     rerender(<GravatarAvatar email="  test@example.com  " />);
-    const src2 = screen.getByTestId('avatar-image').getAttribute('src');
+    const src2 = screen.getByTestId('avatar-image').getAttribute('data-src');
 
     expect(src1).toBe(src2);
   });
