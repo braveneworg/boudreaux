@@ -82,6 +82,8 @@ RUN if [ -f next-build.tar.gz ]; then \
 # Stage 2: Create final image
 FROM ${NODE} AS runner
 
+RUN apk add --no-cache ffmpeg
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1

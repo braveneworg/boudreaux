@@ -44,12 +44,10 @@ vi.mock('@aws-sdk/lib-storage', () => {
   };
 });
 
-// Mock AudioTagStripService
-const mockStripCommentTag = vi.fn();
-vi.mock('@/lib/services/audio-tag-strip-service', () => ({
-  AudioTagStripService: {
-    stripCommentTag: (...args: unknown[]) => mockStripCommentTag(...args),
-  },
+// Mock writeComment
+const mockWriteComment = vi.fn();
+vi.mock('@/lib/audio-metadata', () => ({
+  writeComment: (...args: unknown[]) => mockWriteComment(...args),
 }));
 
 // Mock node:stream/promises (pipeline)
@@ -142,10 +140,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockGetS3BucketName.mockReturnValue('test-bucket');
     mockUploadDone.mockResolvedValue({});
     mockUploadOn.mockReturnValue(undefined);
-    mockStripCommentTag.mockResolvedValue({
-      success: true,
-      data: { commentFound: false, finalFileSize: 50_000_000 },
-    });
+    mockWriteComment.mockResolvedValue(undefined);
   });
 
   it('should return 401 when user is not authenticated', async () => {
@@ -351,39 +346,23 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should call stripCommentTag during upload', async () => {
+  it('should call writeComment during upload', async () => {
     await PUT(makeRequest(), makeParams());
 
-    expect(mockStripCommentTag).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.tmp');
+    expect(mockWriteComment).toHaveBeenCalledWith(
+      '/tmp/upload-test-uuid-1234.tmp',
+      expect.stringContaining('Visit')
+    );
   });
 
-  it('should upload successfully even when stripCommentTag fails', async () => {
-    mockStripCommentTag.mockResolvedValue({
-      success: false,
-      error: 'Unsupported format',
-    });
+  it('should return 500 when writeComment throws', async () => {
+    mockWriteComment.mockRejectedValue(new Error('Unsupported format'));
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  it('should log stripped comment info when comment was found', async () => {
-    mockStripCommentTag.mockResolvedValue({
-      success: true,
-      data: {
-        commentFound: true,
-        finalFileSize: 49_999_500,
-      },
-    });
-    const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-
-    await PUT(makeRequest(), makeParams());
-
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('stripped comment tag'));
-    consoleSpy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(body.success).toBe(false);
   });
 
   it('should show "?" progress percentage when actualFileSize is zero', async () => {

@@ -15,9 +15,9 @@ import { NextResponse } from 'next/server';
 
 import { Upload } from '@aws-sdk/lib-storage';
 
+import { writeComment } from '@/lib/audio-metadata';
 import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { AudioTagStripService } from '@/lib/services/audio-tag-strip-service';
 import { UploadService } from '@/lib/services/upload-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
@@ -40,7 +40,7 @@ export const maxDuration = 300;
  * 2. Validate format type and file metadata headers
  * 3. Validate file size/MIME constraints via UploadService
  * 4. Stream file body to temp file
- * 5. Strip Comment metadata tag from the audio file (best-effort, executed before upload)
+ * 5. Edit comment tag in temp file to include comment to visit site URL
  * 6. Upload processed file to S3 via multipart Upload (no CORS needed)
  * 7. Clean up temp file
  * 8. Return { s3Key, contentType } for the client to pass to confirmDigitalFormatUploadAction
@@ -146,7 +146,7 @@ export async function PUT(
       );
     }
 
-    // Step 7: Stream request body to temp file, strip comment tag, then upload to S3
+    // Step 7: Stream request body to temp file, then upload to S3
     const tempFilePath = join(tmpdir(), `upload-${randomUUID()}.tmp`);
 
     try {
@@ -154,19 +154,8 @@ export async function PUT(
       const nodeStream = Readable.fromWeb(request.body as NodeReadableStream);
       await pipeline(nodeStream, createWriteStream(tempFilePath));
 
-      console.info(`[upload-proxy] ${formatType}: saved to temp file, stripping comment tag`);
-
-      // Strip comment metadata tag (best-effort — upload proceeds even on failure)
-      const stripResult = await AudioTagStripService.stripCommentTag(tempFilePath);
-      if (stripResult.success && stripResult.data.commentFound) {
-        console.info(`[upload-proxy] ${formatType}: stripped comment tag`);
-      } else if (!stripResult.success) {
-        console.warn(
-          `[upload-proxy] ${formatType}: comment strip failed (${stripResult.error}) — uploading original file`
-        );
-      }
-
       // Read actual file size from disk (may differ after tag modification)
+      await writeComment(tempFilePath, `Visit ${process.env.NEXT_PUBLIC_SITE_URL}`);
       const fileStat = await stat(tempFilePath);
       const actualFileSize = fileStat.size;
 
