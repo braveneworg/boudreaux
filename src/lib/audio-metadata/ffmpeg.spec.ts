@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 
 import { writeTagViaFfmpeg } from './ffmpeg';
 
@@ -28,7 +29,11 @@ vi.mock('node:child_process', () => ({
 
 function createMockProcess(): ChildProcess {
   const proc = new EventEmitter() as ChildProcess;
-  proc.stderr = new EventEmitter();
+  proc.stderr = new Readable({
+    read() {
+      this.push(null);
+    },
+  });
   return proc;
 }
 
