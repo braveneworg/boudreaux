@@ -118,8 +118,8 @@ describe('audio-metadata/index', () => {
       expect(supportsComment('/path/to/file.WAV')).toBe(false);
     });
 
-    it('should return true for unknown extensions (only WAV is excluded)', () => {
-      expect(supportsComment('/path/to/file.xyz')).toBe(true);
+    it('should return false for unknown extensions', () => {
+      expect(supportsComment('/path/to/file.xyz')).toBe(false);
     });
   });
 

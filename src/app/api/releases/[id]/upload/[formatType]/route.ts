@@ -146,16 +146,18 @@ export async function PUT(
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_HOST_NAME?.trim();
+    const baseUrl =
+      process.env.NEXT_PUBLIC_HOST_NAME?.trim() || process.env.NEXT_PUBLIC_BASE_URL?.trim();
     if (!baseUrl) {
       console.error(
-        '[upload-proxy] Missing NEXT_PUBLIC_HOST_NAME while writing audio metadata comment.'
+        '[upload-proxy] Missing NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
         {
           success: false,
           error: 'SERVER_CONFIGURATION_ERROR',
-          message: 'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME is not set.',
+          message:
+            'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.',
         },
         { status: 500 }
       );
@@ -166,14 +168,14 @@ export async function PUT(
       validatedBaseUrl = new URL(baseUrl).toString();
     } catch {
       console.error(
-        '[upload-proxy] Invalid NEXT_PUBLIC_HOST_NAME while writing audio metadata comment.'
+        '[upload-proxy] Invalid NEXT_PUBLIC_HOST_NAME/NEXT_PUBLIC_BASE_URL while writing audio metadata comment.'
       );
       return NextResponse.json(
         {
           success: false,
           error: 'SERVER_CONFIGURATION_ERROR',
           message:
-            'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME must be a valid absolute URL.',
+            'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL must be a valid absolute URL.',
         },
         { status: 500 }
       );

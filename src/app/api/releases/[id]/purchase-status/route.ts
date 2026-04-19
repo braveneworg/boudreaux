@@ -63,11 +63,27 @@ export const GET = withRateLimit<{ id: string }>(
 
       if (session.payment_status === 'paid' && session.metadata?.type === 'release_purchase') {
         const { id: releaseId } = await context.params;
+        const metadataReleaseId = session.metadata.releaseId;
         const userId = session.metadata.userId;
         const paymentIntentId =
           typeof session.payment_intent === 'string'
             ? session.payment_intent
             : session.payment_intent?.id;
+
+        if (metadataReleaseId !== releaseId) {
+          console.warn(
+            '[purchase-status] Dev fallback: session releaseId mismatch, skipping auto-create',
+            {
+              sessionId,
+              routeReleaseId: releaseId,
+              metadataReleaseId,
+            }
+          );
+          return NextResponse.json(
+            { confirmed: false },
+            { headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
 
         if (userId && paymentIntentId) {
           // Guard against race with a concurrent webhook delivery

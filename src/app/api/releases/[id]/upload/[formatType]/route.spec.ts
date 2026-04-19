@@ -138,6 +138,7 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   const originalHostName = process.env.NEXT_PUBLIC_HOST_NAME;
+  const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
   beforeEach(() => {
     mockAuth.mockResolvedValue({
@@ -151,10 +152,12 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockWriteComment.mockResolvedValue(undefined);
     mockSupportsComment.mockReturnValue(true);
     process.env.NEXT_PUBLIC_HOST_NAME = 'https://example.com';
+    process.env.NEXT_PUBLIC_BASE_URL = 'https://fallback.example.com';
   });
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_HOST_NAME = originalHostName;
+    process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
   });
 
   it('should return 401 when user is not authenticated', async () => {
@@ -390,19 +393,20 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(mockWriteComment).not.toHaveBeenCalled();
   });
 
-  it('should return 500 when NEXT_PUBLIC_HOST_NAME is missing', async () => {
+  it('should use NEXT_PUBLIC_BASE_URL when NEXT_PUBLIC_HOST_NAME is missing', async () => {
     delete process.env.NEXT_PUBLIC_HOST_NAME;
 
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    await PUT(makeRequest(), makeParams());
 
-    expect(response.status).toBe(500);
-    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
-    expect(body.message).toBe('Server configuration is invalid: NEXT_PUBLIC_HOST_NAME is not set.');
+    expect(mockWriteComment).toHaveBeenCalledWith(
+      '/tmp/upload-test-uuid-1234.mp3',
+      'Visit https://fallback.example.com/'
+    );
   });
 
-  it('should return 500 when NEXT_PUBLIC_HOST_NAME is invalid', async () => {
-    process.env.NEXT_PUBLIC_HOST_NAME = 'not-a-url';
+  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are missing', async () => {
+    delete process.env.NEXT_PUBLIC_HOST_NAME;
+    delete process.env.NEXT_PUBLIC_BASE_URL;
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
@@ -410,7 +414,21 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     expect(response.status).toBe(500);
     expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
     expect(body.message).toBe(
-      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME must be a valid absolute URL.'
+      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.'
+    );
+  });
+
+  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are invalid', async () => {
+    process.env.NEXT_PUBLIC_HOST_NAME = 'not-a-url';
+    process.env.NEXT_PUBLIC_BASE_URL = 'also-not-a-url';
+
+    const response = await PUT(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
+    expect(body.message).toBe(
+      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
     );
   });
 

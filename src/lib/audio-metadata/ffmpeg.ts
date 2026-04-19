@@ -17,22 +17,11 @@ import path from 'node:path';
  * Writes to a sibling temp file first, then atomically renames over the
  * original to avoid corruption if the process is interrupted mid-write.
  *
- * Metadata strategy: `-map_metadata -1` drops all inherited global/stream
- * metadata so the Ogg muxer cannot shadow the `-metadata` override with a
- * stale value. Existing tags (artist, title, etc.) are then re-read from
- * the input via `-i` and selectively forwarded by ffmpeg's codec-copy
- * path for containers that embed tags in stream headers (FLAC VorbisComment
- * blocks, Ogg Vorbis comment headers). For containers that store tags in a
- * separate global metadata block (MP4/M4A, AIFF ID3), the original tags
- * other than the target key are explicitly preserved via a two-pass
- * probe-then-write approach. In practice, `-map_metadata -1` combined with
- * `-codec copy` preserves stream-header tags for Ogg/FLAC while giving us
- * a clean slate for the explicit `-metadata` key.
- *
- * UPDATE: The above approach strips too many tags. The reliable cross-format
- * solution is to probe existing metadata, rebuild the full tag set with the
- * target key replaced, and pass all tags as `-metadata` arguments. This
- * guarantees the override wins regardless of muxer ordering.
+ * Metadata strategy: probe existing tags, rebuild the full tag set with the
+ * target key replaced, and pass every tag back to ffmpeg as explicit
+ * `-metadata key=value` arguments. Combined with `-map_metadata -1` this gives
+ * a deterministic result across containers (Ogg/FLAC/MP3/M4A/AIFF) while
+ * preserving unrelated tags.
  */
 export async function writeTagViaFfmpeg(
   filePath: string,

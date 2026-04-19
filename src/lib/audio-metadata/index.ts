@@ -30,11 +30,11 @@ const COMMENTLESS_EXTENSIONS = new Set(['.wav']);
 
 /**
  * Returns true if the file format supports writing comment metadata.
- * WAV files have no standard tag container, so comment writing is skipped.
+ * WAV files and unrecognized extensions are excluded.
  */
 export function supportsComment(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  return !COMMENTLESS_EXTENSIONS.has(ext);
+  return Object.hasOwn(EXT_TO_FORMAT, ext) && !COMMENTLESS_EXTENSIONS.has(ext);
 }
 
 /**

@@ -116,7 +116,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       mockStripeSessionsRetrieve.mockResolvedValue({
         id: 'cs_test_abc123',
         payment_status: 'paid',
-        metadata: { type: 'release_purchase', userId: 'user-1' },
+        metadata: { type: 'release_purchase', userId: 'user-1', releaseId: 'release-456' },
         payment_intent: 'pi_test_123',
         amount_total: 500,
         currency: 'usd',
@@ -145,7 +145,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       mockStripeSessionsRetrieve.mockResolvedValue({
         id: 'cs_test_racecheck',
         payment_status: 'paid',
-        metadata: { type: 'release_purchase', userId: 'user-1' },
+        metadata: { type: 'release_purchase', userId: 'user-1', releaseId: 'release-123' },
         payment_intent: 'pi_test_existing',
         amount_total: 500,
         currency: 'usd',
@@ -274,7 +274,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       mockStripeSessionsRetrieve.mockResolvedValue({
         id: 'cs_test_piobject',
         payment_status: 'paid',
-        metadata: { type: 'release_purchase', userId: 'user-1' },
+        metadata: { type: 'release_purchase', userId: 'user-1', releaseId: 'release-789' },
         payment_intent: { id: 'pi_test_obj' },
         amount_total: 1000,
         currency: 'eur',
@@ -300,7 +300,7 @@ describe('GET /api/releases/[id]/purchase-status', () => {
       mockStripeSessionsRetrieve.mockResolvedValue({
         id: 'cs_test_defaults',
         payment_status: 'paid',
-        metadata: { type: 'release_purchase', userId: 'user-1' },
+        metadata: { type: 'release_purchase', userId: 'user-1', releaseId: 'release-123' },
         payment_intent: 'pi_test_defaults',
         amount_total: null,
         currency: null,
@@ -316,6 +316,26 @@ describe('GET /api/releases/[id]/purchase-status', () => {
           currency: 'usd',
         })
       );
+    });
+
+    it('returns confirmed: false when session metadata releaseId does not match route releaseId', async () => {
+      mockFindBySessionId.mockResolvedValue(null);
+      mockStripeSessionsRetrieve.mockResolvedValue({
+        id: 'cs_test_mismatch',
+        payment_status: 'paid',
+        metadata: { type: 'release_purchase', userId: 'user-1', releaseId: 'release-other' },
+        payment_intent: 'pi_test_mismatch',
+        amount_total: 500,
+        currency: 'usd',
+      });
+
+      const request = makeRequest('cs_test_mismatch');
+      const response = await GET(request, makeContext('release-123'));
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json).toEqual({ confirmed: false });
+      expect(mockCreate).not.toHaveBeenCalled();
     });
   });
 });
