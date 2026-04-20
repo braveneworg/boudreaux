@@ -1,9 +1,10 @@
 #!/bin/sh
 
-# Skip if there's nothing to push (local ref is up to date with remote)
-if ! git diff --quiet HEAD @{u} 2>/dev/null; then
-  : # there are commits to push, continue
-else
+# Skip if there's nothing to push (no commits ahead of remote)
+# Use rev-list to count commits, not diff (which compares trees and misses
+# merge commits that don't change file content relative to upstream).
+commits_ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "unknown")
+if [ "$commits_ahead" = "0" ]; then
   echo "Nothing to push, skipping pre-push checks."
   exit 0
 fi
