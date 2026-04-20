@@ -97,10 +97,10 @@ describe('imageLoader', () => {
         width: 1920,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/particles-6.svg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/particles-6_w1920.svg');
     });
 
-    it('prepends CDN domain to banner paths', async () => {
+    it('prepends CDN domain to banner paths with width suffix', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -113,7 +113,24 @@ describe('imageLoader', () => {
       });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC Banner 1_5_1920.webp'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC Banner 1_5_1920_w1920.webp'
+      );
+    });
+
+    it('inserts width suffix for different widths', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: '/media/banners/FFINC Banner 1_5_1920.webp',
+        width: 640,
+      });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC Banner 1_5_1920_w640.webp'
       );
     });
 
@@ -129,7 +146,7 @@ describe('imageLoader', () => {
         width: 22,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/external-link-icon_w22.svg');
     });
   });
 
@@ -143,7 +160,7 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://custom-cdn.example.com/media/test.jpg');
+      expect(result).toBe('https://custom-cdn.example.com/media/test_w640.jpg');
     });
 
     it('falls back to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
@@ -155,7 +172,7 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://server-cdn.example.com/media/test.jpg');
+      expect(result).toBe('https://server-cdn.example.com/media/test_w640.jpg');
     });
 
     it('uses hardcoded default when no env vars are set', async () => {
@@ -167,12 +184,12 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/test.jpg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/test_w640.jpg');
     });
   });
 
-  describe('width and quality params', () => {
-    it('does not append query params to the URL', async () => {
+  describe('width suffix in path', () => {
+    it('inserts _w{width} before the file extension', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -185,9 +202,8 @@ describe('imageLoader', () => {
         quality: 75,
       });
 
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.jpg');
       expect(result).not.toContain('?');
-      expect(result).not.toContain('w=');
-      expect(result).not.toContain('q=');
     });
   });
 });

@@ -16,7 +16,7 @@ export default function HomeLoading() {
       <div className="relative w-full bg-muted" style={{ paddingBottom: '61.8%' }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img
-          src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename)}
+          src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 1920)}
           alt=""
           fetchPriority="high"
           decoding="async"
