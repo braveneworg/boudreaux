@@ -197,6 +197,9 @@ export const DownloadDialog = ({
           if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
         }}
       >
+        <DialogTitle className="sr-only">
+          {hasPurchase ? `Download ${releaseTitle}` : `Download ${artistName}'s music`}
+        </DialogTitle>
         {step === 'purchase-confirmed' && (
           <>
             <DialogHeader>

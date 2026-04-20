@@ -98,7 +98,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
     await downloadButton.click();
 
     // Should show the download dialog heading
-    await expect(userPage.getByRole('heading', { name: 'Download' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
@@ -114,7 +114,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
     await downloadButton.click();
 
     // Wait for dialog
-    await expect(userPage.getByRole('heading', { name: 'Download' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
@@ -129,7 +129,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
     await downloadButton.click();
 
     // Wait for dialog
-    await expect(userPage.getByRole('heading', { name: 'Download' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
@@ -220,7 +220,7 @@ test.describe('Download Dialog — Free download flow', () => {
     await downloadButton.click();
 
     // Wait for dialog
-    await expect(userPage.getByRole('heading', { name: 'Download' })).toBeVisible({
+    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
       timeout: 5_000,
     });
 
