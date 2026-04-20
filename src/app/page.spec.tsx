@@ -9,6 +9,16 @@ import Home from './page';
 
 vi.mock('server-only', () => ({}));
 
+// next/headers returns a Promise in Next.js 15+; the page reads the user-agent to pick a variant width.
+vi.mock('next/headers', () => ({
+  headers: () => Promise.resolve({ get: () => '' }),
+}));
+
+// Override setupTests.ts next/server stub to expose userAgentFromString.
+vi.mock('next/server', () => ({
+  userAgentFromString: () => ({ device: { type: 'desktop' } }),
+}));
+
 // Mock TanStack Query SSR utilities — execute each queryFn so coverage sees the arrow functions
 const mockPrefetchQuery = vi
   .fn()

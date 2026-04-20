@@ -33,11 +33,22 @@ interface BannerCarouselProps {
   rotationInterval?: number;
   className?: string;
   /**
-   * When true, banner images are rendered through the width-variant image
-   * loader. When false, banner images use raw `imageFilename` values with
-   * `unoptimized`.
+   * Pre-generated width variant (matching `_w{width}` S3 objects) to render.
+   * Chosen server-side from the user-agent so the correct size is picked
+   * per device. When set, the first slide's URL is also emitted as an
+   * explicit `<link rel="preload">`. When omitted, the raw `imageFilename`
+   * is rendered unoptimized.
    */
-  useVariants?: boolean;
+  variantWidth?: number;
+}
+
+/** Insert the `_w{width}` suffix before the file extension, matching S3 variant keys. */
+function buildBannerSrc(filename: string, width?: number): string {
+  const base = `/${BANNER_CDN_PATH}/${filename}`;
+  if (!width) return base;
+  const lastDot = base.lastIndexOf('.');
+  if (lastDot === -1) return `${base}_w${width}`;
+  return `${base.substring(0, lastDot)}_w${width}${base.substring(lastDot)}`;
 }
 
 const SWIPE_THRESHOLD = 50;
@@ -53,7 +64,7 @@ export function BannerCarousel({
   banners,
   rotationInterval = DEFAULT_ROTATION_INTERVAL,
   className,
-  useVariants = false,
+  variantWidth,
 }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
@@ -298,6 +309,9 @@ export function BannerCarousel({
   const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
   const nextIndex = (currentIndex + 1) % totalSlides;
 
+  const firstBannerPreloadHref =
+    variantWidth && banners[0] ? buildBannerSrc(banners[0].imageFilename, variantWidth) : null;
+
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard interaction per WAI-ARIA carousel pattern */
   return (
     <section
@@ -307,6 +321,9 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
+      {firstBannerPreloadHref && (
+        <link rel="preload" as="image" href={firstBannerPreloadHref} fetchPriority="high" />
+      )}
       {/* Notification strip — always reserves 2.5rem to prevent CLS */}
       <div
         className="relative w-full overflow-hidden"
@@ -402,14 +419,14 @@ export function BannerCarousel({
               >
                 {isVisible && (
                   <Image
-                    src={`/${BANNER_CDN_PATH}/${banner.imageFilename}`}
+                    src={buildBannerSrc(banner.imageFilename, variantWidth)}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"
                     priority={idx === 0}
                     loading={idx === 0 ? undefined : 'lazy'}
                     className="object-cover"
-                    unoptimized={!useVariants}
+                    unoptimized
                   />
                 )}
               </div>
