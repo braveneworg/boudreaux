@@ -23,14 +23,18 @@ interface ImageLoaderParams {
   quality?: number;
 }
 
+const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
+
 /**
  * @param src - Absolute URL, relative `/media/*` path, or blob URL.
- * @returns A direct CDN URL the browser fetches from the edge.
+ * @param width - The requested image width from the `<Image>` component's srcset.
+ * @returns A direct CDN URL pointing to the pre-generated width variant.
  *
- * `width` and `quality` are intentionally unused — CloudFront's cache policy
- * strips query strings, so S3 always serves the original file regardless.
+ * For relative paths, appends `_w{width}` before the file extension so the
+ * browser fetches a size-appropriate variant from S3/CloudFront
+ * (e.g. `/media/banners/hero.webp` at 1080px → `…/hero_w1080.webp`).
  */
-export default function imageLoader({ src }: ImageLoaderParams): string {
+export default function imageLoader({ src, width }: ImageLoaderParams): string {
   // Absolute URLs (CDN, blob, data URIs, other origins): pass through unchanged.
   if (
     src.startsWith('http://') ||
@@ -41,7 +45,21 @@ export default function imageLoader({ src }: ImageLoaderParams): string {
     return src;
   }
 
-  // Relative paths (e.g. `/media/releases/coverart/cover.jpg`): prepend CDN domain.
+  // Relative paths (e.g. `/media/releases/coverart/cover.jpg`): prepend CDN domain
+  // and insert the width variant suffix before the file extension.
   const path = src.startsWith('/') ? src : `/${src}`;
-  return `${CDN_DOMAIN}${path}`;
+  const lastDot = path.lastIndexOf('.');
+
+  if (lastDot === -1) {
+    return `${CDN_DOMAIN}${path}`;
+  }
+
+  const base = path.substring(0, lastDot);
+  const ext = path.substring(lastDot);
+
+  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(ext.toLowerCase())) {
+    return `${CDN_DOMAIN}${path}`;
+  }
+
+  return `${CDN_DOMAIN}${base}_w${width}${ext}`;
 }

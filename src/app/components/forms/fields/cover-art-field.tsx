@@ -22,6 +22,7 @@ import {
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
+import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { cn } from '@/lib/utils';
 import { uploadFileToS3 } from '@/lib/utils/direct-upload';
@@ -185,6 +186,14 @@ export default function CoverArtField<
           shouldDirty: true,
           shouldValidate: true,
         });
+
+        // Fire-and-forget: generate width variants on S3 for the image loader.
+        // Non-blocking — the batch script can backfill if this fails.
+        if (uploadResult.cdnUrl) {
+          generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
+            console.warn('[Cover Art] Variant generation failed:', err);
+          });
+        }
 
         URL.revokeObjectURL(blobUrl);
         setLocalPreviewUrl('');

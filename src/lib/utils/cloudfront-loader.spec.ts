@@ -9,7 +9,7 @@ describe('banner preload helpers', () => {
   });
 
   describe('buildBannerPreloadUrl', () => {
-    it('builds a CDN URL without query params', async () => {
+    it('builds a CDN URL without width suffix when no width is provided', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -21,7 +21,33 @@ describe('banner preload helpers', () => {
       expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero.jpg');
     });
 
-    it('percent-encodes special characters in the filename', async () => {
+    it('inserts _w{width} suffix when width is provided', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('hero.jpg', 1080);
+
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero_w1080.jpg');
+    });
+
+    it('percent-encodes special characters in the filename with width suffix', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('FFINC Banner 1_5_1920.webp', 640);
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w640.webp'
+      );
+    });
+
+    it('percent-encodes special characters without width', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -42,9 +68,9 @@ describe('banner preload helpers', () => {
 
       const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
 
-      const result = buildBannerPreloadUrl('hero.jpg');
+      const result = buildBannerPreloadUrl('hero.jpg', 1920);
 
-      expect(result).toBe('https://public-cdn.example.com/media/banners/hero.jpg');
+      expect(result).toBe('https://public-cdn.example.com/media/banners/hero_w1920.jpg');
     });
 
     it('falls back to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
@@ -54,14 +80,14 @@ describe('banner preload helpers', () => {
 
       const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
 
-      const result = buildBannerPreloadUrl('hero.jpg');
+      const result = buildBannerPreloadUrl('hero.jpg', 1920);
 
-      expect(result).toBe('https://server-cdn.example.com/media/banners/hero.jpg');
+      expect(result).toBe('https://server-cdn.example.com/media/banners/hero_w1920.jpg');
     });
   });
 
   describe('buildBannerPreloadSrcSet', () => {
-    it('builds a srcset string with a single 1920w descriptor', async () => {
+    it('builds a srcset with entries for each device size', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -70,10 +96,19 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero.jpg 1920w');
+      expect(result).toBe(
+        [
+          'https://cdn.fakefourrecords.com/media/banners/hero_w640.jpg 640w',
+          'https://cdn.fakefourrecords.com/media/banners/hero_w750.jpg 750w',
+          'https://cdn.fakefourrecords.com/media/banners/hero_w828.jpg 828w',
+          'https://cdn.fakefourrecords.com/media/banners/hero_w1080.jpg 1080w',
+          'https://cdn.fakefourrecords.com/media/banners/hero_w1200.jpg 1200w',
+          'https://cdn.fakefourrecords.com/media/banners/hero_w1920.jpg 1920w',
+        ].join(', ')
+      );
     });
 
-    it('percent-encodes special characters in the filename', async () => {
+    it('percent-encodes special characters in each srcset entry', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -82,8 +117,11 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadSrcSet('FFINC Banner 1_5_1920.webp');
 
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp 1920w'
+      expect(result).toContain(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w640.webp 640w'
+      );
+      expect(result).toContain(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w1920.webp 1920w'
       );
     });
 
@@ -96,7 +134,8 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
-      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero.jpg');
+      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w640.jpg 640w');
+      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w1920.jpg 1920w');
     });
 
     it('does not include query params', async () => {
@@ -109,8 +148,6 @@ describe('banner preload helpers', () => {
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
       expect(result).not.toContain('?');
-      expect(result).not.toContain('w=');
-      expect(result).not.toContain('q=');
     });
   });
 });
