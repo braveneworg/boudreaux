@@ -2,6 +2,10 @@ import { PrismaClient } from '@prisma/client';
 
 import type { TestUser } from './auth-helpers';
 
+/** 1×1 transparent PNG — always loads, never triggers onError in <Image>. */
+const PLACEHOLDER_COVER_ART =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRl5ErkJggg==';
+
 /**
  * E2E database URL — always uses the local Docker MongoDB container.
  * Never reads from process.env.DATABASE_URL to prevent accidentally
@@ -215,14 +219,14 @@ async function seedTestDatabase() {
         data: {
           title: 'Test Release Alpha',
           releasedOn: new Date('2024-01-15'),
-          coverArt: 'https://picsum.photos/seed/release1/400/400',
+          coverArt: PLACEHOLDER_COVER_ART,
         },
       }),
       prisma.release.create({
         data: {
           title: 'Test Release Beta',
           releasedOn: new Date('2024-06-15'),
-          coverArt: 'https://picsum.photos/seed/release2/400/400',
+          coverArt: PLACEHOLDER_COVER_ART,
         },
       }),
     ]);
@@ -246,7 +250,7 @@ async function seedTestDatabase() {
       data: {
         title: 'E2E Album One',
         releasedOn: new Date('2024-03-01'),
-        coverArt: 'https://picsum.photos/seed/e2e-release1/400/400',
+        coverArt: PLACEHOLDER_COVER_ART,
         publishedAt: new Date(),
         suggestedPrice: 799,
       },
@@ -256,7 +260,7 @@ async function seedTestDatabase() {
       data: {
         title: 'E2E Album Two',
         releasedOn: new Date('2024-06-01'),
-        coverArt: 'https://picsum.photos/seed/e2e-release2/400/400',
+        coverArt: PLACEHOLDER_COVER_ART,
         publishedAt: new Date(),
       },
     });
@@ -265,7 +269,7 @@ async function seedTestDatabase() {
       data: {
         title: 'E2E Album Three',
         releasedOn: new Date('2024-09-01'),
-        coverArt: 'https://picsum.photos/seed/e2e-release3/400/400',
+        coverArt: PLACEHOLDER_COVER_ART,
         publishedAt: new Date(),
       },
     });
