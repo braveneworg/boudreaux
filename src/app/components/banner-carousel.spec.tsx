@@ -133,11 +133,27 @@ describe('BannerCarousel', () => {
       expect(stripContainer.style.opacity).toBe('0');
     });
 
-    it('keeps responsive image sizing without rendering a client-side preload link', () => {
-      const { container } = render(<BannerCarousel banners={[makeBanner(1)]} useVariants />);
+    it('uses the raw imageFilename without a variant suffix when variantWidth is unset', () => {
+      render(<BannerCarousel banners={[makeBanner(1)]} />);
 
-      expect(screen.getByAltText('Banner 1')).toHaveAttribute('sizes', '100vw');
-      expect(container.querySelector('link[rel="preload"][as="image"]')).not.toBeInTheDocument();
+      expect(screen.getByAltText('Banner 1').getAttribute('src')).toBe(
+        '/media/banners/banner-1.jpg'
+      );
+    });
+
+    it('renders the variant-suffixed src and a matching preload link when variantWidth is set', () => {
+      // React 19 hoists <link rel="preload"> to <head> and persists it across
+      // tests, so use a unique slot number to avoid collision with other tests.
+      render(<BannerCarousel banners={[makeBanner(99)]} variantWidth={1920} />);
+
+      expect(screen.getByAltText('Banner 99').getAttribute('src')).toBe(
+        '/media/banners/banner-99_w1920.jpg'
+      );
+
+      const preload = document.head.querySelector(
+        'link[rel="preload"][as="image"][href*="banner-99_w1920"]'
+      );
+      expect(preload?.getAttribute('href')).toBe('/media/banners/banner-99_w1920.jpg');
     });
   });
 
