@@ -43,7 +43,7 @@ describe('generateImageVariantsAction', () => {
   const resizedBuffer = Buffer.from('resized');
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(undefined);
+    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
     mockS3Send.mockReset();
     mockSharpInstance.metadata.mockReset();
     mockSharpInstance.toBuffer.mockReset();
