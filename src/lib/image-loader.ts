@@ -23,6 +23,8 @@ interface ImageLoaderParams {
   quality?: number;
 }
 
+const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
+
 /**
  * @param src - Absolute URL, relative `/media/*` path, or blob URL.
  * @param width - The requested image width from the `<Image>` component's srcset.
@@ -54,5 +56,10 @@ export default function imageLoader({ src, width }: ImageLoaderParams): string {
 
   const base = path.substring(0, lastDot);
   const ext = path.substring(lastDot);
+
+  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(ext.toLowerCase())) {
+    return `${CDN_DOMAIN}${path}`;
+  }
+
   return `${CDN_DOMAIN}${base}_w${width}${ext}`;
 }

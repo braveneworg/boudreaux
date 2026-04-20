@@ -1,3 +1,5 @@
+import { IMAGE_VARIANT_DEVICE_SIZES } from './src/lib/constants/image-variants';
+
 import type { NextConfig } from 'next';
 
 const config = {
@@ -18,7 +20,7 @@ const config = {
     loader: 'custom',
     loaderFile: './src/lib/image-loader.ts',
     // Device sizes still inform srcset generation with custom loaders
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    deviceSizes: [...IMAGE_VARIANT_DEVICE_SIZES],
     // Only allow SVG from our own CDN (we control the contents); block active
     // scripts inside optimized SVGs.
     dangerouslyAllowSVG: false,
