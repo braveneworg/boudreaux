@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.36.0] - 2026-04-20
+
+### Added
+
+- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n- Develop/fix zip file naming for mixed and single downloads (#385)\n
+
 ## [4.35.0] - 2026-04-20
 
 ### Added
