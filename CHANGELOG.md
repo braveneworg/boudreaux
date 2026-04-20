@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.42.0] - 2026-04-20
+
+### Added
+
+- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n- Develop/improve lighthouse metrics (#392)\n
+
 ## [4.41.0] - 2026-04-20
 
 ### Added
