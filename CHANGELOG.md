@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.41.0] - 2026-04-20
+
+### Added
+
+- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n- Develop/improve lighthouse metrics (#391)\n
+
 ## [4.40.0] - 2026-04-20
 
 ### Added
