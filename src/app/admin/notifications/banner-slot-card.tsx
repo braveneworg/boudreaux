@@ -14,9 +14,9 @@ import { DatePicker } from '@/app/components/ui/datepicker';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { createOrUpdateBannerNotificationAction } from '@/lib/actions/banner-notification-action';
+import { BANNER_CDN_PATH } from '@/lib/constants/banner-slots';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils';
-import { cloudfrontLoader } from '@/lib/utils/cloudfront-loader';
 import { isDarkColor } from '@/lib/utils/color';
 import {
   addLinkAttributes,
@@ -116,11 +116,7 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
     if (notification.backgroundColor) setBackgroundColor(notification.backgroundColor);
   };
 
-  const thumbnailUrl = cloudfrontLoader({
-    src: slot.imageFilename,
-    width: 400,
-    quality: 75,
-  });
+  const thumbnailUrl = `/${BANNER_CDN_PATH}/${slot.imageFilename}`;
 
   return (
     <div className="rounded-lg border p-4">

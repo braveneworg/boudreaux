@@ -9,9 +9,8 @@ import Image from 'next/image';
 
 import { flushSync } from 'react-dom';
 
-import { DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
+import { BANNER_CDN_PATH, DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
-import { cloudfrontLoader } from '@/lib/utils/cloudfront-loader';
 import { isDarkColor } from '@/lib/utils/color';
 import {
   addLinkAttributes,
@@ -396,8 +395,7 @@ export function BannerCarousel({
               >
                 {isVisible && (
                   <Image
-                    loader={cloudfrontLoader}
-                    src={banner.imageFilename}
+                    src={`/${BANNER_CDN_PATH}/${banner.imageFilename}`}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"

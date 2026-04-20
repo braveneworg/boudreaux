@@ -2,190 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-describe('cloudfrontLoader', () => {
+describe('banner preload helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
   });
 
-  describe('CDN domain resolution', () => {
-    it('uses default CDN domain when no env vars are set', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'hero.jpg', width: 800, quality: 75 });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=800&q=75&f=webp'
-      );
-    });
-
-    it('uses NEXT_PUBLIC_CDN_DOMAIN when set', async () => {
-      vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://public-cdn.example.com');
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'hero.jpg', width: 800, quality: 75 });
-
-      expect(result).toBe(
-        'https://public-cdn.example.com/media/banners/hero.jpg?w=800&q=75&f=webp'
-      );
-    });
-
-    it('falls through to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      vi.stubEnv('CDN_DOMAIN', 'https://server-cdn.example.com');
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'hero.jpg', width: 800, quality: 75 });
-
-      expect(result).toBe(
-        'https://server-cdn.example.com/media/banners/hero.jpg?w=800&q=75&f=webp'
-      );
-    });
-  });
-
-  describe('quality parameter', () => {
-    it('uses the provided quality value', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'banner.png', width: 1200, quality: 90 });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=90&f=webp'
-      );
-    });
-
-    it('defaults to 75 when quality is undefined', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'banner.png', width: 1200, quality: undefined });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=75&f=webp'
-      );
-    });
-
-    it('uses explicit quality 0 when provided', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'banner.png', width: 1200, quality: 0 });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/banner.png?w=1200&q=0&f=webp'
-      );
-    });
-  });
-
-  describe('URL interpolation', () => {
-    it('interpolates different src values correctly', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({
-        src: 'promo/summer-sale.webp',
-        width: 640,
-        quality: 75,
-      });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/promo/summer-sale.webp?w=640&q=75&f=webp'
-      );
-    });
-
-    it('interpolates width correctly', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const narrow = cloudfrontLoader({ src: 'hero.jpg', width: 320, quality: 75 });
-      const wide = cloudfrontLoader({ src: 'hero.jpg', width: 1920, quality: 75 });
-
-      expect(narrow).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=320&q=75&f=webp'
-      );
-      expect(wide).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
-      );
-    });
-
-    it('caps width at 1920 when a larger width is requested', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({ src: 'hero.jpg', width: 3840, quality: 75 });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
-      );
-    });
-
-    it('percent-encodes spaces and special characters in the filename', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({
-        src: 'FFINC Banner 1_5_1920.webp',
-        width: 800,
-        quality: 75,
-      });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=800&q=75&f=webp'
-      );
-    });
-
-    it('encodes each path segment independently when src contains slashes', async () => {
-      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
-      delete process.env.CDN_DOMAIN;
-      vi.resetModules();
-
-      const { cloudfrontLoader } = await import('@/lib/utils/cloudfront-loader');
-
-      const result = cloudfrontLoader({
-        src: 'folder name/file name.webp',
-        width: 800,
-        quality: 75,
-      });
-
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/folder%20name/file%20name.webp?w=800&q=75&f=webp'
-      );
-    });
-  });
-
   describe('buildBannerPreloadUrl', () => {
-    it('builds a preload URL at max width with quality 75 and webp format', async () => {
+    it('builds a CDN URL without query params', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -194,9 +18,7 @@ describe('cloudfrontLoader', () => {
 
       const result = buildBannerPreloadUrl('hero.jpg');
 
-      expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
-      );
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero.jpg');
     });
 
     it('percent-encodes special characters in the filename', async () => {
@@ -209,7 +31,7 @@ describe('cloudfrontLoader', () => {
       const result = buildBannerPreloadUrl('FFINC Banner 1_5_1920.webp');
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp?w=1920&q=75&f=webp'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp'
       );
     });
 
@@ -222,14 +44,24 @@ describe('cloudfrontLoader', () => {
 
       const result = buildBannerPreloadUrl('hero.jpg');
 
-      expect(result).toBe(
-        'https://public-cdn.example.com/media/banners/hero.jpg?w=1920&q=75&f=webp'
-      );
+      expect(result).toBe('https://public-cdn.example.com/media/banners/hero.jpg');
+    });
+
+    it('falls back to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', 'https://server-cdn.example.com');
+      vi.resetModules();
+
+      const { buildBannerPreloadUrl } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadUrl('hero.jpg');
+
+      expect(result).toBe('https://server-cdn.example.com/media/banners/hero.jpg');
     });
   });
 
   describe('buildBannerPreloadSrcSet', () => {
-    it('builds a responsive srcset string for all device sizes at Next.js default quality 75', async () => {
+    it('builds a srcset string with a single 1920w descriptor', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -238,16 +70,7 @@ describe('cloudfrontLoader', () => {
 
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
-      expect(result).toBe(
-        [
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=640&q=75&f=webp 640w',
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=750&q=75&f=webp 750w',
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=828&q=75&f=webp 828w',
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1080&q=75&f=webp 1080w',
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1200&q=75&f=webp 1200w',
-          'https://cdn.fakefourrecords.com/media/banners/hero.jpg?w=1920&q=75&f=webp 1920w',
-        ].join(', ')
-      );
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero.jpg 1920w');
     });
 
     it('percent-encodes special characters in the filename', async () => {
@@ -259,9 +82,9 @@ describe('cloudfrontLoader', () => {
 
       const result = buildBannerPreloadSrcSet('FFINC Banner 1_5_1920.webp');
 
-      expect(result).toContain('FFINC%20Banner%201_5_1920.webp');
-      expect(result).toContain('640w');
-      expect(result).toContain('1920w');
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920.webp 1920w'
+      );
     });
 
     it('uses configured CDN domain', async () => {
@@ -274,6 +97,20 @@ describe('cloudfrontLoader', () => {
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
       expect(result).toContain('https://custom-cdn.example.com/media/banners/hero.jpg');
+    });
+
+    it('does not include query params', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+
+      const result = buildBannerPreloadSrcSet('hero.jpg');
+
+      expect(result).not.toContain('?');
+      expect(result).not.toContain('w=');
+      expect(result).not.toContain('q=');
     });
   });
 });
