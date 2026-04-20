@@ -31,8 +31,13 @@ interface ImageLoaderParams {
  * strips query strings, so S3 always serves the original file regardless.
  */
 export default function imageLoader({ src }: ImageLoaderParams): string {
-  // Absolute URLs (CDN, blob, other origins): pass through unchanged.
-  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('blob:')) {
+  // Absolute URLs (CDN, blob, data URIs, other origins): pass through unchanged.
+  if (
+    src.startsWith('http://') ||
+    src.startsWith('https://') ||
+    src.startsWith('blob:') ||
+    src.startsWith('data:')
+  ) {
     return src;
   }
 

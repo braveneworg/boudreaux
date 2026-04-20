@@ -54,6 +54,20 @@ describe('imageLoader', () => {
       expect(result).toBe('blob:http://localhost:3000/abc-123');
     });
 
+    it('passes through data URIs unchanged', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const dataUri =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRl5ErkJggg==';
+      const result = imageLoader({ src: dataUri, width: 400 });
+
+      expect(result).toBe(dataUri);
+    });
+
     it('passes through http URLs unchanged', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
