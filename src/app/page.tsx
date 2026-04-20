@@ -13,9 +13,16 @@ import { getQueryClient } from '@/lib/utils/get-query-client';
 import { HomeContent } from './components/home-content';
 import PageContainer from './components/ui/page-container';
 
-/** Widths pulled from `deviceSizes` in next.config.ts — must match generated `_w{width}` S3 variants. */
+/**
+ * Widths that match generated `_w{width}` S3 variants. Capped at 1200 because
+ * `generate-image-variants.ts` skips widths `>= originalWidth`, so a 1920px
+ * original never produces a `_w1920` variant and requesting one fails
+ * (`ERR_BLOCKED_BY_ORB` on the CDN, 403 via the origin proxy). Tablets with a
+ * desktop-class UA fall through to the desktop width — fine since 1200 still
+ * looks sharp on tablet and always resolves.
+ */
 const MOBILE_BANNER_WIDTH = 750;
-const DESKTOP_BANNER_WIDTH = 1920;
+const DESKTOP_BANNER_WIDTH = 1200;
 
 /**
  * Home page — Server Component that prefetches banners and featured artists,

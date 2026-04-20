@@ -6,8 +6,6 @@ import { headers } from 'next/headers';
 import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
-import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
-import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 
 import Footer from './components/footer/footer';
 import { Header } from './components/header/header';
@@ -16,15 +14,6 @@ import { Providers } from './components/providers';
 import type { Metadata } from 'next';
 
 import './globals.css';
-
-/**
- * Preload srcset for the first banner image — built at module level from
- * static constants so the `<link rel="preload">` lands in the initial HTML
- * response, outside the Suspense boundary created by loading.tsx.
- * This eliminates the ~900ms LCP "load delay" caused by the image only
- * being discovered after client JS executes.
- */
-const FIRST_BANNER_PRELOAD_SRCSET = buildBannerPreloadSrcSet(BANNER_SLOTS[0].filename);
 
 const jost = Jost({
   subsets: ['latin'],
@@ -88,15 +77,6 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
         {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
-        {/* LCP preload — must be in layout (outside loading.tsx Suspense boundary)
-            so the browser discovers the hero banner image in the initial HTML response */}
-        <link
-          rel="preload"
-          as="image"
-          imageSrcSet={FIRST_BANNER_PRELOAD_SRCSET}
-          imageSizes="100vw"
-          fetchPriority="high"
-        />
       </head>
       <body
         className={`${jost.className} antialiased flex flex-col min-h-screen overflow-x-hidden max-w-full`}

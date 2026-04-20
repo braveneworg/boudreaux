@@ -63,11 +63,6 @@ vi.mock('@/components/ui/sonner', () => ({
   ),
 }));
 
-vi.mock('@/lib/utils/cloudfront-loader', () => ({
-  buildBannerPreloadSrcSet: (filename: string) =>
-    `https://cdn.fakefourrecords.com/media/banners/${encodeURIComponent(filename)}?w=640&q=75&f=webp 640w, https://cdn.fakefourrecords.com/media/banners/${encodeURIComponent(filename)}?w=1920&q=75&f=webp 1920w`,
-}));
-
 describe('RootLayout', () => {
   beforeEach(() => {
     // Default: desktop user agent
@@ -290,26 +285,6 @@ describe('RootLayout', () => {
         : null;
       expect(preconnect).toBeDefined();
       expect(preconnect.props.href).toBe('https://cdn.fakefourrecords.com');
-    });
-
-    it('renders LCP banner preload link with fetchPriority high', async () => {
-      const jsx = await RootLayout({ children: <div>Test</div> });
-      const children = jsx.props.children;
-      const head = Array.isArray(children)
-        ? children.find((c: React.JSX.Element) => c.type === 'head')
-        : null;
-
-      expect(head).toBeDefined();
-      const links = head.props.children;
-      const preload = Array.isArray(links)
-        ? links.find(
-            (l: React.JSX.Element) => l.props?.rel === 'preload' && l.props?.as === 'image'
-          )
-        : null;
-      expect(preload).toBeDefined();
-      expect(preload.props.fetchPriority).toBe('high');
-      expect(preload.props.imageSrcSet).toContain('cdn.fakefourrecords.com/media/banners/');
-      expect(preload.props.imageSizes).toBe('100vw');
     });
   });
 });

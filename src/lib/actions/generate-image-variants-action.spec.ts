@@ -72,11 +72,11 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // Original is 2000px wide → all 6 device sizes (640, 750, 828, 1080, 1200, 1920) are smaller
-    expect(result.variantsGenerated).toBe(6);
+    // Original is 2000px wide → all 5 device sizes (640, 750, 828, 1080, 1200) are smaller
+    expect(result.variantsGenerated).toBe(5);
 
-    // 1 GetObject + 6 PutObject calls
-    expect(mockS3Send).toHaveBeenCalledTimes(7);
+    // 1 GetObject + 5 PutObject calls
+    expect(mockS3Send).toHaveBeenCalledTimes(6);
   });
 
   it('skips widths larger than or equal to the original', async () => {
