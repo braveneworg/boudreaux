@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.38.0] - 2026-04-20
+
+### Added
+
+- Fix image loader to support data URIs and update seed database cover … (#388)\n- Fix image loader to support data URIs and update seed database cover … (#388)\n- Develop/fix broken images by security audit (#387)\n- Develop/fix broken images by security audit (#387)\n- Develop/fix broken images by security audit (#387)\n- Fix image loader to support data URIs and update seed database cover … (#388)\n
+
 ## [4.37.0] - 2026-04-20
 
 ### Added
