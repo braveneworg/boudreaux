@@ -42,7 +42,7 @@ export default function HamburgerMenuSheet({
         side="right"
         className="fixed inset-x-0 w-screen sm:max-w-none h-[calc(100vh-48px)] md:h-[calc(100vh-144px)] top-12 md:top-36 border-0 z-200 pt-0 px-8 backdrop-blur before:inset-0 bg-zinc-950/90 bg-cover bg-center bg-no-repeat pointer-events-auto"
         style={{
-          backgroundImage: "url('media/particles-6.svg')",
+          backgroundImage: "url('/media/particles-6.svg')",
         }}
         aria-label="Navigation menu"
         isOpen={isOpen}
