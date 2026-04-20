@@ -10,10 +10,6 @@ import { BannerCarousel, type BannerSlotData } from './banner-carousel';
 
 const mockIsDarkColor = vi.mocked(isDarkColor);
 
-vi.mock('@/lib/utils/cloudfront-loader', () => ({
-  cloudfrontLoader: ({ src }: { src: string }) => src,
-}));
-
 vi.mock('@/lib/utils/color', () => ({
   isDarkColor: vi.fn(() => false),
 }));

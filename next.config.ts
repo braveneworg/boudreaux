@@ -10,15 +10,15 @@ const config = {
       : undefined,
   devIndicators: false,
 
-  // Configure images for CDN.
-  // Note: `remotePatterns` is an allowlist for the /_next/image optimizer; any
-  // entry here widens what an authenticated/anonymous caller can coax the
-  // optimizer to fetch. Keep the list minimal.
+  // Configure images for direct CDN delivery.
+  // Uses a global custom loader (`image-loader.ts`) so all <Image> components
+  // produce direct CDN URLs instead of routing through /_next/image — which
+  // does not exist on the CloudFront/S3 origin and would 403.
   images: {
-    // Reduce default max device size from 3840 to 1920 for better performance
+    loader: 'custom',
+    loaderFile: './src/lib/image-loader.ts',
+    // Device sizes still inform srcset generation with custom loaders
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
-    // Cache optimized images for 1 day (default is 60s) — images rarely change
-    minimumCacheTTL: 86400,
     // Only allow SVG from our own CDN (we control the contents); block active
     // scripts inside optimized SVGs.
     dangerouslyAllowSVG: false,
