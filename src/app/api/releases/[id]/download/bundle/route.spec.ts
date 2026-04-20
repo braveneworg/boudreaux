@@ -13,8 +13,9 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
   extractClientIp: () => '127.0.0.1',
 }));
+const mockRateLimitCheck = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  downloadLimiter: { check: vi.fn().mockResolvedValue(undefined) },
+  downloadLimiter: { check: (...args: unknown[]) => mockRateLimitCheck(...args) },
   DOWNLOAD_LIMIT: 10,
 }));
 
@@ -396,17 +397,18 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const response = await GET(makeJsonRequest('FLAC'), makeParams());
     await response.text();
 
+    // Single format → flat archive (no subfolder)
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ name: 'FLAC/passwd' })
+      expect.objectContaining({ name: 'passwd' })
     );
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ name: 'FLAC/song.wav' })
+      expect.objectContaining({ name: 'song.wav' })
     );
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ name: 'FLAC/null_byte.mp3' })
+      expect.objectContaining({ name: 'null_byte.mp3' })
     );
 
     const archiveEntryNames = mockAppend.mock.calls.map(([, options]) => options.name as string);
@@ -807,10 +809,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     // Override FORMAT_LABELS by checking the archive.append call
     await GET(makeRequest('FLAC'), makeParams());
 
-    // FLAC is in FORMAT_LABELS so folder is 'FLAC'
+    // Single format → flat archive (no subfolder)
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ name: 'FLAC/01.flac' })
+      expect.objectContaining({ name: '01.flac' })
     );
   });
 
@@ -828,9 +830,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const response = await GET(makeRequest('FLAC'), makeParams());
 
     expect(response.status).toBe(302);
+    // Single format → flat archive (no subfolder)
     expect(mockAppend).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ name: 'FLAC/legacy.flac' })
+      expect.objectContaining({ name: 'legacy.flac' })
     );
   });
 
@@ -860,5 +863,270 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(mockArchiveAbort).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
+  });
+
+  // ─── Rate limiting ──────────────────────────────────────────────────────────
+
+  it('should return 429 when rate limit is exceeded', async () => {
+    mockRateLimitCheck.mockRejectedValueOnce(new Error('Rate limit'));
+
+    const response = await GET(makeRequest(), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body.error).toBe('RATE_LIMITED');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+  });
+
+  // ─── Invalid ObjectId ────────────────────────────────────────────────────────
+
+  it('should return 400 for invalid release ID', async () => {
+    const response = await GET(makeRequest(), makeParams('not-a-valid-id'));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('INVALID_ID');
+  });
+
+  // ─── safeArchiveEntryName edge case ─────────────────────────────────────────
+
+  it('should use "file" fallback when filename sanitizes to empty', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/FLAC/01.flac', fileName: '' }],
+      },
+      {
+        id: 'format-wav',
+        formatType: 'WAV',
+        s3Key: null,
+        fileName: null,
+        files: [{ s3Key: 'releases/r1/WAV/01.wav', fileName: '' }],
+      },
+    ]);
+
+    await GET(makeRequest(), makeParams());
+
+    // Two formats → subfolders; empty filename sanitizes to '' → 'file' fallback
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/file' })
+    );
+  });
+
+  // ─── Single-format flat archive (redirect path) ────────────────────────────
+
+  it('should produce flat archive entries when only one format is requested (redirect path)', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/01.flac', fileName: '01 - Intro.flac' },
+          { s3Key: 'releases/r1/FLAC/02.flac', fileName: '02 - Main.flac' },
+        ],
+      },
+    ]);
+
+    const response = await GET(makeRequest('FLAC'), makeParams());
+
+    expect(response.status).toBe(302);
+    // Single format → no subfolder
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '01 - Intro.flac' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '02 - Main.flac' })
+    );
+  });
+
+  it('should produce subfolder archive entries when multiple formats are requested (redirect path)', async () => {
+    await GET(makeRequest('FLAC,WAV'), makeParams());
+
+    // Multi-format → subfolders
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/01 - Intro.flac' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'WAV/album.wav' })
+    );
+  });
+
+  // ─── Single-format flat archive (SSE path) ─────────────────────────────────
+
+  it('should produce flat archive entries when only one format is requested (SSE path)', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/01.flac', fileName: '01 - Intro.flac' },
+          { s3Key: 'releases/r1/FLAC/02.flac', fileName: '02 - Main.flac' },
+        ],
+      },
+    ]);
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    await response.text();
+
+    // Single format → flat entries
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '01 - Intro.flac' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '02 - Main.flac' })
+    );
+  });
+
+  it('should produce subfolder archive entries when multiple formats are requested (SSE path)', async () => {
+    const response = await GET(makeJsonRequest('FLAC,WAV'), makeParams());
+    await response.text();
+
+    // Multi-format → subfolders
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'FLAC/01 - Intro.flac' })
+    );
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'WAV/album.wav' })
+    );
+  });
+
+  // ─── SSE path: title fallback ──────────────────────────────────────────────
+
+  it('should use fallback filename when title sanitizes to empty in SSE path', async () => {
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: '!!!???',
+    });
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    const readyEvent = events.find((e) => e.event === 'ready');
+    expect(readyEvent?.data).toEqual(expect.objectContaining({ fileName: 'release.zip' }));
+  });
+
+  // ─── SSE path: header fallbacks ────────────────────────────────────────────
+
+  it('should use fallback values when headers are missing in SSE path', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC&respond=json'
+    );
+
+    const response = await GET(req, makeParams());
+    await response.text();
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipAddress: 'unknown',
+        userAgent: 'unknown',
+      })
+    );
+  });
+
+  // ─── SSE path: analytics failure ──────────────────────────────────────────
+
+  it('should emit ready event even when download analytics fail in SSE path', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockUpsertDownloadCount.mockRejectedValueOnce(new Error('Analytics write failed'));
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    // ready event should still be emitted before analytics run
+    const readyEvent = events.find((e) => e.event === 'ready');
+    expect(readyEvent).toBeDefined();
+    expect(readyEvent?.data).toEqual(
+      expect.objectContaining({
+        downloadUrl: 'https://s3.example.com/presigned-bundle-url',
+      })
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to record bundle download analytics',
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── SSE path: outer stream error ─────────────────────────────────────────
+
+  it('should emit error event when archive creation throws in SSE path', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Make the Upload constructor throw to trigger the outer catch
+    const { Upload } = await import('@aws-sdk/lib-storage');
+    (Upload as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('Upload init failed');
+    });
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    const events = await readSSEEvents(response);
+
+    const errorEvent = events.find((e) => e.event === 'error');
+    expect(errorEvent?.data).toEqual(
+      expect.objectContaining({ message: 'An unexpected error occurred.' })
+    );
+    expect(consoleSpy).toHaveBeenCalledWith('Bundle SSE stream error', expect.anything());
+
+    consoleSpy.mockRestore();
+  });
+
+  // ─── SSE path: skips files when S3 returns no body ─────────────────────────
+
+  it('should skip files whose S3 response has no Body (SSE path)', async () => {
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'format-flac',
+        formatType: 'FLAC',
+        s3Key: null,
+        fileName: null,
+        files: [
+          { s3Key: 'releases/r1/FLAC/01.flac', fileName: '01 - Intro.flac' },
+          { s3Key: 'releases/r1/FLAC/02.flac', fileName: '02 - Main.flac' },
+        ],
+      },
+    ]);
+
+    // First file returns no body, second returns normally
+    mockS3Send
+      .mockResolvedValueOnce({ Body: undefined })
+      .mockResolvedValueOnce({ Body: Readable.from(Buffer.from('audio')) });
+
+    const response = await GET(makeJsonRequest('FLAC'), makeParams());
+    await response.text();
+
+    // Only the second file should be appended
+    expect(mockAppend).toHaveBeenCalledTimes(1);
+    expect(mockAppend).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: '02 - Main.flac' })
+    );
+  });
+
+  // ─── Zod validation fallback message ──────────────────────────────────────
+
+  it('should use Zod issue message for invalid formats', async () => {
+    const response = await GET(makeRequest('NOT_A_FORMAT'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('INVALID_FORMATS');
+    expect(typeof body.message).toBe('string');
+    expect(body.message.length).toBeGreaterThan(0);
   });
 });
