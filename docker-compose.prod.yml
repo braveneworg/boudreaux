@@ -36,11 +36,14 @@ services:
       NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_SITE_KEY}
       CLOUDFLARE_SECRET: ${CLOUDFLARE_SECRET}
       NEXT_TELEMETRY_DISABLED: 1
+      # Public base URL (used for audio metadata comments, emails, etc.)
+      NEXT_PUBLIC_HOST_NAME: ${NEXT_PUBLIC_HOST_NAME}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL}
       # AWS S3 configuration for file uploads
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${S3_BUCKET}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
       CDN_DOMAIN: ${CDN_DOMAIN}
       # Stripe subscription payments
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
