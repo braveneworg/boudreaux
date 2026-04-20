@@ -293,7 +293,10 @@ export async function GET(
 
             uploadPromise = combinedUpload.done();
 
-            // Append files for each format into a subfolder
+            // Append files — use format subfolders only when multiple
+            // formats are bundled; single-format bundles are flat so the
+            // zip filename (release title) is the only label the user sees.
+            const useSubfolders = resolvedFormats.length > 1;
             for (const { formatType, files } of resolvedFormats) {
               const label = FORMAT_LABELS[formatType] ?? formatType;
               const safeFolderName = safeArchiveEntryName(label);
@@ -305,11 +308,14 @@ export async function GET(
                     new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
                   );
                   if (s3Response.Body) {
+                    const entryName = useSubfolders
+                      ? `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`
+                      : safeArchiveEntryName(file.fileName);
                     await new Promise<void>((resolve, reject) => {
                       archiveForSse.once('entry', () => resolve());
                       archiveForSse.once('error', reject);
                       archiveForSse.append(s3Response.Body as Readable, {
-                        name: `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`,
+                        name: entryName,
                       });
                     });
                   }
@@ -426,11 +432,16 @@ export async function GET(
 
     const uploadPromise = upload.done();
 
-    // Pipe S3 objects into the archive (fetch all files concurrently)
+    // Pipe S3 objects into the archive — use format subfolders only
+    // when multiple formats are bundled; single-format bundles are flat
+    // so the zip filename (release title) is the only label the user sees.
+    const useSubfolders = resolvedFormats.length > 1;
     const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
       const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
       return files.map((file) => ({
-        archivePath: `${folderName}/${safeArchiveEntryName(file.fileName)}`,
+        archivePath: useSubfolders
+          ? `${folderName}/${safeArchiveEntryName(file.fileName)}`
+          : safeArchiveEntryName(file.fileName),
         s3Key: file.s3Key,
       }));
     });
