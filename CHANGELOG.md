@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.37.0] - 2026-04-20
+
+### Added
+
+- Fix the broken images caused by bad next config (#386)\n- Fix the broken images caused by bad next config (#386)\n- Fix the broken images caused by bad next config (#386)\n
+
 ## [4.36.0] - 2026-04-20
 
 ### Added
