@@ -169,4 +169,38 @@ describe('generateImageVariantsAction', () => {
     // Only 1 GetObject, no PutObject calls
     expect(mockS3Send).toHaveBeenCalledTimes(1);
   });
+
+  it('returns error when key is outside media prefix', async () => {
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/uploads/releases/coverart/private.jpg'
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Image key must start with "media/"');
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it('skips keys that are already width variants', async () => {
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover_w1080.jpg'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.variantsGenerated).toBe(0);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it('returns error when source image content-length exceeds safety limit', async () => {
+    mockS3Send.mockResolvedValue({
+      Body: fakeS3Body(imageBuffer),
+      ContentLength: 21 * 1024 * 1024,
+    });
+
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/large.jpg'
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Source image exceeds 20MB limit');
+  });
 });

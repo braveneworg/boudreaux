@@ -35,6 +35,11 @@ import dotenv from 'dotenv';
 import mime from 'mime';
 import sharp from 'sharp';
 
+import {
+  IMAGE_VARIANT_DEVICE_SIZES,
+  IMAGE_VARIANT_SUFFIX_REGEX,
+} from '../src/lib/constants/image-variants';
+
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
@@ -48,9 +53,6 @@ const AWS_REGION = process.env.AWS_REGION ?? 'us-east-1';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-/** Device sizes from next.config.ts — the widths we generate variants for. */
-const DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920] as const;
 
 /** Extensions that cannot be raster-resized (vector, icon, animated). */
 const SKIP_EXTENSIONS = new Set(['.svg', '.ico', '.gif']);
@@ -66,9 +68,6 @@ const IMAGE_EXTENSIONS = new Set([
   '.tif',
   '.bmp',
 ]);
-
-/** Regex to detect an existing width variant key so we don't re-process. */
-const VARIANT_REGEX = /_w\d+\.\w+$/;
 
 /** Maximum images processed in parallel. */
 const CONCURRENCY = 5;
@@ -233,7 +232,7 @@ function isProcessableImage(key: string): boolean {
 }
 
 function isExistingVariant(key: string): boolean {
-  return VARIANT_REGEX.test(key);
+  return IMAGE_VARIANT_SUFFIX_REGEX.test(key);
 }
 
 function buildVariantKey(originalKey: string, width: number): string {
@@ -248,6 +247,7 @@ interface ProcessResult {
   originalKey: string;
   variantsUploaded: number;
   variantsSkipped: number;
+  uploadedVariantKeys: string[];
   error?: string;
 }
 
@@ -257,7 +257,12 @@ async function processImage(
   key: string,
   dryRun: boolean
 ): Promise<ProcessResult> {
-  const result: ProcessResult = { originalKey: key, variantsUploaded: 0, variantsSkipped: 0 };
+  const result: ProcessResult = {
+    originalKey: key,
+    variantsUploaded: 0,
+    variantsSkipped: 0,
+    uploadedVariantKeys: [],
+  };
 
   try {
     const buffer = await downloadObject(s3, bucket, key);
@@ -271,7 +276,7 @@ async function processImage(
 
     const contentType = mime.getType(key) ?? 'application/octet-stream';
 
-    for (const targetWidth of DEVICE_SIZES) {
+    for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
       if (targetWidth >= originalWidth) {
         result.variantsSkipped++;
         continue;
@@ -294,6 +299,7 @@ async function processImage(
 
       await uploadBuffer(s3, bucket, variantKey, resized, contentType);
       result.variantsUploaded++;
+      result.uploadedVariantKeys.push(variantKey);
 
       log(
         `  ${colors.green}+${colors.reset} ${variantKey} (${targetWidth}px, ${formatBytes(resized.length)})`,
@@ -445,13 +451,9 @@ ${colors.yellow}Environment Variables:${colors.reset}
       totalErrors++;
       log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
     }
-    // Collect variant keys for invalidation
-    if (!options.dryRun && r.variantsUploaded > 0) {
-      for (const w of DEVICE_SIZES) {
-        const variantKey = buildVariantKey(r.originalKey, w);
-        if (allKeys.includes(variantKey)) continue; // was already there
-        uploadedKeys.push(variantKey);
-      }
+    // Collect exact uploaded variant keys for invalidation
+    if (!options.dryRun && r.uploadedVariantKeys.length > 0) {
+      uploadedKeys.push(...r.uploadedVariantKeys);
     }
   }
 

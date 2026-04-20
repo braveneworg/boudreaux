@@ -11,11 +11,10 @@
  * convention (e.g. `hero_w1080.webp`) matching pre-generated S3 objects.
  */
 
+import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
+
 const CDN_DOMAIN =
   process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? 'https://cdn.fakefourrecords.com';
-
-/** Device sizes matching `next.config.ts` — used to build the preload srcset. */
-const DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920] as const;
 
 /**
  * Builds a full CDN URL for a banner image width variant, suitable for
@@ -50,5 +49,7 @@ export const buildBannerPreloadUrl = (imageFilename: string, width?: number): st
  * entry per device size matching the width variants the image loader produces.
  */
 export const buildBannerPreloadSrcSet = (imageFilename: string): string => {
-  return DEVICE_SIZES.map((w) => `${buildBannerPreloadUrl(imageFilename, w)} ${w}w`).join(', ');
+  return IMAGE_VARIANT_DEVICE_SIZES.map(
+    (w) => `${buildBannerPreloadUrl(imageFilename, w)} ${w}w`
+  ).join(', ');
 };

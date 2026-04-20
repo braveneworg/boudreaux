@@ -97,7 +97,7 @@ describe('imageLoader', () => {
         width: 1920,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/particles-6_w1920.svg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/particles-6.svg');
     });
 
     it('prepends CDN domain to banner paths with width suffix', async () => {
@@ -146,7 +146,37 @@ describe('imageLoader', () => {
         width: 22,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/external-link-icon_w22.svg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg');
+    });
+
+    it('does not append width suffix for GIF assets', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: '/media/releases/coverart/animated.gif',
+        width: 640,
+      });
+
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/animated.gif');
+    });
+
+    it('does not append width suffix for ICO assets', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: '/media/icons/favicon.ico',
+        width: 32,
+      });
+
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/favicon.ico');
     });
   });
 
