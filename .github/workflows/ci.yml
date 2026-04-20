@@ -258,15 +258,6 @@ jobs:
           E2E_DATABASE_URL: mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0
           SKIP_ENV_VALIDATION: "true"
 
-      - name: Upload blob report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-blob-${{ matrix.shard }}
-          path: blob-report/
-          retention-days: 1
-          if-no-files-found: warn
-
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v7
