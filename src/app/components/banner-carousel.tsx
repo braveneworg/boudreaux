@@ -32,6 +32,12 @@ interface BannerCarouselProps {
   banners: BannerSlotData[];
   rotationInterval?: number;
   className?: string;
+  /**
+   * When true, banner images are rendered through the width-variant image
+   * loader. When false, banner images use raw `imageFilename` values with
+   * `unoptimized`.
+   */
+  useVariants?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
@@ -47,6 +53,7 @@ export function BannerCarousel({
   banners,
   rotationInterval = DEFAULT_ROTATION_INTERVAL,
   className,
+  useVariants = false,
 }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
@@ -402,6 +409,7 @@ export function BannerCarousel({
                     priority={idx === 0}
                     loading={idx === 0 ? undefined : 'lazy'}
                     className="object-cover"
+                    unoptimized={!useVariants}
                   />
                 )}
               </div>

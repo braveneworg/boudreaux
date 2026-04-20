@@ -132,6 +132,13 @@ describe('BannerCarousel', () => {
       ) as HTMLElement;
       expect(stripContainer.style.opacity).toBe('0');
     });
+
+    it('keeps responsive image sizing without rendering a client-side preload link', () => {
+      const { container } = render(<BannerCarousel banners={[makeBanner(1)]} useVariants />);
+
+      expect(screen.getByAltText('Banner 1')).toHaveAttribute('sizes', '100vw');
+      expect(container.querySelector('link[rel="preload"][as="image"]')).not.toBeInTheDocument();
+    });
   });
 
   /* ---- multiple banners ---- */

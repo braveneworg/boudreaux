@@ -47,7 +47,7 @@ export const HomeContent = () => {
       {/* Always render BannerCarousel — when empty it renders a placeholder
           section to reserve space, and keeping a single code path avoids a
           conditional mount that could shift layout during hydration. */}
-      <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
+      <BannerCarousel banners={banners} rotationInterval={rotationInterval} useVariants />
       <ContentContainer>
         <ArtistSearchInput />
         <section>
