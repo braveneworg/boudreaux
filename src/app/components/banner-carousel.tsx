@@ -11,7 +11,6 @@ import { flushSync } from 'react-dom';
 
 import { BANNER_CDN_PATH, DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
-import { buildBannerPreloadSrcSet } from '@/lib/utils/cloudfront-loader';
 import { isDarkColor } from '@/lib/utils/color';
 import {
   addLinkAttributes,
@@ -34,9 +33,9 @@ interface BannerCarouselProps {
   rotationInterval?: number;
   className?: string;
   /**
-   * When true, the first slide's `src` is rendered through the width-variant
-   * image loader and an explicit `<link rel="preload">` is emitted for its
-   * responsive srcset. When false, the raw `imageFilename` is used unoptimized.
+   * When true, banner images are rendered through the width-variant image
+   * loader. When false, banner images use raw `imageFilename` values with
+   * `unoptimized`.
    */
   useVariants?: boolean;
 }
@@ -299,9 +298,6 @@ export function BannerCarousel({
   const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
   const nextIndex = (currentIndex + 1) % totalSlides;
 
-  const firstBannerPreloadSrcSet =
-    useVariants && banners[0] ? buildBannerPreloadSrcSet(banners[0].imageFilename) : null;
-
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard interaction per WAI-ARIA carousel pattern */
   return (
     <section
@@ -311,15 +307,6 @@ export function BannerCarousel({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {firstBannerPreloadSrcSet && (
-        <link
-          rel="preload"
-          as="image"
-          imageSrcSet={firstBannerPreloadSrcSet}
-          imageSizes="100vw"
-          fetchPriority="high"
-        />
-      )}
       {/* Notification strip — always reserves 2.5rem to prevent CLS */}
       <div
         className="relative w-full overflow-hidden"
