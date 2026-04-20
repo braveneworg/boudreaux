@@ -185,6 +185,9 @@ export const DownloadDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTitle className="sr-only">
+        {hasPurchase ? `Download ${releaseTitle}` : `Download ${artistName}'s music`}
+      </DialogTitle>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
         className={cn(
