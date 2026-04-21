@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.45.0] - 2026-04-21
+
+### Added
+
+- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n- Develop/fix notification banners and lcp (#395)\n
+
 ## [4.44.0] - 2026-04-21
 
 ### Added
