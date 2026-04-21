@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.48.0] - 2026-04-21
+
+### Added
+
+- Fix secret not being set on EC2 (#398)\n- Fix secret not being set on EC2 (#398)\n- Fix secret not being set on EC2 (#398)\n
+
 ## [4.47.0] - 2026-04-21
 
 ### Added
