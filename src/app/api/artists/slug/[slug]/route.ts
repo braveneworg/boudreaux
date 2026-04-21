@@ -7,19 +7,11 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
-import { stripInlineImageDataUris } from '@/lib/utils/sanitize-response';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Convert BigInt → Number for JSON serialization, and strip legacy inline
- * `data:` URI blobs to keep the response payload small (see sanitize-response.ts).
- */
 function serializeForResponse<T>(data: T): T {
-  const noBigInts: T = JSON.parse(
-    JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  return stripInlineImageDataUris(noBigInts);
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
 }
 
 /**

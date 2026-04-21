@@ -24,6 +24,7 @@ const config = {
     // Only allow SVG from our own CDN (we control the contents); block active
     // scripts inside optimized SVGs.
     dangerouslyAllowSVG: false,
+    contentDispositionType: 'attachment',
     remotePatterns: [
       {
         protocol: 'https',

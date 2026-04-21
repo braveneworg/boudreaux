@@ -8,7 +8,6 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import { stripInlineImageDataUris } from '@/lib/utils/sanitize-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
@@ -18,16 +17,9 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Convert BigInt values to Number so NextResponse.json() can serialize them,
- * and strip any legacy `data:` URI blobs (see sanitize-response.ts) so they
- * can't balloon the HTML via SSR/RSC.
- */
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
 function serializeForResponse<T>(data: T): T {
-  const noBigInts: T = JSON.parse(
-    JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  return stripInlineImageDataUris(noBigInts);
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
 }
 
 /**
