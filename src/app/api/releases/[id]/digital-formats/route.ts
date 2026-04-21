@@ -8,11 +8,18 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { type DigitalFormatType, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { stripInlineImageDataUris } from '@/lib/utils/sanitize-response';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
-/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
-function serializeBigInts<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
+/**
+ * Convert BigInt → Number for JSON serialization, and strip legacy inline
+ * `data:` URI blobs to keep the response payload small (see sanitize-response.ts).
+ */
+function serializeForResponse<T>(data: T): T {
+  const noBigInts: T = JSON.parse(
+    JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
+  );
+  return stripInlineImageDataUris(noBigInts);
 }
 
 /**
@@ -75,7 +82,7 @@ export const GET = withRateLimit<{ id: string }>(
     }
 
     return NextResponse.json(
-      { digitalFormat: serializeBigInts(format) },
+      { digitalFormat: serializeForResponse(format) },
       {
         headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
       }
