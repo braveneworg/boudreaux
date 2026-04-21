@@ -217,6 +217,30 @@ The handler at `src/app/api/stripe/webhook/route.ts` is now **gated to developme
 
 No manual action required — the code change is already applied.
 
+### Step 10: Bootstrap the Stripe IP allowlist refresh Lambda
+
+The SAM template includes a second Lambda (`RefreshIpAllowlistFunction`) that fetches `https://stripe.com/files/ips/ips_webhooks.json` on a daily schedule and writes the result to `/fakefour/stripe/webhook-ip-ranges`. Stripe does not warn before rotating IPs, so this keeps the webhook Lambda's allowlist current without manual intervention.
+
+After the first deployment, invoke it once manually so the parameter is populated immediately instead of waiting up to 24 hours for the first schedule tick:
+
+```bash
+# Find the deployed function name
+aws lambda list-functions \
+  --query "Functions[?contains(FunctionName, 'RefreshIpAllowlist')].FunctionName" \
+  --output text
+
+# Invoke it (replace with the name from above)
+aws lambda invoke \
+  --function-name fakefour-stripe-webhook-RefreshIpAllowlistFunction-XXXX \
+  --log-type Tail \
+  --query 'LogResult' --output text /tmp/refresh-out.json | base64 -d
+
+# Confirm the parameter is populated
+aws ssm get-parameter --name /fakefour/stripe/webhook-ip-ranges --query 'Parameter.Value' --output text
+```
+
+The CloudWatch alarm `RefreshIpAllowlistErrorAlarm` fires if the refresh function errors for two consecutive days. By default it has no `AlarmActions` — wire it to an SNS topic (or remove the alarm) to actually get paged.
+
 ---
 
 ## Troubleshooting

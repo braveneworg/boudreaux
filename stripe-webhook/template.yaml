@@ -85,6 +85,60 @@ Resources:
       StageName: !Ref Environment
       Description: Stripe webhook endpoint for Fake Four Records
 
+  RefreshIpAllowlistFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: refresh-ip-allowlist-handler.handler
+      Description: Refreshes the Stripe webhook IP allowlist from stripe.com
+      Timeout: 15
+      MemorySize: 256
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:PutParameter
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/webhook-ip-ranges'
+      Environment:
+        Variables:
+          SSM_PARAMETER_PATH: /fakefour/stripe/webhook-ip-ranges
+      Events:
+        DailyRefresh:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Description: Refresh Stripe webhook IP allowlist daily
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2024
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - refresh-ip-allowlist-handler.ts
+        External:
+          - '@aws-sdk/*'
+
+  RefreshIpAllowlistErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Stripe webhook IP allowlist refresh Lambda is failing
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref RefreshIpAllowlistFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
   PrismaEngineLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
