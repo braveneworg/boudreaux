@@ -103,7 +103,6 @@ describe('banner preload helpers', () => {
           'https://cdn.fakefourrecords.com/media/banners/hero_w828.jpg 828w',
           'https://cdn.fakefourrecords.com/media/banners/hero_w1080.jpg 1080w',
           'https://cdn.fakefourrecords.com/media/banners/hero_w1200.jpg 1200w',
-          'https://cdn.fakefourrecords.com/media/banners/hero_w1920.jpg 1920w',
         ].join(', ')
       );
     });
@@ -121,7 +120,7 @@ describe('banner preload helpers', () => {
         'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w640.webp 640w'
       );
       expect(result).toContain(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w1920.webp 1920w'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w1200.webp 1200w'
       );
     });
 
@@ -135,7 +134,7 @@ describe('banner preload helpers', () => {
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
       expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w640.jpg 640w');
-      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w1920.jpg 1920w');
+      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w1200.jpg 1200w');
     });
 
     it('does not include query params', async () => {
