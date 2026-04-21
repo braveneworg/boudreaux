@@ -10,7 +10,8 @@
 # The .env file format is KEY=VALUE, one per line. Expected keys:
 #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, DATABASE_URL, EMAIL_FROM,
 #   BASE_URL, STRIPE_PRICE_MINIMUM, STRIPE_PRICE_EXTRA,
-#   STRIPE_PRICE_EXTRA_EXTRA, AWS_SES_REGION, SES_IDENTITY_ARN
+#   STRIPE_PRICE_EXTRA_EXTRA, AWS_SES_REGION, SES_IDENTITY_ARN,
+#   STRIPE_WEBHOOK_IP_RANGES
 
 set -euo pipefail
 
@@ -42,6 +43,7 @@ Required .env keys:
   STRIPE_PRICE_EXTRA_EXTRA Stripe price ID for extra-extra tier
   AWS_SES_REGION           AWS region for SES (e.g., us-east-1)
   SES_IDENTITY_ARN         SES identity ARN for IAM policy
+  STRIPE_WEBHOOK_IP_RANGES Comma-separated list of Stripe webhook IP CIDR ranges
 EOF
 }
 
@@ -176,6 +178,7 @@ STRIPE_PRICE_EXTRA=$(read_value "STRIPE_PRICE_EXTRA" "Stripe price ID — extra 
 STRIPE_PRICE_EXTRA_EXTRA=$(read_value "STRIPE_PRICE_EXTRA_EXTRA" "Stripe price ID — extra-extra tier (price_...)")
 SES_REGION=$(read_value "AWS_SES_REGION" "AWS SES region (e.g., us-east-1)")
 SES_IDENTITY_ARN=$(read_value "SES_IDENTITY_ARN" "SES identity ARN (arn:aws:ses:...)")
+STRIPE_WEBHOOK_IP_RANGES=$(read_value "STRIPE_WEBHOOK_IP_RANGES" "Stripe webhook IP CIDR ranges (comma-separated)")
 
 echo ""
 echo "--- Pushing parameters to SSM ---"
@@ -202,6 +205,7 @@ push "/fakefour/stripe/price-extra"        "$STRIPE_PRICE_EXTRA"     "String"
 push "/fakefour/stripe/price-extra-extra"  "$STRIPE_PRICE_EXTRA_EXTRA" "String"
 push "/fakefour/aws-ses-region"            "$SES_REGION"             "String"
 push "/fakefour/ses-identity-arn"          "$SES_IDENTITY_ARN"       "String"
+push "/fakefour/stripe/webhook-ip-ranges"  "$STRIPE_WEBHOOK_IP_RANGES" "String"
 
 echo ""
 echo "=== Done: $SUCCESS succeeded, $FAIL failed ==="
