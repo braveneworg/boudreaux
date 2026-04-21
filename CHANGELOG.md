@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.47.0] - 2026-04-21
+
+### Added
+
+- Update LCP (#397)\n- Update LCP (#397)\n- Update LCP (#397)\n- Update LCP (#397)\n
+
 ## [4.46.0] - 2026-04-21
 
 ### Added
