@@ -171,7 +171,7 @@ echo ""
 STRIPE_SECRET_KEY=$(read_value "STRIPE_SECRET_KEY" "Stripe live secret key (sk_live_...)" secret)
 STRIPE_WEBHOOK_SECRET=$(read_value "STRIPE_WEBHOOK_SECRET" "Stripe webhook secret (whsec_... or 'placeholder')" secret)
 DATABASE_URL=$(read_value "DATABASE_URL" "MongoDB connection string" secret)
-EMAIL_FROM=$(read_value "EMAIL_FROM" "SES sender email address" secret)
+EMAIL_FROM=$(read_value "EMAIL_FROM" "SES sender email address")
 BASE_URL=$(read_value "BASE_URL" "Production base URL (e.g., https://fakefourrecords.com)")
 STRIPE_PRICE_MINIMUM=$(read_value "STRIPE_PRICE_MINIMUM" "Stripe price ID — minimum tier (price_...)")
 STRIPE_PRICE_EXTRA=$(read_value "STRIPE_PRICE_EXTRA" "Stripe price ID — extra tier (price_...)")
@@ -198,7 +198,7 @@ push() {
 push "/fakefour/stripe/secret-key"        "$STRIPE_SECRET_KEY"      "SecureString"
 push "/fakefour/stripe/webhook-secret"     "$STRIPE_WEBHOOK_SECRET"  "SecureString"
 push "/fakefour/database-url"              "$DATABASE_URL"           "SecureString"
-push "/fakefour/email-from"                "$EMAIL_FROM"             "SecureString"
+push "/fakefour/email-from"                "$EMAIL_FROM"             "String"
 push "/fakefour/base-url"                  "$BASE_URL"               "String"
 push "/fakefour/stripe/price-minimum"      "$STRIPE_PRICE_MINIMUM"   "String"
 push "/fakefour/stripe/price-extra"        "$STRIPE_PRICE_EXTRA"     "String"
