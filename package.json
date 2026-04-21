@@ -32,6 +32,7 @@
     "s3:lifecycle": "pnpm exec tsx scripts/s3-apply-lifecycle.ts",
     "images:upload": "pnpm exec tsx scripts/upload-images.ts",
     "images:generate-variants": "pnpm exec tsx scripts/generate-image-variants.ts",
+    "backfill:coverart": "pnpm exec tsx scripts/backfill-coverart-urls.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
     "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx .",

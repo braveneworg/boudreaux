@@ -10,7 +10,6 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
-import { stripInlineImageDataUris } from '@/lib/utils/sanitize-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
@@ -19,15 +18,9 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Convert BigInt → Number for JSON serialization, and strip legacy inline
- * `data:` URI blobs to keep the response payload small (see sanitize-response.ts).
- */
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
 function serializeRelease<T>(data: T): T {
-  const noBigInts: T = JSON.parse(
-    JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  return stripInlineImageDataUris(noBigInts);
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
 }
 
 /**

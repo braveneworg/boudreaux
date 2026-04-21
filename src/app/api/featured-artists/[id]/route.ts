@@ -8,22 +8,15 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import { stripInlineImageDataUris } from '@/lib/utils/sanitize-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
 
-/**
- * Convert BigInt → Number for JSON serialization, and strip legacy inline
- * `data:` URI blobs to keep the response payload small (see sanitize-response.ts).
- */
+/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
 function serializeForResponse<T>(data: T): T {
-  const noBigInts: T = JSON.parse(
-    JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  return stripInlineImageDataUris(noBigInts);
+  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
 }
 
 /**
