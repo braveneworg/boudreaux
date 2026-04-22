@@ -183,7 +183,7 @@ STRIPE_WEBHOOK_IP_RANGES=$(read_value "STRIPE_WEBHOOK_IP_RANGES" "Stripe webhook
 # Strip any surrounding quotes / whitespace from each comma-separated entry.
 # Users often paste a JSON-style list like "1.2.3.4","5.6.7.8" — the Lambda
 # expects bare comma-separated values and rejects quoted entries as invalid IPs.
-STRIPE_WEBHOOK_IP_RANGES=$(echo "$STRIPE_WEBHOOK_IP_RANGES" | tr -d '"' | tr -d "'" | tr -d ' ')
+STRIPE_WEBHOOK_IP_RANGES=$(printf '%s' "$STRIPE_WEBHOOK_IP_RANGES" | tr -d '"' | tr -d "'" | tr -d ' ')
 
 echo ""
 echo "--- Pushing parameters to SSM ---"

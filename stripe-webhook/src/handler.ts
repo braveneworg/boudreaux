@@ -93,9 +93,10 @@ export const lambdaHandler = async (
     }
 
     if (allowedRanges.length === 0) {
-      console.error(
-        'Stripe webhook IP allowlist (SSM /fakefour/stripe/webhook-ip-ranges) is empty'
-      );
+      const webhookIpRangesPath =
+        process.env.SSM_PATH_STRIPE_WEBHOOK_IP_RANGES ??
+        '(unset SSM_PATH_STRIPE_WEBHOOK_IP_RANGES)';
+      console.error(`Stripe webhook IP allowlist (SSM ${webhookIpRangesPath}) is empty`);
       return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
     }
 
