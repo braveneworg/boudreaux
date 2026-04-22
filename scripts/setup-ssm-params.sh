@@ -180,6 +180,11 @@ SES_REGION=$(read_value "AWS_SES_REGION" "AWS SES region (e.g., us-east-1)")
 SES_IDENTITY_ARN=$(read_value "SES_IDENTITY_ARN" "SES identity ARN (arn:aws:ses:...)")
 STRIPE_WEBHOOK_IP_RANGES=$(read_value "STRIPE_WEBHOOK_IP_RANGES" "Stripe webhook IP CIDR ranges (comma-separated)")
 
+# Strip any surrounding quotes / whitespace from each comma-separated entry.
+# Users often paste a JSON-style list like "1.2.3.4","5.6.7.8" — the Lambda
+# expects bare comma-separated values and rejects quoted entries as invalid IPs.
+STRIPE_WEBHOOK_IP_RANGES=$(echo "$STRIPE_WEBHOOK_IP_RANGES" | tr -d '"' | tr -d "'" | tr -d ' ')
+
 echo ""
 echo "--- Pushing parameters to SSM ---"
 echo ""

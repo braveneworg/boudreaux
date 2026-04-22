@@ -13,6 +13,7 @@ interface ResolvedSecrets {
   stripeSecretKey: string;
   stripeWebhookSecret: string;
   databaseUrl: string;
+  webhookIpRanges: string;
 }
 
 /**
@@ -24,6 +25,7 @@ const SSM_PATH_ENV_VARS = {
   stripeSecretKey: 'SSM_PATH_STRIPE_SECRET_KEY',
   stripeWebhookSecret: 'SSM_PATH_STRIPE_WEBHOOK_SECRET',
   databaseUrl: 'SSM_PATH_DATABASE_URL',
+  webhookIpRanges: 'SSM_PATH_STRIPE_WEBHOOK_IP_RANGES',
 } as const;
 
 async function fetchSsmParameter(path: string): Promise<string> {
@@ -58,6 +60,7 @@ export async function initSecrets(): Promise<ResolvedSecrets> {
     stripeSecretKey: '',
     stripeWebhookSecret: '',
     databaseUrl: '',
+    webhookIpRanges: '',
   };
 
   for (const [key, envVar] of Object.entries(SSM_PATH_ENV_VARS)) {
@@ -68,16 +71,17 @@ export async function initSecrets(): Promise<ResolvedSecrets> {
     paths[key as keyof ResolvedSecrets] = path;
   }
 
-  const [stripeSecretKey, stripeWebhookSecret, databaseUrl] = await Promise.all([
+  const [stripeSecretKey, stripeWebhookSecret, databaseUrl, webhookIpRanges] = await Promise.all([
     fetchSsmParameter(paths.stripeSecretKey),
     fetchSsmParameter(paths.stripeWebhookSecret),
     fetchSsmParameter(paths.databaseUrl),
+    fetchSsmParameter(paths.webhookIpRanges),
   ]);
 
   // Set DATABASE_URL in process.env so PrismaClient picks it up automatically.
   process.env.DATABASE_URL = databaseUrl;
 
-  cachedSecrets = { stripeSecretKey, stripeWebhookSecret, databaseUrl };
+  cachedSecrets = { stripeSecretKey, stripeWebhookSecret, databaseUrl, webhookIpRanges };
   return cachedSecrets;
 }
 
