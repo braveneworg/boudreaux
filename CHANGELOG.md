@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.49.0] - 2026-04-22
+
+### Added
+
+- Update setup-ssm-params.sh (#400)\n- Update setup-ssm-params.sh (#400)\n- Develop/update s3 secret setting env (#399)\n- Develop/update s3 secret setting env (#399)\n- Develop/update s3 secret setting env (#399)\n- Update setup-ssm-params.sh (#400)\n
+
 ## [4.48.0] - 2026-04-21
 
 ### Added
