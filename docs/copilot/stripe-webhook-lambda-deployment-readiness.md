@@ -135,6 +135,53 @@ aws iam attach-role-policy --role-name GitHubActionsDeployRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
 aws iam attach-role-policy --role-name GitHubActionsDeployRole \
   --policy-arn arn:aws:iam::aws:policy/IAMFullAccess
+
+# Set these first so the scoped policy resources are account/region specific.
+AWS_ACCOUNT_ID='<your-aws-account-id>'
+AWS_REGION='<your-aws-region>'
+
+# CloudWatch alarm management (scoped to RefreshIpAllowlist alarms created by this stack)
+aws iam put-role-policy \
+  --role-name GitHubActionsDeployRole \
+  --policy-name CloudWatchAlarms \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [{
+      \"Effect\": \"Allow\",
+      \"Action\": [
+        \"cloudwatch:PutMetricAlarm\",
+        \"cloudwatch:DeleteAlarms\",
+        \"cloudwatch:DescribeAlarms\",
+        \"cloudwatch:TagResource\",
+        \"cloudwatch:UntagResource\",
+        \"cloudwatch:ListTagsForResource\"
+      ],
+      \"Resource\": \"arn:aws:cloudwatch:${AWS_REGION}:${AWS_ACCOUNT_ID}:alarm:RefreshIpAllowlist*\"
+    }]
+  }"
+
+# EventBridge rule management (scoped to RefreshIpAllowlist schedule rules created by this stack)
+aws iam put-role-policy \
+  --role-name GitHubActionsDeployRole \
+  --policy-name EventBridgeRules \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [{
+      \"Effect\": \"Allow\",
+      \"Action\": [
+        \"events:PutRule\",
+        \"events:DeleteRule\",
+        \"events:DescribeRule\",
+        \"events:PutTargets\",
+        \"events:RemoveTargets\",
+        \"events:ListTargetsByRule\",
+        \"events:TagResource\",
+        \"events:UntagResource\",
+        \"events:ListTagsForResource\"
+      ],
+      \"Resource\": \"arn:aws:events:${AWS_REGION}:${AWS_ACCOUNT_ID}:rule/RefreshIpAllowlist*\"
+    }]
+  }"
 ```
 
 Get the role ARN:

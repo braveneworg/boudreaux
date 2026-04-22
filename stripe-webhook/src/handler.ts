@@ -15,8 +15,8 @@ import { getStripe } from './lib/stripe.js';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
 
-const getStripeWebhookIpRanges = (): string[] => {
-  return (process.env.STRIPE_WEBHOOK_IP_RANGES ?? '')
+const parseStripeWebhookIpRanges = (raw: string): string[] => {
+  return raw
     .split(',')
     .map((range) => range.trim())
     .filter(Boolean);
@@ -67,9 +67,25 @@ const isIpAllowed = (sourceIp: string, allowedRanges: string[]): boolean => {
 export const lambdaHandler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
+  // Cheap early rejection — no secrets fetch needed.
+  const signature = event.headers['stripe-signature'];
+  if (!signature) {
+    return { statusCode: 400, body: 'Missing stripe-signature header' };
+  }
+
+  let stripeWebhookSecret: string;
+  let webhookIpRanges: string;
+  try {
+    await initSecrets();
+    ({ stripeWebhookSecret, webhookIpRanges } = getSecrets());
+  } catch (err) {
+    console.error('Failed to initialize Stripe webhook secrets:', err);
+    return { statusCode: 500, body: 'Internal server error' };
+  }
+
   if (!shouldSkipStripeIpCheck()) {
     const sourceIp = getSourceIp(event);
-    const allowedRanges = getStripeWebhookIpRanges();
+    const allowedRanges = parseStripeWebhookIpRanges(webhookIpRanges);
 
     if (!sourceIp) {
       console.warn('Rejecting Stripe webhook request with missing source IP');
@@ -77,9 +93,10 @@ export const lambdaHandler = async (
     }
 
     if (allowedRanges.length === 0) {
-      console.error(
-        'STRIPE_WEBHOOK_IP_RANGES must be configured when SKIP_STRIPE_IP_CHECK is not true'
-      );
+      const webhookIpRangesPath =
+        process.env.SSM_PATH_STRIPE_WEBHOOK_IP_RANGES ??
+        '(unset SSM_PATH_STRIPE_WEBHOOK_IP_RANGES)';
+      console.error(`Stripe webhook IP allowlist (SSM ${webhookIpRangesPath}) is empty`);
       return { statusCode: 500, body: 'Stripe webhook IP allowlist is not configured' };
     }
 
@@ -87,20 +104,6 @@ export const lambdaHandler = async (
       console.warn(`Rejecting Stripe webhook request from non-allowlisted IP: ${sourceIp}`);
       return { statusCode: 403, body: 'Forbidden' };
     }
-  }
-
-  const signature = event.headers['stripe-signature'];
-  if (!signature) {
-    return { statusCode: 400, body: 'Missing stripe-signature header' };
-  }
-
-  let stripeWebhookSecret: string;
-  try {
-    await initSecrets();
-    ({ stripeWebhookSecret } = getSecrets());
-  } catch (err) {
-    console.error('Failed to initialize Stripe webhook secrets:', err);
-    return { statusCode: 500, body: 'Internal server error' };
   }
 
   const rawBody = event.isBase64Encoded

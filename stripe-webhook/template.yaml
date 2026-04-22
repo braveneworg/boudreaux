@@ -39,6 +39,7 @@ Resources:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/secret-key'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/webhook-secret'
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/database-url'
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/fakefour/stripe/webhook-ip-ranges'
             - Effect: Allow
               Action:
                 - kms:Decrypt
@@ -48,13 +49,13 @@ Resources:
           SSM_PATH_STRIPE_SECRET_KEY: '/fakefour/stripe/secret-key'
           SSM_PATH_STRIPE_WEBHOOK_SECRET: '/fakefour/stripe/webhook-secret'
           SSM_PATH_DATABASE_URL: '/fakefour/database-url'
+          SSM_PATH_STRIPE_WEBHOOK_IP_RANGES: '/fakefour/stripe/webhook-ip-ranges'
           EMAIL_FROM: '{{resolve:ssm:/fakefour/email-from}}'
           BASE_URL: '{{resolve:ssm:/fakefour/base-url}}'
           STRIPE_PRICE_MINIMUM: '{{resolve:ssm:/fakefour/stripe/price-minimum}}'
           STRIPE_PRICE_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra}}'
           STRIPE_PRICE_EXTRA_EXTRA: '{{resolve:ssm:/fakefour/stripe/price-extra-extra}}'
           AWS_SES_REGION: '{{resolve:ssm:/fakefour/aws-ses-region}}'
-          STRIPE_WEBHOOK_IP_RANGES: '{{resolve:ssm:/fakefour/stripe/webhook-ip-ranges}}'
       Layers:
         - !Ref PrismaEngineLayer
       Events:
