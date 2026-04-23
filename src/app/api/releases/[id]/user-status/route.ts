@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { PurchaseService } from '@/lib/services/purchase-service';
 
 import { auth } from '../../../../../../auth';
 
@@ -29,11 +30,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [purchase, downloadRecord, digitalFormats] = await Promise.all([
+    const [purchase, digitalFormats] = await Promise.all([
       PurchaseRepository.findByUserAndRelease(userId, releaseId),
-      PurchaseRepository.getDownloadRecord(userId, releaseId),
       new ReleaseDigitalFormatRepository().findAllByRelease(releaseId),
     ]);
+    const downloadAccess = await PurchaseService.getDownloadAccessForPurchase(
+      purchase,
+      userId,
+      releaseId
+    );
 
     const availableFormats = digitalFormats.map((f) => ({
       formatType: f.formatType as DigitalFormatType,
@@ -43,7 +48,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({
       hasPurchase: purchase !== null,
       purchasedAt: purchase?.purchasedAt ?? null,
-      downloadCount: downloadRecord?.downloadCount ?? 0,
+      downloadCount: downloadAccess.downloadCount,
+      resetInHours: downloadAccess.resetInHours,
       availableFormats,
     });
   } catch (error) {

@@ -39,6 +39,7 @@ export const DeferredDownloadDialog = ({
     [userStatus?.purchasedAt]
   );
   const downloadCount = userStatus?.downloadCount ?? 0;
+  const resetInHours = userStatus?.resetInHours ?? null;
   const availableFormats = userStatus?.availableFormats ?? [];
 
   if (!shouldRenderDialog) {
@@ -62,6 +63,7 @@ export const DeferredDownloadDialog = ({
       hasPurchase={hasPurchase}
       purchasedAt={purchasedAt}
       downloadCount={downloadCount}
+      resetInHours={resetInHours}
       availableFormats={availableFormats}
     >
       <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />

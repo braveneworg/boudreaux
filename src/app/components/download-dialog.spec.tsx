@@ -1025,7 +1025,7 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     const user = userEvent.setup();
 
     render(
-      <DownloadDialog {...defaultProps} hasPurchase downloadCount={5}>
+      <DownloadDialog {...defaultProps} hasPurchase downloadCount={5} resetInHours={3}>
         <button>Open Download</button>
       </DownloadDialog>
     );
@@ -1037,8 +1037,9 @@ describe('DownloadDialog — hasPurchase button variants', () => {
     });
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
-    expect(screen.getByText(/download limit for/)).toBeInTheDocument();
-    expect(screen.getByText('support@fakefourinc.com')).toBeInTheDocument();
+    expect(screen.getByText(/you've reached your download limit for/i)).toBeInTheDocument();
+    expect(screen.getByText(/resets in 3 hours/i)).toBeInTheDocument();
+    expect(screen.queryByText(/support@fakefourinc\.com/i)).not.toBeInTheDocument();
   });
 
   it('should show disabled "Download limit reached" button when hasPurchase=true and signed in and over limit', async () => {
@@ -1319,6 +1320,7 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
       atCap: false,
+      resetInHours: null,
     });
 
     const user = userEvent.setup();
@@ -1343,6 +1345,7 @@ describe('DownloadDialog — email step purchase-mode callbacks', () => {
   it('should navigate to purchase-checkout step when purchaseMode=true and guest has no existing purchase', async () => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: false,
+      resetInHours: null,
     });
 
     const user = userEvent.setup();
@@ -1595,11 +1598,13 @@ describe('DownloadDialog — returning-download step', () => {
 
   const navigateToReturningDownload = async (
     user: ReturnType<typeof userEvent.setup>,
-    atCap: boolean
+    atCap: boolean,
+    resetInHours: number | null = null
   ) => {
     mockCheckGuestPurchaseAction.mockResolvedValue({
       hasPurchase: true,
       atCap,
+      resetInHours,
     });
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
@@ -1663,11 +1668,27 @@ describe('DownloadDialog — returning-download step', () => {
       </DownloadDialog>
     );
 
-    await navigateToReturningDownload(user, true);
+    await navigateToReturningDownload(user, true, 2);
 
     expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
-    expect(screen.getByText(/download limit for/)).toBeInTheDocument();
-    expect(screen.getByText('support@fakefourinc.com')).toBeInTheDocument();
+    expect(screen.getByText(/you've reached your download limit for/i)).toBeInTheDocument();
+    expect(screen.getByText(/resets in 2 hours/i)).toBeInTheDocument();
+    expect(screen.queryByText(/support@fakefourinc\.com/i)).not.toBeInTheDocument();
+  });
+
+  it('should omit reset-hours text for guest cap when resetInHours is null', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await navigateToReturningDownload(user, true, null);
+
+    expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    expect(screen.queryByText(/resets in/i)).not.toBeInTheDocument();
   });
 });
 

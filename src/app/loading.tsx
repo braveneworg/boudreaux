@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
-import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
+import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 
 export default function HomeLoading() {
   return (
@@ -16,7 +16,9 @@ export default function HomeLoading() {
       <div className="relative w-full bg-muted" style={{ paddingBottom: '61.8%' }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img
-          src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 1200)}
+          src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 750)}
+          srcSet={buildBannerPreloadSrcSet(BANNER_SLOTS[0].filename)}
+          sizes="100vw"
           alt=""
           fetchPriority="high"
           decoding="async"
@@ -36,9 +38,9 @@ export default function HomeLoading() {
         {/* Search input skeleton */}
         <div className="h-9 w-full rounded-md bg-muted animate-pulse mb-0" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}
-        <div className="h-[52px] w-48 bg-muted animate-pulse rounded mb-0" />
+        <div className="h-13 w-48 bg-muted animate-pulse rounded mb-0" />
         {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper */}
-        <div className="min-h-[76px] w-full bg-muted animate-pulse rounded mb-2" />
+        <div className="min-h-19 w-full bg-muted animate-pulse rounded mb-2" />
         {/* FormatFileListDrawer + Download button skeleton */}
         <div className="flex flex-col items-center min-h-10 mb-2">
           <div className="h-10 w-48 bg-muted animate-pulse rounded" />
@@ -48,7 +50,7 @@ export default function HomeLoading() {
         {/* Audio controls skeleton — matches bg-zinc-900 min-h-14 */}
         <div className="min-h-14 w-full max-w-xl mx-auto bg-zinc-900/20 animate-pulse" />
         {/* InfoTickerTape skeleton — matches bg-zinc-800 rounded-b-lg min-h-[40px] */}
-        <div className="min-h-[40px] w-full max-w-xl mx-auto bg-zinc-800/20 animate-pulse rounded-b-lg mb-2" />
+        <div className="min-h-10 w-full max-w-xl mx-auto bg-zinc-800/20 animate-pulse rounded-b-lg mb-2" />
         {/* Share widget skeleton */}
         <div className="flex justify-center gap-1 mb-2">
           <div className="h-8 w-48 bg-muted animate-pulse rounded" />

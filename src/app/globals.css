@@ -125,29 +125,19 @@
     overflow-wrap: break-word; /* Standard and preferred */
     word-wrap: break-word; /* Legacy name for browser compatibility */
     text-wrap: wrap; /* Future-proofing for CSS Text Module Level 4 */
-    @apply relative -top-2;
   }
   h1,
   h2 {
     @apply tracking-[0.2rem] font-semibold;
   }
   h1 {
-    @apply text-5xl text-zinc-900;
+    @apply text-2xl text-zinc-900;
   }
   h2 {
-    @apply text-4xl mb-0 pb-0 mt-0 text-zinc-700;
+    @apply text-xl mb-0 pb-0 mt-0 text-zinc-700;
   }
   h3 {
-    @apply text-2xl leading-snug mb-3 mt-4;
-  }
-  h4 {
-    @apply text-xl leading-normal mb-2 mt-3;
-  }
-  h5 {
-    @apply text-lg tracking-normal leading-normal mb-2 mt-3;
-  }
-  h6 {
-    @apply text-base tracking-normal leading-normal mb-2 mt-2;
+    @apply leading-snug mb-3 mt-4;
   }
   a {
     font-family:

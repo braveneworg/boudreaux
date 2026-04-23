@@ -12,7 +12,6 @@ import { useForm, FormProvider } from 'react-hook-form';
 
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Card } from '@/app/components/ui/card';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { signinAction } from '@/lib/actions/signin-action';
@@ -112,10 +111,10 @@ const SignupPage = () => {
         items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
       />
       <ContentContainer>
-        <Card>
-          {isSignupPath ? <h1>Sign Up</h1> : <h1>Sign In</h1>}
+        {isSignupPath ? <h1>Sign Up</h1> : <h1>Sign In</h1>}
+        <div className="mt-3 flex flex-col">
           <FormProvider {...form}>
-            <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
+            <form noValidate onSubmit={form.handleSubmit(handleSubmit)} autoComplete="on">
               <SignupSigninForm
                 control={form.control}
                 isPending={isSubmitting}
@@ -127,7 +126,7 @@ const SignupPage = () => {
               />
             </form>
           </FormProvider>
-        </Card>
+        </div>
       </ContentContainer>
     </PageContainer>
   );

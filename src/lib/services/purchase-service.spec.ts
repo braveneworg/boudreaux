@@ -66,6 +66,7 @@ describe('PurchaseService', () => {
         reason: 'no_purchase',
         downloadCount: 0,
         lastDownloadedAt: null,
+        resetInHours: null,
       });
       expect(mockGetDownloadRecord).not.toHaveBeenCalled();
     });
@@ -86,6 +87,7 @@ describe('PurchaseService', () => {
         reason: 'download_limit_reached',
         downloadCount: 5,
         lastDownloadedAt: twoHoursAgo,
+        resetInHours: 4,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
     });
@@ -107,6 +109,7 @@ describe('PurchaseService', () => {
         reason: null,
         downloadCount: 0,
         lastDownloadedAt: sevenHoursAgo,
+        resetInHours: null,
       });
       expect(mockResetDownloadCount).toHaveBeenCalledWith('user-123', 'release-abc');
     });
@@ -126,6 +129,7 @@ describe('PurchaseService', () => {
         reason: null,
         downloadCount: 3,
         lastDownloadedAt: anHourAgo,
+        resetInHours: null,
       });
     });
 
@@ -140,6 +144,7 @@ describe('PurchaseService', () => {
         reason: null,
         downloadCount: 0,
         lastDownloadedAt: null,
+        resetInHours: null,
       });
     });
 
@@ -157,6 +162,7 @@ describe('PurchaseService', () => {
         reason: 'download_limit_reached',
         downloadCount: 5,
         lastDownloadedAt: null,
+        resetInHours: null,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
     });
@@ -177,6 +183,7 @@ describe('PurchaseService', () => {
         reason: 'download_limit_reached',
         downloadCount: 5,
         lastDownloadedAt: exactlySixHoursAgo,
+        resetInHours: null,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
     });

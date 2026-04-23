@@ -15,6 +15,7 @@ interface GuestPurchaseStatus {
   hasPurchase: boolean;
   downloadCount: number;
   atCap: boolean;
+  resetInHours: number | null;
 }
 
 // Rate limiter: 10 requests per minute per IP to prevent purchase/account enumeration
@@ -44,17 +45,17 @@ export async function checkGuestPurchaseAction(
   try {
     await limiter.check(10, ip);
   } catch {
-    return { hasPurchase: false, downloadCount: 0, atCap: false };
+    return { hasPurchase: false, downloadCount: 0, atCap: false, resetInHours: null };
   }
 
   const user = await PurchaseRepository.findUserByEmail(email);
   if (!user) {
-    return { hasPurchase: false, downloadCount: 0, atCap: false };
+    return { hasPurchase: false, downloadCount: 0, atCap: false, resetInHours: null };
   }
 
   const hasPurchase = await PurchaseService.checkExistingPurchase(user.id, releaseId);
   if (!hasPurchase) {
-    return { hasPurchase: false, downloadCount: 0, atCap: false };
+    return { hasPurchase: false, downloadCount: 0, atCap: false, resetInHours: null };
   }
 
   const access = await PurchaseService.getDownloadAccess(user.id, releaseId);
@@ -62,5 +63,6 @@ export async function checkGuestPurchaseAction(
     hasPurchase: true,
     downloadCount: access.downloadCount,
     atCap: access.downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT,
+    resetInHours: access.resetInHours,
   };
 }

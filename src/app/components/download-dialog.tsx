@@ -74,6 +74,8 @@ interface DownloadDialogProps {
   hasPurchase?: boolean;
   purchasedAt?: Date | null;
   downloadCount?: number;
+  /** Hours until the per-release download limit resets. null when no reset is pending. */
+  resetInHours?: number | null;
   availableFormats?: AvailableFormat[];
   openOnMount?: boolean;
   children: ReactElement;
@@ -88,6 +90,7 @@ export const DownloadDialog = ({
   hasPurchase = false,
   purchasedAt = null,
   downloadCount = 0,
+  resetInHours = null,
   availableFormats = [],
   openOnMount = false,
   children,
@@ -100,6 +103,7 @@ export const DownloadDialog = ({
   const [purchaseMode, setPurchaseMode] = useState(false);
   const [amountCents, setAmountCents] = useState<number>(0);
   const [guestAtCap, setGuestAtCap] = useState(false);
+  const [guestResetInHours, setGuestResetInHours] = useState<number | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
 
@@ -169,6 +173,7 @@ export const DownloadDialog = ({
         setPurchaseMode(false);
         setAmountCents(0);
         setGuestAtCap(false);
+        setGuestResetInHours(null);
         setPurchaseError(null);
       }
     },
@@ -230,12 +235,10 @@ export const DownloadDialog = ({
                   Download limit reached
                 </Button>
                 <p className="text-muted-foreground text-sm">
-                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
-                  Contact{' '}
-                  <a href="mailto:support@fakefourinc.com" className="underline">
-                    support@fakefourinc.com
-                  </a>{' '}
-                  for assistance.
+                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
+                  {resetInHours !== null
+                    ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
+                    : ''}
                 </p>
               </>
             ) : (
@@ -287,12 +290,10 @@ export const DownloadDialog = ({
                       Download limit reached
                     </Button>
                     <p className="text-muted-foreground text-sm">
-                      You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
-                      Contact{' '}
-                      <a href="mailto:support@fakefourinc.com" className="underline">
-                        support@fakefourinc.com
-                      </a>{' '}
-                      for assistance.
+                      You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
+                      {resetInHours !== null
+                        ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
+                        : ''}
                     </p>
                   </>
                 ) : (
@@ -476,12 +477,10 @@ export const DownloadDialog = ({
                   Download limit reached
                 </Button>
                 <p className="text-muted-foreground text-sm">
-                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
-                  Contact{' '}
-                  <a href="mailto:support@fakefourinc.com" className="underline">
-                    support@fakefourinc.com
-                  </a>{' '}
-                  for assistance.
+                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
+                  {resetInHours !== null
+                    ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
+                    : ''}
                 </p>
               </>
             ) : (
@@ -529,6 +528,7 @@ export const DownloadDialog = ({
                 const status = await checkGuestPurchaseAction(email, releaseId);
                 if (status.hasPurchase) {
                   setGuestAtCap(status.atCap);
+                  setGuestResetInHours(status.resetInHours);
                   setStep('returning-download');
                 } else {
                   setStep('purchase-checkout');
@@ -588,12 +588,10 @@ export const DownloadDialog = ({
                   Download limit reached
                 </Button>
                 <p className="text-muted-foreground text-sm">
-                  You&apos;ve reached the download limit for <strong>{releaseTitle}</strong>.
-                  Contact{' '}
-                  <a href="mailto:support@fakefourinc.com" className="underline">
-                    support@fakefourinc.com
-                  </a>{' '}
-                  for assistance.
+                  You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
+                  {guestResetInHours !== null
+                    ? ` Resets in ${guestResetInHours} hour${guestResetInHours === 1 ? '' : 's'}.`
+                    : ''}
                 </p>
               </>
             ) : (

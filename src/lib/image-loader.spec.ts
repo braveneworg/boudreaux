@@ -9,7 +9,7 @@ describe('imageLoader', () => {
   });
 
   describe('absolute URLs', () => {
-    it('passes through full CDN URLs unchanged', async () => {
+    it('adds width suffix to full CDN URLs', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -21,7 +21,39 @@ describe('imageLoader', () => {
         width: 640,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/cover.jpg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.jpg');
+    });
+
+    it('adds width suffix to full CDN URLs while preserving query strings', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: 'https://cdn.fakefourrecords.com/media/releases/coverart/cover.jpg?token=abc',
+        width: 828,
+      });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w828.jpg?token=abc'
+      );
+    });
+
+    it('does not append width suffix to absolute CDN SVG URLs', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: 'https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg',
+        width: 64,
+      });
+
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/icons/external-link-icon.svg');
     });
 
     it('passes through non-CDN https URLs unchanged', async () => {

@@ -91,6 +91,9 @@ describe('BannerCarousel', () => {
   });
 
   afterEach(() => {
+    document.head.querySelectorAll('link[rel="preload"][as="image"]').forEach((node) => {
+      node.remove();
+    });
     vi.useRealTimers();
   });
 
@@ -133,27 +136,29 @@ describe('BannerCarousel', () => {
       expect(stripContainer.style.opacity).toBe('0');
     });
 
-    it('uses the raw imageFilename without a variant suffix when variantWidth is unset', () => {
+    it('renders the banner through Next image optimization with the raw banner path encoded', () => {
       render(<BannerCarousel banners={[makeBanner(1)]} />);
 
-      expect(screen.getByAltText('Banner 1').getAttribute('src')).toBe(
-        '/media/banners/banner-1.jpg'
+      expect(screen.getByAltText('Banner 1').getAttribute('src')).toContain(
+        encodeURIComponent('/media/banners/banner-1.jpg')
       );
     });
 
-    it('renders the variant-suffixed src and a matching preload link when variantWidth is set', () => {
-      // React 19 hoists <link rel="preload"> to <head> and persists it across
-      // tests, so use a unique slot number to avoid collision with other tests.
-      render(<BannerCarousel banners={[makeBanner(99)]} variantWidth={1920} />);
+    it('lets Next image emit a preload for the priority banner image', () => {
+      document.head.querySelectorAll('link[rel="preload"][as="image"]').forEach((node) => {
+        node.remove();
+      });
 
-      expect(screen.getByAltText('Banner 99').getAttribute('src')).toBe(
-        '/media/banners/banner-99_w1920.jpg'
+      render(<BannerCarousel banners={[makeBanner(99)]} />);
+
+      expect(screen.getByAltText('Banner 99').getAttribute('src')).toContain(
+        encodeURIComponent('/media/banners/banner-99.jpg')
       );
 
-      const preload = document.head.querySelector(
-        'link[rel="preload"][as="image"][href*="banner-99_w1920"]'
+      const preload = document.head.querySelector('link[rel="preload"][as="image"]');
+      expect(preload?.getAttribute('imagesrcset')).toContain(
+        encodeURIComponent('/media/banners/banner-99.jpg')
       );
-      expect(preload?.getAttribute('href')).toBe('/media/banners/banner-99_w1920.jpg');
     });
   });
 

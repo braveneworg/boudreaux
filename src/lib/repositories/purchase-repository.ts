@@ -181,7 +181,7 @@ export class PurchaseRepository {
             },
             releaseDownloads: {
               where: { userId },
-              select: { downloadCount: true },
+              select: { downloadCount: true, lastDownloadedAt: true },
             },
           },
         },
