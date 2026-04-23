@@ -1,8 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
-import { LOGO_DATA_URI } from './logo.js';
+import { LOGO_URL } from './constants.js';
 
 import type { PurchaseConfirmationEmailData } from '../types.js';
 
@@ -33,10 +32,10 @@ export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEma
             <td style="background-color: #18181b; padding: 24px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="vertical-align: middle; padding-right: 14px;">
-                    <img src="${LOGO_DATA_URI}" alt="Fake Four Inc." width="40" height="45" style="display: block; border: 0;" />
+                  <td>
+                    <img src="${LOGO_URL}" alt="Fake Four Inc." width="96" height="98" style="display: block; border: 0;" />
                   </td>
-                  <td style="vertical-align: middle;">
+                  <td style="vertical-align: middle; padding-left: 14px;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
                     <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Purchase Confirmed</p>
                   </td>

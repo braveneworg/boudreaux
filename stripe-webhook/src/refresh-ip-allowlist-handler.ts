@@ -25,9 +25,7 @@ export const handler = async (): Promise<RefreshResult> => {
 
   const response = await fetch(STRIPE_WEBHOOK_IPS_URL);
   if (!response.ok) {
-    throw new Error(
-      `Stripe IPs fetch failed: ${response.status} ${response.statusText}`
-    );
+    throw new Error(`Stripe IPs fetch failed: ${response.status} ${response.statusText}`);
   }
 
   const payload = (await response.json()) as StripeIpsFile;
