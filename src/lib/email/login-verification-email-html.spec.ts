@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { LOGO_URL } from './constants';
 import { buildLoginVerificationEmailHtml } from './login-verification-email-html';
 
 describe('buildLoginVerificationEmailHtml', () => {
@@ -72,9 +73,9 @@ describe('buildLoginVerificationEmailHtml', () => {
   });
 
   describe('logo', () => {
-    it('should include the CID logo reference in the img src', () => {
+    it('should include the shared logo URL in the img src', () => {
       const html = buildLoginVerificationEmailHtml(baseInput);
-      expect(html).toContain('src="cid:logo@fakefourrecords.com"');
+      expect(html).toContain(`src="${LOGO_URL}"`);
     });
 
     it('should include an alt attribute for the logo image', () => {

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { LOGO_URL } from './constants';
+
 import type { SubscriptionConfirmationEmailData } from '../types.js';
 
 function escapeHtml(text: string): string {
@@ -31,8 +33,17 @@ export function buildSubscriptionConfirmationEmailHtml(
           <!-- Header -->
           <tr>
             <td style="background-color: #18181b; padding: 24px 32px;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
-              <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Subscription Confirmed</p>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <img src="${LOGO_URL}" alt="Fake Four Inc." width="96" height="98" style="display: block; border: 0;" />
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 14px;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
+                    <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Subscription Confirmed</p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
