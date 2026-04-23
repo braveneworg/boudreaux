@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.52.0] - 2026-04-23
+
+### Added
+
+- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n- Develop/fix download bundle limit messaging (#403)\n
+
 ## [4.51.0] - 2026-04-23
 
 ### Added
