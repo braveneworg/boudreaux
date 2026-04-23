@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.51.0] - 2026-04-23
+
+### Added
+
+- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n- Develop/make email template logos consistent (#402)\n
+
 ## [4.50.0] - 2026-04-22
 
 ### Added
