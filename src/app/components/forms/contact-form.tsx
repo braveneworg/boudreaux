@@ -96,7 +96,7 @@ const ContactForm = ({
                 {...field}
                 placeholder="How can we help?"
                 rows={6}
-                className="min-h-[120px] resize-y"
+                className="min-h-30 resize-y"
               />
             </FormControl>
             <FormMessage />
@@ -110,7 +110,7 @@ const ContactForm = ({
         onToken={onTurnstileToken}
       />
 
-      <div className="flex items-center gap-3 mt-4">
+      <div className="flex items-center gap-3 my-4">
         <Button disabled={isPending} size="lg">
           Send message
         </Button>

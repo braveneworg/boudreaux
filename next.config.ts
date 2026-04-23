@@ -70,6 +70,7 @@ const config = {
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   serverExternalPackages: ['node-id3'],
   experimental: {
+    optimizeCss: true,
     optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
       bodySizeLimit: '50mb',
@@ -127,6 +128,21 @@ const config = {
     }
 
     return [
+      // Next.js hashed build assets are immutable and safe to cache forever.
+      // Also emit CORS header for cross-origin font/chunk usage via assetPrefix.
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
       // Favicon — rarely changes; 1-day cache + 7-day SWR
       {
         source: '/favicon.ico',

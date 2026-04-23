@@ -5,12 +5,15 @@ import 'server-only';
 
 import { DOWNLOAD_RESET_HOURS, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { computeResetInHours } from '@/lib/utils/download-reset';
 
 export interface DownloadAccess {
   allowed: boolean;
   reason: 'no_purchase' | 'download_limit_reached' | null;
   downloadCount: number;
   lastDownloadedAt: Date | null;
+  /** Hours remaining until the download limit resets. null when no reset is pending. */
+  resetInHours: number | null;
 }
 
 /**
@@ -44,7 +47,13 @@ export class PurchaseService {
   static async getDownloadAccess(userId: string, releaseId: string): Promise<DownloadAccess> {
     const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
     if (!purchase) {
-      return { allowed: false, reason: 'no_purchase', downloadCount: 0, lastDownloadedAt: null };
+      return {
+        allowed: false,
+        reason: 'no_purchase',
+        downloadCount: 0,
+        lastDownloadedAt: null,
+        resetInHours: null,
+      };
     }
 
     const downloadRecord = await PurchaseRepository.getDownloadRecord(userId, releaseId);
@@ -55,12 +64,24 @@ export class PurchaseService {
       // If 6+ hours have passed since last download, reset the counter
       if (isResetWindowElapsed(lastDownloadedAt)) {
         await PurchaseRepository.resetDownloadCount(userId, releaseId);
-        return { allowed: true, reason: null, downloadCount: 0, lastDownloadedAt };
+        return {
+          allowed: true,
+          reason: null,
+          downloadCount: 0,
+          lastDownloadedAt,
+          resetInHours: null,
+        };
       }
-      return { allowed: false, reason: 'download_limit_reached', downloadCount, lastDownloadedAt };
+      return {
+        allowed: false,
+        reason: 'download_limit_reached',
+        downloadCount,
+        lastDownloadedAt,
+        resetInHours: computeResetInHours(lastDownloadedAt),
+      };
     }
 
-    return { allowed: true, reason: null, downloadCount, lastDownloadedAt };
+    return { allowed: true, reason: null, downloadCount, lastDownloadedAt, resetInHours: null };
   }
 
   /**

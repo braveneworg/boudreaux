@@ -14,16 +14,11 @@ import { Heading } from './ui/heading';
 
 import type { BannerSlotData } from './banner-carousel';
 
-interface HomeContentProps {
-  /** Server-chosen width variant for the banner LCP image (from UA detection). */
-  bannerVariantWidth?: number;
-}
-
 /**
  * Client content wrapper for the home page.
  * Uses TanStack Query to fetch banners and featured artists (hydrated from SSR prefetch).
  */
-export const HomeContent = ({ bannerVariantWidth }: HomeContentProps) => {
+export const HomeContent = () => {
   const { data: bannersData } = useBannersQuery();
   const { data: artistsData } = useActiveFeaturedArtistsQuery();
 
@@ -52,11 +47,7 @@ export const HomeContent = ({ bannerVariantWidth }: HomeContentProps) => {
       {/* Always render BannerCarousel — when empty it renders a placeholder
           section to reserve space, and keeping a single code path avoids a
           conditional mount that could shift layout during hydration. */}
-      <BannerCarousel
-        banners={banners}
-        rotationInterval={rotationInterval}
-        variantWidth={bannerVariantWidth}
-      />
+      <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
         <ArtistSearchInput />
         <section>

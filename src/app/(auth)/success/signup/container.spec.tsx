@@ -7,9 +7,15 @@ import { render, screen } from '@testing-library/react';
 
 import SuccessContainer from './container';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/signin',
+}));
+
 // Mock UI components
-vi.mock('@/app/components/ui/card', () => ({
-  Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
+vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
+  BreadcrumbMenu: ({ items }: { items: Array<{ anchorText: string }> }) => (
+    <nav data-testid="breadcrumb-menu">{items[0]?.anchorText}</nav>
+  ),
 }));
 
 vi.mock('@/app/components/ui/content-container', () => ({
@@ -48,9 +54,10 @@ describe('SignupSuccessContainer', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('renders Card component', () => {
+  it('renders breadcrumb menu with sign-in context', () => {
     render(<SuccessContainer email={testEmail} />);
-    expect(screen.getByTestId('card')).toBeInTheDocument();
+    expect(screen.getByTestId('breadcrumb-menu')).toBeInTheDocument();
+    expect(screen.getByText('Sign In')).toBeInTheDocument();
   });
 
   it('renders check email instruction', () => {

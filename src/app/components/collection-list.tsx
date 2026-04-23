@@ -34,6 +34,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
+import { computeResetInHours } from '@/lib/utils/download-reset';
 import { parseSSEBuffer } from '@/lib/utils/parse-sse';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 import { triggerDownload } from '@/lib/utils/trigger-download';
@@ -67,6 +68,7 @@ interface CollectionPurchase {
     }>;
     releaseDownloads: Array<{
       downloadCount: number;
+      lastDownloadedAt: string | null;
     }>;
   };
 }
@@ -113,6 +115,11 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
         const artistName = getArtistName(purchase);
         const coverArt = getReleaseCoverArt(purchase.release);
         const downloadCount = purchase.release.releaseDownloads[0]?.downloadCount ?? 0;
+        const lastDownloadedAt = purchase.release.releaseDownloads[0]?.lastDownloadedAt ?? null;
+        const resetInHours =
+          downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT
+            ? computeResetInHours(lastDownloadedAt)
+            : null;
         const availableFormats = purchase.release.digitalFormats
           .filter((f) => f.files.length > 0)
           .map((f) => ({
@@ -165,6 +172,7 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
                 releaseTitle={purchase.release.title}
                 availableFormats={availableFormats}
                 downloadCount={downloadCount}
+                resetInHours={resetInHours}
               />
 
               {isAdmin && (
@@ -220,6 +228,7 @@ interface CollectionDownloadDialogProps {
   releaseTitle: string;
   availableFormats: AvailableFormat[];
   downloadCount: number;
+  resetInHours: number | null;
 }
 
 type FormatDownloadStatus = 'pending' | 'zipping' | 'done' | 'uploading' | 'complete' | 'error';
@@ -235,6 +244,7 @@ const CollectionDownloadDialog = ({
   releaseTitle,
   availableFormats,
   downloadCount,
+  resetInHours,
 }: CollectionDownloadDialogProps) => {
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allFormatTypes = useMemo(
@@ -416,11 +426,10 @@ const CollectionDownloadDialog = ({
               Download limit reached
             </Button>
             <p className="text-muted-foreground text-sm">
-              You&apos;ve reached the {MAX_RELEASE_DOWNLOAD_COUNT}-download limit. Contact{' '}
-              <a href="mailto:support@fakefourinc.com" className="underline">
-                support@fakefourinc.com
-              </a>{' '}
-              for assistance.
+              You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
+              {resetInHours !== null
+                ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
+                : ''}
             </p>
           </>
         ) : noFormats ? (

@@ -58,9 +58,9 @@ const SignupSigninForm = ({
             control={control}
             name="email"
             render={({ field }) => (
-              <FormItem className={cn(isSigningIn ? 'mb-2' : 'mb-0', 'mt-0')}>
+              <FormItem className={cn(isSigningIn ? 'mb-2' : 'mb-0')}>
                 <FormLabel className="sr-only" htmlFor="email">
-                  Email
+                  Email address
                 </FormLabel>
                 <FormControl>
                   {isVerified && (

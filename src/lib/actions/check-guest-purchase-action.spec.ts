@@ -43,6 +43,7 @@ describe('checkGuestPurchaseAction', () => {
       hasPurchase: false,
       downloadCount: 0,
       atCap: false,
+      resetInHours: null,
     });
     expect(mockFindUserByEmail).toHaveBeenCalledWith('unknown@example.com');
     expect(mockCheckExistingPurchase).not.toHaveBeenCalled();
@@ -67,6 +68,7 @@ describe('checkGuestPurchaseAction', () => {
       hasPurchase: false,
       downloadCount: 0,
       atCap: false,
+      resetInHours: null,
     });
     expect(mockCheckExistingPurchase).toHaveBeenCalledWith('user-123', 'release-1');
     expect(mockGetDownloadAccess).not.toHaveBeenCalled();
@@ -132,7 +134,12 @@ describe('checkGuestPurchaseAction', () => {
     const callsBefore = mockFindUserByEmail.mock.calls.length;
     const result = await checkGuestPurchaseAction('attacker@example.com', 'release-1');
 
-    expect(result).toEqual({ hasPurchase: false, downloadCount: 0, atCap: false });
+    expect(result).toEqual({
+      hasPurchase: false,
+      downloadCount: 0,
+      atCap: false,
+      resetInHours: null,
+    });
     // DB should not be queried after rate limit is hit
     expect(mockFindUserByEmail.mock.calls.length).toBe(callsBefore);
   });
@@ -145,7 +152,12 @@ describe('checkGuestPurchaseAction', () => {
 
     const result = await checkGuestPurchaseAction('test@example.com', 'release-1');
 
-    expect(result).toEqual({ hasPurchase: false, downloadCount: 0, atCap: false });
+    expect(result).toEqual({
+      hasPurchase: false,
+      downloadCount: 0,
+      atCap: false,
+      resetInHours: null,
+    });
   });
 
   it('should fall back to "anonymous" when neither IP header is set', async () => {
@@ -156,6 +168,11 @@ describe('checkGuestPurchaseAction', () => {
 
     const result = await checkGuestPurchaseAction('anon@example.com', 'release-1');
 
-    expect(result).toEqual({ hasPurchase: false, downloadCount: 0, atCap: false });
+    expect(result).toEqual({
+      hasPurchase: false,
+      downloadCount: 0,
+      atCap: false,
+      resetInHours: null,
+    });
   });
 });

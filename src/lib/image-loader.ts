@@ -25,6 +25,23 @@ interface ImageLoaderParams {
 
 const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 
+function appendWidthSuffix(pathname: string, width: number): string {
+  const lastDot = pathname.lastIndexOf('.');
+
+  if (lastDot === -1) {
+    return pathname;
+  }
+
+  const base = pathname.substring(0, lastDot);
+  const ext = pathname.substring(lastDot);
+
+  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(ext.toLowerCase())) {
+    return pathname;
+  }
+
+  return `${base}_w${width}${ext}`;
+}
+
 /**
  * @param src - Absolute URL, relative `/media/*` path, or blob URL.
  * @param width - The requested image width from the `<Image>` component's srcset.
@@ -35,31 +52,24 @@ const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
  * (e.g. `/media/banners/hero.webp` at 1080px → `…/hero_w1080.webp`).
  */
 export default function imageLoader({ src, width }: ImageLoaderParams): string {
-  // Absolute URLs (CDN, blob, data URIs, other origins): pass through unchanged.
-  if (
-    src.startsWith('http://') ||
-    src.startsWith('https://') ||
-    src.startsWith('blob:') ||
-    src.startsWith('data:')
-  ) {
+  if (src.startsWith('blob:') || src.startsWith('data:')) {
     return src;
+  }
+
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    const sourceUrl = new URL(src);
+    const cdnUrl = new URL(CDN_DOMAIN);
+
+    if (sourceUrl.origin !== cdnUrl.origin) {
+      return src;
+    }
+
+    sourceUrl.pathname = appendWidthSuffix(sourceUrl.pathname, width);
+    return sourceUrl.toString();
   }
 
   // Relative paths (e.g. `/media/releases/coverart/cover.jpg`): prepend CDN domain
   // and insert the width variant suffix before the file extension.
   const path = src.startsWith('/') ? src : `/${src}`;
-  const lastDot = path.lastIndexOf('.');
-
-  if (lastDot === -1) {
-    return `${CDN_DOMAIN}${path}`;
-  }
-
-  const base = path.substring(0, lastDot);
-  const ext = path.substring(lastDot);
-
-  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(ext.toLowerCase())) {
-    return `${CDN_DOMAIN}${path}`;
-  }
-
-  return `${CDN_DOMAIN}${base}_w${width}${ext}`;
+  return `${CDN_DOMAIN}${appendWidthSuffix(path, width)}`;
 }

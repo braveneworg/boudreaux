@@ -6,6 +6,8 @@ import { headers } from 'next/headers';
 import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
+import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 
 import Footer from './components/footer/footer';
 import { Header } from './components/header/header';
@@ -69,12 +71,30 @@ export default async function RootLayout({
   const userAgent = (await headers()).get('user-agent') || '';
   const { device } = userAgentFromString(userAgent);
   const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
+  const lcpBannerWidth = isMobile ? 750 : 1200;
+  const firstBannerFilename = BANNER_SLOTS[0]?.filename;
+  const firstBannerPreloadHref = firstBannerFilename
+    ? buildBannerPreloadUrl(firstBannerFilename, lcpBannerWidth)
+    : null;
+  const firstBannerPreloadSrcSet = firstBannerFilename
+    ? buildBannerPreloadSrcSet(firstBannerFilename)
+    : null;
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
+        {firstBannerPreloadHref && (
+          <link
+            rel="preload"
+            as="image"
+            href={firstBannerPreloadHref}
+            imageSrcSet={firstBannerPreloadSrcSet ?? undefined}
+            imageSizes="100vw"
+            fetchPriority="high"
+          />
+        )}
         {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>

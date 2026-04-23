@@ -172,6 +172,7 @@ export async function GET(
           success: false,
           error: 'DOWNLOAD_LIMIT',
           message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
+          resetInHours: access.resetInHours,
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );

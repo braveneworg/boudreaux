@@ -10,6 +10,7 @@ interface ReleaseUserStatusResponse {
   hasPurchase: boolean;
   purchasedAt: string | null;
   downloadCount: number;
+  resetInHours: number | null;
   availableFormats: Array<{
     formatType: DigitalFormatType;
     fileName: string;

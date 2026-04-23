@@ -61,7 +61,7 @@ function buildPurchase(overrides: Record<string, unknown> = {}) {
         { formatType: 'FLAC', files: [{ fileName: 'track.flac' }] },
         { formatType: 'WAV', files: [{ fileName: 'track.wav' }] },
       ],
-      releaseDownloads: [{ downloadCount: 2 }],
+      releaseDownloads: [{ downloadCount: 2, lastDownloadedAt: null as string | null }],
     },
     ...overrides,
   };
@@ -366,7 +366,13 @@ describe('CollectionDownloadDialog', () => {
   it('shows download limit message when at limit', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
-    purchase.release.releaseDownloads = [{ downloadCount: 5 }];
+    purchase.release.releaseDownloads = [
+      {
+        downloadCount: 5,
+        lastDownloadedAt: '2026-01-15T10:00:00.000Z',
+      },
+    ];
+    vi.setSystemTime(new Date('2026-01-15T12:00:00.000Z'));
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -375,6 +381,23 @@ describe('CollectionDownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: /download test album/i }));
 
     expect(screen.getByText(/download limit reached/i)).toBeInTheDocument();
+    expect(screen.getByText(/resets in 4 hours/i)).toBeInTheDocument();
+    expect(screen.queryByText(/support@fakefourinc\.com/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show reset hours when at limit and lastDownloadedAt is unavailable', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const purchase = buildPurchase();
+    purchase.release.releaseDownloads = [{ downloadCount: 5, lastDownloadedAt: null }];
+
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+
+    expect(screen.getByText(/you've reached your download limit/i)).toBeInTheDocument();
+    expect(screen.queryByText(/resets in/i)).not.toBeInTheDocument();
   });
 
   it('shows no formats message when no digital formats', async () => {

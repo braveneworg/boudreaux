@@ -125,7 +125,6 @@
     overflow-wrap: break-word; /* Standard and preferred */
     word-wrap: break-word; /* Legacy name for browser compatibility */
     text-wrap: wrap; /* Future-proofing for CSS Text Module Level 4 */
-    @apply relative -top-2;
   }
   h1,
   h2 {

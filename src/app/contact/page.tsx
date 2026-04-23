@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 
 import ContactForm from '@/app/components/forms/contact-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
-import { Card, CardContent } from '@/app/components/ui/card';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { contactAction } from '@/lib/actions/contact-action';
@@ -128,57 +127,53 @@ const ContactPage = () => {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
-        <Card>
-          <CardContent>
-            <h1>Contact Us</h1>
-            <div className="flex flex-col space-y-2 mb-4">
-              <p>
-                <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos
-              </p>
-              <p>
-                <strong>Label Manager:</strong> Dylan
-              </p>
-              <p>
-                <a href="mailto:dylanowenmusic@gmail.com">dylanowenmusic@gmail.com</a>
-              </p>
-              <p>
-                <strong>Distribution:</strong> Jeep Ward at Redeye Worldwide
-              </p>
-              <p>
-                <a href="mailto:jeephalo@gmail.com">jeephalo@gmail.com</a>
-              </p>
-              <p>
-                <strong>Media and Fan Support:</strong> Niki
-              </p>
-              <p>
-                <a href="mailto:nikianarchy@gmail.com">nikianarchy@gmail.com</a>
-              </p>
-              <p>
-                <strong>Customer Service:</strong> Mo Niklz
-              </p>
-              <p>
-                <a href="mailto:djmoniklz@gmail.com">djmoniklz@gmail.com</a>
-              </p>
-            </div>
-            <p className="text-muted-foreground mb-6">
-              Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
-              back to you.
-            </p>
-            <FormProvider {...form}>
-              <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
-                <ContactForm
-                  control={form.control}
-                  isPending={isSubmitting}
-                  isVerified={isVerified}
-                  setIsVerified={setIsVerified}
-                  onTurnstileToken={setTurnstileToken}
-                  state={state}
-                  setValue={form.setValue}
-                />
-              </form>
-            </FormProvider>
-          </CardContent>
-        </Card>
+        <h1>Contact Us</h1>
+        <div className="flex flex-col space-y-2 mb-4">
+          <p>
+            <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos
+          </p>
+          <p>
+            <strong>Label Manager:</strong> Dylan
+          </p>
+          <p>
+            <a href="mailto:dylanowenmusic@gmail.com">dylanowenmusic@gmail.com</a>
+          </p>
+          <p>
+            <strong>Distribution:</strong> Jeep Ward at Redeye Worldwide
+          </p>
+          <p>
+            <a href="mailto:jeephalo@gmail.com">jeephalo@gmail.com</a>
+          </p>
+          <p>
+            <strong>Media and Fan Support:</strong> Niki
+          </p>
+          <p>
+            <a href="mailto:nikianarchy@gmail.com">nikianarchy@gmail.com</a>
+          </p>
+          <p>
+            <strong>Customer Service:</strong> Mo Niklz
+          </p>
+          <p>
+            <a href="mailto:djmoniklz@gmail.com">djmoniklz@gmail.com</a>
+          </p>
+        </div>
+        <p className="text-muted-foreground mb-6">
+          Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
+          back to you.
+        </p>
+        <FormProvider {...form}>
+          <form noValidate onSubmit={form.handleSubmit(handleSubmit)}>
+            <ContactForm
+              control={form.control}
+              isPending={isSubmitting}
+              isVerified={isVerified}
+              setIsVerified={setIsVerified}
+              onTurnstileToken={setTurnstileToken}
+              state={state}
+              setValue={form.setValue}
+            />
+          </form>
+        </FormProvider>
       </ContentContainer>
     </PageContainer>
   );

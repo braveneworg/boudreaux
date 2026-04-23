@@ -165,6 +165,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       reason: null,
       downloadCount: 1,
       lastDownloadedAt: null,
+      resetInHours: null,
     });
     mockPrismaReleaseFindFirst.mockResolvedValue({
       id: '507f1f77bcf86cd799439011',
@@ -242,6 +243,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       reason: 'no_purchase',
       downloadCount: 0,
       lastDownloadedAt: null,
+      resetInHours: null,
     });
 
     const response = await GET(makeRequest(), makeParams());
@@ -257,6 +259,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       reason: 'download_limit_reached',
       downloadCount: 5,
       lastDownloadedAt: null,
+      resetInHours: 3,
     });
 
     const response = await GET(makeRequest(), makeParams());
@@ -264,6 +267,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toBe('DOWNLOAD_LIMIT');
+    expect(body.resetInHours).toBe(3);
   });
 
   it('should return 404 when release is not found', async () => {

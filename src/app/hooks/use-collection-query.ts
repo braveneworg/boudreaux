@@ -35,6 +35,7 @@ interface CollectionResponse {
       }>;
       releaseDownloads: Array<{
         downloadCount: number;
+        lastDownloadedAt: string | null;
       }>;
     };
   }>;

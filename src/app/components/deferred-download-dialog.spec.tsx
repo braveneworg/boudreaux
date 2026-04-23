@@ -29,6 +29,7 @@ vi.mock('next/dynamic', () => ({
       hasPurchase,
       purchasedAt,
       downloadCount,
+      resetInHours,
       availableFormats,
       openOnMount,
       children,
@@ -39,6 +40,7 @@ vi.mock('next/dynamic', () => ({
       hasPurchase: boolean;
       purchasedAt: Date | null;
       downloadCount: number;
+      resetInHours: number | null;
       availableFormats: Array<{ formatType: string; fileName: string }>;
       openOnMount: boolean;
       children: React.ReactNode;
@@ -51,6 +53,7 @@ vi.mock('next/dynamic', () => ({
         data-has-purchase={String(hasPurchase)}
         data-purchased-at={purchasedAt ? purchasedAt.toISOString() : ''}
         data-download-count={String(downloadCount)}
+        data-reset-in-hours={resetInHours === null ? '' : String(resetInHours)}
         data-format-count={String(availableFormats.length)}
         data-open-on-mount={String(openOnMount)}
       >
@@ -129,6 +132,7 @@ describe('DeferredDownloadDialog', () => {
     expect(dialog).toHaveAttribute('data-has-purchase', 'false');
     expect(dialog).toHaveAttribute('data-purchased-at', '');
     expect(dialog).toHaveAttribute('data-download-count', '0');
+    expect(dialog).toHaveAttribute('data-reset-in-hours', '');
     expect(dialog).toHaveAttribute('data-format-count', '0');
   });
 
@@ -139,6 +143,7 @@ describe('DeferredDownloadDialog', () => {
         hasPurchase: true,
         purchasedAt: '2025-06-15T12:00:00.000Z',
         downloadCount: 3,
+        resetInHours: 2,
         availableFormats: [
           { formatType: 'FLAC', fileName: 'album.flac.zip' },
           { formatType: 'MP3_320KBPS', fileName: 'album.mp3.zip' },
@@ -153,6 +158,7 @@ describe('DeferredDownloadDialog', () => {
     expect(dialog).toHaveAttribute('data-has-purchase', 'true');
     expect(dialog).toHaveAttribute('data-purchased-at', '2025-06-15T12:00:00.000Z');
     expect(dialog).toHaveAttribute('data-download-count', '3');
+    expect(dialog).toHaveAttribute('data-reset-in-hours', '2');
     expect(dialog).toHaveAttribute('data-format-count', '2');
   });
 
@@ -163,6 +169,7 @@ describe('DeferredDownloadDialog', () => {
         hasPurchase: false,
         purchasedAt: null,
         downloadCount: 0,
+        resetInHours: null,
         availableFormats: [],
       },
     });
