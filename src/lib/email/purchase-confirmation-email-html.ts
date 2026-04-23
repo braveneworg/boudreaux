@@ -38,7 +38,7 @@ export function buildPurchaseConfirmationEmailHtml(data: PurchaseConfirmationEma
             <td style="background-color: #18181b; padding: 24px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="vertical-align: middle; width: 46px; height: 46px; border-radius: 9999px; background-color: #ffffff; text-align: center;">
+                  <td>
                     <img src="${LOGO_URL}" alt="Fake Four Inc." width="96" height="98" style="display: block; border: 0;" />
                   </td>
                   <td style="vertical-align: middle; padding-left: 14px;">
