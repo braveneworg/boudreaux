@@ -122,8 +122,13 @@ const config = {
       "frame-ancestors 'none'",
     ];
 
-    // Only upgrade insecure requests in production
-    if (process.env.NODE_ENV === 'production') {
+    // In E2E builds, the app runs on http://localhost in CI/Playwright.
+    // Forcing upgrade-insecure-requests would rewrite localhost URLs to HTTPS
+    // and break client hydration/scripts in standalone test runs.
+    const shouldUpgradeInsecureRequests =
+      process.env.NODE_ENV === 'production' && process.env.SKIP_CDN_ASSET_PREFIX !== 'true';
+
+    if (shouldUpgradeInsecureRequests) {
       cspParts.push('upgrade-insecure-requests');
     }
 
