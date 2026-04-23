@@ -244,11 +244,15 @@ jobs:
       - name: Extract build artifact
         run: |
           tar -xzf next-build-e2e.tar.gz
-          # Standalone server needs static files alongside it
-          cp -r .next/static .next/standalone/.next/static
+          # Standalone server needs static files alongside it. The standalone
+          # output already contains .next/standalone/.next/static (with CSS from
+          # optimizeCss), so a plain `cp -r` would nest as .next/static/static.
+          # Use `-T` to treat the destination as the target path, merging
+          # contents instead of creating a subdirectory.
+          cp -rT .next/static .next/standalone/.next/static
           # Copy public directory for standalone server
           if [ -d public ]; then
-            cp -r public .next/standalone/public
+            cp -rT public .next/standalone/public
           fi
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/3)
