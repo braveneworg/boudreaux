@@ -24,7 +24,7 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 const mockGetDownloadAccess = vi.fn();
 vi.mock('@/lib/services/purchase-service', () => ({
   PurchaseService: {
-    getDownloadAccess: (...args: unknown[]) => mockGetDownloadAccess(...args),
+    getDownloadAccessForPurchase: (...args: unknown[]) => mockGetDownloadAccess(...args),
   },
 }));
 
@@ -100,7 +100,11 @@ describe('GET /api/releases/[id]/user-status', () => {
       resetInHours: 4,
       availableFormats: [{ formatType: 'MP3_320KBPS', fileName: 'album.zip' }],
     });
-    expect(mockGetDownloadAccess).toHaveBeenCalledWith('user-1', 'release-1');
+    expect(mockGetDownloadAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ purchasedAt: new Date('2024-06-01') }),
+      'user-1',
+      'release-1'
+    );
   });
 
   it('should map availableFormats fileName from fileName, files[0], and fallback format zip', async () => {

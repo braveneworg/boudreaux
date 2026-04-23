@@ -30,11 +30,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [purchase, downloadAccess, digitalFormats] = await Promise.all([
+    const [purchase, digitalFormats] = await Promise.all([
       PurchaseRepository.findByUserAndRelease(userId, releaseId),
-      PurchaseService.getDownloadAccess(userId, releaseId),
       new ReleaseDigitalFormatRepository().findAllByRelease(releaseId),
     ]);
+    const downloadAccess = await PurchaseService.getDownloadAccessForPurchase(
+      purchase,
+      userId,
+      releaseId
+    );
 
     const availableFormats = digitalFormats.map((f) => ({
       formatType: f.formatType as DigitalFormatType,

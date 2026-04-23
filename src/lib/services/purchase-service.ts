@@ -16,6 +16,8 @@ export interface DownloadAccess {
   resetInHours: number | null;
 }
 
+type PurchaseRecord = Awaited<ReturnType<typeof PurchaseRepository.findByUserAndRelease>>;
+
 /**
  * Returns true if the given timestamp is more than DOWNLOAD_RESET_HOURS ago.
  */
@@ -46,6 +48,18 @@ export class PurchaseService {
    */
   static async getDownloadAccess(userId: string, releaseId: string): Promise<DownloadAccess> {
     const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
+    return this.getDownloadAccessForPurchase(purchase, userId, releaseId);
+  }
+
+  /**
+   * Determines whether the user is permitted to download the release
+   * using an already-fetched purchase record.
+   */
+  static async getDownloadAccessForPurchase(
+    purchase: PurchaseRecord,
+    userId: string,
+    releaseId: string
+  ): Promise<DownloadAccess> {
     if (!purchase) {
       return {
         allowed: false,
