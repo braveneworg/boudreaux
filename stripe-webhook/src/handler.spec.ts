@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { lambdaHandler } from './handler.js';
-import { initSecrets } from './lib/secrets.js';
+import { getSecrets, initSecrets } from './lib/secrets.js';
 
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type Stripe from 'stripe';
@@ -37,17 +37,16 @@ vi.mock('ipaddr.js', () => ({
 
 const mockConstructEvent = vi.fn();
 
+const DEFAULT_SECRETS = {
+  stripeSecretKey: 'sk_test_fake',
+  stripeWebhookSecret: 'whsec_test',
+  databaseUrl: 'mongodb://localhost:27017/test',
+  webhookIpRanges: '',
+};
+
 vi.mock('./lib/secrets.js', () => ({
-  initSecrets: vi.fn().mockResolvedValue({
-    stripeSecretKey: 'sk_test_fake',
-    stripeWebhookSecret: 'whsec_test',
-    databaseUrl: 'mongodb://localhost:27017/test',
-  }),
-  getSecrets: vi.fn().mockReturnValue({
-    stripeSecretKey: 'sk_test_fake',
-    stripeWebhookSecret: 'whsec_test',
-    databaseUrl: 'mongodb://localhost:27017/test',
-  }),
+  initSecrets: vi.fn(),
+  getSecrets: vi.fn(),
 }));
 
 vi.mock('./lib/stripe.js', () => ({
@@ -137,13 +136,14 @@ const mockStripeEvent = (type = 'checkout.session.completed') =>
 describe('lambdaHandler', () => {
   beforeEach(() => {
     process.env.SKIP_STRIPE_IP_CHECK = 'true';
+    vi.mocked(initSecrets).mockResolvedValue(DEFAULT_SECRETS);
+    vi.mocked(getSecrets).mockReturnValue(DEFAULT_SECRETS);
     mockConstructEvent.mockReturnValue(mockStripeEvent());
     mockHandleCheckoutSessionCompleted.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     delete process.env.SKIP_STRIPE_IP_CHECK;
-    delete process.env.STRIPE_WEBHOOK_IP_RANGES;
   });
 
   // ── Signature validation ─────────────────────────────────────────────────
@@ -268,9 +268,13 @@ describe('lambdaHandler', () => {
   // ── IP filtering ─────────────────────────────────────────────────────────
 
   describe('IP filtering (SKIP_STRIPE_IP_CHECK = false)', () => {
+    const withIpRanges = (webhookIpRanges: string) => {
+      vi.mocked(getSecrets).mockReturnValue({ ...DEFAULT_SECRETS, webhookIpRanges });
+    };
+
     beforeEach(() => {
       process.env.SKIP_STRIPE_IP_CHECK = 'false';
-      process.env.STRIPE_WEBHOOK_IP_RANGES = ALLOWED_IP;
+      withIpRanges(ALLOWED_IP);
     });
 
     it('returns 403 when source IP is missing', async () => {
@@ -280,8 +284,8 @@ describe('lambdaHandler', () => {
       expect(result).toEqual({ statusCode: 403, body: 'Forbidden' });
     });
 
-    it('returns 500 when STRIPE_WEBHOOK_IP_RANGES is empty', async () => {
-      process.env.STRIPE_WEBHOOK_IP_RANGES = '';
+    it('returns 500 when webhookIpRanges is empty', async () => {
+      withIpRanges('');
       const event = makeEvent();
       const result = await lambdaHandler(event);
       expect(result).toEqual({
@@ -314,7 +318,7 @@ describe('lambdaHandler', () => {
 
     it('logs warning for invalid CIDR entries and rejects non-matching IP', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      process.env.STRIPE_WEBHOOK_IP_RANGES = '192.168.1.0/24';
+      withIpRanges('192.168.1.0/24');
       const event = makeEvent();
       const result = await lambdaHandler(event);
       // parseCIDR mock throws, so it logs a warning and falls through to reject
@@ -327,7 +331,7 @@ describe('lambdaHandler', () => {
 
     it('logs warning for invalid individual IP range entries', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      process.env.STRIPE_WEBHOOK_IP_RANGES = 'not-valid-ip';
+      withIpRanges('not-valid-ip');
       const event = makeEvent();
       const result = await lambdaHandler(event);
       expect(result).toEqual({ statusCode: 403, body: 'Forbidden' });

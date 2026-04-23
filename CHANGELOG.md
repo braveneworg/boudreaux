@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.50.0] - 2026-04-22
+
+### Added
+
+- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n- Develop/fix setup ssm params script (#401)\n
+
 ## [4.49.0] - 2026-04-22
 
 ### Added
