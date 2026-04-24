@@ -60,6 +60,10 @@ export function BannerCarousel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [incomingIndex, setIncomingIndex] = useState<number | null>(null);
+  // Peripheral slides (prev/next) compete with the LCP image on first paint.
+  // Defer mounting their <Image> until after the first paint is committed so
+  // the browser's fetch queue can prioritize the LCP banner.
+  const [peripheralSlidesReady, setPeripheralSlidesReady] = useState(false);
   const currentIndexRef = useRef(0);
   const isAnimatingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -158,6 +162,48 @@ export function BannerCarousel({
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
+
+  // Mount peripheral slide images only after the LCP paints.
+  useEffect(() => {
+    if (totalSlides <= 1) return;
+
+    let isMounted = true;
+    let idleCallbackId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const win = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    const markPeripheralSlidesReady = () => {
+      if (!isMounted) return;
+      setPeripheralSlidesReady(true);
+    };
+
+    const raf = requestAnimationFrame(() => {
+      if (!isMounted) return;
+
+      if (typeof win.requestIdleCallback === 'function') {
+        idleCallbackId = win.requestIdleCallback(markPeripheralSlidesReady, { timeout: 1500 });
+      } else {
+        timeoutId = setTimeout(markPeripheralSlidesReady, 200);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      cancelAnimationFrame(raf);
+
+      if (idleCallbackId !== null && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleCallbackId);
+      }
+
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [totalSlides]);
 
   // Derive outgoing and incoming notification strips for seamless crossfade
   const isTransitioning = incomingIndex !== null;
@@ -386,6 +432,13 @@ export function BannerCarousel({
             const isPrevSlide = idx === prevIndex;
             const isNextSlide = idx === nextIndex;
             const isVisible = isCurrentSlide || (totalSlides > 1 && (isPrevSlide || isNextSlide));
+            // Only paint the current slide's image on first render; peripheral
+            // slides mount after LCP to avoid contending for bandwidth.
+            // Also mount the incoming slide image immediately when a transition
+            // starts so early swipes/clicks don't leave a blank slide.
+            const isIncoming = idx === incomingIndex;
+            const shouldRenderImage =
+              isCurrentSlide || isIncoming || (isVisible && peripheralSlidesReady);
 
             return (
               <div
@@ -402,14 +455,15 @@ export function BannerCarousel({
                   visibility: isVisible ? 'visible' : 'hidden',
                 }}
               >
-                {isVisible && (
+                {shouldRenderImage && (
                   <Image
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"
-                    priority={idx === 0}
-                    loading={idx === 0 ? undefined : 'lazy'}
+                    priority={isCurrentSlide}
+                    fetchPriority={isCurrentSlide ? 'high' : 'low'}
+                    loading={isCurrentSlide ? undefined : 'lazy'}
                     className="object-cover"
                   />
                 )}

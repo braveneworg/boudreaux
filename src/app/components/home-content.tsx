@@ -3,16 +3,27 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import nextDynamic from 'next/dynamic';
+
 import { useActiveFeaturedArtistsQuery } from '@/app/hooks/use-active-featured-artists-query';
 import { useBannersQuery } from '@/app/hooks/use-banners-query';
 
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
-import { FeaturedArtistsPlayer } from './featured-artists-player';
 import { ContentContainer } from './ui/content-container';
 import { Heading } from './ui/heading';
 
 import type { BannerSlotData } from './banner-carousel';
+
+// video.js and the featured-artists player bundle are the bulk of the homepage
+// JS. Defer hydration until after the banner paints (below-the-fold UI).
+const FeaturedArtistsPlayer = nextDynamic(
+  () => import('./featured-artists-player').then((m) => ({ default: m.FeaturedArtistsPlayer })),
+  {
+    ssr: false,
+    loading: () => <div aria-hidden className="min-h-112" />,
+  }
+);
 
 /**
  * Client content wrapper for the home page.

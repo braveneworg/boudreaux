@@ -1,6 +1,36 @@
+import { BANNER_SLOTS } from './src/lib/constants/banner-slots';
 import { IMAGE_VARIANT_DEVICE_SIZES } from './src/lib/constants/image-variants';
 
 import type { NextConfig } from 'next';
+
+// Precompute the home page's LCP image preload so it can be emitted as an
+// HTTP Link: response header — earlier than any <link rel=preload> in <head>.
+// URL building is inlined (rather than imported from cloudfront-loader) because
+// Next.js's next.config.ts transpiler does not resolve the `@/` path alias.
+const LCP_CDN_DOMAIN =
+  process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? 'https://cdn.fakefourrecords.com';
+
+function buildLcpBannerUrl(filename: string, width: number): string {
+  const encoded = filename
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/');
+  const dot = encoded.lastIndexOf('.');
+  const base = dot === -1 ? encoded : encoded.slice(0, dot);
+  const ext = dot === -1 ? '' : encoded.slice(dot);
+  return `${LCP_CDN_DOMAIN}/media/banners/${base}_w${width}${ext}`;
+}
+
+const HOME_LCP_FILENAME = BANNER_SLOTS[0]?.filename;
+const HOME_LCP_WIDTH = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
+const HOME_LCP_LINK_HEADER =
+  HOME_LCP_FILENAME && HOME_LCP_WIDTH
+    ? `<${buildLcpBannerUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; ` +
+      `imagesrcset="${IMAGE_VARIANT_DEVICE_SIZES.map(
+        (w) => `${buildLcpBannerUrl(HOME_LCP_FILENAME, w)} ${w}w`
+      ).join(', ')}"; ` +
+      `imagesizes="100vw"; fetchpriority="high"`
+    : null;
 
 const config = {
   // Use full CDN URL for all static assets in production
@@ -132,7 +162,17 @@ const config = {
       cspParts.push('upgrade-insecure-requests');
     }
 
+    const homeHeaders = [
+      ...(HOME_LCP_LINK_HEADER ? [{ key: 'Link', value: HOME_LCP_LINK_HEADER }] : []),
+    ];
+
     return [
+      // Preload the LCP banner via HTTP Link header so the browser can start
+      // fetching it before the HTML body parses any <link rel=preload> tags.
+      {
+        source: '/',
+        headers: homeHeaders,
+      },
       // Next.js hashed build assets are immutable and safe to cache forever.
       // Also emit CORS header for cross-origin font/chunk usage via assetPrefix.
       {
