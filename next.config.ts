@@ -163,10 +163,6 @@ const config = {
     }
 
     const homeHeaders = [
-      {
-        key: 'Cache-Control',
-        value: 'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
-      },
       ...(HOME_LCP_LINK_HEADER ? [{ key: 'Link', value: HOME_LCP_LINK_HEADER }] : []),
     ];
 
