@@ -69,7 +69,11 @@ export default function imageLoader({ src, width }: ImageLoaderParams): string {
   }
 
   // Relative paths (e.g. `/media/releases/coverart/cover.jpg`): prepend CDN domain
-  // and insert the width variant suffix before the file extension.
-  const path = src.startsWith('/') ? src : `/${src}`;
-  return `${CDN_DOMAIN}${appendWidthSuffix(path, width)}`;
+  // and insert the width variant suffix before the file extension. Per-segment
+  // encodeURIComponent so filenames with spaces or other reserved characters
+  // produce valid srcset/preload URLs (raw spaces break srcset parsing and
+  // invalidate `<link rel=preload href>`).
+  const rawPath = src.startsWith('/') ? src : `/${src}`;
+  const encodedPath = rawPath.split('/').map(encodeURIComponent).join('/');
+  return `${CDN_DOMAIN}${appendWidthSuffix(encodedPath, width)}`;
 }

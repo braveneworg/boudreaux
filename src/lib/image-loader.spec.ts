@@ -132,7 +132,7 @@ describe('imageLoader', () => {
       expect(result).toBe('https://cdn.fakefourrecords.com/media/particles-6.svg');
     });
 
-    it('prepends CDN domain to banner paths with width suffix', async () => {
+    it('prepends CDN domain to banner paths with width suffix and encodes spaces', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -145,7 +145,7 @@ describe('imageLoader', () => {
       });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC Banner 1_5_1920_w1920.webp'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w1920.webp'
       );
     });
 
@@ -162,7 +162,7 @@ describe('imageLoader', () => {
       });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/banners/FFINC Banner 1_5_1920_w640.webp'
+        'https://cdn.fakefourrecords.com/media/banners/FFINC%20Banner%201_5_1920_w640.webp'
       );
     });
 
