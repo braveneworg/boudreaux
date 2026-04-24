@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.53.0] - 2026-04-24
+
+### Added
+
+- fix: enhance image loader to encode paths and update user status quer… (#404)\n- fix: enhance image loader to encode paths and update user status quer… (#404)\n- fix: enhance image loader to encode paths and update user status quer… (#404)\n
+
 ## [4.52.0] - 2026-04-23
 
 ### Added
