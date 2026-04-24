@@ -1,6 +1,21 @@
+import { BANNER_SLOTS } from './src/lib/constants/banner-slots';
 import { IMAGE_VARIANT_DEVICE_SIZES } from './src/lib/constants/image-variants';
+import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from './src/lib/utils/cloudfront-loader';
 
 import type { NextConfig } from 'next';
+
+// Precompute the home page's LCP image preload so it can be emitted as an
+// HTTP Link: response header — earlier than any <link rel=preload> in <head>.
+// Using the largest variant we generate as the fallback href; the browser
+// picks the right candidate from imagesrcset based on device width.
+const HOME_LCP_FILENAME = BANNER_SLOTS[0]?.filename;
+const HOME_LCP_WIDTH = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
+const HOME_LCP_LINK_HEADER =
+  HOME_LCP_FILENAME && HOME_LCP_WIDTH
+    ? `<${buildBannerPreloadUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; ` +
+      `imagesrcset="${buildBannerPreloadSrcSet(HOME_LCP_FILENAME)}"; ` +
+      `imagesizes="100vw"; fetchpriority="high"`
+    : null;
 
 const config = {
   // Use full CDN URL for all static assets in production
@@ -132,7 +147,21 @@ const config = {
       cspParts.push('upgrade-insecure-requests');
     }
 
+    const homeHeaders = [
+      {
+        key: 'Cache-Control',
+        value: 'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
+      },
+      ...(HOME_LCP_LINK_HEADER ? [{ key: 'Link', value: HOME_LCP_LINK_HEADER }] : []),
+    ];
+
     return [
+      // Preload the LCP banner via HTTP Link header so the browser can start
+      // fetching it before the HTML body parses any <link rel=preload> tags.
+      {
+        source: '/',
+        headers: homeHeaders,
+      },
       // Next.js hashed build assets are immutable and safe to cache forever.
       // Also emit CORS header for cross-origin font/chunk usage via assetPrefix.
       {
