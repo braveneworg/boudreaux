@@ -1,19 +1,34 @@
 import { BANNER_SLOTS } from './src/lib/constants/banner-slots';
 import { IMAGE_VARIANT_DEVICE_SIZES } from './src/lib/constants/image-variants';
-import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from './src/lib/utils/cloudfront-loader';
 
 import type { NextConfig } from 'next';
 
 // Precompute the home page's LCP image preload so it can be emitted as an
 // HTTP Link: response header — earlier than any <link rel=preload> in <head>.
-// Using the largest variant we generate as the fallback href; the browser
-// picks the right candidate from imagesrcset based on device width.
+// URL building is inlined (rather than imported from cloudfront-loader) because
+// Next.js's next.config.ts transpiler does not resolve the `@/` path alias.
+const LCP_CDN_DOMAIN =
+  process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? 'https://cdn.fakefourrecords.com';
+
+function buildLcpBannerUrl(filename: string, width: number): string {
+  const encoded = filename
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/');
+  const dot = encoded.lastIndexOf('.');
+  const base = dot === -1 ? encoded : encoded.slice(0, dot);
+  const ext = dot === -1 ? '' : encoded.slice(dot);
+  return `${LCP_CDN_DOMAIN}/media/banners/${base}_w${width}${ext}`;
+}
+
 const HOME_LCP_FILENAME = BANNER_SLOTS[0]?.filename;
 const HOME_LCP_WIDTH = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
 const HOME_LCP_LINK_HEADER =
   HOME_LCP_FILENAME && HOME_LCP_WIDTH
-    ? `<${buildBannerPreloadUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; ` +
-      `imagesrcset="${buildBannerPreloadSrcSet(HOME_LCP_FILENAME)}"; ` +
+    ? `<${buildLcpBannerUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; ` +
+      `imagesrcset="${IMAGE_VARIANT_DEVICE_SIZES.map(
+        (w) => `${buildLcpBannerUrl(HOME_LCP_FILENAME, w)} ${w}w`
+      ).join(', ')}"; ` +
       `imagesizes="100vw"; fetchpriority="high"`
     : null;
 
