@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useQuery } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { queryKeys } from '@/lib/query-keys';
@@ -31,6 +32,8 @@ const fetchReleaseUserStatus = async (
 };
 
 export const useReleaseUserStatusQuery = (releaseId: string) => {
+  const { status } = useSession();
+
   const {
     isPending,
     error = Error('Unknown error'),
@@ -39,7 +42,7 @@ export const useReleaseUserStatusQuery = (releaseId: string) => {
   } = useQuery({
     queryKey: queryKeys.releases.userStatus(releaseId),
     queryFn: () => fetchReleaseUserStatus(releaseId),
-    enabled: !!releaseId,
+    enabled: !!releaseId && status === 'authenticated',
   });
 
   return { isPending, error, data, refetch };
