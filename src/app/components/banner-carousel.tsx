@@ -166,17 +166,43 @@ export function BannerCarousel({
   // Mount peripheral slide images only after the LCP paints.
   useEffect(() => {
     if (totalSlides <= 1) return;
+
+    let isMounted = true;
+    let idleCallbackId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const win = globalThis as typeof globalThis & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
     };
+
+    const markPeripheralSlidesReady = () => {
+      if (!isMounted) return;
+      setPeripheralSlidesReady(true);
+    };
+
     const raf = requestAnimationFrame(() => {
+      if (!isMounted) return;
+
       if (typeof win.requestIdleCallback === 'function') {
-        win.requestIdleCallback(() => setPeripheralSlidesReady(true), { timeout: 1500 });
+        idleCallbackId = win.requestIdleCallback(markPeripheralSlidesReady, { timeout: 1500 });
       } else {
-        setTimeout(() => setPeripheralSlidesReady(true), 200);
+        timeoutId = setTimeout(markPeripheralSlidesReady, 200);
       }
     });
-    return () => cancelAnimationFrame(raf);
+
+    return () => {
+      isMounted = false;
+      cancelAnimationFrame(raf);
+
+      if (idleCallbackId !== null && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleCallbackId);
+      }
+
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [totalSlides]);
 
   // Derive outgoing and incoming notification strips for seamless crossfade
@@ -408,7 +434,11 @@ export function BannerCarousel({
             const isVisible = isCurrentSlide || (totalSlides > 1 && (isPrevSlide || isNextSlide));
             // Only paint the current slide's image on first render; peripheral
             // slides mount after LCP to avoid contending for bandwidth.
-            const shouldRenderImage = isCurrentSlide || (isVisible && peripheralSlidesReady);
+            // Also mount the incoming slide image immediately when a transition
+            // starts so early swipes/clicks don't leave a blank slide.
+            const isIncoming = idx === incomingIndex;
+            const shouldRenderImage =
+              isCurrentSlide || isIncoming || (isVisible && peripheralSlidesReady);
 
             return (
               <div
