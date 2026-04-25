@@ -5,9 +5,12 @@
 import {
   buildCdnUrl,
   buildS3Key,
+  extractS3KeyFromCdnUrl,
+  getFileExtension,
   isDataUri,
   parseArgs,
   parseDataUri,
+  swapKeyExtensionToWebp,
 } from './backfill-coverart-urls';
 
 describe('parseArgs', () => {
@@ -116,6 +119,53 @@ describe('buildCdnUrl', () => {
   it('strips trailing slashes on the domain', () => {
     expect(buildCdnUrl('https://cdn.example.com///', 'media/x.jpg')).toBe(
       'https://cdn.example.com/media/x.jpg'
+    );
+  });
+});
+
+describe('extractS3KeyFromCdnUrl', () => {
+  it('returns the S3 key from a valid CDN URL', () => {
+    expect(
+      extractS3KeyFromCdnUrl('https://cdn.example.com/media/releases/coverart/cover.jpg')
+    ).toBe('media/releases/coverart/cover.jpg');
+  });
+
+  it('decodes percent-encoded path segments', () => {
+    expect(
+      extractS3KeyFromCdnUrl('https://cdn.example.com/media/banners/FFINC%20Banner%201.webp')
+    ).toBe('media/banners/FFINC Banner 1.webp');
+  });
+
+  it('returns null for malformed URLs', () => {
+    expect(extractS3KeyFromCdnUrl('not a url')).toBeNull();
+  });
+});
+
+describe('getFileExtension', () => {
+  it('returns lowercase dotted extension', () => {
+    expect(getFileExtension('cover.JPG')).toBe('.jpg');
+    expect(getFileExtension('cover.png')).toBe('.png');
+  });
+
+  it('strips query strings before reading the extension', () => {
+    expect(getFileExtension('https://cdn.example.com/cover.jpg?v=1')).toBe('.jpg');
+  });
+
+  it('returns empty string when there is no dot', () => {
+    expect(getFileExtension('cover')).toBe('');
+  });
+});
+
+describe('swapKeyExtensionToWebp', () => {
+  it('replaces the existing extension with .webp', () => {
+    expect(swapKeyExtensionToWebp('media/releases/coverart/cover.jpg')).toBe(
+      'media/releases/coverart/cover.webp'
+    );
+  });
+
+  it('appends .webp when there is no extension', () => {
+    expect(swapKeyExtensionToWebp('media/releases/coverart/cover')).toBe(
+      'media/releases/coverart/cover.webp'
     );
   });
 });
