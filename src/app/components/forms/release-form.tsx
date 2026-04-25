@@ -751,6 +751,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   setValue={releaseForm.setValue}
                   artistIds={watchedArtistIds || []}
                   disabled={isSubmitting}
+                  entityId={preGeneratedId}
                   onUploadComplete={
                     releaseId
                       ? async (cdnUrl) => {

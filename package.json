@@ -1,6 +1,6 @@
 {
   "name": "boudreaux",
-  "version": "4.57.0",
+  "version": "4.55.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -33,6 +33,7 @@
     "images:upload": "pnpm exec tsx scripts/upload-images.ts",
     "images:generate-variants": "pnpm exec tsx scripts/generate-image-variants.ts",
     "images:convert-to-webp": "pnpm exec tsx scripts/convert-images-to-webp.ts",
+    "images:cleanup-orphans": "pnpm exec tsx scripts/cleanup-orphan-images.ts",
     "backfill:coverart": "pnpm exec tsx scripts/backfill-coverart-urls.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
