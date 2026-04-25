@@ -48,6 +48,14 @@ interface CoverArtFieldProps<
   artistIds: string[];
   disabled?: boolean;
   entityType?: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
+  /**
+   * Optional callback fired after a successful upload AND variant generation.
+   * When provided, the field also waits for variant generation (instead of
+   * fire-and-forget) so the parent can persist the URL to the DB knowing the
+   * srcset variants exist on S3. The "Uploading..." spinner stays visible
+   * across the entire sequence.
+   */
+  onUploadComplete?: (cdnUrl: string) => Promise<void>;
 }
 
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -63,6 +71,7 @@ export default function CoverArtField<
   artistIds,
   disabled = false,
   entityType = 'releases',
+  onUploadComplete,
 }: CoverArtFieldProps<TFieldValues, TName>) {
   const [isUploading, setIsUploading] = useState(false);
   const [localPreviewUrl, setLocalPreviewUrl] = useState('');
@@ -187,12 +196,38 @@ export default function CoverArtField<
           shouldValidate: true,
         });
 
-        // Fire-and-forget: generate width variants on S3 for the image loader.
-        // Non-blocking — the batch script can backfill if this fails.
         if (uploadResult.cdnUrl) {
-          generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
-            console.warn('[Cover Art] Variant generation failed:', err);
-          });
+          if (onUploadComplete) {
+            // Caller wants the variants present + the URL persisted before we
+            // return. Block on both so the spinner reflects real progress and
+            // the parent can update its own DB row knowing the srcset variants
+            // are live on S3.
+            try {
+              const variantResult = await generateImageVariantsAction(uploadResult.cdnUrl);
+              if (!variantResult.success) {
+                console.warn(
+                  '[Cover Art] Variant generation reported failure:',
+                  variantResult.error
+                );
+              }
+            } catch (err) {
+              console.warn('[Cover Art] Variant generation threw:', err);
+            }
+
+            try {
+              await onUploadComplete(uploadResult.cdnUrl);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to save cover art';
+              toast.error(message);
+              return;
+            }
+          } else {
+            // Fire-and-forget — preserves the original behavior for callers
+            // that don't need the URL persisted immediately.
+            generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
+              console.warn('[Cover Art] Variant generation failed:', err);
+            });
+          }
         }
 
         URL.revokeObjectURL(blobUrl);
@@ -206,7 +241,7 @@ export default function CoverArtField<
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [entityType, name, setValue]
+    [entityType, name, onUploadComplete, setValue]
   );
 
   const handleFileSelect = useCallback(
@@ -238,12 +273,19 @@ export default function CoverArtField<
           {/* Preview */}
           {(field.value || localPreviewUrl) && (
             <div className="relative h-40 w-40 overflow-hidden rounded-lg border group">
+              {/* `unoptimized` bypasses the custom image loader, which would
+                  otherwise rewrite the src to `_w{width}.webp`. Width variants
+                  are generated asynchronously after upload (fire-and-forget),
+                  and small originals never produce `_w750`+ variants — both
+                  cause broken-image flashes in this admin preview. The 160×160
+                  slot doesn't need variant resolution anyway. */}
               <Image
                 src={localPreviewUrl || (field.value as string)}
                 alt="Cover art"
                 fill
                 className="object-cover"
-                unoptimized={!!(localPreviewUrl && localPreviewUrl.startsWith('blob:'))}
+                sizes="160px"
+                unoptimized
               />
               {isUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">

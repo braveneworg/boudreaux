@@ -48,6 +48,7 @@ import {
   reorderReleaseImagesAction,
 } from '@/lib/actions/release-image-actions';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
+import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { FormState } from '@/lib/types/form-state';
@@ -750,6 +751,22 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   setValue={releaseForm.setValue}
                   artistIds={watchedArtistIds || []}
                   disabled={isSubmitting}
+                  onUploadComplete={
+                    releaseId
+                      ? async (cdnUrl) => {
+                          // Edit mode only: persist the new cover art to the
+                          // release row immediately (after S3 upload + variant
+                          // generation). Avoids losing the cover if the user
+                          // navigates away before submitting the full form.
+                          // For new releases there's no row to update yet —
+                          // the create flow will save it on form submit.
+                          const result = await updateReleaseCoverArtAction(releaseId, cdnUrl);
+                          if (!result.success) {
+                            throw new Error(result.error ?? 'Failed to save cover art');
+                          }
+                        }
+                      : undefined
+                  }
                 />
                 <FormField
                   control={control}
