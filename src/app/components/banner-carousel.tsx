@@ -288,7 +288,7 @@ export function BannerCarousel({
         {/* Notification strip placeholder */}
         <div className="w-full" style={{ minHeight: '2.5rem' }} />
         {/* Banner aspect-ratio placeholder */}
-        <div className="relative w-full bg-muted" style={{ paddingBottom: '61.8%' }} />
+        <div className="relative w-full bg-muted" style={{ paddingBottom: '57.14%' }} />
         {/* Dot indicators placeholder */}
         <div className="flex justify-center gap-2 py-2">
           <div className="h-11 w-11" />
@@ -368,7 +368,7 @@ export function BannerCarousel({
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden"
-        style={{ paddingBottom: '61.8%' }}
+        style={{ paddingBottom: '57.14%' }}
       >
         <div
           ref={trackRef}
