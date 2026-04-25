@@ -460,12 +460,12 @@ export async function runBackfill(argv: string[], deps?: { prisma?: PrismaClient
       // formats. We can't use `{ coverArt: { not: null } }` here because Prisma
       // MongoDB rejects null in `not` filters; the OR avoids the issue and
       // additionally excludes empty / weird values cheaply on the DB side.
+      // No `as const` — Prisma's WhereInput expects a mutable `OR` array, and
+      // freezing the literal type widens `findMany` row inference back to the
+      // full model shape (breaking the `select` projection).
       const where = {
-        OR: [
-          { coverArt: { startsWith: 'data:' } },
-          { coverArt: { startsWith: 'http' } },
-        ],
-      } as const;
+        OR: [{ coverArt: { startsWith: 'data:' } }, { coverArt: { startsWith: 'http' } }],
+      };
       const rows =
         model === 'release'
           ? await prisma.release.findMany({
