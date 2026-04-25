@@ -47,7 +47,15 @@ export default async function Home() {
     .map((fa) => getFeaturedArtistCoverArt(fa))
     .find((src): src is string => Boolean(src));
 
-  if (firstCoverArt) {
+  // Only preload real CDN URLs. `data:` / `blob:` URLs (e.g. a stale base64
+  // cover art that never made it to S3) would otherwise be embedded into the
+  // HTML head 5× via `imageSrcSet`, blocking the parser and *increasing* FCP.
+  const isPreloadable =
+    typeof firstCoverArt === 'string' &&
+    !firstCoverArt.startsWith('data:') &&
+    !firstCoverArt.startsWith('blob:');
+
+  if (isPreloadable && firstCoverArt) {
     // `sizes="(max-width: 640px) 100vw, 576px"` matches InteractiveCoverArt.
     // Below the banner but frequently the LCP on mobile; preloading trims
     // hundreds of ms off the first paint of the artist cover.

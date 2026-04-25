@@ -5,15 +5,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * One-shot backfill: replace `data:image/*;base64,...` URIs stored in
- * `Release.coverArt` and `FeaturedArtist.coverArt` with real CDN URLs.
+ * One-shot backfill: normalize `Release.coverArt` and `FeaturedArtist.coverArt`
+ * to WebP CDN URLs. Handles two input shapes:
+ *   1. `data:image/*;base64,...` URIs (seeded or extracted from audio metadata):
+ *      decode, transcode to WebP, upload to S3, rewrite the DB column.
+ *   2. Existing CDN URLs in transcodable raster formats (JPG/JPEG/PNG/TIFF/BMP):
+ *      download from S3, transcode to WebP, upload alongside the original
+ *      (`cover.jpg` → `cover.webp`), rewrite the DB column.
  *
- * Why this exists: a subset of releases were seeded (or imported from audio-file
- * embedded art) with `coverArt` as a base64 data URI. React Server Component
- * SSR inlines those bytes into the initial HTML, which blows the document up
- * to 2+ MB and crushes LCP on mobile. Uploading each to S3 and rewriting the
- * column to a CDN URL brings the HTML back to normal size without changing UI
- * behavior.
+ * Why: base64 cover art bloats the SSR HTML to 2+ MB and crushes LCP on mobile.
+ * Non-webp CDN URLs work but pay a payload-size penalty on every render.
  *
  * Defaults to dry-run. Pass `--execute` to actually upload + write to the DB.
  *
@@ -38,10 +39,12 @@
  */
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
-import mime from 'mime';
+import sharp from 'sharp';
+
+import { WEBP_QUALITY, WEBP_TRANSCODE_EXTENSIONS } from '../src/lib/constants/image-variants';
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -160,6 +163,29 @@ export function buildCdnUrl(cdnDomain: string, key: string): string {
   return `${trimmed}/${key}`;
 }
 
+/** Extract the S3 object key from a CDN URL, or null if `url` isn't a valid URL. */
+export function extractS3KeyFromCdnUrl(url: string): string | null {
+  try {
+    return decodeURIComponent(new URL(url).pathname).replace(/^\//, '');
+  } catch {
+    return null;
+  }
+}
+
+/** Lowercase file extension including the leading dot, or '' when absent. */
+export function getFileExtension(value: string): string {
+  // Strip query/hash so `cover.jpg?v=1` returns `.jpg`.
+  const cleaned = value.split('?')[0].split('#')[0];
+  const dot = cleaned.lastIndexOf('.');
+  return dot === -1 ? '' : cleaned.substring(dot).toLowerCase();
+}
+
+/** Swap (or append) `.webp` on an S3 key, preserving the rest of the path. */
+export function swapKeyExtensionToWebp(key: string): string {
+  const dot = key.lastIndexOf('.');
+  return dot === -1 ? `${key}.webp` : `${key.substring(0, dot)}.webp`;
+}
+
 // ---------------------------------------------------------------------------
 // Processing
 // ---------------------------------------------------------------------------
@@ -178,6 +204,57 @@ interface RowResult {
   uploadedKey?: string;
 }
 
+async function downloadObjectFromS3(s3: S3Client, bucket: string, key: string): Promise<Buffer> {
+  const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const stream = response.Body;
+  if (!stream) throw new Error(`empty body for ${key}`);
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of stream as AsyncIterable<Uint8Array>) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+interface SourceImage {
+  buffer: Buffer;
+  /** Resolved key when the source is an existing S3 object; null for data URIs. */
+  existingKey: string | null;
+}
+
+/**
+ * Resolve the source bytes for a row's `coverArt`. Returns `null` when the
+ * value is already a `.webp`, an unsupported format, or otherwise not eligible
+ * for transcoding.
+ */
+async function resolveSourceImage(
+  ctx: UploadContext,
+  coverArt: string
+): Promise<{ source: SourceImage } | { skip: string }> {
+  if (isDataUri(coverArt)) {
+    const parsed = parseDataUri(coverArt);
+    if (!parsed) return { skip: 'could not parse data URI' };
+    return { source: { buffer: parsed.buffer, existingKey: null } };
+  }
+
+  // Treat as a CDN URL. Skip anything we can't safely transcode.
+  const ext = getFileExtension(coverArt);
+  if (ext === '.webp') {
+    return { skip: 'already .webp' };
+  }
+  if (!WEBP_TRANSCODE_EXTENSIONS.has(ext)) {
+    return { skip: `not a transcodable format (${ext || '<no ext>'})` };
+  }
+
+  const key = extractS3KeyFromCdnUrl(coverArt);
+  if (!key) return { skip: 'could not parse CDN URL' };
+
+  try {
+    const buffer = await downloadObjectFromS3(ctx.s3, ctx.bucket, key);
+    return { source: { buffer, existingKey: key } };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown S3 error';
+    return { skip: `S3 download failed: ${msg}` };
+  }
+}
+
 async function migrateRow(
   ctx: UploadContext,
   model: ModelName,
@@ -185,24 +262,38 @@ async function migrateRow(
   prisma: PrismaClient
 ): Promise<RowResult> {
   const { id, coverArt } = row;
-  if (!isDataUri(coverArt)) {
-    return { id, status: 'skipped', detail: 'not a data URI' };
+  if (!coverArt) {
+    return { id, status: 'skipped', detail: 'no coverArt' };
   }
 
-  const parsed = parseDataUri(coverArt);
-  if (!parsed) {
-    return { id, status: 'failed', detail: 'could not parse data URI' };
+  const resolved = await resolveSourceImage(ctx, coverArt);
+  if ('skip' in resolved) {
+    return { id, status: 'skipped', detail: resolved.skip };
   }
 
-  const ext = mime.getExtension(parsed.mimeType) ?? 'jpg';
-  const key = buildS3Key(model, id, ext);
+  // For existing S3 objects, place the .webp next to the original so the
+  // path is intuitive and the variant generator can produce siblings under
+  // the same prefix. For data URIs, keep the legacy `backfill-{model}-{id}`
+  // naming so re-runs are idempotent.
+  const key = resolved.source.existingKey
+    ? swapKeyExtensionToWebp(resolved.source.existingKey)
+    : buildS3Key(model, id, 'webp');
   const cdnUrl = buildCdnUrl(ctx.cdnDomain, key);
 
+  let webpBuffer: Buffer;
+  try {
+    webpBuffer = await sharp(resolved.source.buffer).webp({ quality: WEBP_QUALITY }).toBuffer();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown sharp error';
+    return { id, status: 'failed', detail: `WebP transcode failed: ${msg}` };
+  }
+
+  const sourceLabel = resolved.source.existingKey ?? 'data URI';
   if (!ctx.execute) {
     return {
       id,
       status: 'migrated',
-      detail: `[dry-run] would upload ${parsed.buffer.length} bytes → ${key}`,
+      detail: `[dry-run] would transcode ${resolved.source.buffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${key}`,
       uploadedKey: key,
     };
   }
@@ -212,8 +303,8 @@ async function migrateRow(
       new PutObjectCommand({
         Bucket: ctx.bucket,
         Key: key,
-        Body: parsed.buffer,
-        ContentType: parsed.mimeType,
+        Body: webpBuffer,
+        ContentType: 'image/webp',
         CacheControl: 'public, max-age=31536000, immutable',
       })
     );
@@ -241,7 +332,7 @@ async function migrateRow(
   return {
     id,
     status: 'migrated',
-    detail: `uploaded ${parsed.buffer.length} bytes → ${cdnUrl}`,
+    detail: `transcoded ${resolved.source.buffer.length} → ${webpBuffer.length} bytes (${sourceLabel}) → ${cdnUrl}`,
     uploadedKey: key,
   };
 }
@@ -295,11 +386,13 @@ async function invalidateCloudFront(
 // ---------------------------------------------------------------------------
 
 const HELP = `
-${colors.cyan}Backfill base64 coverArt → CDN URLs${colors.reset}
+${colors.cyan}Backfill coverArt → WebP CDN URLs${colors.reset}
 
-Decodes any \`data:image/*;base64,...\` values in Release.coverArt and
-FeaturedArtist.coverArt, uploads the bytes to S3, and rewrites the column
-to a CDN URL. Safe to run repeatedly.
+Normalizes Release.coverArt and FeaturedArtist.coverArt to WebP CDN URLs:
+  - \`data:image/*;base64,...\` values are decoded, transcoded to WebP, and uploaded.
+  - Existing JPG/JPEG/PNG/TIFF/BMP CDN URLs are downloaded, transcoded to WebP,
+    and uploaded alongside the original (\`cover.jpg\` → \`cover.webp\`).
+  - Already-\`.webp\` values are skipped. Safe to run repeatedly.
 
 ${colors.yellow}Usage:${colors.reset}
   pnpm run backfill:coverart
@@ -362,20 +455,31 @@ export async function runBackfill(argv: string[], deps?: { prisma?: PrismaClient
   try {
     for (const model of opts.models) {
       log(`Scanning ${model}...`, 'info');
+      // Pull every row whose coverArt is a data URI or an HTTP(S) URL.
+      // `migrateRow` skips ones that are already `.webp` or in unsupported
+      // formats. We can't use `{ coverArt: { not: null } }` here because Prisma
+      // MongoDB rejects null in `not` filters; the OR avoids the issue and
+      // additionally excludes empty / weird values cheaply on the DB side.
+      const where = {
+        OR: [
+          { coverArt: { startsWith: 'data:' } },
+          { coverArt: { startsWith: 'http' } },
+        ],
+      } as const;
       const rows =
         model === 'release'
           ? await prisma.release.findMany({
-              where: { coverArt: { startsWith: 'data:' } },
+              where,
               select: { id: true, coverArt: true },
               ...(opts.limit ? { take: opts.limit } : {}),
             })
           : await prisma.featuredArtist.findMany({
-              where: { coverArt: { startsWith: 'data:' } },
+              where,
               select: { id: true, coverArt: true },
               ...(opts.limit ? { take: opts.limit } : {}),
             });
 
-      log(`  found ${rows.length} ${model} row(s) with data URIs`, 'info');
+      log(`  found ${rows.length} ${model} row(s) with non-webp coverArt`, 'info');
 
       const results = await mapWithConcurrency(rows, opts.concurrency, (row) =>
         migrateRow(ctx, model, row, prisma)
