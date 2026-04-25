@@ -22,6 +22,7 @@ import {
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
+import { finalizeCoverArtUploadAction } from '@/lib/actions/finalize-cover-art-upload-action';
 import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,23 @@ interface CoverArtFieldProps<
   artistIds: string[];
   disabled?: boolean;
   entityType?: 'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists';
+  /**
+   * Stable entity ID used to scope cover-art uploads to one canonical S3 key.
+   * When provided, uploads land at `media/{entityType}/{entityId}/cover.{ext}`
+   * and re-uploads OVERWRITE the existing object (S3 PUT semantics) instead
+   * of creating a new timestamped file each time. When omitted, falls back
+   * to the legacy timestamp-suffixed key generation so callers without a
+   * stable ID still work.
+   */
+  entityId?: string;
+  /**
+   * Optional callback fired after a successful upload AND variant generation.
+   * When provided, the field also waits for variant generation (instead of
+   * fire-and-forget) so the parent can persist the URL to the DB knowing the
+   * srcset variants exist on S3. The "Uploading..." spinner stays visible
+   * across the entire sequence.
+   */
+  onUploadComplete?: (cdnUrl: string) => Promise<void>;
 }
 
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -63,6 +81,8 @@ export default function CoverArtField<
   artistIds,
   disabled = false,
   entityType = 'releases',
+  entityId,
+  onUploadComplete,
 }: CoverArtFieldProps<TFieldValues, TName>) {
   const [isUploading, setIsUploading] = useState(false);
   const [localPreviewUrl, setLocalPreviewUrl] = useState('');
@@ -164,12 +184,24 @@ export default function CoverArtField<
       setIsUploading(true);
 
       try {
-        const tempEntityId = crypto.randomUUID();
-        const presignedResult = await getPresignedUploadUrlsAction(entityType, tempEntityId, [
+        // When an `entityId` is provided we lock the upload to a single
+        // canonical key (`media/{entityType}/{entityId}/cover.{ext}`) so a
+        // re-upload overwrites the previous file. Without one we fall back
+        // to the legacy random-UUID + timestamp behavior.
+        const useStableKey = typeof entityId === 'string' && entityId.length > 0;
+        const targetEntityId = useStableKey ? entityId : crypto.randomUUID();
+
+        const inferredExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const stableS3Key = useStableKey
+          ? `media/${entityType}/${entityId}/cover.${inferredExtension}`
+          : undefined;
+
+        const presignedResult = await getPresignedUploadUrlsAction(entityType, targetEntityId, [
           {
             fileName: file.name,
             contentType: file.type,
             fileSize: file.size,
+            ...(stableS3Key ? { existingS3Key: stableS3Key } : {}),
           },
         ]);
 
@@ -187,12 +219,77 @@ export default function CoverArtField<
           shouldValidate: true,
         });
 
-        // Fire-and-forget: generate width variants on S3 for the image loader.
-        // Non-blocking — the batch script can backfill if this fails.
         if (uploadResult.cdnUrl) {
-          generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
-            console.warn('[Cover Art] Variant generation failed:', err);
-          });
+          if (onUploadComplete) {
+            // Caller wants the variants present + the URL persisted before we
+            // return. Block on both so the spinner reflects real progress and
+            // the parent can update its own DB row knowing the srcset variants
+            // are live on S3.
+            let variantsOk = true;
+            try {
+              const variantResult = await generateImageVariantsAction(uploadResult.cdnUrl);
+              if (!variantResult.success) {
+                variantsOk = false;
+                console.warn(
+                  '[Cover Art] Variant generation reported failure:',
+                  variantResult.error
+                );
+                toast.error(
+                  `Cover uploaded, but variant generation failed: ${variantResult.error ?? 'unknown error'}. Re-run \`pnpm run images:generate-variants\` to backfill.`
+                );
+              }
+            } catch (err) {
+              variantsOk = false;
+              const message = err instanceof Error ? err.message : 'Unknown error';
+              console.warn('[Cover Art] Variant generation threw:', err);
+              toast.error(`Cover uploaded, but variant generation threw: ${message}`);
+            }
+
+            // After variants exist, sweep cross-extension orphans (e.g. an old
+            // cover.png left behind when uploading cover.jpg) and invalidate
+            // the CloudFront cache for the entity prefix in one wildcard call.
+            // Skipped when no stable entity ID was used — there's no canonical
+            // prefix to safely scope the cleanup against.
+            if (useStableKey && entityId) {
+              const newKey = presignedResult.data[0].s3Key;
+              try {
+                const finalizeResult = await finalizeCoverArtUploadAction(
+                  entityType,
+                  entityId,
+                  newKey
+                );
+                if (!finalizeResult.success) {
+                  console.warn('[Cover Art] Finalize step reported failure:', finalizeResult.error);
+                }
+              } catch (err) {
+                console.warn('[Cover Art] Finalize step threw:', err);
+              }
+            }
+
+            try {
+              await onUploadComplete(uploadResult.cdnUrl);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to save cover art';
+              toast.error(message);
+              return;
+            }
+
+            // Skip the trailing "Cover art uploaded" success toast when
+            // variants didn't fully succeed — the warning above is the
+            // accurate signal in that case.
+            URL.revokeObjectURL(blobUrl);
+            setLocalPreviewUrl('');
+            if (variantsOk) {
+              toast.success('Cover art uploaded');
+            }
+            return;
+          } else {
+            // Fire-and-forget — preserves the original behavior for callers
+            // that don't need the URL persisted immediately.
+            generateImageVariantsAction(uploadResult.cdnUrl).catch((err) => {
+              console.warn('[Cover Art] Variant generation failed:', err);
+            });
+          }
         }
 
         URL.revokeObjectURL(blobUrl);
@@ -206,7 +303,7 @@ export default function CoverArtField<
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [entityType, name, setValue]
+    [entityId, entityType, name, onUploadComplete, setValue]
   );
 
   const handleFileSelect = useCallback(
@@ -238,12 +335,19 @@ export default function CoverArtField<
           {/* Preview */}
           {(field.value || localPreviewUrl) && (
             <div className="relative h-40 w-40 overflow-hidden rounded-lg border group">
+              {/* `unoptimized` bypasses the custom image loader, which would
+                  otherwise rewrite the src to `_w{width}.webp`. Width variants
+                  are generated asynchronously after upload (fire-and-forget),
+                  and small originals never produce `_w750`+ variants — both
+                  cause broken-image flashes in this admin preview. The 160×160
+                  slot doesn't need variant resolution anyway. */}
               <Image
                 src={localPreviewUrl || (field.value as string)}
                 alt="Cover art"
                 fill
                 className="object-cover"
-                unoptimized={!!(localPreviewUrl && localPreviewUrl.startsWith('blob:'))}
+                sizes="160px"
+                unoptimized
               />
               {isUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">

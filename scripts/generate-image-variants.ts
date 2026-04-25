@@ -280,12 +280,11 @@ async function processImage(
     const ext = getExtension(key);
     const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
 
+    // Generate every variant width, including ones >= the original.
+    // `withoutEnlargement: true` keeps sharp from upscaling — a 500px source
+    // asked for at 1200px just emits a 500px image saved at the `_w1200`
+    // filename. Keeps every srcset URL live for small originals.
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
-      if (targetWidth >= originalWidth) {
-        result.variantsSkipped++;
-        continue;
-      }
-
       const variantKey = buildVariantKey(key, targetWidth);
       const webpVariantKey = shouldTranscodeToWebp
         ? buildVariantKey(key, targetWidth, '.webp')

@@ -21,7 +21,11 @@ import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 /** Extensions that cannot be raster-resized. */
 const SKIP_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 const ALLOWED_KEY_PREFIX = 'media/';
-const MAX_SOURCE_IMAGE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB safety limit for server action memory use.
+// Aligned with the 50MB ceiling enforced by `presigned-upload-actions.ts` for
+// images. Anything that fits the upload pipe should fit the variant pipe; PNGs
+// at album-cover resolution routinely exceed 20MB so the previous limit was
+// silently rejecting valid uploads.
+const MAX_SOURCE_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export interface GenerateImageVariantsResult {
   success: boolean;
@@ -168,15 +172,14 @@ export const generateImageVariantsAction = async (
     const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
     let variantsGenerated = 0;
 
-    // Generate and upload each variant. For non-WebP raster originals we also
-    // emit a `.webp` sibling at each width so the image loader can serve WebP
-    // (smaller payloads → better LCP) while keeping the original-format variant
-    // as a fallback for any client that can't consume WebP.
+    // Generate and upload every variant width, even ones >= the original.
+    // `withoutEnlargement: true` clamps sharp's output to the original's
+    // native dimensions, so a 500px source asked for at 1200px just emits
+    // a 500px image saved at the `_w1200` filename. This keeps every URL in
+    // the loader's srcset live (no 403s for small originals); browsers trust
+    // the width descriptor and pick the appropriate entry without ever
+    // fetch-failing.
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
-      if (targetWidth >= originalWidth) {
-        continue;
-      }
-
       const pipeline = sharp(buffer).resize(targetWidth, undefined, {
         fit: 'inside',
         withoutEnlargement: true,

@@ -68,30 +68,33 @@ describe('generateImageVariantsAction', () => {
     expect(requireRole).toHaveBeenCalledWith('admin');
   });
 
-  it('generates JPG + WebP variants for all device sizes smaller than the original', async () => {
+  it('generates JPG + WebP variants for every device size, regardless of original width', async () => {
     const result = await generateImageVariantsAction(
       'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
     );
 
     expect(result.success).toBe(true);
-    // Original is 2000px wide → 5 device sizes (640, 750, 828, 1080, 1200) are smaller.
-    // Each emits an original-format + WebP sibling = 10 variants.
+    // 5 device sizes × (original-format + WebP sibling) = 10 variants.
     expect(result.variantsGenerated).toBe(10);
 
     // 1 GetObject + 10 PutObject calls
     expect(mockS3Send).toHaveBeenCalledTimes(11);
   });
 
-  it('skips widths larger than or equal to the original', async () => {
-    mockSharpInstance.metadata.mockResolvedValue({ width: 800, height: 600 });
+  it('still produces every variant when the original is smaller than every device size', async () => {
+    // `withoutEnlargement: true` clamps sharp output to the original's dims;
+    // each `_w{N}` URL still resolves to a valid (smaller) image so the
+    // browser srcset never 403s.
+    mockSharpInstance.metadata.mockResolvedValue({ width: 320, height: 240 });
 
     const result = await generateImageVariantsAction(
-      'https://cdn.fakefourrecords.com/media/releases/coverart/small.jpg'
+      'https://cdn.fakefourrecords.com/media/releases/coverart/tiny.jpg'
     );
 
     expect(result.success).toBe(true);
-    // 800px original → only 640 and 750 are smaller; JPG + WebP each = 4 variants
-    expect(result.variantsGenerated).toBe(4);
+    // 5 sizes × (jpg + webp) = 10 variants
+    expect(result.variantsGenerated).toBe(10);
+    expect(mockS3Send).toHaveBeenCalledTimes(11);
   });
 
   it('does not emit WebP sibling when the original is already WebP', async () => {
@@ -100,7 +103,7 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // 5 device sizes smaller than 2000px, only original-format (webp) variants
+    // 5 device sizes, only original-format (webp) variants — no transcoded sibling
     expect(result.variantsGenerated).toBe(5);
     expect(mockS3Send).toHaveBeenCalledTimes(6);
   });
@@ -112,8 +115,8 @@ describe('generateImageVariantsAction', () => {
       'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
     );
 
-    // 700px original → only w640 runs: 1 GetObject + 1 JPG PutObject + 1 WebP PutObject = 3 calls
-    expect(mockS3Send).toHaveBeenCalledTimes(3);
+    // 5 sizes × (jpg + webp) = 10 PutObject + 1 GetObject = 11 calls
+    expect(mockS3Send).toHaveBeenCalledTimes(11);
 
     const putCalls = mockS3Send.mock.calls.slice(1).map(([cmd]) => cmd.input ?? cmd);
     expect(putCalls).toContainEqual(
@@ -126,6 +129,11 @@ describe('generateImageVariantsAction', () => {
       expect.objectContaining({
         Key: 'media/releases/coverart/album-cover_w640.webp',
         ContentType: 'image/webp',
+      })
+    );
+    expect(putCalls).toContainEqual(
+      expect.objectContaining({
+        Key: 'media/releases/coverart/album-cover_w1200.jpg',
       })
     );
   });
@@ -196,19 +204,6 @@ describe('generateImageVariantsAction', () => {
     });
   });
 
-  it('generates no variants when original is smaller than all device sizes', async () => {
-    mockSharpInstance.metadata.mockResolvedValue({ width: 320, height: 240 });
-
-    const result = await generateImageVariantsAction(
-      'https://cdn.fakefourrecords.com/media/releases/coverart/tiny.jpg'
-    );
-
-    expect(result.success).toBe(true);
-    expect(result.variantsGenerated).toBe(0);
-    // Only 1 GetObject, no PutObject calls
-    expect(mockS3Send).toHaveBeenCalledTimes(1);
-  });
-
   it('returns error when key is outside media prefix', async () => {
     const result = await generateImageVariantsAction(
       'https://cdn.fakefourrecords.com/uploads/releases/coverart/private.jpg'
@@ -232,7 +227,7 @@ describe('generateImageVariantsAction', () => {
   it('returns error when source image content-length exceeds safety limit', async () => {
     mockS3Send.mockResolvedValue({
       Body: fakeS3Body(imageBuffer),
-      ContentLength: 21 * 1024 * 1024,
+      ContentLength: 51 * 1024 * 1024,
     });
 
     const result = await generateImageVariantsAction(
@@ -240,6 +235,6 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Source image exceeds 20MB limit');
+    expect(result.error).toBe('Source image exceeds 50MB limit');
   });
 });

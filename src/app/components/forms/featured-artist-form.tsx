@@ -45,8 +45,10 @@ import {
 import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
+import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
+import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import {
   createFeaturedArtistSchema,
@@ -95,6 +97,10 @@ export default function FeaturedArtistForm({
   const [featuredArtistId, setFeaturedArtistId] = useState<string | null>(
     initialFeaturedArtistId || null
   );
+  // Stable ID for the cover-art upload key. Uses the real ID in edit mode and
+  // a freshly minted ObjectID in create mode. Same pattern as release-form so
+  // re-uploads land on the canonical `cover.{ext}` key and overwrite cleanly.
+  const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
   const { data: _session } = useSession();
@@ -614,6 +620,25 @@ export default function FeaturedArtistForm({
                   artistIds={derivedArtistIds}
                   entityType="featured-artists"
                   disabled={isPending}
+                  entityId={preGeneratedId}
+                  onUploadComplete={
+                    featuredArtistId
+                      ? async (cdnUrl) => {
+                          // Edit mode only: persist the new cover art to the
+                          // featured-artist row immediately (after S3 upload +
+                          // variant generation + orphan sweep + CloudFront
+                          // invalidation). For create mode there's no row to
+                          // update yet — submit will save it then.
+                          const result = await updateFeaturedArtistCoverArtAction(
+                            featuredArtistId,
+                            cdnUrl
+                          );
+                          if (!result.success) {
+                            throw new Error(result.error ?? 'Failed to save cover art');
+                          }
+                        }
+                      : undefined
+                  }
                 />
               </div>
             </CardContent>

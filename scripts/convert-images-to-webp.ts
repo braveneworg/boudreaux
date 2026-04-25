@@ -243,15 +243,14 @@ async function processImage(
       return result;
     }
 
+    // Generate every variant width — `withoutEnlargement: true` clamps
+    // sharp's output to original dims for sizes >= original, so the URL is
+    // always live (browsers happily display a 500px image at a `_w1200`
+    // filename — they trust the srcset width descriptor).
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
       const webpKey = buildWebpVariantKey(key, targetWidth);
 
       if (existingKeys.has(webpKey)) {
-        result.variantsSkipped++;
-        continue;
-      }
-
-      if (targetWidth >= originalWidth) {
         result.variantsSkipped++;
         continue;
       }
