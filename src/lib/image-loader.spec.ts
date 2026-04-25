@@ -9,7 +9,7 @@ describe('imageLoader', () => {
   });
 
   describe('absolute URLs', () => {
-    it('adds width suffix to full CDN URLs', async () => {
+    it('transcodes raster CDN URLs to .webp width variants', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -21,10 +21,12 @@ describe('imageLoader', () => {
         width: 640,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.jpg');
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.webp'
+      );
     });
 
-    it('adds width suffix to full CDN URLs while preserving query strings', async () => {
+    it('transcodes raster CDN URLs to .webp while preserving query strings', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -37,7 +39,39 @@ describe('imageLoader', () => {
       });
 
       expect(result).toBe(
-        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w828.jpg?token=abc'
+        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w828.webp?token=abc'
+      );
+    });
+
+    it('keeps .webp CDN URLs as .webp variants', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: 'https://cdn.fakefourrecords.com/media/banners/hero.webp',
+        width: 1080,
+      });
+
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero_w1080.webp');
+    });
+
+    it('transcodes PNG CDN URLs to .webp width variants', async () => {
+      delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
+      delete process.env.CDN_DOMAIN;
+      vi.resetModules();
+
+      const { default: imageLoader } = await import('@/lib/image-loader');
+
+      const result = imageLoader({
+        src: 'https://cdn.fakefourrecords.com/media/releases/coverart/cover.png',
+        width: 750,
+      });
+
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w750.webp'
       );
     });
 
@@ -222,7 +256,7 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://custom-cdn.example.com/media/test_w640.jpg');
+      expect(result).toBe('https://custom-cdn.example.com/media/test_w640.webp');
     });
 
     it('falls back to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
@@ -234,7 +268,7 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://server-cdn.example.com/media/test_w640.jpg');
+      expect(result).toBe('https://server-cdn.example.com/media/test_w640.webp');
     });
 
     it('uses hardcoded default when no env vars are set', async () => {
@@ -246,12 +280,12 @@ describe('imageLoader', () => {
 
       const result = imageLoader({ src: '/media/test.jpg', width: 640 });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/test_w640.jpg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/test_w640.webp');
     });
   });
 
   describe('width suffix in path', () => {
-    it('inserts _w{width} before the file extension', async () => {
+    it('inserts _w{width} before the file extension and transcodes to .webp', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -264,7 +298,9 @@ describe('imageLoader', () => {
         quality: 75,
       });
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.jpg');
+      expect(result).toBe(
+        'https://cdn.fakefourrecords.com/media/releases/coverart/cover_w640.webp'
+      );
       expect(result).not.toContain('?');
     });
   });

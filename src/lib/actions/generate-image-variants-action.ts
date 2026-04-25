@@ -12,6 +12,8 @@ import sharp from 'sharp';
 import {
   IMAGE_VARIANT_DEVICE_SIZES,
   IMAGE_VARIANT_SUFFIX_REGEX,
+  WEBP_QUALITY,
+  WEBP_TRANSCODE_EXTENSIONS,
 } from '@/lib/constants/image-variants';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
@@ -73,11 +75,11 @@ function getExtension(key: string): string {
   return dot === -1 ? '' : key.substring(dot).toLowerCase();
 }
 
-function buildVariantKey(originalKey: string, width: number): string {
+function buildVariantKey(originalKey: string, width: number, overrideExt?: string): string {
   const dot = originalKey.lastIndexOf('.');
-  if (dot === -1) return `${originalKey}_w${width}`;
+  if (dot === -1) return `${originalKey}_w${width}${overrideExt ?? ''}`;
   const base = originalKey.substring(0, dot);
-  const ext = originalKey.substring(dot);
+  const ext = overrideExt ?? originalKey.substring(dot);
   return `${base}_w${width}${ext}`;
 }
 
@@ -163,28 +165,51 @@ export const generateImageVariantsAction = async (
     }
 
     const contentType = mime.getType(s3Key) ?? 'application/octet-stream';
+    const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
     let variantsGenerated = 0;
 
-    // Generate and upload each variant
+    // Generate and upload each variant. For non-WebP raster originals we also
+    // emit a `.webp` sibling at each width so the image loader can serve WebP
+    // (smaller payloads → better LCP) while keeping the original-format variant
+    // as a fallback for any client that can't consume WebP.
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
       if (targetWidth >= originalWidth) {
         continue;
       }
 
-      const variantKey = buildVariantKey(s3Key, targetWidth);
-      const resized = await sharp(buffer)
-        .resize(targetWidth, undefined, { fit: 'inside', withoutEnlargement: true })
-        .toBuffer();
-
-      const putCommand = new PutObjectCommand({
-        Bucket: bucket,
-        Key: variantKey,
-        Body: resized,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable',
+      const pipeline = sharp(buffer).resize(targetWidth, undefined, {
+        fit: 'inside',
+        withoutEnlargement: true,
       });
 
-      await s3Client.send(putCommand);
+      const variantKey = buildVariantKey(s3Key, targetWidth);
+      const originalVariantBuffer = await pipeline.clone().toBuffer();
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: variantKey,
+          Body: originalVariantBuffer,
+          ContentType: contentType,
+          CacheControl: 'public, max-age=31536000, immutable',
+        })
+      );
+      variantsGenerated++;
+
+      if (!shouldTranscodeToWebp) continue;
+
+      const webpVariantKey = buildVariantKey(s3Key, targetWidth, '.webp');
+      const webpBuffer = await pipeline.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: webpVariantKey,
+          Body: webpBuffer,
+          ContentType: 'image/webp',
+          CacheControl: 'public, max-age=31536000, immutable',
+        })
+      );
       variantsGenerated++;
     }
 
