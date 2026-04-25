@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.58.0] - 2026-04-25
+
+### Added
+
+- Gate build bump version and update version (#411)\n- Gate build bump version and update version (#411)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Develop/fix console warnings and lcp (#410)\n- Gate build bump version and update version (#411)\n
+
 ## [4.57.0] - 2026-04-25
 
 ### Added
