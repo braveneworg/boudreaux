@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 
 export default function HomeLoading() {
@@ -13,9 +13,10 @@ export default function HomeLoading() {
           paints in the first HTML flush. The preload in layout.tsx ensures
           the image is already cached; this <img> triggers an immediate paint
           instead of waiting for React hydration + carousel mount. */}
-      <div className="relative w-full bg-muted" style={{ paddingBottom: '57.14%' }}>
+      <div className="relative w-full bg-muted" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img
+          data-testid="lcp-banner-img"
           src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 750)}
           srcSet={buildBannerPreloadSrcSet(BANNER_SLOTS[0].filename)}
           sizes="100vw"

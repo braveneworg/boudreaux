@@ -12,6 +12,14 @@ export const BANNER_SLOTS = [
 
 export const BANNER_CDN_PATH = 'media/banners';
 
+/**
+ * `padding-bottom` value reserving banner vertical space, derived from the
+ * source's 1920×1097 aspect ratio (1097 / 1920 ≈ 57.14%). Used by both the
+ * carousel container and the loading skeleton — drift causes CLS when the
+ * skeleton swaps to the real banner.
+ */
+export const BANNER_ASPECT_PADDING = '57.14%';
+
 export const DEFAULT_ROTATION_INTERVAL = 6.5;
 
 export const MIN_ROTATION_INTERVAL = 3;

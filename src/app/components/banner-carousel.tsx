@@ -9,7 +9,11 @@ import Image from 'next/image';
 
 import { flushSync } from 'react-dom';
 
-import { BANNER_CDN_PATH, DEFAULT_ROTATION_INTERVAL } from '@/lib/constants/banner-slots';
+import {
+  BANNER_ASPECT_PADDING,
+  BANNER_CDN_PATH,
+  DEFAULT_ROTATION_INTERVAL,
+} from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
 import { isDarkColor } from '@/lib/utils/color';
 import {
@@ -288,7 +292,10 @@ export function BannerCarousel({
         {/* Notification strip placeholder */}
         <div className="w-full" style={{ minHeight: '2.5rem' }} />
         {/* Banner aspect-ratio placeholder */}
-        <div className="relative w-full bg-muted" style={{ paddingBottom: '57.14%' }} />
+        <div
+          className="relative w-full bg-muted"
+          style={{ paddingBottom: BANNER_ASPECT_PADDING }}
+        />
         {/* Dot indicators placeholder */}
         <div className="flex justify-center gap-2 py-2">
           <div className="h-11 w-11" />
@@ -368,7 +375,7 @@ export function BannerCarousel({
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden"
-        style={{ paddingBottom: '57.14%' }}
+        style={{ paddingBottom: BANNER_ASPECT_PADDING }}
       >
         <div
           ref={trackRef}
