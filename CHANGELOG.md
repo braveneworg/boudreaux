@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.59.0] - 2026-04-25
+
+### Added
+
+- Add low priority fetch and lazy loading to banners (#412)\n- Add low priority fetch and lazy loading to banners (#412)\n- Add low priority fetch and lazy loading to banners (#412)\n
+
 ## [4.58.0] - 2026-04-25
 
 ### Added
