@@ -5,9 +5,9 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import ReactDOM from 'react-dom';
 
 import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
-import imageLoader from '@/lib/image-loader';
 import { queryKeys } from '@/lib/query-keys';
 import type { FeaturedArtist } from '@/lib/types/media-models';
+import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
@@ -52,9 +52,9 @@ export default async function Home() {
     // Below the banner but frequently the LCP on mobile; preloading trims
     // hundreds of ms off the first paint of the artist cover.
     const imageSrcSet = IMAGE_VARIANT_DEVICE_SIZES.map(
-      (w) => `${imageLoader({ src: firstCoverArt, width: w })} ${w}w`
+      (w) => `${buildCdnImageVariantUrl(firstCoverArt, w)} ${w}w`
     ).join(', ');
-    ReactDOM.preload(imageLoader({ src: firstCoverArt, width: 828 }), {
+    ReactDOM.preload(buildCdnImageVariantUrl(firstCoverArt, 828), {
       as: 'image',
       imageSrcSet,
       imageSizes: '(max-width: 640px) 100vw, 576px',
