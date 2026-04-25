@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.60.0] - 2026-04-25
+
+### Added
+
+- Fix aspect ratio on banner images (#413)\n- Fix aspect ratio on banner images (#413)\n- Fix aspect ratio on banner images (#413)\n
+
 ## [4.59.0] - 2026-04-25
 
 ### Added
