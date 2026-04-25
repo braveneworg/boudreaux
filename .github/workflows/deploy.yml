@@ -1259,16 +1259,30 @@ jobs:
         if: steps.bump-type.outputs.skip != 'true'
         id: version
         run: |
+          # Refresh tags so we can detect collisions caused by re-runs or
+          # parallel workflows that already pushed the target tag.
+          git fetch --tags --force origin
+
           OLD_VERSION=$(jq -r '.version' package.json)
           pnpm version ${{ steps.bump-type.outputs.bump }} --no-git-tag-version
           NEW_VERSION=$(jq -r '.version' package.json)
+          NEW_TAG="v$NEW_VERSION"
+
+          if git rev-parse -q --verify "refs/tags/$NEW_TAG" >/dev/null; then
+            echo "::warning::Tag $NEW_TAG already exists — another run beat us to it or package.json drifted behind tags. Skipping bump."
+            git checkout -- package.json pnpm-lock.yaml
+            echo "skip_remainder=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip_remainder=false" >> "$GITHUB_OUTPUT"
           echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
           echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
           echo "Bumped: $OLD_VERSION → $NEW_VERSION"
 
       - name: Generate changelog entry
-        if: steps.bump-type.outputs.skip != 'true'
+        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -1355,7 +1369,7 @@ jobs:
           fi
 
       - name: Commit, tag, and push
-        if: steps.bump-type.outputs.skip != 'true'
+        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
@@ -1382,7 +1396,7 @@ jobs:
             sleep 5
           done
       - name: Create GitHub Release
-        if: steps.bump-type.outputs.skip != 'true'
+        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
