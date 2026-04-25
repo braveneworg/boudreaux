@@ -17,6 +17,8 @@ vi.mock('@/lib/utils/s3-client', () => ({
 const mockSharpInstance = {
   metadata: vi.fn(),
   resize: vi.fn().mockReturnThis(),
+  clone: vi.fn().mockReturnThis(),
+  webp: vi.fn().mockReturnThis(),
   toBuffer: vi.fn(),
 };
 vi.mock('sharp', () => ({
@@ -66,17 +68,18 @@ describe('generateImageVariantsAction', () => {
     expect(requireRole).toHaveBeenCalledWith('admin');
   });
 
-  it('generates variants for all device sizes smaller than the original', async () => {
+  it('generates JPG + WebP variants for all device sizes smaller than the original', async () => {
     const result = await generateImageVariantsAction(
       'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
     );
 
     expect(result.success).toBe(true);
-    // Original is 2000px wide → all 5 device sizes (640, 750, 828, 1080, 1200) are smaller
-    expect(result.variantsGenerated).toBe(5);
+    // Original is 2000px wide → 5 device sizes (640, 750, 828, 1080, 1200) are smaller.
+    // Each emits an original-format + WebP sibling = 10 variants.
+    expect(result.variantsGenerated).toBe(10);
 
-    // 1 GetObject + 5 PutObject calls
-    expect(mockS3Send).toHaveBeenCalledTimes(6);
+    // 1 GetObject + 10 PutObject calls
+    expect(mockS3Send).toHaveBeenCalledTimes(11);
   });
 
   it('skips widths larger than or equal to the original', async () => {
@@ -87,8 +90,44 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // 800px original → only 640 and 750 are smaller
-    expect(result.variantsGenerated).toBe(2);
+    // 800px original → only 640 and 750 are smaller; JPG + WebP each = 4 variants
+    expect(result.variantsGenerated).toBe(4);
+  });
+
+  it('does not emit WebP sibling when the original is already WebP', async () => {
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/banners/hero.webp'
+    );
+
+    expect(result.success).toBe(true);
+    // 5 device sizes smaller than 2000px, only original-format (webp) variants
+    expect(result.variantsGenerated).toBe(5);
+    expect(mockS3Send).toHaveBeenCalledTimes(6);
+  });
+
+  it('emits a WebP sibling with image/webp content type', async () => {
+    mockSharpInstance.metadata.mockResolvedValue({ width: 700, height: 500 });
+
+    await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
+    );
+
+    // 700px original → only w640 runs: 1 GetObject + 1 JPG PutObject + 1 WebP PutObject = 3 calls
+    expect(mockS3Send).toHaveBeenCalledTimes(3);
+
+    const putCalls = mockS3Send.mock.calls.slice(1).map(([cmd]) => cmd.input ?? cmd);
+    expect(putCalls).toContainEqual(
+      expect.objectContaining({
+        Key: 'media/releases/coverart/album-cover_w640.jpg',
+        ContentType: 'image/jpeg',
+      })
+    );
+    expect(putCalls).toContainEqual(
+      expect.objectContaining({
+        Key: 'media/releases/coverart/album-cover_w640.webp',
+        ContentType: 'image/webp',
+      })
+    );
   });
 
   it('skips SVG files', async () => {

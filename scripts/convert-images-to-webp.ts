@@ -5,23 +5,24 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * One-time batch script to generate width-variant images on S3.
+ * One-time batch script to back-fill WebP siblings for existing raster images
+ * in S3 — typically cover art uploaded before variant generation transcoded
+ * to WebP. For every original raster image under `media/` (JPG/PNG/TIFF/BMP),
+ * this script creates `_w{width}.webp` siblings at each device-size breakpoint.
  *
- * For every original image under `media/` in S3, this script creates
- * resized copies at each device-size breakpoint using the `_w{width}`
- * naming convention (e.g. `hero_w1080.webp`). These variants are what
- * the custom Next.js image loader (`src/lib/image-loader.ts`) resolves.
+ * Idempotent: skips originals that already have their `_w{width}.webp`
+ * siblings present in S3.
  *
  * Usage:
- *   pnpm run images:generate-variants
- *   pnpm run images:generate-variants -- --dry-run
- *   pnpm run images:generate-variants -- --prefix media/banners/
- *   pnpm run images:generate-variants -- --no-invalidate
+ *   pnpm run images:convert-to-webp
+ *   pnpm run images:convert-to-webp -- --dry-run
+ *   pnpm run images:convert-to-webp -- --prefix media/releases/coverart/
+ *   pnpm run images:convert-to-webp -- --no-invalidate
  *
  * Environment Variables:
- *   S3_BUCKET                  - S3 bucket name (required)
- *   AWS_REGION                 - AWS region (default: us-east-1)
- *   CLOUDFRONT_DISTRIBUTION_ID - CloudFront distribution ID (optional)
+ *   S3_BUCKET                    S3 bucket name (required)
+ *   AWS_REGION                   AWS region (default: us-east-1)
+ *   CLOUDFRONT_DISTRIBUTION_ID   CloudFront distribution ID (optional)
  */
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
@@ -32,7 +33,6 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
-import mime from 'mime';
 import sharp from 'sharp';
 
 import {
@@ -52,31 +52,7 @@ dotenv.config();
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION ?? 'us-east-1';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Extensions that cannot be raster-resized (vector, icon, animated). */
-const SKIP_EXTENSIONS = new Set(['.svg', '.ico', '.gif']);
-
-/** Raster image extensions we process. */
-const IMAGE_EXTENSIONS = new Set([
-  '.jpg',
-  '.jpeg',
-  '.png',
-  '.webp',
-  '.avif',
-  '.tiff',
-  '.tif',
-  '.bmp',
-]);
-
-/** Maximum images processed in parallel. */
 const CONCURRENCY = 5;
-
-// ---------------------------------------------------------------------------
-// Logging
-// ---------------------------------------------------------------------------
 
 const colors = {
   red: '\x1b[31m',
@@ -95,16 +71,10 @@ function log(message: string, type: 'info' | 'success' | 'warning' | 'error' = '
     warning: colors.yellow,
     error: colors.red,
   };
-  const color = colorMap[type];
-  const formatted = `${color}[GENERATE-VARIANTS]${colors.reset} ${message}`;
-
-  if (type === 'error') {
-    console.error(formatted);
-  } else if (type === 'warning') {
-    console.warn(formatted);
-  } else {
-    console.info(formatted);
-  }
+  const formatted = `${colorMap[type]}[CONVERT-WEBP]${colors.reset} ${message}`;
+  if (type === 'error') console.error(formatted);
+  else if (type === 'warning') console.warn(formatted);
+  else console.info(formatted);
 }
 
 function formatBytes(bytes: number): string {
@@ -119,22 +89,21 @@ function formatBytes(bytes: number): string {
 // S3 helpers
 // ---------------------------------------------------------------------------
 
-async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Promise<string[]> {
-  const keys: string[] = [];
+async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Promise<Set<string>> {
+  const keys = new Set<string>();
   let continuationToken: string | undefined;
 
   do {
-    const command = new ListObjectsV2Command({
-      Bucket: bucket,
-      Prefix: prefix,
-      ContinuationToken: continuationToken,
-    });
-    const response = await s3.send(command);
+    const response = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
 
     for (const obj of response.Contents ?? []) {
-      if (obj.Key) {
-        keys.push(obj.Key);
-      }
+      if (obj.Key) keys.add(obj.Key);
     }
 
     continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
@@ -144,15 +113,10 @@ async function listAllObjects(s3: S3Client, bucket: string, prefix: string): Pro
 }
 
 async function downloadObject(s3: S3Client, bucket: string, key: string): Promise<Buffer> {
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const response = await s3.send(command);
+  const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const stream = response.Body;
+  if (!stream) throw new Error(`Empty body for ${key}`);
 
-  if (!stream) {
-    throw new Error(`Empty body for ${key}`);
-  }
-
-  // Collect stream into buffer
   const chunks: Uint8Array[] = [];
   for await (const chunk of stream as AsyncIterable<Uint8Array>) {
     chunks.push(chunk);
@@ -164,21 +128,18 @@ async function uploadBuffer(
   s3: S3Client,
   bucket: string,
   key: string,
-  buffer: Buffer,
-  contentType: string
+  buffer: Buffer
 ): Promise<void> {
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: buffer,
-    ContentType: contentType,
-  });
-  await s3.send(command);
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000, immutable',
+    })
+  );
 }
-
-// ---------------------------------------------------------------------------
-// CloudFront invalidation (mirrors upload-images.ts)
-// ---------------------------------------------------------------------------
 
 async function invalidateCloudFront(
   distributionId: string,
@@ -196,7 +157,7 @@ async function invalidateCloudFront(
       new CreateInvalidationCommand({
         DistributionId: distributionId,
         InvalidationBatch: {
-          CallerReference: `gen-variants-wildcard-${Date.now()}`,
+          CallerReference: `convert-webp-wildcard-${Date.now()}`,
           Paths: { Quantity: 1, Items: ['/*'] },
         },
       })
@@ -211,7 +172,7 @@ async function invalidateCloudFront(
     new CreateInvalidationCommand({
       DistributionId: distributionId,
       InvalidationBatch: {
-        CallerReference: `gen-variants-${Date.now()}`,
+        CallerReference: `convert-webp-${Date.now()}`,
         Paths: { Quantity: paths.length, Items: paths },
       },
     })
@@ -220,7 +181,7 @@ async function invalidateCloudFront(
 }
 
 // ---------------------------------------------------------------------------
-// Image processing
+// Key helpers
 // ---------------------------------------------------------------------------
 
 function getExtension(key: string): string {
@@ -228,22 +189,20 @@ function getExtension(key: string): string {
   return dot === -1 ? '' : key.substring(dot).toLowerCase();
 }
 
-function isProcessableImage(key: string): boolean {
+function isTranscodableOriginal(key: string): boolean {
   const ext = getExtension(key);
-  return IMAGE_EXTENSIONS.has(ext) && !SKIP_EXTENSIONS.has(ext);
+  return WEBP_TRANSCODE_EXTENSIONS.has(ext) && !IMAGE_VARIANT_SUFFIX_REGEX.test(key);
 }
 
-function isExistingVariant(key: string): boolean {
-  return IMAGE_VARIANT_SUFFIX_REGEX.test(key);
-}
-
-function buildVariantKey(originalKey: string, width: number, overrideExt?: string): string {
+function buildWebpVariantKey(originalKey: string, width: number): string {
   const dot = originalKey.lastIndexOf('.');
-  if (dot === -1) return `${originalKey}_w${width}${overrideExt ?? ''}`;
-  const base = originalKey.substring(0, dot);
-  const ext = overrideExt ?? originalKey.substring(dot);
-  return `${base}_w${width}${ext}`;
+  if (dot === -1) return `${originalKey}_w${width}.webp`;
+  return `${originalKey.substring(0, dot)}_w${width}.webp`;
 }
+
+// ---------------------------------------------------------------------------
+// Per-image processing
+// ---------------------------------------------------------------------------
 
 interface ProcessResult {
   originalKey: string;
@@ -257,6 +216,7 @@ async function processImage(
   s3: S3Client,
   bucket: string,
   key: string,
+  existingKeys: Set<string>,
   dryRun: boolean
 ): Promise<ProcessResult> {
   const result: ProcessResult = {
@@ -266,73 +226,58 @@ async function processImage(
     uploadedVariantKeys: [],
   };
 
+  const missingWidths = IMAGE_VARIANT_DEVICE_SIZES.filter(
+    (w) => !existingKeys.has(buildWebpVariantKey(key, w))
+  );
+
+  if (missingWidths.length === 0) {
+    result.variantsSkipped = IMAGE_VARIANT_DEVICE_SIZES.length;
+    return result;
+  }
+
   try {
     const buffer = await downloadObject(s3, bucket, key);
-    const metadata = await sharp(buffer).metadata();
-    const originalWidth = metadata.width ?? 0;
-
+    const originalWidth = (await sharp(buffer).metadata()).width ?? 0;
     if (originalWidth === 0) {
       result.error = 'Could not determine image width';
       return result;
     }
 
-    const contentType = mime.getType(key) ?? 'application/octet-stream';
-    const ext = getExtension(key);
-    const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(ext);
-
     for (const targetWidth of IMAGE_VARIANT_DEVICE_SIZES) {
+      const webpKey = buildWebpVariantKey(key, targetWidth);
+
+      if (existingKeys.has(webpKey)) {
+        result.variantsSkipped++;
+        continue;
+      }
+
       if (targetWidth >= originalWidth) {
         result.variantsSkipped++;
         continue;
       }
 
-      const variantKey = buildVariantKey(key, targetWidth);
-      const webpVariantKey = shouldTranscodeToWebp
-        ? buildVariantKey(key, targetWidth, '.webp')
-        : null;
-
       if (dryRun) {
         log(
-          `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${variantKey} (${targetWidth}px from ${originalWidth}px)`,
+          `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpKey} (${targetWidth}px WebP from ${originalWidth}px)`,
           'info'
         );
         result.variantsUploaded++;
-        if (webpVariantKey) {
-          log(
-            `  ${colors.dim}[dry-run]${colors.reset} Would generate: ${webpVariantKey} (${targetWidth}px WebP)`,
-            'info'
-          );
-          result.variantsUploaded++;
-        }
         continue;
       }
 
-      const pipeline = sharp(buffer).resize(targetWidth, undefined, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      });
+      const webpBuffer = await sharp(buffer)
+        .resize(targetWidth, undefined, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: WEBP_QUALITY })
+        .toBuffer();
 
-      const resized = await pipeline.clone().toBuffer();
-      await uploadBuffer(s3, bucket, variantKey, resized, contentType);
+      await uploadBuffer(s3, bucket, webpKey, webpBuffer);
       result.variantsUploaded++;
-      result.uploadedVariantKeys.push(variantKey);
+      result.uploadedVariantKeys.push(webpKey);
 
       log(
-        `  ${colors.green}+${colors.reset} ${variantKey} (${targetWidth}px, ${formatBytes(resized.length)})`,
+        `  ${colors.green}+${colors.reset} ${webpKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
         'info'
       );
-
-      if (webpVariantKey) {
-        const webpBuffer = await pipeline.clone().webp({ quality: WEBP_QUALITY }).toBuffer();
-        await uploadBuffer(s3, bucket, webpVariantKey, webpBuffer, 'image/webp');
-        result.variantsUploaded++;
-        result.uploadedVariantKeys.push(webpVariantKey);
-
-        log(
-          `  ${colors.green}+${colors.reset} ${webpVariantKey} (${targetWidth}px WebP, ${formatBytes(webpBuffer.length)})`,
-          'info'
-        );
-      }
     }
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Unknown error';
@@ -390,9 +335,7 @@ function parseArgs(args: string[]): CliOptions {
       options.invalidateCache = false;
     } else if ((arg === '--prefix' || arg === '-p') && i + 1 < args.length) {
       options.prefix = args[++i];
-      if (!options.prefix.endsWith('/')) {
-        options.prefix += '/';
-      }
+      if (!options.prefix.endsWith('/')) options.prefix += '/';
     }
   }
 
@@ -408,16 +351,17 @@ async function main(): Promise<void> {
 
   if (args.includes('--help') || args.includes('-h')) {
     console.info(`
-${colors.cyan}Generate Image Width Variants${colors.reset}
+${colors.cyan}Convert Existing Raster Images to WebP Variants${colors.reset}
 
-Download original images from S3, resize to each device-size breakpoint,
-and upload the variants with _w{width} suffix naming.
+Back-fill _w{width}.webp siblings for cover art uploaded before the variant
+pipeline started transcoding to WebP. Idempotent — skips variants that already
+exist in S3.
 
 ${colors.yellow}Usage:${colors.reset}
-  pnpm run images:generate-variants
-  pnpm run images:generate-variants -- --dry-run
-  pnpm run images:generate-variants -- --prefix media/banners/
-  pnpm run images:generate-variants -- --no-invalidate
+  pnpm run images:convert-to-webp
+  pnpm run images:convert-to-webp -- --dry-run
+  pnpm run images:convert-to-webp -- --prefix media/releases/coverart/
+  pnpm run images:convert-to-webp -- --no-invalidate
 
 ${colors.yellow}Options:${colors.reset}
   --dry-run           List what would be generated without uploading
@@ -441,18 +385,14 @@ ${colors.yellow}Environment Variables:${colors.reset}
   const s3 = new S3Client({ region: AWS_REGION });
 
   log(`Scanning s3://${S3_BUCKET}/${options.prefix}...`, 'info');
-  if (options.dryRun) {
-    log('DRY RUN — no files will be uploaded', 'warning');
-  }
+  if (options.dryRun) log('DRY RUN — no files will be uploaded', 'warning');
 
-  // 1. List all objects
   const allKeys = await listAllObjects(s3, S3_BUCKET, options.prefix);
-  log(`Found ${allKeys.length} total object(s)`, 'info');
+  log(`Found ${allKeys.size} total object(s)`, 'info');
 
-  // 2. Filter to processable originals
-  const originals = allKeys.filter((key) => isProcessableImage(key) && !isExistingVariant(key));
+  const originals = [...allKeys].filter(isTranscodableOriginal);
   log(
-    `${originals.length} original image(s) to process (excluding SVG/ICO/GIF and existing variants)`,
+    `${originals.length} transcodable original(s) to process (JPG/PNG/TIFF/BMP, excluding existing variants)`,
     'info'
   );
 
@@ -461,7 +401,6 @@ ${colors.yellow}Environment Variables:${colors.reset}
     process.exit(0);
   }
 
-  // 3. Process with concurrency
   const uploadedKeys: string[] = [];
   let totalVariants = 0;
   let totalSkipped = 0;
@@ -469,7 +408,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
 
   const results = await mapWithConcurrency(originals, CONCURRENCY, async (key) => {
     log(`Processing: ${key}`, 'info');
-    return processImage(s3, S3_BUCKET, key, options.dryRun);
+    return processImage(s3, S3_BUCKET, key, allKeys, options.dryRun);
   });
 
   for (const r of results) {
@@ -479,13 +418,11 @@ ${colors.yellow}Environment Variables:${colors.reset}
       totalErrors++;
       log(`Error processing ${r.originalKey}: ${r.error}`, 'error');
     }
-    // Collect exact uploaded variant keys for invalidation
     if (!options.dryRun && r.uploadedVariantKeys.length > 0) {
       uploadedKeys.push(...r.uploadedVariantKeys);
     }
   }
 
-  // 4. CloudFront invalidation
   const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
   if (!options.dryRun && options.invalidateCache && distributionId && uploadedKeys.length > 0) {
     try {
@@ -496,10 +433,9 @@ ${colors.yellow}Environment Variables:${colors.reset}
     }
   }
 
-  // 5. Summary
   console.info('\n' + '='.repeat(60));
   log(
-    `Summary: ${originals.length} originals → ${totalVariants} variants generated, ${totalSkipped} skipped (larger than original), ${totalErrors} error(s)`,
+    `Summary: ${originals.length} originals → ${totalVariants} WebP variants generated, ${totalSkipped} skipped, ${totalErrors} error(s)`,
     totalErrors > 0 ? 'warning' : 'success'
   );
   console.info('='.repeat(60));

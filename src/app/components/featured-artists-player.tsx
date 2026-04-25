@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
@@ -97,31 +98,6 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
   const handleTogglePlay = useCallback(() => {
     playerControls?.toggle();
   }, [playerControls]);
-
-  /**
-   * Get the cover art URL for a featured artist
-   */
-  const getCoverArt = (featured: FeaturedArtist): string | null => {
-    if (featured.coverArt) {
-      return featured.coverArt;
-    }
-    if (featured.release?.coverArt) {
-      return featured.release.coverArt;
-    }
-    // Fallback to first image in the release
-    if (featured.release?.images?.length && featured.release.images[0].src) {
-      return featured.release.images[0].src;
-    }
-    // Fallback to first artist's first image
-    if (featured.artists?.length > 0) {
-      for (const artist of featured.artists) {
-        if (artist.images?.length > 0) {
-          return artist.images[0].src;
-        }
-      }
-    }
-    return null;
-  };
 
   const handleSelectArtist = (artist: FeaturedArtist, options?: { autoPlay?: boolean }) => {
     // If this is a click-initiated reselect of the current artist, toggle play/pause
@@ -276,7 +252,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               {/* Interactive Cover Art — aspect-square container prevents CLS */}
               <div className="w-full aspect-square rounded-t-lg overflow-hidden bg-muted">
                 {(() => {
-                  const coverArt = getCoverArt(selectedArtist);
+                  const coverArt = getFeaturedArtistCoverArt(selectedArtist);
                   if (!coverArt) return null;
                   return (
                     <MediaPlayer.InteractiveCoverArt

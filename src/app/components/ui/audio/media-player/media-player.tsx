@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -174,33 +175,6 @@ const FeaturedArtistCarousel = ({
     };
   }, [carouselApi, handleSettle]);
 
-  /**
-   * Get the cover art URL for a featured artist
-   */
-  const getCoverArt = (featured: FeaturedArtist): string | null => {
-    // Use featured coverArt if available
-    if (featured.coverArt) {
-      return featured.coverArt;
-    }
-    // Fall back to release coverArt
-    if (featured.release?.coverArt) {
-      return featured.release.coverArt;
-    }
-    // Fall back to first image in the release
-    if (featured.release?.images?.length && featured.release.images[0].src) {
-      return featured.release.images[0].src;
-    }
-    // Fall back to first artist's first image
-    if (featured.artists?.length > 0) {
-      for (const artist of featured.artists) {
-        if (artist.images?.length > 0) {
-          return artist.images[0].src;
-        }
-      }
-    }
-    return null;
-  };
-
   return (
     <Carousel
       aria-label="Featured Artists"
@@ -213,7 +187,7 @@ const FeaturedArtistCarousel = ({
         <CarouselPrevious className="relative left-0 top-auto translate-y-0 shrink-0" />
         <CarouselContent className="-ml-2">
           {sortedArtists.map((featured, index) => {
-            const coverArt = getCoverArt(featured);
+            const coverArt = getFeaturedArtistCoverArt(featured);
             const displayName = getFeaturedArtistDisplayName(featured);
             const imageError = failedImages.has(featured.id);
 
@@ -388,8 +362,12 @@ const InteractiveCoverArt = ({
           alt={alt}
           fill
           className="object-cover"
-          sizes="100vw"
+          // Container is `w-full max-w-xl` (36rem = 576px). On mobile the slot
+          // is viewport-wide; on sm+ it's capped at 576px. Telling the browser
+          // this lets it pick w640 on desktop instead of w1080/w1200.
+          sizes="(max-width: 640px) 100vw, 576px"
           priority={priority}
+          fetchPriority={priority ? 'high' : undefined}
           onError={() => setImageError(true)}
         />
       )}

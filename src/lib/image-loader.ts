@@ -25,6 +25,14 @@ interface ImageLoaderParams {
 
 const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 
+/**
+ * Raster extensions that get transcoded to `.webp` by the variant generator.
+ * The loader mirrors that naming so `<Image>` fetches the smaller WebP variant.
+ * Must stay in sync with `WEBP_TRANSCODE_EXTENSIONS` in
+ * `src/lib/constants/image-variants.ts`.
+ */
+const WEBP_TRANSCODE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']);
+
 function appendWidthSuffix(pathname: string, width: number): string {
   const lastDot = pathname.lastIndexOf('.');
 
@@ -34,12 +42,14 @@ function appendWidthSuffix(pathname: string, width: number): string {
 
   const base = pathname.substring(0, lastDot);
   const ext = pathname.substring(lastDot);
+  const extLower = ext.toLowerCase();
 
-  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(ext.toLowerCase())) {
+  if (SKIP_WIDTH_SUFFIX_EXTENSIONS.has(extLower)) {
     return pathname;
   }
 
-  return `${base}_w${width}${ext}`;
+  const outputExt = WEBP_TRANSCODE_EXTENSIONS.has(extLower) ? '.webp' : ext;
+  return `${base}_w${width}${outputExt}`;
 }
 
 /**

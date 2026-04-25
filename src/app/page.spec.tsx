@@ -36,6 +36,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchQuery: mockPrefetchQuery,
+    getQueryData: vi.fn().mockReturnValue(undefined),
   }),
 }));
 
