@@ -4,6 +4,7 @@
 import { render } from '@testing-library/react';
 
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
 
 import HomeLoading from './loading';
 
@@ -26,9 +27,13 @@ describe('HomeLoading', () => {
       ''
     );
 
+    const srcset = img?.getAttribute('srcset');
+    const firstSize = IMAGE_VARIANT_DEVICE_SIZES[0];
+    const lastSize = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
+
     expect(img?.getAttribute('src')).toContain(expectedFilenameFragment);
-    expect(img?.getAttribute('srcset')).toContain('640w');
-    expect(img?.getAttribute('srcset')).toContain('1200w');
+    expect(srcset).toContain(`${firstSize}w`);
+    expect(srcset).toContain(`${lastSize}w`);
   });
 
   it('reserves banner space using the shared aspect-ratio constant', () => {
