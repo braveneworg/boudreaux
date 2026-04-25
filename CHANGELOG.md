@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.57.0] - 2026-04-25
+
+### Added
+
+- Fix lint and type errors (#409)\n- Fix lint and type errors (#409)\n- Fix lint and type errors (#409)\n- Develop/fix console warnings and lcp (#408)\n- Develop/fix console warnings and lcp (#408)\n- Develop/fix console warnings and lcp (#408)\n- Fix lint and type errors (#409)\n
+
 ## [4.56.0] - 2026-04-25
 
 ### Added
