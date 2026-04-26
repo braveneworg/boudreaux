@@ -57,7 +57,7 @@ describe('UsernameLink', () => {
     render(<UsernameLink username="testuser" />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass('text-sm', 'text-muted-foreground', 'hover:text-foreground');
+    expect(link).toHaveClass('text-sm', 'text-zinc-950-foreground', 'hover:text-foreground');
   });
 
   it('handles empty username gracefully', () => {

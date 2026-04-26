@@ -692,7 +692,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
               {/* Images Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-zinc-950-foreground">
                   Add images for this artist. You can drag to reorder them. Images will be uploaded
                   after the artist is created or updated.
                 </p>
@@ -834,7 +834,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     </FormItem>
                   )}
                 />
-                <p className="text-xs text-muted-foreground">Only used for bands</p>
+                <p className="text-xs text-zinc-950-foreground">Only used for bands</p>
               </section>
             </CardContent>
 

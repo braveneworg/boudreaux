@@ -22,7 +22,7 @@ As a distinguished senior full-stack TypeScript developer with over a decade of 
 
 ## Project Context
 
-Next.js v16.1.6+ app with TypeScript, Tanstack Query for data fetching and mutations, Tailwind v4, shadcn/ui, React Hook Form, Zod, Auth.js, Prisma, MongoDB, Vitest, Docker, AWS, and more. The project follows best practices for file structure, naming conventions, styling, and testing.
+Next.js 16 app with TypeScript 6 (strict), React 19, Tailwind v4, shadcn/ui, React Hook Form 7, Zod 4, Auth.js (next-auth v5), Prisma 6 + MongoDB, AWS S3 / SES, Stripe 21, TanStack Query 5, Vitest 4, Playwright, Docker. The project follows best practices for file structure, naming conventions, styling, and testing. Versions are sourced from `package.json`; consult `CLAUDE.md` for the canonical stack reference.
 
 ## Key Rules
 
@@ -34,7 +34,7 @@ Next.js v16.1.6+ app with TypeScript, Tanstack Query for data fetching and mutat
 - Use responsive design principles
 - Prioritize accessibility (ARIA attributes, keyboard navigation)
 - Use icons from lucide-react
-- Use Roboto font for UI text
+- Use Jost font for UI text
 
 ### Components
 
@@ -56,7 +56,7 @@ Next.js v16.1.6+ app with TypeScript, Tanstack Query for data fetching and mutat
 - Always use React Hook Form + Zod validation
 - First, try to use components defined in src/app/components/forms/fields, and use shadcn/ui components
 - Define Zod schemas for form validation
-- Schemas in lib/validations/
+- Schemas in src/lib/validation/
 - Pattern:
 
 ```typescript
@@ -67,7 +67,8 @@ const form = useForm({
 
 ### Data Fetching
 
-- Use Server Actions for mutations (in app/actions/)
+- Use Server Actions for mutations (in src/lib/actions/)
+- For queries from Client Components, call API route handlers (use TanStack Query for caching)
 - Fetch directly in Server Components
 - Use fetch with caching options:
 
@@ -76,9 +77,9 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 ```
 
 - Always validate with Zod
-- Use decorators for auth checks (e.g. withAuth, withAdmin)
-- Use Prisma for DB access (in lib/prisma/)
-- Use services/ for complex business logic
+- Use decorators for auth checks (`withAuth`, `withAdmin` from `src/lib/decorators/with-auth.ts`)
+- Use Prisma via the repository pattern (in src/lib/repositories/) — never call Prisma directly from components or route handlers
+- Use src/lib/services/ for business logic that composes repositories
 - Use Prisma transactions for multi-step DB ops
 - Use Prisma Client in Server Components or Server Actions only
 - Avoid using Prisma Client in Client Components
@@ -86,20 +87,33 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ### File Structure
 
-- app/ - pages and layouts
-- components/ui/ - shadcn components
-- lib/ - utilities, validations, hooks
+- src/app/ - pages, layouts, API routes (App Router)
+- src/app/components/ - shared feature components
+- src/app/components/ui/ - shadcn/ui primitives (alias `@/ui/*` or `@/components/ui/*`)
+- src/app/components/forms/fields/ - reusable RHF/Zod field components
+- src/app/hooks/ - client-side React hooks (TanStack Query, etc.)
+- src/lib/actions/ - Server Actions ('use server')
+- src/lib/repositories/ - Prisma data-access layer
+- src/lib/services/ - business logic services
+- src/lib/validation/ - Zod schemas
+- src/lib/decorators/ - withAuth, withAdmin, withRateLimit
+- src/lib/email/, src/lib/utils/ - email templates and shared utilities
+- e2e/ - Playwright E2E tests
+- scripts/ - tsx scripts (mongo backup, S3 ops, image variants)
 
 ### Development Workflow
 
-- Run `pnpm run dev` to start the development server
+- Run `pnpm run dev` to start the development server (Turbopack)
 - Run `pnpm run build` to create a production build
-- Run `pnpm run lint` to check code quality
-- Run `pnpm run lint` to check and auto-fix linting issues
+- Run `pnpm run lint` to check code quality and auto-fix linting issues
 - Run `pnpm run format` to format code with Prettier
-- Run `pnpm run test` to run tests in watch mode
-- Run `pnpm run test:run` to run all tests once
+- Run `pnpm run typecheck` to run tsc against tracked types
+- Run `pnpm run test` to run unit tests in watch mode
+- Run `pnpm run test:run` to run all unit tests once
 - Run `pnpm run test:coverage` to generate coverage reports
+- Run `pnpm run test:coverage:check` to validate coverage against `COVERAGE_METRICS.md`
+- Run `pnpm run test:e2e` to run Playwright E2E tests
+- Run `pnpm run stripe` to forward Stripe webhooks to localhost:3000
 - Always run tests after making changes
 - Always run lint and format before committing
 
@@ -166,7 +180,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 - Unit tests with Vitest
 - Component tests with @testing-library/react
-- Place tests next to files: Component.test.tsx
+- Place tests next to source files using the `.spec.ts` / `.spec.tsx` suffix (e.g. `component.spec.tsx`)
 - Mock external dependencies
 - Test edge cases and error handling
 - Use descriptive test names
@@ -215,7 +229,6 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 - Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
-- Always put the tMPL license header in all source files from HEADER.txt
 - Always check if global styles are controlling the styles of a component before adding new styles to the component
 - Always use canonical tailwind v4 utility classes for styling and avoid adding custom CSS unless necessary
 - Always check for existing components in the codebase before creating new ones, and reuse them when possible to maintain consistency and reduce code duplication

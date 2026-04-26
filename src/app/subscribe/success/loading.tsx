@@ -9,7 +9,7 @@ const SubscribeSuccessLoading = () => (
       role="status"
       aria-label="Loading"
     />
-    <p className="text-muted-foreground mt-6 text-lg">Confirming your subscription…</p>
+    <p className="text-zinc-950-foreground mt-6 text-lg">Confirming your subscription…</p>
   </div>
 );
 

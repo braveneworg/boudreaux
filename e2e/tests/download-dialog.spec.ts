@@ -33,7 +33,7 @@ test.describe('Download Dialog — Purchased User', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     // Click the download trigger button
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -46,7 +46,7 @@ test.describe('Download Dialog — Purchased User', () => {
   test('shows format options via multi-combobox', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -64,7 +64,7 @@ test.describe('Download Dialog — Purchased User', () => {
   test('shows download button with format count after selecting formats', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -93,7 +93,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
   test('opens download dialog with free and premium options', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -110,7 +110,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
   test('shows subscribe CTA in download dialog', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await downloadButton.click();
 
     // Wait for dialog
@@ -125,7 +125,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
   test('shows PWYW amount input when premium option selected', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await downloadButton.click();
 
     // Wait for dialog
@@ -156,7 +156,7 @@ test.describe('Download Dialog — Multi-format selection', () => {
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -181,7 +181,7 @@ test.describe('Download Dialog — Multi-format selection', () => {
   test('shows selected format pills below combobox', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -215,7 +215,7 @@ test.describe('Download Dialog — Free download flow', () => {
   test('can select free download option and proceed', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 

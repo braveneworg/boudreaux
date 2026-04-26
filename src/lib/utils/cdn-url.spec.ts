@@ -63,6 +63,27 @@ describe('buildCdnUrl', () => {
     expect(buildCdnUrl(s3Key)).toBe(s3Key);
   });
 
+  it('should return the E2E MP3 fallback for mp3 assets when E2E_MODE is true', () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    expect(buildCdnUrl(s3Key)).toBe('/e2e/audio/e2e-track-320.mp3');
+  });
+
+  it('should return the E2E MP3 fallback for mp3 assets when NEXT_PUBLIC_E2E_MODE is true', () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
+
+    expect(buildCdnUrl(s3Key)).toBe('/e2e/audio/e2e-track-320.mp3');
+  });
+
+  it('should keep non-mp3 assets unchanged in E2E mode', () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.public.com');
+
+    expect(buildCdnUrl('releases/abc/audio/track.flac')).toBe(
+      'https://cdn.public.com/releases/abc/audio/track.flac'
+    );
+  });
+
   it('should handle http:// prefix on CDN_DOMAIN', () => {
     delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
     vi.stubEnv('CDN_DOMAIN', 'http://cdn.example.com');

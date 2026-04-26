@@ -824,7 +824,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
                 {/* Show all other formats in a collapsible section */}
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  <summary className="cursor-pointer text-sm text-zinc-950-foreground hover:text-foreground">
                     Show all formats ({Object.keys(FORMATS).length} total)
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -865,7 +865,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
               {/* Images Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-zinc-950-foreground">
                   Add images for this release. You can drag to reorder them. Images will be uploaded
                   after the release is created or updated.
                 </p>
@@ -989,55 +989,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   {/* Download Analytics Section - Edit mode only */}
                   <section className="space-y-4">
                     <DownloadAnalyticsDashboard releaseId={initialReleaseId!} />
-                  </section>
-
-                  <Separator />
-
-                  {/* Featured Section - Edit mode only */}
-                  <section className="space-y-4">
-                    <h2 className="font-semibold">Featured Settings</h2>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <FormField
-                        control={control}
-                        name="featuredOn"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Featured On</FormLabel>
-                            <FormControl>
-                              <DatePicker
-                                fieldName={field.name}
-                                onSelect={handleSelectDate}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={control}
-                        name="featuredUntil"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Featured Until</FormLabel>
-                            <FormControl>
-                              <DatePicker
-                                fieldName={field.name}
-                                onSelect={handleSelectDate}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <TextField
-                      control={control}
-                      name="featuredDescription"
-                      label="Featured Description"
-                      placeholder="Special description when featured"
-                    />
                   </section>
                 </>
               )}

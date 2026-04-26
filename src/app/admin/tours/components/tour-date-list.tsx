@@ -170,7 +170,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">Tour Dates</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-zinc-950-foreground">
               Manage individual show dates for this tour
             </p>
           </div>
@@ -185,9 +185,9 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
         {tourDates.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="mb-4 size-12 text-muted-foreground" />
+              <Calendar className="mb-4 size-12 text-zinc-950-foreground" />
               <h4 className="mb-2 text-lg font-medium">No tour dates yet</h4>
-              <p className="mb-4 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-zinc-950-foreground">
                 Get started by adding your first show date
               </p>
               <Button type="button" onClick={handleAddClick} variant="outline">
@@ -205,14 +205,14 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                     <div className="flex-1 space-y-3">
                       {/* Date and Time */}
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="size-4 text-muted-foreground" />
+                        <Calendar className="size-4 text-zinc-950-foreground" />
                         <span className="font-medium">
                           {formatTourDate(tourDate.startDate, tourDate.timeZone)}
                           {tourDate.endDate &&
                             ` - ${formatTourDate(tourDate.endDate, tourDate.timeZone)}`}
                         </span>
                         <Separator orientation="vertical" className="h-4" />
-                        <span className="text-muted-foreground">
+                        <span className="text-zinc-950-foreground">
                           {formatTourTime(tourDate.showStartTime, tourDate.timeZone, {
                             ...(tourDate.timeZone ? { timeZoneName: 'short' } : {}),
                           })}{' '}
@@ -225,8 +225,8 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
 
                       {/* Doors Open */}
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="size-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">
+                        <Calendar className="size-4 text-zinc-950-foreground" />
+                        <span className="text-zinc-950-foreground">
                           Doors:{' '}
                           {tourDate.doorsOpenAt
                             ? formatTourTime(tourDate.doorsOpenAt, tourDate.timeZone)
@@ -236,7 +236,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
 
                       {/* Venue */}
                       <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="size-4 text-muted-foreground" />
+                        <MapPin className="size-4 text-zinc-950-foreground" />
                         <span>
                           {tourDate.venue.name}
                           {tourDate.venue.city && `, ${tourDate.venue.city}`}
@@ -246,7 +246,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
 
                       {/* Headliners */}
                       <div className="flex items-start gap-2 text-sm">
-                        <Music className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <Music className="mt-0.5 size-4 shrink-0 text-zinc-950-foreground" />
                         <ArtistPillList
                           tourDateId={tourDate.id}
                           headliners={tourDate.headliners}
@@ -276,7 +276,9 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                           {tourDate.ticketPrices && (
                             <>
                               <Separator orientation="vertical" className="h-4" />
-                              <span className="text-muted-foreground">{tourDate.ticketPrices}</span>
+                              <span className="text-zinc-950-foreground">
+                                {tourDate.ticketPrices}
+                              </span>
                             </>
                           )}
                         </div>
@@ -285,7 +287,7 @@ export default function TourDateList({ tourId, onDialogOpenChange }: TourDateLis
                       {/* Notes */}
                       {tourDate.notes && (
                         <div className="mt-2 rounded-md bg-muted p-3 text-sm">
-                          <p className="text-muted-foreground">{tourDate.notes}</p>
+                          <p className="text-zinc-950-foreground">{tourDate.notes}</p>
                         </div>
                       )}
                     </div>

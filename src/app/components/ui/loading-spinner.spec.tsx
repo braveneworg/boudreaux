@@ -49,7 +49,7 @@ describe('LoadingSpinner', () => {
   it('loading text has muted foreground style', () => {
     render(<LoadingSpinner />);
 
-    expect(screen.getByText('Loading...')).toHaveClass('text-muted-foreground');
+    expect(screen.getByText('Loading...')).toHaveClass('text-zinc-950-foreground');
   });
 
   it('loading text has small text size', () => {

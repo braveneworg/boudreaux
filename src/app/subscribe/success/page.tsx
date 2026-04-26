@@ -35,7 +35,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Subscribe</h1>
-        <p className="text-muted-foreground mt-4 text-lg">
+        <p className="text-zinc-950-foreground mt-4 text-lg">
           It looks like you arrived here without completing checkout.
         </p>
       </div>
@@ -46,7 +46,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Something Went Wrong</h1>
-        <p className="text-muted-foreground mt-4 text-lg">
+        <p className="text-zinc-950-foreground mt-4 text-lg">
           We could not verify your subscription. Please contact support if you believe this is an
           error.
         </p>
@@ -70,12 +70,12 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
       return (
         <div className="mx-auto max-w-2xl px-4 py-16 text-center">
           <h1 className="text-3xl font-bold tracking-tight">Welcome to the Family!</h1>
-          <p className="text-muted-foreground mt-4 text-lg">
+          <p className="text-zinc-950-foreground mt-4 text-lg">
             Thank you for subscribing! You now have access to all music on the Fake Four Inc. record
             label.
           </p>
           {customerEmail && (
-            <p className="text-muted-foreground mt-2 text-sm">
+            <p className="text-zinc-950-foreground mt-2 text-sm">
               A confirmation email will be sent to {maskEmail(customerEmail)}.
             </p>
           )}
@@ -86,7 +86,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Processing Your Subscription</h1>
-        <p className="text-muted-foreground mt-4 text-lg">
+        <p className="text-zinc-950-foreground mt-4 text-lg">
           Your payment is being processed. You will receive a confirmation email shortly.
         </p>
       </div>
@@ -95,7 +95,7 @@ const SubscribeSuccessPage = async ({ searchParams }: SubscribeSuccessPageProps)
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Something Went Wrong</h1>
-        <p className="text-muted-foreground mt-4 text-lg">
+        <p className="text-zinc-950-foreground mt-4 text-lg">
           We could not verify your subscription. Please contact support if you believe this is an
           error.
         </p>

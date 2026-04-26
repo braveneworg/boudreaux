@@ -178,6 +178,9 @@ vi.mock('lucide-react', () => ({
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
   ChevronUp: () => <span data-testid="chevron-up-icon" />,
   EllipsisVertical: () => <span data-testid="ellipsis-vertical-icon" />,
+  Eye: ({ className }: { className?: string }) => (
+    <span data-testid="eye-icon" className={className} />
+  ),
   Pause: ({ className }: { className?: string }) => (
     <span data-testid="pause-icon" className={className} />
   ),

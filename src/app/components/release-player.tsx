@@ -14,7 +14,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import nextDynamic from 'next/dynamic';
 
-import { DownloadTriggerButton } from '@/app/components/download-trigger-button';
+import { Download } from 'lucide-react';
+
+import { MediaActionLink } from '@/app/components/media-action-link';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
@@ -153,27 +155,27 @@ export const ReleasePlayer = ({
     <MediaPlayer className="mb-2">
       <div className="space-y-2 mt-2">
         {hasFiles && currentFile && primaryArtist && (
-          <>
-            <DownloadDialog
-              artistName={getArtistDisplayName(primaryArtist)}
-              releaseId={releaseId}
-              releaseTitle={releaseTitle}
-              suggestedPrice={suggestedPrice}
-              hasPurchase={hasPurchase}
-              purchasedAt={purchasedAt}
-              downloadCount={downloadCount}
-              availableFormats={availableFormats}
-            >
-              <DownloadTriggerButton />
-            </DownloadDialog>
-            <MediaPlayer.FormatFileListDrawer
-              files={files}
-              currentFileId={currentFile.id}
-              onFileSelect={handleFileSelect}
-              artistName={getArtistDisplayName(primaryArtist)}
-              releaseTitle={release.title ?? ''}
-            />
-          </>
+          <MediaPlayer.FormatFileListDrawer
+            files={files}
+            currentFileId={currentFile.id}
+            onFileSelect={handleFileSelect}
+            artistName={getArtistDisplayName(primaryArtist)}
+            releaseTitle={release.title ?? ''}
+            downloadTrigger={
+              <DownloadDialog
+                artistName={getArtistDisplayName(primaryArtist)}
+                releaseId={releaseId}
+                releaseTitle={releaseTitle}
+                suggestedPrice={suggestedPrice}
+                hasPurchase={hasPurchase}
+                purchasedAt={purchasedAt}
+                downloadCount={downloadCount}
+                availableFormats={availableFormats}
+              >
+                <MediaActionLink icon={Download} label="Download" />
+              </DownloadDialog>
+            }
+          />
         )}
 
         <div className="flex flex-col items-center">

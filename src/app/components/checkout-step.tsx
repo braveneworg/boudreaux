@@ -80,7 +80,7 @@ export const CheckoutStep = ({ tier, customerEmail }: CheckoutStepProps) => {
           <DialogDescription>Complete your subscription</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-75 items-center justify-center" role="status">
-          <Loader2Icon className="text-muted-foreground size-8 animate-spin" />
+          <Loader2Icon className="text-zinc-950-foreground size-8 animate-spin" />
         </div>
       </>
     );

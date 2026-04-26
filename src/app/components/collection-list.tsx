@@ -425,7 +425,7 @@ const CollectionDownloadDialog = ({
               <DownloadIcon className="size-4" />
               Download limit reached
             </Button>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-zinc-950-foreground text-sm">
               You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
               {resetInHours !== null
                 ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -433,14 +433,14 @@ const CollectionDownloadDialog = ({
             </p>
           </>
         ) : noFormats ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-zinc-950-foreground text-sm">
             No digital formats are available for download yet.
           </p>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Select formats:</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-zinc-950-foreground text-xs">
                 {downloadCount}/{MAX_RELEASE_DOWNLOAD_COUNT} downloads used
               </p>
             </div>
@@ -477,7 +477,7 @@ const CollectionDownloadDialog = ({
                     ) : fp.status === 'error' ? (
                       <AlertCircle className="text-destructive size-4 shrink-0" />
                     ) : (
-                      <span className="text-muted-foreground size-4 shrink-0 text-center">
+                      <span className="text-zinc-950-foreground size-4 shrink-0 text-center">
                         &bull;
                       </span>
                     )}

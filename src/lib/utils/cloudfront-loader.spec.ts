@@ -21,7 +21,7 @@ describe('banner preload helpers', () => {
       expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero.jpg');
     });
 
-    it('inserts _w{width} suffix when width is provided', async () => {
+    it('inserts _w{width} suffix and transcodes raster source to .webp', async () => {
       delete process.env.NEXT_PUBLIC_CDN_DOMAIN;
       delete process.env.CDN_DOMAIN;
       vi.resetModules();
@@ -30,7 +30,7 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadUrl('hero.jpg', 1080);
 
-      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero_w1080.jpg');
+      expect(result).toBe('https://cdn.fakefourrecords.com/media/banners/hero_w1080.webp');
     });
 
     it('percent-encodes special characters in the filename with width suffix', async () => {
@@ -70,7 +70,7 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadUrl('hero.jpg', 1920);
 
-      expect(result).toBe('https://public-cdn.example.com/media/banners/hero_w1920.jpg');
+      expect(result).toBe('https://public-cdn.example.com/media/banners/hero_w1920.webp');
     });
 
     it('falls back to CDN_DOMAIN when NEXT_PUBLIC_CDN_DOMAIN is not set', async () => {
@@ -82,7 +82,7 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadUrl('hero.jpg', 1920);
 
-      expect(result).toBe('https://server-cdn.example.com/media/banners/hero_w1920.jpg');
+      expect(result).toBe('https://server-cdn.example.com/media/banners/hero_w1920.webp');
     });
   });
 
@@ -93,18 +93,14 @@ describe('banner preload helpers', () => {
       vi.resetModules();
 
       const { buildBannerPreloadSrcSet } = await import('@/lib/utils/cloudfront-loader');
+      const { IMAGE_VARIANT_DEVICE_SIZES } = await import('@/lib/constants/image-variants');
 
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
-      expect(result).toBe(
-        [
-          'https://cdn.fakefourrecords.com/media/banners/hero_w640.jpg 640w',
-          'https://cdn.fakefourrecords.com/media/banners/hero_w750.jpg 750w',
-          'https://cdn.fakefourrecords.com/media/banners/hero_w828.jpg 828w',
-          'https://cdn.fakefourrecords.com/media/banners/hero_w1080.jpg 1080w',
-          'https://cdn.fakefourrecords.com/media/banners/hero_w1200.jpg 1200w',
-        ].join(', ')
-      );
+      const expected = IMAGE_VARIANT_DEVICE_SIZES.map(
+        (w) => `https://cdn.fakefourrecords.com/media/banners/hero_w${w}.webp ${w}w`
+      ).join(', ');
+      expect(result).toBe(expected);
     });
 
     it('percent-encodes special characters in each srcset entry', async () => {
@@ -133,8 +129,10 @@ describe('banner preload helpers', () => {
 
       const result = buildBannerPreloadSrcSet('hero.jpg');
 
-      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w640.jpg 640w');
-      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w1200.jpg 1200w');
+      expect(result).toContain('https://custom-cdn.example.com/media/banners/hero_w640.webp 640w');
+      expect(result).toContain(
+        'https://custom-cdn.example.com/media/banners/hero_w1200.webp 1200w'
+      );
     });
 
     it('does not include query params', async () => {

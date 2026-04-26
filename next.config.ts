@@ -51,6 +51,12 @@ const config = {
     loaderFile: './src/lib/image-loader.ts',
     // Device sizes still inform srcset generation with custom loaders
     deviceSizes: [...IMAGE_VARIANT_DEVICE_SIZES],
+    // Pin imageSizes to the same set we actually generate variants for.
+    // Next.js builds srcset from `imageSizes ∪ deviceSizes`; leaving the
+    // default `[16, 32, 48, 64, 96, 128, 256, 384]` causes the browser to
+    // request widths like `_w256.webp` that the variant pipeline never wrote
+    // to S3, surfacing as 403s on the CDN (no clean 404 due to bucket policy).
+    imageSizes: [...IMAGE_VARIANT_DEVICE_SIZES],
     // Only allow SVG from our own CDN (we control the contents); block active
     // scripts inside optimized SVGs.
     dangerouslyAllowSVG: false,
@@ -173,15 +179,13 @@ const config = {
         source: '/',
         headers: homeHeaders,
       },
-      // Next.js hashed build assets are immutable and safe to cache forever.
-      // Also emit CORS header for cross-origin font/chunk usage via assetPrefix.
+      // Next.js already emits `public, max-age=31536000, immutable` for hashed
+      // build assets — overriding it here triggers a dev-mode warning and
+      // breaks HMR. We only emit the CORS header so cross-origin font/chunk
+      // requests work when assetPrefix points at the CDN.
       {
         source: '/_next/static/:path*',
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
           {
             key: 'Access-Control-Allow-Origin',
             value: '*',

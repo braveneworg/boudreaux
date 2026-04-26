@@ -175,7 +175,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
         <p className="truncate text-sm font-medium" title={item.fileName}>
           {item.fileName}
         </p>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-zinc-950-foreground">
           <span>{formatFileSize(item.fileSize)}</span>
           {item.duration && (
             <>
@@ -191,7 +191,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
         {item.isUploading && item.uploadProgress !== undefined && (
           <div className="mt-2">
             <Progress value={item.uploadProgress} className="h-1.5" />
-            <span className="mt-0.5 block text-xs text-muted-foreground">
+            <span className="mt-0.5 block text-xs text-zinc-950-foreground">
               {Math.round(item.uploadProgress)}% uploaded
             </span>
           </div>
@@ -230,7 +230,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
           <button
             type="button"
             onClick={() => onDeleteRequest(item)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-zinc-950-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
             aria-label="Remove file"
           >
             <X className="h-4 w-4" />
@@ -437,11 +437,11 @@ export const MediaUploader = ({
   const getUploadIcon = () => {
     switch (mediaType) {
       case 'audio':
-        return <FileAudio className="mb-2 h-10 w-10 text-muted-foreground" />;
+        return <FileAudio className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
       case 'video':
-        return <FileVideo className="mb-2 h-10 w-10 text-muted-foreground" />;
+        return <FileVideo className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
       default:
-        return <Music className="mb-2 h-10 w-10 text-muted-foreground" />;
+        return <Music className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
     }
   };
 
@@ -449,7 +449,7 @@ export const MediaUploader = ({
     <div className={cn('space-y-4', className)}>
       {/* Deleting indicator */}
       {isDeleting && (
-        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-zinc-950-foreground">
           <SpinnerRingCircle size="sm" />
           <span>Deleting...</span>
         </div>
@@ -480,7 +480,7 @@ export const MediaUploader = ({
           aria-label={label}
         />
         {getUploadIcon()}
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-zinc-950-foreground">
           {canAddMore ? (
             <>
               <span className="font-medium text-foreground">Click to upload</span> or drag and drop
@@ -494,7 +494,7 @@ export const MediaUploader = ({
           )}
         </p>
         {mediaItems.length > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-zinc-950-foreground">
             {mediaItems.length} / {maxFiles} files
           </p>
         )}
@@ -541,7 +541,7 @@ export const MediaUploader = ({
       <Dialog open={!!itemToDelete} onOpenChange={handleCancelDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete File</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-950-foreground">
             Are you sure you want to delete this file? This action cannot be undone.
           </p>
           {itemToDelete && (
@@ -562,7 +562,7 @@ export const MediaUploader = ({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{itemToDelete.fileName}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-zinc-950-foreground">
                   {formatFileSize(itemToDelete.fileSize)}
                 </p>
               </div>

@@ -38,8 +38,12 @@ import type { HeadlinerWithRelations } from './artist-pill';
 interface SortableArtistPillProps {
   headliner: HeadlinerWithRelations;
   index: number;
-  onSetTimeUpdate: (headlinerId: string, setTime: string | null) => Promise<void>;
-  onRemove: (headlinerId: string) => Promise<void>;
+  onSetTimeUpdate: (
+    headlinerId: string,
+    artistId: string | null,
+    setTime: string | null
+  ) => Promise<void>;
+  onRemove: (headlinerId: string, artistId: string | null) => Promise<void>;
 }
 
 function SortableArtistPill({
@@ -130,24 +134,33 @@ export default function ArtistPillList({
     [headliners, tourDateId]
   );
 
-  const handleSetTimeUpdate = useCallback(async (headlinerId: string, setTime: string | null) => {
-    const result = await updateHeadlinerSetTimeAction(headlinerId, setTime);
-    if (result.success) {
-      toast.success('Set time updated');
-      // Update local state
-      setHeadliners((prev) =>
-        prev.map((h) =>
-          h.id === headlinerId ? { ...h, setTime: setTime ? new Date(setTime) : null } : h
-        )
+  const handleSetTimeUpdate = useCallback(
+    async (headlinerId: string, artistId: string | null, setTime: string | null) => {
+      const result = await updateHeadlinerSetTimeAction(
+        headlinerId,
+        setTime,
+        tourDateId,
+        artistId ?? undefined
       );
-    } else {
-      toast.error(result.error || 'Failed to update set time');
-    }
-  }, []);
+
+      if (result.success) {
+        toast.success('Set time updated');
+        // Update local state
+        setHeadliners((prev) =>
+          prev.map((h) =>
+            h.id === headlinerId ? { ...h, setTime: setTime ? new Date(setTime) : null } : h
+          )
+        );
+      } else {
+        toast.error(result.error || 'Failed to update set time');
+      }
+    },
+    [tourDateId]
+  );
 
   const handleRemove = useCallback(
-    async (headlinerId: string) => {
-      const result = await removeHeadlinerAction(headlinerId);
+    async (headlinerId: string, artistId: string | null) => {
+      const result = await removeHeadlinerAction(headlinerId, tourDateId, artistId ?? undefined);
       if (result.success) {
         toast.success('Artist removed from tour date');
         setHeadliners((prev) => prev.filter((h) => h.id !== headlinerId));
@@ -156,11 +169,11 @@ export default function ArtistPillList({
         toast.error(result.error || 'Failed to remove artist');
       }
     },
-    [onHeadlinersChange]
+    [onHeadlinersChange, tourDateId]
   );
 
   if (headliners.length === 0) {
-    return <span className="text-sm text-muted-foreground">No headliners</span>;
+    return <span className="text-sm text-zinc-950-foreground">No headliners</span>;
   }
 
   return (

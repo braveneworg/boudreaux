@@ -174,7 +174,7 @@ export default function ReleaseSelect<
                       onValueChange={setSearchValue}
                     />
                     {isLoading && (
-                      <div className="py-6 text-center text-sm text-muted-foreground">
+                      <div className="py-6 text-center text-sm text-zinc-950-foreground">
                         Loading releases...
                       </div>
                     )}

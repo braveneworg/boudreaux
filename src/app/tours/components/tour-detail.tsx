@@ -66,7 +66,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
             <CardHeader>
               <div className="space-y-2">
                 {isPastTour && (
-                  <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                  <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-zinc-950-foreground">
                     Past Event
                   </span>
                 )}
@@ -84,9 +84,11 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                     />
                   </div>
                 )}
-                {tour.subtitle && <p className="text-xl text-muted-foreground">{tour.subtitle}</p>}
+                {tour.subtitle && (
+                  <p className="text-xl text-zinc-950-foreground">{tour.subtitle}</p>
+                )}
                 {tour.subtitle2 && (
-                  <p className="text-lg text-muted-foreground">{tour.subtitle2}</p>
+                  <p className="text-lg text-zinc-950-foreground">{tour.subtitle2}</p>
                 )}
               </div>
             </CardHeader>
@@ -97,7 +99,9 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                 <>
                   <div>
                     <h3 className="mb-2 text-lg font-semibold">About</h3>
-                    <p className="whitespace-pre-wrap text-muted-foreground">{tour.description}</p>
+                    <p className="whitespace-pre-wrap text-zinc-950-foreground">
+                      {tour.description}
+                    </p>
                   </div>
                   <Separator />
                 </>
@@ -140,7 +144,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               {sortedTourDates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tour dates announced yet.</p>
+                <p className="text-sm text-zinc-950-foreground">No tour dates announced yet.</p>
               ) : (
                 sortedTourDates.map((tourDate, index) => {
                   const headlinerNames = tourDate.headliners
@@ -152,7 +156,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                     <div key={tourDate.id} className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex items-start gap-2 text-sm">
-                          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
                           <div>
                             <div className="font-medium">
                               {formatTourDate(tourDate.startDate, tourDate.timeZone, {
@@ -167,7 +171,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                                 ? ` - ${formatTourDate(tourDate.endDate, tourDate.timeZone)}`
                                 : ''}
                             </div>
-                            <div className="text-muted-foreground">
+                            <div className="text-zinc-950-foreground">
                               {formatTourTime(tourDate.showStartTime, tourDate.timeZone)}
                               {tourDate.showEndTime
                                 ? ` - ${formatTourTime(tourDate.showEndTime, tourDate.timeZone)}`
@@ -177,7 +181,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                         </div>
 
                         <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
                           <VenueDirectionsLink
                             destination={[
                               tourDate.venue.name,
@@ -194,7 +198,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                             <div className="font-medium group-hover:underline">
                               {tourDate.venue.name}
                             </div>
-                            <div className="text-muted-foreground group-hover:underline">
+                            <div className="text-zinc-950-foreground group-hover:underline">
                               {[tourDate.venue.city, tourDate.venue.state]
                                 .filter(Boolean)
                                 .join(', ')}
@@ -204,14 +208,14 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
 
                         {headlinerNames.length > 0 && (
                           <div className="flex items-start gap-2 text-sm">
-                            <Music className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <Music className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
                             <span>{headlinerNames.join(', ')}</span>
                           </div>
                         )}
 
                         {(tourDate.ticketPrices || tourDate.ticketsUrl) && (
                           <div className="flex items-start gap-2 text-sm">
-                            <Ticket className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <Ticket className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
                             <div className="space-y-2">
                               {tourDate.ticketPrices && <div>{tourDate.ticketPrices}</div>}
                               {tourDate.ticketsUrl && (

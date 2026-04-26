@@ -54,7 +54,7 @@ test.describe('Release Page — Player and Navigation', () => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
     // The download trigger button should be visible on the player
-    await expect(userPage.getByRole('button', { name: 'Download music' })).toBeVisible({
+    await expect(userPage.getByRole('button', { name: 'Download' })).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -77,7 +77,7 @@ test.describe('Release Page — Purchase State Awareness', () => {
     // Regular user has purchased E2E Album One
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 
@@ -94,7 +94,7 @@ test.describe('Release Page — Purchase State Awareness', () => {
     // Regular user has NOT purchased E2E Album Two
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 
-    const downloadButton = userPage.getByRole('button', { name: 'Download music' });
+    const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
     await downloadButton.click();
 

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { Sheet, SheetContent, SheetTitle } from '@/app/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/app/components/ui/sheet';
 
 import SocialMediaIconLinks from './social-media-icon-links';
 import AuthToolbar from '../auth/auth-toolbar';
@@ -45,9 +45,11 @@ export default function HamburgerMenuSheet({
           backgroundImage: "url('/media/particles-6.svg')",
         }}
         aria-label="Navigation menu"
-        isOpen={isOpen}
       >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+        <SheetDescription className="sr-only">
+          Site navigation links and account actions.
+        </SheetDescription>
         <nav className="flex flex-col" aria-label="Main navigation">
           <SocialMediaIconLinks className="pt-2 justify-center" />
           <AuthToolbar className="text-zinc-50 pb-0" onNavigate={() => onOpenChange(false)} />

@@ -79,7 +79,7 @@ const CDNStatusBanner = () => {
               <Progress value={progress} className="mt-2 h-2" />
             )}
           </div>
-          <Clock className="h-4 w-4 text-muted-foreground" />
+          <Clock className="h-4 w-4 text-zinc-950-foreground" />
         </div>
       </Alert>
     </div>

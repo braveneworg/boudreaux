@@ -19,7 +19,7 @@ export const NowPlayingHeading = ({
       <h3
         className={
           visibleHeading
-            ? 'text-sm font-bold tracking-normal text-shadow-accent mb-0 pb-0 leading-0 mt-3'
+            ? 'text-sm font-bold tracking-normal mb-1 pb-0 mt-0'
             : 'sr-only text-lg font-semibold'
         }
         aria-label={`Now playing: ${artistName} - ${title}`}

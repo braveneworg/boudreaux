@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { Download } from 'lucide-react';
+
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
@@ -13,6 +15,7 @@ import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-di
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
 import { DeferredDownloadDialog } from './deferred-download-dialog';
+import { MediaActionLink } from './media-action-link';
 import { NowPlayingHeading } from './now-playing-heading';
 import { ReleaseShareWidget } from './release-share-widget';
 
@@ -219,8 +222,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             />
           )}
         </div>
-        {/* Track list, download, now-playing heading — reserve space to prevent CLS */}
-        <div className="flex flex-col items-center min-h-10">
+        {/* Track list / download link row + now-playing heading.
+            -mt-1 cancels half of the parent's space-y-2 so the row sits closer
+            to the carousel above. min-h-10 reserves stable height across
+            loading + dynamic-dialog states to prevent CLS. */}
+        <div className="flex flex-col items-center min-h-10 -mt-1">
           {showFileListDrawer && selectedArtist?.release && (
             <>
               <MediaPlayer.FormatFileListDrawer
@@ -230,11 +236,15 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
                 artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
                 releaseTitle={selectedArtist.release.title ?? ''}
                 featuredTrackNumber={selectedArtist.featuredTrackNumber ?? undefined}
-              />
-              <DeferredDownloadDialog
-                artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
-                releaseId={selectedArtist.release.id}
-                releaseTitle={selectedArtist.release.title ?? ''}
+                downloadTrigger={
+                  <DeferredDownloadDialog
+                    artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}
+                    releaseId={selectedArtist.release.id}
+                    releaseTitle={selectedArtist.release.title ?? ''}
+                  >
+                    <MediaActionLink icon={Download} label="Download" />
+                  </DeferredDownloadDialog>
+                }
               />
               <NowPlayingHeading
                 artistName={getFeaturedArtistDisplayName(selectedArtist) ?? ''}

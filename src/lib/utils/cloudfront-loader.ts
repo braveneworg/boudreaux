@@ -12,6 +12,7 @@
  */
 
 import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
+import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 
 const CDN_DOMAIN =
   process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? 'https://cdn.fakefourrecords.com';
@@ -20,8 +21,9 @@ const CDN_DOMAIN =
  * Builds a full CDN URL for a banner image width variant, suitable for
  * server-side `<link rel="preload">` tags to eliminate LCP delay.
  *
- * When `width` is provided, inserts `_w{width}` before the file extension
- * to match the custom image loader's URL pattern.
+ * When `width` is provided, delegates to `buildCdnImageVariantUrl` so the
+ * URL exactly matches what `<Image>` requests via the custom loader —
+ * including the JPG/PNG → WebP transcode the variant generator applies.
  */
 export const buildBannerPreloadUrl = (imageFilename: string, width?: number): string => {
   const encodedFilename = imageFilename
@@ -33,15 +35,7 @@ export const buildBannerPreloadUrl = (imageFilename: string, width?: number): st
     return `${CDN_DOMAIN}/media/banners/${encodedFilename}`;
   }
 
-  const lastDot = encodedFilename.lastIndexOf('.');
-
-  if (lastDot === -1) {
-    return `${CDN_DOMAIN}/media/banners/${encodedFilename}`;
-  }
-
-  const base = encodedFilename.substring(0, lastDot);
-  const ext = encodedFilename.substring(lastDot);
-  return `${CDN_DOMAIN}/media/banners/${base}_w${width}${ext}`;
+  return buildCdnImageVariantUrl(`/media/banners/${imageFilename}`, width);
 };
 
 /**

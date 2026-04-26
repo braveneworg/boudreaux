@@ -256,6 +256,23 @@ export class TourDateRepository {
   }
 
   /**
+   * Update setTime for a headliner identified by the (tourDateId, artistId) pair.
+   * Returns true when at least one row is updated.
+   */
+  static async updateHeadlinerSetTimeByTourDateAndArtist(
+    tourDateId: string,
+    artistId: string,
+    setTime: Date | null
+  ): Promise<boolean> {
+    const result = await prisma.tourDateHeadliner.updateMany({
+      where: { tourDateId, artistId },
+      data: { setTime },
+    });
+
+    return result.count > 0;
+  }
+
+  /**
    * Remove a specific headliner from a tour date
    * Only deletes the TourDateHeadliner junction record — does NOT delete the artist
    */
@@ -263,6 +280,21 @@ export class TourDateRepository {
     await prisma.tourDateHeadliner.delete({
       where: { id: headlinerId },
     });
+  }
+
+  /**
+   * Remove a headliner identified by the (tourDateId, artistId) pair.
+   * Returns true when at least one row is deleted.
+   */
+  static async removeHeadlinerByTourDateAndArtist(
+    tourDateId: string,
+    artistId: string
+  ): Promise<boolean> {
+    const result = await prisma.tourDateHeadliner.deleteMany({
+      where: { tourDateId, artistId },
+    });
+
+    return result.count > 0;
   }
 
   /**

@@ -150,7 +150,7 @@ export function TimezoneSelect({
           disabled={disabled}
           className={cn(
             'w-full justify-between font-normal',
-            !value && 'text-muted-foreground',
+            !value && 'text-zinc-950-foreground',
             className
           )}
         >

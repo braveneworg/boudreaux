@@ -163,12 +163,14 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     onFileSelect,
     artistName: _artistName,
     releaseTitle: _releaseTitle,
+    downloadTrigger,
   }: {
     files: Array<{ id: string; title?: string | null; fileName: string; trackNumber: number }>;
     currentFileId: string | null;
     onFileSelect: (fileId: string) => void;
     artistName: string;
     releaseTitle: string;
+    downloadTrigger?: ReactNode;
   }) => (
     <div data-testid="format-file-list-drawer" data-current-file-id={currentFileId ?? ''}>
       {files.map((f) => (
@@ -176,6 +178,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
           {f.title ?? f.fileName}
         </button>
       ))}
+      {downloadTrigger}
     </div>
   );
   FormatFileListDrawer.displayName = 'FormatFileListDrawer';
@@ -198,10 +201,10 @@ vi.mock('@/app/components/download-dialog', () => ({
   ),
 }));
 
-vi.mock('@/app/components/download-trigger-button', () => ({
-  DownloadTriggerButton: () => (
+vi.mock('@/app/components/media-action-link', () => ({
+  MediaActionLink: ({ label }: { label: string }) => (
     <button data-testid="download-trigger-button" aria-label="Download music">
-      download
+      {label}
     </button>
   ),
 }));
@@ -416,16 +419,13 @@ describe('ReleasePlayer', () => {
     expect(triggerButton).toBeInTheDocument();
   });
 
-  it('should render DownloadDialog before FormatFileListDrawer in the DOM', () => {
+  it('should render DownloadDialog inside FormatFileListDrawer trigger row', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
     const downloadDialog = screen.getByTestId('download-dialog');
     const formatFileListDrawer = screen.getByTestId('format-file-list-drawer');
 
-    // DownloadDialog should come before FormatFileListDrawer in document order
-    const order = downloadDialog.compareDocumentPosition(formatFileListDrawer);
-    // Node.DOCUMENT_POSITION_FOLLOWING = 4
-    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(formatFileListDrawer).toContainElement(downloadDialog);
   });
 
   it('should not render download dialog when release has no files', () => {

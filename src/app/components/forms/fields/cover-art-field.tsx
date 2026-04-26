@@ -351,7 +351,7 @@ export default function CoverArtField<
               />
               {isUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
                 </div>
               )}
               {!isUploading && !disabled && (
@@ -415,17 +415,19 @@ export default function CoverArtField<
               />
               {isUploading ? (
                 <>
-                  <Loader2 className="mb-2 h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Uploading...</p>
+                  <Loader2 className="mb-2 h-8 w-8 animate-spin text-zinc-950-foreground" />
+                  <p className="text-sm text-zinc-950-foreground">Uploading...</p>
                 </>
               ) : (
                 <>
-                  <ImagePlus className="mb-2 h-8 w-8 text-muted-foreground" />
+                  <ImagePlus className="mb-2 h-8 w-8 text-zinc-950-foreground" />
                   <p className="text-center text-sm">
                     <span className="font-medium text-foreground">Click to upload</span> or drag and
                     drop
                   </p>
-                  <p className="text-xs text-muted-foreground">JPEG, PNG, WebP, GIF up to 50MB</p>
+                  <p className="text-xs text-zinc-950-foreground">
+                    JPEG, PNG, WebP, GIF up to 50MB
+                  </p>
                 </>
               )}
             </div>
@@ -434,7 +436,7 @@ export default function CoverArtField<
           {/* Artist image combobox */}
           {artistIds.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Or select from artist images:</p>
+              <p className="text-sm text-zinc-950-foreground">Or select from artist images:</p>
               <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -499,7 +501,7 @@ export default function CoverArtField<
                             <div className="flex min-w-0 flex-col">
                               <span className="truncate text-sm">{img.artistName}</span>
                               {img.caption && (
-                                <span className="truncate text-xs text-muted-foreground">
+                                <span className="truncate text-xs text-zinc-950-foreground">
                                   {img.caption}
                                 </span>
                               )}

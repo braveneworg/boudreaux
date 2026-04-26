@@ -91,7 +91,7 @@ export const MultiCombobox = ({
                 selected
               </span>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-zinc-950-foreground">{placeholder}</span>
             )}
             <ChevronsUpDown className="ml-2 shrink-0 opacity-50" />
           </Button>

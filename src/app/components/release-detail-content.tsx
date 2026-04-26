@@ -36,7 +36,7 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
   if (releasePending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
       </div>
     );
   }
@@ -45,8 +45,8 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
     return (
       <div className="flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/5 p-8">
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-muted-foreground">Release not found</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h3 className="text-lg font-semibold text-zinc-950-foreground">Release not found</h3>
+          <p className="mt-2 text-sm text-zinc-950-foreground">
             The release you are looking for does not exist.
           </p>
         </div>

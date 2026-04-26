@@ -47,7 +47,7 @@ export const ArtistSearchResults = ({
     <Command shouldFilter={false}>
       <CommandList id={id}>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>
+          <div className="py-6 text-center text-sm text-zinc-950-foreground">Searching...</div>
         ) : !hasResults ? (
           <CommandEmpty>No artists or releases found.</CommandEmpty>
         ) : (
@@ -68,7 +68,7 @@ export const ArtistSearchResults = ({
                   />
                 ) : (
                   <div className="flex size-8 items-center justify-center rounded-full bg-muted">
-                    <User className="size-4 text-muted-foreground" />
+                    <User className="size-4 text-zinc-950-foreground" />
                   </div>
                 )}
                 <span className="text-sm font-medium">All releases by {artist.artistName}</span>
@@ -80,7 +80,7 @@ export const ArtistSearchResults = ({
                   onSelect={() => onReleaseSelect(artist.artistSlug, release.id)}
                   className="flex items-center gap-3 px-2 py-1.5 pl-6"
                 >
-                  <Disc3 className="size-4 text-muted-foreground" />
+                  <Disc3 className="size-4 text-zinc-950-foreground" />
                   <span className="text-sm">{release.title}</span>
                 </CommandItem>
               ))}

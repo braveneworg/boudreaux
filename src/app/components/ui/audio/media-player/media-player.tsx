@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
-import { ChevronDown, ChevronUp, EllipsisVertical, Pause, Play, Star } from 'lucide-react';
+import { ChevronDown, ChevronUp, EllipsisVertical, Eye, Pause, Play, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -216,7 +216,7 @@ const FeaturedArtistCarousel = ({
                       />
                     ) : (
                       <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                        <span className="text-zinc-500 text-xs text-center px-1">
+                        <span className="text-zinc-950 text-xs text-center px-1">
                           {displayName}
                         </span>
                       </div>
@@ -569,7 +569,7 @@ const TrackListDrawer = ({
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription asChild>
             <div>
-              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <h3 className="text-sm text-shadow-none">{artistName}</h3>
               <p className="text-sm text-shadow-none mb-0">
                 <em>{release.title}</em>
               </p>
@@ -599,7 +599,7 @@ const TrackListDrawer = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
                       className={`text-sm font-medium w-6 shrink-0 text-right ${
-                        isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                        isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {index + 1}.
@@ -619,7 +619,7 @@ const TrackListDrawer = ({
                       className={`text-sm truncate ${
                         isCurrentTrack
                           ? 'font-semibold text-zinc-50!'
-                          : 'text-zinc-500 dark:text-zinc-500'
+                          : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {getTrackDisplayTitle(file.title, file.fileName)}
@@ -627,7 +627,7 @@ const TrackListDrawer = ({
                   </div>
                   <span
                     className={`text-sm shrink-0 font-mono ${
-                      isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                      isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
                     }`}
                   >
                     {formatDuration(file.duration ?? 0)}
@@ -682,6 +682,12 @@ interface FormatFileListDrawerProps {
   artistName: string;
   releaseTitle: string;
   featuredTrackNumber?: number;
+  /**
+   * Optional download trigger rendered alongside the "View" link. Typically a
+   * `DownloadDialog` / `DeferredDownloadDialog` wrapping a `MediaActionLink`
+   * with `icon={Download}`. When omitted, only the View link is rendered.
+   */
+  downloadTrigger?: React.ReactNode;
 }
 
 /**
@@ -695,6 +701,7 @@ const FormatFileListDrawer = ({
   artistName,
   releaseTitle,
   featuredTrackNumber,
+  downloadTrigger,
 }: FormatFileListDrawerProps) => {
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -704,22 +711,34 @@ const FormatFileListDrawer = ({
 
   return (
     <Drawer>
-      <DrawerTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full flex items-center justify-center text-sm text-zinc-600 hover:text-zinc-900 mb-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-        >
-          <span>View all {files.length} tracks</span>
-          <ChevronDown className="h-4 w-4" />
-        </Button>
-      </DrawerTrigger>
+      {/* Stable min-h-10 keeps the row height invariant across loading
+          states (skeleton, dynamic-dialog placeholder, hydrated content) so
+          there's no CLS when DeferredDownloadDialog flips from button →
+          dialog or when files arrive late. */}
+      <div className="flex items-center justify-center flex-wrap gap-x-1.5 text-sm text-zinc-950 min-h-8">
+        <DrawerTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 underline font-semibold text-zinc-950 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm cursor-pointer"
+          >
+            <Eye className="size-4" aria-hidden="true" />
+            View
+          </button>
+        </DrawerTrigger>
+        {downloadTrigger && (
+          <>
+            <em>or</em>
+            {downloadTrigger}
+          </>
+        )}
+        <span>all {files.length} tracks</span>
+      </div>
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription asChild>
             <div>
-              <h3 className="text-sm text-shadow-none mb-0 leading-1">{artistName}</h3>
+              <h3 className="text-base mt-0 text-shadow-none font-semibold">{artistName}</h3>
               <p className="text-sm text-shadow-none mb-0">
                 <em>{releaseTitle}</em>
               </p>
@@ -749,7 +768,7 @@ const FormatFileListDrawer = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span
                       className={`text-sm font-medium w-6 shrink-0 text-right ${
-                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-500'
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {file.trackNumber}.
@@ -758,7 +777,7 @@ const FormatFileListDrawer = ({
                       className={`text-sm truncate ${
                         isCurrentFile
                           ? 'font-semibold text-zinc-50!'
-                          : 'text-zinc-500 dark:text-zinc-500'
+                          : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {displayTitle}
@@ -776,7 +795,7 @@ const FormatFileListDrawer = ({
                   {file.duration != null && (
                     <span
                       className={`text-sm shrink-0 font-mono ${
-                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-500 dark:text-zinc-600'
+                        isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
                       }`}
                     >
                       {formatDuration(file.duration)}

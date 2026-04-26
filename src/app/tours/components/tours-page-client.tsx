@@ -92,7 +92,7 @@ export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
           <TourSearch value={searchQuery} onChange={setSearchQuery} />
         </div>
         {searchQuery && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-zinc-950-foreground">
             {filteredTours.length === 1 ? '1 tour found' : `${filteredTours.length} tours found`}
           </div>
         )}
@@ -102,8 +102,8 @@ export const ToursPageClient = ({ tours }: ToursPageClientProps) => {
       {filteredTours.length === 0 && searchQuery ? (
         <div className="flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/5 p-8">
           <div className="text-center">
-            <h3 className="text-lg font-semibold text-muted-foreground">No tours found</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold text-zinc-950-foreground">No tours found</h3>
+            <p className="mt-2 text-sm text-zinc-950-foreground">
               Try adjusting your search or clear filters to see all tours.
             </p>
           </div>

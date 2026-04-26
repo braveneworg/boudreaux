@@ -45,6 +45,30 @@ vi.mock('lucide-react', () => ({
   ),
 }));
 
+// Mock DeferredDownloadDialog so the test does not pull in the deferred dialog tree
+vi.mock('./deferred-download-dialog', () => ({
+  DeferredDownloadDialog: ({
+    artistName,
+    releaseId,
+    releaseTitle,
+  }: {
+    artistName: string;
+    releaseId: string;
+    releaseTitle: string;
+    triggerClassName?: string;
+  }) => (
+    <button
+      type="button"
+      data-testid="deferred-download-dialog"
+      data-artist={artistName}
+      data-release-id={releaseId}
+      data-release-title={releaseTitle}
+    >
+      Download
+    </button>
+  ),
+}));
+
 describe('ReleaseCard', () => {
   const defaultProps = {
     id: 'release-1',
@@ -127,5 +151,20 @@ describe('ReleaseCard', () => {
 
     const playButton = screen.getByRole('link', { name: /play midnight serenade/i });
     expect(playButton).toHaveAttribute('aria-label', 'Play Midnight Serenade');
+  });
+
+  it('should render Download button to the right of the Play button', () => {
+    render(<ReleaseCard {...defaultProps} />);
+
+    const playButton = screen.getByRole('link', { name: /play midnight serenade/i });
+    const downloadButton = screen.getByTestId('deferred-download-dialog');
+
+    expect(downloadButton).toBeInTheDocument();
+    expect(downloadButton).toHaveAttribute('data-release-id', 'release-1');
+    expect(downloadButton).toHaveAttribute('data-release-title', 'Midnight Serenade');
+    expect(downloadButton).toHaveAttribute('data-artist', 'John Doe');
+
+    const ordering = playButton.compareDocumentPosition(downloadButton);
+    expect(ordering & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -32,7 +32,6 @@ function SheetContent({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left';
-  isOpen?: boolean;
 }) {
   return (
     <SheetPortal>
@@ -95,7 +94,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn('text-muted-foreground text-sm', className)}
+      className={cn('text-zinc-950-foreground text-sm', className)}
       {...props}
     />
   );

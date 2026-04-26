@@ -124,6 +124,91 @@ describe('Tour Date Headliner Actions', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to update set time');
     });
+
+    it('falls back to tourDate+artist lookup when P2025 is thrown and IDs are valid', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockResolvedValue(
+        true as never
+      );
+
+      const setTime = '2026-03-08T20:00:00.000Z';
+      const result = await updateHeadlinerSetTimeAction(
+        validObjectId,
+        setTime,
+        validObjectId2,
+        validObjectId3
+      );
+
+      expect(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).toHaveBeenCalledWith(
+        validObjectId2,
+        validObjectId3,
+        new Date(setTime)
+      );
+      expect(logSecurityEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ fallback: true }),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('returns failure when P2025 fallback finds no record', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockResolvedValue(
+        false as never
+      );
+
+      const result = await updateHeadlinerSetTimeAction(
+        validObjectId,
+        '2026-03-08T20:00:00.000Z',
+        validObjectId2,
+        validObjectId3
+      );
+
+      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+    });
+
+    it('returns failure when the P2025 fallback itself throws', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockRejectedValue(
+        new Error('fallback exploded')
+      );
+
+      const result = await updateHeadlinerSetTimeAction(
+        validObjectId,
+        '2026-03-08T20:00:00.000Z',
+        validObjectId2,
+        validObjectId3
+      );
+
+      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+    });
+
+    it('does not attempt fallback when P2025 fires but tourDateId/artistId are invalid', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+
+      const result = await updateHeadlinerSetTimeAction(
+        validObjectId,
+        '2026-03-08T20:00:00.000Z',
+        'invalid-id',
+        validObjectId3
+      );
+
+      expect(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+    });
   });
 
   describe('removeHeadlinerAction', () => {
@@ -180,6 +265,69 @@ describe('Tour Date Headliner Actions', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to remove headliner');
+    });
+
+    it('falls back to tourDate+artist removal when P2025 is thrown and IDs are valid', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockResolvedValue(
+        true as never
+      );
+
+      const result = await removeHeadlinerAction(validObjectId, validObjectId2, validObjectId3);
+
+      expect(TourDateRepository.removeHeadlinerByTourDateAndArtist).toHaveBeenCalledWith(
+        validObjectId2,
+        validObjectId3
+      );
+      expect(logSecurityEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ fallback: true }),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('returns failure when the P2025 fallback finds no record', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockResolvedValue(
+        false as never
+      );
+
+      const result = await removeHeadlinerAction(validObjectId, validObjectId2, validObjectId3);
+
+      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
+    });
+
+    it('returns failure when the P2025 fallback itself throws', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+      vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockRejectedValue(
+        new Error('fallback exploded')
+      );
+
+      const result = await removeHeadlinerAction(validObjectId, validObjectId2, validObjectId3);
+
+      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
+    });
+
+    it('does not attempt fallback when P2025 fires but tourDateId/artistId are invalid', async () => {
+      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+
+      const result = await removeHeadlinerAction(validObjectId, 'invalid-id', validObjectId3);
+
+      expect(TourDateRepository.removeHeadlinerByTourDateAndArtist).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
     });
   });
 
