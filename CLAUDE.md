@@ -1,52 +1,87 @@
 # boudreaux Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-23
+Last updated: 2026-04-25
 
 ## Active Technologies
 
-- TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Stripe 20, Prisma 5 (MongoDB), Auth.js, AWS SES, shadcn/ui, Zod, React Hook Form (001-release-search-player)
-- TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Prisma 5 (MongoDB), Auth.js, shadcn/ui, Zod, React Hook Form (002-tour-management)
-- TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Stripe 20 (payment mode), Prisma 5 (MongoDB), Auth.js, AWS SES, shadcn/ui, Zod, React Hook Form (003-stripe-pwyw-purchase)
-- TypeScript 5+ (strict mode) + Next.js 16 (App Router), React 18, Prisma 5 (MongoDB), AWS SDK S3 v3 (presigned URLs), Auth.js, shadcn/ui (Accordion), Zod, React Hook Form (004-release-digital-formats)
-- MongoDB via Prisma (003-stripe-pwyw-purchase, 004-release-digital-formats)
-- AWS S3 (presigned URLs for upload/download, 24hr expiration for downloads, 15min for uploads) (004-release-digital-formats)
+Versions are sourced from `package.json`; keep this list in sync when upgrading.
+
+- **Language / Runtime**: TypeScript 6 (strict mode), Node 24, pnpm 10
+- **Framework**: Next.js 16 (App Router, Turbopack dev), React 19
+- **Data**: Prisma 6 with MongoDB, AWS SDK S3 v3 (presigned URLs — 24hr download, 15min upload)
+- **Auth**: Auth.js (next-auth v5 beta)
+- **Payments**: Stripe 21 (payment-mode checkout, PWYW)
+- **Email**: AWS SES
+- **UI**: shadcn/ui (Radix UI primitives), Tailwind v4, lucide-react icons, Jost font
+- **Forms / Validation**: React Hook Form 7, Zod 4
+- **Client data fetching**: TanStack Query 5
+- **Testing**: Vitest 4, @testing-library/react, Playwright (E2E)
+
+### Feature history
+
+- 004-release-digital-formats: digital format management, S3 presigned upload/download, freemium quota
+- 003-stripe-pwyw-purchase: Stripe payment-mode checkout, PWYW dialog, download gate API
+- 002-tour-management: tour management (Tour, TourDate, Venue), admin CRUD, public listings
+- 001-release-search-player: release search combobox, media player, artist carousel
 
 ## Project Structure
 
 ```text
 src/
-├── app/               # Next.js App Router pages, layouts, and API routes
-│   ├── api/           # API routes (GET queries; Stripe webhook)
-│   ├── components/    # Shared feature components
-│   ├── (auth)/        # Auth-gated routes
-│   ├── admin/         # Admin pages
-│   └── releases/      # Release pages and media player
+├── app/                    # Next.js App Router pages, layouts, API routes
+│   ├── api/                # API routes (GET queries; Stripe webhook)
+│   ├── (auth)/             # Auth-gated routes
+│   ├── admin/              # Admin pages
+│   ├── releases/           # Release pages and media player
+│   ├── tours/              # Tour pages
+│   ├── components/         # Shared feature components
+│   │   ├── ui/             # shadcn/ui primitives (alias: @/ui/*, @/components/ui/*)
+│   │   └── forms/
+│   │       └── fields/     # Reusable RHF/Zod field components
+│   └── hooks/              # Client-side React hooks (TanStack Query, etc.)
 ├── lib/
-│   ├── actions/       # Server Actions (mutations) — 'use server' at top
-│   ├── email/         # Email templates and SES dispatch
-│   ├── repositories/  # Prisma data-access layer
-│   ├── services/      # Business logic services
-│   ├── utils/         # Utilities (auth, rate-limiting, SES client, Stripe client)
-│   └── validation/    # Zod schemas
+│   ├── actions/            # Server Actions (mutations) — 'use server' at top
+│   ├── decorators/         # withAuth, withAdmin, withRateLimit
+│   ├── email/              # Email templates and SES dispatch
+│   ├── repositories/       # Prisma data-access layer (repository pattern)
+│   ├── services/           # Business logic services
+│   ├── utils/              # Utilities (auth, rate-limiting, SES client, Stripe client)
+│   ├── validation/         # Zod schemas
+│   ├── prisma.ts           # Prisma client (server-only)
+│   └── stripe.ts           # Stripe client
 prisma/
-└── schema.prisma      # MongoDB schema
+└── schema.prisma           # MongoDB schema
+e2e/                        # Playwright E2E tests (fixtures, helpers, tests)
+scripts/                    # tsx scripts (mongo backup, S3 ops, image variants, etc.)
 docs/
-└── copilot/           # AI-generated markdown documents go here
+└── copilot/                # AI-generated markdown documents go here
 ```
+
+### Path aliases (`tsconfig.json`)
+
+- `@/*` → `src/*`
+- `@/components/*` → `src/app/components/*`
+- `@/ui/*` → `src/app/components/ui/*`
+- `@/hooks/*` → `src/app/hooks/*`
+- `@/lib/*` → `src/lib/*`
+- `@/utils/*` → `src/lib/utils/*`
 
 ## Commands
 
 ```bash
-pnpm run dev              # Start development server
-pnpm run build            # Production build
-pnpm run test             # Run tests in watch mode
-pnpm run test:run         # Run all tests once
-pnpm run test:coverage    # Coverage report (target 90–95%)
-pnpm run lint             # ESLint check and auto-fix
-pnpm run format           # Prettier format
-pnpm exec prisma db push  # Push schema changes to MongoDB
-pnpm exec prisma studio   # Browse database
-stripe listen --forward-to http://localhost:3000/api/stripe/webhook  # Local webhook forwarding
+pnpm run dev                    # Start dev server (Turbopack)
+pnpm run build                  # Production build (webpack)
+pnpm run test                   # Run unit tests in watch mode
+pnpm run test:run               # Run all unit tests once
+pnpm run test:coverage          # Coverage report (target 90–95%)
+pnpm run test:coverage:check    # Coverage + regression check vs COVERAGE_METRICS.md
+pnpm run test:e2e               # Run Playwright E2E tests
+pnpm run typecheck              # tsc --noEmit on tracked types
+pnpm run lint                   # ESLint check and auto-fix
+pnpm run format                 # Prettier format
+pnpm exec prisma db push        # Push schema changes to MongoDB
+pnpm exec prisma studio         # Browse database
+pnpm run stripe                 # Forward Stripe webhooks to localhost:3000
 ```
 
 Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before committing.
@@ -71,18 +106,16 @@ Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before co
 ## Next.js Architecture
 
 - Server Components by default — add `'use client'` only for interactive components (Stripe Elements, dialogs, etc.).
-- Server Actions for all mutations (in `lib/actions/`). Add `'use server'` directive at top of file.
-- Never call services, prisma client or repositories directly from Client Components. User server actions for mutations but do not access prisma directly. Use api route handlers to call services or repositories. Call api route handlers for queries from Client components.
-
-````typescript
-- Always use `'server-only'` package in files meant exclusively for server-side execution to prevent accidental client-side imports.
-- Use decorators for auth checks (e.g., `withAuth`, `withAdmin`) in Server Actions.
-- Prefer tanstack/react-query for client-side data fetching and caching in interactive components.
+- Server Actions for all mutations (in `src/lib/actions/`). Add `'use server'` directive at top of file.
+- Never call services, the Prisma client, or repositories directly from Client Components. Use Server Actions for mutations; for queries, call API route handlers from Client Components.
+- Always use the `'server-only'` package in files meant exclusively for server-side execution to prevent accidental client-side imports.
+- Use decorators for auth checks (`withAuth`, `withAdmin` from `src/lib/decorators/with-auth.ts`) in API route handlers and Server Actions.
+- Prefer TanStack Query for client-side data fetching and caching in interactive components.
 - Data fetching in Server Components uses `fetch` with explicit cache options:
 
 ```typescript
 const res = await fetch(url, { cache: 'no-store' }); // for fresh data
-````
+```
 
 - Always validate external data (API responses, user input) with Zod.
 - Use Prisma transactions for multi-step DB operations.
@@ -108,7 +141,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 - Always use React Hook Form + Zod for all forms.
 - Check `src/app/components/forms/fields/` for existing field components before building new ones.
-- Define Zod schemas in `lib/validation/`.
+- Define Zod schemas in `src/lib/validation/`.
 - Standard pattern:
 
 ```typescript
@@ -128,7 +161,7 @@ const form = useForm({
 - Follow shadcn/ui design patterns and variants. Never create new UI primitives — use shadcn/ui.
 - Use shadcn/ui components from `@/components/ui` whenever possible.
 - Use `lucide-react` for all icons.
-- Use Roboto font for UI text.
+- Use Jost font for UI text.
 - Keep UI consistent with existing components.
 - Prioritize accessibility: semantic HTML, ARIA attributes, keyboard navigation support.
 - Use responsive design principles throughout.
@@ -157,7 +190,7 @@ const form = useForm({
 
 ## Testing
 
-- Vitest for all unit and integration tests.
+- Vitest 4 for all unit and integration tests; Playwright for E2E (`e2e/` directory, `pnpm run test:e2e`).
 - `@testing-library/react` for component tests.
 - Test files use `.spec.ts` / `.spec.tsx` suffix, placed adjacent to source files.
 - Use `describe`/`it` blocks for organization.
@@ -233,7 +266,7 @@ When reviewing code, verify:
 - Never mix Server/Client Component patterns incorrectly.
 - Never skip Zod validation in Server Actions.
 - Never use Prisma Client in Client Components.
-- Never expose secrets or sensitive information in the codebase.
+- Never expose secrets or sensitive information in the codebase or logs or .env files.
 - Never disable ESLint or Prettier rules globally or with `eslint-disable` without a documented reason.
 - Never import `describe`, `it`, `expect`, or `vi` from Vitest — they are globals.
 - Never use `expect` inside conditional statements in tests.
@@ -244,13 +277,6 @@ When reviewing code, verify:
 - Never mock implementation details in tests — mock behavior.
 - Never create documentation from files not located in this repository.
 - Never attempt to write DB-interacting code without first verifying the database connection is healthy.
-
-## Recent Changes
-
-- 004-release-digital-formats: Added digital format management (ReleaseDigitalFormat, UserDownloadQuota, DownloadEvent models), S3 presigned URL upload/download (24hr download expiration, 15min upload), freemium 5-download quota with unique release tracking, soft delete with 90-day grace period, admin accordion UI with checkmark indicators, download authorization API with purchase/quota checks, format-specific file validation (MP3/AAC 100MB, FLAC 250MB, WAV 500MB)
-- 003-stripe-pwyw-purchase: Added Stripe payment-mode checkout, PWYW purchase dialog, download gate API, purchase/download tracking models, SES purchase confirmation email
-- 002-tour-management: Added tour management (Tour, TourDate, Venue models), admin CRUD, public tour listings
-- 001-release-search-player: Added release search combobox, release media player page, artist carousel, breadcrumb navigation
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
