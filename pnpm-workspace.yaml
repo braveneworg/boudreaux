@@ -1,2 +1,4 @@
 packages:
   - '.'
+shamefullyHoist: true
+strictPeerDependencies: false
