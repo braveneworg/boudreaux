@@ -157,7 +157,7 @@ const ContactPage = () => {
             <a href="mailto:djmoniklz@gmail.com">djmoniklz@gmail.com</a>
           </p>
         </div>
-        <p className="text-muted-foreground mb-6">
+        <p className="text-zinc-950-foreground mb-6">
           Have a question, demo, or business inquiry? Fill out the form below and we&apos;ll get
           back to you.
         </p>

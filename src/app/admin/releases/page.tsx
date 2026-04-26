@@ -71,7 +71,7 @@ export default async function ReleasesPage() {
           </Card>
         ) : releases.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+            <CardContent className="py-8 text-center text-zinc-950-foreground">
               No releases found. Create your first release to get started.
             </CardContent>
           </Card>

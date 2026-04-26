@@ -40,11 +40,15 @@ export default function HomeLoading() {
         <div className="h-9 w-full rounded-md bg-muted animate-pulse mb-0" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}
         <div className="h-13 w-48 bg-muted animate-pulse rounded mb-0" />
-        {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper */}
-        <div className="min-h-19 w-full bg-muted animate-pulse rounded mb-2" />
-        {/* FormatFileListDrawer + Download button skeleton */}
+        {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper.
+            mb-1 mirrors the actual component, where the link-row uses -mt-1
+            to sit closer to the carousel above. */}
+        <div className="min-h-19 w-full bg-muted animate-pulse rounded mb-1" />
+        {/* View / Download link-row + NowPlayingHeading skeleton.
+            min-h-10 holds the row stable across loading → hydrated states
+            so there's no CLS once the link buttons render. */}
         <div className="flex flex-col items-center min-h-10 mb-2">
-          <div className="h-10 w-48 bg-muted animate-pulse rounded" />
+          <div className="h-6 w-72 bg-muted animate-pulse rounded" />
         </div>
         {/* Cover art skeleton — aspect-square with bg-muted, rounded-t */}
         <div className="aspect-square w-full max-w-xl mx-auto bg-muted animate-pulse rounded-t-lg" />

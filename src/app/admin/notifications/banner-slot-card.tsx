@@ -146,7 +146,7 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
             maxLength={500}
             className="font-mono text-sm"
           />
-          <p className="text-xs text-muted-foreground">{content.length}/500 characters</p>
+          <p className="text-xs text-zinc-950-foreground">{content.length}/500 characters</p>
           {formState.errors?.content && (
             <p className="text-sm text-destructive">{formState.errors.content[0]}</p>
           )}
@@ -164,7 +164,7 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
                 onChange={(e) => setTextColor(e.target.value)}
                 className="h-9 w-12 cursor-pointer rounded border"
               />
-              <span className="text-xs text-muted-foreground">{textColor}</span>
+              <span className="text-xs text-zinc-950-foreground">{textColor}</span>
             </div>
           </div>
           <div className="space-y-2">
@@ -177,7 +177,7 @@ export function BannerSlotCard({ slot, onDelete }: BannerSlotCardProps) {
                 onChange={(e) => setBackgroundColor(e.target.value)}
                 className="h-9 w-12 cursor-pointer rounded border"
               />
-              <span className="text-xs text-muted-foreground">{backgroundColor}</span>
+              <span className="text-xs text-zinc-950-foreground">{backgroundColor}</span>
             </div>
           </div>
         </div>

@@ -67,7 +67,7 @@ export const CheckoutForm = () => {
   if (checkoutState.type === 'loading') {
     return (
       <div className="flex min-h-[200px] items-center justify-center" role="status">
-        <Loader2Icon className="text-muted-foreground size-8 animate-spin" />
+        <Loader2Icon className="text-zinc-950-foreground size-8 animate-spin" />
       </div>
     );
   }

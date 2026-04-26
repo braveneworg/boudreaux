@@ -146,7 +146,7 @@ const SortableImageItem = ({
           {item.uploadProgress !== undefined && (
             <div className="w-3/4">
               <Progress value={item.uploadProgress} className="h-1.5" />
-              <span className="mt-1 block text-center text-xs text-muted-foreground">
+              <span className="mt-1 block text-center text-xs text-zinc-950-foreground">
                 {Math.round(item.uploadProgress)}%
               </span>
             </div>
@@ -169,7 +169,7 @@ const SortableImageItem = ({
             ? { ...attributes, ...listeners }
             : {})}
         >
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          <GripVertical className="h-3.5 w-3.5 text-zinc-950-foreground" />
         </div>
       )}
 
@@ -432,7 +432,7 @@ export const ImageUploader = ({
     <div className={cn('space-y-4', className)}>
       {/* Reordering/Deleting indicator */}
       {(isReordering || isDeleting) && (
-        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-zinc-950-foreground">
           <SpinnerRingCircle size="sm" />
           <span>{isDeleting ? 'Deleting...' : 'Saving order...'}</span>
         </div>
@@ -462,8 +462,8 @@ export const ImageUploader = ({
           className="absolute inset-0 cursor-pointer opacity-0"
           aria-label={label}
         />
-        <ImagePlus className="mb-2 h-8 w-8 text-muted-foreground" />
-        <p className="text-center text-sm text-muted-foreground">
+        <ImagePlus className="mb-2 h-8 w-8 text-zinc-950-foreground" />
+        <p className="text-center text-sm text-zinc-950-foreground">
           {canAddMore ? (
             <>
               <span className="font-medium text-foreground">Click to upload</span> or drag and drop
@@ -478,7 +478,7 @@ export const ImageUploader = ({
           )}
         </p>
         {images.length > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-zinc-950-foreground">
             {images.length} / {maxImages} images
           </p>
         )}
@@ -560,7 +560,7 @@ export const ImageUploader = ({
       <Dialog open={!!imageToDelete} onOpenChange={handleCancelDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete Image</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-950-foreground">
             Are you sure you want to delete this image? This action cannot be undone.
           </p>
           {imageToDelete && (

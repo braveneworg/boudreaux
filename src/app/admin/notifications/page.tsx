@@ -60,7 +60,7 @@ export default async function NotificationsPage() {
         </Heading>
       </div>
 
-      <p className="text-muted-foreground px-6 mb-4">
+      <p className="text-zinc-950-foreground px-6 mb-4">
         Manage the notification text strips for each banner slot. Each slot has a fixed CDN image;
         you can optionally attach a notification strip with styled text.
       </p>

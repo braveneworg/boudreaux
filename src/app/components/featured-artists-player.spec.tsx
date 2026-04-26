@@ -158,6 +158,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     currentFileId,
     onFileSelect,
     featuredTrackNumber,
+    downloadTrigger,
   }: {
     files: Array<{ id: string; title?: string | null; fileName: string }>;
     currentFileId: string | null;
@@ -165,6 +166,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     artistName: string;
     releaseTitle: string;
     featuredTrackNumber?: number;
+    downloadTrigger?: ReactNode;
   }) => (
     <div
       data-testid="format-file-list-drawer"
@@ -176,6 +178,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
           {f.title ?? f.fileName}
         </button>
       ))}
+      {downloadTrigger}
     </div>
   );
   FormatFileListDrawer.displayName = 'FormatFileListDrawer';

@@ -367,7 +367,7 @@ export default function TourForm({ tourId, initialTour = null }: TourFormProps) 
                   <section className="space-y-4">
                     <div className="space-y-2">
                       <h3>Tour Images</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-zinc-950-foreground">
                         Upload images for this tour. You can add up to 10 images. Images can be
                         reordered by dragging and dropping.
                       </p>

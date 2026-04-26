@@ -201,14 +201,14 @@ export const FormatBundleDownload = ({
   if (isLoadingFormatsResolved) {
     return (
       <div className="flex items-center justify-center py-4" role="status">
-        <Loader2 className="text-muted-foreground size-5 animate-spin" />
+        <Loader2 className="text-zinc-950-foreground size-5 animate-spin" />
       </div>
     );
   }
 
   if (resolvedFormats.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">No digital formats available for download.</p>
+      <p className="text-zinc-950-foreground text-sm">No digital formats available for download.</p>
     );
   }
 
@@ -234,7 +234,7 @@ export const FormatBundleDownload = ({
               ) : fp.status === 'error' ? (
                 <AlertCircle className="text-destructive size-4 shrink-0" />
               ) : (
-                <span className="text-muted-foreground size-4 shrink-0 text-center">&bull;</span>
+                <span className="text-zinc-950-foreground size-4 shrink-0 text-center">&bull;</span>
               )}
               <span
                 className={

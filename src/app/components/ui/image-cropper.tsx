@@ -295,7 +295,7 @@ export function ImageCropper({
           </div>
 
           {/* Instructions */}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-950-foreground">
             💡 <strong>Tip:</strong> Drag the top or bottom edges to adjust height, sides to adjust
             width, or corners to resize freely. Drag inside to reposition.
           </p>
@@ -343,7 +343,7 @@ export function ImageCropper({
           </div>
 
           {/* Preview dimensions info */}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-950-foreground">
             Final image size: {BANNER_WIDTH}×{BANNER_HEIGHT} pixels (golden ratio)
           </p>
         </div>

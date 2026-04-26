@@ -64,7 +64,7 @@ export const TourSearch = ({
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-950-foreground" />
         <Input
           type="search"
           value={localValue}

@@ -3,7 +3,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000;
   --fake-four-orange: oklch(0.6907 0.1173 50.77);
   --fake-four-orange-hover: oklch(0.6407 0.1173 50.77);
 }
@@ -11,8 +11,6 @@
 @theme {
   --color-rebecca-purple: #639;
   --animate-spin-slow: rotate(360deg) 1.5s linear infinite;
-  --color-punk-pink: #ff007f;
-  --color-punk-black: #0a0a0a;
 }
 
 @theme inline {

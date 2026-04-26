@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { cloneElement, isValidElement, useMemo, useState } from 'react';
+import type { MouseEvent, ReactElement } from 'react';
 
 import nextDynamic from 'next/dynamic';
 
@@ -16,6 +17,10 @@ const DownloadDialog = nextDynamic(
   () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
   {
     ssr: false,
+    // Stable footprint matches the default DownloadTriggerButton (h-10) so
+    // the brief swap from button → dynamic-loading skeleton → dialog doesn't
+    // shift the layout. When `children` is supplied the consumer is expected
+    // to host this in a min-height container of its own.
     loading: () => <div className="h-10 w-40 animate-pulse bg-muted rounded mb-2 min-h-10" />,
   }
 );
@@ -24,8 +29,14 @@ interface DeferredDownloadDialogProps {
   artistName: string;
   releaseId: string;
   releaseTitle: string;
-  /** Override styling for the trigger button (merged via twMerge after defaults). */
+  /** Override styling for the default trigger button (merged via twMerge after defaults). */
   triggerClassName?: string;
+  /**
+   * Custom trigger element. When provided, replaces the default
+   * `DownloadTriggerButton`. The element's `onClick` is preserved and
+   * augmented to also lazy-mount the dialog on first click.
+   */
+  children?: ReactElement<{ onClick?: (event: MouseEvent<HTMLElement>) => void }>;
 }
 
 export const DeferredDownloadDialog = ({
@@ -33,6 +44,7 @@ export const DeferredDownloadDialog = ({
   releaseId,
   releaseTitle,
   triggerClassName,
+  children,
 }: DeferredDownloadDialogProps) => {
   const [shouldRenderDialog, setShouldRenderDialog] = useState(false);
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
@@ -47,6 +59,16 @@ export const DeferredDownloadDialog = ({
   const availableFormats = userStatus?.availableFormats ?? [];
 
   if (!shouldRenderDialog) {
+    if (children && isValidElement(children)) {
+      const existingOnClick = children.props.onClick;
+      return cloneElement(children, {
+        onClick: (event: MouseEvent<HTMLElement>) => {
+          existingOnClick?.(event);
+          setShouldRenderDialog(true);
+        },
+      });
+    }
+
     return (
       <DownloadTriggerButton
         className={cn('mb-2 min-h-10', triggerClassName)}
@@ -70,7 +92,9 @@ export const DeferredDownloadDialog = ({
       resetInHours={resetInHours}
       availableFormats={availableFormats}
     >
-      <DownloadTriggerButton className={cn('mb-2 min-h-10', triggerClassName)} label="Download" />
+      {children ?? (
+        <DownloadTriggerButton className={cn('mb-2 min-h-10', triggerClassName)} label="Download" />
+      )}
     </DownloadDialog>
   );
 };

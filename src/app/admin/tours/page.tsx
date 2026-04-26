@@ -71,7 +71,7 @@ export default async function ToursPage() {
           </Card>
         ) : tours.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+            <CardContent className="py-8 text-center text-zinc-950-foreground">
               No tours found. Create your first tour to get started.
             </CardContent>
           </Card>

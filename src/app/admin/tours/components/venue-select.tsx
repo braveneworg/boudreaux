@@ -267,7 +267,7 @@ export default function VenueSelect<
                         disabled={disabled}
                         className={cn(
                           'w-full min-w-0 shrink justify-between',
-                          !selectedId && 'text-muted-foreground'
+                          !selectedId && 'text-zinc-950-foreground'
                         )}
                       >
                         <span className="truncate">

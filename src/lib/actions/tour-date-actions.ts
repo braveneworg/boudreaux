@@ -207,7 +207,9 @@ export const deleteTourDateAction = async (
  */
 export const updateHeadlinerSetTimeAction = async (
   headlinerId: string,
-  setTime: string | null
+  setTime: string | null,
+  tourDateId?: string,
+  artistId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   let session;
   try {
@@ -220,13 +222,13 @@ export const updateHeadlinerSetTimeAction = async (
     return { success: false, error: 'Invalid headliner ID' };
   }
 
+  const parsedSetTime = setTime ? new Date(setTime) : null;
+
+  if (setTime && parsedSetTime && isNaN(parsedSetTime.getTime())) {
+    return { success: false, error: 'Invalid set time format' };
+  }
+
   try {
-    const parsedSetTime = setTime ? new Date(setTime) : null;
-
-    if (setTime && isNaN(parsedSetTime!.getTime())) {
-      return { success: false, error: 'Invalid set time format' };
-    }
-
     await TourDateRepository.updateHeadlinerSetTime(headlinerId, parsedSetTime);
 
     logSecurityEvent({
@@ -240,6 +242,43 @@ export const updateHeadlinerSetTimeAction = async (
 
     return { success: true };
   } catch (error) {
+    const isRecordNotFound =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2025';
+
+    if (
+      isRecordNotFound &&
+      tourDateId &&
+      artistId &&
+      OBJECT_ID_REGEX.test(tourDateId) &&
+      OBJECT_ID_REGEX.test(artistId)
+    ) {
+      try {
+        const fallbackUpdated = await TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist(
+          tourDateId,
+          artistId,
+          parsedSetTime
+        );
+
+        if (fallbackUpdated) {
+          logSecurityEvent({
+            event: 'tourDateHeadliner.setTimeUpdated',
+            userId: session.user.id,
+            metadata: { headlinerId, artistId, setTime, fallback: true },
+          });
+
+          revalidatePath('/admin/tours');
+          revalidatePath('/tours');
+
+          return { success: true };
+        }
+      } catch (fallbackError) {
+        console.error('[updateHeadlinerSetTimeAction:fallback]', fallbackError);
+      }
+    }
+
     console.error('[updateHeadlinerSetTimeAction]', error);
     return { success: false, error: 'Failed to update set time' };
   }
@@ -250,7 +289,9 @@ export const updateHeadlinerSetTimeAction = async (
  * Only removes the junction record — does NOT delete the artist.
  */
 export const removeHeadlinerAction = async (
-  headlinerId: string
+  headlinerId: string,
+  tourDateId?: string,
+  artistId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   let session;
   try {
@@ -277,6 +318,42 @@ export const removeHeadlinerAction = async (
 
     return { success: true };
   } catch (error) {
+    const isRecordNotFound =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2025';
+
+    if (
+      isRecordNotFound &&
+      tourDateId &&
+      artistId &&
+      OBJECT_ID_REGEX.test(tourDateId) &&
+      OBJECT_ID_REGEX.test(artistId)
+    ) {
+      try {
+        const fallbackRemoved = await TourDateRepository.removeHeadlinerByTourDateAndArtist(
+          tourDateId,
+          artistId
+        );
+
+        if (fallbackRemoved) {
+          logSecurityEvent({
+            event: 'tourDateHeadliner.removed',
+            userId: session.user.id,
+            metadata: { headlinerId, artistId, fallback: true },
+          });
+
+          revalidatePath('/admin/tours');
+          revalidatePath('/tours');
+
+          return { success: true };
+        }
+      } catch (fallbackError) {
+        console.error('[removeHeadlinerAction:fallback]', fallbackError);
+      }
+    }
+
     console.error('[removeHeadlinerAction]', error);
     return { success: false, error: 'Failed to remove headliner' };
   }

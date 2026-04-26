@@ -75,11 +75,11 @@ export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashb
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground py-8 text-center text-sm" data-testid="loading">
+        <div className="text-zinc-950-foreground py-8 text-center text-sm" data-testid="loading">
           Loading analytics...
         </div>
       ) : !analytics ? (
-        <div className="text-muted-foreground py-8 text-center text-sm" data-testid="error">
+        <div className="text-zinc-950-foreground py-8 text-center text-sm" data-testid="error">
           Failed to load analytics
         </div>
       ) : (
@@ -88,7 +88,7 @@ export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashb
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Downloads</CardTitle>
-                <Download className="text-muted-foreground h-4 w-4" />
+                <Download className="text-zinc-950-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="total-downloads">
@@ -100,7 +100,7 @@ export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashb
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Unique Users</CardTitle>
-                <Users className="text-muted-foreground h-4 w-4" />
+                <Users className="text-zinc-950-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="unique-users">
@@ -112,7 +112,7 @@ export function DownloadAnalyticsDashboard({ releaseId }: DownloadAnalyticsDashb
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Formats</CardTitle>
-                <BarChart3 className="text-muted-foreground h-4 w-4" />
+                <BarChart3 className="text-zinc-950-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="format-count">

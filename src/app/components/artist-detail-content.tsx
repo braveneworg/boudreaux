@@ -27,7 +27,7 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   if (isPending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
       </div>
     );
   }
@@ -36,10 +36,10 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
     return (
       <div className="flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/5 p-8">
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-muted-foreground">
+          <h3 className="text-lg font-semibold text-zinc-950-foreground">
             {error ? 'Failed to load artist' : 'Artist not found'}
           </h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-zinc-950-foreground">
             {error ? 'Please try again later.' : 'The artist you are looking for does not exist.'}
           </p>
         </div>

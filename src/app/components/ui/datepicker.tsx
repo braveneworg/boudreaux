@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,8 +26,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date>();
   const [month, setMonth] = useState<Date>(new Date());
-  const idRef = useRef(uuidv4());
-  const a11yId = `date-picker-${idRef.current}`;
+  const a11yId = useId();
   const dateInputRef = useRef<HTMLInputElement>(null);
   const startDate = new Date(1900, 0, 1);
   const endDate = new Date(2099, 11, 31);
@@ -96,6 +95,8 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
     }
   }, [open]);
 
+  const displayValue = date ? format(date, 'MM/dd/yyyy') : '';
+
   return (
     <div className="flex flex-col gap-3">
       <Label htmlFor={a11yId} className="px-1 sr-only">
@@ -112,13 +113,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               onChange={handleChangeDateInput}
               onKeyDown={handleKeyDown}
               placeholder="mm/dd/yyyy"
-              value={
-                date?.toLocaleDateString(navigator && navigator.language, {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                }) ?? ''
-              }
+              value={displayValue}
             />
           </div>
         </PopoverAnchor>
@@ -145,7 +140,7 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               type="button"
               variant="ghost"
               size="sm"
-              className="text-xs text-muted-foreground h-7 px-2"
+              className="text-xs text-zinc-950-foreground h-7 px-2"
               onClick={() => {
                 setDate(undefined);
                 onSelect?.('', fieldName);

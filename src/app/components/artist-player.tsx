@@ -14,7 +14,9 @@ import { useCallback, useMemo, useState } from 'react';
 import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
-import { DownloadTriggerButton } from '@/app/components/download-trigger-button';
+import { Download } from 'lucide-react';
+
+import { MediaActionLink } from '@/app/components/media-action-link';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import {
@@ -157,7 +159,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   if (releases.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
+      <div className="flex items-center justify-center py-12 text-zinc-950-foreground">
         <p>No releases available for this artist.</p>
       </div>
     );
@@ -194,7 +196,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                         className="size-20 object-cover"
                       />
                     ) : (
-                      <div className="flex size-20 items-center justify-center bg-muted text-xs text-muted-foreground">
+                      <div className="flex size-20 items-center justify-center bg-muted text-xs text-zinc-950-foreground">
                         {ar.release.title.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -227,13 +229,6 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   onTogglePlay={handleTogglePlay}
                   className="shadow-lg"
                 />
-                <DownloadDialog
-                  artistName={artistName}
-                  releaseId={selectedRelease.id}
-                  releaseTitle={selectedRelease.title ?? ''}
-                >
-                  <DownloadTriggerButton />
-                </DownloadDialog>
                 <NowPlayingHeading
                   artistName={artistName}
                   title={selectedRelease.title ?? ''}
@@ -277,6 +272,15 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
               onFileSelect={handleFileSelect}
               artistName={artistName}
               releaseTitle={selectedRelease.title ?? ''}
+              downloadTrigger={
+                <DownloadDialog
+                  artistName={artistName}
+                  releaseId={selectedRelease.id}
+                  releaseTitle={selectedRelease.title ?? ''}
+                >
+                  <MediaActionLink icon={Download} label="Download" />
+                </DownloadDialog>
+              }
             />
           )}
         </div>

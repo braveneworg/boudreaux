@@ -77,7 +77,7 @@ export const FormatDownloadList = ({
 
   if (formats.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">No digital formats available for download.</p>
+      <p className="text-zinc-950-foreground text-sm">No digital formats available for download.</p>
     );
   }
 
@@ -85,7 +85,7 @@ export const FormatDownloadList = ({
     <div className="space-y-2">
       <p className="text-sm font-medium">Choose a format:</p>
       {!hasPurchased && remainingQuota !== null && !quotaExceeded && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-zinc-950-foreground text-xs">
           {remainingQuota} free {remainingQuota === 1 ? 'download' : 'downloads'} remaining
         </p>
       )}

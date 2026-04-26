@@ -86,8 +86,12 @@ interface ArtistPillProps {
   index: number;
   isDragging?: boolean;
   dragHandleProps?: Record<string, unknown>;
-  onSetTimeUpdate: (headlinerId: string, setTime: string | null) => Promise<void>;
-  onRemove: (headlinerId: string) => Promise<void>;
+  onSetTimeUpdate: (
+    headlinerId: string,
+    artistId: string | null,
+    setTime: string | null
+  ) => Promise<void>;
+  onRemove: (headlinerId: string, artistId: string | null) => Promise<void>;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -126,13 +130,13 @@ const ArtistPill = ({
 
   const handleSetTimeChange = async (time: string) => {
     if (!time) {
-      await onSetTimeUpdate(headliner.id, null);
+      await onSetTimeUpdate(headliner.id, headliner.artistId, null);
       return;
     }
     // Build a full ISO date string; the date portion doesn't matter for display,
     // but we need a valid DateTime for Prisma storage.
     const isoString = `1970-01-01T${time}:00.000Z`;
-    await onSetTimeUpdate(headliner.id, isoString);
+    await onSetTimeUpdate(headliner.id, headliner.artistId, isoString);
   };
 
   const handleRemoveClick = () => {
@@ -143,7 +147,7 @@ const ArtistPill = ({
   const handleConfirmRemove = async () => {
     setIsRemoving(true);
     try {
-      await onRemove(headliner.id);
+      await onRemove(headliner.id, headliner.artistId);
       setDeleteDialogOpen(false);
     } catch {
       toast.error('Failed to remove artist');
@@ -222,7 +226,7 @@ const ArtistPill = ({
               <div className="space-y-3">
                 {/* Set Time picker */}
                 <div className="space-y-1.5">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-950-foreground">
                     <Clock className="size-3" />
                     Set Time (optional)
                   </span>
@@ -254,7 +258,7 @@ const ArtistPill = ({
 
         {/* Set time display below the pill */}
         {setTimeDisplay && (
-          <span className="mt-0.5 pl-8 text-xs text-muted-foreground">{setTimeDisplay}</span>
+          <span className="mt-0.5 pl-8 text-xs text-zinc-950-foreground">{setTimeDisplay}</span>
         )}
       </div>
 

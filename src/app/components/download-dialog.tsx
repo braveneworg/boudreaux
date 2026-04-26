@@ -234,7 +234,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-zinc-950-foreground text-sm">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {resetInHours !== null
                     ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -289,7 +289,7 @@ export const DownloadDialog = ({
                       <DownloadIcon className="size-4" />
                       Download limit reached
                     </Button>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-zinc-950-foreground text-sm">
                       You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                       {resetInHours !== null
                         ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -337,7 +337,7 @@ export const DownloadDialog = ({
                                   <div className="flex flex-col gap-1">
                                     <span className="leading-snug">{option.label}</span>
                                     {option.value === 'premium-digital' && (
-                                      <span className="text-muted-foreground">
+                                      <span className="text-zinc-950-foreground">
                                         {' '}
                                         or <em>pay what you want</em>
                                       </span>
@@ -431,7 +431,7 @@ export const DownloadDialog = ({
 
             {/* Subscribe CTA */}
             <div className="border-t pt-4">
-              <p className="text-muted-foreground mb-3 text-sm">
+              <p className="text-zinc-950-foreground mb-3 text-sm">
                 Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
               </p>
               <Button
@@ -476,7 +476,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-zinc-950-foreground text-sm">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {resetInHours !== null
                     ? ` Resets in ${resetInHours} hour${resetInHours === 1 ? '' : 's'}.`
@@ -587,7 +587,7 @@ export const DownloadDialog = ({
                   <DownloadIcon className="size-4" />
                   Download limit reached
                 </Button>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-zinc-950-foreground text-sm">
                   You&apos;ve reached your download limit for <strong>{releaseTitle}</strong>.
                   {guestResetInHours !== null
                     ? ` Resets in ${guestResetInHours} hour${guestResetInHours === 1 ? '' : 's'}.`

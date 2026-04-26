@@ -82,7 +82,7 @@ export function NotificationSearch({ onSelect }: NotificationSearchProps) {
             onValueChange={setSearchValue}
           />
           {isLoading && (
-            <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>
+            <div className="py-6 text-center text-sm text-zinc-950-foreground">Searching...</div>
           )}
           {!isLoading && (
             <>
@@ -101,7 +101,7 @@ export function NotificationSearch({ onSelect }: NotificationSearchProps) {
                             ? stripHtml(notification.content).slice(0, 80)
                             : '(empty)'}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-zinc-950-foreground">
                           Slot {notification.slotNumber} &middot;{' '}
                           {new Date(notification.createdAt).toLocaleDateString()}
                         </span>

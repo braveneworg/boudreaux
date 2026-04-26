@@ -45,7 +45,7 @@ export const ReleasesContent = () => {
   if (isPending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
       </div>
     );
   }
@@ -53,7 +53,7 @@ export const ReleasesContent = () => {
   if (error && !data) {
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-12 text-center">
-        <p className="text-muted-foreground">Unable to load releases. Please try again later.</p>
+        <p className="text-zinc-950-foreground">Unable to load releases. Please try again later.</p>
         <Link
           href="/releases"
           className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"

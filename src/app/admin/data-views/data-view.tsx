@@ -640,14 +640,14 @@ export function DataView<T extends Record<string, unknown>>({
               {isFetchingNextPage ? (
                 <div className="flex items-center gap-2">
                   <Spinner className="size-4" />
-                  <span className="text-sm text-muted-foreground">Loading more...</span>
+                  <span className="text-sm text-zinc-950-foreground">Loading more...</span>
                 </div>
               ) : hasNextPage ? (
                 <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
                   Load More
                 </Button>
               ) : (
-                <span className="text-sm text-muted-foreground">All items loaded</span>
+                <span className="text-sm text-zinc-950-foreground">All items loaded</span>
               )}
             </div>
           )}

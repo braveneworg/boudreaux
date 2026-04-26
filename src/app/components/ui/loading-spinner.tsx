@@ -14,7 +14,7 @@ export const LoadingSpinner = ({ className }: LoadingSpinnerProps) => {
     // Use the class name to adjust layout and size as needed
     <div className={cn('flex items-center justify-center gap-2', className)}>
       <SpinnerRingCircle />
-      <span className="text-sm text-muted-foreground">Loading...</span>
+      <span className="text-sm text-zinc-950-foreground">Loading...</span>
     </div>
   );
 };
