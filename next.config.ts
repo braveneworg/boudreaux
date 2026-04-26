@@ -173,15 +173,13 @@ const config = {
         source: '/',
         headers: homeHeaders,
       },
-      // Next.js hashed build assets are immutable and safe to cache forever.
-      // Also emit CORS header for cross-origin font/chunk usage via assetPrefix.
+      // Next.js already emits `public, max-age=31536000, immutable` for hashed
+      // build assets — overriding it here triggers a dev-mode warning and
+      // breaks HMR. We only emit the CORS header so cross-origin font/chunk
+      // requests work when assetPrefix points at the CDN.
       {
         source: '/_next/static/:path*',
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
           {
             key: 'Access-Control-Allow-Origin',
             value: '*',
