@@ -2,8 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
+
 import { generateImageVariantsAction } from './generate-image-variants-action';
 import { requireRole } from '../utils/auth/require-role';
+
+const SIZE_COUNT = IMAGE_VARIANT_DEVICE_SIZES.length;
 
 vi.mock('server-only', () => ({}));
 vi.mock('../utils/auth/require-role');
@@ -74,11 +78,11 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // 5 device sizes × (original-format + WebP sibling) = 10 variants.
-    expect(result.variantsGenerated).toBe(10);
+    // Each device size emits an original-format + WebP sibling.
+    expect(result.variantsGenerated).toBe(SIZE_COUNT * 2);
 
-    // 1 GetObject + 10 PutObject calls
-    expect(mockS3Send).toHaveBeenCalledTimes(11);
+    // 1 GetObject + (SIZE_COUNT * 2) PutObject calls
+    expect(mockS3Send).toHaveBeenCalledTimes(1 + SIZE_COUNT * 2);
   });
 
   it('still produces every variant when the original is smaller than every device size', async () => {
@@ -92,9 +96,9 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // 5 sizes × (jpg + webp) = 10 variants
-    expect(result.variantsGenerated).toBe(10);
-    expect(mockS3Send).toHaveBeenCalledTimes(11);
+    // Each size emits an original-format + WebP sibling.
+    expect(result.variantsGenerated).toBe(SIZE_COUNT * 2);
+    expect(mockS3Send).toHaveBeenCalledTimes(1 + SIZE_COUNT * 2);
   });
 
   it('does not emit WebP sibling when the original is already WebP', async () => {
@@ -103,9 +107,9 @@ describe('generateImageVariantsAction', () => {
     );
 
     expect(result.success).toBe(true);
-    // 5 device sizes, only original-format (webp) variants — no transcoded sibling
-    expect(result.variantsGenerated).toBe(5);
-    expect(mockS3Send).toHaveBeenCalledTimes(6);
+    // Only original-format (webp) variants — no transcoded sibling
+    expect(result.variantsGenerated).toBe(SIZE_COUNT);
+    expect(mockS3Send).toHaveBeenCalledTimes(1 + SIZE_COUNT);
   });
 
   it('emits a WebP sibling with image/webp content type', async () => {
@@ -115,8 +119,8 @@ describe('generateImageVariantsAction', () => {
       'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
     );
 
-    // 5 sizes × (jpg + webp) = 10 PutObject + 1 GetObject = 11 calls
-    expect(mockS3Send).toHaveBeenCalledTimes(11);
+    // Each size emits jpg + webp PutObject calls + 1 GetObject for the source.
+    expect(mockS3Send).toHaveBeenCalledTimes(1 + SIZE_COUNT * 2);
 
     const putCalls = mockS3Send.mock.calls.slice(1).map(([cmd]) => cmd.input ?? cmd);
     expect(putCalls).toContainEqual(

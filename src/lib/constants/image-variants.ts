@@ -3,12 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Device sizes we generate `_w{width}` variants for. Capped at 1200 on purpose:
- * `generate-image-variants.ts` skips widths `>= originalWidth`, so a 1920px
- * original would never get a `_w1920` variant, and requesting one produces
- * `ERR_BLOCKED_BY_ORB` (CDN) or 403 (origin) instead of a clean 404.
+ * Widths we generate `_w{width}` variants for. Used as both `deviceSizes` and
+ * `imageSizes` in `next.config.ts` so every srcset entry Next.js emits
+ * resolves to a real S3 object — missing variants 403 on the CDN, never 404.
+ *
+ * Includes small thumbnail widths (256, 384) for components with small
+ * `sizes` like the featured-artists carousel. Capped at 1200: the variant
+ * generator now uses `withoutEnlargement: true`, so larger asks just emit
+ * the original at the requested filename — no need to add 1920+.
  */
-export const IMAGE_VARIANT_DEVICE_SIZES = [640, 750, 828, 1080, 1200] as const;
+export const IMAGE_VARIANT_DEVICE_SIZES = [256, 384, 640, 750, 828, 1080, 1200] as const;
 export const IMAGE_VARIANT_SUFFIX_REGEX = /_w\d+\.[^/.]+$/i;
 
 /**

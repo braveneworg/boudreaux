@@ -51,6 +51,12 @@ const config = {
     loaderFile: './src/lib/image-loader.ts',
     // Device sizes still inform srcset generation with custom loaders
     deviceSizes: [...IMAGE_VARIANT_DEVICE_SIZES],
+    // Pin imageSizes to the same set we actually generate variants for.
+    // Next.js builds srcset from `imageSizes ∪ deviceSizes`; leaving the
+    // default `[16, 32, 48, 64, 96, 128, 256, 384]` causes the browser to
+    // request widths like `_w256.webp` that the variant pipeline never wrote
+    // to S3, surfacing as 403s on the CDN (no clean 404 due to bucket policy).
+    imageSizes: [...IMAGE_VARIANT_DEVICE_SIZES],
     // Only allow SVG from our own CDN (we control the contents); block active
     // scripts inside optimized SVGs.
     dangerouslyAllowSVG: false,
