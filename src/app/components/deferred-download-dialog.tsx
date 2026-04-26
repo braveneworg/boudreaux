@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import nextDynamic from 'next/dynamic';
 
 import { useReleaseUserStatusQuery } from '@/app/hooks/use-release-user-status-query';
+import { cn } from '@/lib/utils';
 
 import { DownloadTriggerButton } from './download-trigger-button';
 
@@ -23,12 +24,15 @@ interface DeferredDownloadDialogProps {
   artistName: string;
   releaseId: string;
   releaseTitle: string;
+  /** Override styling for the trigger button (merged via twMerge after defaults). */
+  triggerClassName?: string;
 }
 
 export const DeferredDownloadDialog = ({
   artistName,
   releaseId,
   releaseTitle,
+  triggerClassName,
 }: DeferredDownloadDialogProps) => {
   const [shouldRenderDialog, setShouldRenderDialog] = useState(false);
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
@@ -45,7 +49,7 @@ export const DeferredDownloadDialog = ({
   if (!shouldRenderDialog) {
     return (
       <DownloadTriggerButton
-        className="mb-2 min-h-10"
+        className={cn('mb-2 min-h-10', triggerClassName)}
         label="Download"
         onClick={() => {
           setShouldRenderDialog(true);
@@ -66,7 +70,7 @@ export const DeferredDownloadDialog = ({
       resetInHours={resetInHours}
       availableFormats={availableFormats}
     >
-      <DownloadTriggerButton className="mb-2 min-h-10" label="Download release" />
+      <DownloadTriggerButton className={cn('mb-2 min-h-10', triggerClassName)} label="Download" />
     </DownloadDialog>
   );
 };

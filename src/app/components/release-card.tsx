@@ -15,6 +15,8 @@ import { Music2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+import { DeferredDownloadDialog } from './deferred-download-dialog';
+
 interface ReleaseCardProps {
   /** Unique release identifier */
   id: string;
@@ -79,6 +81,16 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
           <Music2 className="size-3.5" />
           Play
         </Link>
+
+        <DeferredDownloadDialog
+          artistName={artistName ?? ''}
+          releaseId={id}
+          releaseTitle={title}
+          triggerClassName={cn(
+            'mb-0 min-h-0 gap-1 rounded-md border-0 px-3 py-1.5 text-xs font-medium opacity-100',
+            'bg-zinc-900 text-white hover:bg-zinc-700 hover:opacity-100 transition-colors'
+          )}
+        />
 
         {bandcampUrl ? (
           <Link
