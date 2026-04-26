@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
 
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* .npmrc ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 # Install ALL dependencies (including dev) for building
 # Use cache mount for pnpm store to speed up installs
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
@@ -15,7 +15,7 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 
 # Copy package files first for Prisma generation
-COPY package.json pnpm-lock.yaml* .npmrc ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY prisma ./prisma
 
 # Now copy source code (changes most frequently)
