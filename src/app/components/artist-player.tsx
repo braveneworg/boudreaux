@@ -11,7 +11,6 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
 import { Download } from 'lucide-react';
@@ -33,13 +32,9 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
+import { DeferredDownloadDialog } from './deferred-download-dialog';
 import { NowPlayingHeading } from './now-playing-heading';
 import { ReleaseShareWidget } from './release-share-widget';
-
-const DownloadDialog = nextDynamic(
-  () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
-  { ssr: false }
-);
 
 interface ArtistPlayerProps {
   /** Artist with published releases and tracks */
@@ -273,13 +268,13 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
               artistName={artistName}
               releaseTitle={selectedRelease.title ?? ''}
               downloadTrigger={
-                <DownloadDialog
+                <DeferredDownloadDialog
                   artistName={artistName}
                   releaseId={selectedRelease.id}
                   releaseTitle={selectedRelease.title ?? ''}
                 >
                   <MediaActionLink icon={Download} label="Download" />
-                </DownloadDialog>
+                </DeferredDownloadDialog>
               }
             />
           )}

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { cloneElement, isValidElement, useMemo, useState } from 'react';
+import { cloneElement, isValidElement, useCallback, useMemo, useState } from 'react';
 import type { MouseEvent, ReactElement } from 'react';
 
 import nextDynamic from 'next/dynamic';
@@ -17,11 +17,12 @@ const DownloadDialog = nextDynamic(
   () => import('./download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
   {
     ssr: false,
-    // Stable footprint matches the default DownloadTriggerButton (h-10) so
-    // the brief swap from button → dynamic-loading skeleton → dialog doesn't
-    // shift the layout. When `children` is supplied the consumer is expected
-    // to host this in a min-height container of its own.
-    loading: () => <div className="h-10 w-40 animate-pulse bg-muted rounded mb-2 min-h-10" />,
+    // The visible trigger is rendered as a sibling above this dynamic
+    // boundary, so the chunk-loading window doesn't need its own placeholder.
+    // Returning null keeps the layout footprint stable on first tap (no FOUC,
+    // no CLS) — previous behavior swapped the children out for a skeleton of
+    // a different size.
+    loading: () => null,
   }
 );
 
@@ -46,7 +47,12 @@ export const DeferredDownloadDialog = ({
   triggerClassName,
   children,
 }: DeferredDownloadDialogProps) => {
-  const [shouldRenderDialog, setShouldRenderDialog] = useState(false);
+  // Each tap increments openCounter, which is also the key on DownloadDialog.
+  // Re-mounting on every tap forces openOnMount to fire again, so re-opens
+  // after a close behave correctly. Trade-off: in-progress dialog state is
+  // discarded between opens — acceptable since reopening is an explicit
+  // "start over" gesture.
+  const [openCounter, setOpenCounter] = useState(0);
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
 
   const hasPurchase = userStatus?.hasPurchase ?? false;
@@ -58,43 +64,45 @@ export const DeferredDownloadDialog = ({
   const resetInHours = userStatus?.resetInHours ?? null;
   const availableFormats = userStatus?.availableFormats ?? [];
 
-  if (!shouldRenderDialog) {
-    if (children && isValidElement(children)) {
-      const existingOnClick = children.props.onClick;
-      return cloneElement(children, {
-        onClick: (event: MouseEvent<HTMLElement>) => {
-          existingOnClick?.(event);
-          setShouldRenderDialog(true);
-        },
-      });
-    }
+  const handleTriggerClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      children?.props?.onClick?.(event);
+      setOpenCounter((count) => count + 1);
+    },
+    [children]
+  );
 
-    return (
+  const trigger =
+    children && isValidElement(children) ? (
+      cloneElement(children, { onClick: handleTriggerClick })
+    ) : (
       <DownloadTriggerButton
         className={cn('mb-2 min-h-10', triggerClassName)}
         label="Download"
-        onClick={() => {
-          setShouldRenderDialog(true);
-        }}
+        onClick={handleTriggerClick}
       />
     );
-  }
 
   return (
-    <DownloadDialog
-      artistName={artistName}
-      openOnMount
-      releaseId={releaseId}
-      releaseTitle={releaseTitle}
-      hasPurchase={hasPurchase}
-      purchasedAt={purchasedAt}
-      downloadCount={downloadCount}
-      resetInHours={resetInHours}
-      availableFormats={availableFormats}
-    >
-      {children ?? (
-        <DownloadTriggerButton className={cn('mb-2 min-h-10', triggerClassName)} label="Download" />
+    <>
+      {trigger}
+      {openCounter > 0 && (
+        <DownloadDialog
+          key={openCounter}
+          artistName={artistName}
+          openOnMount
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+          hasPurchase={hasPurchase}
+          purchasedAt={purchasedAt}
+          downloadCount={downloadCount}
+          resetInHours={resetInHours}
+          availableFormats={availableFormats}
+        >
+          {/* Radix DialogTrigger asChild requires a single React element child. The visible trigger lives above this dynamic boundary; this hidden span satisfies the API without participating in layout. */}
+          <span aria-hidden="true" className="hidden" />
+        </DownloadDialog>
       )}
-    </DownloadDialog>
+    </>
   );
 };

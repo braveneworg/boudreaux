@@ -715,7 +715,7 @@ const FormatFileListDrawer = ({
           states (skeleton, dynamic-dialog placeholder, hydrated content) so
           there's no CLS when DeferredDownloadDialog flips from button →
           dialog or when files arrive late. */}
-      <div className="flex items-center justify-center flex-wrap gap-x-1.5 text-sm text-zinc-950 min-h-8">
+      <div className="flex items-center justify-center flex-wrap gap-1.5 text-sm text-zinc-950 min-h-8">
         <DrawerTrigger asChild>
           <button
             type="button"

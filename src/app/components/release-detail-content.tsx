@@ -27,8 +27,11 @@ interface ReleaseDetailContentProps {
  */
 export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailContentProps) => {
   const { isPending: releasePending, data: release } = useReleaseQuery(releaseId);
-  const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
-  const { data: formatsData } = useReleaseDigitalFormatsQuery(releaseId);
+  // Pre-warm the TanStack Query cache for the data DeferredDownloadDialog
+  // fetches once the user opens it. The hooks dedupe internally, so the dialog
+  // sees instant data on first open.
+  useReleaseUserStatusQuery(releaseId);
+  useReleaseDigitalFormatsQuery(releaseId);
 
   const primaryArtistId = release?.artistReleases?.[0]?.artist?.id ?? null;
   const { data: relatedData } = useReleaseRelatedQuery(releaseId, primaryArtistId);
@@ -57,11 +60,6 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
   const primaryArtist = release.artistReleases?.[0]?.artist;
   const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
-  const hasPurchase = userStatus?.hasPurchase ?? false;
-  const purchasedAt = userStatus?.purchasedAt ? new Date(userStatus.purchasedAt) : null;
-  const downloadCount = userStatus?.downloadCount ?? 0;
-
-  const availableFormats = formatsData?.formats ?? [];
   const otherReleases = relatedData?.releases ?? [];
 
   const breadcrumbItems = [
@@ -85,11 +83,6 @@ export const ReleaseDetailContent = ({ releaseId, autoPlay }: ReleaseDetailConte
         autoPlay={autoPlay}
         releaseId={release.id}
         releaseTitle={release.title}
-        suggestedPrice={release.suggestedPrice ? release.suggestedPrice / 100 : null}
-        hasPurchase={hasPurchase}
-        purchasedAt={purchasedAt}
-        downloadCount={downloadCount}
-        availableFormats={availableFormats}
       />
       <ReleaseDescription description={release.description ?? null} />
     </>

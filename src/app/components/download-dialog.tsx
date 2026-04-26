@@ -331,7 +331,7 @@ export const DownloadDialog = ({
                                 className="flex items-center gap-3 space-y-0"
                               >
                                 <FormControl>
-                                  <RadioGroupItem value={option.value} />
+                                  <RadioGroupItem className="size-6" value={option.value} />
                                 </FormControl>
                                 <FormLabel className="cursor-pointer font-normal">
                                   <div className="flex flex-col gap-1">
@@ -436,7 +436,7 @@ export const DownloadDialog = ({
               </p>
               <Button
                 type="button"
-                className="w-full bg-(--fake-four-orange)! text-white hover:bg-(--fake-four-orange-hover) focus-visible:ring-(--fake-four-orange) data-[state=open]:bg-(--fake-four-orange-hover)"
+                className="w-full bg-green-700! text-white hover:bg-green-800 focus-visible:ring-green-700 data-[state=open]:bg-green-800"
                 variant="outline"
                 onClick={handleSubscribe}
               >
