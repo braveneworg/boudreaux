@@ -990,55 +990,6 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                   <section className="space-y-4">
                     <DownloadAnalyticsDashboard releaseId={initialReleaseId!} />
                   </section>
-
-                  <Separator />
-
-                  {/* Featured Section - Edit mode only */}
-                  <section className="space-y-4">
-                    <h2 className="font-semibold">Featured Settings</h2>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <FormField
-                        control={control}
-                        name="featuredOn"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Featured On</FormLabel>
-                            <FormControl>
-                              <DatePicker
-                                fieldName={field.name}
-                                onSelect={handleSelectDate}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={control}
-                        name="featuredUntil"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Featured Until</FormLabel>
-                            <FormControl>
-                              <DatePicker
-                                fieldName={field.name}
-                                onSelect={handleSelectDate}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <TextField
-                      control={control}
-                      name="featuredDescription"
-                      label="Featured Description"
-                      placeholder="Special description when featured"
-                    />
-                  </section>
                 </>
               )}
             </CardContent>
