@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -11,23 +11,33 @@ import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 
 import { ReleasePlayer } from './release-player';
 
-// Mock next/dynamic to render synchronously — no Promises involved.
-// The real next/dynamic lazy-loads DownloadDialog with { ssr: false }, which
-// defers rendering via React.lazy. This mock bypasses the async loader entirely
-// and returns a synchronous component that mirrors the DownloadDialog mock's
-// output so that getByTestId assertions work without awaiting.
-vi.mock('next/dynamic', () => ({
-  __esModule: true,
-  default: () => {
-    function DynamicDownloadDialog(props: { children?: ReactNode; artistName?: string }) {
-      return (
-        <div data-testid="download-dialog" data-artist-name={props.artistName}>
-          {props.children}
-        </div>
-      );
-    }
-    DynamicDownloadDialog.displayName = 'DynamicDownloadDialog';
-    return DynamicDownloadDialog;
+// Stub DeferredDownloadDialog: renders the trigger always (mirroring the real
+// component's CLS-safe shape) and only mounts the dialog test-double after a
+// click. Lets the existing assertions still discover both elements, while
+// validating the new architecture where the trigger lives outside the dynamic
+// boundary.
+vi.mock('./deferred-download-dialog', () => ({
+  DeferredDownloadDialog: ({
+    artistName,
+    children,
+  }: {
+    artistName: string;
+    children?: ReactNode;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+      <>
+        <button
+          type="button"
+          data-testid="download-trigger-button"
+          aria-label="Download music"
+          onClick={() => setIsOpen(true)}
+        >
+          {children ?? 'download'}
+        </button>
+        {isOpen && <div data-testid="download-dialog" data-artist-name={artistName} />}
+      </>
+    );
   },
 }));
 
@@ -187,26 +197,8 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
-// Mock DownloadDialog at consumer level
-vi.mock('@/app/components/download-dialog', () => ({
-  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
-    <div data-testid="download-dialog" data-artist-name={artistName}>
-      {children}
-    </div>
-  ),
-  DownloadTriggerButton: () => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      download
-    </button>
-  ),
-}));
-
 vi.mock('@/app/components/media-action-link', () => ({
-  MediaActionLink: ({ label }: { label: string }) => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      {label}
-    </button>
-  ),
+  MediaActionLink: ({ label }: { label: string }) => <span>{label}</span>,
 }));
 
 describe('ReleasePlayer', () => {
@@ -404,8 +396,10 @@ describe('ReleasePlayer', () => {
     expect(coverArt).toHaveAttribute('data-is-playing', 'false');
   });
 
-  it('should render the download dialog with the correct artist name', () => {
+  it('should render the download dialog with the correct artist name on first tap', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    fireEvent.click(screen.getByTestId('download-trigger-button'));
 
     const downloadDialog = screen.getByTestId('download-dialog');
     expect(downloadDialog).toBeInTheDocument();
@@ -419,8 +413,10 @@ describe('ReleasePlayer', () => {
     expect(triggerButton).toBeInTheDocument();
   });
 
-  it('should render DownloadDialog inside FormatFileListDrawer trigger row', () => {
+  it('should mount the download dialog inside FormatFileListDrawer once tapped', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    fireEvent.click(screen.getByTestId('download-trigger-button'));
 
     const downloadDialog = screen.getByTestId('download-dialog');
     const formatFileListDrawer = screen.getByTestId('format-file-list-drawer');
@@ -428,7 +424,7 @@ describe('ReleasePlayer', () => {
     expect(formatFileListDrawer).toContainElement(downloadDialog);
   });
 
-  it('should not render download dialog when release has no files', () => {
+  it('should not render download trigger or dialog when release has no files', () => {
     render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
 
     expect(screen.queryByTestId('download-dialog')).not.toBeInTheDocument();

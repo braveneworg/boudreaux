@@ -18,7 +18,7 @@ const SocialShareWidget = nextDynamic(
   () => import('./social-share-widget').then((mod) => ({ default: mod.SocialShareWidget })),
   {
     ssr: false,
-    loading: () => <div className="h-8 w-36 min-h-8 animate-pulse bg-muted rounded" />,
+    loading: () => <div className="bg-muted h-8 min-h-8 w-36 animate-pulse rounded" />,
   }
 );
 
@@ -82,13 +82,13 @@ export const ReleaseShareWidget = ({
   }, [artistUrl, featuredArtists, selectedArtist, setSelectedArtist]);
   return (
     <>
-      <div className="max-w-90 mx-auto mt-3 -mb-3 overflow-hidden flex justify-center items-center">
-        <span className="inline-block size-10 -mb-3.25">
+      <div className="mx-auto mt-3 -mb-3 flex max-w-90 items-center justify-center overflow-hidden">
+        <span className="-mb-3.25 inline-block size-10">
           <Share2Icon onClick={handleShare2IconClick} size={22} className="ml-2 opacity-60" />
         </span>
         <SocialShareWidget artistUrl={artistUrl} />
       </div>
-      <Separator className="bg-zinc-300 mx-auto mt-3 mb-1 min-h-px max-h-px max-w-[calc(100%-2rem)]" />
+      <Separator className="mx-auto mt-3 mb-1 max-h-px min-h-px max-w-[calc(100%-2rem)] bg-zinc-300" />
     </>
   );
 };

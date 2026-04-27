@@ -15,7 +15,7 @@ const Logo = ({ isMobile }: Readonly<LogoProps>) => {
     <Link href="/" className="shrink-0">
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="block ml-3 mt-px size-10 md:size-36 rounded-full bg-white"
+        className="mt-px ml-3 block size-10 rounded-full bg-white md:size-36"
         height={48}
         priority
         unoptimized

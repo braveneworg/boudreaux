@@ -334,7 +334,7 @@ export default function CoverArtField<
 
           {/* Preview */}
           {(field.value || localPreviewUrl) && (
-            <div className="relative h-40 w-40 overflow-hidden rounded-lg border group">
+            <div className="group relative h-40 w-40 overflow-hidden rounded-lg border">
               {/* `unoptimized` bypasses the custom image loader, which would
                   otherwise rewrite the src to `_w{width}.webp`. Width variants
                   are generated asynchronously after upload (fire-and-forget),
@@ -350,8 +350,8 @@ export default function CoverArtField<
                 unoptimized
               />
               {isUploading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                  <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
+                <div className="bg-background/80 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
+                  <Loader2 className="text-zinc-950-foreground h-8 w-8 animate-spin" />
                 </div>
               )}
               {!isUploading && !disabled && (
@@ -367,7 +367,7 @@ export default function CoverArtField<
                       setLocalPreviewUrl('');
                     }
                   }}
-                  className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow-sm transition-opacity hover:bg-destructive sm:opacity-0 sm:group-hover:opacity-100"
+                  className="bg-destructive/90 text-destructive-foreground hover:bg-destructive absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Remove cover art"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -415,17 +415,17 @@ export default function CoverArtField<
               />
               {isUploading ? (
                 <>
-                  <Loader2 className="mb-2 h-8 w-8 animate-spin text-zinc-950-foreground" />
-                  <p className="text-sm text-zinc-950-foreground">Uploading...</p>
+                  <Loader2 className="text-zinc-950-foreground mb-2 h-8 w-8 animate-spin" />
+                  <p className="text-zinc-950-foreground text-sm">Uploading...</p>
                 </>
               ) : (
                 <>
-                  <ImagePlus className="mb-2 h-8 w-8 text-zinc-950-foreground" />
+                  <ImagePlus className="text-zinc-950-foreground mb-2 h-8 w-8" />
                   <p className="text-center text-sm">
-                    <span className="font-medium text-foreground">Click to upload</span> or drag and
+                    <span className="text-foreground font-medium">Click to upload</span> or drag and
                     drop
                   </p>
-                  <p className="text-xs text-zinc-950-foreground">
+                  <p className="text-zinc-950-foreground text-xs">
                     JPEG, PNG, WebP, GIF up to 50MB
                   </p>
                 </>
@@ -436,7 +436,7 @@ export default function CoverArtField<
           {/* Artist image combobox */}
           {artistIds.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-zinc-950-foreground">Or select from artist images:</p>
+              <p className="text-zinc-950-foreground text-sm">Or select from artist images:</p>
               <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -501,7 +501,7 @@ export default function CoverArtField<
                             <div className="flex min-w-0 flex-col">
                               <span className="truncate text-sm">{img.artistName}</span>
                               {img.caption && (
-                                <span className="truncate text-xs text-zinc-950-foreground">
+                                <span className="text-zinc-950-foreground truncate text-xs">
                                   {img.caption}
                                 </span>
                               )}

@@ -11,7 +11,6 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
 import { Download } from 'lucide-react';
@@ -33,13 +32,9 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
+import { DeferredDownloadDialog } from './deferred-download-dialog';
 import { NowPlayingHeading } from './now-playing-heading';
 import { ReleaseShareWidget } from './release-share-widget';
-
-const DownloadDialog = nextDynamic(
-  () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
-  { ssr: false }
-);
 
 interface ArtistPlayerProps {
   /** Artist with published releases and tracks */
@@ -159,7 +154,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   if (releases.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-zinc-950-foreground">
+      <div className="text-zinc-950-foreground flex items-center justify-center py-12">
         <p>No releases available for this artist.</p>
       </div>
     );
@@ -182,7 +177,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                     onClick={() => handleReleaseSelect(index)}
                     className={cn(
                       'relative overflow-hidden rounded-md transition-all',
-                      isSelected && 'ring-2 ring-primary'
+                      isSelected && 'ring-primary ring-2'
                     )}
                     aria-label={`Play ${ar.release.title}`}
                     aria-pressed={isSelected}
@@ -196,7 +191,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                         className="size-20 object-cover"
                       />
                     ) : (
-                      <div className="flex size-20 items-center justify-center bg-muted text-xs text-zinc-950-foreground">
+                      <div className="bg-muted text-zinc-950-foreground flex size-20 items-center justify-center text-xs">
                         {ar.release.title.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -228,6 +223,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   isPlaying={isPlaying}
                   onTogglePlay={handleTogglePlay}
                   className="shadow-lg"
+                  priority
                 />
                 <NowPlayingHeading
                   artistName={artistName}
@@ -273,13 +269,13 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
               artistName={artistName}
               releaseTitle={selectedRelease.title ?? ''}
               downloadTrigger={
-                <DownloadDialog
+                <DeferredDownloadDialog
                   artistName={artistName}
                   releaseId={selectedRelease.id}
                   releaseTitle={selectedRelease.title ?? ''}
                 >
                   <MediaActionLink icon={Download} label="Download" />
-                </DownloadDialog>
+                </DeferredDownloadDialog>
               }
             />
           )}

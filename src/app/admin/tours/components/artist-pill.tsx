@@ -169,9 +169,9 @@ const ArtistPill = ({
       <div ref={ref} className="inline-flex flex-col items-start">
         <div
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1',
+            'inline-flex items-center gap-1.5 rounded-full py-1 pr-1 pl-1',
             'transition-shadow',
-            isDragging && 'shadow-lg ring-2 ring-primary/30'
+            isDragging && 'ring-primary/30 shadow-lg ring-2'
           )}
           style={{ backgroundColor: color.bg }}
         >
@@ -211,7 +211,7 @@ const ArtistPill = ({
                   'relative flex size-6 shrink-0 items-center justify-center rounded-full',
                   'transition-colors hover:opacity-80',
                   // Invisible 44x44 tap target for accessibility
-                  'before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
+                  'before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
                 )}
                 style={{
                   backgroundColor: useBlack ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)',
@@ -226,7 +226,7 @@ const ArtistPill = ({
               <div className="space-y-3">
                 {/* Set Time picker */}
                 <div className="space-y-1.5">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-950-foreground">
+                  <span className="text-zinc-950-foreground flex items-center gap-1.5 text-xs font-medium">
                     <Clock className="size-3" />
                     Set Time (optional)
                   </span>
@@ -238,14 +238,14 @@ const ArtistPill = ({
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-border" />
+                <div className="bg-border h-px" />
 
                 {/* Remove button */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-start text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive w-full justify-start"
                   onClick={handleRemoveClick}
                 >
                   <Trash2 className="mr-2 size-4" />
@@ -258,7 +258,7 @@ const ArtistPill = ({
 
         {/* Set time display below the pill */}
         {setTimeDisplay && (
-          <span className="mt-0.5 pl-8 text-xs text-zinc-950-foreground">{setTimeDisplay}</span>
+          <span className="text-zinc-950-foreground mt-0.5 pl-8 text-xs">{setTimeDisplay}</span>
         )}
       </div>
 
@@ -277,7 +277,7 @@ const ArtistPill = ({
             <AlertDialogAction
               onClick={handleConfirmRemove}
               disabled={isRemoving}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90 text-white"
             >
               {isRemoving ? 'Removing...' : 'Remove'}
             </AlertDialogAction>

@@ -48,7 +48,7 @@ const CDNStatusBanner = () => {
     : 0;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 p-4">
+    <div className="fixed top-0 right-0 left-0 z-50 p-4">
       <Alert className={config.className}>
         <div className="flex items-start gap-3">
           {config.icon}
@@ -79,7 +79,7 @@ const CDNStatusBanner = () => {
               <Progress value={progress} className="mt-2 h-2" />
             )}
           </div>
-          <Clock className="h-4 w-4 text-zinc-950-foreground" />
+          <Clock className="text-zinc-950-foreground h-4 w-4" />
         </div>
       </Alert>
     </div>

@@ -39,7 +39,7 @@ export const MessageSpinner = ({
       )}
     >
       <SpinnerRingCircle size={size} variant={variant} />
-      <div className={cn(`flex justify-center items-center pl-8 ${containerSize}`)}>
+      <div className={cn(`flex items-center justify-center pl-8 ${containerSize}`)}>
         <span className={cn('text-zinc-950-foreground m-0 p-0', textClass)}>{title}</span>
       </div>
     </div>

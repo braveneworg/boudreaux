@@ -24,8 +24,8 @@ const StatusIndicator = ({
 }: StatusIndicatorProps) => {
   if (isPending) {
     return (
-      <div className={cn('flex items-center justify-center w-6 h-6', className)}>
-        <LoaderIcon className="w-4 h-4 animate-spin text-blue-500" />
+      <div className={cn('flex h-6 w-6 items-center justify-center', className)}>
+        <LoaderIcon className="h-4 w-4 animate-spin text-blue-500" />
       </div>
     );
   }
@@ -34,11 +34,11 @@ const StatusIndicator = ({
     return (
       <div
         className={cn(
-          'flex items-center justify-center w-6 h-6 rounded-full bg-red-100',
+          'flex h-6 w-6 items-center justify-center rounded-full bg-red-100',
           className
         )}
       >
-        <XIcon className="w-4 h-4 text-red-600" />
+        <XIcon className="h-4 w-4 text-red-600" />
       </div>
     );
   }
@@ -47,11 +47,11 @@ const StatusIndicator = ({
     return (
       <div
         className={cn(
-          'flex items-center justify-center w-6 h-6 rounded-full bg-red-100',
+          'flex h-6 w-6 items-center justify-center rounded-full bg-red-100',
           className
         )}
       >
-        <XIcon className="w-4 h-4 text-red-600" />
+        <XIcon className="h-4 w-4 text-red-600" />
       </div>
     );
   }
@@ -60,11 +60,11 @@ const StatusIndicator = ({
     return (
       <div
         className={cn(
-          'flex items-center justify-center w-6 h-6 rounded-full bg-green-100',
+          'flex h-6 w-6 items-center justify-center rounded-full bg-green-100',
           className
         )}
       >
-        <CheckIcon className="w-4 h-4 text-green-600" />
+        <CheckIcon className="h-4 w-4 text-green-600" />
       </div>
     );
   }

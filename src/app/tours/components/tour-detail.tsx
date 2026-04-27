@@ -61,19 +61,19 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
       {/* Main Content */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left Column - Tour Info */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <div className="space-y-2">
                 {isPastTour && (
-                  <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-zinc-950-foreground">
+                  <span className="bg-muted text-zinc-950-foreground inline-block rounded-full px-3 py-1 text-xs font-medium">
                     Past Event
                   </span>
                 )}
                 <CardTitle className="text-3xl">{tour.title}</CardTitle>
                 {/* Hero Image */}
                 {sortedImages.length > 0 && (
-                  <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
+                  <div className="bg-muted relative aspect-video w-full overflow-hidden rounded-lg">
                     <Image
                       src={sortedImages[0].s3Url}
                       alt={sortedImages[0].altText || tour.title}
@@ -85,10 +85,10 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                   </div>
                 )}
                 {tour.subtitle && (
-                  <p className="text-xl text-zinc-950-foreground">{tour.subtitle}</p>
+                  <p className="text-zinc-950-foreground text-xl">{tour.subtitle}</p>
                 )}
                 {tour.subtitle2 && (
-                  <p className="text-lg text-zinc-950-foreground">{tour.subtitle2}</p>
+                  <p className="text-zinc-950-foreground text-lg">{tour.subtitle2}</p>
                 )}
               </div>
             </CardHeader>
@@ -99,7 +99,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                 <>
                   <div>
                     <h3 className="mb-2 text-lg font-semibold">About</h3>
-                    <p className="whitespace-pre-wrap text-zinc-950-foreground">
+                    <p className="text-zinc-950-foreground whitespace-pre-wrap">
                       {tour.description}
                     </p>
                   </div>
@@ -116,7 +116,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                       {sortedImages.slice(1).map((image) => (
                         <div
                           key={image.id}
-                          className="relative aspect-video overflow-hidden rounded-lg bg-muted"
+                          className="bg-muted relative aspect-video overflow-hidden rounded-lg"
                         >
                           <Image
                             src={image.s3Url}
@@ -144,7 +144,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               {sortedTourDates.length === 0 ? (
-                <p className="text-sm text-zinc-950-foreground">No tour dates announced yet.</p>
+                <p className="text-zinc-950-foreground text-sm">No tour dates announced yet.</p>
               ) : (
                 sortedTourDates.map((tourDate, index) => {
                   const headlinerNames = tourDate.headliners
@@ -156,7 +156,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                     <div key={tourDate.id} className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex items-start gap-2 text-sm">
-                          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
+                          <Calendar className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
                           <div>
                             <div className="font-medium">
                               {formatTourDate(tourDate.startDate, tourDate.timeZone, {
@@ -181,7 +181,7 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
                         </div>
 
                         <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
+                          <MapPin className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
                           <VenueDirectionsLink
                             destination={[
                               tourDate.venue.name,
@@ -208,14 +208,14 @@ export const TourDetail = ({ tour }: TourDetailProps) => {
 
                         {headlinerNames.length > 0 && (
                           <div className="flex items-start gap-2 text-sm">
-                            <Music className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
+                            <Music className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
                             <span>{headlinerNames.join(', ')}</span>
                           </div>
                         )}
 
                         {(tourDate.ticketPrices || tourDate.ticketsUrl) && (
                           <div className="flex items-start gap-2 text-sm">
-                            <Ticket className="mt-0.5 h-4 w-4 shrink-0 text-zinc-950-foreground" />
+                            <Ticket className="text-zinc-950-foreground mt-0.5 h-4 w-4 shrink-0" />
                             <div className="space-y-2">
                               {tourDate.ticketPrices && <div>{tourDate.ticketPrices}</div>}
                               {tourDate.ticketsUrl && (

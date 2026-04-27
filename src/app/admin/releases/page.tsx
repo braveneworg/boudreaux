@@ -67,11 +67,11 @@ export default async function ReleasesPage() {
       <div className="mt-6 grid gap-4">
         {fetchError ? (
           <Card>
-            <CardContent className="py-8 text-center text-destructive">{fetchError}</CardContent>
+            <CardContent className="text-destructive py-8 text-center">{fetchError}</CardContent>
           </Card>
         ) : releases.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-zinc-950-foreground">
+            <CardContent className="text-zinc-950-foreground py-8 text-center">
               No releases found. Create your first release to get started.
             </CardContent>
           </Card>

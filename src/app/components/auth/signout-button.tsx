@@ -28,7 +28,7 @@ const SignedinToolbar = ({
 
   return (
     <div className={cn('mt-3', className)}>
-      <div className="flex align-center gap-4 mb-3">
+      <div className="align-center mb-3 flex gap-4">
         <GravatarAvatar
           email={session?.user?.email || ''}
           firstName={session?.user?.name?.split(' ')[0]}
@@ -38,7 +38,7 @@ const SignedinToolbar = ({
           <SignedInAs onClick={onNavigate} />
           <div className="flex items-center gap-2">
             <SignOutButton onNavigate={onNavigate} />
-            {!isMobile && <VerticalSeparator className="h-6! -mt-1 mx-2 self-stretch w-0.5!" />}
+            {!isMobile && <VerticalSeparator className="mx-2 -mt-1 h-6! w-0.5! self-stretch" />}
             <EditProfileButton />
             {isAdmin && <AdminLink onClick={onNavigate} />}
           </div>

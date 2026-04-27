@@ -7,7 +7,7 @@ const UsernameLink = ({ username }: { username: string }) => {
   return (
     <Link
       href={`/profile/${username}`}
-      className="text-sm text-zinc-950-foreground hover:text-foreground"
+      className="text-zinc-950-foreground hover:text-foreground text-sm"
     >
       @{username}
     </Link>

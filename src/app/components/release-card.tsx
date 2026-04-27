@@ -53,7 +53,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
             data-testid="cover-art-placeholder"
             className={cn(
               'flex h-full w-full flex-col items-center justify-center',
-              'bg-zinc-800 text-white text-center p-4'
+              'bg-zinc-800 p-4 text-center text-white'
             )}
           >
             <span className="text-sm font-medium">{title}</span>
@@ -64,8 +64,8 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
 
       {/* Info */}
       <div className="flex flex-col gap-0.5">
-        <h3 className="text-sm font-semibold text-zinc-900 line-clamp-1">{title}</h3>
-        {artistName && <p className="text-xs text-zinc-500 line-clamp-1">{artistName}</p>}
+        <h3 className="line-clamp-1 text-sm font-semibold text-zinc-900">{title}</h3>
+        {artistName && <p className="line-clamp-1 text-xs text-zinc-500">{artistName}</p>}
       </div>
 
       {/* Actions */}
@@ -75,7 +75,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
           aria-label={`Play ${title}`}
           className={cn(
             'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium',
-            'bg-zinc-900 text-white hover:bg-zinc-700 transition-colors'
+            'bg-zinc-900 text-white transition-colors hover:bg-zinc-700'
           )}
         >
           <Music2 className="size-3.5" />
@@ -97,7 +97,7 @@ export const ReleaseCard = ({ id, title, artistName, coverArt, bandcampUrl }: Re
             href={bandcampUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:text-zinc-900"
           >
             Bandcamp
           </Link>

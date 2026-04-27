@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
@@ -400,6 +400,26 @@ describe('CollectionDownloadDialog', () => {
     expect(screen.queryByText(/resets in/i)).not.toBeInTheDocument();
   });
 
+  it('shows singular reset hour when reset is exactly one hour away', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const purchase = buildPurchase();
+    purchase.release.releaseDownloads = [
+      {
+        downloadCount: 5,
+        lastDownloadedAt: '2026-01-15T10:00:00.000Z',
+      },
+    ];
+    vi.setSystemTime(new Date('2026-01-15T15:00:00.000Z'));
+
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+
+    expect(screen.getByText(/resets in 1 hour\./i)).toBeInTheDocument();
+  });
+
   it('shows no formats message when no digital formats', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const purchase = buildPurchase();
@@ -638,5 +658,101 @@ describe('CollectionDownloadDialog', () => {
 
     expect(await screen.findByText('Downloads started!')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps the download dialog open when escape is pressed during an active download', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeDisabled();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('button', { name: /preparing/i })).toBeInTheDocument();
+  });
+
+  it('preserves per-format error status when ready is emitted later', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const events: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
+      { event: 'error', data: { formatType: 'FLAC' } },
+      {
+        event: 'ready',
+        data: {
+          downloadUrl: 'https://s3.example.com/bundle.zip',
+          fileName: 'Test Album.zip',
+        },
+      },
+      { event: 'complete', data: {} },
+    ];
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(events)));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    const flacProgressLabel = await screen.findByText('FLAC', {
+      selector: 'span.text-destructive',
+    });
+    expect(flacProgressLabel).toHaveClass('text-destructive');
+  });
+
+  it('keeps errored format status when global uploading progress arrives', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const events: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
+      { event: 'error', data: { formatType: 'FLAC' } },
+      { event: 'progress', data: { status: 'uploading' } },
+      { event: 'complete', data: {} },
+    ];
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(events)));
+
+    render(<CollectionList purchases={[buildPurchase()]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 2 formats/i }));
+
+    const flacProgressLabel = await screen.findByText('FLAC', {
+      selector: 'span.text-destructive',
+    });
+    expect(flacProgressLabel).toHaveClass('text-destructive');
+    expect(await screen.findByRole('alert')).toHaveTextContent('No formats could be prepared');
+  });
+
+  it('uses raw formatType as progress label when label mapping is missing', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const purchase = buildPurchase();
+    purchase.release.digitalFormats = [
+      { formatType: 'CUSTOM_XYZ', files: [{ fileName: 'custom.zip' }] },
+    ];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => new Promise(() => {}))
+    );
+
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await user.click(screen.getByRole('button', { name: /download test album/i }));
+    await user.click(screen.getByRole('button', { name: /download 1 format/i }));
+
+    const progressRegion = screen.getByRole('status');
+    expect(within(progressRegion).getByText('CUSTOM_XYZ')).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@ export const PatreonLink = () => {
       href="https://www.patreon.com/c/Ceschi/posts"
       target="_blank"
       rel="noopener noreferrer"
-      className="text-sm font-medium text-accent hover:underline"
+      className="text-accent text-sm font-medium hover:underline"
     >
       Patreon
     </a>

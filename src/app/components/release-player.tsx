@@ -12,42 +12,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import nextDynamic from 'next/dynamic';
-
 import { Download } from 'lucide-react';
 
+import { DeferredDownloadDialog } from '@/app/components/deferred-download-dialog';
 import { MediaActionLink } from '@/app/components/media-action-link';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
-import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
-
-const DownloadDialog = nextDynamic(
-  () => import('@/app/components/download-dialog').then((mod) => ({ default: mod.DownloadDialog })),
-  { ssr: false }
-);
-
-interface AvailableFormat {
-  formatType: DigitalFormatType;
-  fileName: string;
-}
 
 interface ReleasePlayerProps {
   /** Full release data with digital format files, artist, and images */
   release: PublishedReleaseDetail;
   /** Whether to auto-play the first track on mount (e.g. from Play button click) */
   autoPlay?: boolean;
-  // PWYW purchase props forwarded to DownloadDialog
   releaseId: string;
   releaseTitle?: string;
-  suggestedPrice?: number | null;
-  hasPurchase?: boolean;
-  purchasedAt?: Date | null;
-  downloadCount?: number;
-  availableFormats?: AvailableFormat[];
 }
 
 /**
@@ -60,11 +42,6 @@ export const ReleasePlayer = ({
   autoPlay = false,
   releaseId,
   releaseTitle,
-  suggestedPrice,
-  hasPurchase,
-  purchasedAt,
-  downloadCount,
-  availableFormats,
 }: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
@@ -153,7 +130,7 @@ export const ReleasePlayer = ({
 
   return (
     <MediaPlayer className="mb-2">
-      <div className="space-y-2 mt-2">
+      <div className="mt-2 space-y-2">
         {hasFiles && currentFile && primaryArtist && (
           <MediaPlayer.FormatFileListDrawer
             files={files}
@@ -162,25 +139,20 @@ export const ReleasePlayer = ({
             artistName={getArtistDisplayName(primaryArtist)}
             releaseTitle={release.title ?? ''}
             downloadTrigger={
-              <DownloadDialog
+              <DeferredDownloadDialog
                 artistName={getArtistDisplayName(primaryArtist)}
                 releaseId={releaseId}
-                releaseTitle={releaseTitle}
-                suggestedPrice={suggestedPrice}
-                hasPurchase={hasPurchase}
-                purchasedAt={purchasedAt}
-                downloadCount={downloadCount}
-                availableFormats={availableFormats}
+                releaseTitle={releaseTitle ?? ''}
               >
                 <MediaActionLink icon={Download} label="Download" />
-              </DownloadDialog>
+              </DeferredDownloadDialog>
             }
           />
         )}
 
         <div className="flex flex-col items-center">
           {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens */}
-          <div className="w-full max-w-xl mx-auto md:max-w-3xl lg:max-w-4xl">
+          <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
             <div className="relative">
               <MediaPlayer.InteractiveCoverArt
                 src={coverArtSrc}
@@ -188,6 +160,7 @@ export const ReleasePlayer = ({
                 isPlaying={isPlaying}
                 onTogglePlay={handleTogglePlay}
                 className="shadow-lg"
+                priority
               />
             </div>
 

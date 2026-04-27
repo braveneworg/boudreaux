@@ -128,7 +128,7 @@ const ContactPage = () => {
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
         <h1>Contact Us</h1>
-        <div className="flex flex-col space-y-2 mb-4">
+        <div className="mb-4 flex flex-col space-y-2">
           <p>
             <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos
           </p>

@@ -380,7 +380,7 @@ export const AudioPlayer = ({
             src={poster}
             alt="Album cover"
             priority
-            className="w-full h-auto"
+            className="h-auto w-full"
           />
         </div>
       )}

@@ -489,10 +489,10 @@ export default function TourDateForm({
                           value={(field.value as string) || ''}
                           type="number"
                           placeholder="e.g. -300"
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-950-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="border-input placeholder:text-zinc-950-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         />
                       </FormControl>
-                      <p className="text-xs text-zinc-950-foreground">
+                      <p className="text-zinc-950-foreground text-xs">
                         Minutes from UTC. Auto-filled when a timezone is selected.
                       </p>
                       <FormMessage />
@@ -638,7 +638,7 @@ export default function TourDateForm({
                         value={field.value || ''}
                         type="text"
                         placeholder="https://cdn.example.com/icons/provider-icon.png"
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-950-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        className="border-input placeholder:text-zinc-950-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </FormControl>
                     <FormDescription>

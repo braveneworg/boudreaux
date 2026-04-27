@@ -280,7 +280,7 @@ export function ImageCropper({
               onComplete={(c) => setCompletedCrop(c)}
               aspect={lockAspectRatio ? aspectRatio : undefined}
               ruleOfThirds
-              className="max-h-full max-w-full [&_.ReactCrop__crop-selection]:touch-none [&_.ReactCrop__drag-handle]:h-3 [&_.ReactCrop__drag-handle]:w-3 [&_.ReactCrop__drag-handle.ord-n]:-top-1.5! [&_.ReactCrop__drag-handle.ord-s]:-bottom-1.5! [&_.ReactCrop__drag-handle.ord-e]:-right-1.5! [&_.ReactCrop__drag-handle.ord-w]:-left-1.5! [&_.ReactCrop__drag-bar.ord-n]:h-2! [&_.ReactCrop__drag-bar.ord-s]:h-2! [&_.ReactCrop__drag-bar.ord-n]:-top-1! [&_.ReactCrop__drag-bar.ord-s]:-bottom-1! [&_.ReactCrop__drag-bar.ord-e]:w-2! [&_.ReactCrop__drag-bar.ord-w]:w-2! [&_.ReactCrop__drag-bar.ord-e]:-right-1! [&_.ReactCrop__drag-bar.ord-w]:-left-1!"
+              className="max-h-full max-w-full [&_.ReactCrop__crop-selection]:touch-none [&_.ReactCrop__drag-bar.ord-e]:-right-1! [&_.ReactCrop__drag-bar.ord-e]:w-2! [&_.ReactCrop__drag-bar.ord-n]:-top-1! [&_.ReactCrop__drag-bar.ord-n]:h-2! [&_.ReactCrop__drag-bar.ord-s]:-bottom-1! [&_.ReactCrop__drag-bar.ord-s]:h-2! [&_.ReactCrop__drag-bar.ord-w]:-left-1! [&_.ReactCrop__drag-bar.ord-w]:w-2! [&_.ReactCrop__drag-handle]:h-3 [&_.ReactCrop__drag-handle]:w-3 [&_.ReactCrop__drag-handle.ord-e]:-right-1.5! [&_.ReactCrop__drag-handle.ord-n]:-top-1.5! [&_.ReactCrop__drag-handle.ord-s]:-bottom-1.5! [&_.ReactCrop__drag-handle.ord-w]:-left-1.5!"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -295,7 +295,7 @@ export function ImageCropper({
           </div>
 
           {/* Instructions */}
-          <p className="text-sm text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground text-sm">
             💡 <strong>Tip:</strong> Drag the top or bottom edges to adjust height, sides to adjust
             width, or corners to resize freely. Drag inside to reposition.
           </p>
@@ -343,7 +343,7 @@ export function ImageCropper({
           </div>
 
           {/* Preview dimensions info */}
-          <p className="text-sm text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground text-sm">
             Final image size: {BANNER_WIDTH}×{BANNER_HEIGHT} pixels (golden ratio)
           </p>
         </div>

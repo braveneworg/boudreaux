@@ -44,7 +44,7 @@ const TurnstileWidget = ({
   };
 
   return (
-    <div className="w-full flex justify-center items-center">
+    <div className="flex w-full items-center justify-center">
       {!shouldBypassTurnstile && (
         <Turnstile
           onError={handleReset}
@@ -57,7 +57,7 @@ const TurnstileWidget = ({
           sitekey={siteKey}
           theme="light"
           size={isSmallMobile ? 'compact' : 'flexible'}
-          className="mt-3 mb-0 mx-auto"
+          className="mx-auto mt-3 mb-0"
         />
       )}
     </div>

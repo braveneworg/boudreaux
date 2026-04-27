@@ -51,7 +51,7 @@ const SignupSigninForm = ({
 
   return (
     <PageContainer>
-      {!isVerified && <Skeleton className="h-10 w-full mx-auto" />}
+      {!isVerified && <Skeleton className="mx-auto h-10 w-full" />}
       {isVerified && (
         <>
           <FormField
@@ -85,7 +85,7 @@ const SignupSigninForm = ({
               control={control}
               name="termsAndConditions"
               render={({ field }) => (
-                <FormItem className="mb-4 mt-4 flex flex-wrap items-center gap-4">
+                <FormItem className="mt-4 mb-4 flex flex-wrap items-center gap-4">
                   <FormControl>
                     <Switch
                       name="termsAndConditions"
@@ -119,7 +119,7 @@ const SignupSigninForm = ({
         setIsVerified={setIsVerified}
         onToken={onTurnstileToken}
       />
-      <div className="flex items-center gap-3 mt-4">
+      <div className="mt-4 flex items-center gap-3">
         {!isVerified && <Skeleton className="h-10 w-24" />}
         {isVerified && (
           <Button disabled={isPending} size="lg">

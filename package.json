@@ -185,6 +185,7 @@
     "magicast": "^0.3.5",
     "mime": "^4.0.7",
     "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.3",
     "prisma": "^6.0.1",
     "shadcn": "^3.4.2",
     "sharp": "^0.34.5",

@@ -61,7 +61,7 @@ export default function TermsAndConditionsPage() {
             </PageSection>
 
             <PageSection id="acceptable-use" title="4. Acceptable Use">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">You May:</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">You May:</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Stream and download music for personal, non-commercial use as permitted</li>
                 <li>Create and share playlists</li>
@@ -73,7 +73,7 @@ export default function TermsAndConditionsPage() {
                 <li>Upload content that you own or have the rights to share</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">You May Not:</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">You May Not:</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   Use the service for any illegal purpose or in violation of any local, state,
@@ -124,7 +124,7 @@ export default function TermsAndConditionsPage() {
             </PageSection>
 
             <PageSection id="content-ownership" title="5. Content Ownership and Licensing">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Our Content</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Our Content</h3>
               <PageSectionParagraph>
                 All music, artwork, text, graphics, logos, and other content provided by us or our
                 artists (collectively, &ldquo;Platform Content&rdquo;) is owned by us, our
@@ -132,7 +132,7 @@ export default function TermsAndConditionsPage() {
                 trademark, and other intellectual property laws.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 Your License to Use Platform Content
               </h3>
               <PageSectionParagraph>
@@ -149,7 +149,7 @@ export default function TermsAndConditionsPage() {
                 <li>Use any data mining, robots, or similar data gathering methods</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">User-Generated Content</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">User-Generated Content</h3>
               <PageSectionParagraph>
                 If you upload, submit, or post content to the service (&ldquo;User Content&rdquo;),
                 you grant us a worldwide, non-exclusive, royalty-free, transferable license to use,
@@ -231,12 +231,12 @@ export default function TermsAndConditionsPage() {
             </PageSection>
 
             <PageSection id="subscriptions-payments" title="10. Subscriptions and Payments">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Free Tier</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Free Tier</h3>
               <PageSectionParagraph>
                 We may offer a free tier with limited features and advertising.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Paid Subscriptions</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Paid Subscriptions</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   Subscription fees are billed in advance on a recurring basis (monthly or annually)
@@ -355,31 +355,31 @@ export default function TermsAndConditionsPage() {
             </PageSection>
 
             <PageSection id="general-provisions" title="19. General Provisions">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Entire Agreement</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Entire Agreement</h3>
               <PageSectionParagraph>
                 These Terms constitute the entire agreement between you and us regarding the service
                 and supersede all prior agreements.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Severability</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Severability</h3>
               <PageSectionParagraph>
                 If any provision of these Terms is found to be unenforceable, the remaining
                 provisions will remain in full force and effect.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Waiver</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Waiver</h3>
               <PageSectionParagraph>
                 No waiver of any term shall be deemed a further or continuing waiver of such term or
                 any other term.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Assignment</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Assignment</h3>
               <PageSectionParagraph>
                 You may not assign or transfer these Terms without our prior written consent. We may
                 assign our rights and obligations without restriction.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Force Majeure</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Force Majeure</h3>
               <PageSectionParagraph>
                 We shall not be liable for any failure to perform due to circumstances beyond our
                 reasonable control.

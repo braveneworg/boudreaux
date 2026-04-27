@@ -334,28 +334,28 @@ export function DataView<T extends Record<string, unknown>>({
         className="w-full"
         onClick={handleCreateEntityButtonClick}
       >{`Create ${entityDisplayLabel}`}</Button>
-      {error && <div className="text-red-600 mb-2">{error}</div>}
+      {error && <div className="mb-2 text-red-600">{error}</div>}
       <Input
-        className="w-full my-4"
+        className="my-4 w-full"
         type="search"
         onChange={handleSearchChange}
         placeholder={`Search ${entityDisplayLabel}s...`}
       />
       {supportsSoftDelete && (
-        <div className="flex items-center gap-2 mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
           <Label htmlFor="show-deleted" className="cursor-pointer">
             Show deleted
           </Label>
         </div>
       )}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex items-center gap-2">
         <Switch id="show-published" checked={showPublished} onCheckedChange={setShowPublished} />
         <Label htmlFor="show-published" className="cursor-pointer">
           Show published
         </Label>
       </div>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <Switch
           id="show-unpublished"
           checked={showUnpublished}
@@ -406,7 +406,7 @@ export function DataView<T extends Record<string, unknown>>({
                               onClick={() =>
                                 setPreviewImage({ src: coverArtUrl!, altText: 'Cover art' })
                               }
-                              className="group relative h-16 w-16 overflow-hidden rounded-md border bg-muted transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                              className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
                             >
                               {isBase64 ? (
                                 // Use native img for base64 data URLs
@@ -425,7 +425,7 @@ export function DataView<T extends Record<string, unknown>>({
                                   sizes="64px"
                                 />
                               )}
-                              <span className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+                              <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
                                 <Eye className="h-3 w-3" />
                               </span>
                             </button>
@@ -445,7 +445,7 @@ export function DataView<T extends Record<string, unknown>>({
                                   onClick={() =>
                                     setPreviewImage(image as { src: string; altText?: string })
                                   }
-                                  className="group relative h-16 w-16 overflow-hidden rounded-md border bg-muted transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                  className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
                                 >
                                   <Image
                                     src={cleanImageUrl(image.src)}
@@ -454,7 +454,7 @@ export function DataView<T extends Record<string, unknown>>({
                                     className="object-cover"
                                     sizes="64px"
                                   />
-                                  <span className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
+                                  <span className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-70 transition-opacity group-hover:opacity-100">
                                     <Eye className="h-3 w-3" />
                                   </span>
                                 </button>
@@ -466,11 +466,11 @@ export function DataView<T extends Record<string, unknown>>({
 
                       return null;
                     })()}
-                    <div className="flex flex-row justify-center gap-2 items-center mb-2">
+                    <div className="mb-2 flex flex-row items-center justify-center gap-2">
                       <InfoIcon className="h-4 w-4" />
                       <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
                     </div>
-                    <Separator className="border-[0.5px] mt-0 mb-2 border-zinc-300" />
+                    <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
                     {fieldsToShow.map((field: string, index: number) => {
                       if (field.endsWith('At') || field.endsWith('On')) {
                         const dateValue = item[field] ? new Date(item[field] as string) : null;
@@ -517,8 +517,8 @@ export function DataView<T extends Record<string, unknown>>({
                         </span>
                       );
                     })}
-                    <Separator className="border-[0.5px] mt-2 mb-4 border-zinc-400" />
-                    <div className="flex gap-2 justify-center items-center">
+                    <Separator className="mt-2 mb-4 border-[0.5px] border-zinc-400" />
+                    <div className="flex items-center justify-center gap-2">
                       <Button asChild variant="outline">
                         <Link href={`/admin/${entityUrlPath}/${id}`}>
                           <Pencil className="mr-2 size-4" />
@@ -635,19 +635,19 @@ export function DataView<T extends Record<string, unknown>>({
           {fetchNextPage && (
             <div
               ref={loadMoreRef}
-              className="flex flex-col items-center justify-center gap-2 py-6 min-h-15"
+              className="flex min-h-15 flex-col items-center justify-center gap-2 py-6"
             >
               {isFetchingNextPage ? (
                 <div className="flex items-center gap-2">
                   <Spinner className="size-4" />
-                  <span className="text-sm text-zinc-950-foreground">Loading more...</span>
+                  <span className="text-zinc-950-foreground text-sm">Loading more...</span>
                 </div>
               ) : hasNextPage ? (
                 <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
                   Load More
                 </Button>
               ) : (
-                <span className="text-sm text-zinc-950-foreground">All items loaded</span>
+                <span className="text-zinc-950-foreground text-sm">All items loaded</span>
               )}
             </div>
           )}
@@ -681,7 +681,7 @@ export function DataView<T extends Record<string, unknown>>({
               )}
             </div>
           )}
-          <DialogClose className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background">
+          <DialogClose className="bg-background/90 text-foreground hover:bg-background absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogClose>

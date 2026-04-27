@@ -43,7 +43,7 @@ export default function PrivacyPolicyPage() {
             </PageSection>
 
             <PageSection id="information-we-collect" title="1. Information We Collect">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Information You Provide to Us</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Information You Provide to Us</h3>
 
               <PageSectionParagraph>
                 <strong>Account Information</strong>
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
                 <li>Messages sent through our platform features</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 Information We Collect Automatically
               </h3>
 
@@ -142,7 +142,7 @@ export default function PrivacyPolicyPage() {
                 We use your information exclusively to provide and improve our service:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">To Provide Our Service</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">To Provide Our Service</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Create and manage your account</li>
                 <li>Process your subscription and payments</li>
@@ -151,7 +151,7 @@ export default function PrivacyPolicyPage() {
                 <li>Allow you to interact with other users (comments, follows, etc.)</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">To Personalize Your Experience</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">To Personalize Your Experience</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Recommend music based on your listening history and preferences</li>
                 <li>Create personalized playlists and radio stations</li>
@@ -160,7 +160,7 @@ export default function PrivacyPolicyPage() {
                 <li>Remember your preferences and settings</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">To Improve Our Service</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">To Improve Our Service</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Analyze usage patterns to understand how people use our platform</li>
                 <li>Identify and fix technical issues</li>
@@ -169,7 +169,7 @@ export default function PrivacyPolicyPage() {
                 <li>Improve our recommendation algorithms</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">To Communicate With You</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">To Communicate With You</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Send you service-related notifications (account changes, security alerts)</li>
                 <li>Provide customer support when you contact us</li>
@@ -178,7 +178,7 @@ export default function PrivacyPolicyPage() {
                 <li>Share personalized music recommendations (with your consent)</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">To Ensure Security and Compliance</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">To Ensure Security and Compliance</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Protect against fraud, abuse, and security threats</li>
                 <li>Verify account authenticity</li>
@@ -200,7 +200,7 @@ export default function PrivacyPolicyPage() {
                 We only share your information in the following limited circumstances:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">With Your Consent</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">With Your Consent</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   When you explicitly choose to share information (e.g., making a playlist public)
@@ -210,7 +210,7 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">With Service Providers</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">With Service Providers</h3>
               <PageSectionParagraph>
                 We work with trusted third-party service providers who help us operate our platform.
                 These partners are contractually obligated to:
@@ -237,7 +237,7 @@ export default function PrivacyPolicyPage() {
                 specific function.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">For Legal Reasons</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">For Legal Reasons</h3>
               <PageSectionParagraph>
                 We may disclose your information if required to:
               </PageSectionParagraph>
@@ -248,14 +248,14 @@ export default function PrivacyPolicyPage() {
                 <li>Detect, prevent, or address fraud, security, or technical issues</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Business Transfers</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Business Transfers</h3>
               <PageSectionParagraph>
                 If we are involved in a merger, acquisition, or sale of assets, your information may
                 be transferred. We will notify you before your information is transferred and
                 becomes subject to a different privacy policy.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Aggregated and Anonymized Data</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Aggregated and Anonymized Data</h3>
               <PageSectionParagraph>
                 We may share aggregated or anonymized information that cannot identify you
                 personally, such as:
@@ -270,7 +270,7 @@ export default function PrivacyPolicyPage() {
             <PageSection id="privacy-rights" title="4. Your Privacy Rights and Choices">
               <PageSectionParagraph>You have control over your information:</PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Access and Update</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Access and Update</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   View and update your account information at any time through your account settings
@@ -278,7 +278,7 @@ export default function PrivacyPolicyPage() {
                 <li>Request a copy of your personal data</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Download Your Data</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Download Your Data</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   Request a downloadable copy of your listening history, playlists, and account
@@ -286,7 +286,7 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Delete Your Information</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Delete Your Information</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Delete specific content (playlists, comments, etc.)</li>
                 <li>Request deletion of your account and associated data</li>
@@ -296,7 +296,7 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Communication Preferences</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Communication Preferences</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   Opt out of promotional emails while still receiving essential service
@@ -306,20 +306,20 @@ export default function PrivacyPolicyPage() {
                 <li>Unsubscribe links are included in all marketing emails</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Cookie Preferences</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Cookie Preferences</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Control cookie settings through your browser</li>
                 <li>Note that disabling certain cookies may limit functionality</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Do Not Track</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Do Not Track</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   We respect browser &ldquo;Do Not Track&rdquo; signals where technically feasible
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Cancel Your Subscription</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Cancel Your Subscription</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Cancel your paid subscription at any time from your account settings</li>
                 <li>Cancellation takes effect at the end of your billing period</li>
@@ -331,7 +331,7 @@ export default function PrivacyPolicyPage() {
                 We implement industry-standard security measures to protect your data:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Technical Safeguards</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Technical Safeguards</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Encryption of data in transit using SSL/TLS</li>
                 <li>Encryption of sensitive data at rest</li>
@@ -340,7 +340,7 @@ export default function PrivacyPolicyPage() {
                 <li>Firewalls and intrusion detection systems</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Organizational Safeguards</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Organizational Safeguards</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Limited employee access to personal information (need-to-know basis only)</li>
                 <li>Background checks for employees with data access</li>
@@ -348,7 +348,7 @@ export default function PrivacyPolicyPage() {
                 <li>Strict data handling policies and procedures</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Account Security</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Account Security</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Strong password requirements</li>
                 <li>Account activity monitoring for suspicious behavior</li>
@@ -453,7 +453,7 @@ export default function PrivacyPolicyPage() {
                 General Data Protection Regulation (GDPR):
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Legal Basis for Processing</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Legal Basis for Processing</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Contractual necessity (to provide our service)</li>
                 <li>Legitimate interests (to improve and secure our service)</li>
@@ -461,7 +461,7 @@ export default function PrivacyPolicyPage() {
                 <li>Legal obligations (to comply with applicable laws)</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Your Rights</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Your Rights</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Right to access your personal data</li>
                 <li>Right to rectification of inaccurate data</li>

@@ -188,7 +188,7 @@ export default function ReleaseMultiSelect<
                           <span>{emptyMessage}</span>
                           <Link
                             href={getCreateReleaseUrl()}
-                            className="flex items-center gap-1 text-sm text-primary hover:underline"
+                            className="text-primary flex items-center gap-1 text-sm hover:underline"
                           >
                             <Plus className="h-4 w-4" />
                             Create new release
@@ -217,7 +217,7 @@ export default function ReleaseMultiSelect<
                     <div className="border-t p-2">
                       <Link
                         href={getCreateReleaseUrl()}
-                        className="flex items-center gap-1 text-sm text-primary hover:underline"
+                        className="text-primary flex items-center gap-1 text-sm hover:underline"
                       >
                         <Plus className="h-4 w-4" />
                         Create new release
@@ -236,7 +236,7 @@ export default function ReleaseMultiSelect<
                       <button
                         type="button"
                         onClick={() => handleRemove(release.id)}
-                        className="ml-1 rounded-full hover:bg-muted-foreground/20"
+                        className="hover:bg-muted-foreground/20 ml-1 rounded-full"
                         disabled={disabled}
                         aria-label={`Remove ${release.title}`}
                       >

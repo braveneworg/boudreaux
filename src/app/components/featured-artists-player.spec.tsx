@@ -33,13 +33,20 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   }) => (
     <div data-testid="featured-artist-carousel">
       {featuredArtists.map((artist) => (
-        <button
-          key={artist.id}
-          data-testid={`artist-${artist.id}`}
-          onClick={() => onSelect?.(artist, { autoPlay: true })}
-        >
-          {artist.displayName || 'Unknown'}
-        </button>
+        <div key={artist.id}>
+          <button
+            data-testid={`artist-${artist.id}`}
+            onClick={() => onSelect?.(artist, { autoPlay: true })}
+          >
+            {artist.displayName || 'Unknown'}
+          </button>
+          <button
+            data-testid={`artist-no-autoplay-${artist.id}`}
+            onClick={() => onSelect?.(artist)}
+          >
+            {artist.displayName || 'Unknown'} (no autoplay)
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -157,6 +164,8 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
     files,
     currentFileId,
     onFileSelect,
+    artistName,
+    releaseTitle,
     featuredTrackNumber,
     downloadTrigger,
   }: {
@@ -172,12 +181,17 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
       data-testid="format-file-list-drawer"
       data-current-file-id={currentFileId}
       data-featured-track-number={featuredTrackNumber?.toString() ?? ''}
+      data-artist-name={artistName}
+      data-release-title={releaseTitle}
     >
       {files.map((f) => (
         <button key={f.id} data-testid={`file-select-${f.id}`} onClick={() => onFileSelect?.(f.id)}>
           {f.title ?? f.fileName}
         </button>
       ))}
+      <button data-testid="file-select-missing" onClick={() => onFileSelect?.('missing-file-id')}>
+        Missing file
+      </button>
       {downloadTrigger}
     </div>
   );
@@ -1266,6 +1280,53 @@ describe('FeaturedArtistsPlayer', () => {
   });
 
   describe('additional branch coverage', () => {
+    it('should default autoPlay to false when selecting artist without autoPlay options', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(screen.getByTestId('artist-no-autoplay-featured-2'));
+
+      expect(screen.getByTestId('media-controls')).toHaveAttribute('data-auto-play', 'false');
+    });
+
+    it('should fall back to first file when onFileSelect receives an unknown file id', () => {
+      render(<FeaturedArtistsPlayer featuredArtists={mockFeaturedArtists} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(screen.getByTestId('artist-featured-2'));
+      fireEvent.click(screen.getByTestId('file-select-missing'));
+
+      expect(screen.getByTestId('media-controls')).toHaveAttribute(
+        'data-audio-src',
+        'https://cdn.example.com/audio/track-1.mp3'
+      );
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-current-file-id',
+        'file-1'
+      );
+    });
+
+    it('should pass empty release title fallback to drawer when release title is null', () => {
+      const artistWithNullReleaseTitle: FeaturedArtist = {
+        ...mockFeaturedArtists[1],
+        release: {
+          ...mockRelease,
+          title: null,
+        },
+      } as unknown as FeaturedArtist;
+
+      render(<FeaturedArtistsPlayer featuredArtists={[artistWithNullReleaseTitle]} />, {
+        wrapper: createWrapper(),
+      });
+
+      expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+        'data-release-title',
+        ''
+      );
+    });
+
     it('should fall back to fileName in ticker tape when track title is null', () => {
       const filesWithNullTitle = [
         {

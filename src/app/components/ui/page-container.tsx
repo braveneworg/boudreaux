@@ -11,7 +11,7 @@ const PageContainer = ({
   className?: string;
 }) => {
   return (
-    <div className={cn('flex-1 mx-auto min-h-full flex flex-col w-full', className)}>
+    <div className={cn('mx-auto flex min-h-full w-full flex-1 flex-col', className)}>
       {children}
     </div>
   );

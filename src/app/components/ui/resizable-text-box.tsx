@@ -262,7 +262,7 @@ export function ResizableTextBox({
       <div
         className={cn(
           'flex h-full w-full items-center justify-center',
-          'cursor-grab select-none transition-shadow',
+          'cursor-grab transition-shadow select-none',
           isDragging && 'cursor-grabbing',
           !isSelected &&
             'hover:ring-2 hover:ring-white/50 hover:ring-offset-2 hover:ring-offset-transparent',
@@ -299,14 +299,14 @@ export function ResizableTextBox({
           />
           {/* East */}
           <div
-            className="absolute -right-1 top-1/2 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
+            className="absolute top-1/2 -right-1 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'e')}
             onTouchStart={(e) => handleResizeStart(e, 'e')}
             style={{ cursor: cursorMap.e }}
           />
           {/* West */}
           <div
-            className="absolute -left-1 top-1/2 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
+            className="absolute top-1/2 -left-1 h-6 w-2 -translate-y-1/2 cursor-ew-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'w')}
             onTouchStart={(e) => handleResizeStart(e, 'w')}
             style={{ cursor: cursorMap.w }}
@@ -315,21 +315,21 @@ export function ResizableTextBox({
           {/* Corner handles */}
           {/* Northeast */}
           <div
-            className="absolute -right-1.5 -top-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
+            className="absolute -top-1.5 -right-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'ne')}
             onTouchStart={(e) => handleResizeStart(e, 'ne')}
             style={{ cursor: cursorMap.ne }}
           />
           {/* Northwest */}
           <div
-            className="absolute -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
+            className="absolute -top-1.5 -left-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'nw')}
             onTouchStart={(e) => handleResizeStart(e, 'nw')}
             style={{ cursor: cursorMap.nw }}
           />
           {/* Southeast */}
           <div
-            className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
+            className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white/80 shadow-md hover:bg-white"
             onMouseDown={(e) => handleResizeStart(e, 'se')}
             onTouchStart={(e) => handleResizeStart(e, 'se')}
             style={{ cursor: cursorMap.se }}
@@ -347,7 +347,7 @@ export function ResizableTextBox({
             <button
               type="button"
               className={cn(
-                'absolute -right-6 top-1/2 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white'
+                'absolute top-1/2 -right-6 flex h-5 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-white/80 text-xs text-gray-700 shadow-md transition-colors hover:bg-white'
               )}
               onMouseDown={onRotateStart}
               onTouchStart={onRotateStart}

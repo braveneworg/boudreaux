@@ -143,8 +143,9 @@ describe('Header', () => {
   describe('sparkle effects', () => {
     it('renders sparkle container', () => {
       const { container } = render(<Header />);
-      const sparkleContainer = container.querySelector('[class*="pointer-events-none z-10"]');
+      const sparkleContainer = container.querySelector('.pointer-events-none');
       expect(sparkleContainer).toBeInTheDocument();
+      expect(sparkleContainer).toHaveClass('absolute', 'inset-0', 'z-10');
     });
 
     it('generates 20 sparkles and 15 extinguish particles', () => {

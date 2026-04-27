@@ -8,12 +8,12 @@ export default function HomeLoading() {
   return (
     <div className="w-full">
       {/* Notification strip skeleton — always reserves 2.5rem to match banner-carousel */}
-      <div className="w-full bg-muted animate-pulse" style={{ minHeight: '2.5rem' }} />
+      <div className="bg-muted w-full animate-pulse" style={{ minHeight: '2.5rem' }} />
       {/* Real first banner image — rendered in the Suspense fallback so it
           paints in the first HTML flush. The preload in layout.tsx ensures
           the image is already cached; this <img> triggers an immediate paint
           instead of waiting for React hydration + carousel mount. */}
-      <div className="relative w-full bg-muted" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
+      <div className="bg-muted relative w-full" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img
           data-testid="lcp-banner-img"
@@ -23,44 +23,44 @@ export default function HomeLoading() {
           alt=""
           fetchPriority="high"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
       </div>
       {/* Dot indicators skeleton — matches h-11 w-11 button wrappers */}
       <div className="flex justify-center gap-2 py-2">
         {Array.from({ length: 3 }, (_, i) => (
-          <div key={i} className="flex items-center justify-center h-11 w-11">
-            <div className="h-2.5 w-2.5 rounded-full bg-muted animate-pulse" />
+          <div key={i} className="flex h-11 w-11 items-center justify-center">
+            <div className="bg-muted h-2.5 w-2.5 animate-pulse rounded-full" />
           </div>
         ))}
       </div>
       {/* Content area skeleton — matches ContentContainer: bg-zinc-100, border-t, px-2 */}
-      <div className="flex-1 font-sans bg-zinc-100 border-t border-t-zinc-300 min-h-full flex flex-col w-full pt-2 px-2">
+      <div className="flex min-h-full w-full flex-1 flex-col border-t border-t-zinc-300 bg-zinc-100 px-2 pt-2 font-sans">
         {/* Search input skeleton */}
-        <div className="h-9 w-full rounded-md bg-muted animate-pulse mb-0" />
+        <div className="bg-muted mb-0 h-9 w-full animate-pulse rounded-md" />
         {/* Featured artists heading skeleton — matches Heading level={1}: h-[52px] */}
-        <div className="h-13 w-48 bg-muted animate-pulse rounded mb-0" />
+        <div className="bg-muted mb-0 h-13 w-48 animate-pulse rounded" />
         {/* Featured artists carousel skeleton — matches min-h-[76px] wrapper.
             mb-1 mirrors the actual component, where the link-row uses -mt-1
             to sit closer to the carousel above. */}
-        <div className="min-h-19 w-full bg-muted animate-pulse rounded mb-1" />
+        <div className="bg-muted mb-1 min-h-19 w-full animate-pulse rounded" />
         {/* View / Download link-row + NowPlayingHeading skeleton.
             min-h-10 holds the row stable across loading → hydrated states
             so there's no CLS once the link buttons render. */}
-        <div className="flex flex-col items-center min-h-10 mb-2">
-          <div className="h-6 w-72 bg-muted animate-pulse rounded" />
+        <div className="mb-2 flex min-h-10 flex-col items-center">
+          <div className="bg-muted h-6 w-72 animate-pulse rounded" />
         </div>
         {/* Cover art skeleton — aspect-square with bg-muted, rounded-t */}
-        <div className="aspect-square w-full max-w-xl mx-auto bg-muted animate-pulse rounded-t-lg" />
+        <div className="bg-muted mx-auto aspect-square w-full max-w-xl animate-pulse rounded-t-lg" />
         {/* Audio controls skeleton — matches bg-zinc-900 min-h-14 */}
-        <div className="min-h-14 w-full max-w-xl mx-auto bg-zinc-900/20 animate-pulse" />
+        <div className="mx-auto min-h-14 w-full max-w-xl animate-pulse bg-zinc-900/20" />
         {/* InfoTickerTape skeleton — matches bg-zinc-800 rounded-b-lg min-h-[40px] */}
-        <div className="min-h-10 w-full max-w-xl mx-auto bg-zinc-800/20 animate-pulse rounded-b-lg mb-2" />
+        <div className="mx-auto mb-2 min-h-10 w-full max-w-xl animate-pulse rounded-b-lg bg-zinc-800/20" />
         {/* Share widget skeleton */}
-        <div className="flex justify-center gap-1 mb-2">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+        <div className="mb-2 flex justify-center gap-1">
+          <div className="bg-muted h-8 w-48 animate-pulse rounded" />
         </div>
-        <div className="h-px max-w-[calc(100%-2rem)] mx-auto bg-muted" />
+        <div className="bg-muted mx-auto h-px max-w-[calc(100%-2rem)]" />
       </div>
     </div>
   );

@@ -168,7 +168,7 @@ function CarouselContent({ className, ...props }: ComponentProps<'div'>) {
   const { carouselRef, orientation } = useCarousel();
 
   return (
-    <div ref={carouselRef} className="overflow-hidden min-w-0 flex-1" data-slot="carousel-content">
+    <div ref={carouselRef} className="min-w-0 flex-1 overflow-hidden" data-slot="carousel-content">
       <div
         className={cn('flex', orientation === 'horizontal' ? '' : '-mt-4 flex-col', className)}
         {...props}
@@ -268,7 +268,7 @@ function CarouselNext({
         'absolute z-15 size-8 rounded-full text-zinc-950',
         orientation === 'horizontal'
           ? 'top-1/2 right-0 -translate-y-1/2'
-          : 'top-1/2 -mt-3 right-4 -translate-y-1/2',
+          : 'top-1/2 right-4 -mt-3 -translate-y-1/2',
         className
       )}
       disabled={!opts?.loop && !canScrollNext}

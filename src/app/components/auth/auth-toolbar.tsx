@@ -59,12 +59,12 @@ const AuthToolbar = ({
   return (
     <div className={cn('mt-2 mb-4', className, { hidden: isSigninOrSignupPage })}>
       <div
-        className={cn('flex items-center relative justify-center gap-2', className, {
+        className={cn('relative flex items-center justify-center gap-2', className, {
           hidden: isSigninOrSignupPage,
         })}
       >
         <SignInLink onClick={onNavigate} />
-        <VerticalSeparator className="h-6! mt-1 mx-2 self-stretch w-0.5!" />
+        <VerticalSeparator className="mx-2 mt-1 h-6! w-0.5! self-stretch" />
         <SignUpLink onClick={onNavigate} />
       </div>
     </div>

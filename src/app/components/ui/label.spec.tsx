@@ -275,7 +275,7 @@ describe('Label', () => {
       render(
         <Label>
           <span>Full Name</span>
-          <span className="text-red-500 ml-1" aria-label="required">
+          <span className="ml-1 text-red-500" aria-label="required">
             *
           </span>
         </Label>

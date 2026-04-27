@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -12,6 +12,33 @@ import { ArtistPlayer } from './artist-player';
 
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
+}));
+
+// Stub DeferredDownloadDialog to mirror the real component's CLS-safe shape:
+// trigger always rendered, dialog test-double mounts only after click.
+vi.mock('./deferred-download-dialog', () => ({
+  DeferredDownloadDialog: ({
+    artistName,
+    children,
+  }: {
+    artistName: string;
+    children?: ReactNode;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+      <>
+        <button
+          type="button"
+          data-testid="download-trigger-button"
+          aria-label="Download music"
+          onClick={() => setIsOpen(true)}
+        >
+          {children ?? 'download'}
+        </button>
+        {isOpen && <div data-testid="download-dialog" data-artist-name={artistName} />}
+      </>
+    );
+  },
 }));
 
 // Mock the MediaPlayer component and sub-components
@@ -169,26 +196,8 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
   return { MediaPlayer: MockMediaPlayer };
 });
 
-// Mock DownloadDialog at consumer level
-vi.mock('@/app/components/download-dialog', () => ({
-  DownloadDialog: ({ children, artistName }: { children: ReactNode; artistName: string }) => (
-    <div data-testid="download-dialog" data-artist-name={artistName}>
-      {children}
-    </div>
-  ),
-  DownloadTriggerButton: () => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      download
-    </button>
-  ),
-}));
-
 vi.mock('@/app/components/media-action-link', () => ({
-  MediaActionLink: ({ label }: { label: string }) => (
-    <button data-testid="download-trigger-button" aria-label="Download music">
-      {label}
-    </button>
-  ),
+  MediaActionLink: ({ label }: { label: string }) => <span>{label}</span>,
 }));
 
 // Mock next/image
@@ -861,8 +870,10 @@ describe('ArtistPlayer', () => {
     const release = createRelease('release-1', 'Test Album', [mockFile1]);
     const artist = createArtistWithReleases([release]);
 
-    it('should render the download dialog with the correct artist name', () => {
+    it('should render the download dialog with the correct artist name on first tap', () => {
       render(<ArtistPlayer artist={artist} />);
+
+      fireEvent.click(screen.getByTestId('download-trigger-button'));
 
       const downloadDialog = screen.getByTestId('download-dialog');
       expect(downloadDialog).toBeInTheDocument();

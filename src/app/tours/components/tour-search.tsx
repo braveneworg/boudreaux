@@ -64,14 +64,14 @@ export const TourSearch = ({
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-950-foreground" />
+        <Search className="text-zinc-950-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
         <Input
           type="search"
           value={localValue}
           onChange={handleInputChange}
           placeholder={placeholder}
           disabled={disabled}
-          className="pl-9 pr-9"
+          className="pr-9 pl-9"
           aria-label="Search tours by artist name"
         />
         {localValue && (
@@ -81,7 +81,7 @@ export const TourSearch = ({
             size="sm"
             onClick={handleClear}
             disabled={disabled}
-            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 p-0"
+            className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 p-0"
             aria-label="Clear search"
           >
             <X className="h-4 w-4" />

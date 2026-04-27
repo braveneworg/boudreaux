@@ -182,14 +182,52 @@ describe('DeferredDownloadDialog', () => {
     expect(dialog).toHaveAttribute('data-purchased-at', '');
   });
 
-  it('should render the trigger button inside DownloadDialog as children', async () => {
+  it('should keep the trigger mounted as a sibling of the dialog so it never unmounts during chunk load', async () => {
     const user = userEvent.setup();
 
     render(<DeferredDownloadDialog {...defaultProps} />);
-    await user.click(screen.getByTestId('download-trigger'));
+    const trigger = screen.getByTestId('download-trigger');
+    await user.click(trigger);
 
     const dialog = screen.getByTestId('download-dialog');
-    const innerTrigger = dialog.querySelector('[data-testid="download-trigger"]');
-    expect(innerTrigger).toBeInTheDocument();
+    // Trigger remains in the document and is NOT a descendant of the dialog —
+    // this is what prevents the first-tap CLS/FOUC from the dynamic boundary
+    // unmounting its children during the loading state.
+    expect(trigger).toBeInTheDocument();
+    expect(dialog.contains(trigger)).toBe(false);
+  });
+
+  it('should re-mount the dialog on each tap so re-opens fire openOnMount', async () => {
+    const user = userEvent.setup();
+
+    render(<DeferredDownloadDialog {...defaultProps} />);
+
+    await user.click(screen.getByTestId('download-trigger'));
+    const firstDialog = screen.getByTestId('download-dialog');
+
+    await user.click(screen.getByTestId('download-trigger'));
+    const secondDialog = screen.getByTestId('download-dialog');
+
+    // A new instance every tap (key changes) so openOnMount re-fires.
+    expect(secondDialog).not.toBe(firstDialog);
+    expect(secondDialog).toHaveAttribute('data-open-on-mount', 'true');
+  });
+
+  it('should forward existing onClick on a custom trigger', async () => {
+    const user = userEvent.setup();
+    const customClick = vi.fn();
+
+    render(
+      <DeferredDownloadDialog {...defaultProps}>
+        <button data-testid="custom-trigger" onClick={customClick}>
+          Custom
+        </button>
+      </DeferredDownloadDialog>
+    );
+
+    await user.click(screen.getByTestId('custom-trigger'));
+
+    expect(customClick).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('download-dialog')).toBeInTheDocument();
   });
 });

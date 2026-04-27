@@ -9,31 +9,31 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full min-h-23 bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:content-[''] before:absolute before:inset-0 before:opacity-90 before:pointer-events-none before:-z-10 relative">
-      <div className="relative mx-auto w-full max-w-480 py-1 mt-2 z-10">
-        <div className="flex flex-col items-center justify-center gap-0 md:flex-row md:justify-between px-4 md:px-8">
-          <div className="flex text-zinc-50 text-sm md:text-base">
+    <footer className="relative min-h-23 w-full bg-zinc-950 bg-[url('/media/particles-6.svg')] bg-cover bg-center bg-no-repeat before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:opacity-90 before:content-['']">
+      <div className="relative z-10 mx-auto mt-2 w-full max-w-480 py-1">
+        <div className="flex flex-col items-center justify-center gap-0 px-4 md:flex-row md:justify-between md:px-8">
+          <div className="flex text-sm text-zinc-50 md:text-base">
             © {currentYear} Fake Four Inc.
-            <VerticalSeparator className="h-4! mx-3" />
+            <VerticalSeparator className="mx-3 h-4!" />
             All rights reserved.
           </div>
           <nav className="flex flex-wrap items-center justify-center">
             <Link
-              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              className="px-2 py-1 text-sm text-zinc-50 hover:underline"
               href="/legal/terms-and-conditions"
             >
               Terms and Conditions
             </Link>
             <VerticalSeparator className="h-4!" />
             <Link
-              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              className="px-2 py-1 text-sm text-zinc-50 hover:underline"
               href="/legal/privacy-policy"
             >
               Privacy Policy
             </Link>
             <VerticalSeparator className="h-4!" />
             <Link
-              className="text-zinc-50 text-sm hover:underline px-2 py-1"
+              className="px-2 py-1 text-sm text-zinc-50 hover:underline"
               href="/legal/cookies-policy"
             >
               Cookies Policy
