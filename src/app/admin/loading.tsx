@@ -4,15 +4,15 @@
 
 export default function AdminLoading() {
   return (
-    <div className="mx-auto w-full max-w-480 px-4 md:px-8 py-8">
+    <div className="mx-auto w-full max-w-480 px-4 py-8 md:px-8">
       {/* Heading skeleton */}
-      <div className="h-10 w-48 bg-muted animate-pulse rounded mb-6" />
+      <div className="bg-muted mb-6 h-10 w-48 animate-pulse rounded" />
       {/* Combobox selector skeleton */}
-      <div className="h-10 w-64 rounded-md bg-muted animate-pulse mb-8" />
+      <div className="bg-muted mb-8 h-10 w-64 animate-pulse rounded-md" />
       {/* Table skeleton */}
       <div className="space-y-3">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="h-12 w-full bg-muted animate-pulse rounded" />
+          <div key={i} className="bg-muted h-12 w-full animate-pulse rounded" />
         ))}
       </div>
     </div>

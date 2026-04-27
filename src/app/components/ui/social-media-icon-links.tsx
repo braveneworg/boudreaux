@@ -62,11 +62,11 @@ const menuLinks: MenuLink[] = [
 ];
 
 const SocialMediaIconLinks = ({ className }: { className: string }) => (
-  <div className={cn(['flex flex-wrap pt-0 justify-end', className])}>
+  <div className={cn(['flex flex-wrap justify-end pt-0', className])}>
     {menuLinks.map((link) => (
       <Link
         aria-label={link.label}
-        className="text-zinc-50 h-10 px-2 transition-transform md:hover:scale-[107.5%]"
+        className="h-10 px-2 text-zinc-50 transition-transform md:hover:scale-[107.5%]"
         data-testid={`${link.label.toLowerCase()}-icon`}
         href={link.href}
         key={link.href}

@@ -154,7 +154,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
 
   if (releases.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-zinc-950-foreground">
+      <div className="text-zinc-950-foreground flex items-center justify-center py-12">
         <p>No releases available for this artist.</p>
       </div>
     );
@@ -177,7 +177,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                     onClick={() => handleReleaseSelect(index)}
                     className={cn(
                       'relative overflow-hidden rounded-md transition-all',
-                      isSelected && 'ring-2 ring-primary'
+                      isSelected && 'ring-primary ring-2'
                     )}
                     aria-label={`Play ${ar.release.title}`}
                     aria-pressed={isSelected}
@@ -191,7 +191,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                         className="size-20 object-cover"
                       />
                     ) : (
-                      <div className="flex size-20 items-center justify-center bg-muted text-xs text-zinc-950-foreground">
+                      <div className="bg-muted text-zinc-950-foreground flex size-20 items-center justify-center text-xs">
                         {ar.release.title.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -223,6 +223,7 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
                   isPlaying={isPlaying}
                   onTogglePlay={handleTogglePlay}
                   className="shadow-lg"
+                  priority
                 />
                 <NowPlayingHeading
                   artistName={artistName}

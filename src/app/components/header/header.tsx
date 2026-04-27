@@ -48,15 +48,15 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
   );
 
   return (
-    <div className="sticky top-0 left-0 right-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)]">
+    <div className="sticky top-0 right-0 left-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)]">
       {/* Animated background layer — CSS animation replaces framer-motion */}
-      <div className="absolute inset-0 bg-black before:content-[''] before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:pointer-events-none header-bg-pulse" />
+      <div className="header-bg-pulse absolute inset-0 bg-black before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:content-['']" />
       {/* Sparkle overlay */}
-      <div className="absolute inset-0 pointer-events-none z-10">
+      <div className="pointer-events-none absolute inset-0 z-10">
         {/* Main sparkles */}
         {sparkles.map((sparkle) => (
           <span
-            className="absolute w-1 h-1 bg-white rounded-full header-sparkle"
+            className="header-sparkle absolute h-1 w-1 rounded-full bg-white"
             key={sparkle.id}
             style={{
               left: `${sparkle.left}%`,
@@ -69,7 +69,7 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
         {/* Extinguishing particles */}
         {extinguishParticles.map((particle) => (
           <span
-            className="absolute w-0.5 h-0.5 bg-orange-400 rounded-full header-extinguish"
+            className="header-extinguish absolute h-0.5 w-0.5 rounded-full bg-orange-400"
             key={particle.id}
             style={{
               left: `${particle.left}%`,
@@ -81,14 +81,14 @@ const Header = ({ isMobile = false }: { isMobile?: boolean }) => {
         ))}
       </div>
       {/* Header content layer */}
-      <div className="relative mx-auto w-full max-w-480 pl-0 md:px-8 overflow-hidden z-20">
-        <header className="relative flex items-center justify-between leading-[58px] h-[58px] md:h-[122px] w-full min-w-0">
+      <div className="relative z-20 mx-auto w-full max-w-480 overflow-hidden pl-0 md:px-8">
+        <header className="relative flex h-[58px] w-full min-w-0 items-center justify-between leading-[58px] md:h-[122px]">
           <Logo isMobile={isMobile} />
           {isMobile && (
             <>
               <Image
                 alt="Fake Four Inc. Words"
-                className="relative right-0.5 w-[202px] h-auto"
+                className="relative right-0.5 h-auto w-[202px]"
                 priority
                 src="/media/fake-four-inc-words-sans-hand.webp"
                 width={222}

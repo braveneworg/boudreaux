@@ -15,11 +15,11 @@ export const NowPlayingHeading = ({
   visibleHeading = false,
 }: NowPlayingHeadingProps) => {
   return (
-    <section className="flex flex-col justify-center text-sm gap-1 items-center px-2">
+    <section className="flex flex-col items-center justify-center gap-1 px-2 text-sm">
       <h3
         className={
           visibleHeading
-            ? 'text-sm font-bold tracking-normal mb-1 pb-0 mt-0'
+            ? 'mt-0 mb-1 pb-0 text-sm font-bold tracking-normal'
             : 'sr-only text-lg font-semibold'
         }
         aria-label={`Now playing: ${artistName} - ${title}`}

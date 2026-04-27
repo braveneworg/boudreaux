@@ -37,7 +37,7 @@ const ContactForm = ({
   setValue,
 }: ContactFormProps) => {
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="animate-in fade-in space-y-4 duration-300">
       <ComboboxField
         control={control}
         name="reason"
@@ -110,7 +110,7 @@ const ContactForm = ({
         onToken={onTurnstileToken}
       />
 
-      <div className="flex items-center gap-3 my-4">
+      <div className="my-4 flex items-center gap-3">
         <Button disabled={isPending} size="lg">
           Send message
         </Button>

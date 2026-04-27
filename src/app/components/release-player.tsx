@@ -130,7 +130,7 @@ export const ReleasePlayer = ({
 
   return (
     <MediaPlayer className="mb-2">
-      <div className="space-y-2 mt-2">
+      <div className="mt-2 space-y-2">
         {hasFiles && currentFile && primaryArtist && (
           <MediaPlayer.FormatFileListDrawer
             files={files}
@@ -152,7 +152,7 @@ export const ReleasePlayer = ({
 
         <div className="flex flex-col items-center">
           {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens */}
-          <div className="w-full max-w-xl mx-auto md:max-w-3xl lg:max-w-4xl">
+          <div className="mx-auto w-full max-w-xl md:max-w-3xl lg:max-w-4xl">
             <div className="relative">
               <MediaPlayer.InteractiveCoverArt
                 src={coverArtSrc}
@@ -160,6 +160,7 @@ export const ReleasePlayer = ({
                 isPlaying={isPlaying}
                 onTogglePlay={handleTogglePlay}
                 className="shadow-lg"
+                priority
               />
             </div>
 

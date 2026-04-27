@@ -8,7 +8,7 @@ import { LogInIcon } from 'lucide-react';
 const SignInLink = ({ onClick }: { onClick?: () => void }) => (
   <Link
     href="/signin"
-    className="flex text-zinc-50 underline items-center gap-2 text-xl"
+    className="flex items-center gap-2 text-xl text-zinc-50 underline"
     onClick={onClick}
   >
     <LogInIcon size={24} className="mt-1" />

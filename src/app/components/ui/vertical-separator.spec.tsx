@@ -22,7 +22,7 @@ describe('VerticalSeparator', () => {
   });
 
   it('passes className to separator', () => {
-    render(<VerticalSeparator className="h-10 mx-px" />);
+    render(<VerticalSeparator className="mx-px h-10" />);
 
     const separator = document.querySelector('[data-slot="separator"]');
     expect(separator).toHaveClass('h-10');

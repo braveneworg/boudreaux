@@ -140,17 +140,17 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
                   alt={coverArt.alt}
                   width={80}
                   height={80}
-                  className="rounded-md object-cover size-20"
+                  className="size-20 rounded-md object-cover"
                 />
               ) : (
-                <div className="flex size-20 items-center justify-center rounded-md bg-zinc-200 text-zinc-400 text-xs">
+                <div className="flex size-20 items-center justify-center rounded-md bg-zinc-200 text-xs text-zinc-400">
                   No art
                 </div>
               )}
             </Link>
 
             {/* Info */}
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <Link
                 href={`/releases/${purchase.release.id}`}
                 className="block truncate font-semibold text-zinc-900 hover:underline"
@@ -158,7 +158,7 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
                 {purchase.release.title}
               </Link>
               <p className="truncate text-sm text-zinc-500">{artistName}</p>
-              <p className="text-xs text-zinc-400 mt-1">
+              <p className="mt-1 text-xs text-zinc-400">
                 {formatPrice(purchase.amountPaid, purchase.currency)}
                 {' \u00b7 '}
                 {new Date(purchase.purchasedAt).toLocaleDateString()}
@@ -166,7 +166,7 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               <CollectionDownloadDialog
                 releaseId={purchase.release.id}
                 releaseTitle={purchase.release.title}
@@ -498,7 +498,7 @@ const CollectionDownloadDialog = ({
             )}
 
             {downloadPhase === 'error' && downloadError && (
-              <div className="flex items-center gap-2 text-destructive text-sm" role="alert">
+              <div className="text-destructive flex items-center gap-2 text-sm" role="alert">
                 <AlertCircle className="size-4 shrink-0" />
                 <span>{downloadError}</span>
               </div>

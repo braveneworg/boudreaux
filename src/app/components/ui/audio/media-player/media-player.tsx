@@ -71,7 +71,7 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
   return (
     <Carousel aria-label="Featured Artists" orientation="horizontal">
       <div className="flex items-center gap-2">
-        <CarouselPrevious className="relative left-0 top-auto translate-y-0 shrink-0" />
+        <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
         <CarouselContent className="flex justify-center gap-2">
           {numberUpSliced.map((artist) => {
             const latestRelease = artist.releases.sort(
@@ -94,7 +94,7 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
             );
           })}
         </CarouselContent>
-        <CarouselNext className="relative top-auto translate-y-0 right-auto shrink-0" />
+        <CarouselNext className="relative top-auto right-auto shrink-0 translate-y-0" />
       </div>
     </Carousel>
   );
@@ -127,9 +127,11 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
  */
 const FeaturedArtistCarousel = ({
   featuredArtists,
+  selectedArtistId,
   onSelect,
 }: {
   featuredArtists: FeaturedArtist[];
+  selectedArtistId?: string;
   onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
 }) => {
   // Sort by position (lower numbers first)
@@ -140,6 +142,14 @@ const FeaturedArtistCarousel = ({
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const clickInitiatedRef = useRef(false);
+
+  // Index of the externally-selected artist. The carousel must always center
+  // this slide so the visible center matches the playing cover art.
+  const selectedIndex = useMemo(() => {
+    if (!selectedArtistId) return 0;
+    const idx = sortedArtists.findIndex((a) => a.id === selectedArtistId);
+    return idx < 0 ? 0 : idx;
+  }, [sortedArtists, selectedArtistId]);
 
   const handleSelect = (featured: FeaturedArtist, index: number) => {
     if (!carouselApi) {
@@ -175,16 +185,24 @@ const FeaturedArtistCarousel = ({
     };
   }, [carouselApi, handleSettle]);
 
+  // Keep the carousel centered on the externally-selected artist. Runs on
+  // mount once the API is ready, and on any change to the selected id.
+  useEffect(() => {
+    if (!carouselApi) return;
+    if (carouselApi.selectedScrollSnap() === selectedIndex) return;
+    carouselApi.scrollTo(selectedIndex);
+  }, [carouselApi, selectedIndex]);
+
   return (
     <Carousel
       aria-label="Featured Artists"
       orientation="horizontal"
-      className="w-full mb-0"
+      className="mb-0 w-full"
       opts={{ loop: true, align: 'center' }}
       setApi={setCarouselApi}
     >
       <div className="flex items-center">
-        <CarouselPrevious className="relative left-0 top-auto translate-y-0 shrink-0" />
+        <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
         <CarouselContent className="-ml-2">
           {sortedArtists.map((featured, index) => {
             const coverArt = getFeaturedArtistCoverArt(featured);
@@ -194,12 +212,12 @@ const FeaturedArtistCarousel = ({
             return (
               <CarouselItem
                 key={featured.id}
-                className="pl-2 pt-1 pb-1 basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 shrink-0"
+                className="shrink-0 basis-1/3 pt-1 pb-1 pl-2 sm:basis-1/5 lg:basis-[calc(100%/7)]"
               >
                 <button
                   type="button"
                   onClick={() => handleSelect(featured, index)}
-                  className="group relative w-full aspect-square rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="group focus:ring-primary relative aspect-square w-full rounded-lg focus:ring-2 focus:ring-offset-2 focus:outline-none"
                   aria-label={`Select ${displayName}`}
                 >
                   <div className="absolute inset-0 overflow-hidden rounded-lg">
@@ -209,20 +227,20 @@ const FeaturedArtistCarousel = ({
                         alt={displayName ?? ''}
                         fill
                         className="object-cover transition-transform group-hover:scale-105"
-                        sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
+                        sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 14vw"
                         onError={() => {
                           setFailedImages((prev) => new Set(prev).add(featured.id));
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-                        <span className="text-zinc-950 text-xs text-center px-1">
+                      <div className="flex h-full w-full items-center justify-center bg-zinc-200">
+                        <span className="px-1 text-center text-xs text-zinc-950">
                           {displayName}
                         </span>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center">
-                      <span className="text-white text-xs font-medium pb-2 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1 max-w-full">
+                    <div className="absolute inset-0 flex items-end justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+                      <span className="max-w-full truncate px-1 pb-2 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
                         {displayName}
                       </span>
                     </div>
@@ -232,7 +250,7 @@ const FeaturedArtistCarousel = ({
             );
           })}
         </CarouselContent>
-        <CarouselNext className="relative top-auto translate-y-0 right-auto shrink-0" />
+        <CarouselNext className="relative top-auto right-auto shrink-0 translate-y-0" />
       </div>
     </Carousel>
   );
@@ -265,7 +283,7 @@ const CoverArtView = ({
       alt={`${release.title} by ${getArtistDisplayName(artist)}`}
       width={width}
       height={height}
-      className="w-full aspect-square object-cover rounded-lg"
+      className="aspect-square w-full rounded-lg object-cover"
     />
   );
 };
@@ -349,12 +367,12 @@ const InteractiveCoverArt = ({
     <button
       type="button"
       onClick={handleClick}
-      className={`relative w-full aspect-square group cursor-pointer focus:outline-none rounded-t-lg overflow-hidden ${className ?? ''}`}
+      className={`group relative aspect-square w-full cursor-pointer overflow-hidden rounded-t-lg focus:outline-none ${className ?? ''}`}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
       {imageError ? (
-        <div className="w-full h-full bg-zinc-200 flex items-center justify-center">
-          <Play className="w-12 h-12 text-zinc-400" />
+        <div className="flex h-full w-full items-center justify-center bg-zinc-200">
+          <Play className="h-12 w-12 text-zinc-400" />
         </div>
       ) : (
         <Image
@@ -367,6 +385,7 @@ const InteractiveCoverArt = ({
           // this lets it pick w640 on desktop instead of w1080/w1200.
           sizes="(max-width: 640px) 100vw, 576px"
           priority={priority}
+          loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}
           onError={() => setImageError(true)}
         />
@@ -374,14 +393,14 @@ const InteractiveCoverArt = ({
       {/* Overlay - visible when not playing or briefly when pausing */}
       <div
         className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-          showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          showOverlay ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
         {/* Nearly transparent background */}
         <div className="absolute inset-0 bg-black/10" />
         {/* Icon container */}
-        <div className="relative z-10 flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm">
-          <OverlayIcon className="w-8 h-8 text-white/30 drop-shadow-md" />
+        <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+          <OverlayIcon className="h-8 w-8 text-white/30 drop-shadow-md" />
         </div>
       </div>
     </button>
@@ -462,9 +481,9 @@ const InfoTickerTape = (props: InfoTickerTapeProps) => {
   }
 
   return (
-    <div className={`w-full bg-zinc-800 py-2 rounded-b-lg ${isPlaying ? '' : 'text-center'}`}>
-      <div className="overflow-hidden mx-3">
-        <div className={`whitespace-nowrap inline-block ${isPlaying ? 'animate-marquee' : ''}`}>
+    <div className={`w-full rounded-b-lg bg-zinc-800 py-2 ${isPlaying ? '' : 'text-center'}`}>
+      <div className="mx-3 overflow-hidden">
+        <div className={`inline-block whitespace-nowrap ${isPlaying ? 'animate-marquee' : ''}`}>
           <span className="text-xs font-medium text-zinc-100">
             {trackTitle}
             {displayName && ` • by ${displayName}`}
@@ -558,7 +577,7 @@ const TrackListDrawer = ({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full flex items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 mb-1 focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="mb-1 flex w-full items-center justify-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 focus-visible:ring-0 focus-visible:ring-offset-0"
         >
           <span>View all {allFiles.length} tracks</span>
           <ChevronDown className="h-4 w-4" />
@@ -570,7 +589,7 @@ const TrackListDrawer = ({
           <DrawerDescription asChild>
             <div>
               <h3 className="text-sm text-shadow-none">{artistName}</h3>
-              <p className="text-sm text-shadow-none mb-0">
+              <p className="mb-0 text-sm text-shadow-none">
                 <em>{release.title}</em>
               </p>
               <p>
@@ -579,8 +598,8 @@ const TrackListDrawer = ({
             </div>
           </DrawerDescription>
         </DrawerHeader>
-        <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
-          <ol className="px-0 -ml-2">
+        <div className="max-h-[60vh] overflow-y-auto px-0 pb-4">
+          <ol className="-ml-2 px-0">
             {sortedFiles.map((file, index) => {
               const isCurrentTrack = currentTrackId === file.id;
               const coverArt = release.coverArt || null;
@@ -596,16 +615,16 @@ const TrackListDrawer = ({
                   } ${onTrackSelect ? 'cursor-pointer' : ''}`}
                   onClick={() => onTrackSelect?.(file.id)}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span
-                      className={`text-sm font-medium w-6 shrink-0 text-right ${
+                      className={`w-6 shrink-0 text-right text-sm font-medium ${
                         isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {index + 1}.
                     </span>
                     {coverArt && (
-                      <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded">
                         <Image
                           src={coverArt}
                           alt={getTrackDisplayTitle(file.title, file.fileName)}
@@ -616,7 +635,7 @@ const TrackListDrawer = ({
                       </div>
                     )}
                     <span
-                      className={`text-sm truncate ${
+                      className={`truncate text-sm ${
                         isCurrentTrack
                           ? 'font-semibold text-zinc-50!'
                           : 'text-zinc-950 dark:text-zinc-950'
@@ -626,7 +645,7 @@ const TrackListDrawer = ({
                     </span>
                   </div>
                   <span
-                    className={`text-sm shrink-0 font-mono ${
+                    className={`shrink-0 font-mono text-sm ${
                       isCurrentTrack ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
                     }`}
                   >
@@ -646,7 +665,7 @@ const TrackListDrawer = ({
             })}
           </ol>
         </div>
-        <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
+        <div className="border-t border-zinc-200 px-4 pt-2 pb-2 dark:border-zinc-700">
           <div className="flex justify-between text-sm text-zinc-600">
             <span>Total time</span>
             <span className="font-mono">
@@ -656,7 +675,7 @@ const TrackListDrawer = ({
         </div>
         <DrawerClose asChild>
           <Button variant="outline" className="mx-4 mb-4">
-            <ChevronUp className="h-4 w-4 mr-2" />
+            <ChevronUp className="mr-2 h-4 w-4" />
             Close
           </Button>
         </DrawerClose>
@@ -715,11 +734,11 @@ const FormatFileListDrawer = ({
           states (skeleton, dynamic-dialog placeholder, hydrated content) so
           there's no CLS when DeferredDownloadDialog flips from button →
           dialog or when files arrive late. */}
-      <div className="flex items-center justify-center flex-wrap gap-1.5 text-sm text-zinc-950 min-h-8">
+      <div className="flex min-h-8 flex-wrap items-center justify-center gap-1.5 text-sm text-zinc-950">
         <DrawerTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1 underline font-semibold text-zinc-950 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm cursor-pointer"
+            className="focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 rounded-sm font-semibold text-zinc-950 underline hover:text-zinc-700 focus-visible:ring-2 focus-visible:outline-none"
           >
             <Eye className="size-4" aria-hidden="true" />
             View
@@ -738,8 +757,8 @@ const FormatFileListDrawer = ({
           <DrawerTitle className="sr-only">Track List</DrawerTitle>
           <DrawerDescription asChild>
             <div>
-              <h3 className="text-base mt-0 text-shadow-none font-semibold">{artistName}</h3>
-              <p className="text-sm text-shadow-none mb-0">
+              <h3 className="mt-0 text-base font-semibold text-shadow-none">{artistName}</h3>
+              <p className="mb-0 text-sm text-shadow-none">
                 <em>{releaseTitle}</em>
               </p>
               <p>
@@ -748,8 +767,8 @@ const FormatFileListDrawer = ({
             </div>
           </DrawerDescription>
         </DrawerHeader>
-        <div className="px-0 pb-4 max-h-[60vh] overflow-y-auto">
-          <ol className="px-0 -ml-2">
+        <div className="max-h-[60vh] overflow-y-auto px-0 pb-4">
+          <ol className="-ml-2 px-0">
             {files.map((file) => {
               const isCurrentFile = currentFileId === file.id;
               const displayTitle = getTrackDisplayTitle(file.title, file.fileName);
@@ -765,16 +784,16 @@ const FormatFileListDrawer = ({
                   } ${onFileSelect ? 'cursor-pointer' : ''}`}
                   onClick={() => onFileSelect?.(file.id)}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span
-                      className={`text-sm font-medium w-6 shrink-0 text-right ${
+                      className={`w-6 shrink-0 text-right text-sm font-medium ${
                         isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-950'
                       }`}
                     >
                       {file.trackNumber}.
                     </span>
                     <span
-                      className={`text-sm truncate ${
+                      className={`truncate text-sm ${
                         isCurrentFile
                           ? 'font-semibold text-zinc-50!'
                           : 'text-zinc-950 dark:text-zinc-950'
@@ -794,7 +813,7 @@ const FormatFileListDrawer = ({
                   </div>
                   {file.duration != null && (
                     <span
-                      className={`text-sm shrink-0 font-mono ${
+                      className={`shrink-0 font-mono text-sm ${
                         isCurrentFile ? 'text-zinc-50!' : 'text-zinc-950 dark:text-zinc-600'
                       }`}
                     >
@@ -815,7 +834,7 @@ const FormatFileListDrawer = ({
           </ol>
         </div>
         {files.some((f) => f.duration != null) && (
-          <div className="px-4 pb-2 border-t border-zinc-200 dark:border-zinc-700 pt-2">
+          <div className="border-t border-zinc-200 px-4 pt-2 pb-2 dark:border-zinc-700">
             <div className="flex justify-between text-sm text-zinc-600">
               <span>Total time</span>
               <span className="font-mono">
@@ -826,7 +845,7 @@ const FormatFileListDrawer = ({
         )}
         <DrawerClose asChild>
           <Button variant="outline" className="mx-4 mb-4">
-            <ChevronUp className="h-4 w-4 mr-2" />
+            <ChevronUp className="mr-2 h-4 w-4" />
             Close
           </Button>
         </DrawerClose>
@@ -956,7 +975,7 @@ const DotNavMenu = ({ navMenuItems }: { navMenuItems: NavMenuItem[] }) => {
 const DotNavMenuItem = ({ navMenuItem }: { navMenuItem: NavMenuItem }) => {
   return (
     <div
-      className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 w-full text-left"
+      className="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
       role="menuitem"
     >
       {navMenuItem.label}

@@ -19,17 +19,17 @@ export const ToursContent = () => {
   if (isPending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
+        <Loader2 className="text-zinc-950-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/5 p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-zinc-950-foreground">Failed to load tours</h3>
-          <p className="mt-2 text-sm text-zinc-950-foreground">Please try again later.</p>
+          <h3 className="text-zinc-950-foreground text-lg font-semibold">Failed to load tours</h3>
+          <p className="text-zinc-950-foreground mt-2 text-sm">Please try again later.</p>
         </div>
       </div>
     );

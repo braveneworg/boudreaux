@@ -45,9 +45,9 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
+    <div className="mx-auto max-w-2xl p-4">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold mb-2">{tracks[currentTrack].title}</h2>
+        <h2 className="mb-2 text-3xl font-bold">{tracks[currentTrack].title}</h2>
         <p className="text-gray-600">{tracks[currentTrack].artist}</p>
       </div>
 
@@ -58,15 +58,15 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
       />
 
       <div className="mt-6">
-        <h3 className="text-lg font-semibold mb-3">Playlist</h3>
+        <h3 className="mb-3 text-lg font-semibold">Playlist</h3>
         <ul className="space-y-2">
           {tracks.map((track, index) => (
             // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- track selection in playlist player
             <li
               key={track.id}
-              className={`p-3 rounded cursor-pointer transition-colors ${
+              className={`cursor-pointer rounded p-3 transition-colors ${
                 index === currentTrack
-                  ? 'bg-blue-100 border-l-4 border-blue-500'
+                  ? 'border-l-4 border-blue-500 bg-blue-100'
                   : 'bg-gray-50 hover:bg-gray-100'
               }`}
               onClick={() => playTrack(index)}
@@ -105,7 +105,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen py-8">
-      <h1 className="text-4xl font-bold text-center mb-8">Audio Player</h1>
+      <h1 className="mb-8 text-center text-4xl font-bold">Audio Player</h1>
       <PlaylistPlayer tracks={sampleTracks} />
     </main>
   );

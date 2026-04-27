@@ -253,7 +253,7 @@ export const FormatBundleDownload = ({
       )}
 
       {downloadPhase === 'error' && downloadError && (
-        <div className="flex items-center gap-2 text-destructive text-sm" role="alert">
+        <div className="text-destructive flex items-center gap-2 text-sm" role="alert">
           <AlertCircle className="size-4 shrink-0" />
           <span>{downloadError}</span>
         </div>

@@ -82,7 +82,7 @@ export default function CookiesPolicyPage() {
                 We categorize cookies based on their purpose and necessity:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 1. Strictly Necessary Cookies (Always Active)
               </h3>
               <PageSectionParagraph>
@@ -124,7 +124,7 @@ export default function CookiesPolicyPage() {
                 contract with you (providing the service)
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 2. Functional Cookies (Opt-in Required)
               </h3>
               <PageSectionParagraph>
@@ -161,7 +161,7 @@ export default function CookiesPolicyPage() {
                 <strong>Legal Basis:</strong> Your consent, which you can withdraw at any time
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 3. Performance and Analytics Cookies (Opt-in Required)
               </h3>
               <PageSectionParagraph>
@@ -219,7 +219,7 @@ export default function CookiesPolicyPage() {
                 identify individual users from this data.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">
+              <h3 className="mt-6 mb-4 text-xl font-semibold">
                 4. Targeting and Advertising Cookies (Opt-in Required)
               </h3>
               <PageSectionParagraph>
@@ -258,28 +258,28 @@ export default function CookiesPolicyPage() {
                 In addition to cookies, we use similar technologies:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Local Storage</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Local Storage</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Stores data locally on your device to improve performance</li>
                 <li>Used to cache album artwork and reduce loading times</li>
                 <li>You can clear local storage through your browser settings</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Session Storage</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Session Storage</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Temporarily stores data during your browsing session</li>
                 <li>Automatically cleared when you close your browser</li>
                 <li>Used for temporary playback states and navigation</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Web Beacons (Pixel Tags)</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Web Beacons (Pixel Tags)</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Small transparent images embedded in emails or web pages</li>
                 <li>Help us understand email open rates and user engagement</li>
                 <li>Used only with your consent for marketing communications</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Device Fingerprinting</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Device Fingerprinting</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>We do NOT use device fingerprinting or other covert tracking methods</li>
                 <li>We respect your privacy and rely on transparent cookie usage</li>
@@ -287,13 +287,13 @@ export default function CookiesPolicyPage() {
             </PageSection>
 
             <PageSection id="cookie-duration-types" title="Cookie Duration Types">
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Session Cookies</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Session Cookies</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Temporary cookies that expire when you close your browser</li>
                 <li>Used for essential functions like keeping you logged in during a session</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Persistent Cookies</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Persistent Cookies</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Remain on your device for a set period (specified in each cookie category)</li>
                 <li>Used to remember your preferences across multiple visits</li>
@@ -306,7 +306,7 @@ export default function CookiesPolicyPage() {
                 You have several options to control cookies:
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">1. Cookie Consent Manager</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">1. Cookie Consent Manager</h3>
               <PageSectionParagraph>
                 When you first visit our site, you&apos;ll see a cookie consent banner. You can:
               </PageSectionParagraph>
@@ -329,7 +329,7 @@ export default function CookiesPolicyPage() {
                 <li>Personalized music recommendations</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">2. Browser Settings</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">2. Browser Settings</h3>
               <PageSectionParagraph>
                 Most web browsers allow you to control cookies through their settings:
               </PageSectionParagraph>
@@ -356,7 +356,7 @@ export default function CookiesPolicyPage() {
                 reset your preferences.
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">3. Browser Do Not Track (DNT)</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">3. Browser Do Not Track (DNT)</h3>
               <PageSectionParagraph>
                 Some browsers have a &ldquo;Do Not Track&rdquo; feature. When enabled, we respect
                 this signal by:
@@ -367,7 +367,7 @@ export default function CookiesPolicyPage() {
                 <li>Ensuring third-party services also respect DNT signals where possible</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">4. Opt-Out of Third-Party Cookies</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">4. Opt-Out of Third-Party Cookies</h3>
               <PageSectionParagraph>
                 For third-party cookies (like Google Analytics), you can opt-out directly:
               </PageSectionParagraph>
@@ -402,7 +402,7 @@ export default function CookiesPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">5. Mobile Device Settings</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">5. Mobile Device Settings</h3>
               <PageSectionParagraph>For mobile apps (if applicable):</PageSectionParagraph>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
@@ -420,7 +420,7 @@ export default function CookiesPolicyPage() {
                 Directive (Cookie Law).
               </PageSectionParagraph>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">Your Rights Under EU Law</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Your Rights Under EU Law</h3>
               <PageSectionParagraph>
                 <strong>Right to Consent:</strong>
               </PageSectionParagraph>
@@ -466,7 +466,7 @@ export default function CookiesPolicyPage() {
                 <li>You can request deletion of data collected via cookies by contacting us</li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">GDPR Compliance Measures</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">GDPR Compliance Measures</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
                   <strong>Consent Management Platform:</strong> We use a compliant cookie consent
@@ -498,7 +498,7 @@ export default function CookiesPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="mb-4 mt-6 text-xl font-semibold">International Data Transfers</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">International Data Transfers</h3>
               <PageSectionParagraph>
                 Some of our service providers (like Google Analytics) may transfer cookie data
                 outside the EU. We ensure adequate protection through:

@@ -26,7 +26,7 @@ export default function AboutPage() {
             height={92}
             src="/media/ceschi-and-david-ramos-brothers-and-fouders-of-fake-four-inc.jpeg"
             alt="Ceschi and David Ramos, founders of Fake Four Inc. in 2008"
-            className="inline-block float-right ml-4 rounded-full shadow-md border-2 border-zinc-50"
+            className="float-right ml-4 inline-block rounded-full border-2 border-zinc-50 shadow-md"
             priority
           />
           <strong>Fake Four Inc.</strong> is an independent record label based in New Haven,
@@ -46,7 +46,7 @@ export default function AboutPage() {
                 alt="Listen to David Ramos' This Up Here on Bandcamp"
                 width={380}
                 height={42}
-                className="float-left mr-4 mb-2 rounded-md shadow-md border-2 border-zinc-50"
+                className="float-left mr-4 mb-2 rounded-md border-2 border-zinc-50 shadow-md"
               />
             </Link>
             The first full-length release came with <em>This Up Here</em> by David Ramos on May 20,

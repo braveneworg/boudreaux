@@ -99,13 +99,13 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
 
   return (
     <div className="flex flex-col gap-3">
-      <Label htmlFor={a11yId} className="px-1 sr-only">
+      <Label htmlFor={a11yId} className="sr-only px-1">
         Use up/down arrow keys to change year, left/right to change month
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
           <div className="flex w-full items-center" role="group">
-            <CalendarIcon className="ml-3.5 absolute size-4" />
+            <CalendarIcon className="absolute ml-3.5 size-4" />
             <Input
               id={a11yId}
               ref={dateInputRef}
@@ -135,12 +135,12 @@ export const DatePicker = ({ onSelect, fieldName, value }: DatePickerProps) => {
               }
             }}
           />
-          <div className="border-t p-2 flex justify-end">
+          <div className="flex justify-end border-t p-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="text-xs text-zinc-950-foreground h-7 px-2"
+              className="text-zinc-950-foreground h-7 px-2 text-xs"
               onClick={() => {
                 setDate(undefined);
                 onSelect?.('', fieldName);

@@ -36,12 +36,12 @@ export default function HamburgerMenu() {
   }, [isAuthenticated]);
 
   return (
-    <div className="flex justify-end items-center pointer-events-none">
+    <div className="pointer-events-none flex items-center justify-end">
       <HamburgerMenuSheet isOpen={isOpen} onOpenChange={setIsOpen} menuItems={menuItems}>
         <SheetTrigger className="relative" asChild>
           <Button
             size="icon"
-            className="relative bg-transparent pointer-events-auto top-0.5 right-2"
+            className="pointer-events-auto relative top-0.5 right-2 bg-transparent"
           >
             <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
             <HamburgerPatty isOpen={isOpen} rotateOpen={45} yOffset={-8} duration={0.3} />

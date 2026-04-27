@@ -36,7 +36,7 @@ const DataStoreHealthStatus = (): JSX.Element => {
       : healthStatus;
 
   return (
-    <div className="flex flex-col justify-center items-center sm:items-center">
+    <div className="flex flex-col items-center justify-center sm:items-center">
       <p className="mt-8 pb-1">
         DB health status:&nbsp;{' '}
         <HealthStatusIcon

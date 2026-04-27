@@ -232,7 +232,7 @@ export default function ArtistMultiSelect<
                           <span>{emptyMessage}</span>
                           <Link
                             href={getCreateArtistUrl()}
-                            className="flex items-center gap-1 text-sm text-primary hover:underline"
+                            className="text-primary flex items-center gap-1 text-sm hover:underline"
                           >
                             <Plus className="h-4 w-4" />
                             Create new artist
@@ -263,7 +263,7 @@ export default function ArtistMultiSelect<
                     <div className="border-t p-2">
                       <Link
                         href={getCreateArtistUrl()}
-                        className="flex items-center gap-1 text-sm text-primary hover:underline"
+                        className="text-primary flex items-center gap-1 text-sm hover:underline"
                       >
                         <Plus className="h-4 w-4" />
                         Create new artist
@@ -282,7 +282,7 @@ export default function ArtistMultiSelect<
                       <button
                         type="button"
                         onClick={() => handleRemove(artist.id)}
-                        className="ml-1 rounded-full hover:bg-muted-foreground/20"
+                        className="hover:bg-muted-foreground/20 ml-1 rounded-full"
                         disabled={disabled}
                         aria-label={`Remove ${getArtistDisplayName(artist)}`}
                       >

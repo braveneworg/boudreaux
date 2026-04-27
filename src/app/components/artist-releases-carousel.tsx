@@ -46,7 +46,7 @@ export const ArtistReleasesCarousel = ({ releases, artistName }: ArtistReleasesC
           const coverArt = getReleaseCoverArt(release);
 
           return (
-            <CarouselItem key={release.id} className="basis-1/3 pl-2 flex justify-center">
+            <CarouselItem key={release.id} className="flex basis-1/3 justify-center pl-2">
               <Link href={`/releases/${release.id}`}>
                 {coverArt ? (
                   <Image

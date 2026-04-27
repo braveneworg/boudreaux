@@ -214,7 +214,7 @@ export const DownloadDialog = ({
               </DialogDescription>
             </DialogHeader>
 
-            <p className="text-zinc-900 text-sm">
+            <p className="text-sm text-zinc-900">
               Purchased on{' '}
               <strong>
                 {purchasedAt
@@ -269,7 +269,7 @@ export const DownloadDialog = ({
 
             {hasPurchase && session?.user ? (
               <>
-                <p className="text-zinc-900 text-sm">
+                <p className="text-sm text-zinc-900">
                   Purchased on{' '}
                   <strong>
                     {purchasedAt
@@ -456,7 +456,7 @@ export const DownloadDialog = ({
               </DialogDescription>
             </DialogHeader>
 
-            <p className="text-zinc-900 text-sm">
+            <p className="text-sm text-zinc-900">
               You already purchased this on{' '}
               <strong>
                 {purchasedAt

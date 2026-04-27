@@ -148,7 +148,7 @@ export const TimePicker = ({
               if (h > 12) h = 12;
               setHour(String(h));
             }}
-            className="h-9 w-14 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="h-9 w-14 [appearance:textfield] text-center tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
 
           <span className="text-zinc-950-foreground font-medium">:</span>
@@ -164,18 +164,18 @@ export const TimePicker = ({
               const m = Math.min(59, Math.max(0, parseInt(minute, 10) || 0));
               setMinute(String(m).padStart(2, '0'));
             }}
-            className="h-9 w-14 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="h-9 w-14 [appearance:textfield] text-center tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
 
           {/* AM/PM toggle */}
-          <div className="flex flex-col gap-1 ml-1">
+          <div className="ml-1 flex flex-col gap-1">
             {(['AM', 'PM'] as const).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
                 className={cn(
-                  'px-2 py-0.5 rounded text-xs font-medium border transition-colors',
+                  'rounded border px-2 py-0.5 text-xs font-medium transition-colors',
                   period === p
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-input hover:bg-accent hover:text-accent-foreground'
@@ -193,7 +193,7 @@ export const TimePicker = ({
             type="button"
             variant="ghost"
             size="sm"
-            className="text-xs text-zinc-950-foreground h-7 px-2"
+            className="text-zinc-950-foreground h-7 px-2 text-xs"
             onClick={handleClear}
           >
             Clear

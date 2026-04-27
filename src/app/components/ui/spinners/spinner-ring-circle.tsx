@@ -44,7 +44,7 @@ const SpinnerRingCircle = ({
   return (
     <div
       className={cn(
-        'flex justify-center items-center',
+        'flex items-center justify-center',
         spinnerRingCircleVariants({ size, variant }),
         className
       )}

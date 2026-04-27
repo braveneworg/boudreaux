@@ -27,7 +27,7 @@ export default async function ToursPage() {
       <div className="container mx-auto py-8">
         <div className="mb-8 space-y-2">
           <h1 className="text-4xl font-bold tracking-tight">Tours</h1>
-          <p className="text-lg text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground text-lg">
             Search and browse upcoming and recent tour dates
           </p>
         </div>

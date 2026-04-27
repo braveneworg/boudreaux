@@ -368,7 +368,7 @@ export default function VenueSelect<
 
           <div className="space-y-4 py-4">
             {createError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-destructive text-sm" role="alert">
                 {createError}
               </p>
             )}
@@ -501,7 +501,7 @@ export default function VenueSelect<
 
           <div className="space-y-4 py-4">
             {updateError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-destructive text-sm" role="alert">
                 {updateError}
               </p>
             )}

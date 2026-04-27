@@ -67,11 +67,11 @@ export default async function ToursPage() {
       <div className="mt-6 grid gap-4">
         {fetchError ? (
           <Card>
-            <CardContent className="py-8 text-center text-destructive">{fetchError}</CardContent>
+            <CardContent className="text-destructive py-8 text-center">{fetchError}</CardContent>
           </Card>
         ) : tours.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-zinc-950-foreground">
+            <CardContent className="text-zinc-950-foreground py-8 text-center">
               No tours found. Create your first tour to get started.
             </CardContent>
           </Card>

@@ -105,7 +105,7 @@ const ParticleGenerator = ({
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-auto border border-gray-700"
+      className="h-auto w-full border border-gray-700"
     >
       <rect width={width} height={height} fill={bgColor} opacity={bgOpacity} />
       <defs>
@@ -159,14 +159,14 @@ export default function ParticleGeneratorDemo() {
   return (
     <ContentContainer>
       <h1>Particle SVG Generator</h1>
-      <p className="text-gray-600 mb-5 bg-zinc-50 p-4 rounded-lg shadow-sm">
+      <p className="mb-5 rounded-lg bg-zinc-50 p-4 text-gray-600 shadow-sm">
         Total particles: <strong>{totalParticles}</strong> | Adjust counts per particle type
       </p>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-5">
+      <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {(Object.entries(counts) as [keyof ParticleCounts, number][]).map(([type, count]) => (
-          <div key={type} className="bg-zinc-50 p-4 rounded-lg shadow-sm">
-            <label className="block mb-2 capitalize font-medium">
+          <div key={type} className="rounded-lg bg-zinc-50 p-4 shadow-sm">
+            <label className="mb-2 block font-medium capitalize">
               {type}: {count}
             </label>
             <input
@@ -183,37 +183,37 @@ export default function ParticleGeneratorDemo() {
               max="500"
               value={count}
               onChange={(e) => updateCount(type, e.target.value)}
-              className="w-full mt-2 px-1 py-1 border border-gray-300 rounded"
+              className="mt-2 w-full rounded border border-gray-300 px-1 py-1"
             />
           </div>
         ))}
       </div>
 
-      <div className="bg-white p-4 rounded-lg mb-5 shadow-sm">
+      <div className="mb-5 rounded-lg bg-white p-4 shadow-sm">
         <h3 className="mt-0">Global Parameters</h3>
 
         <div className="mb-4">
           <div className="mb-4">
-            <span className="block mb-1.5 font-medium">Particle Color</span>
-            <div className="flex gap-2.5 items-center">
+            <span className="mb-1.5 block font-medium">Particle Color</span>
+            <div className="flex items-center gap-2.5">
               <input
                 type="color"
                 value={particleColor === 'white' ? '#ffffff' : particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
-                className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
+                className="h-10 w-[60px] cursor-pointer rounded border border-gray-300"
               />
               <input
                 type="text"
                 value={particleColor}
                 onChange={(e) => setParticleColor(e.target.value)}
                 placeholder="e.g., white, #ffffff, rgb(255,255,255)"
-                className="flex-1 px-2 py-2 border border-gray-300 rounded"
+                className="flex-1 rounded border border-gray-300 px-2 py-2"
               />
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1.5 font-medium">
+            <label className="mb-1.5 block font-medium">
               Particle Opacity: {particleOpacity.toFixed(2)}
             </label>
             <input
@@ -228,12 +228,12 @@ export default function ParticleGeneratorDemo() {
           </div>
 
           <div className="mb-4">
-            <label className="flex items-center gap-2 mb-2 font-medium cursor-pointer">
+            <label className="mb-2 flex cursor-pointer items-center gap-2 font-medium">
               <input
                 type="checkbox"
                 checked={isTransparent}
                 onChange={(e) => setIsTransparent(e.target.checked)}
-                className="w-4 h-4"
+                className="h-4 w-4"
               />
               Transparent Background
             </label>
@@ -242,26 +242,26 @@ export default function ParticleGeneratorDemo() {
           {!isTransparent && (
             <>
               <div className="mb-4">
-                <span className="block mb-1.5 font-medium">Background Color</span>
-                <div className="flex gap-2.5 items-center">
+                <span className="mb-1.5 block font-medium">Background Color</span>
+                <div className="flex items-center gap-2.5">
                   <input
                     type="color"
                     value={bgColor === 'black' ? '#000000' : bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    className="w-[60px] h-10 cursor-pointer border border-gray-300 rounded"
+                    className="h-10 w-[60px] cursor-pointer rounded border border-gray-300"
                   />
                   <input
                     type="text"
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
                     placeholder="e.g., black, #000000, rgb(0,0,0)"
-                    className="flex-1 px-2 py-2 border border-gray-300 rounded"
+                    className="flex-1 rounded border border-gray-300 px-2 py-2"
                   />
                 </div>
               </div>
 
               <div className="mb-4">
-                <label className="block mb-1.5 font-medium">
+                <label className="mb-1.5 block font-medium">
                   Background Opacity: {bgOpacity.toFixed(2)}
                 </label>
                 <input
@@ -278,7 +278,7 @@ export default function ParticleGeneratorDemo() {
           )}
 
           <div className="mb-4">
-            <label className="block mb-1.5 font-medium">
+            <label className="mb-1.5 block font-medium">
               Brightness Range: {brightnessRange[0].toFixed(2)} - {brightnessRange[1].toFixed(2)}
             </label>
             <div className="flex gap-2.5">
@@ -308,7 +308,7 @@ export default function ParticleGeneratorDemo() {
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1.5 font-medium">
+            <label className="mb-1.5 block font-medium">
               Scale Range: {scaleRange[0].toFixed(2)} - {scaleRange[1].toFixed(2)}
             </label>
             <div className="flex gap-2.5">
@@ -335,13 +335,13 @@ export default function ParticleGeneratorDemo() {
 
           <button
             onClick={() => setSeed(seed + 1)}
-            className="px-5 py-2.5 bg-blue-600 text-white border-0 rounded-md cursor-pointer font-medium hover:bg-blue-700 transition-colors"
+            className="cursor-pointer rounded-md border-0 bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-blue-700"
           >
             Regenerate (New Random Positions)
           </button>
         </div>
       </div>
-      <div className="bg-white p-5 rounded-lg shadow-sm">
+      <div className="rounded-lg bg-white p-5 shadow-sm">
         <ParticleGenerator
           key={seed}
           particleCounts={counts}
@@ -355,7 +355,7 @@ export default function ParticleGeneratorDemo() {
         />
       </div>
 
-      <div className="mt-5 p-4 bg-blue-50 rounded-lg">
+      <div className="mt-5 rounded-lg bg-blue-50 p-4">
         <h3 className="mt-0">How to Export</h3>
         <p>
           Right-click the SVG above and &quot;Save image as...&quot; or inspect the element and copy

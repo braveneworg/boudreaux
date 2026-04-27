@@ -114,7 +114,7 @@ const SortableImageItem = ({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative aspect-square overflow-hidden rounded-lg border bg-muted',
+        'group bg-muted relative aspect-square overflow-hidden rounded-lg border',
         isDragging && 'z-50 opacity-80 shadow-lg',
         item.error && 'border-destructive',
         item.isUploading && 'pointer-events-none'
@@ -141,12 +141,12 @@ const SortableImageItem = ({
 
       {/* Uploading overlay */}
       {item.isUploading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-sm">
+        <div className="bg-background/80 absolute inset-0 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
           <SpinnerRingCircle size="md" variant="primary" />
           {item.uploadProgress !== undefined && (
             <div className="w-3/4">
               <Progress value={item.uploadProgress} className="h-1.5" />
-              <span className="mt-1 block text-center text-xs text-zinc-950-foreground">
+              <span className="text-zinc-950-foreground mt-1 block text-center text-xs">
                 {Math.round(item.uploadProgress)}%
               </span>
             </div>
@@ -156,7 +156,7 @@ const SortableImageItem = ({
 
       {/* Error indicator */}
       {item.error && (
-        <div className="absolute inset-x-0 bottom-0 bg-destructive/90 px-2 py-1 text-xs text-destructive-foreground">
+        <div className="bg-destructive/90 text-destructive-foreground absolute inset-x-0 bottom-0 px-2 py-1 text-xs">
           {item.error}
         </div>
       )}
@@ -164,12 +164,12 @@ const SortableImageItem = ({
       {/* Drag handle icon - visual indicator, desktop uses this for dragging */}
       {isInteractive && (
         <div
-          className="pointer-events-none absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 shadow-sm backdrop-blur-sm sm:pointer-events-auto sm:cursor-grab sm:opacity-0 sm:transition-opacity sm:hover:bg-background sm:group-hover:opacity-100 sm:active:cursor-grabbing"
+          className="bg-background/80 sm:hover:bg-background pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-full shadow-sm backdrop-blur-sm sm:pointer-events-auto sm:cursor-grab sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:active:cursor-grabbing"
           {...(typeof window !== 'undefined' && window.innerWidth >= 640
             ? { ...attributes, ...listeners }
             : {})}
         >
-          <GripVertical className="h-3.5 w-3.5 text-zinc-950-foreground" />
+          <GripVertical className="text-zinc-950-foreground h-3.5 w-3.5" />
         </div>
       )}
 
@@ -181,7 +181,7 @@ const SortableImageItem = ({
             e.stopPropagation();
             onDeleteRequest(item);
           }}
-          className="absolute right-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow-sm transition-opacity hover:bg-destructive sm:opacity-0 sm:group-hover:opacity-100"
+          className="bg-destructive/90 text-destructive-foreground hover:bg-destructive absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
           aria-label="Remove image"
         >
           <X className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ const SortableImageItem = ({
             e.stopPropagation();
             onPreview(item);
           }}
-          className="absolute bottom-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition-opacity hover:bg-background sm:opacity-0 sm:group-hover:opacity-100"
+          className="bg-background/90 text-foreground hover:bg-background absolute right-1 bottom-1 z-20 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
           aria-label="Preview image"
         >
           <Eye className="h-3.5 w-3.5" />
@@ -432,7 +432,7 @@ export const ImageUploader = ({
     <div className={cn('space-y-4', className)}>
       {/* Reordering/Deleting indicator */}
       {(isReordering || isDeleting) && (
-        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-zinc-950-foreground">
+        <div className="bg-muted/50 text-zinc-950-foreground flex items-center justify-center gap-2 rounded-md py-2 text-sm">
           <SpinnerRingCircle size="sm" />
           <span>{isDeleting ? 'Deleting...' : 'Saving order...'}</span>
         </div>
@@ -462,11 +462,11 @@ export const ImageUploader = ({
           className="absolute inset-0 cursor-pointer opacity-0"
           aria-label={label}
         />
-        <ImagePlus className="mb-2 h-8 w-8 text-zinc-950-foreground" />
-        <p className="text-center text-sm text-zinc-950-foreground">
+        <ImagePlus className="text-zinc-950-foreground mb-2 h-8 w-8" />
+        <p className="text-zinc-950-foreground text-center text-sm">
           {canAddMore ? (
             <>
-              <span className="font-medium text-foreground">Click to upload</span> or drag and drop
+              <span className="text-foreground font-medium">Click to upload</span> or drag and drop
               <br />
               <span className="text-xs">
                 {acceptedTypes.map((t) => t.replace('image/', '')).join(', ')} up to{' '}
@@ -478,7 +478,7 @@ export const ImageUploader = ({
           )}
         </p>
         {images.length > 0 && (
-          <p className="mt-1 text-xs text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground mt-1 text-xs">
             {images.length} / {maxImages} images
           </p>
         )}
@@ -549,7 +549,7 @@ export const ImageUploader = ({
               />
             </div>
           )}
-          <DialogClose className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background">
+          <DialogClose className="bg-background/90 text-foreground hover:bg-background absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
@@ -560,7 +560,7 @@ export const ImageUploader = ({
       <Dialog open={!!imageToDelete} onOpenChange={handleCancelDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete Image</DialogTitle>
-          <p className="text-sm text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground text-sm">
             Are you sure you want to delete this image? This action cannot be undone.
           </p>
           {imageToDelete && (

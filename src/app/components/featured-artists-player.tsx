@@ -199,7 +199,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
   if (featuredArtists.length === 0) {
     return (
-      <div className="text-center py-8 text-zinc-500">
+      <div className="py-8 text-center text-zinc-500">
         <p>No featured artists available at this time.</p>
       </div>
     );
@@ -212,12 +212,13 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
 
   return (
     <MediaPlayer className="mx-0 mb-2">
-      <div className="space-y-2 mt-0">
+      <div className="mt-0 space-y-2">
         {/* Featured Artists Carousel — reserve stable height even when < 3 artists */}
         <div className="min-h-[76px]">
           {displayableArtists.length >= 3 && (
             <MediaPlayer.FeaturedArtistCarousel
               featuredArtists={displayableArtists}
+              selectedArtistId={selectedArtist?.id}
               onSelect={handleSelectArtist}
             />
           )}
@@ -226,7 +227,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
             -mt-1 cancels half of the parent's space-y-2 so the row sits closer
             to the carousel above. min-h-10 reserves stable height across
             loading + dynamic-dialog states to prevent CLS. */}
-        <div className="flex flex-col items-center min-h-10 -mt-1">
+        <div className="-mt-1 flex min-h-10 flex-col items-center">
           {showFileListDrawer && selectedArtist?.release && (
             <>
               <MediaPlayer.FormatFileListDrawer
@@ -258,9 +259,9 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
         {/* Selected Artist Details — cover art + controls + ticker */}
         {selectedArtist && (
           <div className="flex flex-col items-center">
-            <div className="w-full max-w-xl mx-auto">
+            <div className="mx-auto w-full max-w-xl">
               {/* Interactive Cover Art — aspect-square container prevents CLS */}
-              <div className="w-full aspect-square rounded-t-lg overflow-hidden bg-muted">
+              <div className="bg-muted aspect-square w-full overflow-hidden rounded-t-lg">
                 {(() => {
                   const coverArt = getFeaturedArtistCoverArt(selectedArtist);
                   if (!coverArt) return null;
@@ -278,7 +279,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               </div>
 
               {/* Audio Controls — stable min-height prevents CLS during Video.js lazy load */}
-              <div className="w-full bg-zinc-900 min-h-14">
+              <div className="min-h-14 w-full bg-zinc-900">
                 {audioSrc && (
                   <MediaPlayer.Controls
                     audioSrc={audioSrc}
@@ -294,7 +295,7 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
               </div>
 
               {/* Info Ticker Tape — stable min-height */}
-              <div className="w-full min-h-10 bg-zinc-800 rounded-b-lg">
+              <div className="min-h-10 w-full rounded-b-lg bg-zinc-800">
                 {currentTrackTitle && (
                   <MediaPlayer.InfoTickerTape
                     featuredArtist={selectedArtist}

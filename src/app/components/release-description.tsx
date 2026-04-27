@@ -23,7 +23,7 @@ export const ReleaseDescription = ({ description }: ReleaseDescriptionProps) => 
   }
 
   return (
-    <div data-testid="release-description" className="whitespace-pre-line break-words px-4 py-4">
+    <div data-testid="release-description" className="px-4 py-4 break-words whitespace-pre-line">
       {description}
     </div>
   );

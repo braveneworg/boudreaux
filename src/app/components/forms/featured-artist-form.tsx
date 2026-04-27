@@ -436,7 +436,7 @@ export default function FeaturedArtistForm({
               {/* Media Associations */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Media Associations</h3>
-                <p className="text-sm text-zinc-950-foreground">
+                <p className="text-zinc-950-foreground text-sm">
                   Associate this featured artist with a release. The MP3 320kbps digital format is
                   automatically used for audio playback.
                 </p>
@@ -454,7 +454,7 @@ export default function FeaturedArtistForm({
 
                     {/* Digital format status indicator */}
                     {formatStatus === 'loading' && (
-                      <p className="text-sm text-zinc-950-foreground">
+                      <p className="text-zinc-950-foreground text-sm">
                         Checking for MP3 320kbps format...
                       </p>
                     )}
@@ -466,7 +466,7 @@ export default function FeaturedArtistForm({
                       </p>
                     )}
                     {formatStatus === 'missing' && (
-                      <p className="flex items-center gap-1.5 text-sm text-destructive">
+                      <p className="text-destructive flex items-center gap-1.5 text-sm">
                         <XCircle className="h-4 w-4" />
                         No MP3 320kbps format found. Please upload format files first.
                       </p>
@@ -517,7 +517,7 @@ export default function FeaturedArtistForm({
 
                 {/* Derived artists indicator */}
                 {derivedArtistNames.length > 0 && (
-                  <p className="text-sm text-zinc-950-foreground">
+                  <p className="text-zinc-950-foreground text-sm">
                     Associated artists: {derivedArtistNames.join(', ')}
                   </p>
                 )}
@@ -531,7 +531,7 @@ export default function FeaturedArtistForm({
                   label="Display Name (Optional)"
                   placeholder="Override display name when featured"
                 />
-                <p className="text-sm text-zinc-950-foreground -mt-4">
+                <p className="text-zinc-950-foreground -mt-4 text-sm">
                   If not provided, the artist&apos;s default display name will be used.
                 </p>
 

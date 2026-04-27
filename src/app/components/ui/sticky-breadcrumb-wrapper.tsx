@@ -39,7 +39,7 @@ export function StickyBreadcrumbWrapper({
     <div
       className={`${
         isSticky ? 'fixed' : 'relative'
-      } top-0 left-0 right-0 z-50 w-full mb-2 bg-white/80 py-3 transition-all duration-200 border-b border-gray-200`}
+      } top-0 right-0 left-0 z-50 mb-2 w-full border-b border-gray-200 bg-white/80 py-3 transition-all duration-200`}
     >
       <div className="container mx-auto w-full max-w-full px-4">{children}</div>
     </div>

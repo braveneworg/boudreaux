@@ -152,7 +152,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors',
+        'group bg-card relative flex items-center gap-3 rounded-lg border p-3 transition-colors',
         item.error && 'border-destructive bg-destructive/5',
         item.uploadedUrl && !item.isUploading && 'border-green-500/50 bg-green-500/5'
       )}
@@ -175,7 +175,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
         <p className="truncate text-sm font-medium" title={item.fileName}>
           {item.fileName}
         </p>
-        <div className="flex items-center gap-2 text-xs text-zinc-950-foreground">
+        <div className="text-zinc-950-foreground flex items-center gap-2 text-xs">
           <span>{formatFileSize(item.fileSize)}</span>
           {item.duration && (
             <>
@@ -191,14 +191,14 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
         {item.isUploading && item.uploadProgress !== undefined && (
           <div className="mt-2">
             <Progress value={item.uploadProgress} className="h-1.5" />
-            <span className="mt-0.5 block text-xs text-zinc-950-foreground">
+            <span className="text-zinc-950-foreground mt-0.5 block text-xs">
               {Math.round(item.uploadProgress)}% uploaded
             </span>
           </div>
         )}
 
         {/* Error message */}
-        {item.error && <p className="mt-1 text-xs text-destructive">{item.error}</p>}
+        {item.error && <p className="text-destructive mt-1 text-xs">{item.error}</p>}
       </div>
 
       {/* Status indicators */}
@@ -230,7 +230,7 @@ const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) 
           <button
             type="button"
             onClick={() => onDeleteRequest(item)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-zinc-950-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
+            className="bg-muted text-zinc-950-foreground hover:bg-destructive hover:text-destructive-foreground flex h-8 w-8 items-center justify-center rounded-full transition-colors"
             aria-label="Remove file"
           >
             <X className="h-4 w-4" />
@@ -437,11 +437,11 @@ export const MediaUploader = ({
   const getUploadIcon = () => {
     switch (mediaType) {
       case 'audio':
-        return <FileAudio className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
+        return <FileAudio className="text-zinc-950-foreground mb-2 h-10 w-10" />;
       case 'video':
-        return <FileVideo className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
+        return <FileVideo className="text-zinc-950-foreground mb-2 h-10 w-10" />;
       default:
-        return <Music className="mb-2 h-10 w-10 text-zinc-950-foreground" />;
+        return <Music className="text-zinc-950-foreground mb-2 h-10 w-10" />;
     }
   };
 
@@ -449,7 +449,7 @@ export const MediaUploader = ({
     <div className={cn('space-y-4', className)}>
       {/* Deleting indicator */}
       {isDeleting && (
-        <div className="flex items-center justify-center gap-2 rounded-md bg-muted/50 py-2 text-sm text-zinc-950-foreground">
+        <div className="bg-muted/50 text-zinc-950-foreground flex items-center justify-center gap-2 rounded-md py-2 text-sm">
           <SpinnerRingCircle size="sm" />
           <span>Deleting...</span>
         </div>
@@ -480,10 +480,10 @@ export const MediaUploader = ({
           aria-label={label}
         />
         {getUploadIcon()}
-        <p className="text-center text-sm text-zinc-950-foreground">
+        <p className="text-zinc-950-foreground text-center text-sm">
           {canAddMore ? (
             <>
-              <span className="font-medium text-foreground">Click to upload</span> or drag and drop
+              <span className="text-foreground font-medium">Click to upload</span> or drag and drop
               <br />
               <span className="text-xs">
                 {getAcceptedTypesDisplay()} up to {Math.round(maxFileSize / 1024 / 1024)}MB
@@ -494,7 +494,7 @@ export const MediaUploader = ({
           )}
         </p>
         {mediaItems.length > 0 && (
-          <p className="mt-1 text-xs text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground mt-1 text-xs">
             {mediaItems.length} / {maxFiles} files
           </p>
         )}
@@ -541,11 +541,11 @@ export const MediaUploader = ({
       <Dialog open={!!itemToDelete} onOpenChange={handleCancelDelete}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete File</DialogTitle>
-          <p className="text-sm text-zinc-950-foreground">
+          <p className="text-zinc-950-foreground text-sm">
             Are you sure you want to delete this file? This action cannot be undone.
           </p>
           {itemToDelete && (
-            <div className="my-4 flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
+            <div className="bg-muted/50 my-4 flex items-center gap-3 rounded-lg border p-3">
               <div
                 className={cn(
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
@@ -562,7 +562,7 @@ export const MediaUploader = ({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{itemToDelete.fileName}</p>
-                <p className="text-xs text-zinc-950-foreground">
+                <p className="text-zinc-950-foreground text-xs">
                   {formatFileSize(itemToDelete.fileSize)}
                 </p>
               </div>

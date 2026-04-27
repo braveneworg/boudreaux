@@ -293,7 +293,7 @@ export function BannerCarousel({
         <div className="w-full" style={{ minHeight: '2.5rem' }} />
         {/* Banner aspect-ratio placeholder */}
         <div
-          className="relative w-full bg-muted"
+          className="bg-muted relative w-full"
           style={{ paddingBottom: BANNER_ASPECT_PADDING }}
         />
         {/* Dot indicators placeholder */}
@@ -330,7 +330,7 @@ export function BannerCarousel({
           <div
             key={`strip-out-${currentIndex}`}
             className={cn(
-              'absolute inset-0 w-full px-4 py-2 text-center text-sm banner-strip-slide',
+              'banner-strip-slide absolute inset-0 w-full px-4 py-2 text-center text-sm',
               isDarkColor(outgoingNotification.backgroundColor)
                 ? 'banner-strip-dark'
                 : 'banner-strip-light'
@@ -350,7 +350,7 @@ export function BannerCarousel({
           <div
             key={`strip-${isTransitioning ? `in-${incomingIndex}` : currentIndex}`}
             className={cn(
-              'w-full px-4 py-2 text-center text-sm banner-strip-slide',
+              'banner-strip-slide w-full px-4 py-2 text-center text-sm',
               isDarkColor(activeNotification.backgroundColor)
                 ? 'banner-strip-dark'
                 : 'banner-strip-light'
@@ -402,7 +402,7 @@ export function BannerCarousel({
             return (
               <div
                 key={banner.slotNumber}
-                className="absolute inset-0 pointer-events-none select-none"
+                className="pointer-events-none absolute inset-0 select-none"
                 style={{
                   transform: isPrevSlide
                     ? 'translateX(-100%)'
@@ -447,7 +447,7 @@ export function BannerCarousel({
               role="tab"
               aria-selected={idx === currentIndex}
               aria-label={`Go to banner ${idx + 1}`}
-              className="flex items-center justify-center h-11 w-11 p-0"
+              className="flex h-11 w-11 items-center justify-center p-0"
               onClick={() => goToIndex(idx)}
             >
               <span

@@ -22,19 +22,19 @@ export const CollectionContent = () => {
   if (isPending) {
     return (
       <div className="flex min-h-100 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-950-foreground" />
+        <Loader2 className="text-zinc-950-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/5 p-8">
+      <div className="border-muted-foreground/25 bg-muted/5 flex min-h-100 items-center justify-center rounded-lg border-2 border-dashed p-8">
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-zinc-950-foreground">
+          <h3 className="text-zinc-950-foreground text-lg font-semibold">
             Failed to load collection
           </h3>
-          <p className="mt-2 text-sm text-zinc-950-foreground">Please try again later.</p>
+          <p className="text-zinc-950-foreground mt-2 text-sm">Please try again later.</p>
         </div>
       </div>
     );
@@ -58,13 +58,13 @@ export const CollectionContent = () => {
         ]}
       />
       <div className="px-4 pb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 mb-6">My Collection</h1>
+        <h1 className="mb-6 text-2xl font-bold tracking-tight text-zinc-900">My Collection</h1>
         {purchases.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-zinc-500 text-lg">No purchases yet.</p>
-            <p className="text-zinc-400 text-sm mt-2">
+          <div className="py-12 text-center">
+            <p className="text-lg text-zinc-500">No purchases yet.</p>
+            <p className="mt-2 text-sm text-zinc-400">
               Browse{' '}
-              <Link href="/releases" className="underline text-zinc-600">
+              <Link href="/releases" className="text-zinc-600 underline">
                 releases
               </Link>{' '}
               to find music you love.

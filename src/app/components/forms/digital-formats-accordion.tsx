@@ -1132,9 +1132,9 @@ export function DigitalFormatsAccordion({
         return <Loader2 className="h-5 w-5 animate-spin text-blue-600" aria-label="Uploading" />;
       }
       if (state.status === 'error') {
-        return <AlertCircle className="h-5 w-5 text-destructive" aria-label="Upload failed" />;
+        return <AlertCircle className="text-destructive h-5 w-5" aria-label="Upload failed" />;
       }
-      return <FileAudio className="h-5 w-5 text-zinc-950-foreground" />;
+      return <FileAudio className="text-zinc-950-foreground h-5 w-5" />;
     },
     [getUploadState, isUploaded, isUploading]
   );
@@ -1197,8 +1197,8 @@ export function DigitalFormatsAccordion({
             {FORMAT_CONFIGS.map((config) => (
               <AccordionItem key={config.type} value={config.type}>
                 <AccordionTrigger className="hover:no-underline" disabled>
-                  <div className="flex items-center gap-3 w-full opacity-50">
-                    <FileAudio className="h-5 w-5 text-zinc-950-foreground" />
+                  <div className="flex w-full items-center gap-3 opacity-50">
+                    <FileAudio className="text-zinc-950-foreground h-5 w-5" />
                     <span className="font-medium">{config.label}</span>
                   </div>
                 </AccordionTrigger>
@@ -1217,7 +1217,7 @@ export function DigitalFormatsAccordion({
           <Music className="h-5 w-5" />
           Digital Formats
           {albumTitle && (
-            <span className="ml-2 text-sm font-normal text-zinc-950-foreground">
+            <span className="text-zinc-950-foreground ml-2 text-sm font-normal">
               &mdash; {albumTitle}
             </span>
           )}
@@ -1284,11 +1284,11 @@ export function DigitalFormatsAccordion({
             return (
               <AccordionItem key={config.type} value={config.type}>
                 <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3 w-full">
+                  <div className="flex w-full items-center gap-3">
                     {getStatusIcon(config.type)}
                     <span className="font-medium">{config.label}</span>
                     {selected && (
-                      <span className="ml-auto mr-4 text-xs text-zinc-950-foreground">
+                      <span className="text-zinc-950-foreground mr-4 ml-auto text-xs">
                         {selected.fileName}
                         {selected.fileSize > 0 && ` (${formatFileSize(selected.fileSize)})`}
                       </span>
@@ -1305,7 +1305,7 @@ export function DigitalFormatsAccordion({
                   }}
                 >
                   <div className="space-y-4 pt-2">
-                    <p className="text-sm text-zinc-950-foreground">{config.description}</p>
+                    <p className="text-zinc-950-foreground text-sm">{config.description}</p>
 
                     {/* Drag and drop zone */}
                     <div
@@ -1314,24 +1314,24 @@ export function DigitalFormatsAccordion({
                       onDragLeave={handleDragLeave}
                       className={cn(
                         'flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6',
-                        'transition-colors hover:border-primary/50',
+                        'hover:border-primary/50 transition-colors',
                         dragOverFormat === config.type && 'border-primary bg-primary/5',
                         (uploading || isLocked || isBlockedByOtherUpload) &&
                           'pointer-events-none opacity-50'
                       )}
                     >
-                      <Upload className="mb-3 h-8 w-8 text-zinc-950-foreground" />
+                      <Upload className="text-zinc-950-foreground mb-3 h-8 w-8" />
                       {isLocked ? (
-                        <p className="mb-1 text-sm text-zinc-950-foreground">
+                        <p className="text-zinc-950-foreground mb-1 text-sm">
                           Upload MP3 320kbps first
                         </p>
                       ) : (
-                        <p className="mb-1 text-sm text-zinc-950-foreground">
+                        <p className="text-zinc-950-foreground mb-1 text-sm">
                           Drag and drop a {config.label} file or folder here, or choose a folder
                           below
                         </p>
                       )}
-                      <p className="mb-3 text-xs text-zinc-950-foreground">
+                      <p className="text-zinc-950-foreground mb-3 text-xs">
                         Accepts: {config.acceptTypes}
                       </p>
                       <div className="space-y-2">
@@ -1390,7 +1390,7 @@ export function DigitalFormatsAccordion({
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex min-w-0 items-center gap-3">
                             {getStatusIcon(config.type)}
                             <div className="min-w-0">
                               {selected && (
@@ -1408,7 +1408,7 @@ export function DigitalFormatsAccordion({
                                 {getStatusText(config.type)}
                               </p>
                               {selected && selected.fileSize > 0 && (
-                                <p className="text-xs text-zinc-950-foreground">
+                                <p className="text-zinc-950-foreground text-xs">
                                   {formatFileSize(selected.fileSize)}
                                 </p>
                               )}
@@ -1433,7 +1433,7 @@ export function DigitalFormatsAccordion({
                             {uploadedFilesList[config.type].map((fileInfo, idx) => (
                               <li
                                 key={fileInfo.s3Key}
-                                className="flex items-center gap-2 text-xs text-zinc-950-foreground"
+                                className="text-zinc-950-foreground flex items-center gap-2 text-xs"
                               >
                                 <FileAudio className="h-3 w-3 shrink-0" />
                                 <span className="truncate">
@@ -1454,10 +1454,10 @@ export function DigitalFormatsAccordion({
                     {error && (
                       <div
                         role="alert"
-                        className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3"
+                        className="border-destructive bg-destructive/10 flex items-start gap-2 rounded-md border p-3"
                       >
-                        <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                        <p className="text-sm text-destructive">{error}</p>
+                        <AlertCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
+                        <p className="text-destructive text-sm">{error}</p>
                       </div>
                     )}
                   </div>

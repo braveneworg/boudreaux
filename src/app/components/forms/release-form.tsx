@@ -611,9 +611,9 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
-            <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
-            <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
+            <div className="bg-muted h-10 w-full animate-pulse rounded-md" />
           </div>
         </CardContent>
       </Card>
@@ -636,7 +636,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
           },
         ]}
       />
-      <Card className="px-0 pb-0 w-full border-none">
+      <Card className="w-full border-none px-0 pb-0">
         <CardHeader>
           <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
           <CardDescription className="text-sm">
@@ -797,7 +797,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                   {Object.entries(FORMAT_GROUPS).map(([groupName, groupFormats]) => (
                     <div key={groupName} className="space-y-3">
-                      <h3 className="text-2xl font-medium text-foreground">{groupName}</h3>
+                      <h3 className="text-foreground text-2xl font-medium">{groupName}</h3>
                       <div className="space-y-4">
                         {groupFormats.map((format) => (
                           <div key={format} className="flex items-center justify-between">
@@ -824,7 +824,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
 
                 {/* Show all other formats in a collapsible section */}
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-sm text-zinc-950-foreground hover:text-foreground">
+                  <summary className="text-zinc-950-foreground hover:text-foreground cursor-pointer text-sm">
                     Show all formats ({Object.keys(FORMATS).length} total)
                   </summary>
                   <div className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -865,7 +865,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
               {/* Images Section */}
               <section className="space-y-4">
                 <h2 className="font-semibold">Images</h2>
-                <p className="text-sm text-zinc-950-foreground">
+                <p className="text-zinc-950-foreground text-sm">
                   Add images for this release. You can drag to reorder them. Images will be uploaded
                   after the release is created or updated.
                 </p>
