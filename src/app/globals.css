@@ -88,7 +88,8 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
   }
   html {
     height: 100%;
@@ -100,7 +101,12 @@
   input,
   textarea,
   select {
-    @apply bg-zinc-50! text-zinc-900! placeholder:text-zinc-800!;
+    background-color: var(--color-zinc-50) !important;
+    color: var(--color-zinc-900) !important;
+
+    &::placeholder {
+      color: var(--color-zinc-800) !important;
+    }
   }
 
   h1,
@@ -126,16 +132,16 @@
   }
   h1,
   h2 {
-    @apply tracking-[0.2rem] font-semibold;
+    @apply font-semibold tracking-[0.2rem];
   }
   h1 {
     @apply text-2xl text-zinc-900;
   }
   h2 {
-    @apply text-xl mb-0 pb-0 mt-0 text-zinc-700;
+    @apply mt-0 mb-0 pb-0 text-xl text-zinc-700;
   }
   h3 {
-    @apply leading-snug mb-3 mt-4;
+    @apply mt-4 mb-3 leading-snug;
   }
   a {
     font-family:
