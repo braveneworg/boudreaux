@@ -4,6 +4,7 @@
 import React from 'react';
 
 import { render, screen } from '@testing-library/react';
+import ReactDOM from 'react-dom';
 
 import Home from './page';
 
@@ -28,6 +29,8 @@ const mockPrefetchQuery = vi
     }
   });
 const mockDehydratedState = { queries: [], mutations: [] };
+const mockGetQueryData = vi.fn();
+
 vi.mock('@tanstack/react-query', () => ({
   dehydrate: () => mockDehydratedState,
   HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -36,7 +39,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchQuery: mockPrefetchQuery,
-    getQueryData: vi.fn().mockReturnValue(undefined),
+    getQueryData: mockGetQueryData,
   }),
 }));
 
@@ -56,6 +59,10 @@ vi.mock('./components/home-content', () => ({
 }));
 
 describe('Home Page', () => {
+  beforeEach(() => {
+    mockGetQueryData.mockReturnValue(undefined);
+  });
+
   it('should render page structure', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -85,5 +92,86 @@ describe('Home Page', () => {
     render(HomeComponent);
 
     expect(screen.getByTestId('home-content')).toBeInTheDocument();
+  });
+
+  it('preloads first featured artist CDN cover art when available', async () => {
+    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
+
+    mockGetQueryData.mockReturnValue({
+      featuredArtists: [
+        {
+          id: 'featured-1',
+          isActive: true,
+          sortOrder: 1,
+          displayName: 'Jane Doe',
+          coverArt: 'https://cdn.example.com/releases/cover.jpg',
+          artists: [],
+          release: { coverArt: 'https://cdn.example.com/releases/cover.jpg' },
+        },
+      ],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(preloadSpy).toHaveBeenCalledTimes(1);
+    expect(preloadSpy).toHaveBeenCalledWith(
+      'https://cdn.example.com/releases/cover.jpg',
+      expect.objectContaining({
+        as: 'image',
+        fetchPriority: 'high',
+        imageSizes: '(max-width: 640px) 100vw, 576px',
+      })
+    );
+
+    expect(preloadSpy.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        imageSrcSet: expect.stringContaining('828w'),
+      })
+    );
+  });
+
+  it('does not preload when first cover art is a data URL', async () => {
+    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
+
+    mockGetQueryData.mockReturnValue({
+      featuredArtists: [
+        {
+          id: 'featured-1',
+          isActive: true,
+          sortOrder: 1,
+          displayName: 'Jane Doe',
+          artists: [],
+          release: { coverArt: 'data:image/jpeg;base64,abc123' },
+        },
+      ],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(preloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not preload when first cover art is a blob URL', async () => {
+    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
+
+    mockGetQueryData.mockReturnValue({
+      featuredArtists: [
+        {
+          id: 'featured-1',
+          isActive: true,
+          sortOrder: 1,
+          displayName: 'Jane Doe',
+          artists: [],
+          release: { coverArt: 'blob:https://example.com/1234' },
+        },
+      ],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(preloadSpy).not.toHaveBeenCalled();
   });
 });

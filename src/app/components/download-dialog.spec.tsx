@@ -1676,6 +1676,21 @@ describe('DownloadDialog — returning-download step', () => {
     expect(screen.queryByText(/support@fakefourinc\.com/i)).not.toBeInTheDocument();
   });
 
+  it('should show singular hour text when guest cap resetInHours is 1', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await navigateToReturningDownload(user, true, 1);
+
+    expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    expect(screen.getByText(/resets in 1 hour\./i)).toBeInTheDocument();
+  });
+
   it('should omit reset-hours text for guest cap when resetInHours is null', async () => {
     const user = userEvent.setup();
 
@@ -1881,6 +1896,30 @@ describe('DownloadDialog — effectiveSuggestedPrice fallback', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('should fall back to $5 when suggestedPrice and premiumPrice are both null', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        artistName="Test Artist"
+        releaseId="release-123"
+        premiumPrice={null as unknown as number}
+        suggestedPrice={null}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Buy & Download for \$5\.00/ })
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 describe('DownloadDialog — hasPurchase on download step', () => {
@@ -1980,5 +2019,27 @@ describe('DownloadDialog — hasPurchase on download step', () => {
     });
     expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Continue to Download/ })).not.toBeInTheDocument();
+  });
+
+  it('should show singular hour text on format-select when resetInHours is 1', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'authed@example.com', id: 'user-1' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...purchaseProps} downloadCount={5} resetInHours={1}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/resets in 1 hour\./i)).toBeInTheDocument();
   });
 });

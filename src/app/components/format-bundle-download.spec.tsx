@@ -368,6 +368,40 @@ describe('FormatBundleDownload', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
   });
 
+  it('shows an error when SSE completes without a ready event', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const eventsWithoutReady: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
+      { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'done' } },
+      { event: 'complete', data: {} },
+    ];
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(eventsWithoutReady)));
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No formats could be prepared');
+  });
+
+  it('does not start a second request while download is already in progress', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const mockFetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+
+    const downloadButton = screen.getByRole('button', { name: /Download 3 formats/ });
+    await user.click(downloadButton);
+    await user.click(downloadButton);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('treats SSE read errors after ready as success', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onDownloadComplete = vi.fn();
@@ -436,5 +470,68 @@ describe('FormatBundleDownload', () => {
     expect(
       await screen.findByText('No digital formats available for download.')
     ).toBeInTheDocument();
+  });
+
+  it('marks a format as error when SSE emits an error event for that format', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const eventsWithFormatError: Array<{ event: string; data: Record<string, unknown> }> = [
+      { event: 'progress', data: { formatType: 'FLAC', label: 'FLAC', status: 'zipping' } },
+      { event: 'error', data: { formatType: 'FLAC' } },
+      { event: 'complete', data: {} },
+    ];
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeSSEResponse(eventsWithFormatError)));
+
+    render(<FormatBundleDownload {...defaultProps} />, { wrapper: createQueryWrapper() });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+
+    const flacProgressLabel = await screen.findByText('FLAC', {
+      selector: 'span.text-destructive',
+    });
+    expect(flacProgressLabel).toHaveClass('text-destructive');
+    expect(await screen.findByRole('alert')).toHaveTextContent('No formats could be prepared');
+  });
+
+  it('uses raw formatType as progress label when label mapping is missing', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => new Promise(() => {}))
+    );
+
+    render(
+      <FormatBundleDownload
+        {...defaultProps}
+        availableFormats={[{ formatType: 'CUSTOM_XYZ', fileName: 'file.xyz' }]}
+      />,
+      { wrapper: createQueryWrapper() }
+    );
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByRole('option', { name: /CUSTOM_XYZ/i }));
+    await user.click(screen.getByRole('button', { name: /Download 1 format/i }));
+
+    const progressRegion = screen.getByRole('status');
+    expect(within(progressRegion).getByText('CUSTOM_XYZ')).toBeInTheDocument();
+  });
+
+  it('clears pending reset timer on unmount after successful download', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(makeSSEResponse()));
+
+    const { unmount } = render(<FormatBundleDownload {...defaultProps} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    await selectAll(user);
+    await user.click(screen.getByRole('button', { name: /Download 3 formats/ }));
+    await screen.findByText('Download started!');
+
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 });

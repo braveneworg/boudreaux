@@ -85,11 +85,12 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
               <CarouselItem key={artist.id}>
                 <Image
                   className="border-radius-[0.5rem]"
-                  src={latestCoverArt}
+                  src={buildCdnImageVariantUrl(latestCoverArt, 256)}
                   alt={artist.displayName ?? `${artist.firstName} ${artist.surname}`}
                   width={144}
                   height={144}
                   sizes="144px"
+                  unoptimized
                 />
               </CarouselItem>
             );
@@ -284,10 +285,11 @@ const CoverArtView = ({
 
   return (
     <Image
-      src={release.coverArt}
+      src={buildCdnImageVariantUrl(release.coverArt, 384)}
       alt={`${release.title} by ${getArtistDisplayName(artist)}`}
       width={width}
       height={height}
+      unoptimized
       className="aspect-square w-full rounded-lg object-cover"
     />
   );
@@ -694,9 +696,10 @@ const TrackListDrawer = ({
                     {coverArt && (
                       <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded">
                         <Image
-                          src={coverArt}
+                          src={buildCdnImageVariantUrl(coverArt, 384)}
                           alt={getTrackDisplayTitle(file.title, file.fileName)}
                           fill
+                          unoptimized
                           className="object-cover"
                           sizes="40px"
                         />

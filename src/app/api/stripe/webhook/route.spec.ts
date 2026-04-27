@@ -160,6 +160,17 @@ describe('POST /api/stripe/webhook', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should return 404 in production mode', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const request = createRequest('{}');
+    const response = await POST(request);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'Not found' });
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+  });
+
   it('should return 400 when stripe-signature header is missing', async () => {
     const request = createRequest('{}', null);
     const response = await POST(request);
