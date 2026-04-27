@@ -7,9 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-
-import { auth } from '../../../auth';
 
 /**
  * Fetch all purchases for the currently authenticated user.

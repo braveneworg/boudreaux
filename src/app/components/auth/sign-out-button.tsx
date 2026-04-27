@@ -19,7 +19,7 @@ const SignOutButton = ({ onNavigate }: SignOutButtonProps) => {
 
   return (
     <Button
-      className="ml-2 text-xl text-zinc-50 underline"
+      className="ml-2 text-zinc-50 underline"
       variant="link:narrow"
       onClick={async () => {
         onNavigate?.();
@@ -27,7 +27,7 @@ const SignOutButton = ({ onNavigate }: SignOutButtonProps) => {
         router.push(url);
       }}
     >
-      <LogOutIcon />
+      <LogOutIcon size={18} className="mt-1" />
       Sign Out
     </Button>
   );

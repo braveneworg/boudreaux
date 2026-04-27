@@ -19,7 +19,7 @@ vi.mock('@/lib/utils/rate-limit', () => ({
 }));
 
 const mockAuth = vi.fn();
-vi.mock('../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 

@@ -8,7 +8,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock auth
 const mockAuth = vi.fn();
-vi.mock('../../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 

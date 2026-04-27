@@ -4,12 +4,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
-
-import { auth } from '../../../../auth';
 
 import type { Prisma } from '@prisma/client';
 

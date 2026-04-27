@@ -54,7 +54,7 @@ vi.mock('@/lib/utils/audit-log', () => ({
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../auth', () => ({
+vi.mock('@/auth', () => ({
   signIn: mockSignIn,
 }));
 

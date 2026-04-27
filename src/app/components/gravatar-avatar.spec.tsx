@@ -35,17 +35,17 @@ describe('GravatarAvatar', () => {
     expect(img).toHaveAttribute('data-src', expect.stringContaining('?d=retro'));
   });
 
-  it('renders with default size-18 class', () => {
+  it('renders with default size-16 class', () => {
     render(<GravatarAvatar email="test@example.com" />);
 
-    expect(screen.getByTestId('avatar')).toHaveClass('size-18');
+    expect(screen.getByTestId('avatar')).toHaveClass('size-16');
   });
 
   it('applies custom className', () => {
     render(<GravatarAvatar email="test@example.com" className="custom-class" />);
 
     const avatar = screen.getByTestId('avatar');
-    expect(avatar).toHaveClass('size-18');
+    expect(avatar).toHaveClass('size-16');
     expect(avatar).toHaveClass('custom-class');
   });
 

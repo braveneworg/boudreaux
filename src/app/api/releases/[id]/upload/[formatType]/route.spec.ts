@@ -13,7 +13,7 @@ import { PUT } from './route';
 globalThis.ReadableStream = ReadableStream as unknown as typeof globalThis.ReadableStream;
 
 const mockAuth = vi.fn();
-vi.mock('../../../../../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 

@@ -16,7 +16,7 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
-import contactSchema, { type ContactFormSchemaType } from '@/lib/validation/contact-schema';
+import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
 
 const ContactPage = () => {
   const { data: session } = useSession();

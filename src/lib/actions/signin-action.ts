@@ -7,13 +7,12 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { signIn } from '@/auth';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
-import signinSchema from '@/lib/validation/signin-schema';
-
-import { signIn } from '../../../auth';
+import { signinSchema } from '@/lib/validation/signin-schema';
 
 import type { FormState } from '../types/form-state';
 

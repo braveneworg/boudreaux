@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { beforeEach } from 'vitest';
 
 import { signinAction } from '@/lib/actions/signin-action';
 
@@ -40,7 +39,7 @@ vi.mock('@/lib/utils/verify-turnstile', () => ({
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../auth', () => ({
+vi.mock('@/auth', () => ({
   signIn: mockSignIn,
 }));
 

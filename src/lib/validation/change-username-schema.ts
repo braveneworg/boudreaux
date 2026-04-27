@@ -10,7 +10,7 @@ const username = z
   .regex(/^[a-zA-Z0-9_-]+$/, {
     message: 'Invalid username. You can only use letters, numbers, underscores, and dashes.',
   });
-const changeUsernameSchema = z
+export const changeUsernameSchema = z
   .object({
     username,
     confirmUsername: z.string(),
@@ -19,7 +19,5 @@ const changeUsernameSchema = z
     message: 'Usernames do not match',
     path: ['confirmUsername'],
   });
-
-export default changeUsernameSchema;
 
 export type ChangeUsernameFormData = z.infer<typeof changeUsernameSchema>;

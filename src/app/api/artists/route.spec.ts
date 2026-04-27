@@ -4,10 +4,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
+import { auth } from '@/auth';
 import { ArtistService } from '@/lib/services/artist-service';
 
 import { GET, POST as postHandler } from './route';
-import { auth } from '../../../../auth';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -20,7 +20,7 @@ vi.mock('@/lib/decorators/with-auth', () => ({
 }));
 
 // Mock auth for inline admin checks in GET handler
-vi.mock('../../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } }),
 }));
 

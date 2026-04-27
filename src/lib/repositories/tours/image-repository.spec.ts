@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { Prisma } from '@prisma/client';
-import { describe, expect, it, vi } from 'vitest';
 
 import { ImageRepository } from './image-repository';
 

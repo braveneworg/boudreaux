@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { COUNTRIES } from '../utils/countries';
 import { US_STATES } from '../utils/states';
 
-const profileSchema = z.object({
+export const profileSchema = z.object({
   firstName: z
     .string()
     .max(50, { message: 'First name must be less than 50 characters' })
@@ -65,5 +65,3 @@ const profileSchema = z.object({
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
-
-export default profileSchema;

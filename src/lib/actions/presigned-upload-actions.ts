@@ -8,11 +8,10 @@ import 'server-only';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+import { auth } from '@/auth';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
-
-import { auth } from '../../../auth';
 
 const logger = loggers.presignedUrls;
 

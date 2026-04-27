@@ -44,7 +44,8 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
-import downloadSchema, {
+import {
+  downloadSchema,
   DOWNLOAD_OPTIONS,
   type DownloadFormSchemaType,
 } from '@/lib/validation/download-schema';

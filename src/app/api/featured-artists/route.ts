@@ -4,14 +4,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
-
-import { auth } from '../../../../auth';
 
 import type { Prisma } from '@prisma/client';
 

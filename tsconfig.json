@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@/auth": ["./auth.ts"],
       "@/components/*": ["./src/app/components/*"],
       "@/lib/*": ["./src/lib/*"],
       "@/app/lib/*": ["./src/lib/*"],

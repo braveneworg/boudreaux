@@ -5,14 +5,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { generateUsername } from 'unique-username-generator';
 import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
-import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
+import { ReleaseService } from '@/lib/services/release-service';
+import { UserService } from '@/lib/services/user-service';
 import { stripe } from '@/lib/stripe';
 import { getTierByPriceId } from '@/lib/subscriber-rates';
 
@@ -209,34 +209,10 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
     } else {
       // Create a new user for first-time guest purchasers so the purchase can
       // be linked and the auto-login flow can create a session for them.
-      // Guard against concurrent webhook deliveries racing on the unique email
-      // index (P2002) by re-fetching the user if creation fails.
-      const placeholderUsername = generateUsername('', 0, 15);
-      try {
-        const newUser = await prisma.user.create({
-          data: {
-            email: customerEmail,
-            emailVerified: new Date(),
-            username: placeholderUsername,
-          },
-        });
-        userId = newUser.id;
-      } catch (createError) {
-        if (createError instanceof PrismaClientKnownRequestError && createError.code === 'P2002') {
-          // Race condition: another webhook delivery already created this user — re-fetch.
-          const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
-          if (racedUser) {
-            userId = racedUser.id;
-          } else {
-            console.error('release_purchase webhook: P2002 race — user not found on re-fetch', {
-              sessionId: retrievedSession.id,
-              email: customerEmail,
-            });
-          }
-        } else {
-          throw createError;
-        }
-      }
+      // UserService.createGuestPurchaser handles concurrent webhook deliveries
+      // racing on the unique email index (P2002) by re-fetching on conflict.
+      const guest = await UserService.createGuestPurchaser(customerEmail);
+      userId = guest.id;
     }
   }
 
@@ -312,10 +288,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   }
 
   // Fetch release title for the confirmation email
-  const release = await prisma.release.findFirst({
-    where: { id: releaseId },
-    select: { title: true },
-  });
+  const release = await ReleaseService.findTitleById(releaseId);
   const releaseTitle = release?.title ?? 'Unknown Release';
 
   // Resolve the email for the confirmation. Prefer the Stripe session email,
@@ -324,11 +297,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
   // on the session object.
   let emailForConfirmation = customerEmail;
   if (!emailForConfirmation) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    emailForConfirmation = user?.email ?? null;
+    emailForConfirmation = await UserService.findEmailById(userId);
   }
 
   if (emailForConfirmation) {

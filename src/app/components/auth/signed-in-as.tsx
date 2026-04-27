@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
+import { EditIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
@@ -33,7 +34,8 @@ const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
             <span className="text-xl">Signed in as: </span>
           </div>
         )}
-        <Link className="text-xl text-zinc-50 underline" href="/profile" onClick={onClick}>
+        <EditIcon size={16} className="mt-1 ml-2.5" />
+        <Link className="text-zinc-50 underline" href="/profile" onClick={onClick}>
           {username ? `@${username}` : displayName}
         </Link>
       </div>

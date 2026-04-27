@@ -12,7 +12,7 @@ const EditProfileButton = () => {
 
   return isMobile ? null : (
     <Link className="flex items-center gap-2 text-xl" href="/profile">
-      <UserIcon size={24} />
+      <UserIcon size={18} className="mt-1" />
       Edit Profile
     </Link>
   );

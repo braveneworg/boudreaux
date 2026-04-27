@@ -7,10 +7,12 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
-import { prisma } from '../prisma';
+import { ArtistService } from '../services/artist-service';
+import { ImageService } from '../services/image-service';
+import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
 
 /**
@@ -60,46 +62,14 @@ export const registerArtistImagesAction = async (
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Verify artist exists
-    const artistExists = await prisma.artist.findUnique({
-      where: { id: artistId },
-      select: { id: true },
-    });
-
-    if (!artistExists) {
+    if (!(await ArtistService.existsById(artistId))) {
       return { success: false, error: 'Artist not found' };
     }
 
-    // Get the next sort order for this artist
-    const existingImages = await prisma.image.findMany({
-      where: { artistId },
-      select: { id: true },
-    });
-    let nextSortOrder = existingImages.length;
-
-    const results: RegisterImageResult[] = [];
-
-    for (const image of images) {
-      const dbImage = await prisma.image.create({
-        data: {
-          src: image.cdnUrl,
-          caption: image.caption,
-          altText: image.altText,
-          artistId,
-          sortOrder: nextSortOrder,
-        },
-      });
-
-      results.push({
-        id: dbImage.id,
-        src: dbImage.src ?? '',
-        caption: dbImage.caption ?? undefined,
-        altText: dbImage.altText ?? undefined,
-        sortOrder: dbImage.sortOrder ?? nextSortOrder,
-      });
-
-      nextSortOrder++;
-    }
+    const results = await ImageService.registerForArtist(
+      artistId,
+      images.map(({ cdnUrl, caption, altText }) => ({ cdnUrl, caption, altText }))
+    );
 
     // Log image registration for security audit
     logSecurityEvent({
@@ -139,46 +109,14 @@ export const registerReleaseImagesAction = async (
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Verify release exists
-    const releaseExists = await prisma.release.findUnique({
-      where: { id: releaseId },
-      select: { id: true },
-    });
-
-    if (!releaseExists) {
+    if (!(await ReleaseService.existsById(releaseId))) {
       return { success: false, error: 'Release not found' };
     }
 
-    // Get the next sort order for this release
-    const existingImages = await prisma.image.findMany({
-      where: { releaseId },
-      select: { id: true },
-    });
-    let nextSortOrder = existingImages.length;
-
-    const results: RegisterImageResult[] = [];
-
-    for (const image of images) {
-      const dbImage = await prisma.image.create({
-        data: {
-          src: image.cdnUrl,
-          caption: image.caption,
-          altText: image.altText,
-          releaseId,
-          sortOrder: nextSortOrder,
-        },
-      });
-
-      results.push({
-        id: dbImage.id,
-        src: dbImage.src ?? '',
-        caption: dbImage.caption ?? undefined,
-        altText: dbImage.altText ?? undefined,
-        sortOrder: dbImage.sortOrder ?? nextSortOrder,
-      });
-
-      nextSortOrder++;
-    }
+    const results = await ImageService.registerForRelease(
+      releaseId,
+      images.map(({ cdnUrl, caption, altText }) => ({ cdnUrl, caption, altText }))
+    );
 
     // Log image registration for security audit
     logSecurityEvent({

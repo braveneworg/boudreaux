@@ -6,12 +6,8 @@ import Link from 'next/link';
 import { UserPlus } from 'lucide-react';
 
 const SignUpLink = ({ onClick }: { onClick?: () => void }) => (
-  <Link
-    href="/signup"
-    className="flex items-center gap-2 text-xl text-zinc-50 underline"
-    onClick={onClick}
-  >
-    <UserPlus size={24} className="mt-1" />
+  <Link href="/signup" className="flex items-center gap-2 text-zinc-50 underline" onClick={onClick}>
+    <UserPlus size={18} className="mt-1" />
     Sign Up
   </Link>
 );

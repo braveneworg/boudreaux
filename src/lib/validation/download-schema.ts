@@ -11,7 +11,7 @@ export const DOWNLOAD_OPTIONS = [
   },
 ] as const;
 
-const downloadSchema = z.object({
+export const downloadSchema = z.object({
   downloadOption: z
     .string({
       error: 'Please select a download option',
@@ -34,5 +34,3 @@ const downloadSchema = z.object({
 });
 
 export type DownloadFormSchemaType = z.infer<typeof downloadSchema>;
-
-export default downloadSchema;

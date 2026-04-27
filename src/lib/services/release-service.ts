@@ -594,4 +594,90 @@ export class ReleaseService {
       return { success: false, error: 'Failed to fetch artist releases' };
     }
   }
+
+  /**
+   * Find the first release whose title matches `title` case-insensitively.
+   * Used by the find-or-create-release flow to dedupe by album title.
+   */
+  static async findByTitleInsensitive(title: string): Promise<{
+    id: string;
+    title: string;
+    publishedAt: Date | null;
+    deletedOn: Date | null;
+  } | null> {
+    return prisma.release.findFirst({
+      where: {
+        title: {
+          equals: title,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        publishedAt: true,
+        deletedOn: true,
+      },
+    });
+  }
+
+  /**
+   * Apply un-delete and/or publish to a found release. No-ops when there is
+   * nothing to update so callers don't have to inspect the partial payload.
+   */
+  static async applyFoundReleaseUpdate(
+    id: string,
+    updates: { undelete?: boolean; publish?: boolean }
+  ): Promise<void> {
+    const data: { deletedOn?: null; publishedAt?: Date } = {};
+    if (updates.undelete) {
+      data.deletedOn = null;
+    }
+    if (updates.publish) {
+      data.publishedAt = new Date();
+    }
+    if (Object.keys(data).length === 0) {
+      return;
+    }
+    await prisma.release.update({
+      where: { id },
+      data,
+    });
+  }
+
+  /**
+   * Fetch the title of a published release by id. Returns null when the
+   * release is missing or unpublished. Used by download endpoints that only
+   * need the title for the ZIP filename.
+   */
+  static async findPublishedTitleById(id: string): Promise<{ id: string; title: string } | null> {
+    return prisma.release.findFirst({
+      where: { id, publishedAt: { not: null } },
+      select: { id: true, title: true },
+    });
+  }
+
+  /**
+   * Fetch the title of a release by id regardless of publish state. Used by
+   * post-purchase confirmation flows where the release may have since been
+   * unpublished but the customer still needs the original title.
+   */
+  static async findTitleById(id: string): Promise<{ id: string; title: string } | null> {
+    return prisma.release.findUnique({
+      where: { id },
+      select: { id: true, title: true },
+    });
+  }
+
+  /**
+   * Lightweight existence check used by callers that only need to validate a
+   * releaseId before performing a follow-up write.
+   */
+  static async existsById(id: string): Promise<boolean> {
+    const found = await prisma.release.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    return Boolean(found);
+  }
 }

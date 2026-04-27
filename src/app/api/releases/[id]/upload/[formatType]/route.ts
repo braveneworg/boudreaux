@@ -15,13 +15,12 @@ import { NextResponse } from 'next/server';
 
 import { Upload } from '@aws-sdk/lib-storage';
 
+import { auth } from '@/auth';
 import { supportsComment, writeComment } from '@/lib/audio-metadata';
 import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { UploadService } from '@/lib/services/upload-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
-
-import { auth } from '../../../../../../../auth';
 
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 

@@ -51,20 +51,13 @@ describe('SignInLink', () => {
 
     const icon = screen.getByTestId('login-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveAttribute('data-size', '24');
+    expect(icon).toHaveAttribute('data-size', '18');
   });
 
   it('applies the correct CSS classes', () => {
     render(<SignInLink />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass(
-      'flex',
-      'text-zinc-50',
-      'underline',
-      'items-center',
-      'gap-2',
-      'text-xl'
-    );
+    expect(link).toHaveClass('flex', 'text-zinc-50', 'underline', 'items-center', 'gap-2');
   });
 });
