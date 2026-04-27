@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.64.0] - 2026-04-27
+
+### Added
+
+- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n- Chore/code review batch 1 to 4 (#418)\n
+
 ## [4.63.0] - 2026-04-27
 
 ### Added
