@@ -5,7 +5,6 @@
 import { auth } from '@/auth';
 
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { prisma } from '../prisma';
 import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';
 import { requireRole } from '../utils/auth/require-role';
@@ -17,14 +16,6 @@ vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
 vi.mock('@/auth');
-vi.mock('../prisma', () => ({
-  prisma: {
-    release: {
-      findFirst: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
 vi.mock('../services/release-service');
 vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
@@ -35,10 +26,12 @@ const mockAuth = vi.mocked(auth) as unknown as ReturnType<
   typeof vi.fn<() => Promise<Session | null>>
 >;
 const mockRequireRole = vi.mocked(requireRole);
-const mockPrismaReleaseFindFirst = vi.mocked(prisma.release.findFirst) as unknown as ReturnType<
+const mockReleaseFindByTitle = vi.mocked(
+  ReleaseService.findByTitleInsensitive
+) as unknown as ReturnType<
   typeof vi.fn<() => Promise<Pick<Release, 'id' | 'title' | 'publishedAt' | 'deletedOn'> | null>>
 >;
-const mockPrismaReleaseUpdate = vi.mocked(prisma.release.update);
+const mockReleaseApplyFoundUpdate = vi.mocked(ReleaseService.applyFoundReleaseUpdate);
 const mockReleaseServiceCreate = vi.mocked(ReleaseService.createRelease);
 
 describe('findOrCreateReleaseAction', () => {
@@ -153,7 +146,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: null,
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(existingRelease);
+      mockReleaseFindByTitle.mockResolvedValue(existingRelease);
 
       const metadata: ReleaseMetadata = {
         album: 'Test Album',
@@ -168,20 +161,7 @@ describe('findOrCreateReleaseAction', () => {
         created: false,
       });
 
-      expect(mockPrismaReleaseFindFirst).toHaveBeenCalledWith({
-        where: {
-          title: {
-            equals: 'Test Album',
-            mode: 'insensitive',
-          },
-        },
-        select: {
-          id: true,
-          title: true,
-          publishedAt: true,
-          deletedOn: true,
-        },
-      });
+      expect(mockReleaseFindByTitle).toHaveBeenCalledWith('Test Album');
     });
 
     it('should find release case-insensitively', async () => {
@@ -192,7 +172,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: null,
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(existingRelease);
+      mockReleaseFindByTitle.mockResolvedValue(existingRelease);
 
       const metadata: ReleaseMetadata = {
         album: 'THE BEST ALBUM',
@@ -209,7 +189,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should trim album name before searching', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue({
+      mockReleaseFindByTitle.mockResolvedValue({
         id: 'release-123',
         title: 'Trimmed Album',
         publishedAt: null,
@@ -222,26 +202,13 @@ describe('findOrCreateReleaseAction', () => {
 
       await findOrCreateReleaseAction(metadata);
 
-      expect(mockPrismaReleaseFindFirst).toHaveBeenCalledWith({
-        where: {
-          title: {
-            equals: 'Trimmed Album',
-            mode: 'insensitive',
-          },
-        },
-        select: {
-          id: true,
-          title: true,
-          publishedAt: true,
-          deletedOn: true,
-        },
-      });
+      expect(mockReleaseFindByTitle).toHaveBeenCalledWith('Trimmed Album');
     });
   });
 
   describe('creating new release', () => {
     beforeEach(() => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
     });
 
     it('should create a new release when not found', async () => {
@@ -498,7 +465,7 @@ describe('findOrCreateReleaseAction', () => {
 
   describe('error handling', () => {
     beforeEach(() => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
     });
 
     it('should handle release creation failure', async () => {
@@ -520,7 +487,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should handle database query errors', async () => {
-      mockPrismaReleaseFindFirst.mockRejectedValue(new Error('Connection failed'));
+      mockReleaseFindByTitle.mockRejectedValue(new Error('Connection failed'));
 
       const metadata: ReleaseMetadata = {
         album: 'Test Album',
@@ -535,7 +502,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should handle unknown errors gracefully', async () => {
-      mockPrismaReleaseFindFirst.mockRejectedValue('Unknown error type');
+      mockReleaseFindByTitle.mockRejectedValue('Unknown error type');
 
       const metadata: ReleaseMetadata = {
         album: 'Test Album',
@@ -616,7 +583,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: new Date('2024-06-01'),
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(softDeletedRelease);
+      mockReleaseFindByTitle.mockResolvedValue(softDeletedRelease);
 
       const metadata: ReleaseMetadata = {
         album: 'Deleted Album',
@@ -632,9 +599,9 @@ describe('findOrCreateReleaseAction', () => {
       });
 
       // Should clear deletedOn
-      expect(mockPrismaReleaseUpdate).toHaveBeenCalledWith({
-        where: { id: 'release-deleted' },
-        data: { deletedOn: null },
+      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-deleted', {
+        undelete: true,
+        publish: false,
       });
     });
 
@@ -646,7 +613,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: new Date('2024-06-01'),
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(softDeletedUnpublished);
+      mockReleaseFindByTitle.mockResolvedValue(softDeletedUnpublished);
 
       const metadata: ReleaseMetadata = {
         album: 'Deleted Unpublished Album',
@@ -662,12 +629,9 @@ describe('findOrCreateReleaseAction', () => {
       });
 
       // Should clear deletedOn AND set publishedAt
-      expect(mockPrismaReleaseUpdate).toHaveBeenCalledWith({
-        where: { id: 'release-deleted-unpub' },
-        data: {
-          deletedOn: null,
-          publishedAt: expect.any(Date),
-        },
+      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-deleted-unpub', {
+        undelete: true,
+        publish: true,
       });
     });
 
@@ -679,7 +643,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: null,
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(activePublished);
+      mockReleaseFindByTitle.mockResolvedValue(activePublished);
 
       const metadata: ReleaseMetadata = {
         album: 'Active Album',
@@ -688,7 +652,7 @@ describe('findOrCreateReleaseAction', () => {
       await findOrCreateReleaseAction(metadata, { publish: true });
 
       // No update needed — already published and not deleted
-      expect(mockPrismaReleaseUpdate).not.toHaveBeenCalled();
+      expect(mockReleaseApplyFoundUpdate).not.toHaveBeenCalled();
     });
 
     it('should not call update when release is active and publish is not requested', async () => {
@@ -699,7 +663,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: null,
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(activeUnpublished);
+      mockReleaseFindByTitle.mockResolvedValue(activeUnpublished);
 
       const metadata: ReleaseMetadata = {
         album: 'Active Unpublished',
@@ -708,7 +672,7 @@ describe('findOrCreateReleaseAction', () => {
       await findOrCreateReleaseAction(metadata);
 
       // No publish requested and not deleted, so no update
-      expect(mockPrismaReleaseUpdate).not.toHaveBeenCalled();
+      expect(mockReleaseApplyFoundUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -721,7 +685,7 @@ describe('findOrCreateReleaseAction', () => {
         deletedOn: null,
       };
 
-      mockPrismaReleaseFindFirst.mockResolvedValue(unpublishedRelease);
+      mockReleaseFindByTitle.mockResolvedValue(unpublishedRelease);
 
       const metadata: ReleaseMetadata = {
         album: 'Unpublished Album',
@@ -729,14 +693,14 @@ describe('findOrCreateReleaseAction', () => {
 
       await findOrCreateReleaseAction(metadata, { publish: true });
 
-      expect(mockPrismaReleaseUpdate).toHaveBeenCalledWith({
-        where: { id: 'release-unpub' },
-        data: { publishedAt: expect.any(Date) },
+      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-unpub', {
+        undelete: false,
+        publish: true,
       });
     });
 
     it('should include publishedAt when creating a new release with publish option', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
 
       const createdRelease = {
         id: 'new-pub-release',
@@ -770,7 +734,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should return error with specific message when createRelease returns failure with error', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
       mockReleaseServiceCreate.mockResolvedValue({
         success: false,
         error: 'Title cannot be empty',
@@ -783,7 +747,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should return fallback error message when createRelease returns failure with empty error', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
       mockReleaseServiceCreate.mockResolvedValue({
         success: false,
         error: '',
@@ -796,7 +760,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should return fallback error message when createRelease returns failure with undefined error', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
       mockReleaseServiceCreate.mockResolvedValue({
         success: false,
       } as never);
@@ -808,7 +772,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should not include publishedAt when creating a new release without publish option', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
 
       const createdRelease = {
         id: 'new-draft-release',
@@ -849,7 +813,7 @@ describe('findOrCreateReleaseAction', () => {
     };
 
     beforeEach(() => {
-      mockPrismaReleaseFindFirst.mockResolvedValue(null);
+      mockReleaseFindByTitle.mockResolvedValue(null);
       mockReleaseServiceCreate.mockResolvedValue({
         success: true,
         data: createdRelease as unknown as never,
@@ -952,7 +916,7 @@ describe('findOrCreateReleaseAction', () => {
     });
 
     it('should connect artist when finding an existing release', async () => {
-      mockPrismaReleaseFindFirst.mockResolvedValue({
+      mockReleaseFindByTitle.mockResolvedValue({
         id: 'existing-release-456',
         title: 'Existing Album',
         publishedAt: new Date(),

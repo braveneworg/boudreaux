@@ -870,4 +870,16 @@ export class ArtistService {
       create: { artistId, releaseId },
     });
   }
+
+  /**
+   * Lightweight existence check used by callers that only need to validate an
+   * artistId before performing a follow-up write.
+   */
+  static async existsById(artistId: string): Promise<boolean> {
+    const found = await prisma.artist.findUnique({
+      where: { id: artistId },
+      select: { id: true },
+    });
+    return Boolean(found);
+  }
 }

@@ -11,7 +11,6 @@ import { auth } from '@/auth';
 import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { prisma } from '../prisma';
 import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';
 import { logSecurityEvent } from '../utils/audit-log';
@@ -161,39 +160,14 @@ export async function findOrCreateReleaseAction(
     }
 
     // Try to find an existing release by title (case-insensitive)
-    const existingRelease = await prisma.release.findFirst({
-      where: {
-        title: {
-          equals: albumTitle,
-          mode: 'insensitive',
-        },
-      },
-      select: {
-        id: true,
-        title: true,
-        publishedAt: true,
-        deletedOn: true,
-      },
-    });
+    const existingRelease = await ReleaseService.findByTitleInsensitive(albumTitle);
 
     if (existingRelease) {
-      // Build update payload: un-delete soft-deleted releases and publish if requested
-      const updateData: { deletedOn?: null; publishedAt?: Date } = {};
+      const undelete = Boolean(existingRelease.deletedOn);
+      const publish = Boolean(options.publish && !existingRelease.publishedAt);
 
-      if (existingRelease.deletedOn) {
-        updateData.deletedOn = null;
-      }
-
-      if (options.publish && !existingRelease.publishedAt) {
-        updateData.publishedAt = new Date();
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await prisma.release.update({
-          where: { id: existingRelease.id },
-          data: updateData,
-        });
-
+      if (undelete || publish) {
+        await ReleaseService.applyFoundReleaseUpdate(existingRelease.id, { undelete, publish });
         revalidatePath('/admin/releases');
       }
 

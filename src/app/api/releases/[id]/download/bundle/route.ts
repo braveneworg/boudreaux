@@ -17,11 +17,11 @@ import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
-import { prisma } from '@/lib/prisma';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
+import { ReleaseService } from '@/lib/services/release-service';
 import {
   buildContentDisposition,
   generatePresignedDownloadUrl,
@@ -179,10 +179,7 @@ export async function GET(
     }
 
     // Step 5: Fetch release title for ZIP filename
-    const release = await prisma.release.findFirst({
-      where: { id: releaseId, publishedAt: { not: null } },
-      select: { id: true, title: true },
-    });
+    const release = await ReleaseService.findPublishedTitleById(releaseId);
 
     if (!release) {
       return Response.json(

@@ -4,10 +4,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 import { withAuth } from '@/lib/decorators/with-auth';
-import { prisma } from '@/lib/prisma';
+import { UserService } from '@/lib/services/user-service';
 import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
 
 export const POST = withAuth(async (request: NextRequest, _context, session) => {
@@ -33,37 +31,28 @@ export const POST = withAuth(async (request: NextRequest, _context, session) => 
 
     const { username } = validationResult.data;
 
-    // Update user in database
-    try {
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { username },
-      });
+    const result = await UserService.updateUsername(session.user.id, username);
 
+    if (result.duplicate) {
+      // Always return 200 with `available: false` to prevent enumeration.
       return NextResponse.json(
         {
-          available: true,
-          success: true,
-          message: 'Username updated successfully',
-          username,
+          available: false,
+          error: 'This username is not available. Please choose another.',
         },
         { status: 200 }
       );
-    } catch (error) {
-      // Handle duplicate username error
-      // Always return 200 with available flag to prevent enumeration
-      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
-        return NextResponse.json(
-          {
-            available: false,
-            error: 'This username is not available. Please choose another.',
-          },
-          { status: 200 }
-        );
-      }
-
-      throw error;
     }
+
+    return NextResponse.json(
+      {
+        available: true,
+        success: true,
+        message: 'Username updated successfully',
+        username,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     // Log safely - don't expose error details in production
     if (process.env.NODE_ENV === 'development') {

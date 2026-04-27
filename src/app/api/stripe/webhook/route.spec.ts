@@ -117,19 +117,24 @@ vi.mock('@/lib/email/send-purchase-confirmation', () => ({
   sendPurchaseConfirmationEmail: (...args: unknown[]) => mockSendPurchaseConfirmationEmail(...args),
 }));
 
-const mockPrismaReleaseFindFirst = vi.fn();
-const mockPrismaUserCreate = vi.fn();
-const mockPrismaUserFindUnique = vi.fn();
+const mockReleaseFindTitleById = vi.fn();
+const mockUserCreateGuestPurchaser = vi.fn();
+const mockUserFindEmailById = vi.fn();
+// Legacy aliases preserved so existing assertions still read clearly.
+const mockPrismaReleaseFindFirst = mockReleaseFindTitleById;
+const mockPrismaUserCreate = mockUserCreateGuestPurchaser;
+const mockPrismaUserFindUnique = mockUserFindEmailById;
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    release: {
-      findFirst: (...args: unknown[]) => mockPrismaReleaseFindFirst(...args),
-    },
-    user: {
-      create: (...args: unknown[]) => mockPrismaUserCreate(...args),
-      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
-    },
+vi.mock('@/lib/services/release-service', () => ({
+  ReleaseService: {
+    findTitleById: (...args: unknown[]) => mockReleaseFindTitleById(...args),
+  },
+}));
+
+vi.mock('@/lib/services/user-service', () => ({
+  UserService: {
+    createGuestPurchaser: (...args: unknown[]) => mockUserCreateGuestPurchaser(...args),
+    findEmailById: (...args: unknown[]) => mockUserFindEmailById(...args),
   },
 }));
 
@@ -1403,16 +1408,13 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-noem' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release' });
-      mockPrismaUserFindUnique.mockResolvedValue({ email: 'user-from-db@example.com' });
+      mockPrismaUserFindUnique.mockResolvedValue('user-from-db@example.com');
       mockSendPurchaseConfirmationEmail.mockResolvedValue(true);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
       expect(mockPurchaseCreate).toHaveBeenCalled();
-      expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
-        where: { id: 'b07f1f77bcf86cd79943901e' },
-        select: { email: true },
-      });
+      expect(mockPrismaUserFindUnique).toHaveBeenCalledWith('b07f1f77bcf86cd79943901e');
       expect(mockSendPurchaseConfirmationEmail).toHaveBeenCalledWith(
         expect.objectContaining({ customerEmail: 'user-from-db@example.com' })
       );
@@ -1442,7 +1444,7 @@ describe('POST /api/stripe/webhook', () => {
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPurchaseCreate.mockResolvedValue({ id: 'p-noem2' });
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'No Email Release 2' });
-      mockPrismaUserFindUnique.mockResolvedValue({ email: null });
+      mockPrismaUserFindUnique.mockResolvedValue(null);
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
@@ -1533,7 +1535,7 @@ describe('POST /api/stripe/webhook', () => {
       });
       mockCheckoutSessionsRetrieve.mockResolvedValue(session);
       mockFindUserByEmail.mockResolvedValue(null);
-      mockPrismaUserCreate.mockResolvedValue({ id: 'u-new', email: 'newguest@example.com' });
+      mockPrismaUserCreate.mockResolvedValue({ id: 'u-new', created: true });
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'New Release' });
       mockPurchaseCreate.mockResolvedValue({ id: 'p-new' });
@@ -1541,19 +1543,13 @@ describe('POST /api/stripe/webhook', () => {
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
-      expect(mockPrismaUserCreate).toHaveBeenCalledWith({
-        data: {
-          email: 'newguest@example.com',
-          emailVerified: expect.any(Date),
-          username: 'generated-username',
-        },
-      });
+      expect(mockPrismaUserCreate).toHaveBeenCalledWith('newguest@example.com');
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'u-new', releaseId: 'f07f1f77bcf86cd799439024' })
       );
     });
 
-    it('recovers from P2002 race on guest-user creation by re-fetching the existing user', async () => {
+    it('uses the user returned by UserService.createGuestPurchaser (race recovery handled in service)', async () => {
       const session = {
         id: 'cs_race',
         mode: 'payment',
@@ -1569,17 +1565,9 @@ describe('POST /api/stripe/webhook', () => {
         data: { object: session },
       });
       mockCheckoutSessionsRetrieve.mockResolvedValue(session);
-      // First findUserByEmail returns null → triggers create
-      mockFindUserByEmail
-        .mockResolvedValueOnce(null)
-        // Second findUserByEmail (after P2002) returns the already-created user
-        .mockResolvedValueOnce({ id: 'u-raced' });
-      mockPrismaUserCreate.mockRejectedValue(
-        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        })
-      );
+      mockFindUserByEmail.mockResolvedValue(null);
+      // Service handles the P2002 race internally and returns the existing user.
+      mockPrismaUserCreate.mockResolvedValue({ id: 'u-raced', created: false });
       mockFindByPaymentIntentId.mockResolvedValue(null);
       mockPrismaReleaseFindFirst.mockResolvedValue({ title: 'Race Release' });
       mockPurchaseCreate.mockResolvedValue({ id: 'p-race' });
@@ -1587,7 +1575,6 @@ describe('POST /api/stripe/webhook', () => {
       const request = createRequest('{}');
       const response = await POST(request);
       expect(response.status).toBe(200);
-      expect(mockFindUserByEmail).toHaveBeenCalledTimes(2);
       expect(mockPurchaseCreate).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'u-raced', releaseId: 'a17f1f77bcf86cd799439025' })
       );

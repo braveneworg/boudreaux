@@ -5,10 +5,7 @@
 
 import 'server-only';
 
-import { generateUsername } from 'unique-username-generator';
-
-import { prisma } from '@/lib/prisma';
-import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { UserService } from '@/lib/services/user-service';
 import { validateEmailSecurity } from '@/lib/utils/email-security';
 import { rateLimit } from '@/lib/utils/rate-limit';
 
@@ -46,9 +43,7 @@ export const resolveSubscriberAction = async (
       };
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser = await UserService.findByEmail(email);
 
     if (existingUser) {
       // Return uniform response to prevent email enumeration
@@ -62,15 +57,7 @@ export const resolveSubscriberAction = async (
       };
     }
 
-    const adapter = CustomPrismaAdapter(prisma);
-    await adapter.createUser!({
-      id: '',
-      email,
-      emailVerified: null,
-      name: null,
-      image: null,
-      username: generateUsername('', 4),
-    });
+    await UserService.createSubscriber(email);
 
     // Return uniform response to prevent email enumeration
     return { success: true };
