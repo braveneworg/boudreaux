@@ -63,6 +63,10 @@ describe('Home Page', () => {
     mockGetQueryData.mockReturnValue(undefined);
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should render page structure', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);

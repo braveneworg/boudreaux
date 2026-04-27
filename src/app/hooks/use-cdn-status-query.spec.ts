@@ -23,6 +23,10 @@ describe('useCdnStatusQuery', () => {
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('uses polling while invalidation is in progress', () => {
     renderHook(() => useCdnStatusQuery());
 
@@ -38,10 +42,13 @@ describe('useCdnStatusQuery', () => {
   });
 
   it('fetches CDN status with no-store cache mode', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ status: 'ready', message: 'done' }),
-    }) as unknown as typeof fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'ready', message: 'done' }),
+      })
+    );
 
     renderHook(() => useCdnStatusQuery());
 
@@ -54,7 +61,7 @@ describe('useCdnStatusQuery', () => {
   });
 
   it('throws when status endpoint returns a failure response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
     renderHook(() => useCdnStatusQuery());
 

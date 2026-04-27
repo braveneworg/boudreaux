@@ -23,6 +23,10 @@ describe('useArtistNavSearchQuery', () => {
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('disables the query for short search terms', () => {
     renderHook(() => useArtistNavSearchQuery('ab'));
 
@@ -36,12 +40,15 @@ describe('useArtistNavSearchQuery', () => {
   });
 
   it('fetches search results for valid query strings', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [] }],
-      }),
-    }) as unknown as typeof fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [] }],
+        }),
+      })
+    );
 
     renderHook(() => useArtistNavSearchQuery('artist'));
 
@@ -58,7 +65,7 @@ describe('useArtistNavSearchQuery', () => {
   });
 
   it('throws when the search request fails', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
     renderHook(() => useArtistNavSearchQuery('artist'));
 
