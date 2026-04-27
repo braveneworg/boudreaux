@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.63.0] - 2026-04-27
+
+### Added
+
+- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n- Develop/fix cls search styling and fa carousel (#417)\n
+
 ## [4.62.0] - 2026-04-26
 
 ### Added
