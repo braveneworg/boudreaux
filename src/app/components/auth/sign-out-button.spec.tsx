@@ -101,6 +101,6 @@ describe('SignOutButton', () => {
 
     const button = screen.getByRole('button', { name: /sign out/i });
     expect(button).toHaveClass('text-zinc-50');
-    expect(button).toHaveClass('text-xl');
+    expect(button).toHaveClass('underline');
   });
 });

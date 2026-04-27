@@ -66,7 +66,7 @@ export default function HamburgerMenuSheet({
               >
                 <a
                   href={item.href}
-                  className="mt-5 block text-2xl tracking-wider text-zinc-50 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white"
+                  className="mt-5 block text-xl tracking-wider text-zinc-50 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white"
                   onClick={() => onOpenChange(false)}
                   tabIndex={0}
                 >

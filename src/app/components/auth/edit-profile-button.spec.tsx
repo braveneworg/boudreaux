@@ -64,14 +64,14 @@ describe('EditProfileButton', () => {
 
     const icon = screen.getByTestId('user-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveAttribute('data-size', '24');
+    expect(icon).toHaveAttribute('data-size', '18');
   });
 
   it('applies the correct CSS classes', () => {
     render(<EditProfileButton />);
 
     const link = screen.getByRole('link');
-    expect(link).toHaveClass('flex', 'items-center', 'gap-2', 'text-xl');
+    expect(link).toHaveClass('flex', 'items-center', 'gap-2');
   });
 
   it('renders null on mobile devices', () => {

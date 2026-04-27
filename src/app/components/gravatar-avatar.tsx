@@ -28,7 +28,7 @@ export const GravatarAvatar = ({
           .toUpperCase();
 
   return (
-    <Avatar className={cn('size-18 border-2 border-b-zinc-50', className)}>
+    <Avatar className={cn('size-16 border border-zinc-900', className)}>
       <AvatarImage src={gravatarUrl} alt="User Avatar" />
       <AvatarFallback>{fallbackInitials}</AvatarFallback>
     </Avatar>

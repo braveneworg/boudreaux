@@ -6,12 +6,8 @@ import Link from 'next/link';
 import { LogInIcon } from 'lucide-react';
 
 const SignInLink = ({ onClick }: { onClick?: () => void }) => (
-  <Link
-    href="/signin"
-    className="flex items-center gap-2 text-xl text-zinc-50 underline"
-    onClick={onClick}
-  >
-    <LogInIcon size={24} className="mt-1" />
+  <Link href="/signin" className="flex items-center gap-2 text-zinc-50 underline" onClick={onClick}>
+    <LogInIcon size={18} className="mt-1" />
     Sign In
   </Link>
 );

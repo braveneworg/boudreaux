@@ -24,6 +24,11 @@ vi.mock('lucide-react', () => ({
       KeyIcon
     </div>
   ),
+  EditIcon: ({ size, className }: { size?: number; className?: string }) => (
+    <div data-testid="edit-icon" data-size={size} className={className}>
+      EditIcon
+    </div>
+  ),
 }));
 
 // Mock Next.js Link
@@ -88,7 +93,7 @@ describe('SignedInAs', () => {
       render(<SignedInAs />);
 
       const link = screen.getByRole('link', { name: /@testuser/i });
-      expect(link).toHaveClass('text-xl');
+      expect(link).toHaveClass('text-zinc-50');
     });
 
     it('renders the username link with @ prefix', () => {
@@ -304,7 +309,7 @@ describe('SignedInAs', () => {
       render(<SignedInAs />);
 
       const link = screen.getByRole('link');
-      expect(link).toHaveClass('text-xl');
+      expect(link).toHaveClass('underline');
       expect(link).toHaveClass('text-zinc-50');
     });
 
