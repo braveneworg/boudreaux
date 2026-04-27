@@ -29,6 +29,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
+import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
@@ -208,6 +209,7 @@ const FeaturedArtistCarousel = ({
             const coverArt = getFeaturedArtistCoverArt(featured);
             const displayName = getFeaturedArtistDisplayName(featured);
             const imageError = failedImages.has(featured.id);
+            const isSelectedArtist = selectedArtistId === featured.id;
 
             return (
               <CarouselItem
@@ -223,11 +225,14 @@ const FeaturedArtistCarousel = ({
                   <div className="absolute inset-0 overflow-hidden rounded-lg">
                     {coverArt && !imageError ? (
                       <Image
-                        src={coverArt}
+                        src={buildCdnImageVariantUrl(coverArt, 384)}
                         alt={displayName ?? ''}
                         fill
+                        unoptimized
                         className="object-cover transition-transform group-hover:scale-105"
                         sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 14vw"
+                        loading={isSelectedArtist ? 'eager' : undefined}
+                        fetchPriority={isSelectedArtist ? 'high' : 'low'}
                         onError={() => {
                           setFailedImages((prev) => new Set(prev).add(featured.id));
                         }}
@@ -344,6 +349,33 @@ const InteractiveCoverArt = ({
 }: InteractiveCoverArtProps) => {
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [displaySrc, setDisplaySrc] = useState(src);
+  const [incomingSrc, setIncomingSrc] = useState<string | null>(null);
+  const [showIncomingImage, setShowIncomingImage] = useState(false);
+  const swapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (swapTimerRef.current) {
+        clearTimeout(swapTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (src === displaySrc || src === incomingSrc) {
+      return;
+    }
+
+    if (swapTimerRef.current) {
+      clearTimeout(swapTimerRef.current);
+      swapTimerRef.current = null;
+    }
+
+    setImageError(false);
+    setShowIncomingImage(false);
+    setIncomingSrc(src);
+  }, [src, displaySrc, incomingSrc]);
 
   const handleClick = () => {
     if (isPlaying) {
@@ -375,20 +407,56 @@ const InteractiveCoverArt = ({
           <Play className="h-12 w-12 text-zinc-400" />
         </div>
       ) : (
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          className="object-cover"
-          // Container is `w-full max-w-xl` (36rem = 576px). On mobile the slot
-          // is viewport-wide; on sm+ it's capped at 576px. Telling the browser
-          // this lets it pick w640 on desktop instead of w1080/w1200.
-          sizes="(max-width: 640px) 100vw, 576px"
-          priority={priority}
-          loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : undefined}
-          onError={() => setImageError(true)}
-        />
+        <>
+          <Image
+            src={buildCdnImageVariantUrl(displaySrc, 828)}
+            alt={alt}
+            fill
+            unoptimized
+            className="object-cover"
+            // Container is `w-full max-w-xl` (36rem = 576px). On mobile the slot
+            // is viewport-wide; on sm+ it's capped at 576px. Telling the browser
+            // this lets it pick w640 on desktop instead of w1080/w1200.
+            sizes="(max-width: 640px) 100vw, 576px"
+            priority={priority}
+            loading={priority ? 'eager' : undefined}
+            fetchPriority={priority ? 'high' : undefined}
+            onError={() => setImageError(true)}
+          />
+          {incomingSrc ? (
+            <Image
+              src={buildCdnImageVariantUrl(incomingSrc, 828)}
+              alt=""
+              aria-hidden
+              fill
+              unoptimized
+              className={cn(
+                'pointer-events-none object-cover transition-opacity duration-500',
+                showIncomingImage ? 'opacity-100' : 'opacity-0'
+              )}
+              sizes="(max-width: 640px) 100vw, 576px"
+              loading="eager"
+              fetchPriority="low"
+              onLoad={() => {
+                setShowIncomingImage(true);
+
+                if (swapTimerRef.current) {
+                  clearTimeout(swapTimerRef.current);
+                }
+
+                swapTimerRef.current = setTimeout(() => {
+                  setDisplaySrc(incomingSrc);
+                  setIncomingSrc(null);
+                  setShowIncomingImage(false);
+                }, 500);
+              }}
+              onError={() => {
+                setIncomingSrc(null);
+                setShowIncomingImage(false);
+              }}
+            />
+          ) : null}
+        </>
       )}
       {/* Overlay - visible when not playing or briefly when pausing */}
       <div
