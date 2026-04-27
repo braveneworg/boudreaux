@@ -81,7 +81,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
             return {
               id: updatedUser.id,
               name: updatedUser.name,
-              email: updatedUser.email ?? '',
+              email: updatedUser.email,
               emailVerified: updatedUser.emailVerified,
               image: updatedUser.image,
               username: updatedUser.username ?? undefined,
@@ -91,7 +91,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
           return {
             id: existingUser.id,
             name: existingUser.name,
-            email: existingUser.email ?? '',
+            email: existingUser.email,
             emailVerified: existingUser.emailVerified,
             image: existingUser.image,
             username: existingUser.username ?? undefined,
@@ -112,7 +112,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       return {
         id: user.id,
         name: user.name,
-        email: user.email ?? '',
+        email: user.email,
         emailVerified: user.emailVerified,
         image: user.image,
         username: user.username ?? undefined,
@@ -129,7 +129,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       return {
         id: user.id,
         name: user.name,
-        email: user.email ?? '',
+        email: user.email,
         emailVerified: user.emailVerified,
         image: user.image,
         username: user.username ?? undefined,
@@ -146,7 +146,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       return {
         id: user.id,
         name: user.name,
-        email: user.email ?? '',
+        email: user.email,
         emailVerified: user.emailVerified,
         image: user.image,
         username: user.username ?? undefined,
@@ -164,7 +164,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       return {
         id: account.user.id,
         name: account.user.name,
-        email: account.user.email ?? '',
+        email: account.user.email,
         emailVerified: account.user.emailVerified,
         image: account.user.image,
         username: account.user.username ?? undefined,
@@ -188,7 +188,7 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
       return {
         id: user.id,
         name: user.name,
-        email: user.email ?? '',
+        email: user.email,
         emailVerified: user.emailVerified,
         image: user.image,
         username: user.username ?? undefined,

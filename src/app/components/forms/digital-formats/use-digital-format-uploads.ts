@@ -499,6 +499,7 @@ export function useDigitalFormatUploads({
             });
             confirmOk = cr.success;
           } else {
+            const fileByName = new Map(files.map((f) => [f.name, f]));
             const cr = await confirmMultiTrackUploadAction({
               releaseId: releaseId!,
               formatType,
@@ -507,10 +508,7 @@ export function useDigitalFormatUploads({
                 s3Key: f.s3Key,
                 fileName: f.fileName,
                 fileSize: f.fileSize,
-                mimeType:
-                  files[successFiles.indexOf(f)]?.type ||
-                  files.find((orig) => orig.name === f.fileName)?.type ||
-                  '',
+                mimeType: fileByName.get(f.fileName)?.type || '',
                 title: f.title,
                 duration: f.duration,
               })),
