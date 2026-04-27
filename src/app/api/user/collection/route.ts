@@ -6,9 +6,8 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-
-import { auth } from '../../../../../auth';
 
 export const dynamic = 'force-dynamic';
 

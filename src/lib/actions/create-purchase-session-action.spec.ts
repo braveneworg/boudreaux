@@ -25,7 +25,7 @@ vi.mock('@prisma/client/runtime/library', () => ({
 }));
 
 const mockAuth = vi.fn();
-vi.mock('../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 

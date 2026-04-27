@@ -6,12 +6,11 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
-
-import { auth } from '../../../../../../auth';
 
 export const dynamic = 'force-dynamic';
 

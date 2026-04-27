@@ -21,7 +21,7 @@ export const CONTACT_REASONS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-const contactSchema = z.object({
+export const contactSchema = z.object({
   reason: z
     .string()
     .min(1, { message: 'Please select a reason for contacting us' })
@@ -52,5 +52,3 @@ const contactSchema = z.object({
 });
 
 export type ContactFormSchemaType = z.infer<typeof contactSchema>;
-
-export default contactSchema;

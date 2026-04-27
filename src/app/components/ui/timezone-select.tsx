@@ -58,8 +58,10 @@ function getSupportedTimezones(): string[] {
   try {
     // Intl.supportedValuesOf is available in all modern environments and
     // returns the runtime's full, up-to-date IANA timezone database.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (Intl as any).supportedValuesOf('timeZone') as string[];
+    const intlWithSupportedValues = Intl as typeof Intl & {
+      supportedValuesOf?: (key: 'timeZone') => string[];
+    };
+    return intlWithSupportedValues.supportedValuesOf?.('timeZone') ?? POPULAR_TIMEZONES;
   } catch {
     return POPULAR_TIMEZONES;
   }

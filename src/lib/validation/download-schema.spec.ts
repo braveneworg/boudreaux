@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { describe, it, expect } from 'vitest';
 
-import downloadSchema, {
+import {
+  downloadSchema,
   DOWNLOAD_OPTIONS,
   type DownloadFormSchemaType,
 } from '@/lib/validation/download-schema';

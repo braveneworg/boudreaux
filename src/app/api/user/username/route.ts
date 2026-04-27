@@ -8,7 +8,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { withAuth } from '@/lib/decorators/with-auth';
 import { prisma } from '@/lib/prisma';
-import changeUsernameSchema from '@/lib/validation/change-username-schema';
+import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
 
 export const POST = withAuth(async (request: NextRequest, _context, session) => {
   try {

@@ -5,12 +5,11 @@
 
 import 'server-only';
 
+import { auth } from '@/auth';
 import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { stripe } from '@/lib/stripe';
 import { getStripePriceId, type SubscriberRateTier } from '@/lib/subscriber-rates';
 import { rateLimit } from '@/lib/utils/rate-limit';
-
-import { auth } from '../../../auth';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 

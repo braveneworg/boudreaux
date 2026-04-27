@@ -77,7 +77,7 @@ export const ArtistSearchInput = () => {
                 setOpen(true);
               }
             }}
-            className="selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring h-10 w-full min-w-0 rounded-md border! border-x border-zinc-950! bg-transparent px-3 py-1 pl-8 shadow-xs transition-[color,box-shadow] focus-visible:ring-[3px]"
+            className="selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-ring h-10 w-full min-w-0 rounded-md border! border-zinc-950! bg-transparent px-3 py-1 pl-8 shadow-xs transition-[color,box-shadow] focus-visible:ring-[3px]"
             aria-label="Search artists and releases"
             aria-expanded={open && showDropdown}
             aria-controls="artist-search-listbox"

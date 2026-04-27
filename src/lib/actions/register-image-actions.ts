@@ -7,9 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 

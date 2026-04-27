@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextResponse } from 'next/server';
 
-import { auth } from '../../../../auth';
+import { auth } from '@/auth';
 
 /**
  * Debug endpoint to check environment variable configuration.

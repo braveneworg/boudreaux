@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { EMAIL_REGEX } from '@/lib/utils/auth/auth-utils';
 
-const emailStepSchema = z.object({
+export const emailStepSchema = z.object({
   email: z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' }),
   termsAndConditions: z
     .boolean({ message: 'You must accept the terms and conditions' })
@@ -15,5 +15,3 @@ const emailStepSchema = z.object({
 });
 
 export type EmailStepFormSchemaType = z.infer<typeof emailStepSchema>;
-
-export default emailStepSchema;

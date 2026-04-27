@@ -14,11 +14,10 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { CollectionContent } from '@/app/components/collection-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
+import { auth } from '@/auth';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
-
-import { auth } from '../../../../auth';
 
 export default async function CollectionPage() {
   const session = await auth();

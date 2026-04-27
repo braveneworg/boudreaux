@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { auth } from '../../../../auth';
+import { auth } from '@/auth';
 
 import type { Session } from 'next-auth';
 

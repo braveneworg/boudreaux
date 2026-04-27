@@ -8,13 +8,12 @@ import { revalidatePath } from 'next/cache';
 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import changeUsernameSchema from '@/lib/validation/change-username-schema';
-
-import { auth } from '../../../auth';
+import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
 
 import type { FormState } from '../types/form-state';
 import type { AdapterUser } from 'next-auth/adapters';

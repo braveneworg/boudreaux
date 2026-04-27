@@ -7,10 +7,10 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';

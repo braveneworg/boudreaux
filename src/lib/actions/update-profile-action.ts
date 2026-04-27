@@ -7,13 +7,12 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import profileSchema from '@/lib/validation/profile-schema';
-
-import { auth } from '../../../auth';
+import { profileSchema } from '@/lib/validation/profile-schema';
 
 import type { FormState } from '../types/form-state';
 

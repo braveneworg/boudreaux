@@ -13,7 +13,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { auth } from '../../../auth';
+import { auth } from '@/auth';
 
 interface Session {
   user: {

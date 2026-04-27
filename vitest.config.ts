@@ -255,6 +255,7 @@ export default defineConfig({
       { find: '@/hooks', replacement: path.resolve(process.cwd(), './src/app/hooks') },
       { find: '@/utils', replacement: path.resolve(process.cwd(), './src/lib/utils') },
       { find: '@/test-utils', replacement: path.resolve(process.cwd(), './src/test-utils') },
+      { find: '@/auth', replacement: path.resolve(process.cwd(), './auth.ts') },
       { find: '@', replacement: path.resolve(process.cwd(), './src') },
       // Keep only next/server alias - let vi.mock handle next/navigation
       {

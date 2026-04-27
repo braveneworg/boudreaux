@@ -6,7 +6,7 @@ import { GET } from './route';
 
 const mockAuth = vi.fn();
 
-vi.mock('../../../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 

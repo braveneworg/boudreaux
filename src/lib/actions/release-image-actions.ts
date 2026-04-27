@@ -9,10 +9,10 @@ import { revalidatePath } from 'next/cache';
 
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 
+import { auth } from '@/auth';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { getS3Client } from '@/lib/utils/s3-client';
 
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 

@@ -4,13 +4,14 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
+
 import {
   deleteReleaseImageAction,
   getReleaseImagesAction,
   updateReleaseImageAction,
   reorderReleaseImagesAction,
 } from './release-image-actions';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { logSecurityEvent } from '../utils/audit-log';
 import { requireRole } from '../utils/auth/require-role';
@@ -19,7 +20,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('../../../auth');
+vi.mock('@/auth');
 vi.mock('../prisma', () => ({
   prisma: {
     image: {

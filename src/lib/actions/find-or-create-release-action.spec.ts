@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
+import { auth } from '@/auth';
+
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { auth } from '../../../auth';
 import { prisma } from '../prisma';
 import { ArtistService } from '../services/artist-service';
 import { ReleaseService } from '../services/release-service';
@@ -15,7 +16,7 @@ import type { Session } from 'next-auth';
 vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
-vi.mock('../../../auth');
+vi.mock('@/auth');
 vi.mock('../prisma', () => ({
   prisma: {
     release: {

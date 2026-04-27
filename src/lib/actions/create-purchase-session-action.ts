@@ -11,11 +11,10 @@ import { encode } from '@auth/core/jwt';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { stripe } from '@/lib/stripe';
-
-import { auth } from '../../../auth';
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 

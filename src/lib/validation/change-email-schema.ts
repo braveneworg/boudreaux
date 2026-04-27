@@ -9,7 +9,7 @@ const EMAIL_REGEX =
   /^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
 const emailRegex = z.string().regex(EMAIL_REGEX, { message: 'Invalid email address' });
-const changeEmailSchema = z
+export const changeEmailSchema = z
   .object({
     email: emailRegex,
     confirmEmail: emailRegex,
@@ -19,7 +19,5 @@ const changeEmailSchema = z
     message: 'Email addresses do not match',
     path: ['confirmEmail'],
   });
-
-export default changeEmailSchema;
 
 export type ChangeEmailFormData = z.infer<typeof changeEmailSchema>;

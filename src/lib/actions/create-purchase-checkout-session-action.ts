@@ -5,13 +5,12 @@
 
 import 'server-only';
 
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { purchaseCheckoutActionSchema } from '@/lib/validation/purchase-schema';
-
-import { auth } from '../../../auth';
 
 const limiter = rateLimit({
   interval: 60 * 1000, // 1 minute

@@ -20,7 +20,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('../../../auth', () => ({
+vi.mock('@/auth', () => ({
   auth: mockAuth,
   signOut: mockSignOut,
 }));

@@ -30,7 +30,7 @@ import { Switch } from '@/app/components/ui/switch';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import { resolveSubscriberAction } from '@/lib/actions/resolve-subscriber-action';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
-import emailStepSchema from '@/lib/validation/email-step-schema';
+import { emailStepSchema } from '@/lib/validation/email-step-schema';
 import type { EmailStepFormSchemaType } from '@/lib/validation/email-step-schema';
 
 interface EmailStepProps {

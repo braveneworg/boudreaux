@@ -2,13 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
+import { auth } from '@/auth';
+
 import { getPresignedUploadUrlsAction } from './presigned-upload-actions';
-import { auth } from '../../../auth';
 import { requireRole } from '../utils/auth/require-role';
 import { getS3BucketName } from '../utils/s3-client';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../../../auth');
+vi.mock('@/auth');
 vi.mock('../utils/auth/require-role');
 vi.mock('../utils/logger', () => ({
   loggers: {

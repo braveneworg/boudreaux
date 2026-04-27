@@ -15,7 +15,7 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { sesClient } from '@/lib/utils/ses-client';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
-import contactSchema, { CONTACT_REASONS } from '@/lib/validation/contact-schema';
+import { contactSchema, CONTACT_REASONS } from '@/lib/validation/contact-schema';
 
 import type { FormState } from '../types/form-state';
 

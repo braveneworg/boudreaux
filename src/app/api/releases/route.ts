@@ -4,12 +4,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
-
-import { auth } from '../../../../auth';
 
 import type { Prisma } from '@prisma/client';
 

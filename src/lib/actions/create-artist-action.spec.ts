@@ -4,10 +4,10 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { auth } from '@/auth';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 
 import { createArtistAction } from './create-artist-action';
-import { auth } from '../../../auth';
 import { ArtistService } from '../services/artist-service';
 import { logSecurityEvent } from '../utils/audit-log';
 import { setUnknownError } from '../utils/auth/auth-utils';
@@ -19,7 +19,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('../../../auth');
+vi.mock('@/auth');
 vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
