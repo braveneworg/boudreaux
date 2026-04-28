@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.65.0] - 2026-04-28
+
+### Added
+
+- Develop/make misc style changes (#420)\n- Develop/make misc style changes (#420)\n- Develop/make misc style changes (#420)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes and subscription rules (#419)\n- Develop/make misc style changes (#420)\n
+
 ## [4.64.0] - 2026-04-27
 
 ### Added
