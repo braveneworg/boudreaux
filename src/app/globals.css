@@ -4,8 +4,6 @@
 :root {
   --background: #ffffff;
   --foreground: #000;
-  --fake-four-orange: oklch(0.6907 0.1173 50.77);
-  --fake-four-orange-hover: oklch(0.6407 0.1173 50.77);
 }
 
 @theme {
