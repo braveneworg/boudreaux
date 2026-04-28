@@ -144,7 +144,11 @@ describe('BannerCarousel', () => {
       );
     });
 
-    it('lets Next image emit a preload for the priority banner image', () => {
+    it('does not emit a Next Image preload tag for banners', () => {
+      // The LCP banner is preloaded via the HTTP `Link` response header
+      // (configured in `next.config.ts`) — not via a Next Image `priority`
+      // preload tag. Emitting one from the component would re-fire on every
+      // carousel auto-rotation and trigger "preloaded but not used" warnings.
       document.head.querySelectorAll('link[rel="preload"][as="image"]').forEach((node) => {
         node.remove();
       });
@@ -156,9 +160,7 @@ describe('BannerCarousel', () => {
       );
 
       const preload = document.head.querySelector('link[rel="preload"][as="image"]');
-      expect(preload?.getAttribute('imagesrcset')).toContain(
-        encodeURIComponent('/media/banners/banner-99.jpg')
-      );
+      expect(preload).toBeNull();
     });
   });
 

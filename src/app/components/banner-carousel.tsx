@@ -415,14 +415,21 @@ export function BannerCarousel({
                 }}
               >
                 {shouldRenderImage && (
+                  // No `priority` here on purpose: the LCP banner is preloaded
+                  // via the HTTP `Link` response header configured in
+                  // `next.config.ts`. Re-emitting `<link rel=preload>` from
+                  // each slide as the carousel auto-rotates triggers
+                  // "preloaded but not used" warnings — the late-injected
+                  // preload arrives after `window.load` and the rendered
+                  // <img>'s srcset has usually already started fetching, so
+                  // the preloaded URL never matches what the browser uses.
                   <Image
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"
-                    priority={isCurrentSlide}
                     fetchPriority={isCurrentSlide ? 'high' : 'low'}
-                    loading={isCurrentSlide ? undefined : 'lazy'}
+                    loading={isCurrentSlide ? 'eager' : 'lazy'}
                     className="object-cover"
                   />
                 )}
