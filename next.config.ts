@@ -106,7 +106,6 @@ const config = {
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   serverExternalPackages: ['node-id3'],
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
       bodySizeLimit: '50mb',

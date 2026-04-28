@@ -1,14 +1,5 @@
 #!/bin/sh
 
-# Skip if there's nothing to push (no commits ahead of remote)
-# Use rev-list to count commits, not diff (which compares trees and misses
-# merge commits that don't change file content relative to upstream).
-commits_ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "unknown")
-if [ "$commits_ahead" = "0" ]; then
-  echo "Nothing to push, skipping pre-push checks."
-  exit 0
-fi
-
 # Prevent pushing directly to main or master branches
 branch_name=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
@@ -16,31 +7,55 @@ if [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
   exit 1
 fi
 
-# Fetch latest changes from remote to ensure we're pushing on top of the latest code
-git fetch origin main --quiet
-
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to fetch latest changes from remote. Please check your network connection and try again."
-  exit 1
+# Resolve the branch's configured upstream (e.g. "origin/feature-x"). If the
+# branch has no upstream yet (first push), skip all upstream-relative checks
+# so we don't fail with `fatal: Not a valid object name @{u}`.
+upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
+if [ -z "$upstream_ref" ]; then
+  echo "ℹ️  No upstream configured for '$branch_name' — skipping upstream sync checks."
+  has_upstream=0
+else
+  has_upstream=1
+  upstream_remote=${upstream_ref%%/*}
+  upstream_branch=${upstream_ref#*/}
 fi
 
-# If local branch is behind remote, prevent push to avoid conflicts
-if ! git merge-base --is-ancestor @{u} HEAD; then
-  echo "🚫 Your local branch is behind the remote branch."
-  git checkout main
-  git pull --rebase
-  git checkout "$branch_name"
-  git merge main --no-ff --quiet
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to pull or merge latest changes from remote. Please resolve any conflicts and try pushing again."
+if [ "$has_upstream" = "1" ]; then
+  # Skip if there's nothing to push (no commits ahead of remote).
+  # Use rev-list to count commits, not diff (which compares trees and misses
+  # merge commits that don't change file content relative to upstream).
+  commits_ahead=$(git rev-list --count "$upstream_ref"..HEAD 2>/dev/null || echo "unknown")
+  if [ "$commits_ahead" = "0" ]; then
+    echo "Nothing to push, skipping pre-push checks."
+    exit 0
+  fi
+
+  # Fetch the actual upstream so the comparison below is against the latest
+  # remote state — fetching only `origin main` would leave $upstream_ref stale
+  # and produce false "behind remote" results for non-main upstreams.
+  if ! git fetch "$upstream_remote" "$upstream_branch" --quiet; then
+    echo "❌ Failed to fetch latest changes from $upstream_ref. Please check your network connection and try again."
     exit 1
   fi
-  echo "✅ Your local branch is now up to date with remote. Please try pushing again"
-  exit 0
+
+  # If local branch is genuinely behind its upstream, prevent push.
+  if ! git merge-base --is-ancestor "$upstream_ref" HEAD; then
+    echo "🚫 Your local branch is behind '$upstream_ref'."
+    echo "   Run: git pull --rebase $upstream_remote $upstream_branch"
+    exit 1
+  fi
 fi
 
-# Check if any .ts or .tsx files changed compared to the remote tracking branch
-TS_CHANGED=$(git diff --name-only @{u}..HEAD -- '*.ts' '*.tsx' 2>/dev/null | head -1)
+# Determine the diff base for change detection: prefer upstream, otherwise
+# fall back to origin/main so first-push branches still get type-checked.
+if [ "$has_upstream" = "1" ]; then
+  diff_base="$upstream_ref"
+else
+  diff_base="origin/main"
+fi
+
+# Check if any .ts or .tsx files changed compared to the diff base
+TS_CHANGED=$(git diff --name-only "$diff_base"..HEAD -- '*.ts' '*.tsx' 2>/dev/null | head -1)
 
 if [ -z "$TS_CHANGED" ]; then
   echo "📦 No .ts or .tsx files changed — skipping type-check, lint, and tests."
