@@ -31,7 +31,7 @@ vi.mock('./signup-link', () => ({
 }));
 
 vi.mock('./signout-button', () => ({
-  SignedinToolbar: ({ className }: { className?: string }) => (
+  SignedInToolbar: ({ className }: { className?: string }) => (
     <div data-testid="signout-toolbar" className={className}>
       Signed In Toolbar
     </div>
