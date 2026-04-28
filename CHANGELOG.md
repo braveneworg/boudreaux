@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.69.0] - 2026-04-28
+
+### Added
+
+- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n- Remove experimental css optimizations (#424)\n
+
 ## [4.68.0] - 2026-04-28
 
 ### Added

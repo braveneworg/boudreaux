@@ -12,7 +12,7 @@ import { log } from '@/lib/utils/console-logger';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import SignInLink from './signin-link';
-import { SignedinToolbar } from './signout-button';
+import { SignedInToolbar } from './signout-button';
 import SignUpLink from './signup-link';
 import { MessageSpinner } from '../ui/spinners/message-spinner';
 import VerticalSeparator from '../ui/vertical-separator';
@@ -51,7 +51,7 @@ const AuthToolbar = ({
     }
 
     log(loggingPrefix, 'Rendering authenticated toolbar');
-    return <SignedinToolbar className={className} onNavigate={onNavigate} />;
+    return <SignedInToolbar className={className} onNavigate={onNavigate} />;
   }
 
   // Show sign in/up links for unauthenticated users

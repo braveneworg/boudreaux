@@ -15,7 +15,7 @@ import { GravatarAvatar } from '../gravatar-avatar';
 import VerticalSeparator from '../ui/vertical-separator';
 
 // Use in hamburger menu on mobile
-export const SignedinToolbar = ({
+export const SignedInToolbar = ({
   className,
   onNavigate,
 }: {
