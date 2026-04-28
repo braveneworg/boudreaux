@@ -96,7 +96,9 @@
   }
 
   body {
-    @apply bg-background text-foreground min-h-dvh;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    min-height: 100dvh;
   }
   input,
   textarea,
@@ -132,16 +134,26 @@
   }
   h1,
   h2 {
-    @apply font-semibold tracking-[0.2rem];
+    font-weight: 600;
+    letter-spacing: 0.2rem;
   }
   h1 {
-    @apply text-2xl text-zinc-900;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    color: var(--color-zinc-900);
   }
   h2 {
-    @apply mt-0 mb-0 pb-0 text-xl text-zinc-700;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    color: var(--color-zinc-700);
   }
   h3 {
-    @apply mt-4 mb-3 leading-snug;
+    margin-top: 1rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.375;
   }
   a {
     font-family:
@@ -154,12 +166,13 @@
       Helvetica,
       Arial,
       sans-serif;
-    @apply text-blue-700 underline-offset-4;
+    color: var(--color-blue-700);
+    text-underline-offset: 0.25rem;
     &:hover {
-      @apply underline;
+      text-decoration-line: underline;
     }
     &:visited {
-      @apply text-rebecca-purple;
+      color: var(--color-rebecca-purple);
     }
   }
 }
