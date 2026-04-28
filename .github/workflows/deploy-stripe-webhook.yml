@@ -54,9 +54,26 @@ jobs:
       - name: Copy Prisma client and engine to layer
         working-directory: stripe-webhook
         run: |
-          # Use Node's resolver so we don't rely on pnpm symlink layout.
-          PRISMA_CLIENT_DIR=$(node -e "console.log(require('path').dirname(require.resolve('@prisma/client/package.json')))")
-          PRISMA_DOT_DIR=$(node -e "console.log(require('path').dirname(require.resolve('.prisma/client/index.js')))")
+          # Resolve the real (de-symlinked) @prisma/client install dir. With pnpm
+          # this lives inside the virtual store: node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client
+          PRISMA_CLIENT_PKG=$(node -e "console.log(require.resolve('@prisma/client/package.json'))")
+          PRISMA_CLIENT_DIR=$(dirname "$(readlink -f "$PRISMA_CLIENT_PKG")")
+          # .prisma/client is generated as a sibling of @prisma/client in the same node_modules
+          PRISMA_DOT_DIR="$(dirname "$(dirname "$PRISMA_CLIENT_DIR")")/.prisma/client"
+
+          # Fallback: search the workspace for a .prisma/client directory containing
+          # the linux-arm64 query engine if the path above does not exist.
+          if [ ! -d "$PRISMA_DOT_DIR" ]; then
+            echo "Sibling .prisma/client not found at $PRISMA_DOT_DIR, falling back to find"
+            PRISMA_DOT_DIR=$(find "$(pwd)/.." -type d -path '*/.prisma/client' \
+              -exec test -e '{}/package.json' \; -print 2>/dev/null | head -n 1)
+          fi
+
+          if [ -z "$PRISMA_DOT_DIR" ] || [ ! -d "$PRISMA_DOT_DIR" ]; then
+            echo "ERROR: could not locate generated .prisma/client directory."
+            echo "Did 'prisma generate' run successfully?"
+            exit 1
+          fi
 
           echo "Resolved @prisma/client: $PRISMA_CLIENT_DIR"
           echo "Resolved .prisma/client: $PRISMA_DOT_DIR"
