@@ -10,14 +10,15 @@ import { auth } from '@/auth';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/releases/[id]/user-status
- * Returns purchase status, download info, and available formats for the authenticated user.
- * Returns 401 if not authenticated.
+ * Returns purchase status, subscriber status, download info, and available
+ * formats for the authenticated user. Returns 401 if not authenticated.
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,14 +30,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [purchase, digitalFormats] = await Promise.all([
+    const [purchase, digitalFormats, hasActiveSubscription] = await Promise.all([
       PurchaseRepository.findByUserAndRelease(userId, releaseId),
       new ReleaseDigitalFormatRepository().findAllByRelease(releaseId),
+      SubscriptionRepository.hasActiveSubscription(userId),
     ]);
     const downloadAccess = await PurchaseService.getDownloadAccessForPurchase(
       purchase,
       userId,
-      releaseId
+      releaseId,
+      hasActiveSubscription
     );
 
     const availableFormats = digitalFormats.map((f) => ({
@@ -46,6 +49,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({
       hasPurchase: purchase !== null,
+      isSubscriber: hasActiveSubscription,
       purchasedAt: purchase?.purchasedAt ?? null,
       downloadCount: downloadAccess.downloadCount,
       resetInHours: downloadAccess.resetInHours,
