@@ -209,4 +209,84 @@ describe('HamburgerMenuSheet', () => {
     const homeLink = screen.getByRole('link', { name: 'Home' });
     expect(homeLink).toHaveAttribute('tabindex', '0');
   });
+
+  it('renders the sr-only sheet description', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const description = screen.getByText('Site navigation links and account actions.');
+    expect(description).toBeInTheDocument();
+    expect(description).toHaveClass('sr-only');
+  });
+
+  it('sets an accessible aria-label on the navigation menu dialog', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-label', 'Navigation menu');
+  });
+
+  it('applies the menu-item-stagger class to each menu list item', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item) => {
+      expect(item).toHaveClass('menu-item-stagger');
+    });
+  });
+
+  it('reveals menu items with opacity/transform when isOpen is true', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const items = screen.getAllByRole('listitem');
+    items.forEach((item) => {
+      expect(item).toHaveStyle({ opacity: '1', transform: 'translateX(0)' });
+    });
+  });
+
+  it('staggers menu item transition delays based on item index', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]).toHaveStyle({
+      transition: 'opacity 0.3s ease 0s, transform 0.3s ease 0s',
+    });
+    expect(items[1]).toHaveStyle({
+      transition: 'opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s',
+    });
+    expect(items[2]).toHaveStyle({
+      transition: 'opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s',
+    });
+  });
+
+  it('applies focus-visible styling to menu links', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const homeLink = screen.getByRole('link', { name: 'Home' });
+    expect(homeLink).toHaveClass('focus:outline-none');
+    expect(homeLink).toHaveClass('focus-visible:ring-2');
+    expect(homeLink).toHaveClass('focus-visible:ring-white');
+  });
 });

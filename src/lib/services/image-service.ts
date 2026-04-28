@@ -62,8 +62,7 @@ async function registerImages({
   ownerId: string;
   images: RegisterImageInput[];
 }): Promise<RegisteredImage[]> {
-  const where =
-    ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
+  const where = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
   const existing = await prisma.image.findMany({
     where,
     select: { id: true },
@@ -72,8 +71,7 @@ async function registerImages({
 
   const results: RegisteredImage[] = [];
   for (const image of images) {
-    const ownerData =
-      ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
+    const ownerData = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
     const dbImage = await prisma.image.create({
       data: {
         src: image.cdnUrl,

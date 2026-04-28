@@ -27,6 +27,7 @@ vi.mock('next/dynamic', () => ({
       releaseId,
       releaseTitle,
       hasPurchase,
+      isSubscriber,
       purchasedAt,
       downloadCount,
       resetInHours,
@@ -38,6 +39,7 @@ vi.mock('next/dynamic', () => ({
       releaseId: string;
       releaseTitle: string;
       hasPurchase: boolean;
+      isSubscriber: boolean;
       purchasedAt: Date | null;
       downloadCount: number;
       resetInHours: number | null;
@@ -51,6 +53,7 @@ vi.mock('next/dynamic', () => ({
         data-release-id={releaseId}
         data-release-title={releaseTitle}
         data-has-purchase={String(hasPurchase)}
+        data-is-subscriber={String(isSubscriber)}
         data-purchased-at={purchasedAt ? purchasedAt.toISOString() : ''}
         data-download-count={String(downloadCount)}
         data-reset-in-hours={resetInHours === null ? '' : String(resetInHours)}
@@ -130,10 +133,32 @@ describe('DeferredDownloadDialog', () => {
 
     const dialog = screen.getByTestId('download-dialog');
     expect(dialog).toHaveAttribute('data-has-purchase', 'false');
+    expect(dialog).toHaveAttribute('data-is-subscriber', 'false');
     expect(dialog).toHaveAttribute('data-purchased-at', '');
     expect(dialog).toHaveAttribute('data-download-count', '0');
     expect(dialog).toHaveAttribute('data-reset-in-hours', '');
     expect(dialog).toHaveAttribute('data-format-count', '0');
+  });
+
+  it('should forward isSubscriber from userStatus to DownloadDialog', async () => {
+    const user = userEvent.setup();
+    mockUseReleaseUserStatusQuery.mockReturnValue({
+      data: {
+        hasPurchase: false,
+        isSubscriber: true,
+        purchasedAt: null,
+        downloadCount: 0,
+        resetInHours: null,
+        availableFormats: [{ formatType: 'FLAC', fileName: 'album.flac.zip' }],
+      },
+    });
+
+    render(<DeferredDownloadDialog {...defaultProps} />);
+    await user.click(screen.getByTestId('download-trigger'));
+
+    const dialog = screen.getByTestId('download-dialog');
+    expect(dialog).toHaveAttribute('data-is-subscriber', 'true');
+    expect(dialog).toHaveAttribute('data-has-purchase', 'false');
   });
 
   it('should pass purchase data from userStatus to DownloadDialog', async () => {

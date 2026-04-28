@@ -5,6 +5,7 @@ import 'server-only';
 
 import { DOWNLOAD_RESET_HOURS, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { computeResetInHours } from '@/lib/utils/download-reset';
 
 export interface DownloadAccess {
@@ -14,6 +15,8 @@ export interface DownloadAccess {
   lastDownloadedAt: Date | null;
   /** Hours remaining until the download limit resets. null when no reset is pending. */
   resetInHours: number | null;
+  /** True when access is granted via an active subscription rather than a per-release purchase. */
+  isSubscriber?: boolean;
 }
 
 type PurchaseRecord = Awaited<ReturnType<typeof PurchaseRepository.findByUserAndRelease>>;
@@ -47,20 +50,28 @@ export class PurchaseService {
    * passed since the last download, the counter is automatically reset to 0.
    */
   static async getDownloadAccess(userId: string, releaseId: string): Promise<DownloadAccess> {
-    const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
-    return this.getDownloadAccessForPurchase(purchase, userId, releaseId);
+    const [purchase, hasActiveSubscription] = await Promise.all([
+      PurchaseRepository.findByUserAndRelease(userId, releaseId),
+      SubscriptionRepository.hasActiveSubscription(userId),
+    ]);
+    return this.getDownloadAccessForPurchase(purchase, userId, releaseId, hasActiveSubscription);
   }
 
   /**
    * Determines whether the user is permitted to download the release
    * using an already-fetched purchase record.
+   *
+   * When `hasActiveSubscription` is true, the user is granted access
+   * regardless of whether a per-release purchase exists. The per-release
+   * download cap (MAX_RELEASE_DOWNLOAD_COUNT) still applies.
    */
   static async getDownloadAccessForPurchase(
     purchase: PurchaseRecord,
     userId: string,
-    releaseId: string
+    releaseId: string,
+    hasActiveSubscription = false
   ): Promise<DownloadAccess> {
-    if (!purchase) {
+    if (!purchase && !hasActiveSubscription) {
       return {
         allowed: false,
         reason: 'no_purchase',
@@ -69,6 +80,8 @@ export class PurchaseService {
         resetInHours: null,
       };
     }
+
+    const isSubscriber = !purchase && hasActiveSubscription;
 
     const downloadRecord = await PurchaseRepository.getDownloadRecord(userId, releaseId);
     const downloadCount = downloadRecord?.downloadCount ?? 0;
@@ -84,6 +97,7 @@ export class PurchaseService {
           downloadCount: 0,
           lastDownloadedAt,
           resetInHours: null,
+          isSubscriber,
         };
       }
       return {
@@ -92,10 +106,18 @@ export class PurchaseService {
         downloadCount,
         lastDownloadedAt,
         resetInHours: computeResetInHours(lastDownloadedAt),
+        isSubscriber,
       };
     }
 
-    return { allowed: true, reason: null, downloadCount, lastDownloadedAt, resetInHours: null };
+    return {
+      allowed: true,
+      reason: null,
+      downloadCount,
+      lastDownloadedAt,
+      resetInHours: null,
+      isSubscriber,
+    };
   }
 
   /**

@@ -213,4 +213,36 @@ describe('SubscriptionRepository', () => {
       });
     });
   });
+
+  describe('hasActiveSubscription', () => {
+    it('should query for the user id with subscriptionStatus in [active, trialing]', async () => {
+      mockFindFirst.mockResolvedValue({ id: 'user-1' });
+
+      await SubscriptionRepository.hasActiveSubscription('user-1');
+
+      expect(mockFindFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'user-1',
+          subscriptionStatus: { in: ['active', 'trialing'] },
+        },
+        select: { id: true },
+      });
+    });
+
+    it('should return true when an active subscriber row exists', async () => {
+      mockFindFirst.mockResolvedValue({ id: 'user-1' });
+
+      const result = await SubscriptionRepository.hasActiveSubscription('user-1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when no matching user is found', async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      const result = await SubscriptionRepository.hasActiveSubscription('user-1');
+
+      expect(result).toBe(false);
+    });
+  });
 });

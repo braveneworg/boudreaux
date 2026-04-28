@@ -91,11 +91,12 @@ export async function handleCheckoutSessionCompleted(
     }
   }
 
-  // Reset the flag so the email is sent even if this is a re-subscription
-  await getPrisma().user.updateMany({
-    where: { email: customerEmail },
-    data: { confirmationEmailSentAt: null },
-  });
+  // Send the subscription confirmation email. The function is idempotent via
+  // the `confirmationEmailSentAt` flag on the User record, which prevents the
+  // same email from being sent twice when both `checkout.session.completed`
+  // and `customer.subscription.updated` fire for the same new subscription.
+  // Re-subscriptions are handled by `handleSubscriptionDeleted`, which clears
+  // the flag on cancellation so the next signup gets a fresh email.
   await sendSubscriptionConfirmationEmail(customerEmail, tier, interval);
 }
 

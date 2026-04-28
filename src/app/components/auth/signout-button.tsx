@@ -36,9 +36,9 @@ const SignedinToolbar = ({
         />
         <div className="flex flex-col gap-1">
           <SignedInAs onClick={onNavigate} />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <SignOutButton onNavigate={onNavigate} />
-            {!isMobile && <VerticalSeparator className="mx-2 -mt-1 h-4! w-0.5! self-stretch" />}
+            {!isMobile && <VerticalSeparator className="mx-2 h-4! w-0.5! self-stretch" />}
             <EditProfileButton />
             {isAdmin && <AdminLink onClick={onNavigate} />}
           </div>

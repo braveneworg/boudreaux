@@ -15,6 +15,7 @@ const mockFindByUserAndRelease = vi.hoisted(() => vi.fn());
 const mockGetDownloadRecord = vi.hoisted(() => vi.fn());
 const mockUpsertDownloadCount = vi.hoisted(() => vi.fn());
 const mockResetDownloadCount = vi.hoisted(() => vi.fn());
+const mockHasActiveSubscription = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
@@ -25,10 +26,17 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
+vi.mock('@/lib/repositories/subscription-repository', () => ({
+  SubscriptionRepository: {
+    hasActiveSubscription: mockHasActiveSubscription,
+  },
+}));
+
 describe('PurchaseService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-04T12:00:00Z'));
+    mockHasActiveSubscription.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -88,6 +96,7 @@ describe('PurchaseService', () => {
         downloadCount: 5,
         lastDownloadedAt: twoHoursAgo,
         resetInHours: 4,
+        isSubscriber: false,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
     });
@@ -110,6 +119,7 @@ describe('PurchaseService', () => {
         downloadCount: 0,
         lastDownloadedAt: sevenHoursAgo,
         resetInHours: null,
+        isSubscriber: false,
       });
       expect(mockResetDownloadCount).toHaveBeenCalledWith('user-123', 'release-abc');
     });
@@ -130,6 +140,7 @@ describe('PurchaseService', () => {
         downloadCount: 3,
         lastDownloadedAt: anHourAgo,
         resetInHours: null,
+        isSubscriber: false,
       });
     });
 
@@ -145,6 +156,7 @@ describe('PurchaseService', () => {
         downloadCount: 0,
         lastDownloadedAt: null,
         resetInHours: null,
+        isSubscriber: false,
       });
     });
 
@@ -163,6 +175,7 @@ describe('PurchaseService', () => {
         downloadCount: 5,
         lastDownloadedAt: null,
         resetInHours: null,
+        isSubscriber: false,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
     });
@@ -184,8 +197,47 @@ describe('PurchaseService', () => {
         downloadCount: 5,
         lastDownloadedAt: exactlySixHoursAgo,
         resetInHours: null,
+        isSubscriber: false,
       });
       expect(mockResetDownloadCount).not.toHaveBeenCalled();
+    });
+
+    it('should grant subscriber access when no purchase exists but user has an active subscription', async () => {
+      mockFindByUserAndRelease.mockResolvedValue(null);
+      mockHasActiveSubscription.mockResolvedValue(true);
+      mockGetDownloadRecord.mockResolvedValue(null);
+
+      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+
+      expect(result).toEqual({
+        allowed: true,
+        reason: null,
+        downloadCount: 0,
+        lastDownloadedAt: null,
+        resetInHours: null,
+        isSubscriber: true,
+      });
+    });
+
+    it('should still enforce per-release download cap for subscribers', async () => {
+      mockFindByUserAndRelease.mockResolvedValue(null);
+      mockHasActiveSubscription.mockResolvedValue(true);
+      const twoHoursAgo = new Date('2026-04-04T10:00:00Z');
+      mockGetDownloadRecord.mockResolvedValue({
+        downloadCount: 5,
+        lastDownloadedAt: twoHoursAgo,
+      });
+
+      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+
+      expect(result).toEqual({
+        allowed: false,
+        reason: 'download_limit_reached',
+        downloadCount: 5,
+        lastDownloadedAt: twoHoursAgo,
+        resetInHours: 4,
+        isSubscriber: true,
+      });
     });
   });
 

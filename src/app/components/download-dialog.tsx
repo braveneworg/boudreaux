@@ -73,6 +73,8 @@ interface DownloadDialogProps {
   releaseTitle?: string;
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
+  /** True when the authenticated user holds an active label subscription. Subscribers are auto-advanced past the purchase/PWYW step. */
+  isSubscriber?: boolean;
   purchasedAt?: Date | null;
   downloadCount?: number;
   /** Hours until the per-release download limit resets. null when no reset is pending. */
@@ -89,6 +91,7 @@ export const DownloadDialog = ({
   releaseTitle = '',
   suggestedPrice = null,
   hasPurchase = false,
+  isSubscriber = false,
   purchasedAt = null,
   downloadCount = 0,
   resetInHours = null,
@@ -108,12 +111,21 @@ export const DownloadDialog = ({
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
 
-  // Auto-advance authenticated purchasers directly to format selection
+  // Subscribers fall back to the session-derived status when the user-status
+  // query hasn't resolved yet (or in render paths that don't pass the prop),
+  // so subscribers always skip directly to format selection.
+  const sessionSubscriptionStatus = session?.user?.subscriptionStatus;
+  const isActiveSubscriber =
+    isSubscriber ||
+    sessionSubscriptionStatus === 'active' ||
+    sessionSubscriptionStatus === 'trialing';
+
+  // Auto-advance authenticated purchasers and active subscribers directly to format selection
   useEffect(() => {
-    if (open && hasPurchase && session?.user && step === 'download') {
+    if (open && (hasPurchase || isActiveSubscriber) && session?.user && step === 'download') {
       setStep('format-select');
     }
-  }, [open, hasPurchase, session, step]);
+  }, [open, hasPurchase, isActiveSubscriber, session, step]);
 
   const form = useForm<DownloadFormSchemaType>({
     resolver: zodResolver(downloadSchema),
@@ -430,46 +442,53 @@ export const DownloadDialog = ({
               </Form>
             )}
 
-            {/* Subscribe CTA */}
-            <div className="border-t pt-4">
-              <p className="text-zinc-950-foreground mb-3 text-sm">
-                Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
-              </p>
-              <Button
-                type="button"
-                className="w-full bg-green-700! text-white hover:bg-green-800 focus-visible:ring-green-700 data-[state=open]:bg-green-800"
-                variant="outline"
-                onClick={handleSubscribe}
-              >
-                <UserPlus2Icon className="size-4" />
-                Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
-              </Button>
-            </div>
+            {/* Subscribe CTA — hidden for active subscribers */}
+            {!isActiveSubscriber && (
+              <div className="border-t pt-4">
+                <p className="text-zinc-950-foreground mb-3 text-sm">
+                  Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
+                </p>
+                <Button
+                  type="button"
+                  className="w-full bg-green-700 text-white hover:bg-green-800 focus-visible:ring-green-700 data-[state=open]:bg-green-800"
+                  onClick={handleSubscribe}
+                >
+                  <UserPlus2Icon className="size-4" />
+                  Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
+                </Button>
+              </div>
+            )}
           </>
         )}
 
         {step === 'format-select' && (
           <>
             <DialogHeader>
-              <DialogTitle>Download Again</DialogTitle>
+              <DialogTitle>{hasPurchase ? 'Download Again' : 'Download'}</DialogTitle>
               <DialogDescription>
                 Select formats for <strong>{releaseTitle}</strong>
               </DialogDescription>
             </DialogHeader>
 
-            <p className="text-sm text-zinc-900">
-              You already purchased this on{' '}
-              <strong>
-                {purchasedAt
-                  ? new Date(purchasedAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })
-                  : 'a previous date'}
-              </strong>
-              .
-            </p>
+            {hasPurchase ? (
+              <p className="text-sm text-zinc-900">
+                You already purchased this on{' '}
+                <strong>
+                  {purchasedAt
+                    ? new Date(purchasedAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })
+                    : 'a previous date'}
+                </strong>
+                .
+              </p>
+            ) : isActiveSubscriber ? (
+              <p className="text-sm text-zinc-900">
+                Included with your <strong>Fake Four Inc.</strong> subscription.
+              </p>
+            ) : null}
 
             {downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT ? (
               <>

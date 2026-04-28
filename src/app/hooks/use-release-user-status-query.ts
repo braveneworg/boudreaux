@@ -9,6 +9,7 @@ import { queryKeys } from '@/lib/query-keys';
 
 interface ReleaseUserStatusResponse {
   hasPurchase: boolean;
+  isSubscriber: boolean;
   purchasedAt: string | null;
   downloadCount: number;
   resetInHours: number | null;

@@ -23,7 +23,14 @@ vi.mock('next/navigation', () => ({
 
 const mockUseSession = vi.fn<
   () => {
-    data: { user?: { email?: string; stripeCustomerId?: string; id?: string } } | null;
+    data: {
+      user?: {
+        email?: string;
+        stripeCustomerId?: string;
+        id?: string;
+        subscriptionStatus?: string;
+      };
+    } | null;
     status: string;
   }
 >();
@@ -1124,6 +1131,173 @@ describe('DownloadDialog — hasPurchase button variants', () => {
       expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
     });
     expect(screen.getByText('No digital formats available for download.')).toBeInTheDocument();
+  });
+});
+
+describe('DownloadDialog — active subscriber flow', () => {
+  const defaultProps = {
+    artistName: 'Test Artist',
+    premiumPrice: 8,
+    releaseId: 'release-123',
+  };
+
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'sub@example.com', id: 'user-sub' } },
+      status: 'authenticated',
+    });
+  });
+
+  it('should auto-advance an active subscriber to format-select via the isSubscriber prop', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        isSubscriber
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Included with your/i, { selector: 'p, p *' }) ??
+        screen.getByText(/Fake Four Inc\./i)
+    ).toBeInTheDocument();
+    // Subscribers do not see the "Subscribe" CTA on the format-select step
+    expect(screen.queryByRole('link', { name: /^Subscribe/i })).not.toBeInTheDocument();
+  });
+
+  it('should auto-advance via session.subscriptionStatus="active" when isSubscriber prop is omitted', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { email: 'sub@example.com', id: 'user-sub', subscriptionStatus: 'active' },
+      },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('format-bundle-download')).toBeInTheDocument();
+  });
+
+  it('should auto-advance via session.subscriptionStatus="trialing" when isSubscriber prop is omitted', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { email: 'sub@example.com', id: 'user-sub', subscriptionStatus: 'trialing' },
+      },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download' })).toBeInTheDocument();
+    });
+  });
+
+  it('should NOT auto-advance when subscriptionStatus is canceled', async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: { email: 'sub@example.com', id: 'user-sub', subscriptionStatus: 'canceled' },
+      },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    // Should still be on the initial download step (radio options visible),
+    // and the FormatBundleDownload (only rendered on format-select) should NOT be present.
+    await waitFor(() => {
+      expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByTestId('format-bundle-download')).not.toBeInTheDocument();
+  });
+
+  it('should prefer "Download Again" heading and purchase copy when hasPurchase is also true', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        hasPurchase
+        isSubscriber
+        purchasedAt={new Date('2026-01-15T00:00:00.000Z')}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/already purchased this/i)).toBeInTheDocument();
+  });
+
+  it('should still enforce the per-release download limit for subscribers', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        isSubscriber
+        downloadCount={5}
+        resetInHours={3}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album-flac.zip' }]}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Download limit reached/ })).toBeDisabled();
+    });
+    expect(screen.getByText(/resets in 3 hours/i)).toBeInTheDocument();
   });
 });
 

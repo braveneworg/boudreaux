@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '@/lib/constants/subscription-status';
 import { prisma } from '@/lib/prisma';
 
 import type Stripe from 'stripe';
@@ -107,6 +108,23 @@ export class SubscriptionRepository {
       where: { email },
       select: SUBSCRIPTION_SELECT,
     });
+  }
+
+  /**
+   * Returns true when the user currently holds an active subscription
+   * (status `active` or `trialing`). Used to gate label-wide download
+   * privileges granted to subscribers.
+   */
+  static async hasActiveSubscription(userId: string): Promise<boolean> {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        subscriptionStatus: { in: [...ACTIVE_SUBSCRIPTION_STATUSES] },
+      },
+      select: { id: true },
+    });
+
+    return user !== null;
   }
 
   /**
