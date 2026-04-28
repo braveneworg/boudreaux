@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import SignedinToolbar from './signout-button';
+import { SignedinToolbar } from './signout-button';
 
 // Mock next-auth
 const mockUseSession = vi.fn();
@@ -33,7 +33,7 @@ vi.mock('./edit-profile-button', () => ({
 }));
 
 vi.mock('./admin-link', () => ({
-  default: ({ onClick }: { onClick?: () => void }) => (
+  AdminLink: ({ onClick }: { onClick?: () => void }) => (
     <button data-testid="admin-link" onClick={onClick}>
       Admin Link
     </button>

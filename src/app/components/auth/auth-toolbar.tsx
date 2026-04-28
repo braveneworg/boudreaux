@@ -12,7 +12,7 @@ import { log } from '@/lib/utils/console-logger';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import SignInLink from './signin-link';
-import SignedinToolbar from './signout-button';
+import { SignedinToolbar } from './signout-button';
 import SignUpLink from './signup-link';
 import { MessageSpinner } from '../ui/spinners/message-spinner';
 import VerticalSeparator from '../ui/vertical-separator';

@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 import { ShieldUser as ShieldUserIcon } from 'lucide-react';
 
-const AdminLink = ({ onClick }: { onClick?: () => void }) => {
+export const AdminLink = ({ onClick }: { onClick?: () => void }) => {
   return (
     <Link
       className="-mt-2.5 ml-1 flex items-center gap-1.5 text-sm text-zinc-50 underline"
@@ -17,5 +17,3 @@ const AdminLink = ({ onClick }: { onClick?: () => void }) => {
     </Link>
   );
 };
-
-export default AdminLink;

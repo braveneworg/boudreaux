@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import AdminLink from './admin-link';
+import { AdminLink } from './admin-link';
 
 vi.mock('lucide-react', () => ({
   ShieldUser: ({ className }: { className?: string }) => (
