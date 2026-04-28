@@ -7,7 +7,7 @@ import { useIsMobile } from '@/app/hooks/use-mobile';
 import { CONSTANTS } from '@/lib/constants';
 import { cn } from '@/lib/utils/tailwind-utils';
 
-import AdminLink from './admin-link';
+import { AdminLink } from './admin-link';
 import EditProfileButton from './edit-profile-button';
 import { SignOutButton } from './sign-out-button';
 import SignedInAs from './signed-in-as';
@@ -15,7 +15,7 @@ import { GravatarAvatar } from '../gravatar-avatar';
 import VerticalSeparator from '../ui/vertical-separator';
 
 // Use in hamburger menu on mobile
-const SignedinToolbar = ({
+export const SignedInToolbar = ({
   className,
   onNavigate,
 }: {
@@ -47,5 +47,3 @@ const SignedinToolbar = ({
     </div>
   );
 };
-
-export default SignedinToolbar;

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import SignedinToolbar from './signout-button';
+import { SignedInToolbar } from './signout-button';
 
 // Mock next-auth
 const mockUseSession = vi.fn();
@@ -33,7 +33,7 @@ vi.mock('./edit-profile-button', () => ({
 }));
 
 vi.mock('./admin-link', () => ({
-  default: ({ onClick }: { onClick?: () => void }) => (
+  AdminLink: ({ onClick }: { onClick?: () => void }) => (
     <button data-testid="admin-link" onClick={onClick}>
       Admin Link
     </button>
@@ -92,7 +92,7 @@ vi.mock('@/lib/utils/tailwind-utils', () => ({
   },
 }));
 
-describe('SignedinToolbar', () => {
+describe('SignedInToolbar', () => {
   beforeEach(() => {
     mockUseSession.mockReturnValue({
       data: {
@@ -111,7 +111,7 @@ describe('SignedinToolbar', () => {
   describe('rendering', () => {
     it('renders all child components on desktop', () => {
       mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       expect(screen.getByTestId('gravatar-avatar')).toBeInTheDocument();
       expect(screen.getByTestId('signed-in-as')).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('SignedinToolbar', () => {
     });
 
     it('renders gravatar avatar with session data', () => {
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       const avatar = screen.getByTestId('gravatar-avatar');
       expect(avatar).toHaveAttribute('data-email', 'test@example.com');
@@ -130,20 +130,20 @@ describe('SignedinToolbar', () => {
 
     it('renders vertical separator on desktop', () => {
       mockUseIsMobile.mockReturnValue(false);
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       expect(screen.getByTestId('vertical-separator')).toBeInTheDocument();
     });
 
     it('hides vertical separator on mobile', () => {
       mockUseIsMobile.mockReturnValue(true);
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       expect(screen.queryByTestId('vertical-separator')).not.toBeInTheDocument();
     });
 
     it('applies custom className', () => {
-      const { container } = render(<SignedinToolbar className="custom-class" />);
+      const { container } = render(<SignedInToolbar className="custom-class" />);
 
       const wrapper = container.querySelector('.custom-class');
       expect(wrapper).toBeInTheDocument();
@@ -163,13 +163,13 @@ describe('SignedinToolbar', () => {
         },
         status: 'authenticated',
       });
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       expect(screen.getByTestId('admin-link')).toBeInTheDocument();
     });
 
     it('hides admin link when user is not admin', () => {
-      render(<SignedinToolbar />);
+      render(<SignedInToolbar />);
 
       expect(screen.queryByTestId('admin-link')).not.toBeInTheDocument();
     });
@@ -178,7 +178,7 @@ describe('SignedinToolbar', () => {
   describe('navigation callbacks', () => {
     it('passes onNavigate to SignOutButton', () => {
       const onNavigate = vi.fn();
-      render(<SignedinToolbar onNavigate={onNavigate} />);
+      render(<SignedInToolbar onNavigate={onNavigate} />);
 
       screen.getByTestId('sign-out-button').click();
       expect(onNavigate).toHaveBeenCalledOnce();
@@ -186,7 +186,7 @@ describe('SignedinToolbar', () => {
 
     it('passes onNavigate to SignedInAs', () => {
       const onNavigate = vi.fn();
-      render(<SignedinToolbar onNavigate={onNavigate} />);
+      render(<SignedInToolbar onNavigate={onNavigate} />);
 
       screen.getByTestId('signed-in-as-action').click();
       expect(onNavigate).toHaveBeenCalledOnce();
@@ -205,7 +205,7 @@ describe('SignedinToolbar', () => {
         },
         status: 'authenticated',
       });
-      render(<SignedinToolbar onNavigate={onNavigate} />);
+      render(<SignedInToolbar onNavigate={onNavigate} />);
 
       screen.getByTestId('admin-link').click();
       expect(onNavigate).toHaveBeenCalledOnce();
