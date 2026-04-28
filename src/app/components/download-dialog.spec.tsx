@@ -23,7 +23,14 @@ vi.mock('next/navigation', () => ({
 
 const mockUseSession = vi.fn<
   () => {
-    data: { user?: { email?: string; stripeCustomerId?: string; id?: string } } | null;
+    data: {
+      user?: {
+        email?: string;
+        stripeCustomerId?: string;
+        id?: string;
+        subscriptionStatus?: string;
+      };
+    } | null;
     status: string;
   }
 >();
