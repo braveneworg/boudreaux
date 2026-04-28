@@ -411,27 +411,27 @@ const InteractiveCoverArt = ({
       ) : (
         <>
           <Image
-            src={buildCdnImageVariantUrl(displaySrc, 828)}
+            src={displaySrc}
             alt={alt}
             fill
-            unoptimized
             className="object-cover"
-            // Container is `w-full max-w-xl` (36rem = 576px). On mobile the slot
-            // is viewport-wide; on sm+ it's capped at 576px. Telling the browser
-            // this lets it pick w640 on desktop instead of w1080/w1200.
+            // Container is `w-full max-w-xl` (576px CSS max). The global
+            // `imageLoader` (configured via `images.loaderFile`) maps each
+            // srcset width to our pre-generated CDN `_w{width}` variants, so
+            // we keep `next/image`'s srcset/preload behavior while serving
+            // direct CDN URLs. NOTE: do not pass `unoptimized` here — it
+            // disables srcset generation entirely, forcing a single width.
             sizes="(max-width: 640px) 100vw, 576px"
             priority={priority}
-            loading={priority ? 'eager' : undefined}
             fetchPriority={priority ? 'high' : undefined}
             onError={() => setImageError(true)}
           />
           {incomingSrc ? (
             <Image
-              src={buildCdnImageVariantUrl(incomingSrc, 828)}
+              src={incomingSrc}
               alt=""
               aria-hidden
               fill
-              unoptimized
               className={cn(
                 'pointer-events-none object-cover transition-opacity duration-500',
                 showIncomingImage ? 'opacity-100' : 'opacity-0'

@@ -206,7 +206,11 @@ async function invalidateCloudFront(
   }
 
   log(`Invalidating CloudFront cache for ${keys.length} file(s)...`, 'info');
-  const paths = keys.map((k) => `/${k}`);
+  // CloudFront rejects unencoded special characters (spaces, parens, etc.)
+  // in invalidation paths with: "Your request contains one or more invalid
+  // invalidation paths." Encode each segment so keys with spaces or other
+  // reserved chars become valid (e.g. `/foo bar.webp` → `/foo%20bar.webp`).
+  const paths = keys.map((k) => `/${k.split('/').map(encodeURIComponent).join('/')}`);
   await cloudfront.send(
     new CreateInvalidationCommand({
       DistributionId: distributionId,

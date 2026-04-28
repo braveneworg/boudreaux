@@ -56,9 +56,13 @@ export default async function Home() {
     !firstCoverArt.startsWith('blob:');
 
   if (isPreloadable && firstCoverArt) {
-    // `sizes="(max-width: 640px) 100vw, 576px"` matches InteractiveCoverArt.
-    // Below the banner but frequently the LCP on mobile; preloading trims
-    // hundreds of ms off the first paint of the artist cover.
+    // The InteractiveCoverArt <Image> below uses the global custom loader
+    // (`images.loaderFile`) which generates a srcset of `_w{width}` CDN
+    // variants over IMAGE_VARIANT_DEVICE_SIZES. Mirror the exact same
+    // srcset + sizes here so the preload matches whichever width the
+    // browser ultimately picks for the rendered <img>. The player is
+    // dynamic-imported with `ssr: false`, so `<Image priority>` can't
+    // auto-emit this preload during SSR — we have to do it manually.
     const imageSrcSet = IMAGE_VARIANT_DEVICE_SIZES.map(
       (w) => `${buildCdnImageVariantUrl(firstCoverArt, w)} ${w}w`
     ).join(', ');
