@@ -18,6 +18,15 @@ const CDN_DOMAIN =
 const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 
 /**
+ * Matches an existing `_w{number}` suffix at the end of a filename's base
+ * (extension already stripped), e.g. `cover_w1200`. We strip this before
+ * re-applying a new width so stored URLs that already encode a variant width
+ * don't double-suffix into non-existent paths like `cover_w1200_w828.webp`
+ * (which 403 on the CDN).
+ */
+const EXISTING_WIDTH_SUFFIX_REGEX = /_w\d+$/;
+
+/**
  * Raster extensions that get transcoded to `.webp` by the variant generator.
  * Must stay in sync with `WEBP_TRANSCODE_EXTENSIONS` in
  * `src/lib/constants/image-variants.ts`.
@@ -39,8 +48,12 @@ function appendWidthSuffix(pathname: string, width: number): string {
     return pathname;
   }
 
+  // Strip any existing `_w{number}` already present in the filename so we
+  // don't produce `cover_w1200_w828.webp` (which doesn't exist on S3).
+  const baseWithoutWidth = base.replace(EXISTING_WIDTH_SUFFIX_REGEX, '');
+
   const outputExt = WEBP_TRANSCODE_EXTENSIONS.has(extLower) ? '.webp' : ext;
-  return `${base}_w${width}${outputExt}`;
+  return `${baseWithoutWidth}_w${width}${outputExt}`;
 }
 
 /**
