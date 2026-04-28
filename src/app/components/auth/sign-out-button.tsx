@@ -19,7 +19,7 @@ const SignOutButton = ({ onNavigate }: SignOutButtonProps) => {
 
   return (
     <Button
-      className="ml-2 text-zinc-50 underline"
+      className="mt-0 ml-2 pt-0 text-zinc-50 underline"
       variant="link:narrow"
       onClick={async () => {
         onNavigate?.();

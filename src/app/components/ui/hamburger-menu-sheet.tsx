@@ -37,10 +37,10 @@ export default function HamburgerMenuSheet({
 }: HamburgerMenuSheetProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <div className="relative -top-0.5 size-9">{children}</div>
+      <div className="size-9">{children}</div>
       <SheetContent
         side="right"
-        className="pointer-events-auto fixed inset-x-0 top-12 z-200 h-[calc(100vh-48px)] w-screen border-0 bg-zinc-950/90 bg-cover bg-center bg-no-repeat px-8 pt-0 backdrop-blur before:inset-0 sm:max-w-none md:top-36 md:h-[calc(100vh-144px)]"
+        className="pointer-events-auto fixed inset-x-0 top-14 z-200 h-[calc(100vh-48px)] w-screen border-0 bg-zinc-950/90 bg-cover bg-center bg-no-repeat px-8 pt-0 backdrop-blur before:inset-0 sm:max-w-none md:top-36 md:h-[calc(100vh-144px)]"
         style={{
           backgroundImage: "url('/media/particles-6.svg')",
         }}
@@ -66,7 +66,7 @@ export default function HamburgerMenuSheet({
               >
                 <a
                   href={item.href}
-                  className="mt-5 block text-xl tracking-wider text-zinc-50 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white"
+                  className="mt-3.5 block text-xl tracking-wider text-zinc-50 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white"
                   onClick={() => onOpenChange(false)}
                   tabIndex={0}
                 >

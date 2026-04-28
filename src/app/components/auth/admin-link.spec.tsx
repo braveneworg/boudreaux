@@ -43,11 +43,11 @@ describe('AdminLink', () => {
       expect(link).toHaveClass('flex', 'items-center');
     });
 
-    it('should have gap-2 between icon and text', () => {
+    it('should have gap-1.5 between icon and text', () => {
       render(<AdminLink />);
 
       const link = screen.getByRole('link', { name: /admin/i });
-      expect(link).toHaveClass('gap-2');
+      expect(link).toHaveClass('gap-1.5');
     });
 
     it('should have text-zinc-50 class', () => {
@@ -57,11 +57,11 @@ describe('AdminLink', () => {
       expect(link).toHaveClass('text-zinc-50');
     });
 
-    it('should have underline-offset-4 class', () => {
+    it('should have underline class', () => {
       render(<AdminLink />);
 
       const link = screen.getByRole('link', { name: /admin/i });
-      expect(link).toHaveClass('underline-offset-4');
+      expect(link).toHaveClass('underline');
     });
   });
 
@@ -147,7 +147,7 @@ describe('AdminLink', () => {
 
       const secondLink = screen.getByRole('link', { name: /admin/i });
       expect(secondLink).toHaveAttribute('href', '/admin');
-      expect(secondLink).toHaveClass('flex', 'items-center', 'gap-2');
+      expect(secondLink).toHaveClass('flex', 'items-center', 'gap-1.5');
     });
 
     it('should not break when rendered in different contexts', () => {
