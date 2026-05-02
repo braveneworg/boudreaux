@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.71.0] - 2026-05-02
+
+### Added
+
+- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n- Develop/use cloudfront signed urls and cache (#426)\n
+
 ## [4.70.0] - 2026-04-28
 
 ### Added
