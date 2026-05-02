@@ -12,9 +12,11 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
 
 import { FeaturedArtistsPlayer } from './featured-artists-player';
 
-// Mock buildCdnUrl to return a predictable CDN URL
+// Mock buildCdnUrl + resolveStreamUrl to return predictable URLs
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (s3Key: string) => `https://cdn.example.com/${s3Key}`,
+  resolveStreamUrl: (file: { s3Key?: string | null; streamUrl?: string | null }) =>
+    file.streamUrl ?? (file.s3Key ? `https://cdn.example.com/${file.s3Key}` : null),
 }));
 
 // Mock the MediaPlayer component

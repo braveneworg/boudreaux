@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import ReactDOM from 'react-dom';
 
-import Home from './page';
+import Home, { dynamic as homeDynamic } from './page';
 
 vi.mock('server-only', () => ({}));
 
@@ -67,6 +67,12 @@ describe('Home Page', () => {
     vi.restoreAllMocks();
   });
 
+  it('opts the home route into dynamic rendering on every request', () => {
+    // Required so CloudFront-signed streamUrls aren't baked into a
+    // statically-generated HTML response.
+    expect(homeDynamic).toBe('force-dynamic');
+  });
+
   it('should render page structure', async () => {
     const HomeComponent = await Home();
     render(HomeComponent);
@@ -98,7 +104,10 @@ describe('Home Page', () => {
     expect(screen.getByTestId('home-content')).toBeInTheDocument();
   });
 
-  it('preloads first featured artist CDN cover art when available', async () => {
+  it('does not emit a manual ReactDOM.preload for the featured-artist cover art', async () => {
+    // The FeaturedArtistsPlayer is dynamic-imported with `ssr: false`, so the
+    // <img> consumer renders well after window.load and a manual preload would
+    // trigger Chrome's "preloaded but not used" warning.
     const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
 
     mockGetQueryData.mockReturnValue({
@@ -111,64 +120,6 @@ describe('Home Page', () => {
           coverArt: 'https://cdn.example.com/releases/cover.jpg',
           artists: [],
           release: { coverArt: 'https://cdn.example.com/releases/cover.jpg' },
-        },
-      ],
-    });
-
-    const HomeComponent = await Home();
-    render(HomeComponent);
-
-    expect(preloadSpy).toHaveBeenCalledTimes(1);
-    expect(preloadSpy).toHaveBeenCalledWith(
-      'https://cdn.example.com/releases/cover.jpg',
-      expect.objectContaining({
-        as: 'image',
-        fetchPriority: 'high',
-        imageSizes: '(max-width: 640px) 100vw, 576px',
-      })
-    );
-
-    expect(preloadSpy.mock.calls[0]?.[1]).toEqual(
-      expect.objectContaining({
-        imageSrcSet: expect.stringContaining('828w'),
-      })
-    );
-  });
-
-  it('does not preload when first cover art is a data URL', async () => {
-    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
-
-    mockGetQueryData.mockReturnValue({
-      featuredArtists: [
-        {
-          id: 'featured-1',
-          isActive: true,
-          sortOrder: 1,
-          displayName: 'Jane Doe',
-          artists: [],
-          release: { coverArt: 'data:image/jpeg;base64,abc123' },
-        },
-      ],
-    });
-
-    const HomeComponent = await Home();
-    render(HomeComponent);
-
-    expect(preloadSpy).not.toHaveBeenCalled();
-  });
-
-  it('does not preload when first cover art is a blob URL', async () => {
-    const preloadSpy = vi.spyOn(ReactDOM, 'preload').mockImplementation(() => undefined);
-
-    mockGetQueryData.mockReturnValue({
-      featuredArtists: [
-        {
-          id: 'featured-1',
-          isActive: true,
-          sortOrder: 1,
-          displayName: 'Jane Doe',
-          artists: [],
-          release: { coverArt: 'blob:https://example.com/1234' },
         },
       ],
     });

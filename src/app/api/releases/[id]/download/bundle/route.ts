@@ -2,13 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { PassThrough, type Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
 
-import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
 import { getToken } from 'next-auth/jwt';
@@ -23,7 +22,12 @@ import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digit
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
-import { generatePresignedDownloadUrl, getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import {
+  generatePresignedDownloadUrl,
+  getS3BucketName,
+  getS3Client,
+  verifyS3ObjectExists,
+} from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
 
@@ -54,6 +58,97 @@ function safeArchiveEntryName(fileName: string): string {
   const base = path.basename(fileName).replace(/[\\/]/g, '_');
   const sanitized = base.replace(/[^A-Za-z0-9._\- ]/g, '_').replace(/\.{2,}/g, '_');
   return sanitized.length > 0 ? sanitized : 'file';
+}
+
+/**
+ * How many S3 object bodies to download concurrently into memory ahead of
+ * the archiver. archiver appends entries serially, and `archive.append`
+ * with a Readable holds a single S3 socket open for the duration of that
+ * entry — meaning header-only prefetching saves only ~TTFB per file, not
+ * actual transfer time. By buffering bodies fully in parallel and feeding
+ * archiver in-memory Buffers, the multipart S3 uploader can drain at full
+ * throughput while N S3 GETs saturate downstream bandwidth concurrently.
+ *
+ * Memory cost: up to `depth` × file size held in RAM at peak. For typical
+ * lossless releases (~50 MB/track) this caps around 400 MB which is
+ * comfortable for serverful runtimes.
+ */
+const S3_PREFETCH_DEPTH = 8;
+
+/** Multipart upload tuning — large parts + deep queue keeps the egress pipe full. */
+const UPLOAD_PART_SIZE_BYTES = 16 * 1024 * 1024;
+const UPLOAD_QUEUE_SIZE = 8;
+
+/**
+ * Download an S3 object's body fully into a Buffer. Resolves once the
+ * entire body has been streamed to memory.
+ */
+async function fetchObjectBuffer(
+  s3Client: ReturnType<typeof getS3Client>,
+  bucket: string,
+  key: string
+): Promise<Buffer | null> {
+  const response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const body = response.Body;
+  if (!body) {
+    return null;
+  }
+  // AWS SDK v3 in Node returns an IncomingMessage with a smithy-injected
+  // `transformToByteArray` helper; tests pass a plain `Readable`. Support both.
+  const maybeTransform = (body as { transformToByteArray?: () => Promise<Uint8Array> })
+    .transformToByteArray;
+  if (typeof maybeTransform === 'function') {
+    const bytes = await maybeTransform.call(body);
+    return Buffer.from(bytes);
+  }
+  if (body instanceof Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+  return null;
+}
+
+/**
+ * Issue an initial window of `depth` concurrent body downloads up front,
+ * return the in-flight promise array, and let the caller append more via
+ * `inFlight.push(...)` as it consumes them. Yields a true sliding-window
+ * pipeline where downstream bandwidth is saturated by N parallel GETs
+ * while archiver consumes already-buffered bytes from earlier slots.
+ */
+/**
+ * Issue a single prefetch and attach a passive rejection handler so that
+ * if the consumer abandons the promise (e.g. another fetch fails first and
+ * the surrounding try/catch exits the consume loop), Node does not log it
+ * as an unhandled rejection. Awaiting the returned promise still observes
+ * the original rejection.
+ */
+function issuePrefetch(
+  s3Client: ReturnType<typeof getS3Client>,
+  bucket: string,
+  key: string
+): Promise<Buffer | null> {
+  const promise = fetchObjectBuffer(s3Client, bucket, key);
+  // Suppress "unhandled rejection" — the consumer's `await` (or the outer
+  // try/catch) is the authoritative handler.
+  promise.catch(() => {});
+  return promise;
+}
+
+function startBufferPrefetch(
+  s3Client: ReturnType<typeof getS3Client>,
+  bucket: string,
+  keys: readonly string[],
+  depth: number
+): Array<Promise<Buffer | null>> {
+  const inFlight: Array<Promise<Buffer | null>> = [];
+  const initial = Math.min(depth, keys.length);
+  for (let i = 0; i < initial; i++) {
+    inFlight.push(issuePrefetch(s3Client, bucket, keys[i]));
+  }
+  return inFlight;
 }
 
 /**
@@ -222,6 +317,22 @@ export async function GET(
       );
     }
 
+    // Deterministic cache key keyed by release + sorted format list. Bundle
+    // ZIPs are immutable for a given (release, formats) tuple — the
+    // underlying digital format files are content-addressed by S3 key — so
+    // we can safely reuse a previously-built ZIP across users. The S3
+    // lifecycle rule `tmp-bundles-expire-after-1-day` (see
+    // `scripts/s3-apply-lifecycle.ts`) bounds the cache TTL to 24 hours,
+    // which also bounds the staleness window if a digital format is
+    // re-uploaded for a release. The download URL itself is signed
+    // per-request and the response Content-Disposition is set via
+    // `ResponseContentDisposition` at signing time, so the cached object's
+    // upload-time filename does not leak into the user's download.
+    const sortedFormatKey = [...requestedFormats].sort().join('-');
+    const cachedZipKey = `tmp/bundles/cache/${releaseId}/${sortedFormatKey}.zip`;
+    const safeTitleForKey = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
+    const cachedZipFileName = `${safeTitleForKey}.zip`;
+
     // SSE streaming path: create a single combined ZIP containing all
     // requested formats as subfolders, streaming progress events to the
     // client as each format is appended. A single presigned download URL
@@ -231,8 +342,8 @@ export async function GET(
     if (respondJson) {
       const s3ClientForZip = getS3Client();
       const bucketForZip = getS3BucketName();
-      const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
-      const zipFileName = `${safeTitle}.zip`;
+      const zipFileName = cachedZipFileName;
+      const tempZipKey = cachedZipKey;
       let combinedArchive: ReturnType<typeof archiver> | null = null;
       let combinedPassThrough: PassThrough | null = null;
       let combinedUpload: Upload | null = null;
@@ -260,6 +371,59 @@ export async function GET(
           };
 
           try {
+            // Cache hit fast path — a previously-built ZIP for this exact
+            // (release, formats) tuple already exists in S3. Skip archiving
+            // entirely, emit synthetic progress events so the UI advances
+            // through `done` → `uploading` → `ready` immediately, and sign
+            // a fresh download URL.
+            if (await verifyS3ObjectExists(tempZipKey)) {
+              for (const { formatType } of resolvedFormats) {
+                const label = FORMAT_LABELS[formatType] ?? formatType;
+                send('progress', { formatType, label, status: 'zipping' });
+                completedFormats.push(formatType);
+                send('progress', { formatType, label, status: 'done' });
+              }
+              send('progress', { status: 'uploading' });
+
+              const downloadUrl = await generatePresignedDownloadUrl(
+                tempZipKey,
+                zipFileName,
+                TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
+              );
+              send('ready', { downloadUrl, fileName: zipFileName });
+
+              try {
+                await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+
+                const downloadEventRepo = new DownloadEventRepository();
+                const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+                const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+                await Promise.all(
+                  completedFormats.map((formatType) =>
+                    downloadEventRepo.logDownloadEvent({
+                      userId,
+                      releaseId,
+                      formatType,
+                      success: true,
+                      ipAddress,
+                      userAgent,
+                    })
+                  )
+                );
+              } catch (analyticsError) {
+                console.error('Failed to record bundle download analytics (cache hit)', {
+                  completedFormats,
+                  analyticsError,
+                  releaseId,
+                });
+              }
+
+              send('complete', {});
+              controller.close();
+              return;
+            }
+
             const archiveForSse = archiver('zip', { zlib: { level: 0 } });
             const passThroughForSse = new PassThrough();
             combinedArchive = archiveForSse;
@@ -270,7 +434,6 @@ export async function GET(
             // Start the S3 upload immediately so it consumes the archive
             // stream concurrently — otherwise the PassThrough buffer fills,
             // backpressure stalls the archiver, and the entry event never fires.
-            const tempZipKey = `tmp/bundles/${userId}/${randomUUID()}.zip`;
             combinedUpload = new Upload({
               client: s3ClientForZip,
               params: {
@@ -280,8 +443,8 @@ export async function GET(
                 ContentType: 'application/zip',
                 ContentDisposition: buildContentDisposition(zipFileName),
               },
-              partSize: 10 * 1024 * 1024,
-              queueSize: 4,
+              partSize: UPLOAD_PART_SIZE_BYTES,
+              queueSize: UPLOAD_QUEUE_SIZE,
               leavePartsOnError: false,
             });
 
@@ -297,22 +460,36 @@ export async function GET(
               send('progress', { formatType, label, status: 'zipping' });
 
               try {
-                for (const file of files) {
-                  const s3Response = await s3ClientForZip.send(
-                    new GetObjectCommand({ Bucket: bucketForZip, Key: file.s3Key })
-                  );
-                  if (s3Response.Body) {
-                    const entryName = useSubfolders
-                      ? `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`
-                      : safeArchiveEntryName(file.fileName);
-                    await new Promise<void>((resolve, reject) => {
-                      archiveForSse.once('entry', () => resolve());
-                      archiveForSse.once('error', reject);
-                      archiveForSse.append(s3Response.Body as Readable, {
-                        name: entryName,
-                      });
-                    });
+                // Download bodies into memory in parallel so archiver only
+                // does memory→memory copies and the multipart uploader can
+                // drain at full throughput.
+                const keys = files.map((f) => f.s3Key);
+                const inFlight = startBufferPrefetch(
+                  s3ClientForZip,
+                  bucketForZip,
+                  keys,
+                  S3_PREFETCH_DEPTH
+                );
+
+                for (let i = 0; i < files.length; i++) {
+                  const file = files[i];
+                  const buffer = await inFlight[i];
+                  // Eagerly enqueue the next download so a body is
+                  // already in memory by the time we need it.
+                  const nextIndex = i + S3_PREFETCH_DEPTH;
+                  if (nextIndex < files.length) {
+                    inFlight.push(issuePrefetch(s3ClientForZip, bucketForZip, keys[nextIndex]));
                   }
+
+                  if (buffer === null) continue;
+                  const entryName = useSubfolders
+                    ? `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`
+                    : safeArchiveEntryName(file.fileName);
+                  await new Promise<void>((resolve, reject) => {
+                    archiveForSse.once('entry', () => resolve());
+                    archiveForSse.once('error', reject);
+                    archiveForSse.append(buffer, { name: entryName });
+                  });
                 }
 
                 completedFormats.push(formatType);
@@ -392,9 +569,56 @@ export async function GET(
       });
     }
 
-    // Step 7: Create ZIP archive and upload to S3 as a temporary object
+    // Step 7: Create ZIP archive and upload to S3 as a temporary object.
+    // Cache hit fast path — reuse a previously-built ZIP for this exact
+    // (release, formats) tuple. The cache TTL is bounded by the
+    // `tmp-bundles-expire-after-1-day` S3 lifecycle rule.
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
+    const tempS3Key = cachedZipKey;
+    const zipFileName = cachedZipFileName;
+
+    if (await verifyS3ObjectExists(tempS3Key)) {
+      const downloadUrl = await generatePresignedDownloadUrl(
+        tempS3Key,
+        zipFileName,
+        TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
+      );
+
+      try {
+        await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+
+        const downloadEventRepo = new DownloadEventRepository();
+        const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
+        const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+        await Promise.all(
+          resolvedFormats.map(({ formatType }) =>
+            downloadEventRepo.logDownloadEvent({
+              userId,
+              releaseId,
+              formatType,
+              success: true,
+              ipAddress,
+              userAgent,
+            })
+          )
+        );
+      } catch (analyticsError) {
+        console.error('Failed to record bundle download analytics (cache hit, 302 path)', {
+          analyticsError,
+          releaseId,
+        });
+      }
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: downloadUrl,
+          ...NO_STORE_HEADERS,
+        },
+      });
+    }
 
     const archive = archiver('zip', { zlib: { level: 0 } }); // store mode (no compression)
     const passThrough = new PassThrough();
@@ -403,13 +627,8 @@ export async function GET(
     // Abort the S3 upload if archiver encounters an error
     archive.on('error', (err) => passThrough.destroy(err));
 
-    // Sanitize filename for Content-Disposition
-    const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
-    const zipFileName = `${safeTitle}.zip`;
-
     // Start the S3 upload immediately so it consumes the archive stream
     // concurrently — otherwise the PassThrough buffer fills and deadlocks.
-    const tempS3Key = `tmp/bundles/${userId}/${randomUUID()}.zip`;
     const upload = new Upload({
       client: s3Client,
       params: {
@@ -419,8 +638,8 @@ export async function GET(
         ContentType: 'application/zip',
         ContentDisposition: buildContentDisposition(zipFileName),
       },
-      partSize: 10 * 1024 * 1024, // 10 MB
-      queueSize: 4,
+      partSize: UPLOAD_PART_SIZE_BYTES,
+      queueSize: UPLOAD_QUEUE_SIZE,
       leavePartsOnError: false,
     });
 
@@ -441,18 +660,26 @@ export async function GET(
     });
 
     try {
-      for (const fileEntry of fileEntries) {
-        const s3Response = await s3Client.send(
-          new GetObjectCommand({ Bucket: bucketName, Key: fileEntry.s3Key })
-        );
-        const body = s3Response.Body;
-        if (body) {
-          await new Promise<void>((resolve, reject) => {
-            archive.once('entry', () => resolve());
-            archive.once('error', reject);
-            archive.append(body as Readable, { name: fileEntry.archivePath });
-          });
+      // Download bodies into memory in parallel so archiver only does
+      // memory→memory copies and the multipart uploader drains at full
+      // throughput.
+      const keys = fileEntries.map((e) => e.s3Key);
+      const inFlight = startBufferPrefetch(s3Client, bucketName, keys, S3_PREFETCH_DEPTH);
+
+      for (let i = 0; i < fileEntries.length; i++) {
+        const fileEntry = fileEntries[i];
+        const buffer = await inFlight[i];
+        const nextIndex = i + S3_PREFETCH_DEPTH;
+        if (nextIndex < fileEntries.length) {
+          inFlight.push(issuePrefetch(s3Client, bucketName, keys[nextIndex]));
         }
+
+        if (buffer === null) continue;
+        await new Promise<void>((resolve, reject) => {
+          archive.once('entry', () => resolve());
+          archive.once('error', reject);
+          archive.append(buffer, { name: fileEntry.archivePath });
+        });
       }
 
       // Finalize the archive (no more entries) — starts emitting data
@@ -507,20 +734,15 @@ export async function GET(
         },
       });
     } catch (postUploadError) {
-      try {
-        await s3Client.send(
-          new DeleteObjectCommand({
-            Bucket: bucketName,
-            Key: tempS3Key,
-          })
-        );
-      } catch (cleanupError) {
-        console.error('Failed to clean up temporary bundle after post-upload error', {
-          tempS3Key,
-          originalError: postUploadError,
-          cleanupError,
-        });
-      }
+      // Intentionally do NOT delete the uploaded ZIP here — it lives at the
+      // shared cache key (`tmp/bundles/cache/...`) and remains valid for
+      // subsequent requests. The 24-hour S3 lifecycle rule on the
+      // `tmp/bundles/` prefix still bounds its lifetime, and a future
+      // request will simply reuse it via the cache hit fast path.
+      console.error('Bundle post-upload error (cached ZIP retained)', {
+        tempS3Key,
+        postUploadError,
+      });
       throw postUploadError;
     }
   } catch (error) {

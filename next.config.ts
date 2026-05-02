@@ -22,14 +22,19 @@ function buildLcpBannerUrl(filename: string, width: number): string {
 }
 
 const HOME_LCP_FILENAME = BANNER_SLOTS[0]?.filename;
-const HOME_LCP_WIDTH = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
+// Pin to a single width that matches what the Suspense fallback `<img>` in
+// `app/loading.tsx` uses as its `src`. We intentionally do NOT emit
+// `imagesrcset`/`imagesizes` here: with responsive preloads, Chrome's preload
+// picker can deselect the variant the rendered <img> ends up using once
+// hydration replaces the loading-fallback <img> with the BannerCarousel's
+// <Image>, surfacing as "preloaded but not used" warnings. A single fixed-
+// width preload deterministically matches the loading fallback `src` for
+// every viewport. The BannerCarousel <Image> still serves a fully responsive
+// srcset post-hydration; this preload is just the first-paint LCP.
+const HOME_LCP_WIDTH = 750;
 const HOME_LCP_LINK_HEADER =
   HOME_LCP_FILENAME && HOME_LCP_WIDTH
-    ? `<${buildLcpBannerUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; ` +
-      `imagesrcset="${IMAGE_VARIANT_DEVICE_SIZES.map(
-        (w) => `${buildLcpBannerUrl(HOME_LCP_FILENAME, w)} ${w}w`
-      ).join(', ')}"; ` +
-      `imagesizes="100vw"; fetchpriority="high"`
+    ? `<${buildLcpBannerUrl(HOME_LCP_FILENAME, HOME_LCP_WIDTH)}>; rel=preload; as=image; fetchpriority="high"`
     : null;
 
 const config = {

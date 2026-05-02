@@ -10,6 +10,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
+import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
@@ -57,7 +58,11 @@ export const GET = withRateLimit<{ id: string }>(
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(serializeRelease(result.data), {
+    const responseData = withTracks
+      ? attachStreamUrls(serializeRelease(result.data))
+      : serializeRelease(result.data);
+
+    return NextResponse.json(responseData, {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {

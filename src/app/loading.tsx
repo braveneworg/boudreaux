@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
-import { buildBannerPreloadSrcSet, buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
+import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 
 export default function HomeLoading() {
   return (
@@ -10,16 +10,19 @@ export default function HomeLoading() {
       {/* Notification strip skeleton — always reserves 2.5rem to match banner-carousel */}
       <div className="bg-muted w-full animate-pulse" style={{ minHeight: '2.5rem' }} />
       {/* Real first banner image — rendered in the Suspense fallback so it
-          paints in the first HTML flush. The preload in layout.tsx ensures
-          the image is already cached; this <img> triggers an immediate paint
-          instead of waiting for React hydration + carousel mount. */}
+          paints in the first HTML flush. The HTTP `Link` preload header
+          configured in `next.config.ts` warms the browser cache for the same
+          fixed-width URL. We intentionally use a single-width `src` (no
+          `srcSet`/`sizes`) so this <img> deterministically matches the
+          preloaded resource on every viewport — using a responsive srcset
+          here would let Chrome's picker select a different variant and
+          surface "preloaded but not used" warnings when this fallback is
+          unmounted by BannerCarousel hydration. */}
       <div className="bg-muted relative w-full" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img
           data-testid="lcp-banner-img"
           src={buildBannerPreloadUrl(BANNER_SLOTS[0].filename, 750)}
-          srcSet={buildBannerPreloadSrcSet(BANNER_SLOTS[0].filename)}
-          sizes="100vw"
           alt=""
           fetchPriority="high"
           decoding="async"

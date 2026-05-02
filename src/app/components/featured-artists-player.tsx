@@ -9,7 +9,7 @@ import { Download } from 'lucide-react';
 
 import { MediaPlayer, type MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/media-models';
-import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
@@ -81,11 +81,11 @@ export const FeaturedArtistsPlayer = ({ featuredArtists }: FeaturedArtistsPlayer
     return sortedFiles[0] ?? null;
   }, [currentFileId, sortedFiles, selectedArtist?.featuredTrackNumber]);
 
-  /** CDN URL for the current file's audio */
+  /** CDN URL for the current file's audio (signed CloudFront URL when configured). */
   const audioSrc = useMemo<string | null>(() => {
-    if (!currentFile?.s3Key) return null;
-    return buildCdnUrl(currentFile.s3Key);
-  }, [currentFile?.s3Key]);
+    if (!currentFile) return null;
+    return resolveStreamUrl(currentFile);
+  }, [currentFile]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);

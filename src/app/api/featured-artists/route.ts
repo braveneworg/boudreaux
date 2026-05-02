@@ -9,6 +9,7 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
@@ -58,7 +59,7 @@ export const GET = withRateLimit(
 
       return NextResponse.json(
         {
-          featuredArtists: serializeForResponse(result.data),
+          featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
           count: result.data.length,
         },
         {

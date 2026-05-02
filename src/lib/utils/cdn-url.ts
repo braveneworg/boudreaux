@@ -31,3 +31,26 @@ export function buildCdnUrl(s3Key: string): string {
 
   return `https://${cdnBase}/${s3Key}`;
 }
+
+/**
+ * Resolve a playable URL for a digital-format file.
+ *
+ * Prefers a server-attached `streamUrl` (CloudFront signed, see
+ * `attach-stream-urls.ts`) so the request passes the CloudFront trusted
+ * key-group check on the `releases/*\/digital-formats/*` behaviour.
+ *
+ * Falls back to an unsigned `buildCdnUrl(s3Key)` when no signed URL is
+ * available — preserves dev/E2E behaviour and any cached payloads that
+ * predate the signing wiring.
+ *
+ * @returns A URL suitable for `<audio src>` / `<video src>`, or `null`
+ *   when the file has neither a `streamUrl` nor an `s3Key`.
+ */
+export function resolveStreamUrl(file: {
+  s3Key?: string | null;
+  streamUrl?: string | null;
+}): string | null {
+  if (file.streamUrl) return file.streamUrl;
+  if (file.s3Key) return buildCdnUrl(file.s3Key);
+  return null;
+}

@@ -12,6 +12,8 @@ import { ArtistPlayer } from './artist-player';
 
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
+  resolveStreamUrl: (file: { s3Key?: string | null; streamUrl?: string | null }) =>
+    file.streamUrl ?? (file.s3Key ? `https://cdn.example.com/${file.s3Key}` : null),
 }));
 
 // Stub DeferredDownloadDialog to mirror the real component's CLS-safe shape:
