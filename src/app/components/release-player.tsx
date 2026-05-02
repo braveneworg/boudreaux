@@ -19,7 +19,7 @@ import { MediaActionLink } from '@/app/components/media-action-link';
 import { MediaPlayer } from '@/app/components/ui/audio/media-player';
 import type { MediaPlayerControls } from '@/app/components/ui/audio/media-player';
 import type { PublishedReleaseDetail } from '@/lib/types/media-models';
-import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 
@@ -69,9 +69,9 @@ export const ReleasePlayer = ({
   const hasFiles = files.length > 0;
 
   const audioSrc = useMemo<string | null>(() => {
-    if (!currentFile?.s3Key) return null;
-    return buildCdnUrl(currentFile.s3Key);
-  }, [currentFile?.s3Key]);
+    if (!currentFile) return null;
+    return resolveStreamUrl(currentFile);
+  }, [currentFile]);
 
   const primaryArtist = release.artistReleases[0]?.artist;
 

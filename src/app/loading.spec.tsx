@@ -4,7 +4,6 @@
 import { render, screen } from '@testing-library/react';
 
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
-import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
 
 import HomeLoading from './loading';
 
@@ -15,10 +14,9 @@ describe('HomeLoading', () => {
 
     expect(img).toHaveAttribute('fetchpriority', 'high');
     expect(img).toHaveAttribute('decoding', 'async');
-    expect(img).toHaveAttribute('sizes', '100vw');
   });
 
-  it('builds the LCP image src from the first banner slot', () => {
+  it('uses a single fixed-width src that matches the HTTP Link preload', () => {
     render(<HomeLoading />);
     const img = screen.getByTestId('lcp-banner-img');
     const expectedFilenameFragment = encodeURIComponent(BANNER_SLOTS[0].filename).replace(
@@ -26,13 +24,13 @@ describe('HomeLoading', () => {
       ''
     );
 
-    const srcset = img.getAttribute('srcset');
-    const firstSize = IMAGE_VARIANT_DEVICE_SIZES[0];
-    const lastSize = IMAGE_VARIANT_DEVICE_SIZES[IMAGE_VARIANT_DEVICE_SIZES.length - 1];
-
     expect(img.getAttribute('src')).toContain(expectedFilenameFragment);
-    expect(srcset).toContain(`${firstSize}w`);
-    expect(srcset).toContain(`${lastSize}w`);
+    expect(img.getAttribute('src')).toContain('_w750.webp');
+    // Intentionally no srcset/sizes — see comment in `loading.tsx` and
+    // `next.config.ts` for why a responsive preload caused Chrome's preload
+    // picker to mismatch the unmounted Suspense fallback <img>.
+    expect(img.getAttribute('srcset')).toBeNull();
+    expect(img.getAttribute('sizes')).toBeNull();
   });
 
   it('reserves banner space using the shared aspect-ratio constant', () => {

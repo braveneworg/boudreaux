@@ -1,4 +1,39 @@
 #!/bin/sh
+# Husky invokes this hook with `sh -e`, so any non-zero command aborts.
+# Disable -e for the diagnostic prelude; the rest of the script handles
+# its own exit codes explicitly.
+set +e
+
+# Log file for diagnostics (failures during `git push` can swallow hook stderr).
+log_file="${TMPDIR:-/tmp}/husky-pre-push.log"
+: > "$log_file"
+
+# Drain pre-push stdin (git sends "<local ref> <local sha> <remote ref>
+# <remote sha>" lines) so child processes don't inherit it.
+if [ ! -t 0 ]; then
+  cat > /dev/null 2>&1 || true
+fi
+exec </dev/null
+
+# When invoked by `git push`, git exports GIT_* env vars that can confuse
+# child git commands (fetch, rev-parse, diff). Unset them so internal git
+# calls behave like a normal CLI invocation.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY 2>/dev/null
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH 2>/dev/null
+unset GIT_INTERNAL_GETTEXT_SH_SCHEME GIT_REFLOG_ACTION GIT_EDITOR 2>/dev/null
+
+# Redirect all output to the log file; tail it to /dev/tty when available
+# so output is visible during an interactive push.
+exec >>"$log_file" 2>&1
+if [ -e /dev/tty ]; then
+  tail -f "$log_file" >/dev/tty 2>/dev/null &
+  tail_pid=$!
+  # shellcheck disable=SC2064
+  trap "kill $tail_pid 2>/dev/null; exit \$?" EXIT INT TERM
+fi
+
+echo ""
+echo "===== pre-push hook started at $(date) ====="
 
 # Prevent pushing directly to main or master branches
 branch_name=$(git rev-parse --abbrev-ref HEAD)
@@ -8,51 +43,58 @@ if [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
 fi
 
 # Resolve the branch's configured upstream (e.g. "origin/feature-x"). If the
-# branch has no upstream yet (first push), skip all upstream-relative checks
-# so we don't fail with `fatal: Not a valid object name @{u}`.
+# branch has no upstream yet (first push), fall back to comparing against
+# origin/main so first-push branches still get the same safety checks.
 upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
 if [ -z "$upstream_ref" ]; then
-  echo "ℹ️  No upstream configured for '$branch_name' — skipping upstream sync checks."
+  echo "ℹ️  No upstream configured for '$branch_name' — comparing against 'origin/main'."
   has_upstream=0
+  sync_ref="origin/main"
+  sync_remote="origin"
+  sync_branch="main"
 else
   has_upstream=1
-  upstream_remote=${upstream_ref%%/*}
-  upstream_branch=${upstream_ref#*/}
+  sync_ref="$upstream_ref"
+  sync_remote=${upstream_ref%%/*}
+  sync_branch=${upstream_ref#*/}
 fi
 
-if [ "$has_upstream" = "1" ]; then
-  # Skip if there's nothing to push (no commits ahead of remote)
-  # Use rev-list to count commits, not diff (which compares trees and misses
-  # merge commits that don't change file content relative to upstream).
-  commits_ahead=$(git rev-list --count "$upstream_ref"..HEAD 2>/dev/null || echo "unknown")
-  if [ "$commits_ahead" = "0" ]; then
-    echo "Nothing to push, skipping pre-push checks."
-    exit 0
-  fi
-
-  # Fetch the actual upstream so the comparison below is against the latest
-  # remote state — fetching only `origin main` would leave $upstream_ref stale
-  # and produce false "behind remote" results for non-main upstreams.
-  if ! git fetch "$upstream_remote" "$upstream_branch" --quiet; then
-    echo "❌ Failed to fetch latest changes from $upstream_ref. Please check your network connection and try again."
-    exit 1
-  fi
-
-  # If local branch is genuinely behind its upstream, prevent push.
-  if ! git merge-base --is-ancestor "$upstream_ref" HEAD; then
-    echo "🚫 Your local branch is behind '$upstream_ref'."
-    echo "   Run: git pull --rebase $upstream_remote $upstream_branch"
-    exit 1
-  fi
+# Skip if there's nothing to push (no commits ahead of the sync ref).
+# Use rev-list to count commits, not diff (which compares trees and misses
+# merge commits that don't change file content relative to the ref).
+commits_ahead=$(git rev-list --count "$sync_ref"..HEAD 2>/dev/null || echo "unknown")
+if [ "$commits_ahead" = "0" ]; then
+  echo "Nothing to push, skipping pre-push checks."
+  exit 0
 fi
 
-# Determine the diff base for change detection: prefer upstream, otherwise
-# fall back to origin/main so first-push branches still get type-checked.
-if [ "$has_upstream" = "1" ]; then
-  diff_base="$upstream_ref"
-else
-  diff_base="origin/main"
+# Fetch the sync ref so the comparison below is against the latest remote
+# state. For first-push branches this fetches origin/main; for tracked
+# branches it fetches the actual upstream (avoids false "behind" results
+# for non-main upstreams).
+if ! git fetch "$sync_remote" "$sync_branch" --quiet; then
+  echo "❌ Failed to fetch latest changes from $sync_ref. Please check your network connection and try again."
+  exit 1
 fi
+
+# If local branch is genuinely behind the sync ref, prevent push and tell
+# the user to merge it in first. For new branches this means merging
+# origin/main; for tracked branches it means rebasing onto the upstream.
+if ! git merge-base --is-ancestor "$sync_ref" HEAD; then
+  if [ "$has_upstream" = "1" ]; then
+    echo "🚫 Your local branch is behind '$sync_ref'."
+    echo "   Run: git pull --rebase $sync_remote $sync_branch"
+  else
+    echo "🚫 Your branch '$branch_name' is missing commits from '$sync_ref'."
+    echo "   Merge the latest main in before pushing:"
+    echo "   git merge $sync_ref"
+    echo "   (or: git pull --rebase $sync_remote $sync_branch)"
+  fi
+  exit 1
+fi
+
+# Diff base for change detection is the same ref we just synced against.
+diff_base="$sync_ref"
 
 # Check if any .ts or .tsx files changed compared to the diff base
 TS_CHANGED=$(git diff --name-only "$diff_base"..HEAD -- '*.ts' '*.tsx' 2>/dev/null | head -1)
@@ -107,3 +149,5 @@ fi
 
 echo "✅ All tests passed"
 echo "🚀 Pushing changes..."
+
+exit 0

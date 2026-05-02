@@ -56,10 +56,12 @@ const mockS3Send = vi.fn();
 const mockGeneratePresignedDownloadUrl = vi
   .fn()
   .mockResolvedValue('https://s3.example.com/presigned-bundle-url');
+const mockVerifyS3ObjectExists = vi.fn().mockResolvedValue(false);
 vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => ({ send: mockS3Send }),
   getS3BucketName: () => 'test-bucket',
   generatePresignedDownloadUrl: (...args: unknown[]) => mockGeneratePresignedDownloadUrl(...args),
+  verifyS3ObjectExists: (...args: unknown[]) => mockVerifyS3ObjectExists(...args),
 }));
 vi.mock('@/lib/utils/content-disposition', () => ({
   buildContentDisposition: (fileName: string) => `attachment; filename="${fileName}"`,
@@ -303,6 +305,46 @@ describe('GET /api/releases/[id]/download/bundle', () => {
       'Test Album.zip',
       900
     );
+  });
+
+  it('should use a deterministic cache key keyed by release id and sorted formats', async () => {
+    await GET(makeRequest(), makeParams());
+
+    const [tempKey] = mockGeneratePresignedDownloadUrl.mock.calls[0] ?? [];
+    expect(tempKey).toMatch(/^tmp\/bundles\/cache\/507f1f77bcf86cd799439011\/[A-Z-]+\.zip$/);
+    // Sorted formats — FLAC,WAV → "FLAC-WAV"
+    expect(tempKey).toContain('FLAC-WAV');
+  });
+
+  it('should serve a cached ZIP without re-zipping or uploading on cache hit (302 path)', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(makeRequest(), makeParams());
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://s3.example.com/presigned-bundle-url');
+    // Cache hit should skip archiver entirely.
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockUploadDone).not.toHaveBeenCalled();
+    // Analytics still fire on cache hit.
+    expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
+    expect(mockLogDownloadEvent).toHaveBeenCalled();
+  });
+
+  it('should still 302 on cache hit even when analytics fail', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+    mockUpsertDownloadCount.mockRejectedValueOnce(new Error('analytics down'));
+
+    const response = await GET(makeRequest(), makeParams());
+
+    expect(response.status).toBe(302);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to record bundle download analytics (cache hit, 302 path)',
+      expect.objectContaining({ releaseId: '507f1f77bcf86cd799439011' })
+    );
+
+    consoleSpy.mockRestore();
   });
 
   // ─── SSE streaming path (respond=json) ──────────────────────────────────
@@ -602,7 +644,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should delete temporary bundle when post-upload steps fail', async () => {
+  it('should retain cached bundle and surface error when post-upload steps fail', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockUpsertDownloadCount.mockRejectedValueOnce(new Error('Post-upload write failed'));
 
@@ -611,31 +653,23 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
+    // The cached ZIP is intentionally NOT deleted — it remains valid for
+    // subsequent requests and is bounded by the S3 lifecycle rule.
     expect(
       mockS3Send.mock.calls.some(
         ([command]) =>
           (command as { constructor: { name: string } }).constructor.name === 'DeleteObjectCommand'
       )
-    ).toBe(true);
+    ).toBe(false);
 
     consoleSpy.mockRestore();
   });
 
-  it('should log cleanup failure with original error context', async () => {
+  it('should log post-upload error with cached zip key context', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const postUploadError = new Error('Post-upload write failed');
-    const cleanupError = new Error('Cleanup failed');
 
     mockUpsertDownloadCount.mockRejectedValueOnce(postUploadError);
-    mockS3Send.mockImplementation((command: { constructor: { name: string } }) => {
-      if (command.constructor.name === 'DeleteObjectCommand') {
-        return Promise.reject(cleanupError);
-      }
-
-      return Promise.resolve({
-        Body: Readable.from(Buffer.from('fake-audio-data')),
-      });
-    });
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
@@ -643,10 +677,10 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
     expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to clean up temporary bundle after post-upload error',
+      'Bundle post-upload error (cached ZIP retained)',
       expect.objectContaining({
-        originalError: postUploadError,
-        cleanupError,
+        postUploadError,
+        tempS3Key: expect.stringContaining('tmp/bundles/cache/'),
       })
     );
 
@@ -724,7 +758,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(mockFinalize).toHaveBeenCalledTimes(1);
   });
 
-  it('should fetch and append S3 objects just-in-time', async () => {
+  it('should pipeline S3 GETs so TTFB latency overlaps with archiving', async () => {
     interface Deferred<T> {
       promise: Promise<T>;
       resolve: (value: T) => void;
@@ -744,21 +778,24 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     mockS3Send.mockImplementation(() => deferredResponses[callIndex++].promise);
 
     const requestPromise = GET(makeRequest(), makeParams());
+
+    // Pipeline depth (8) > total files (3) → all 3 GETs are issued up front
+    // before any append happens. This is the speedup vs the previous
+    // strictly-serial pattern.
     await vi.waitFor(() => {
-      expect(mockS3Send).toHaveBeenCalledTimes(1);
+      expect(mockS3Send).toHaveBeenCalledTimes(3);
     });
     expect(mockAppend).not.toHaveBeenCalled();
 
+    // As bodies resolve in order, archiver appends them in order.
     first.resolve({ Body: Readable.from(Buffer.from('file-1')) });
     await vi.waitFor(() => {
       expect(mockAppend).toHaveBeenCalledTimes(1);
-      expect(mockS3Send).toHaveBeenCalledTimes(2);
     });
 
     second.resolve({ Body: Readable.from(Buffer.from('file-2')) });
     await vi.waitFor(() => {
       expect(mockAppend).toHaveBeenCalledTimes(2);
-      expect(mockS3Send).toHaveBeenCalledTimes(3);
     });
 
     third.resolve({ Body: Readable.from(Buffer.from('file-3')) });

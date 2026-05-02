@@ -27,7 +27,7 @@ import {
 } from '@/app/components/ui/carousel';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { cn } from '@/lib/utils';
-import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
@@ -78,9 +78,9 @@ export const ArtistPlayer = ({ artist, initialReleaseId }: ArtistPlayerProps) =>
   const hasFiles = files.length > 0;
 
   const audioSrc = useMemo<string | null>(() => {
-    if (!currentFile?.s3Key) return null;
-    return buildCdnUrl(currentFile.s3Key);
-  }, [currentFile?.s3Key]);
+    if (!currentFile) return null;
+    return resolveStreamUrl(currentFile);
+  }, [currentFile]);
 
   const artistName = getArtistDisplayName(artist);
 

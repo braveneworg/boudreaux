@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
+import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,11 @@ export const GET = withRateLimit<{ slug: string }>(
       return NextResponse.json({ error: result.error }, { status });
     }
 
-    return NextResponse.json(serializeForResponse(result.data), {
+    const responseData = withReleases
+      ? attachStreamUrls(serializeForResponse(result.data))
+      : serializeForResponse(result.data);
+
+    return NextResponse.json(responseData, {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (error) {

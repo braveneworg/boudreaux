@@ -199,6 +199,11 @@ describe('finalizeCoverArtUploadAction', () => {
   });
 
   it('skips CloudFront entirely when no distribution ID is configured', async () => {
+    // Explicitly clear the env var rather than relying on the ambient
+    // environment — `.env.local` may set CLOUDFRONT_DISTRIBUTION_ID for
+    // local dev, and `vi.unstubAllEnvs()` in beforeEach restores those
+    // ambient values rather than deleting them.
+    vi.stubEnv('CLOUDFRONT_DISTRIBUTION_ID', '');
     const prefix = `media/releases/${RELEASE_ID}/`;
     mockS3Send.mockResolvedValue(listResponse([`${prefix}cover.png`]));
 

@@ -43,6 +43,8 @@ vi.mock('./deferred-download-dialog', () => ({
 
 vi.mock('@/lib/utils/cdn-url', () => ({
   buildCdnUrl: (key: string) => `https://cdn.example.com/${key}`,
+  resolveStreamUrl: (file: { s3Key?: string | null; streamUrl?: string | null }) =>
+    file.streamUrl ?? (file.s3Key ? `https://cdn.example.com/${file.s3Key}` : null),
 }));
 
 // Mock the MediaPlayer compound component
