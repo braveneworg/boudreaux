@@ -104,20 +104,13 @@ async function fetchObjectBuffer(
   if (body instanceof Readable) {
     const chunks: Buffer[] = [];
     for await (const chunk of body) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+      chunks.push(Buffer.from(chunk));
     }
     return Buffer.concat(chunks);
   }
   return null;
 }
 
-/**
- * Issue an initial window of `depth` concurrent body downloads up front,
- * return the in-flight promise array, and let the caller append more via
- * `inFlight.push(...)` as it consumes them. Yields a true sliding-window
- * pipeline where downstream bandwidth is saturated by N parallel GETs
- * while archiver consumes already-buffered bytes from earlier slots.
- */
 /**
  * Issue a single prefetch and attach a passive rejection handler so that
  * if the consumer abandons the promise (e.g. another fetch fails first and

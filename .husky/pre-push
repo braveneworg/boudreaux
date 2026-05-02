@@ -22,7 +22,8 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY 2>/de
 unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH 2>/dev/null
 unset GIT_INTERNAL_GETTEXT_SH_SCHEME GIT_REFLOG_ACTION GIT_EDITOR 2>/dev/null
 
-# Mirror everything from here on to both the log and stderr.
+# Redirect all output to the log file; tail it to /dev/tty when available
+# so output is visible during an interactive push.
 exec >>"$log_file" 2>&1
 if [ -e /dev/tty ]; then
   tail -f "$log_file" >/dev/tty 2>/dev/null &

@@ -779,7 +779,7 @@ describe('GET /api/releases/[id]/download/bundle', () => {
 
     const requestPromise = GET(makeRequest(), makeParams());
 
-    // Pipeline depth (6) > total files (3) → all 3 GETs are issued up front
+    // Pipeline depth (8) > total files (3) → all 3 GETs are issued up front
     // before any append happens. This is the speedup vs the previous
     // strictly-serial pattern.
     await vi.waitFor(() => {
