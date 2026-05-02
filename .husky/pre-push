@@ -1,4 +1,38 @@
 #!/bin/sh
+# Husky invokes this hook with `sh -e`, so any non-zero command aborts.
+# Disable -e for the diagnostic prelude; the rest of the script handles
+# its own exit codes explicitly.
+set +e
+
+# Log file for diagnostics (failures during `git push` can swallow hook stderr).
+log_file="${TMPDIR:-/tmp}/husky-pre-push.log"
+: > "$log_file"
+
+# Drain pre-push stdin (git sends "<local ref> <local sha> <remote ref>
+# <remote sha>" lines) so child processes don't inherit it.
+if [ ! -t 0 ]; then
+  cat > /dev/null 2>&1 || true
+fi
+exec </dev/null
+
+# When invoked by `git push`, git exports GIT_* env vars that can confuse
+# child git commands (fetch, rev-parse, diff). Unset them so internal git
+# calls behave like a normal CLI invocation.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY 2>/dev/null
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH 2>/dev/null
+unset GIT_INTERNAL_GETTEXT_SH_SCHEME GIT_REFLOG_ACTION GIT_EDITOR 2>/dev/null
+
+# Mirror everything from here on to both the log and stderr.
+exec >>"$log_file" 2>&1
+if [ -e /dev/tty ]; then
+  tail -f "$log_file" >/dev/tty 2>/dev/null &
+  tail_pid=$!
+  # shellcheck disable=SC2064
+  trap "kill $tail_pid 2>/dev/null; exit \$?" EXIT INT TERM
+fi
+
+echo ""
+echo "===== pre-push hook started at $(date) ====="
 
 # Prevent pushing directly to main or master branches
 branch_name=$(git rev-parse --abbrev-ref HEAD)
@@ -114,3 +148,5 @@ fi
 
 echo "✅ All tests passed"
 echo "🚀 Pushing changes..."
+
+exit 0
