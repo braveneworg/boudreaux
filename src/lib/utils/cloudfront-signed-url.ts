@@ -6,7 +6,7 @@ import 'server-only';
 
 import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 
-import { buildContentDisposition } from '@/lib/utils/s3-client';
+import { buildContentDisposition } from '@/lib/utils/content-disposition';
 
 interface CloudFrontSignedUrlInput {
   /** S3 object key (no leading slash), e.g. `releases/abc/digital-formats/.../track.mp3`. */
@@ -90,10 +90,15 @@ export function generateCloudFrontSignedUrl(input: CloudFrontSignedUrlInput): st
 
   const dateLessThan = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-  return getSignedUrl({
-    url,
-    keyPairId: config.keyPairId,
-    privateKey: config.privateKey,
-    dateLessThan,
-  });
+  try {
+    return getSignedUrl({
+      url,
+      keyPairId: config.keyPairId,
+      privateKey: config.privateKey,
+      dateLessThan,
+    });
+  } catch (err) {
+    console.error('CloudFront signing failed; falling back to S3 presigned URL:', err);
+    return null;
+  }
 }

@@ -127,4 +127,26 @@ describe('generateCloudFrontSignedUrl', () => {
     // No double protocol, no double slash before the key.
     expect(url).toMatch(/^https:\/\/cdn\.example\.com\/releases\/abc\/track\.mp3\?/);
   });
+
+  it('returns null and logs when the signing call throws (e.g. malformed PEM)', () => {
+    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
+    process.env.CLOUDFRONT_PRIVATE_KEY = 'NOT_A_VALID_PEM';
+    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const url = generateCloudFrontSignedUrl({
+      s3Key: 'releases/abc/track.mp3',
+      fileName: 'track.mp3',
+      expiresInSeconds: 3600,
+    });
+
+    expect(url).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('CloudFront signing failed'),
+      expect.anything()
+    );
+
+    consoleSpy.mockRestore();
+  });
 });
