@@ -12,6 +12,7 @@ import {
   PRESIGNED_URL_EXPIRATION,
   type DigitalFormatType,
 } from '@/lib/constants/digital-formats';
+import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
 
 /**
  * Get configured S3 client for AWS operations
@@ -134,6 +135,19 @@ export async function generatePresignedDownloadUrl(
   fileName: string,
   expiresInSeconds: number = PRESIGNED_URL_EXPIRATION.DOWNLOAD
 ): Promise<string> {
+  // Prefer CloudFront signed URLs when configured — bytes flow through the
+  // CDN edge cache (cheap repeat downloads, ~$0 on cache hit) instead of
+  // egressing direct from S3 every time. Falls back to S3 presigned URLs
+  // automatically when CloudFront keys are not configured (dev / E2E / CI).
+  const cloudFrontUrl = generateCloudFrontSignedUrl({
+    s3Key,
+    fileName,
+    expiresInSeconds,
+  });
+  if (cloudFrontUrl) {
+    return cloudFrontUrl;
+  }
+
   const s3Client = getS3Client();
   const bucketName = getS3BucketName();
 
