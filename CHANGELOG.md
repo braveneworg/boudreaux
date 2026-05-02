@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.72.0] - 2026-05-02
+
+### Added
+
+- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n- Develop/fix media player file loading from cdn (#427)\n
+
 ## [4.71.0] - 2026-05-02
 
 ### Added
