@@ -539,6 +539,8 @@ jobs:
           S3_BUCKET=${{ secrets.S3_BUCKET }}
           CDN_DOMAIN=${{ secrets.CDN_DOMAIN }}
           NEXT_PUBLIC_CDN_DOMAIN=${{ secrets.NEXT_PUBLIC_CDN_DOMAIN }}
+          CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID }}
+          CLOUDFRONT_PRIVATE_KEY_BASE64=${{ secrets.CLOUDFRONT_PRIVATE_KEY_BASE64 }}
           NEXT_PUBLIC_HOST_NAME=${{ secrets.NEXT_PUBLIC_HOST_NAME }}
           NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
           STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}

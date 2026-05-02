@@ -12,6 +12,8 @@ import {
   PRESIGNED_URL_EXPIRATION,
   type DigitalFormatType,
 } from '@/lib/constants/digital-formats';
+import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
+import { buildContentDisposition } from '@/lib/utils/content-disposition';
 
 /**
  * Get configured S3 client for AWS operations
@@ -98,22 +100,6 @@ export async function generatePresignedUploadUrl(
 }
 
 /**
- * Build an RFC 6266 Content-Disposition header value.
- *
- * - `filename` — ASCII-safe fallback (quotes and backslashes escaped).
- * - `filename*` — RFC 5987 UTF-8 encoded form for non-ASCII characters.
- *
- * Using `encodeURIComponent` inside the quoted `filename` parameter is
- * incorrect per the RFC and causes Safari to misidentify the file
- * extension (appending `.download` instead of `.zip`).
- */
-export function buildContentDisposition(fileName: string): string {
-  const asciiSafe = fileName.replace(/[\\"/]/g, '_');
-  const encoded = encodeURIComponent(fileName).replace(/%20/g, '+');
-  return `attachment; filename="${asciiSafe}"; filename*=UTF-8''${encoded}`;
-}
-
-/**
  * Generate presigned GET URL for downloading digital audio files from S3
  *
  * @param s3Key - S3 object key (path within bucket)
@@ -134,6 +120,19 @@ export async function generatePresignedDownloadUrl(
   fileName: string,
   expiresInSeconds: number = PRESIGNED_URL_EXPIRATION.DOWNLOAD
 ): Promise<string> {
+  // Prefer CloudFront signed URLs when configured — bytes flow through the
+  // CDN edge cache (cheap repeat downloads, ~$0 on cache hit) instead of
+  // egressing direct from S3 every time. Falls back to S3 presigned URLs
+  // automatically when CloudFront keys are not configured (dev / E2E / CI).
+  const cloudFrontUrl = generateCloudFrontSignedUrl({
+    s3Key,
+    fileName,
+    expiresInSeconds,
+  });
+  if (cloudFrontUrl) {
+    return cloudFrontUrl;
+  }
+
   const s3Client = getS3Client();
   const bucketName = getS3BucketName();
 

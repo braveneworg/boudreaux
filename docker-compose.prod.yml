@@ -46,6 +46,10 @@ services:
       AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
       CDN_DOMAIN: ${CDN_DOMAIN}
       NEXT_PUBLIC_CDN_DOMAIN: ${NEXT_PUBLIC_CDN_DOMAIN}
+      # CloudFront signed URLs (paid downloads). When unset, code falls back
+      # to S3 presigned URLs automatically.
+      CLOUDFRONT_KEY_PAIR_ID: ${CLOUDFRONT_KEY_PAIR_ID}
+      CLOUDFRONT_PRIVATE_KEY_BASE64: ${CLOUDFRONT_PRIVATE_KEY_BASE64}
       # Stripe subscription payments
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}

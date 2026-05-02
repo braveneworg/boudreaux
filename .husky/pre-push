@@ -21,7 +21,7 @@ else
 fi
 
 if [ "$has_upstream" = "1" ]; then
-  # Skip if there's nothing to push (no commits ahead of remote).
+  # Skip if there's nothing to push (no commits ahead of remote)
   # Use rev-list to count commits, not diff (which compares trees and misses
   # merge commits that don't change file content relative to upstream).
   commits_ahead=$(git rev-list --count "$upstream_ref"..HEAD 2>/dev/null || echo "unknown")
