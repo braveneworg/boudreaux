@@ -35,11 +35,24 @@ fi
 
 echo "Adding temporary SSH access from ${RUNNER_IP} to: $SG_IDS"
 
+# Authorize the SSH ingress rule; succeed silently if the rule already exists,
+# but fail fast for any other AWS CLI error (auth, wrong SG ID, throttling …).
+authorize_ssh_rule() {
+  local output exit_code
+  output=$(aws ec2 authorize-security-group-ingress "$@" 2>&1) && return 0
+  exit_code=$?
+  if echo "$output" | grep -qE "InvalidPermission\.Duplicate|already exists"; then
+    echo "  SSH rule already exists (idempotent)"
+    return 0
+  fi
+  echo "ERROR: aws ec2 authorize-security-group-ingress failed: $output" >&2
+  return $exit_code
+}
+
 for SG_ID in $SG_IDS; do
-  aws ec2 authorize-security-group-ingress \
+  authorize_ssh_rule \
     --group-id "$SG_ID" \
     --protocol tcp \
     --port 22 \
-    --cidr "${RUNNER_IP}/32" \
-    2>&1 | grep -v "already exists" || true
+    --cidr "${RUNNER_IP}/32"
 done
