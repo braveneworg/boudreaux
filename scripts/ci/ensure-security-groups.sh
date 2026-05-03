@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Ensures HTTP (80) and HTTPS (443) ingress rules exist on all Security Groups
+# attached to the running EC2 instance. Falls back to AWS_SECURITY_GROUP_ID if
+# the instance cannot be auto-discovered.
+#
+# Usage: ./ensure-security-groups.sh
+# Env:   AWS_SECURITY_GROUP_ID  - fallback SG ID if instance discovery fails
+
+set -euo pipefail
+
+# Discover instance ID by running state and name tag
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text 2>/dev/null || echo "")
+
+if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+  echo "WARNING: Could not auto-discover instance. Falling back to AWS_SECURITY_GROUP_ID if set."
+  if [ -n "${AWS_SECURITY_GROUP_ID:-}" ]; then
+    SG_IDS="${AWS_SECURITY_GROUP_ID}"
+  else
+    echo "ERROR: No instance found and AWS_SECURITY_GROUP_ID not set. Cannot ensure Security Group rules."
+    exit 1
+  fi
+else
+  echo "Found instance: $INSTANCE_ID"
+  # Get all Security Groups attached to this instance
+  SG_IDS=$(aws ec2 describe-instances \
+    --instance-ids "$INSTANCE_ID" \
+    --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
+    --output text)
+fi
+
+echo "Security Groups to configure: $SG_IDS"
+
+# For each Security Group, ensure HTTP/HTTPS are open.
+# Port 80: Needed for Let's Encrypt ACME HTTP-01 challenges and HTTP→HTTPS redirect.
+# Port 443: HTTPS traffic for the website.
+for SG_ID in $SG_IDS; do
+  echo "Ensuring ports 80/443 open on $SG_ID..."
+
+  # Add IPv4 rules (idempotent; ignore "already exists" errors)
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$SG_ID" \
+    --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTP for web traffic and Let'\''s Encrypt"}]' \
+    2>&1 | grep -v "already exists" || true
+
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$SG_ID" \
+    --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTPS for web traffic"}]' \
+    2>&1 | grep -v "already exists" || true
+
+  # Optional: Add IPv6 rules (ignore errors if VPC doesn't support IPv6)
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$SG_ID" \
+    --ip-permissions IpProtocol=tcp,FromPort=80,ToPort=80,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTP IPv6"}]' \
+    2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
+
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$SG_ID" \
+    --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,Ipv6Ranges='[{CidrIpv6=::/0,Description="HTTPS IPv6"}]' \
+    2>&1 | grep -v -E "already exists|InvalidParameterValue" || true
+done
+
+echo "Security Group configuration complete."

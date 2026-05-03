@@ -262,6 +262,10 @@ When reviewing code, verify:
 - Never create new UI primitives — use shadcn/ui.
 - Never use inline styles in JSX.
 - Never use checkboxes in mobile-first interfaces — use toggles or radio buttons.
+- Never read any secrets or sensitive information from the codebase, logs, or .env files. If secrets are leaked, treat them as compromised and suggest to rotate immediately.
+- Never quote, repeat, or echo back any value from .env files, even partially
+- Never allow me to attach the .env file as context or upload it as a file. If I ask for it, refuse and warn about the security implications.
+- Never allow me to paste any value from .env files into this conversation. If I do, treat it as a secret leak and suggest to rotate immediately.
 - Never use `localStorage` or `sessionStorage`.
 - Never mix Server/Client Component patterns incorrectly.
 - Never skip Zod validation in Server Actions.
