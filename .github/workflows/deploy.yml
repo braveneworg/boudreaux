@@ -640,7 +640,8 @@ jobs:
           echo "Bumped: $OLD_VERSION → $NEW_VERSION"
 
       - name: Generate changelog entry
-        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
+        if: steps.bump-type.outputs.skip != 'true' &&
+          steps.version.outputs.skip_remainder != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -727,7 +728,8 @@ jobs:
           fi
 
       - name: Commit, tag, and push
-        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
+        if: steps.bump-type.outputs.skip != 'true' &&
+          steps.version.outputs.skip_remainder != 'true'
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
@@ -754,7 +756,8 @@ jobs:
             sleep 5
           done
       - name: Create GitHub Release
-        if: steps.bump-type.outputs.skip != 'true' && steps.version.outputs.skip_remainder != 'true'
+        if: steps.bump-type.outputs.skip != 'true' &&
+          steps.version.outputs.skip_remainder != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
