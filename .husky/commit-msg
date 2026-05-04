@@ -1,0 +1,74 @@
+#!/bin/sh
+
+# Enforce Git commit message conventions:
+#   - Subject line: <= 50 characters
+#   - Blank line separating subject from body (if body present)
+#   - Body lines: <= 72 characters each
+#
+# URLs and lines beginning with '#' (comments) are exempt from the body limit.
+
+COMMIT_MSG_FILE="$1"
+SUBJECT_MAX=50
+BODY_MAX=72
+
+# Strip comment lines (Git adds them when using --verbose / templates)
+MSG=$(grep -v '^#' "$COMMIT_MSG_FILE")
+
+# Skip merge / revert / fixup / squash commits — Git generates these and they
+# routinely exceed the limits.
+FIRST_LINE=$(printf '%s\n' "$MSG" | sed -n '1p')
+case "$FIRST_LINE" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*)
+    exit 0
+    ;;
+esac
+
+errors=0
+
+# --- Subject line check ---
+subject_len=${#FIRST_LINE}
+if [ "$subject_len" -gt "$SUBJECT_MAX" ]; then
+  echo "❌ Commit subject is $subject_len characters (max $SUBJECT_MAX)."
+  echo "   $FIRST_LINE"
+  errors=$((errors + 1))
+fi
+
+# --- Blank-line-after-subject check ---
+SECOND_LINE=$(printf '%s\n' "$MSG" | sed -n '2p')
+THIRD_LINE_AND_AFTER=$(printf '%s\n' "$MSG" | sed -n '3,$p')
+if [ -n "$SECOND_LINE" ] && [ -n "$THIRD_LINE_AND_AFTER" ]; then
+  echo "❌ Commit subject must be followed by a blank line before the body."
+  errors=$((errors + 1))
+fi
+
+# --- Body line length check ---
+line_num=0
+while IFS= read -r line || [ -n "$line" ]; do
+  line_num=$((line_num + 1))
+  # Skip subject (line 1) and the blank separator (line 2)
+  [ "$line_num" -le 2 ] && continue
+  # Skip lines that are a single long URL (no spaces) — wrapping URLs breaks them
+  case "$line" in
+    *" "*) ;;
+    http*|https*|ftp*) continue ;;
+  esac
+  line_len=${#line}
+  if [ "$line_len" -gt "$BODY_MAX" ]; then
+    echo "❌ Body line $line_num is $line_len characters (max $BODY_MAX):"
+    echo "   $line"
+    errors=$((errors + 1))
+  fi
+done <<EOF
+$MSG
+EOF
+
+if [ "$errors" -gt 0 ]; then
+  echo ""
+  echo "💡 Conventions:"
+  echo "   • Subject ≤ ${SUBJECT_MAX} chars, imperative mood, no trailing period"
+  echo "   • Blank line between subject and body"
+  echo "   • Body lines wrapped at ${BODY_MAX} chars"
+  exit 1
+fi
+
+exit 0
