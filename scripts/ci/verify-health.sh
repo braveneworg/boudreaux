@@ -50,7 +50,7 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-      sleep_duration=$((backoff_base * attempt))
+      sleep_duration=$((backoff_base * (1 << (attempt - 1))))
       echo "Retrying in ${sleep_duration} seconds..."
       sleep "$sleep_duration"
       attempt=$((attempt + 1))
@@ -80,7 +80,7 @@ while [ $attempt -le $max_attempts ]; do
     echo "❌ Health check returned unhealthy status (attempt $attempt/$max_attempts)"
     echo "Response: $response"
     if [ $attempt -lt $max_attempts ]; then
-      sleep_duration=$((backoff_base * attempt))
+      sleep_duration=$((backoff_base * (1 << (attempt - 1))))
       echo "Retrying in ${sleep_duration} seconds..."
       sleep "$sleep_duration"
       attempt=$((attempt + 1))

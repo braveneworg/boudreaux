@@ -33,11 +33,26 @@ fi
 
 echo "Revoking SSH access from ${RUNNER_IP} on: $SG_IDS"
 
+# Revoke the SSH ingress rule; succeed silently when the rule no longer exists
+# (already removed or never added), but fail fast for any other AWS CLI error
+# so that unexpected credential/SG issues don't silently leave the runner IP
+# whitelisted.
+revoke_ssh_rule() {
+  local output exit_code
+  output=$(aws ec2 revoke-security-group-ingress "$@" 2>&1) && return 0
+  exit_code=$?
+  if echo "$output" | grep -qE "InvalidPermission\.NotFound|does not exist"; then
+    echo "  SSH rule not found (already removed or never added)"
+    return 0
+  fi
+  echo "ERROR: aws ec2 revoke-security-group-ingress failed: $output" >&2
+  return $exit_code
+}
+
 for SG_ID in $SG_IDS; do
-  aws ec2 revoke-security-group-ingress \
+  revoke_ssh_rule \
     --group-id "$SG_ID" \
     --protocol tcp \
     --port 22 \
-    --cidr "${RUNNER_IP}/32" \
-    2>&1 | grep -v "does not exist" || true
+    --cidr "${RUNNER_IP}/32"
 done
