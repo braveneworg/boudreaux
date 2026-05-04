@@ -371,6 +371,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: read
     env:
       WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
       NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
@@ -478,8 +479,10 @@ jobs:
         uses: appleboy/ssh-action@v1.2.5
         env:
           LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          # Use the workflow's short-lived GITHUB_TOKEN (granted packages: read above)
+          # so we don't depend on a long-lived GHCR_TOKEN PAT for EC2 pulls.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}

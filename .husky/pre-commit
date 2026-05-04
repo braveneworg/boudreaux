@@ -19,6 +19,21 @@ if [ -z "$(git diff --cached --name-only)" ]; then
   exit 1
 fi
 
+# Secret scanning (catches AWS keys, JWTs, .env values, private keys, etc.)
+# Install once: `brew install gitleaks` (or see https://github.com/gitleaks/gitleaks)
+echo "🔐 Scanning staged changes for secrets..."
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --no-banner; then
+    echo "❌ gitleaks detected secrets in staged changes. Remove them before committing."
+    echo "   If this is a false positive, see https://github.com/gitleaks/gitleaks#configuration"
+    exit 1
+  fi
+  echo "✅ No secrets detected"
+else
+  echo "⚠️  gitleaks not installed — secret scanning skipped."
+  echo "   Install with: brew install gitleaks  (or see https://github.com/gitleaks/gitleaks)"
+fi
+
 # Linting staged files
 echo "🔍 Running lint-staged..."
 pnpm exec lint-staged

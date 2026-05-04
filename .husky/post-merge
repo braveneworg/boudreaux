@@ -1,0 +1,26 @@
+#!/bin/sh
+# Post-merge: keep local environment in sync after `git pull` / `git merge`.
+# - Reinstall deps when the lockfile or package.json changed.
+# - Regenerate Prisma client when the schema changed.
+#
+# Skipped when the merge head can't be determined (e.g. unrelated histories).
+
+set -e
+
+if ! git rev-parse --verify -q HEAD@{1} >/dev/null 2>&1; then
+  exit 0
+fi
+
+changed=$(git diff --name-only HEAD@{1} HEAD)
+
+if printf '%s\n' "$changed" | grep -qE '^(pnpm-lock\.yaml|package\.json)$'; then
+  echo "📦 Lockfile or package.json changed — running pnpm install..."
+  pnpm install
+fi
+
+if printf '%s\n' "$changed" | grep -q '^prisma/schema\.prisma$'; then
+  echo "🗄  Prisma schema changed — running pnpm exec prisma generate..."
+  pnpm exec prisma generate
+fi
+
+exit 0

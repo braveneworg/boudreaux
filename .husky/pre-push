@@ -68,6 +68,18 @@ if [ "$commits_ahead" = "0" ]; then
   exit 0
 fi
 
+# Block pushing WIP / fixup! / squash! commits — these should be rebased away
+# before review. Match against the subject line of each commit ahead of the
+# sync ref.
+wip_subjects=$(git log "$sync_ref"..HEAD --pretty=%s | grep -iE '^(wip([: ]|$)|fixup!|squash!)' || true)
+if [ -n "$wip_subjects" ]; then
+  echo "🚫 Refusing to push: WIP / fixup! / squash! commits present:"
+  printf '   - %s\n' "$wip_subjects"
+  echo ""
+  echo "   Rebase to clean these up:  git rebase -i $sync_ref --autosquash"
+  exit 1
+fi
+
 # Fetch the sync ref so the comparison below is against the latest remote
 # state. For first-push branches this fetches origin/main; for tracked
 # branches it fetches the actual upstream (avoids false "behind" results
