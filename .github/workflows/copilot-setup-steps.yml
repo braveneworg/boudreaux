@@ -1,0 +1,30 @@
+name: "Copilot Setup Steps"
+
+# Run automatically when this file changes so setup can be validated,
+# and allow manual runs from the Actions tab.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # Job name MUST be `copilot-setup-steps` — Copilot cloud agent ignores any other name.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # Reuses the same composite action used by CI to ensure the Copilot
+      # agent environment is identical to CI: pnpm 10.12.4 + Node 24.14.1 +
+      # frozen-lockfile install + Prisma client generation.
+      - name: Setup environment
+        uses: ./.github/actions/setup
