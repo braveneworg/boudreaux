@@ -274,10 +274,24 @@ if [ -n "${WEBSITE_DIGEST:-}" ] && [ -n "${NGINX_DIGEST:-}" ]; then
   NEW_NGINX_DIGEST="$NGINX_IMAGE@$NGINX_DIGEST"
 else
   echo "No digests provided; using latest tags"
-  $DOCKER_CMD pull "$WEBSITE_IMAGE:latest" || true
-  $DOCKER_CMD pull "$NGINX_IMAGE:latest" || true
+  $DOCKER_CMD pull "$WEBSITE_IMAGE:latest" || {
+    echo "❌ Failed to pull website image"
+    exit 1
+  }
+  $DOCKER_CMD pull "$NGINX_IMAGE:latest" || {
+    echo "❌ Failed to pull nginx image"
+    exit 1
+  }
   NEW_WEBSITE_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$WEBSITE_IMAGE:latest" 2>/dev/null || true)
   NEW_NGINX_DIGEST=$($DOCKER_CMD inspect --format '{{index .RepoDigests 0}}' "$NGINX_IMAGE:latest" 2>/dev/null || true)
+  if [ -z "$NEW_WEBSITE_DIGEST" ]; then
+    echo "❌ Unable to determine digest for website image after pull"
+    exit 1
+  fi
+  if [ -z "$NEW_NGINX_DIGEST" ]; then
+    echo "❌ Unable to determine digest for nginx image after pull"
+    exit 1
+  fi
 fi
 
 # ---------------------------------------------------------------------------
