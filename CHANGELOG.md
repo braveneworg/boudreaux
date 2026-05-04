@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.74.0] - 2026-05-04
+
+### Added
+
+- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n- fix(ui): make mp3 320 urls unsigned but cached (#433)\n
+
 ## [4.73.0] - 2026-05-04
 
 ### Added
