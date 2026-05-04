@@ -99,4 +99,32 @@ describe('attachStreamUrls', () => {
     expect(attachStreamUrls(undefined)).toBeUndefined();
     expect(attachStreamUrls(42)).toBe(42);
   });
+
+  it('does not sign files whose s3Key is under /MP3_320KBPS/ (public CF behavior)', () => {
+    const payload = {
+      digitalFormat: {
+        files: [
+          {
+            id: 'f-mp3',
+            s3Key: 'releases/abc/digital-formats/MP3_320KBPS/track-1.mp3',
+            streamUrl: null as string | null,
+          },
+          {
+            id: 'f-flac',
+            s3Key: 'releases/abc/digital-formats/FLAC/track-1.flac',
+            streamUrl: null as string | null,
+          },
+        ],
+      },
+    };
+
+    attachStreamUrls(payload);
+
+    // MP3_320 stays unsigned so the client falls back to buildCdnUrl()
+    expect(payload.digitalFormat.files[0].streamUrl).toBeNull();
+    // Lossless formats remain signed
+    expect(payload.digitalFormat.files[1].streamUrl).toBe(
+      'signed:releases/abc/digital-formats/FLAC/track-1.flac'
+    );
+  });
 });

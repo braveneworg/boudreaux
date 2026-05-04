@@ -251,6 +251,8 @@ When reviewing code, verify:
 - Always put AI-generated markdown documents in `docs/copilot/`.
 - Always check database connection health before executing DB queries.
 - Always use meaningful commit messages that describe the changes made.
+- Always review comments on any changed lines to ensure they are still accurate and relevant.
+- Always verify that any new dependencies are necessary and do not duplicate existing functionality.
 
 ## Never Do
 
