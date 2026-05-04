@@ -71,6 +71,13 @@ authorize_ingress_rule_ipv6() {
 for SG_ID in $SG_IDS; do
   echo "Ensuring ports 80/443 open on $SG_ID..."
 
+  # Add IPv4 rules (idempotent; ignore "already exists" errors).
+  # Rule descriptions must match the AWS-allowed charset:
+  #   a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*  (apostrophes are NOT allowed)
+  aws ec2 authorize-security-group-ingress \
+    --group-id "$SG_ID" \
+    --ip-permissions 'IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges=[{CidrIp=0.0.0.0/0,Description="HTTP for web traffic and ACME challenges"}]' \
+    2>&1 | grep -v "already exists" || true
   # Add IPv4 rules (idempotent; only duplicate errors are tolerated)
   authorize_ingress_rule \
     --group-id "$SG_ID" \
@@ -78,7 +85,8 @@ for SG_ID in $SG_IDS; do
 
   authorize_ingress_rule \
     --group-id "$SG_ID" \
-    --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges='[{CidrIp=0.0.0.0/0,Description="HTTPS for web traffic"}]'
+    --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=0.0.0.0/0,Description="HTTPS for web traffic"}]' \
+    2>&1 | grep -v "already exists" || true
 
   # Optional: Add IPv6 rules (ignore errors if VPC doesn't support IPv6)
   authorize_ingress_rule_ipv6 \

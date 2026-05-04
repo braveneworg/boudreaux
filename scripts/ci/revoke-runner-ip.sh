@@ -11,7 +11,12 @@
 
 set -euo pipefail
 
-RUNNER_IP="${1:?Usage: $0 <runner-ipv4>}"
+RUNNER_IP="${1:-}"
+
+if [ -z "$RUNNER_IP" ]; then
+  echo "No runner IP provided; nothing to revoke (whitelist step likely never ran). Skipping."
+  exit 0
+fi
 
 INSTANCE_ID=$(aws ec2 describe-instances \
   --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=*" \
