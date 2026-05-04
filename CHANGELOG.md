@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.73.0] - 2026-05-04
+
+### Added
+
+- feat: enhance CI/CD and commit message validation (#432)\n- feat: enhance CI/CD and commit message validation (#432)\n- feat: enhance CI/CD and commit message validation (#432)\n- Fix bad merge for deploy to ec2 (#431)\n- Fix bad merge for deploy to ec2 (#431)\n- Fix deploy to EC2 job (#430)\n- Fix deploy to EC2 job (#430)\n- Fix deploy to EC2 job (#430)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- Develop/update deployment (#429)\n- feat: enhance security measures and deployment scripts (#428)\n- feat: enhance security measures and deployment scripts (#428)\n- Develop/update deployment (#429)\n- feat: enhance security measures and deployment scripts (#428)\n- feat: enhance CI/CD and commit message validation (#432)\n
+
 ## [4.72.0] - 2026-05-02
 
 ### Added
