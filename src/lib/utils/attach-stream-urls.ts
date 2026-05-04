@@ -7,22 +7,6 @@ import 'server-only';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 
 /**
- * Format folders that are served as public, cacheable CloudFront content
- * (no trusted key group on the matching behavior). Files under these
- * paths are intentionally NOT signed so the CDN response is shared across
- * listeners and works without CloudFront key-pair envs in dev / E2E.
- *
- * Lossless / protected formats (FLAC, WAV, etc.) continue to be signed
- * so the trusted-key-group behavior gates download access.
- */
-const PUBLIC_FORMAT_PATH_SEGMENTS = ['/MP3_320KBPS/'];
-
-function isPublicFormatKey(s3Key: string | null | undefined): boolean {
-  if (!s3Key) return false;
-  return PUBLIC_FORMAT_PATH_SEGMENTS.some((seg) => s3Key.includes(seg));
-}
-
-/**
  * Minimal shape we mutate. We deliberately use a structural type (rather
  * than the Prisma-generated payload) so this helper can walk any payload
  * that contains digital-format files — featured artists, release detail,
@@ -96,10 +80,6 @@ function signFiles(files: FileLike[]): void {
   for (const file of files) {
     if (!file || typeof file !== 'object') continue;
     if (file.streamUrl) continue; // idempotent
-    // Public formats (e.g. MP3 320) are served unsigned via a dedicated
-    // CloudFront behavior without a trusted key group — leave streamUrl
-    // unset so the client falls back to `buildCdnUrl(s3Key)`.
-    if (isPublicFormatKey(file.s3Key)) continue;
     file.streamUrl = signStreamUrl(file.s3Key);
   }
 }
