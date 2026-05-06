@@ -271,6 +271,16 @@ The caching strategy is designed to balance performance with data freshness. The
 
 The cache for queries is implemented using React Query's `staleTime` and `gcTime` options. The `staleTime` determines how long data is considered fresh, while the `gcTime` determines how long unused data is kept in memory before being garbage collected. In this implementation, the homepage data is cached for 10 minutes, while artist page data is not cached at all (staleTime: 0).
 
+## Image caching in s3
+
+When you upload images to the S3 bucket, they are cached by CloudFront CDN for faster delivery to users. The cache duration is determined by the `Cache-Control` headers set on the S3 objects. By default, the uploaded images have a long cache duration (e.g., 1 year) to optimize performance. If you need to update an image, you can either:
+
+1. Upload a new image with a different filename and update the reference in your application.
+2. Invalidate the CloudFront cache for the specific image path to force CloudFront to fetch the updated image from S3. This can be done via the AWS Management Console or using the AWS CLI. Keep in mind that cache invalidation may take some time to propagate, so there may be a delay before the updated image is served to users.
+
+The pnpm script `s3:cache-headers` can be used to set or update cache-control headers for existing S3 objects if needed. This would be the case when you are uploadin images directly
+to S3 without using the `images:upload` script, which sets appropriate cache-control headers automatically. Prefer the images:upload script for uploading images to ensure proper cache-control headers are set for optimal caching behavior.
+
 # Running the development server
 
 ## Prerequisites
