@@ -10,14 +10,13 @@ export default function HomeLoading() {
       {/* Notification strip skeleton — always reserves 2.5rem to match banner-carousel */}
       <div className="bg-muted w-full animate-pulse" style={{ minHeight: '2.5rem' }} />
       {/* Real first banner image — rendered in the Suspense fallback so it
-          paints in the first HTML flush. The HTTP `Link` preload header
-          configured in `next.config.ts` warms the browser cache for the same
-          fixed-width URL. We intentionally use a single-width `src` (no
-          `srcSet`/`sizes`) so this <img> deterministically matches the
-          preloaded resource on every viewport — using a responsive srcset
-          here would let Chrome's picker select a different variant and
-          surface "preloaded but not used" warnings when this fallback is
-          unmounted by BannerCarousel hydration. */}
+          paints in the first HTML flush during route transitions. The
+          hydrated BannerCarousel uses Next/Image's `priority` to emit a
+          responsive preload (with matching `imagesrcset`/`imagesizes`) for
+          the actual rendered slide. We intentionally use a single-width
+          `src` (no `srcSet`/`sizes`) here so this fallback `<img>` paints
+          immediately without the browser running its preload-picker
+          algorithm in the suspense interval. */}
       <div className="bg-muted relative w-full" style={{ paddingBottom: BANNER_ASPECT_PADDING }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: raw <img> in the Suspense fallback ensures the LCP image is in the first HTML flush without requiring client-side JS hydration. The image is pre-optimized WebP served from CloudFront. */}
         <img

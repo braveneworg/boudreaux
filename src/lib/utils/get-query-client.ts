@@ -19,8 +19,8 @@ export const getQueryClient = cache(
     new QueryClient({
       defaultOptions: {
         queries: {
-          staleTime: disableCache ? 0 : 60 * 1000,
-          gcTime: disableCache ? 0 : 5 * 60 * 1000,
+          staleTime: disableCache ? 0 : 30 * 1000, // 30 seconds data is considered fresh and won't refresh
+          gcTime: disableCache ? 0 : 5 * 60 * 1000, // 5 minutes unused data is garbage collected
           refetchOnWindowFocus: false,
           retry: 1,
         },

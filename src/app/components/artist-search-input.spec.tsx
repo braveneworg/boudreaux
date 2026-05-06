@@ -187,6 +187,14 @@ describe('ArtistSearchInput', () => {
     expect(input).toHaveAttribute('type', 'search');
   });
 
+  it('should expose stable id and name attributes for autofill and form-field a11y', () => {
+    render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
+
+    const input = screen.getByRole('combobox');
+    expect(input).toHaveAttribute('id', 'artist-search-input');
+    expect(input).toHaveAttribute('name', 'artist-search');
+  });
+
   it('should update query on input change', () => {
     render(<ArtistSearchInput />, { wrapper: createQueryWrapper() });
 

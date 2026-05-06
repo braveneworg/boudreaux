@@ -30,8 +30,11 @@ export const dynamic = 'force-dynamic';
  * Home page — Server Component that prefetches banners and featured artists,
  * then hydrates client components for interactivity.
  *
- * The hero banner LCP preload is emitted as an HTTP Link header (see
- * next.config.ts). The featured-artist cover art is intentionally NOT
+ * The hero banner LCP preload is emitted by `next/image` itself: the first
+ * slide in `BannerCarousel` is rendered with `priority`, which produces a
+ * `<link rel=preload as=image>` with matching `imagesrcset`/`imagesizes`,
+ * so the browser preload-picker selects the exact variant the rendered
+ * `<img>` will use. The featured-artist cover art is intentionally NOT
  * preloaded here: the `FeaturedArtistsPlayer` is dynamic-imported with
  * `ssr: false`, so the `<img>` that would consume the preload doesn't
  * render until after Video.js's chunk has loaded — well past the
