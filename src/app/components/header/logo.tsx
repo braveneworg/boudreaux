@@ -12,7 +12,7 @@ interface LogoProps {
 
 const Logo = ({ isMobile }: Readonly<LogoProps>) => {
   return (
-    <Link href="/" className="shrink-0">
+    <Link href="/" className="shrink-0" prefetch={false}>
       <Image
         alt="Fake Four Inc. Hand Logo"
         className="mt-px ml-3 block size-10 rounded-full bg-white md:size-36"

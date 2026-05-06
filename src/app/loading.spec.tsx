@@ -16,7 +16,7 @@ describe('HomeLoading', () => {
     expect(img).toHaveAttribute('decoding', 'async');
   });
 
-  it('uses a single fixed-width src that matches the HTTP Link preload', () => {
+  it('uses a single fixed-width src for the Suspense fallback banner', () => {
     render(<HomeLoading />);
     const img = screen.getByTestId('lcp-banner-img');
     const expectedFilenameFragment = encodeURIComponent(BANNER_SLOTS[0].filename).replace(
@@ -26,9 +26,11 @@ describe('HomeLoading', () => {
 
     expect(img.getAttribute('src')).toContain(expectedFilenameFragment);
     expect(img.getAttribute('src')).toContain('_w750.webp');
-    // Intentionally no srcset/sizes — see comment in `loading.tsx` and
-    // `next.config.ts` for why a responsive preload caused Chrome's preload
-    // picker to mismatch the unmounted Suspense fallback <img>.
+    // Intentionally no srcset/sizes on the Suspense fallback `<img>`. The
+    // hydrated `BannerCarousel` uses Next/Image's responsive `priority`
+    // preload, which emits matching `imagesrcset`/`imagesizes`. A
+    // responsive fallback <img> here would let Chrome's preload picker
+    // choose a variant that diverges from the hydrated <img>'s srcset.
     expect(img.getAttribute('srcset')).toBeNull();
     expect(img.getAttribute('sizes')).toBeNull();
   });

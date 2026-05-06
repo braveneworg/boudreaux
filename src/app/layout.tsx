@@ -15,12 +15,23 @@ import type { Metadata } from 'next';
 
 import './globals.css';
 
+// Jost is the body font. We disable next/font's auto-preload because the
+// loader emits a `<link rel=preload>` for every weight/style combination
+// declared below — and at first paint only the regular (400 normal) weight
+// is consumed. The italic + bold-italic variants are only rendered after
+// hydration (e.g. inside `FeaturedArtistsPlayer`'s `NowPlayingHeading`,
+// which is `ssr: false`), so Chrome flags them as "preloaded but not used".
+// `display: 'swap'` lets the page render with the fallback first and swap
+// to Jost when the font is fetched, and `next/font`'s automatic
+// `adjustFontFallback` (size-adjust descriptors on the fallback) prevents
+// the swap from causing layout shift.
 const jost = Jost({
   subsets: ['latin'],
   weight: ['400', '700'],
   style: ['normal', 'italic'],
   variable: '--font-jost',
-  display: 'optional',
+  display: 'swap',
+  preload: false,
 });
 
 // Server-side environment validation on startup
