@@ -261,6 +261,30 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 Open the Docker Desktop application and ensure it is running. You should see the Docker icon in your system tray (Windows) or menu bar (macOS). If Docker is not running, start it from the application.
 
+# Notes on caching
+
+The cache for the featured artists is around 10 minutes, which means that if you add a new release to an artist, it may take up to 10 minutes for that release to appear on the homepage. This is because the homepage fetches the featured artists and their releases from the cache, and the cache is only refreshed every 10 minutes.
+
+However, the queries for the artist pages are not cached, so if you navigate to an artist page, you should see the new release immediately. The cache for the homepage is intended to improve performance and reduce load on the database, but it does mean that there may be a delay in seeing new releases on the homepage. If you want to see the new release on the homepage immediately, you can either wait for the cache to refresh or navigate to the artist page directly.
+
+The caching strategy is designed to balance performance with data freshness. The homepage, which is likely to receive more traffic, benefits from caching to reduce load and improve response times. Artist pages, which are accessed less frequently, can afford to fetch fresh data on each request without significantly impacting performance.
+
+The homepage cache is implemented server-side via `withCache(...)` in `FeaturedArtistsService` with a 10-minute TTL. This means the cache lives on the server, not in the browser, and is shared across all users. Artist page queries bypass this cache and always fetch fresh data.
+
+## Image caching in s3
+
+When you upload images to the S3 bucket, they are served with `Cache-Control: public, max-age=31536000, immutable` headers. This instructs both CloudFront and end-user browsers to cache the image for one year and treat it as immutable.
+
+**Important:** Because the `immutable` directive is set, browser caches will continue serving the cached image for up to a year even if you perform a CloudFront invalidation. A CloudFront invalidation only forces CloudFront's edge caches to refetch from S3 — it has no effect on copies already cached in users' browsers. To reliably update an image for all users, always use one of these strategies:
+
+1. **Upload a new image with a different filename** and update the reference in your application. This is the recommended approach.
+2. **Use versioned/hashed filenames** so each new version of an image has a unique URL, guaranteeing all caches treat it as a new resource.
+
+Avoid replacing an image at the same URL and relying on CloudFront invalidation alone — browser-cached copies with `immutable` will not be evicted.
+
+The pnpm script `s3:cache-headers` can be used to set or update cache-control headers for existing S3 objects if needed. This would be the case when you are uploading images directly
+to S3 without using the `images:upload` script, which sets appropriate cache-control headers automatically. Prefer the images:upload script for uploading images to ensure proper cache-control headers are set for optimal caching behavior.
+
 # Running the development server
 
 ## Prerequisites

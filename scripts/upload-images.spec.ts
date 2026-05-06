@@ -425,6 +425,7 @@ describe('upload-images', () => {
         Key: 'media/photo.jpg',
         Body: {},
         ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
       });
     });
 
@@ -507,6 +508,7 @@ describe('upload-images', () => {
         Key: 'uploads/photo.jpg',
         Body: {},
         ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
       });
     });
 
@@ -700,12 +702,14 @@ describe('upload-images', () => {
         Key: 'photo1.jpg',
         Body: {},
         ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
       });
       expect(putObjectCommandMock).toHaveBeenNthCalledWith(2, {
         Bucket: 'test-bucket',
         Key: 'photo2.png',
         Body: {},
         ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
       });
     });
 
@@ -767,6 +771,7 @@ describe('upload-images', () => {
         Key: 'user-content/photo1.jpg',
         Body: {},
         ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
       });
     });
   });

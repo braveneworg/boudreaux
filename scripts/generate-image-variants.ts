@@ -73,6 +73,7 @@ const IMAGE_EXTENSIONS = new Set([
 
 /** Maximum images processed in parallel. */
 const CONCURRENCY = 5;
+const CACHE_CONTROL_IMMUTABLE = 'public, max-age=31536000, immutable';
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -172,6 +173,7 @@ async function uploadBuffer(
     Key: key,
     Body: buffer,
     ContentType: contentType,
+    CacheControl: CACHE_CONTROL_IMMUTABLE,
   });
   await s3.send(command);
 }

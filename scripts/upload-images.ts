@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 /**
  * Image Upload Script
  * This script uploads one or more images to S3 bucket
@@ -45,6 +49,7 @@ dotenv.config(); // This loads .env as fallback
 
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const CACHE_CONTROL_IMMUTABLE = 'public, max-age=31536000, immutable';
 
 // Only check S3_BUCKET if running as main script
 if (!S3_BUCKET && require.main === module) {
@@ -227,6 +232,7 @@ async function uploadFile(
       Key: s3Key,
       Body: fileStream,
       ContentType: contentType,
+      CacheControl: CACHE_CONTROL_IMMUTABLE,
     });
 
     await s3Client.send(putCommand);
