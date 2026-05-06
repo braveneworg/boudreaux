@@ -28,8 +28,11 @@ exec >>"$log_file" 2>&1
 if [ -e /dev/tty ]; then
   tail -f "$log_file" >/dev/tty 2>/dev/null &
   tail_pid=$!
+  # Capture the script's true exit status *before* killing tail so that a
+  # failing `kill` (tail already dead when /dev/tty is inaccessible) does not
+  # replace it with a non-zero code and make the hook appear to fail.
   # shellcheck disable=SC2064
-  trap "kill $tail_pid 2>/dev/null; exit \$?" EXIT INT TERM
+  trap 'last=$?; kill '"$tail_pid"' 2>/dev/null; exit $last' EXIT INT TERM
 fi
 
 echo ""
