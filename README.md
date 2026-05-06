@@ -269,16 +269,20 @@ However, the queries for the artist pages are not cached, so if you navigate to 
 
 The caching strategy is designed to balance performance with data freshness. The homepage, which is likely to receive more traffic, benefits from caching to reduce load and improve response times. Artist pages, which are accessed less frequently, can afford to fetch fresh data on each request without significantly impacting performance.
 
-The cache for queries is implemented using React Query's `staleTime` and `gcTime` options. The `staleTime` determines how long data is considered fresh, while the `gcTime` determines how long unused data is kept in memory before being garbage collected. In this implementation, the homepage data is cached for 10 minutes, while artist page data is not cached at all (staleTime: 0).
+The homepage cache is implemented server-side via `withCache(...)` in `FeaturedArtistsService` with a 10-minute TTL. This means the cache lives on the server, not in the browser, and is shared across all users. Artist page queries bypass this cache and always fetch fresh data.
 
 ## Image caching in s3
 
-When you upload images to the S3 bucket, they are cached by CloudFront CDN for faster delivery to users. The cache duration is determined by the `Cache-Control` headers set on the S3 objects. By default, the uploaded images have a long cache duration (e.g., 1 year) to optimize performance. If you need to update an image, you can either:
+When you upload images to the S3 bucket, they are served with `Cache-Control: public, max-age=31536000, immutable` headers. This instructs both CloudFront and end-user browsers to cache the image for one year and treat it as immutable.
 
-1. Upload a new image with a different filename and update the reference in your application.
-2. Invalidate the CloudFront cache for the specific image path to force CloudFront to fetch the updated image from S3. This can be done via the AWS Management Console or using the AWS CLI. Keep in mind that cache invalidation may take some time to propagate, so there may be a delay before the updated image is served to users.
+**Important:** Because the `immutable` directive is set, browser caches will continue serving the cached image for up to a year even if you perform a CloudFront invalidation. A CloudFront invalidation only forces CloudFront's edge caches to refetch from S3 — it has no effect on copies already cached in users' browsers. To reliably update an image for all users, always use one of these strategies:
 
-The pnpm script `s3:cache-headers` can be used to set or update cache-control headers for existing S3 objects if needed. This would be the case when you are uploadin images directly
+1. **Upload a new image with a different filename** and update the reference in your application. This is the recommended approach.
+2. **Use versioned/hashed filenames** so each new version of an image has a unique URL, guaranteeing all caches treat it as a new resource.
+
+Avoid replacing an image at the same URL and relying on CloudFront invalidation alone — browser-cached copies with `immutable` will not be evicted.
+
+The pnpm script `s3:cache-headers` can be used to set or update cache-control headers for existing S3 objects if needed. This would be the case when you are uploading images directly
 to S3 without using the `images:upload` script, which sets appropriate cache-control headers automatically. Prefer the images:upload script for uploading images to ensure proper cache-control headers are set for optimal caching behavior.
 
 # Running the development server

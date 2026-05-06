@@ -92,7 +92,7 @@ const config = {
     // Chrome flags on the homepage audit. Trade-off: returning visitors lose
     // separate CSS caching, but first-load FCP/LCP improves when CSS is
     // discovered with the HTML instead of via extra CDN requests.
-    inlineCss: true,
+    inlineCss: process.env.NODE_ENV === 'production',
     optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
       bodySizeLimit: '50mb',
