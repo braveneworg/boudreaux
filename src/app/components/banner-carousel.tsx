@@ -415,21 +415,24 @@ export function BannerCarousel({
                 }}
               >
                 {shouldRenderImage && (
-                  // `priority` is set on the first slide only. This makes
+                  // `priority` is set only on the first slide during the
+                  // initial render (when `currentIndex === 0`). This makes
                   // `next/image` emit a server-rendered `<link rel=preload>`
                   // with matching `imagesrcset`/`imagesizes`, so the browser
                   // preload-picker selects the same variant the rendered
                   // `<img>` will use across viewports — preventing
-                  // "preloaded but not used" warnings. Subsequent slides
+                  // "preloaded but not used" warnings. Once the carousel
+                  // advances, slide 0 loses priority so it no longer
+                  // competes for bandwidth when offscreen. Subsequent slides
                   // rely on `fetchPriority` + `loading` hints below.
                   <Image
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
                     sizes="100vw"
-                    priority={idx === 0}
+                    priority={idx === 0 && currentIndex === 0}
                     fetchPriority={isCurrentSlide ? 'high' : 'low'}
-                    loading={idx === 0 || isCurrentSlide ? 'eager' : 'lazy'}
+                    loading={isCurrentSlide ? 'eager' : 'lazy'}
                     className="object-cover"
                   />
                 )}
