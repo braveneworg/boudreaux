@@ -261,6 +261,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 Open the Docker Desktop application and ensure it is running. You should see the Docker icon in your system tray (Windows) or menu bar (macOS). If Docker is not running, start it from the application.
 
+# Notes on caching
+
+The cache for the featured artists is around 10 minutes, which means that if you add a new release to an artist, it may take up to 10 minutes for that release to appear on the homepage. This is because the homepage fetches the featured artists and their releases from the cache, and the cache is only refreshed every 10 minutes.
+
+However, the queries for the artist pages are not cached, so if you navigate to an artist page, you should see the new release immediately. The cache for the homepage is intended to improve performance and reduce load on the database, but it does mean that there may be a delay in seeing new releases on the homepage. If you want to see the new release on the homepage immediately, you can either wait for the cache to refresh or navigate to the artist page directly.
+
+The caching strategy is designed to balance performance with data freshness. The homepage, which is likely to receive more traffic, benefits from caching to reduce load and improve response times. Artist pages, which are accessed less frequently, can afford to fetch fresh data on each request without significantly impacting performance.
+
+The cache for queries is implemented using React Query's `staleTime` and `gcTime` options. The `staleTime` determines how long data is considered fresh, while the `gcTime` determines how long unused data is kept in memory before being garbage collected. In this implementation, the homepage data is cached for 10 minutes, while artist page data is not cached at all (staleTime: 0).
+
 # Running the development server
 
 ## Prerequisites
