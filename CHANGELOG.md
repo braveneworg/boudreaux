@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.76.0] - 2026-05-06
+
+### Added
+
+- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n- Develop/improve performance (#435)\n
+
 ## [4.75.0] - 2026-05-06
 
 ### Added
