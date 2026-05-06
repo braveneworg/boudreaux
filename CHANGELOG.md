@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.75.0] - 2026-05-06
+
+### Added
+
+- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n- fix: update LCP banner preload strategy (#434)\n
+
 ## [4.74.0] - 2026-05-04
 
 ### Added
