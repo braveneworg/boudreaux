@@ -1,6 +1,41 @@
 <!--
 Boudreaux Constitution - Sync Report
 =====================================
+Version: 1.1.0 → 1.1.1 (PATCH - clarifying refinements: added useDebugValue
+and useInsertionEffect hook guidance, motion.dev as Framer Motion alternative,
+explicit functional-programming preference, README.md maintenance mandate)
+Ratified: 2025-06-01 | Last Amended: 2026-05-06
+
+CHANGES SUMMARY (1.1.1):
+- Core Principles > VI. Code Quality & Maintainability: added explicit
+  preference for functional programming paradigms where appropriate
+- Coding Standards > State & Rendering Best Practices: added useDebugValue
+  and useInsertionEffect hook guidance
+- Core Principles > V. Performance & Scalability: added motion.dev as an
+  alternative to Framer Motion for advanced animation needs
+- Governance > Compliance Review & Validation: added mandate to maintain a
+  comprehensive README.md (setup, usage, contribution guidelines)
+
+MODIFIED PRINCIPLES (1.1.1):
+- V. Performance & Scalability: animation library guidance broadened
+- VI. Code Quality & Maintainability: FP paradigm preference made explicit
+
+ADDED SECTIONS (1.1.1): None (refinements within existing sections)
+REMOVED SECTIONS (1.1.1): None
+
+TEMPLATE VERIFICATION (2026-05-06):
+✅ .specify/templates/plan-template.md - Constitution Check section generic;
+   aligned with all 7 principles
+✅ .specify/templates/spec-template.md - Generic structure supports all
+   constitutional requirements; no update needed
+✅ .specify/templates/tasks-template.md - Phase structure accommodates
+   constitution-driven task types; no update needed
+✅ .github/copilot-instructions.md - All 7 principles reflected
+⚠️ No .specify/templates/commands/ directory exists - no action needed
+
+FOLLOW-UP TODOS (1.1.1): None
+
+--- PRIOR SYNC REPORT (1.1.0) ---
 Version: 1.0.1 → 1.1.0 (MINOR - expanded coding standards, React hooks
 guidance, debugging prohibitions, immutability mandate, tech stack refresh)
 Ratified: 2025-06-01 | Last Amended: 2026-04-01
@@ -133,15 +168,18 @@ re-renders. Implement code splitting and lazy loading (`React.lazy`,
 `Suspense`) for components not needed immediately on page load. Use
 Next.js `<Image>` component for image optimization. Leverage Tanstack
 Query for data fetching with built-in caching, background updates, and
-synchronization. Use Framer Motion for smooth animations that enhance UX
-without compromising performance. Implement skeleton loaders and
+synchronization. Use Framer Motion (or `motion.dev` for advanced needs)
+for smooth animations that enhance UX without compromising performance.
+Implement skeleton loaders and
 placeholders to improve perceived performance during data fetching.
 Monitor performance using React DevTools and profiling tools.
 
 ### VI. Code Quality & Maintainability
 
 Maintain a clean and organized codebase with clear separation of concerns.
-Follow the DRY principle to minimize code duplication. Use absolute imports
+Favor functional programming paradigms (pure functions, immutability,
+composition) where appropriate. Follow the DRY principle to minimize code
+duplication. Use absolute imports
 from the project root (`@/lib/utils`) instead of relative imports that
 traverse up (`../../../`). Avoid deeply nested code; refactor into smaller
 functions and components. Write JSDoc comments for all functions and
@@ -290,6 +328,10 @@ interactions.
   components via refs while keeping internals encapsulated
 - Use `useSyncExternalStore` to subscribe to external stores and ensure
   components stay in sync with external state changes
+- Use `useDebugValue` in custom hooks to surface meaningful labels and
+  state in React DevTools, easing debugging of hook behavior
+- Use `useInsertionEffect` to inject styles or perform pre-DOM-mutation
+  side effects (e.g., CSS-in-JS) so styles are applied before paint
 
 ## Testing & Quality
 
@@ -415,6 +457,9 @@ Changes fall into these categories:
   requirements
 - When reviewing code, ensure it aligns with all seven core principles
   and the coding standards outlined herein
+- Maintain a comprehensive `README.md` covering setup instructions, usage
+  guidelines, and contribution guidelines; update it whenever changes
+  affect onboarding, build, or contribution workflows
 
 ### Continuous Improvement
 
@@ -427,4 +472,4 @@ Changes fall into these categories:
 
 ---
 
-**Version**: 1.1.0 | **Ratified**: 2025-06-01 | **Last Amended**: 2026-04-01
+**Version**: 1.1.1 | **Ratified**: 2025-06-01 | **Last Amended**: 2026-05-06
