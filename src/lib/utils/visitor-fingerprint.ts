@@ -29,8 +29,8 @@ export interface FingerprintInput {
 
 /**
  * Truncate an IPv4 address to its /24 prefix (first 3 octets) or an IPv6
- * address to its /64 prefix (first 4 hextets). Returns the empty string for
- * unparseable input so the resulting fingerprint is still deterministic.
+ * address to its /64 prefix (first 4 hextets). Returns the empty string when
+ * the input cannot be interpreted as IPv4/IPv4-mapped-IPv6/IPv6.
  */
 export function truncateIp(ip: string | null | undefined): string {
   if (!ip) return '';

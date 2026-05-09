@@ -8,7 +8,7 @@ import { PrismaClient } from '@prisma/client';
 /**
  * 007-free-digital-downloads — User Story 1 (Anonymous Free Download)
  *
- * Validates the freemium download flow on iOS Safari (webkit) emulation:
+ * Validates the freemium download flow using iPhone 14 device emulation:
  *  1. Anonymous (logged-out) visitor opens the download dialog.
  *  2. Selects the **Free** radio (MP3 320Kbps + AAC).
  *  3. Lands on the free-format-select step with both formats available.
@@ -17,12 +17,11 @@ import { PrismaClient } from '@prisma/client';
  *  6. The `boudreaux_visitor_id` cookie is set on the API path with the
  *     required attributes (HttpOnly, SameSite=Lax, Secure-in-prod, Path=/api).
  *
- * This test runs only on the webkit project (iOS Safari emulation) because
- * the SSE-then-redirect download flow is the riskiest browser path.
+ * Note: `devices['iPhone 14']` sets viewport/device settings only; engine
+ * selection is controlled by Playwright projects in config.
  */
 
-// Force iPhone 14 (webkit) — the iOS path is the riskiest target for SSE
-// + cookie issuance in a single response.
+// Apply iPhone 14 mobile emulation for this free-download flow.
 test.use({ ...devices['iPhone 14'] });
 
 const E2E_DATABASE_URL =
@@ -46,7 +45,7 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test.describe('Free digital downloads (007 US1) — iOS Safari', () => {
+test.describe('Free digital downloads (007 US1) — iPhone emulation', () => {
   test('anonymous visitor downloads the free MP3+AAC bundle and gets visitor cookie', async ({
     page,
     context,
@@ -96,13 +95,14 @@ test.describe('Free digital downloads (007 US1) — iOS Safari', () => {
 
     const cookies = await context.cookies();
     const visitor = cookies.find((c) => c.name === 'boudreaux_visitor_id');
-    expect(visitor).toBeDefined();
-    expect(visitor!.httpOnly).toBe(true);
-    expect(visitor!.sameSite).toBe('Lax');
-    expect(visitor!.path).toBe('/api');
+    expect(visitor).toMatchObject({
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/api',
+    });
     // `secure` is true in production builds; the E2E dev server runs over
     // http://localhost so we only assert the attribute is a boolean.
-    expect(typeof visitor!.secure).toBe('boolean');
+    expect(typeof visitor?.secure).toBe('boolean');
 
     // Sanity: the dialog is still mounted with the release context.
     expect(e2eRelease1Title).toBe('E2E Album One');

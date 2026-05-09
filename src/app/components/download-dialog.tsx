@@ -43,7 +43,6 @@ import { useFreeDownloadStatusQuery } from '@/app/hooks/use-free-download-status
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
 import { ALREADY_PURCHASED_ERROR, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { FREE_FORMAT_TYPES, isFreeFormatType } from '@/lib/constants/digital-formats';
 import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
 import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
@@ -56,7 +55,6 @@ import {
 type DialogStep =
   | 'download'
   | 'format-select'
-  | 'free-download'
   | 'free-format-select'
   | 'rate-select'
   | 'email-step'
@@ -572,26 +570,6 @@ export const DownloadDialog = ({
             >
               Back
             </Button>
-          </>
-        )}
-
-        {step === 'free-download' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Download</DialogTitle>
-              <DialogDescription>
-                Preparing your free download of <strong>{releaseTitle}</strong>
-              </DialogDescription>
-            </DialogHeader>
-
-            <FormatBundleDownload
-              releaseId={releaseId}
-              availableFormats={availableFormats.filter((f) => isFreeFormatType(f.formatType))}
-              downloadCount={downloadCount}
-              onDownloadComplete={handleDialogDownloadComplete}
-              autoStart
-              initialSelectedFormats={[...FREE_FORMAT_TYPES]}
-            />
           </>
         )}
 
