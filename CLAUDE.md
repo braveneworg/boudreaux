@@ -218,6 +218,21 @@ import { describe, it, expect, vi } from 'vitest';
 - Don't write brittle or hard-to-maintain tests.
 - Don't rely solely on coverage metrics — focus on meaningful tests.
 
+### E2E database isolation (MANDATORY)
+
+E2E tests, the seed script, and the Playwright-managed web server **must** run against the local Docker MongoDB container only. They must never connect to any database URL stored in `.env`, `.env.local`, `.env.test`, `.env.production`, `.env.development`, the shell environment, or any other source outside the hardcoded local-Docker URL.
+
+- The only acceptable E2E database URL is `mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0` (provided by the `boudreaux-e2e-mongo` Docker container on port 27018).
+- Never read, print, grep, cat, source, or otherwise inspect any `.env*` file to "check" or "find" a database URL. If you need to know the E2E URL, use the hardcoded value above.
+- Never set, export, or pass `DATABASE_URL` from the host shell when running E2E. Pass `E2E_DATABASE_URL` (or rely on the hardcoded default in `playwright.config.ts` / `seed-test-db.ts`) and let the test harness scope it to the child process.
+- Always launch the Playwright web server, seed scripts, and any E2E-related Node process with a clean, allowlisted environment. Do not let Next.js, Prisma, or `dotenv` auto-load `.env*` into an E2E run. Use one of:
+  - The repo's Docker E2E compose stack (`pnpm run e2e:docker:up` + the in-container test runner), or
+  - A child process launched with `env -i` plus only the explicitly allowlisted vars (`PATH`, `HOME`, `NODE_ENV=test`, `E2E_DATABASE_URL=...`, `DATABASE_URL=mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0`, `AUTH_SECRET=<test-only>`, `AUTH_URL=http://localhost:3000`, etc.).
+- Before running any E2E suite, verify that the resolved `DATABASE_URL` for the web server process points to `localhost:27018`. If it does not, refuse to run.
+- The seed script's `E2E_SEED_ALLOW_NONLOCAL` escape hatch is forbidden — never set it under any circumstance.
+- If an E2E run produces unexpected results (empty seed DB, "release not found", 404s), the first hypothesis is "the server is connected to the wrong database". Stop, verify the server's effective `DATABASE_URL`, and surface the issue to the user before retrying.
+- Never run E2E (or any production build that boots a server) from a process that has `DATABASE_URL` set in its environment to a non-local value. If `printenv DATABASE_URL` would return a non-`localhost:27018` value, the run is unsafe — abort.
+
 ## Code Review Checklist
 
 When reviewing code, verify:
@@ -265,9 +280,16 @@ When reviewing code, verify:
 - Never use inline styles in JSX.
 - Never use checkboxes in mobile-first interfaces — use toggles or radio buttons.
 - Never read any secrets or sensitive information from the codebase, logs, or .env files. If secrets are leaked, treat them as compromised and suggest to rotate immediately.
-- Never quote, repeat, or echo back any value from .env files, even partially
+- Never quote, repeat, or echo back any value from .env files, even partially.
 - Never allow me to attach the .env file as context or upload it as a file. If I ask for it, refuse and warn about the security implications.
 - Never allow me to paste any value from .env files into this conversation. If I do, treat it as a secret leak and suggest to rotate immediately.
+- Never run any command that reads, prints, copies, decrypts, or pipes the contents of `.env`, `.env.*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`, `.npmrc`, `~/.config/gh/hosts.yml`, or any other secret-bearing file. This explicitly forbids `cat`, `head`, `tail`, `less`, `more`, `grep`, `rg`, `awk`, `sed`, `sort`, `xxd`, `od`, `printenv`, `env`, `set`, `export -p`, `source`, `dotenv`, `node -e "require('dotenv')..."`, or any equivalent on those files — even with `| head -n1`, `| wc -l`, redirection, or other "filtering" tricks. The act of running the command captures output into the chat transcript regardless of what is piped after it.
+- Never run `git diff`, `git show`, `git log -p`, `git stash show -p`, or `git grep` on paths that may contain secrets without first confirming the path is not a secret-bearing file.
+- Never assume a secret-bearing file is safe to read because it is gitignored, locally scoped, or "dev only". Treat all `.env*` files as production secrets.
+- Never run any E2E test, build, dev server, seed script, or migration in a process that could inherit `DATABASE_URL` (or any other connection string) from `.env*`. Always launch with an explicit, hardcoded local-Docker connection string and a clean environment (e.g., `env -i` plus only the required allowlisted vars). If the runtime cannot guarantee `.env*` is ignored, refuse to run.
+- Never echo, log, or include in error messages any environment variable whose name matches `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`, `*CREDENTIAL*`, `*DSN*`, or `*CONNECTION*`. Redact to `***` before printing.
+- Never proceed with a task that "needs" a secret value to continue. Stop and ask the user to provide a placeholder or a local-only equivalent.
+- If a secret value (or partial value) ever appears in tool output, terminal output, file content, or chat input, immediately: (1) stop the current task, (2) tell the user the secret is now compromised and must be rotated, (3) do not repeat or quote the value back, (4) do not attempt to "clean up" by running more commands that touch the secret, and (5) wait for the user before continuing.
 - Never use `localStorage` or `sessionStorage`.
 - Never mix Server/Client Component patterns incorrectly.
 - Never skip Zod validation in Server Actions.

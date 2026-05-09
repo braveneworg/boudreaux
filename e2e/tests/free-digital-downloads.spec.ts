@@ -8,7 +8,8 @@ import { PrismaClient } from '@prisma/client';
 /**
  * 007-free-digital-downloads — User Story 1 (Anonymous Free Download)
  *
- * Validates the freemium download flow using iPhone 14 device emulation:
+ * Validates the freemium download flow using Pixel 7 mobile emulation
+ * (chromium engine, mobile viewport):
  *  1. Anonymous (logged-out) visitor opens the download dialog.
  *  2. Selects the **Free** radio (MP3 320Kbps + AAC).
  *  3. Lands on the free-format-select step with both formats available.
@@ -17,12 +18,14 @@ import { PrismaClient } from '@prisma/client';
  *  6. The `boudreaux_visitor_id` cookie is set on the API path with the
  *     required attributes (HttpOnly, SameSite=Lax, Secure-in-prod, Path=/api).
  *
- * Note: `devices['iPhone 14']` sets viewport/device settings only; engine
- * selection is controlled by Playwright projects in config.
+ * Note: We use Pixel 7 instead of iPhone 14 so the test runs against the
+ * chromium project (matches CI which only installs chromium). Mobile
+ * viewport + touch behavior is what we actually need to validate; engine
+ * choice is incidental.
  */
 
-// Apply iPhone 14 mobile emulation for this free-download flow.
-test.use({ ...devices['iPhone 14'] });
+// Apply Pixel 7 mobile emulation for this free-download flow.
+test.use({ ...devices['Pixel 7'] });
 
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
@@ -45,7 +48,7 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test.describe('Free digital downloads (007 US1) — iPhone emulation', () => {
+test.describe('Free digital downloads (007 US1) — Pixel 7 emulation', () => {
   test('anonymous visitor downloads the free MP3+AAC bundle and gets visitor cookie', async ({
     page,
     context,
@@ -69,9 +72,17 @@ test.describe('Free digital downloads (007 US1) — iPhone emulation', () => {
       timeout: 10_000,
     });
 
-    // Step 4: trigger the bundled download. The combobox already has both
-    // free formats pre-selected; the Download button kicks off SSE.
-    const innerDownload = page.getByRole('button', { name: /^Download$/ });
+    // Step 4a: open the multi-combobox and select all free formats (MP3 320kbps + AAC).
+    const combobox = page.getByRole('combobox');
+    await expect(combobox).toBeVisible({ timeout: 10_000 });
+    await combobox.click();
+    await page.getByRole('option', { name: 'Select all' }).click();
+    await page.keyboard.press('Escape');
+
+    // Step 4b: trigger the bundled download. Button text from FormatBundleDownload:
+    // "Download 2 formats" once both free formats are selected.
+    const innerDownload = page.getByRole('button', { name: /^Download \d+ format/ });
+    await expect(innerDownload).toBeVisible({ timeout: 10_000 });
     await innerDownload.click();
 
     // Step 5: SSE progress is visible (zipping → uploading) before redirect.

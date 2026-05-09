@@ -16,8 +16,9 @@ import { ReleaseDetailContent } from '@/app/components/release-detail-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import PageContainer from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
+import { ReleaseService } from '@/lib/services/release-service';
+import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { fetchApi } from '@/lib/utils/fetch-api';
-import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
 interface ReleasePlayerPageProps {
@@ -36,20 +37,22 @@ export default async function ReleasePlayerPage({ params, searchParams }: Releas
 
   const queryClient = getQueryClient();
 
-  // Prefetch the release with direct fetch for 404 handling
-  const releaseUrl = getInternalApiUrl(
-    `/api/releases/${encodeURIComponent(releaseId)}?withTracks=true`
-  );
-  const releaseResponse = await fetch(releaseUrl, { cache: 'no-store' });
+  // Fetch release directly via service (Server Component → service is server-only).
+  // This avoids an internal HTTP roundtrip (SSRF-safe) and works regardless of
+  // how the standalone server's network/host is configured.
+  const releaseResult = await ReleaseService.getReleaseWithTracks(releaseId);
 
-  if (releaseResponse.status === 404) {
+  if (!releaseResult.success) {
     notFound();
   }
 
-  if (releaseResponse.ok) {
-    const releaseData = await releaseResponse.json();
-    queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
-  }
+  // Match the API response shape: BigInt → Number, Date → string, plus stream URLs.
+  const releaseData = attachStreamUrls(
+    JSON.parse(
+      JSON.stringify(releaseResult.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
+    )
+  );
+  queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
 
   // Extract primaryArtistId from release data for related releases prefetch
   const releaseCache = queryClient.getQueryData<{

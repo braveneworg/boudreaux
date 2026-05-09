@@ -84,33 +84,60 @@ async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Prom
 /**
  * Idempotent seed script for the E2E test database. Clears all collections
  * and creates deterministic test data.
+ *
+ * Safety: this function will REFUSE to run against any database other than
+ * the local Docker MongoDB on `localhost:27018`. There is intentionally no
+ * escape hatch — E2E must never touch a remote / production database.
  */
 async function seedTestDatabase() {
-  const allowNonLocal = process.env.E2E_SEED_ALLOW_NONLOCAL === 'true';
+  let url: URL;
 
-  // Safety guard: by default refuse to run against anything except a local test database
-  if (!allowNonLocal) {
-    let url: URL;
+  try {
+    url = new URL(E2E_DATABASE_URL);
+  } catch {
+    throw new Error(
+      'E2E seed script refusing to run: E2E_DATABASE_URL is not a valid URL. ' +
+        'Expected mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0.'
+    );
+  }
 
+  const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  const isExpectedPort = url.port === '27018';
+  const isExpectedProtocol = url.protocol === 'mongodb:';
+
+  if (!isLocalHost || !isExpectedPort || !isExpectedProtocol) {
+    throw new Error(
+      'E2E seed script refusing to run: E2E_DATABASE_URL must point to ' +
+        'mongodb://localhost:27018/... (the local Docker container). ' +
+        'There is no override for this — never seed a remote database.'
+    );
+  }
+
+  // Defensive: also refuse if the parent process leaks a non-local
+  // DATABASE_URL, because Prisma may auto-load `.env` and pick it up.
+  const parentDbUrl = process.env.DATABASE_URL;
+  if (parentDbUrl) {
     try {
-      url = new URL(E2E_DATABASE_URL);
-    } catch {
+      const parentUrl = new URL(parentDbUrl);
+      const parentIsLocal =
+        parentUrl.protocol === 'mongodb:' &&
+        (parentUrl.hostname === 'localhost' || parentUrl.hostname === '127.0.0.1') &&
+        parentUrl.port === '27018';
+      if (!parentIsLocal) {
+        throw new Error(
+          'E2E seed script refusing to run: a non-local DATABASE_URL is ' +
+            'present in the process environment. Unset DATABASE_URL (e.g. ' +
+            'launch with `env -i`) before running the seed.'
+        );
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('E2E seed script refusing')) {
+        throw e;
+      }
+      // unparsable parent DATABASE_URL — also refuse
       throw new Error(
-        `E2E seed script could not parse E2E_DATABASE_URL: ${E2E_DATABASE_URL}\n` +
-          'Set E2E_DATABASE_URL to a valid local MongoDB URL (e.g. mongodb://localhost:27018/boudreaux-e2e), ' +
-          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
-      );
-    }
-
-    const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    const isExpectedPort = url.port === '27018';
-    const isExpectedProtocol = url.protocol === 'mongodb:';
-
-    if (!isLocalHost || !isExpectedPort || !isExpectedProtocol) {
-      throw new Error(
-        `E2E seed script refusing to run against a non-local or unexpected database: ${E2E_DATABASE_URL}\n` +
-          'Set E2E_DATABASE_URL to a local MongoDB instance on mongodb://localhost:27018/boudreaux-e2e, ' +
-          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
+        'E2E seed script refusing to run: parent DATABASE_URL is set but ' +
+          'unparsable. Unset DATABASE_URL before running the seed.'
       );
     }
   }

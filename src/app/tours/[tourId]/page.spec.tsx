@@ -35,6 +35,13 @@ vi.mock('@/lib/utils/get-internal-api-url', () => ({
   getInternalApiUrl: (path: string) => `http://localhost:3000${path}`,
 }));
 
+const mockFindById = vi.fn();
+vi.mock('@/lib/repositories/tours/tour-repository', () => ({
+  TourRepository: {
+    findById: (...args: unknown[]) => mockFindById(...args),
+  },
+}));
+
 // Mock child component
 vi.mock('../components/tour-detail-content', () => ({
   TourDetailContent: ({ tourId }: { tourId: string }) => (
@@ -57,20 +64,14 @@ describe('TourPage', () => {
   const defaultParams = Promise.resolve({ tourId: 'tour-1' });
 
   beforeEach(() => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ tour: mockTour }),
-    });
+    mockFindById.mockResolvedValue(mockTour);
   });
 
-  it('should fetch tour from API with tourId', async () => {
+  it('should call TourRepository.findById with tourId', async () => {
     const Page = await TourPage({ params: defaultParams });
     render(Page);
 
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/tours/tour-1', {
-      cache: 'no-store',
-    });
+    expect(mockFindById).toHaveBeenCalledWith('tour-1');
   });
 
   it('should render TourDetailContent with tourId', async () => {
@@ -88,36 +89,27 @@ describe('TourPage', () => {
     expect(mockSetQueryData).toHaveBeenCalledWith(['tours', 'detail', 'tour-1'], mockTour);
   });
 
-  it('should call notFound when API returns 404', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-    });
+  it('should call notFound when repository returns null', async () => {
+    mockFindById.mockResolvedValue(null);
 
     await expect(TourPage({ params: defaultParams })).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
-  it('should not set query data when API returns non-OK non-404', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-    });
+  it('should not set query data when repository returns null', async () => {
+    mockFindById.mockResolvedValue(null);
 
-    const Page = await TourPage({ params: defaultParams });
-    render(Page);
+    await expect(TourPage({ params: defaultParams })).rejects.toThrow('NEXT_NOT_FOUND');
 
     expect(mockSetQueryData).not.toHaveBeenCalled();
   });
 
-  it('should encode tourId in URL', async () => {
+  it('should pass the tourId to the repository unchanged', async () => {
     const specialParams = Promise.resolve({ tourId: 'tour/special' });
 
     const Page = await TourPage({ params: specialParams });
     render(Page);
 
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/tours/tour%2Fspecial', {
-      cache: 'no-store',
-    });
+    expect(mockFindById).toHaveBeenCalledWith('tour/special');
   });
 });

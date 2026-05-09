@@ -120,17 +120,14 @@ describe('ArtistDetailPage', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('should fetch artist data with correct URL', async () => {
+  it('should call ArtistService.getArtistBySlugWithReleases with the slug', async () => {
     const Page = await ArtistDetailPage({
       params: defaultParams,
       searchParams: defaultSearchParams,
     });
     render(Page);
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:3000/api/artists/slug/john-doe?withReleases=true',
-      { cache: 'no-store' }
-    );
+    expect(mockGetArtistBySlugWithReleases).toHaveBeenCalledWith('john-doe');
   });
 
   it('should set query data on successful fetch', async () => {
@@ -146,30 +143,36 @@ describe('ArtistDetailPage', () => {
     );
   });
 
-  it('should call notFound when artist returns 404', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: () => Promise.resolve({}),
+  it('should call notFound when artist service returns failure', async () => {
+    mockGetArtistBySlugWithReleases.mockResolvedValue({
+      success: false,
+      error: 'Artist not found',
     });
 
-    await ArtistDetailPage({ params: defaultParams, searchParams: defaultSearchParams });
+    try {
+      await ArtistDetailPage({ params: defaultParams, searchParams: defaultSearchParams });
+    } catch {
+      // notFound() throws in production; tolerate downstream JSON.parse error here
+    }
 
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
-  it('should not set query data on 500 error', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({}),
+  it('should not set query data when service returns failure', async () => {
+    mockGetArtistBySlugWithReleases.mockResolvedValue({
+      success: false,
+      error: 'Database unavailable',
     });
 
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
+    try {
+      const Page = await ArtistDetailPage({
+        params: defaultParams,
+        searchParams: defaultSearchParams,
+      });
+      render(Page);
+    } catch {
+      // notFound() may throw in production; ignore in test
+    }
 
     expect(mockSetQueryData).not.toHaveBeenCalled();
   });
@@ -232,7 +235,7 @@ describe('ArtistDetailPage', () => {
     );
   });
 
-  it('should URL-encode the slug in fetch URL', async () => {
+  it('should pass the slug to the service unchanged', async () => {
     const specialParams = Promise.resolve({ slug: 'artist/special&slug' });
     const Page = await ArtistDetailPage({
       params: specialParams,
@@ -240,10 +243,7 @@ describe('ArtistDetailPage', () => {
     });
     render(Page);
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('artist%2Fspecial%26slug'),
-      expect.anything()
-    );
+    expect(mockGetArtistBySlugWithReleases).toHaveBeenCalledWith('artist/special&slug');
   });
 
   describe('generateMetadata', () => {

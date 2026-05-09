@@ -246,6 +246,12 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 
 ## Never Do
 
+- Never read, print, grep, cat, head, tail, less, source, or otherwise inspect the contents of `.env`, `.env.*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`, `.npmrc`, or any other secret-bearing file. Running such a command captures output into the chat transcript regardless of pipes or filters.
+- Never echo, log, or include in error messages any environment variable whose name matches `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`, `*CREDENTIAL*`, `*DSN*`, or `*CONNECTION*`. Redact to `***` before printing.
+- Never quote, repeat, or echo back any value from `.env*` files, even partially.
+- Never run E2E tests, builds, dev servers, seed scripts, or migrations in a process that could inherit `DATABASE_URL` from `.env*`. E2E must run only against the local Docker MongoDB at `mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0`. Use `env -i` with an allowlist or the repo's Docker E2E compose stack. If you cannot guarantee `.env*` is ignored, refuse to run.
+- Never set `E2E_SEED_ALLOW_NONLOCAL=true`.
+- If a secret value (or partial value) ever appears in tool output, terminal output, file content, or chat input, immediately stop, tell the user the secret is compromised and must be rotated, do not repeat the value, and wait for the user before continuing.
 - Never user a checkbox in a mobile first scenario. Prefer using toggle switches or radio buttons for better usability on mobile devices.
 - Never use a checkbox for binary options in mobile interfaces, as they can be difficult to interact with on smaller screens. Instead, use toggle switches or radio buttons that are more touch-friendly and provide clearer visual feedback to users. Checkboxes can be easily missed or mis-tapped on mobile devices, leading to a frustrating user experience. Always prioritize usability and accessibility when designing forms for mobile users.
 - Never use the non-null assertion operator (!) in TypeScript code

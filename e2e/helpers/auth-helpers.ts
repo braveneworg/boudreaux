@@ -73,7 +73,10 @@ async function createAuthCookie(user: TestUser, secret: string) {
   return {
     name: COOKIE_NAME,
     value: token,
-    domain: 'localhost',
+    // Must match the E2E_HOST in playwright.config.ts. Using 127.0.0.1
+    // (not "localhost") avoids macOS IPv6 resolution issues where the
+    // standalone server binds IPv4 only and SSR internal fetches fail.
+    domain: '127.0.0.1',
     path: '/',
     httpOnly: true,
     sameSite: 'Lax' as const,

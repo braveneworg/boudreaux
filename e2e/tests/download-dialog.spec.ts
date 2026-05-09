@@ -55,10 +55,11 @@ test.describe('Download Dialog — Purchased User', () => {
     await expect(combobox).toBeVisible();
     await combobox.click();
 
-    // E2E Album One has MP3_320KBPS, FLAC, and WAV seeded — verify options in dropdown
+    // E2E Album One has MP3_320KBPS, AAC, FLAC, and WAV seeded — verify options in dropdown
     await expect(userPage.getByRole('option', { name: /FLAC/i })).toBeVisible({ timeout: 5_000 });
     await expect(userPage.getByRole('option', { name: /WAV/i })).toBeVisible();
     await expect(userPage.getByRole('option', { name: /MP3 320kbps/i })).toBeVisible();
+    await expect(userPage.getByRole('option', { name: /^AAC$/i })).toBeVisible();
   });
 
   test('shows download button with format count after selecting formats', async ({ userPage }) => {
@@ -74,7 +75,7 @@ test.describe('Download Dialog — Purchased User', () => {
     await userPage.getByRole('option', { name: 'Select all' }).click();
     await userPage.keyboard.press('Escape');
 
-    // All 3 formats selected — should show "Download 3 formats"
+    // All 4 formats selected (MP3 320kbps, AAC, FLAC, WAV) — should show "Download 4 formats"
     await expect(userPage.getByRole('button', { name: /Download \d+ formats?/ })).toBeVisible();
   });
 });
@@ -102,9 +103,9 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
       timeout: 5_000,
     });
 
-    // Should show format options: Free (320Kbps) and Premium digital formats
-    await expect(userPage.getByLabel(/Free.*320Kbps/)).toBeVisible();
-    await expect(userPage.getByLabel(/Premium digital formats/)).toBeVisible();
+    // Should show format options: Free (MP3 320Kbps + AAC) and Premium digital formats
+    await expect(userPage.getByLabel(/FREE digital formats.*320Kbps.*AAC/i)).toBeVisible();
+    await expect(userPage.getByLabel(/Premium digital formats/i)).toBeVisible();
   });
 
   test('shows subscribe CTA in download dialog', async ({ userPage }) => {
@@ -134,7 +135,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
     });
 
     // Select premium digital formats option
-    const premiumOption = userPage.getByLabel(/Premium digital formats/);
+    const premiumOption = userPage.getByLabel(/Premium digital formats/i);
     await premiumOption.click();
 
     // Should show custom amount input
@@ -168,14 +169,14 @@ test.describe('Download Dialog — Multi-format selection', () => {
     // Select all formats
     await userPage.getByRole('option', { name: 'Select all' }).click();
 
-    // Verify the combobox trigger shows the selected count
-    await expect(combobox).toContainText('3 formats selected');
+    // Verify the combobox trigger shows the selected count (4 seeded: MP3 320kbps, AAC, FLAC, WAV)
+    await expect(combobox).toContainText('4 formats selected');
 
     // Deselect an individual format (WAV)
     await userPage.getByRole('option', { name: /WAV/i }).click();
 
-    // Count should decrease to 2
-    await expect(combobox).toContainText('2 formats selected');
+    // Count should decrease to 3
+    await expect(combobox).toContainText('3 formats selected');
   });
 
   test('shows selected format pills below combobox', async ({ userPage }) => {
@@ -198,6 +199,7 @@ test.describe('Download Dialog — Multi-format selection', () => {
     await expect(pillList.getByRole('listitem').filter({ hasText: /FLAC/ })).toBeVisible();
     await expect(pillList.getByRole('listitem').filter({ hasText: /WAV/ })).toBeVisible();
     await expect(pillList.getByRole('listitem').filter({ hasText: /MP3 320kbps/ })).toBeVisible();
+    await expect(pillList.getByRole('listitem').filter({ hasText: /^AAC$/ })).toBeVisible();
   });
 });
 
@@ -225,7 +227,7 @@ test.describe('Download Dialog — Free download flow', () => {
     });
 
     // Select the free download option
-    const freeOption = userPage.getByLabel(/Free.*320Kbps/);
+    const freeOption = userPage.getByLabel(/FREE digital formats.*320Kbps.*AAC/i);
     await freeOption.click();
 
     // Click the Download button to proceed
