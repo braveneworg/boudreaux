@@ -14,7 +14,6 @@ import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digit
 import {
   CapReachedError,
   freeDownloadQuotaService,
-  FREE_DOWNLOAD_CAP,
 } from '@/lib/services/free-download-quota-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
@@ -122,6 +121,3 @@ export const GET = withRateLimit<{ id: string }>(
     throw err;
   }
 });
-
-// Re-export for explicit reference in tests.
-export { FREE_DOWNLOAD_CAP };
