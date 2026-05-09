@@ -190,6 +190,7 @@ vi.mock('@/app/components/ui/audio/media-player', () => {
           {f.title ?? f.fileName}
         </button>
       ))}
+      <button data-testid="file-select-bogus" onClick={() => onFileSelect('does-not-exist')} />
       {downloadTrigger}
     </div>
   );
@@ -475,9 +476,11 @@ describe('ReleasePlayer', () => {
   it('should not change track when selecting a non-existent file ID', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
-    // The FormatFileListDrawer will call onFileSelect with an ID
-    // We need to simulate a call with a non-existent file ID
-    // The first track should remain active
+    // Trigger onFileSelect with an ID that's not in `files` — the
+    // `if (index >= 0)` guard must short-circuit and leave the current
+    // track untouched.
+    fireEvent.click(screen.getByTestId('file-select-bogus'));
+
     const controls = screen.getByTestId('media-controls');
     expect(controls).toHaveAttribute('data-audio-src', file1CdnUrl);
   });

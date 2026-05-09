@@ -241,4 +241,80 @@ describe('generateImageVariantsAction', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe('Source image exceeds 50MB limit');
   });
+
+  it('returns "Invalid image key" when CDN URL has empty path', async () => {
+    const result = await generateImageVariantsAction('https://cdn.fakefourrecords.com/');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid image key');
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it('treats non-URL strings as raw S3 keys', async () => {
+    // The catch in extractS3Key falls back to stripping the leading slash —
+    // so a bare/relative key is still validated and rejected for not having
+    // the media/ prefix.
+    const result = await generateImageVariantsAction('not a url');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/must start with/);
+  });
+
+  it('emits variants for files without an extension (dot === -1 path)', async () => {
+    mockSharpInstance.metadata.mockResolvedValue({ width: 800, height: 600 });
+
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/no-ext-file'
+    );
+
+    expect(result.success).toBe(true);
+    // Files with no extension still go through the WebP-transcode loop
+    // (extension '' is not in SKIP nor WEBP_TRANSCODE sets), so we get one
+    // PUT per device size + the GetObject.
+    expect(mockS3Send).toHaveBeenCalledTimes(1 + SIZE_COUNT);
+  });
+
+  it('returns "Unknown error" when an unexpected non-Error value is thrown', async () => {
+    mockS3Send.mockRejectedValue('string-thrown');
+
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/bad.jpg'
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Unknown error');
+  });
+
+  it('aborts during streaming when accumulated bytes exceed the safety limit', async () => {
+    // No ContentLength header — forces the per-chunk safety check at L152
+    // to be the path that catches the overflow.
+    const huge = Buffer.alloc(60 * 1024 * 1024);
+    mockS3Send.mockResolvedValue({ Body: fakeS3Body(huge) });
+
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/huge.jpg'
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Source image exceeds 50MB limit');
+  });
+
+  it('falls back to application/octet-stream when mime cannot resolve the extension', async () => {
+    // Force mime.getType to return null so the `?? 'application/octet-stream'`
+    // fallback runs.
+    const mime = (await import('mime')).default;
+    vi.mocked(mime.getType).mockReturnValueOnce(null);
+    mockSharpInstance.metadata.mockResolvedValue({ width: 800, height: 600 });
+
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/album.jpg'
+    );
+
+    expect(result.success).toBe(true);
+    const putCalls = mockS3Send.mock.calls.slice(1).map(([cmd]) => cmd.input ?? cmd);
+    // At least one PUT used the octet-stream fallback content type.
+    expect(putCalls).toContainEqual(
+      expect.objectContaining({ ContentType: 'application/octet-stream' })
+    );
+  });
 });

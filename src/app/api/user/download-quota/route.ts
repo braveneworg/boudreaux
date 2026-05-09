@@ -32,7 +32,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const quotaService = new QuotaEnforcementService();
-    const status = await quotaService.getQuotaStatus(token.sub);
+    const status = await quotaService.getQuotaStatus({ kind: 'user', userId: token.sub });
 
     return NextResponse.json({
       success: true,

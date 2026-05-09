@@ -32,6 +32,16 @@ vi.mock('@/lib/repositories/subscription-repository', () => ({
   },
 }));
 
+const mockGuestFind = vi.hoisted(() => vi.fn());
+const mockGuestIncrement = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/repositories/guest-download-count-repository', () => ({
+  GuestDownloadCountRepository: class {
+    find = mockGuestFind;
+    incrementOrReset = mockGuestIncrement;
+  },
+}));
+
 describe('PurchaseService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -67,7 +77,10 @@ describe('PurchaseService', () => {
     it('should return not allowed with reason "no_purchase" when no purchase record exists', async () => {
       mockFindByUserAndRelease.mockResolvedValue(null);
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: false,
@@ -88,7 +101,10 @@ describe('PurchaseService', () => {
         lastDownloadedAt: twoHoursAgo,
       });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: false,
@@ -111,7 +127,10 @@ describe('PurchaseService', () => {
       });
       mockResetDownloadCount.mockResolvedValue({ downloadCount: 0 });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: true,
@@ -132,7 +151,10 @@ describe('PurchaseService', () => {
         lastDownloadedAt: anHourAgo,
       });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: true,
@@ -148,7 +170,10 @@ describe('PurchaseService', () => {
       mockFindByUserAndRelease.mockResolvedValue({ id: 'purchase-1' });
       mockGetDownloadRecord.mockResolvedValue(null);
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: true,
@@ -167,7 +192,10 @@ describe('PurchaseService', () => {
         lastDownloadedAt: null,
       });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: false,
@@ -189,7 +217,10 @@ describe('PurchaseService', () => {
         lastDownloadedAt: exactlySixHoursAgo,
       });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: false,
@@ -207,7 +238,10 @@ describe('PurchaseService', () => {
       mockHasActiveSubscription.mockResolvedValue(true);
       mockGetDownloadRecord.mockResolvedValue(null);
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: true,
@@ -228,7 +262,10 @@ describe('PurchaseService', () => {
         lastDownloadedAt: twoHoursAgo,
       });
 
-      const result = await PurchaseService.getDownloadAccess('user-123', 'release-abc');
+      const result = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(result).toEqual({
         allowed: false,
@@ -252,10 +289,86 @@ describe('PurchaseService', () => {
       };
       mockUpsertDownloadCount.mockResolvedValue(mockRecord);
 
-      const result = await PurchaseService.incrementDownloadCount('user-123', 'release-abc');
+      const result = await PurchaseService.incrementDownloadCount(
+        { kind: 'user', userId: 'user-123' },
+        'release-abc'
+      );
 
       expect(mockUpsertDownloadCount).toHaveBeenCalledWith('user-123', 'release-abc');
       expect(result).toEqual(mockRecord);
+    });
+
+    it('should delegate to GuestDownloadCountRepository for guest subjects', async () => {
+      const mockRow = { id: 'g-1', visitorId: 'v-1', releaseId: 'release-abc', downloadCount: 1 };
+      mockGuestIncrement.mockResolvedValue(mockRow);
+
+      const result = await PurchaseService.incrementDownloadCount(
+        { kind: 'guest', visitorId: 'v-1' },
+        'release-abc'
+      );
+
+      expect(mockGuestIncrement).toHaveBeenCalledWith('v-1', 'release-abc');
+      expect(result).toEqual(mockRow);
+      expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getDownloadAccess (guest)', () => {
+    const guestSubject = { kind: 'guest', visitorId: 'v-1' } as const;
+
+    beforeEach(() => {
+      mockGuestFind.mockReset();
+    });
+
+    it('allows a fresh guest download when no record exists', async () => {
+      mockGuestFind.mockResolvedValue(null);
+
+      const result = await PurchaseService.getDownloadAccess(guestSubject, 'release-abc');
+
+      expect(result).toEqual({
+        allowed: true,
+        reason: null,
+        downloadCount: 0,
+        lastDownloadedAt: null,
+        resetInHours: null,
+      });
+      expect(mockFindByUserAndRelease).not.toHaveBeenCalled();
+    });
+
+    it('denies a guest at the per-release cap within the reset window', async () => {
+      const twoHoursAgo = new Date('2026-04-04T10:00:00Z');
+      mockGuestFind.mockResolvedValue({
+        downloadCount: 5,
+        lastDownloadAt: twoHoursAgo,
+      });
+
+      const result = await PurchaseService.getDownloadAccess(guestSubject, 'release-abc');
+
+      expect(result).toEqual({
+        allowed: false,
+        reason: 'download_limit_reached',
+        downloadCount: 5,
+        lastDownloadedAt: twoHoursAgo,
+        resetInHours: 4,
+      });
+    });
+
+    it('allows a guest after the reset window has elapsed', async () => {
+      const sevenHoursAgo = new Date('2026-04-04T05:00:00Z');
+      mockGuestFind.mockResolvedValue({
+        downloadCount: 5,
+        lastDownloadAt: sevenHoursAgo,
+      });
+
+      const result = await PurchaseService.getDownloadAccess(guestSubject, 'release-abc');
+
+      expect(result).toEqual({
+        allowed: true,
+        reason: null,
+        downloadCount: 0,
+        lastDownloadedAt: sevenHoursAgo,
+        resetInHours: null,
+      });
     });
   });
 });

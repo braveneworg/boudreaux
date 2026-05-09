@@ -409,6 +409,32 @@ describe('ReleaseService', () => {
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve releases' });
     });
+
+    it('should filter by artistIds when provided', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+
+      const result = await ReleaseService.getReleases({ artistIds: ['artist-1', 'artist-2'] });
+
+      expect(result.success).toBe(true);
+      expect(prisma.release.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            artistReleases: {
+              some: { artistId: { in: ['artist-1', 'artist-2'] } },
+            },
+          }),
+        })
+      );
+    });
+
+    it('should NOT filter by artistIds when an empty array is provided', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([mockRelease]);
+
+      await ReleaseService.getReleases({ artistIds: [] });
+
+      const passedWhere = vi.mocked(prisma.release.findMany).mock.calls.at(-1)?.[0]?.where ?? {};
+      expect(passedWhere).not.toHaveProperty('artistReleases');
+    });
   });
 
   describe('updateRelease', () => {
@@ -643,6 +669,53 @@ describe('ReleaseService', () => {
         digitalFormats: [],
       };
       vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithExternalImages as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).not.toHaveBeenCalled();
+    });
+
+    it('should skip files without an s3Key when collecting deletion targets', async () => {
+      delete process.env.CDN_DOMAIN;
+      const { deleteS3Object } = await import('../utils/s3-client');
+      vi.mocked(deleteS3Object).mockClear();
+
+      const releaseWithEmptyKey = {
+        ...existingRelease,
+        coverArt: null,
+        images: [],
+        digitalFormats: [
+          {
+            id: 'format-1',
+            files: [
+              { id: 'file-no-key', s3Key: null },
+              { id: 'file-with-key', s3Key: 'releases/release-123/mp3/track1.mp3' },
+            ],
+          },
+        ],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithEmptyKey as never);
+      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(deleteS3Object).toHaveBeenCalledTimes(1);
+      expect(deleteS3Object).toHaveBeenCalledWith('releases/release-123/mp3/track1.mp3');
+    });
+
+    it('should not extract an S3 key when ".s3." appears but the path tail is empty', async () => {
+      delete process.env.CDN_DOMAIN;
+      const { deleteS3Object } = await import('../utils/s3-client');
+      vi.mocked(deleteS3Object).mockClear();
+
+      const releaseWithMalformedS3Url = {
+        ...existingRelease,
+        coverArt: null,
+        images: [{ id: 'img-1', src: 'https://bucket.s3.' }],
+        digitalFormats: [],
+      };
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(releaseWithMalformedS3Url as never);
       vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease);
 
       await ReleaseService.deleteRelease('release-123');
@@ -1116,6 +1189,49 @@ describe('ReleaseService', () => {
         success: false,
         error: 'Failed to fetch artist releases',
       });
+    });
+  });
+
+  describe('applyFoundReleaseUpdate', () => {
+    it('clears deletedOn when undelete is true', async () => {
+      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+
+      await ReleaseService.applyFoundReleaseUpdate('release-123', { undelete: true });
+
+      expect(prisma.release.update).toHaveBeenCalledWith({
+        where: { id: 'release-123' },
+        data: { deletedOn: null },
+      });
+    });
+
+    it('sets publishedAt when publish is true', async () => {
+      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+
+      await ReleaseService.applyFoundReleaseUpdate('release-123', { publish: true });
+
+      const call = vi.mocked(prisma.release.update).mock.calls.at(-1)?.[0];
+      expect(call?.where).toEqual({ id: 'release-123' });
+      expect(call?.data).toEqual({ publishedAt: expect.any(Date) });
+    });
+
+    it('combines both updates when both flags are set', async () => {
+      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease);
+
+      await ReleaseService.applyFoundReleaseUpdate('release-123', {
+        undelete: true,
+        publish: true,
+      });
+
+      const data = vi.mocked(prisma.release.update).mock.calls.at(-1)?.[0]?.data;
+      expect(data).toMatchObject({ deletedOn: null, publishedAt: expect.any(Date) });
+    });
+
+    it('is a no-op when neither flag is set', async () => {
+      vi.mocked(prisma.release.update).mockClear();
+
+      await ReleaseService.applyFoundReleaseUpdate('release-123', {});
+
+      expect(prisma.release.update).not.toHaveBeenCalled();
     });
   });
 });

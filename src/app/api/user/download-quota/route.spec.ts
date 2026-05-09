@@ -67,7 +67,7 @@ describe('GET /api/user/download-quota', () => {
   it('should call quota service with user ID from token', async () => {
     await GET(makeRequest());
 
-    expect(mockGetQuotaStatus).toHaveBeenCalledWith('user-123');
+    expect(mockGetQuotaStatus).toHaveBeenCalledWith({ kind: 'user', userId: 'user-123' });
   });
 
   it('should return 500 on unexpected error', async () => {

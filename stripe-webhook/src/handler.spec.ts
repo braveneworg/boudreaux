@@ -192,6 +192,33 @@ describe('lambdaHandler', () => {
     expect(passedBody).toBe(rawPayload);
   });
 
+  it('falls back to an empty body when isBase64Encoded is true and event.body is missing', async () => {
+    const event = makeEvent({ body: undefined as unknown as string, isBase64Encoded: true });
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('signature verification failed');
+    });
+
+    const result = await lambdaHandler(event);
+
+    expect(result).toEqual({ statusCode: 400, body: 'Webhook signature verification failed' });
+    const [passedBody] = mockConstructEvent.mock.calls[0] as [Buffer, string, string];
+    expect(Buffer.isBuffer(passedBody)).toBe(true);
+    expect(passedBody.length).toBe(0);
+  });
+
+  it('falls back to an empty string body when isBase64Encoded is false and event.body is missing', async () => {
+    const event = makeEvent({ body: undefined as unknown as string, isBase64Encoded: false });
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('signature verification failed');
+    });
+
+    const result = await lambdaHandler(event);
+
+    expect(result).toEqual({ statusCode: 400, body: 'Webhook signature verification failed' });
+    const [passedBody] = mockConstructEvent.mock.calls[0] as [string, string, string];
+    expect(passedBody).toBe('');
+  });
+
   // ── Event dispatch ───────────────────────────────────────────────────────
 
   it('dispatches checkout.session.completed to the correct handler', async () => {

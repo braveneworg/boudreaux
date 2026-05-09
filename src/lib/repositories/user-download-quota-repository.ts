@@ -5,115 +5,94 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type { DownloadSubject } from '@/types/download-subject';
 
-import type { UserDownloadQuota } from '@prisma/client';
+import type { Prisma, UserDownloadQuota } from '@prisma/client';
 
 /**
- * Repository for managing user download quota records
+ * Repository for managing freemium download quota records.
  *
- * Enforces freemium download limit using atomic operations to track unique releases
+ * A quota row is keyed by exactly one of `userId` (authenticated subjects) or
+ * `visitorId` (anonymous guests identified by the `boudreaux_visitor_id`
+ * cookie). The two keying strategies are kept disjoint by sparse `@unique`
+ * constraints on each column.
+ *
+ * Feature: 007-free-digital-downloads (guest support)
  */
 export class UserDownloadQuotaRepository {
-  /**
-   * Find existing quota record or create a new one for a user
-   *
-   * @param userId - User ID
-   * @returns Quota record with uniqueReleaseIds array
-   */
-  async findOrCreateByUserId(userId: string): Promise<UserDownloadQuota> {
-    // Try to find existing quota record
-    let quota = await prisma.userDownloadQuota.findUnique({
-      where: { userId },
-    });
+  private whereForSubject(subject: DownloadSubject): Prisma.UserDownloadQuotaWhereUniqueInput {
+    return subject.kind === 'user' ? { userId: subject.userId } : { visitorId: subject.visitorId };
+  }
 
-    // Create if doesn't exist
-    if (!quota) {
-      quota = await prisma.userDownloadQuota.create({
-        data: {
-          userId,
+  private createDataForSubject(subject: DownloadSubject): Prisma.UserDownloadQuotaCreateInput {
+    return subject.kind === 'user'
+      ? {
+          user: { connect: { id: subject.userId } },
           uniqueReleaseIds: [],
-        },
-      });
-    }
-
-    return quota;
+        }
+      : {
+          visitorId: subject.visitorId,
+          uniqueReleaseIds: [],
+        };
   }
 
   /**
-   * Atomically add a unique release ID to user's download quota
-   *
-   * Uses MongoDB $addToSet to prevent duplicates and ensure atomic operation
-   *
-   * @param userId - User ID
-   * @param releaseId - Release ID to add
-   * @returns Updated quota record
+   * Find existing quota record or create a new one for the subject.
    */
-  async addUniqueRelease(userId: string, releaseId: string): Promise<UserDownloadQuota> {
-    // Use findOrCreate to ensure quota record exists first
-    await this.findOrCreateByUserId(userId);
+  async findOrCreateBySubject(subject: DownloadSubject): Promise<UserDownloadQuota> {
+    const existing = await prisma.userDownloadQuota.findUnique({
+      where: this.whereForSubject(subject),
+    });
+    if (existing) {
+      return existing;
+    }
+    return prisma.userDownloadQuota.create({
+      data: this.createDataForSubject(subject),
+    });
+  }
 
-    // Atomic update using MongoDB $addToSet (prevents duplicates)
-    const updatedQuota = await prisma.userDownloadQuota.update({
-      where: { userId },
+  /**
+   * Atomically add a unique release ID to the subject's download quota.
+   */
+  async addUniqueRelease(subject: DownloadSubject, releaseId: string): Promise<UserDownloadQuota> {
+    await this.findOrCreateBySubject(subject);
+    return prisma.userDownloadQuota.update({
+      where: this.whereForSubject(subject),
       data: {
-        uniqueReleaseIds: {
-          push: releaseId,
-        },
+        uniqueReleaseIds: { push: releaseId },
       },
     });
-
-    return updatedQuota;
   }
 
   /**
-   * Check if user has exceeded free download quota
-   *
-   * @param userId - User ID
-   * @param maxQuota - Maximum allowed unique releases (default: 5)
-   * @returns True if quota exceeded, false otherwise
+   * Check if the subject has exceeded the freemium quota.
    */
-  async checkQuotaExceeded(userId: string, maxQuota = 5): Promise<boolean> {
-    const quota = await this.findOrCreateByUserId(userId);
-
+  async checkQuotaExceeded(subject: DownloadSubject, maxQuota = 5): Promise<boolean> {
+    const quota = await this.findOrCreateBySubject(subject);
     return quota.uniqueReleaseIds.length >= maxQuota;
   }
 
   /**
-   * Get remaining quota count for a user
-   *
-   * @param userId - User ID
-   * @param maxQuota - Maximum allowed unique releases (default: 5)
-   * @returns Number of remaining free downloads
+   * Number of remaining free downloads for the subject.
    */
-  async getRemainingQuota(userId: string, maxQuota = 5): Promise<number> {
-    const quota = await this.findOrCreateByUserId(userId);
-    const remaining = maxQuota - quota.uniqueReleaseIds.length;
-
-    return Math.max(0, remaining); // Ensure non-negative
+  async getRemainingQuota(subject: DownloadSubject, maxQuota = 5): Promise<number> {
+    const quota = await this.findOrCreateBySubject(subject);
+    return Math.max(0, maxQuota - quota.uniqueReleaseIds.length);
   }
 
   /**
-   * Check if user has already downloaded a specific release for free
-   *
-   * @param userId - User ID
-   * @param releaseId - Release ID to check
-   * @returns True if release has been downloaded, false otherwise
+   * Whether the subject has already counted the given release toward quota.
    */
-  async hasDownloadedRelease(userId: string, releaseId: string): Promise<boolean> {
-    const quota = await this.findOrCreateByUserId(userId);
-
+  async hasDownloadedRelease(subject: DownloadSubject, releaseId: string): Promise<boolean> {
+    const quota = await this.findOrCreateBySubject(subject);
     return quota.uniqueReleaseIds.includes(releaseId);
   }
 
   /**
-   * Get all unique release IDs downloaded by a user
-   *
-   * @param userId - User ID
-   * @returns Array of release IDs
+   * All release IDs the subject has consumed under the freemium quota.
    */
-  async getDownloadedReleaseIds(userId: string): Promise<string[]> {
-    const quota = await this.findOrCreateByUserId(userId);
-
+  async getDownloadedReleaseIds(subject: DownloadSubject): Promise<string[]> {
+    const quota = await this.findOrCreateBySubject(subject);
     return quota.uniqueReleaseIds;
   }
 }

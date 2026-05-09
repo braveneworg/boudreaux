@@ -127,4 +127,41 @@ describe('attachStreamUrls', () => {
       'signed:releases/abc/digital-formats/FLAC/track-1.flac'
     );
   });
+
+  it('skips files with null/empty s3Key and non-object file entries', () => {
+    const payload = {
+      digitalFormats: [
+        // first format has a missing/null files prop — exercises the
+        // `fmt && Array.isArray(fmt.files)` false branch.
+        { formatType: 'FLAC' },
+        // second has a mix of valid file, null entry, and a primitive entry.
+        {
+          formatType: 'WAV',
+          files: [
+            { id: 'a', s3Key: '', streamUrl: null as string | null },
+            null,
+            'not-an-object',
+            { id: 'b', s3Key: null, streamUrl: null as string | null },
+            {
+              id: 'c',
+              s3Key: 'releases/abc/digital-formats/WAV/track-1.wav',
+              streamUrl: null as string | null,
+            },
+          ],
+        },
+      ],
+    };
+
+    attachStreamUrls(payload);
+
+    const wav = payload.digitalFormats[1].files as Array<unknown>;
+    // Files with falsy s3Key are skipped (signStreamUrl returns null in our test seam).
+    // Files that are non-objects or null are skipped without throwing.
+    expect((wav[0] as { streamUrl: string | null }).streamUrl).toBeNull();
+    expect((wav[3] as { streamUrl: string | null }).streamUrl).toBeNull();
+    // Valid file is signed.
+    expect((wav[4] as { streamUrl: string | null }).streamUrl).toBe(
+      'signed:releases/abc/digital-formats/WAV/track-1.wav'
+    );
+  });
 });

@@ -8,8 +8,9 @@ import { POST } from './route';
 
 vi.mock('server-only', () => ({}));
 
+const mockExtractClientIp = vi.fn((_: NextRequest) => '127.0.0.1');
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
-  extractClientIp: () => '127.0.0.1',
+  extractClientIp: (req: NextRequest) => mockExtractClientIp(req),
 }));
 vi.mock('@/lib/config/rate-limit-tiers', () => ({
   downloadLimiter: { check: vi.fn().mockResolvedValue(undefined) },
@@ -253,5 +254,39 @@ describe('POST /api/releases/[id]/download/confirm', () => {
         userAgent: 'unknown',
       })
     );
+  });
+
+  it('falls back to "unknown" when extractClientIp cannot resolve a client IP', async () => {
+    mockExtractClientIp
+      .mockImplementationOnce((_: NextRequest) => '127.0.0.1')
+      .mockReturnValueOnce(null as never);
+    try {
+      await POST(makeRequest({ formats: ['FLAC'] }), makeParams());
+
+      expect(mockLogDownloadEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ipAddress: 'unknown' })
+      );
+    } finally {
+      mockExtractClientIp.mockImplementation((_: NextRequest) => '127.0.0.1');
+    }
+  });
+
+  it('uses the __Secure cookie name when running in production outside of E2E', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+
+    try {
+      mockGetToken.mockResolvedValueOnce(null);
+      await POST(makeRequest({ formats: ['FLAC'] }), makeParams());
+
+      expect(mockGetToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cookieName: '__Secure-next-auth.session-token',
+          secureCookie: true,
+        })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

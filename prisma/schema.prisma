@@ -669,17 +669,43 @@ model ReleaseDigitalFormatFile {
 
 model UserDownloadQuota {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String   @unique @db.ObjectId
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Exactly one of (userId, visitorId) is set per row.
+  // userId: authenticated freemium quota holder
+  // visitorId: anonymous guest identified by the boudreaux_visitor_id cookie (UUIDv7)
+  // Feature: 007-free-digital-downloads
+  userId           String?  @unique @db.ObjectId
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visitorId        String?  @unique
   uniqueReleaseIds String[] // Array of release ObjectId strings downloaded for free (max 5)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
 
+// Per-(visitorId, releaseId) download counter used to enforce
+// MAX_RELEASE_DOWNLOAD_COUNT for anonymous guests with a 6-hour reset window.
+// Mirrors the per-release cap that PurchaseAccess provides for authenticated users
+// and paid guests, but for the free anonymous flow.
+// Feature: 007-free-digital-downloads
+model GuestDownloadCount {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  visitorId      String
+  releaseId      String   @db.ObjectId
+  downloadCount  Int      @default(0)
+  lastDownloadAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([visitorId, releaseId])
+  @@index([visitorId])
+  @@index([releaseId])
+  @@index([lastDownloadAt])
+}
+
 model DownloadEvent {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String?  @db.ObjectId // Nullable for guest downloads (future feature)
+  userId       String?  @db.ObjectId // Nullable for guest downloads
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  visitorId    String? // boudreaux_visitor_id cookie value for anonymous downloads (007-free-digital-downloads)
   releaseId    String   @db.ObjectId
   formatType   String // Format downloaded (e.g., MP3_320KBPS, FLAC)
   success      Boolean // true = download succeeded, false = failed (quota exceeded, auth error, etc.)
@@ -690,9 +716,29 @@ model DownloadEvent {
   createdAt    DateTime @default(now())
 
   @@index([userId])
+  @@index([visitorId])
   @@index([releaseId])
   @@index([downloadedAt]) // For time-based analytics queries
   @@index([userId, releaseId]) // For per-user per-release download history
+  @@index([visitorId, releaseId, downloadedAt]) // Free-flow rolling-window cap query (007-free-digital-downloads)
+}
+
+// Composite-identity record for anonymous visitors (007-free-digital-downloads).
+// Maps the long-lived first-party cookie value (visitorId) to a server-derived
+// fingerprint hash so that the per-release rolling-window cap survives cookie clears.
+model VisitorIdentity {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  // Canonical anonymous identifier — same value as the boudreaux_visitor_id cookie.
+  visitorId       String   @unique
+  // SHA-256(UA | Accept-Language | IP /24) hex digest. Indexed for cookie-recovery lookups.
+  fingerprintHash String
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([fingerprintHash])
+  @@index([lastSeenAt])
 }
 
 // Banner Notification Carousel (006-banner-notification-carousel)

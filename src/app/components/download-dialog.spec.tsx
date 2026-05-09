@@ -122,11 +122,15 @@ vi.mock('@/app/components/format-bundle-download', () => ({
     availableFormats,
     downloadCount,
     onDownloadComplete,
+    autoStart,
+    initialSelectedFormats,
   }: {
     releaseId: string;
     availableFormats: Array<{ formatType: string; fileName: string }>;
     downloadCount: number;
     onDownloadComplete?: () => void;
+    autoStart?: boolean;
+    initialSelectedFormats?: string[];
   }) => {
     if (availableFormats.length === 0) {
       return <p>No digital formats available for download.</p>;
@@ -137,6 +141,8 @@ vi.mock('@/app/components/format-bundle-download', () => ({
         data-release-id={releaseId}
         data-format-count={availableFormats.length}
         data-download-count={downloadCount}
+        data-auto-start={autoStart ? 'true' : 'false'}
+        data-initial-selected-formats={(initialSelectedFormats ?? []).join(',')}
       >
         Mock Format Bundle Download
         {onDownloadComplete && (
@@ -149,6 +155,40 @@ vi.mock('@/app/components/format-bundle-download', () => ({
   },
 }));
 
+let currentFreeStatusData: { availableFreeFormats: string[] } | undefined = {
+  availableFreeFormats: ['MP3_320KBPS', 'AAC'],
+};
+const mockUseFreeDownloadStatusQuery = vi.fn(() => ({ data: currentFreeStatusData }));
+
+vi.mock('@/app/hooks/use-free-download-status-query', () => ({
+  useFreeDownloadStatusQuery: () => mockUseFreeDownloadStatusQuery(),
+}));
+
+vi.mock('@/app/components/free-format-select-step', () => ({
+  FreeFormatSelectStep: ({
+    releaseId,
+    availableFreeFormats,
+    onDownloadComplete,
+  }: {
+    releaseId: string;
+    availableFreeFormats: ReadonlyArray<string>;
+    onDownloadComplete?: () => void;
+  }) => (
+    <div
+      data-testid="free-format-select-step"
+      data-release-id={releaseId}
+      data-available={availableFreeFormats.join(',')}
+    >
+      Mock Free Format Select Step
+      {onDownloadComplete && (
+        <button data-testid="mock-free-download-btn" onClick={onDownloadComplete}>
+          Trigger free complete
+        </button>
+      )}
+    </div>
+  ),
+}));
+
 describe('DownloadDialog', () => {
   const defaultProps = {
     artistName: 'Test Artist',
@@ -158,6 +198,9 @@ describe('DownloadDialog', () => {
 
   beforeEach(() => {
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+    mockUseFreeDownloadStatusQuery.mockReturnValue({
+      data: { availableFreeFormats: ['MP3_320KBPS', 'AAC'] },
+    });
   });
 
   it('should render the trigger element', () => {
@@ -196,7 +239,7 @@ describe('DownloadDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
-    expect(screen.getByText('Free (320Kbps)')).toBeInTheDocument();
+    expect(screen.getByText(/digital formats: MP3 \(320Kbps\) and AAC/)).toBeInTheDocument();
   });
 
   it('should render the premium download radio option with price', async () => {
@@ -211,7 +254,6 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Open Download' }));
 
     expect(screen.getByText(/Premium digital formats/)).toBeInTheDocument();
-    expect(screen.getByText(/pay what you want/)).toBeInTheDocument();
   });
 
   it('should show custom amount input when premium is selected', async () => {
@@ -329,7 +371,7 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/suggested \$8/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toHaveAttribute('placeholder', '$8.00');
     });
   });
 
@@ -346,7 +388,7 @@ describe('DownloadDialog', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/suggested \$12/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toHaveAttribute('placeholder', '$12.00');
     });
   });
 
@@ -385,11 +427,18 @@ describe('DownloadDialog — dialog lifecycle', () => {
     mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
   });
 
-  it('should close the dialog after a successful form submission', async () => {
+  it('should advance to the free-format-select step when the free option is submitted', async () => {
     const user = userEvent.setup();
 
     render(
-      <DownloadDialog {...defaultProps}>
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[
+          { formatType: 'MP3_320KBPS', fileName: 'album-mp3.zip' },
+          { formatType: 'AAC', fileName: 'album-aac.zip' },
+          { formatType: 'FLAC', fileName: 'album-flac.zip' },
+        ]}
+      >
         <button>Open Download</button>
       </DownloadDialog>
     );
@@ -400,9 +449,8 @@ describe('DownloadDialog — dialog lifecycle', () => {
     await user.click(screen.getByRole('radio', { name: /free/i }));
     await user.click(screen.getByRole('button', { name: 'Download' }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Download' })).not.toBeInTheDocument();
-    });
+    expect(await screen.findByTestId('free-format-select-step')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('should stay open and show rate-select step when the subscribe button is clicked', async () => {
@@ -1904,7 +1952,7 @@ describe('DownloadDialog — suggestedPrice prop', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/suggested \$10/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toHaveAttribute('placeholder', '$10.00');
     });
 
     // The Buy & Download button should show suggestedPrice
@@ -1929,7 +1977,7 @@ describe('DownloadDialog — suggestedPrice prop', () => {
     await user.click(screen.getByRole('radio', { name: /premium/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/suggested \$8/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom amount')).toHaveAttribute('placeholder', '$8.00');
     });
   });
 });
@@ -2215,5 +2263,104 @@ describe('DownloadDialog — hasPurchase on download step', () => {
       expect(screen.getByRole('heading', { name: 'Download Again' })).toBeInTheDocument();
     });
     expect(screen.getByText(/resets in 1 hour\./i)).toBeInTheDocument();
+  });
+});
+
+describe('DownloadDialog — free download flow (007 US1)', () => {
+  const defaultProps = {
+    artistName: 'Test Artist',
+    premiumPrice: 8,
+    releaseId: 'release-123',
+  };
+
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({ data: null, status: 'unauthenticated' });
+    currentFreeStatusData = { availableFreeFormats: ['MP3_320KBPS', 'AAC'] };
+  });
+
+  it('advances to free-format-select step when free radio is submitted', async () => {
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    const freeRadio = screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i });
+    await user.click(freeRadio);
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+
+    expect(await screen.findByTestId('free-format-select-step')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Free Download/ })).toBeInTheDocument();
+  });
+
+  it('passes availableFreeFormats from the free-status query into FreeFormatSelectStep', async () => {
+    currentFreeStatusData = { availableFreeFormats: ['MP3_320KBPS'] };
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }));
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+
+    const step = await screen.findByTestId('free-format-select-step');
+    expect(step.getAttribute('data-available')).toBe('MP3_320KBPS');
+  });
+
+  it('back navigation returns to the download step', async () => {
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }));
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+    await screen.findByTestId('free-format-select-step');
+
+    await user.click(screen.getByRole('button', { name: /^Back$/ }));
+
+    expect(screen.queryByTestId('free-format-select-step')).not.toBeInTheDocument();
+    expect(screen.getByText('Choose download format(s)')).toBeInTheDocument();
+  });
+
+  it('closing the dialog mid-download resets the step state', async () => {
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }));
+    await user.click(screen.getByRole('button', { name: /^Download$/ }));
+    await screen.findByTestId('free-format-select-step');
+
+    // onDownloadComplete closes the dialog and resets state.
+    await user.click(screen.getByTestId('mock-free-download-btn'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('free-format-select-step')).not.toBeInTheDocument();
+    });
+  });
+
+  it('disables the free radio with hint when no free formats are published', async () => {
+    currentFreeStatusData = { availableFreeFormats: [] };
+    const user = userEvent.setup();
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+
+    const freeRadio = screen.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i });
+    expect(freeRadio).toBeDisabled();
+    expect(screen.getByText(/Not available for this release/i)).toBeInTheDocument();
   });
 });

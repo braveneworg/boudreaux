@@ -118,7 +118,7 @@ export async function POST(
     }
 
     // Step 3: Verify purchase exists
-    const access = await PurchaseService.getDownloadAccess(userId, releaseId);
+    const access = await PurchaseService.getDownloadAccess({ kind: 'user', userId }, releaseId);
 
     if (!access.allowed) {
       return Response.json(

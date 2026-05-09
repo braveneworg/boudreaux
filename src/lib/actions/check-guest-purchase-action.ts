@@ -58,7 +58,10 @@ export async function checkGuestPurchaseAction(
     return { hasPurchase: false, downloadCount: 0, atCap: false, resetInHours: null };
   }
 
-  const access = await PurchaseService.getDownloadAccess(user.id, releaseId);
+  const access = await PurchaseService.getDownloadAccess(
+    { kind: 'user', userId: user.id },
+    releaseId
+  );
   return {
     hasPurchase: true,
     downloadCount: access.downloadCount,

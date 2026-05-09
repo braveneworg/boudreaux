@@ -154,7 +154,10 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(mockIncrementQuota).toHaveBeenCalledWith('user-123', '507f1f77bcf86cd799439011');
+    expect(mockIncrementQuota).toHaveBeenCalledWith(
+      { kind: 'user', userId: 'user-123' },
+      '507f1f77bcf86cd799439011'
+    );
   });
 
   it('should not increment quota when already downloaded', async () => {
@@ -319,5 +322,24 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     expect(body.error).toBe('INTERNAL_ERROR');
 
     consoleSpy.mockRestore();
+  });
+
+  it('uses the __Secure cookie name when running in production outside of E2E', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+
+    try {
+      mockGetToken.mockResolvedValueOnce(null);
+      await GET(makeRequest(), makeParams());
+
+      expect(mockGetToken).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cookieName: '__Secure-next-auth.session-token',
+          secureCookie: true,
+        })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

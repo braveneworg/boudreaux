@@ -10,7 +10,7 @@ import {
 
 describe('download-schema', () => {
   const validFreeData: DownloadFormSchemaType = {
-    downloadOption: 'free-320kbps',
+    downloadOption: 'free-320-aac',
     finalAmount: '',
   };
 
@@ -38,9 +38,9 @@ describe('download-schema', () => {
       expect(new Set(values).size).toBe(values.length);
     });
 
-    it('should include free-320kbps option', () => {
+    it('should include free-320-aac option', () => {
       const values = DOWNLOAD_OPTIONS.map((o) => o.value);
-      expect(values).toContain('free-320kbps');
+      expect(values).toContain('free-320-aac');
     });
 
     it('should include premium-digital option', () => {
@@ -50,7 +50,7 @@ describe('download-schema', () => {
   });
 
   describe('downloadOption field', () => {
-    it('should accept free-320kbps', () => {
+    it('should accept free-320-aac', () => {
       const result = downloadSchema.safeParse(validFreeData);
       expect(result.success).toBe(true);
     });
@@ -138,7 +138,7 @@ describe('download-schema', () => {
     it('should accept complete free download data', () => {
       const result = downloadSchema.safeParse(validFreeData);
       expect(result.success).toBe(true);
-      expect(result.data?.downloadOption).toBe('free-320kbps');
+      expect(result.data?.downloadOption).toBe('free-320-aac');
     });
 
     it('should accept premium data with a custom amount', () => {

@@ -367,6 +367,32 @@ async function seedTestDatabase() {
       },
     });
 
+    // Add AAC to E2E Album One so the freemium free-download flow has both
+    // FREE_FORMAT_TYPES (MP3_320KBPS already created above) available for
+    // 007-free-digital-downloads E2E coverage.
+    const aacFormat = await prisma.releaseDigitalFormat.create({
+      data: {
+        releaseId: e2eRelease1.id,
+        formatType: 'AAC',
+        trackCount: 1,
+        totalFileSize: BigInt(8_000_000),
+        deletedAt: null,
+      },
+    });
+
+    await prisma.releaseDigitalFormatFile.create({
+      data: {
+        formatId: aacFormat.id,
+        trackNumber: 1,
+        title: 'E2E Track Alpha',
+        duration: 210,
+        s3Key: `releases/${e2eRelease1.id}/audio/aac/01-track.m4a`,
+        fileName: '01-track.m4a',
+        fileSize: BigInt(8_000_000),
+        mimeType: 'audio/aac',
+      },
+    });
+
     // Create a purchase record for regular user on E2E Album One (for download tests)
     // Note: refundedAt and confirmationEmailSentAt must be explicitly set to null
     // because Prisma with MongoDB won't match `{ refundedAt: null }` queries against

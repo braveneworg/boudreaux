@@ -6,6 +6,8 @@ import { PassThrough, Readable } from 'node:stream';
 
 import { NextRequest } from 'next/server';
 
+import { CapReachedError as MockedCapReachedError } from '@/lib/services/free-download-quota-service';
+
 import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
@@ -81,6 +83,96 @@ vi.mock('@/lib/prisma', () => ({
     release: {
       findFirst: (...args: unknown[]) => mockPrismaReleaseFindFirst(...args),
     },
+  },
+}));
+
+// 007-free-digital-downloads: guest identity + fingerprint + quota helpers
+const mockReadGuestVisitorId = vi.fn().mockResolvedValue(null);
+const mockSetGuestVisitorIdCookie = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/utils/guest-visitor-id', () => ({
+  readGuestVisitorId: (...args: unknown[]) => mockReadGuestVisitorId(...args),
+  setGuestVisitorIdCookie: (...args: unknown[]) => mockSetGuestVisitorIdCookie(...args),
+  VISITOR_ID_COOKIE: 'boudreaux_visitor_id',
+}));
+
+const mockComputeFingerprintHash = vi.fn().mockReturnValue('test-fp-hash');
+vi.mock('@/lib/utils/visitor-fingerprint', () => ({
+  computeFingerprintHash: (...args: unknown[]) => mockComputeFingerprintHash(...args),
+}));
+
+const mockResolveVisitorIdentity = vi.fn().mockResolvedValue({
+  primaryVisitorId: 'guest-visitor-1',
+  allVisitorIds: ['guest-visitor-1'],
+  cookieReissue: true,
+});
+const mockAssertFreeDownloadAllowed = vi.fn().mockResolvedValue({
+  allowed: true,
+  remaining: 3,
+  count: 0,
+  oldestInWindow: null,
+  resetsAt: null,
+});
+class MockCapReachedError extends Error {
+  public readonly code = 'CAP_REACHED' as const;
+  constructor(public readonly resetsAt: Date) {
+    super('Free-download cap reached');
+    this.name = 'CapReachedError';
+  }
+}
+const mockRecordSuccessfulDownload = vi.fn(
+  async (params: {
+    subject: { kind: 'user'; userId: string } | { kind: 'guest'; visitorId: string };
+    releaseId: string;
+    formatType: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }) => {
+    // Mirror the real service: log a single success event so tests asserting
+    // on `mockLogDownloadEvent` continue to observe the write.
+    await mockLogDownloadEvent({
+      userId: params.subject.kind === 'user' ? params.subject.userId : null,
+      visitorId: params.subject.kind === 'guest' ? params.subject.visitorId : null,
+      releaseId: params.releaseId,
+      formatType: params.formatType,
+      success: true,
+      ipAddress: params.ipAddress ?? '',
+      userAgent: params.userAgent ?? '',
+    });
+  }
+);
+vi.mock('@/lib/services/free-download-quota-service', () => {
+  // Declared inside the factory because vi.mock is hoisted above module-scope
+  // identifiers; module-level symbols would not yet be initialized.
+  class CapReachedError extends Error {
+    public readonly code = 'CAP_REACHED' as const;
+    constructor(public readonly resetsAt: Date) {
+      super('Free-download cap reached');
+      this.name = 'CapReachedError';
+    }
+  }
+  return {
+    freeDownloadQuotaService: {
+      resolveVisitorIdentity: (...args: unknown[]) => mockResolveVisitorIdentity(...args),
+      assertFreeDownloadAllowed: (...args: unknown[]) => mockAssertFreeDownloadAllowed(...args),
+      recordSuccessfulDownload: (params: Parameters<typeof mockRecordSuccessfulDownload>[0]) =>
+        mockRecordSuccessfulDownload(params),
+    },
+    FREE_DOWNLOAD_CAP: 3,
+    FREE_DOWNLOAD_WINDOW_MS: 24 * 60 * 60 * 1000,
+    CapReachedError,
+  };
+});
+
+// Re-export the in-test alias so individual tests can construct cap-reached errors.
+const __MockCapReachedError = MockCapReachedError;
+void __MockCapReachedError;
+
+const mockLockAcquire = vi.fn().mockReturnValue(true);
+const mockLockRelease = vi.fn();
+vi.mock('@/lib/services/free-download-lock-service', () => ({
+  freeDownloadLockService: {
+    acquire: (...args: unknown[]) => mockLockAcquire(...args),
+    release: (...args: unknown[]) => mockLockRelease(...args),
   },
 }));
 
@@ -257,6 +349,39 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(body.error).toBe('PURCHASE_REQUIRED');
   });
 
+  it('should bypass purchase requirement when all requested formats are free', async () => {
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: false,
+      reason: 'no_purchase',
+      downloadCount: 0,
+      lastDownloadedAt: null,
+      resetInHours: null,
+    });
+
+    // Use a JSON-mode request so the route resolves synchronously without
+    // streaming the (mocked) archive — we only need to assert the gate did
+    // not return 403.
+    const response = await GET(makeJsonRequest('MP3_320KBPS,AAC'), makeParams());
+
+    expect(response.status).not.toBe(403);
+  });
+
+  it('should still return 403 PURCHASE_REQUIRED when the request mixes free and paid formats', async () => {
+    mockGetDownloadAccess.mockResolvedValue({
+      allowed: false,
+      reason: 'no_purchase',
+      downloadCount: 0,
+      lastDownloadedAt: null,
+      resetInHours: null,
+    });
+
+    const response = await GET(makeRequest('MP3_320KBPS,FLAC'), makeParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('PURCHASE_REQUIRED');
+  });
+
   it('should return 403 when download limit is reached', async () => {
     mockGetDownloadAccess.mockResolvedValue({
       allowed: false,
@@ -311,7 +436,9 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     await GET(makeRequest(), makeParams());
 
     const [tempKey] = mockGeneratePresignedDownloadUrl.mock.calls[0] ?? [];
-    expect(tempKey).toMatch(/^tmp\/bundles\/cache\/507f1f77bcf86cd799439011\/[A-Z-]+\.zip$/);
+    expect(tempKey).toMatch(
+      /^tmp\/bundles\/cache\/507f1f77bcf86cd799439011\/(paid|free)\/[A-Z0-9_-]+\.zip$/
+    );
     // Sorted formats — FLAC,WAV → "FLAC-WAV"
     expect(tempKey).toContain('FLAC-WAV');
   });
@@ -347,6 +474,47 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     consoleSpy.mockRestore();
   });
 
+  // ─── Direct streaming path (respond=stream, paid mode) ──────────────────
+
+  it('should return 200 with ZIP headers when respond=stream on paid mode', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC,WAV&respond=stream',
+        { headers: { 'x-forwarded-for': '127.0.0.1', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/zip');
+    expect(response.headers.get('Content-Disposition')).toMatch(/attachment.*\.zip/);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(response.headers.get('X-Accel-Buffering')).toBe('no');
+
+    // Drain the body so the underlying Upload promise resolves before the
+    // test ends. The archiver mock ends synchronously after finalize so this
+    // resolves quickly.
+    await response.arrayBuffer();
+  });
+
+  it('should still 302 on cache hit even when respond=stream is requested', async () => {
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=FLAC,WAV&respond=stream',
+        { headers: { 'x-forwarded-for': '127.0.0.1', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    // Cache hit takes priority over streaming branch — preserves the
+    // single-source-of-truth fast path for repeat downloads.
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://s3.example.com/presigned-bundle-url');
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
   // ─── SSE streaming path (respond=json) ──────────────────────────────────
 
   it('should return SSE stream with correct headers when respond=json', async () => {
@@ -361,8 +529,11 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     const response = await GET(makeJsonRequest(), makeParams());
     const events = await readSSEEvents(response);
 
-    // progress(FLAC,zipping), progress(FLAC,done), progress(WAV,zipping), progress(WAV,done),
-    // progress(uploading), ready(url), complete
+    // All `zipping` events fire up front (so progress UI shows every format
+    // immediately), then S3 prefetch + archive append run in parallel across
+    // formats, then `done` events fire as each format's last entry is appended.
+    // Order: progress(FLAC,zipping), progress(WAV,zipping), progress(FLAC,done),
+    // progress(WAV,done), progress(uploading), ready(url), complete
     expect(events).toHaveLength(7);
     expect(events[0]).toEqual(
       expect.objectContaining({
@@ -373,13 +544,13 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(events[1]).toEqual(
       expect.objectContaining({
         event: 'progress',
-        data: expect.objectContaining({ formatType: 'FLAC', status: 'done' }),
+        data: expect.objectContaining({ formatType: 'WAV', status: 'zipping' }),
       })
     );
     expect(events[2]).toEqual(
       expect.objectContaining({
         event: 'progress',
-        data: expect.objectContaining({ formatType: 'WAV', status: 'zipping' }),
+        data: expect.objectContaining({ formatType: 'FLAC', status: 'done' }),
       })
     );
     expect(events[3]).toEqual(
@@ -1171,5 +1342,730 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(body.error).toBe('INVALID_FORMATS');
     expect(typeof body.message).toBe('string');
     expect(body.message.length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — mode='free' guest flow
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeFreeRequest(formats = 'MP3_320KBPS,AAC'): NextRequest {
+  return new NextRequest(
+    `http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=${formats}&mode=free`,
+    {
+      headers: {
+        'x-forwarded-for': '203.0.113.42',
+        'user-agent': 'test-agent',
+        'accept-language': 'en-US,en;q=0.9',
+      },
+    }
+  );
+}
+
+describe('GET /api/releases/[id]/download/bundle (mode=free)', () => {
+  beforeEach(() => {
+    // Default: anonymous (no token) — free flow accepts this.
+    mockGetToken.mockResolvedValue(null);
+    // resolveVisitorIdentity returns a fresh visitorId requiring cookie reissue.
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: true,
+    });
+    mockReadGuestVisitorId.mockResolvedValue(null);
+    mockSetGuestVisitorIdCookie.mockResolvedValue(undefined);
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockUpsertDownloadCount.mockResolvedValue(undefined);
+    mockLogDownloadEvent.mockResolvedValue(undefined);
+
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+
+    mockS3Send.mockResolvedValue({
+      Body: Readable.from(Buffer.from('fake-audio-data')),
+    });
+  });
+
+  it('does NOT return 401 for guests when mode=free', async () => {
+    const response = await GET(makeFreeRequest(), makeParams());
+    expect(response.status).not.toBe(401);
+  });
+
+  it('rejects FLAC with INVALID_FORMATS (400) when mode=free', async () => {
+    const response = await GET(makeFreeRequest('FLAC'), makeParams());
+    const body = await response.json();
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('INVALID_FORMATS');
+  });
+
+  it('builds a ZIP for MP3_320KBPS only when mode=free', async () => {
+    mockFindAllByRelease.mockResolvedValueOnce([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://s3.example.com/presigned-bundle-url');
+  });
+
+  it('builds a ZIP for AAC only when mode=free', async () => {
+    mockFindAllByRelease.mockResolvedValueOnce([
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+    const response = await GET(makeFreeRequest('AAC'), makeParams());
+    expect(response.status).toBe(302);
+  });
+
+  it('builds a single ZIP containing both free formats when both are requested', async () => {
+    const response = await GET(makeFreeRequest('MP3_320KBPS,AAC'), makeParams());
+    expect(response.status).toBe(302);
+    // Two files appended to a single archive.
+    expect(mockAppend).toHaveBeenCalledTimes(2);
+  });
+
+  it('issues the visitor-id cookie via setGuestVisitorIdCookie when cookieReissue=true', async () => {
+    await GET(makeFreeRequest(), makeParams());
+    expect(mockSetGuestVisitorIdCookie).toHaveBeenCalledWith('guest-visitor-1');
+  });
+
+  it('does NOT issue the visitor-id cookie when cookieReissue=false', async () => {
+    mockResolveVisitorIdentity.mockResolvedValueOnce({
+      primaryVisitorId: 'existing-visitor',
+      allVisitorIds: ['existing-visitor'],
+      cookieReissue: false,
+    });
+    await GET(makeFreeRequest(), makeParams());
+    expect(mockSetGuestVisitorIdCookie).not.toHaveBeenCalled();
+  });
+
+  it('returns NOT_FOUND when release does not exist', async () => {
+    mockPrismaReleaseFindFirst.mockResolvedValueOnce(null);
+    const response = await GET(makeFreeRequest(), makeParams());
+    expect(response.status).toBe(404);
+  });
+
+  it('does NOT call PurchaseRepository.upsertDownloadCount for guest free downloads', async () => {
+    await GET(makeFreeRequest(), makeParams());
+    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+  });
+
+  it('logs DownloadEvent with visitorId and null userId for guest free downloads', async () => {
+    await GET(makeFreeRequest(), makeParams());
+    expect(mockLogDownloadEvent).toHaveBeenCalled();
+    const call = mockLogDownloadEvent.mock.calls[0][0];
+    expect(call.userId).toBeNull();
+    expect(call.visitorId).toBe('guest-visitor-1');
+  });
+
+  it('uses a cache key namespaced under /free/ when mode=free', async () => {
+    await GET(makeFreeRequest(), makeParams());
+    const [tempKey] = mockGeneratePresignedDownloadUrl.mock.calls[0] ?? [];
+    expect(tempKey).toMatch(/^tmp\/bundles\/cache\/507f1f77bcf86cd799439011\/free\//);
+  });
+
+  it('returns NO_FILES (404) when no free formats are published for the release', async () => {
+    mockFindAllByRelease.mockResolvedValueOnce([]);
+    const response = await GET(makeFreeRequest(), makeParams());
+    const body = await response.json();
+    expect(response.status).toBe(404);
+    expect(body.error).toBe('NO_FILES');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — US2 cap enforcement (T044)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle (mode=free) — cap enforcement', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockSetGuestVisitorIdCookie.mockResolvedValue(undefined);
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({
+      Body: Readable.from(Buffer.from('fake-audio-data')),
+    });
+  });
+
+  it('returns 403 CAP_REACHED with resetsAtIso body when cap is exhausted', async () => {
+    const resetsAt = new Date('2026-05-09T09:00:00Z');
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(new MockedCapReachedError(resetsAt));
+
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.errorCode).toBe('CAP_REACHED');
+    expect(body.resetsAtIso).toBe('2026-05-09T09:00:00.000Z');
+    expect(typeof body.message).toBe('string');
+  });
+
+  it('writes a CAP_REACHED audit DownloadEvent (success:false, errorCode:CAP_REACHED)', async () => {
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+
+    expect(mockLogDownloadEvent).toHaveBeenCalledTimes(1);
+    const audit = mockLogDownloadEvent.mock.calls[0][0];
+    expect(audit.success).toBe(false);
+    expect(audit.errorCode).toBe('CAP_REACHED');
+    expect(audit.visitorId).toBe('guest-visitor-1');
+    expect(audit.userId).toBeNull();
+  });
+
+  it('does NOT call recordSuccessfulDownload when cap is reached', async () => {
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+
+  it('records exactly one success event per successful free bundle (single format)', async () => {
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+    // mockLogDownloadEvent is invoked through the mocked recordSuccessfulDownload.
+    expect(mockLogDownloadEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('records exactly one success event per successful free bundle (two formats)', async () => {
+    mockFindAllByRelease.mockResolvedValueOnce([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+    await GET(makeFreeRequest('MP3_320KBPS,AAC'), makeParams());
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+    expect(mockLogDownloadEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('asserts cap before bundle prep (assertFreeDownloadAllowed runs before S3 GET)', async () => {
+    const callOrder: string[] = [];
+    mockAssertFreeDownloadAllowed.mockImplementationOnce(async () => {
+      callOrder.push('assert');
+      return { allowed: true, remaining: 3, count: 0, oldestInWindow: null, resetsAt: null };
+    });
+    mockS3Send.mockImplementationOnce(async () => {
+      callOrder.push('s3');
+      return { Body: Readable.from(Buffer.from('fake-audio-data')) };
+    });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(callOrder[0]).toBe('assert');
+    expect(callOrder).toContain('s3');
+  });
+
+  it('passes union of visitorIds to assertFreeDownloadAllowed (identity-conflict union)', async () => {
+    mockResolveVisitorIdentity.mockResolvedValueOnce({
+      primaryVisitorId: 'cookie-visitor',
+      allVisitorIds: ['cookie-visitor', 'fingerprint-visitor'],
+      cookieReissue: false,
+    });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitorIds: ['cookie-visitor', 'fingerprint-visitor'],
+        releaseId: '507f1f77bcf86cd799439011',
+      })
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — US3 lock + auth user free flow (T055/T057/T061)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle (mode=free) — concurrency lock + auth user', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  it('returns 409 LOCK_HELD when lock acquisition fails AND no warm cache exists', async () => {
+    mockLockAcquire.mockReturnValueOnce(false);
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(false);
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.errorCode).toBe('LOCK_HELD');
+  });
+
+  it('proceeds via cache hit when lock acquisition fails BUT a warm cache exists', async () => {
+    mockLockAcquire.mockReturnValueOnce(false);
+    // First verifyS3ObjectExists call (cache check on lock fail) → true
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+    // Second call (302 path cache check) → true
+    mockVerifyS3ObjectExists.mockResolvedValueOnce(true);
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(response.status).toBe(302);
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses lock key composed of subjectKey + releaseId + sortedFormatKey', async () => {
+    await GET(makeFreeRequest('MP3_320KBPS,AAC'), makeParams());
+    expect(mockLockAcquire).toHaveBeenCalledWith(
+      'guest:guest-visitor-1|507f1f77bcf86cd799439011|AAC-MP3_320KBPS'
+    );
+  });
+
+  it('releases the lock at the end of a successful free download', async () => {
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockLockRelease).toHaveBeenCalledWith(
+      'guest:guest-visitor-1|507f1f77bcf86cd799439011|MP3_320KBPS'
+    );
+  });
+
+  it('keys cap by userId (NOT visitorId) for authenticated free-flow users', async () => {
+    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: { kind: 'user', userId: 'user-123' },
+        releaseId: '507f1f77bcf86cd799439011',
+      })
+    );
+  });
+
+  it('does NOT issue the visitor cookie for authenticated free-flow users', async () => {
+    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockSetGuestVisitorIdCookie).not.toHaveBeenCalled();
+    expect(mockResolveVisitorIdentity).not.toHaveBeenCalled();
+  });
+
+  it('uses subjectKey "user:<id>" in the lock key for authenticated users', async () => {
+    mockGetToken.mockResolvedValueOnce({ sub: 'user-123' });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(mockLockAcquire).toHaveBeenCalledWith(
+      'user:user-123|507f1f77bcf86cd799439011|MP3_320KBPS'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — Phase 6 polish: STREAM_FAILED audit (T062)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle (mode=free) — stream failure audit', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  it('writes a STREAM_FAILED audit DownloadEvent on 302-path archive failure', async () => {
+    mockS3Send.mockRejectedValueOnce(new Error('S3 GetObject failed'));
+
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams()).catch(() => undefined);
+
+    // Find the STREAM_FAILED row.
+    const streamFailedCall = mockLogDownloadEvent.mock.calls.find((call) => {
+      const arg = (call as ReadonlyArray<{ errorCode?: string; success?: boolean }>)[0];
+      return arg?.errorCode === 'STREAM_FAILED' && arg?.success === false;
+    });
+    expect(streamFailedCall).toBeDefined();
+    expect(streamFailedCall?.[0]?.visitorId).toBe('guest-visitor-1');
+  });
+
+  it('does NOT call recordSuccessfulDownload when stream fails', async () => {
+    mockS3Send.mockRejectedValueOnce(new Error('S3 GetObject failed'));
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams()).catch(() => undefined);
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — US3 cross-release independence + identity union
+// (T054, T056)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle (mode=free) — cross-release + identity-union', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  it('passes the requested releaseId through to assertFreeDownloadAllowed (cap is per-release)', async () => {
+    const releaseB = '507f1f77bcf86cd799439022';
+    mockPrismaReleaseFindFirst.mockResolvedValueOnce({ id: releaseB, title: 'Album B' });
+    await GET(makeFreeRequest('MP3_320KBPS'), makeParams(releaseB));
+    expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({ releaseId: releaseB })
+    );
+  });
+
+  it('cross-release independence: cap exhausted on A does NOT block release B', async () => {
+    // Release A → cap reached
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+    const aResp = await GET(makeFreeRequest('MP3_320KBPS'), makeParams('507f1f77bcf86cd799439011'));
+    expect(aResp.status).toBe(403);
+
+    // Release B (different id) for the SAME visitor → next assert call resolves true
+    const releaseB = '507f1f77bcf86cd799439022';
+    mockPrismaReleaseFindFirst.mockResolvedValueOnce({ id: releaseB, title: 'Album B' });
+    mockAssertFreeDownloadAllowed.mockResolvedValueOnce({
+      allowed: true,
+      remaining: 3,
+      count: 0,
+      oldestInWindow: null,
+      resetsAt: null,
+    });
+    const bResp = await GET(makeFreeRequest('MP3_320KBPS'), makeParams(releaseB));
+    expect(bResp.status).not.toBe(403);
+    expect(bResp.status).not.toBe(409);
+  });
+
+  it('identity-conflict union: cookie-cleared session unions previous events via fingerprint', async () => {
+    // Cookie + fingerprint resolve to two visitor rows. The route must pass
+    // BOTH ids to assertFreeDownloadAllowed so prior cookie events still count.
+    mockResolveVisitorIdentity.mockResolvedValueOnce({
+      primaryVisitorId: 'visitor-new-cookie',
+      allVisitorIds: ['visitor-new-cookie', 'visitor-prior-fingerprint'],
+      cookieReissue: false,
+    });
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+    const response = await GET(makeFreeRequest('MP3_320KBPS'), makeParams());
+    expect(response.status).toBe(403);
+    expect(mockAssertFreeDownloadAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitorIds: ['visitor-new-cookie', 'visitor-prior-fingerprint'],
+      })
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 007-free-digital-downloads — direct-stream branch (`respond=stream`) parity
+// between paid and free flows. Free-mode previously took the SSE path and
+// paid the S3 multipart-upload round-trip before the user saw a single byte;
+// unifying on `respond=stream` removes that latency.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream parity', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+      {
+        id: 'fmt-aac',
+        formatType: 'AAC',
+        s3Key: 'releases/r1/AAC/album.m4a',
+        fileName: 'album.m4a',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  it('returns 200 with ZIP headers when respond=stream + mode=free', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        {
+          headers: {
+            'x-forwarded-for': '203.0.113.42',
+            'user-agent': 'test-agent',
+            'accept-language': 'en-US,en;q=0.9',
+          },
+        }
+      ),
+      makeParams()
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/zip');
+    expect(response.headers.get('Content-Disposition')).toMatch(/attachment.*\.zip/);
+    expect(response.headers.get('X-Accel-Buffering')).toBe('no');
+
+    // Drain so the underlying upload + finalize complete before the test ends.
+    await response.arrayBuffer();
+  });
+
+  it('records exactly one successful free download before returning the stream Response', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    // Cap is committed BEFORE the streaming response is constructed —
+    // mirrors the SSE pre-`ready` placement so concurrent requests after
+    // this point see the new count.
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledTimes(1);
+    expect(mockRecordSuccessfulDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: { kind: 'guest', visitorId: 'guest-visitor-1' },
+        releaseId: '507f1f77bcf86cd799439011',
+      })
+    );
+
+    await response.arrayBuffer();
+  });
+
+  it('does NOT call PurchaseRepository.upsertDownloadCount on the free stream path', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    await response.arrayBuffer();
+    expect(mockUpsertDownloadCount).not.toHaveBeenCalled();
+  });
+
+  it('rejects respond=stream + mode=free with CAP_REACHED before any S3 work happens', async () => {
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.errorCode).toBe('CAP_REACHED');
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/releases/[id]/download/bundle — preflight (respond=preflight)', () => {
+  beforeEach(() => {
+    mockGetToken.mockResolvedValue(null);
+    mockResolveVisitorIdentity.mockResolvedValue({
+      primaryVisitorId: 'guest-visitor-1',
+      allVisitorIds: ['guest-visitor-1'],
+      cookieReissue: false,
+    });
+    mockReadGuestVisitorId.mockResolvedValue('guest-visitor-1');
+    mockComputeFingerprintHash.mockReturnValue('test-fp-hash');
+    mockPrismaReleaseFindFirst.mockResolvedValue({
+      id: '507f1f77bcf86cd799439011',
+      title: 'Test Album',
+    });
+    mockFindAllByRelease.mockResolvedValue([
+      {
+        id: 'fmt-mp3',
+        formatType: 'MP3_320KBPS',
+        s3Key: 'releases/r1/MP3_320KBPS/album.mp3',
+        fileName: 'album.mp3',
+        files: [],
+      },
+    ]);
+    mockS3Send.mockResolvedValue({ Body: Readable.from(Buffer.from('fake-audio-data')) });
+    mockLockAcquire.mockReturnValue(true);
+    mockVerifyS3ObjectExists.mockResolvedValue(false);
+  });
+
+  it('returns 200 success for free-mode preflight when cap is allowed', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS&respond=preflight&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+  });
+
+  it('does NOT acquire the free-download lock during preflight (follow-up stream re-acquires)', async () => {
+    mockLockAcquire.mockClear();
+    await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS&respond=preflight&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(mockLockAcquire).not.toHaveBeenCalled();
+  });
+
+  it('does NOT record a successful free download during preflight', async () => {
+    mockRecordSuccessfulDownload.mockClear();
+    await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS&respond=preflight&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 CAP_REACHED on free-mode preflight when cap is exhausted', async () => {
+    mockAssertFreeDownloadAllowed.mockRejectedValueOnce(
+      new MockedCapReachedError(new Date('2026-05-09T09:00:00Z'))
+    );
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS&respond=preflight&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.errorCode).toBe('CAP_REACHED');
   });
 });

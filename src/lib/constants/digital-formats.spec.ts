@@ -3,9 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import {
+  FREE_FORMAT_TYPES,
   generateS3Key,
   getDefaultMimeType,
   getFileExtensionForFormat,
+  isFreeFormatType,
+  VALID_FORMAT_TYPES,
 } from '@/lib/constants/digital-formats';
 
 describe('digital-formats constants', () => {
@@ -52,6 +55,31 @@ describe('digital-formats constants', () => {
       'should return the first MIME type for %s format',
       (formatType, expectedMimeType) => {
         expect(getDefaultMimeType(formatType)).toBe(expectedMimeType);
+      }
+    );
+  });
+
+  describe('FREE_FORMAT_TYPES', () => {
+    it('contains exactly MP3_320KBPS and AAC', () => {
+      expect([...FREE_FORMAT_TYPES]).toEqual(['MP3_320KBPS', 'AAC']);
+    });
+
+    it('only contains valid digital format types', () => {
+      for (const formatType of FREE_FORMAT_TYPES) {
+        expect(VALID_FORMAT_TYPES).toContain(formatType);
+      }
+    });
+  });
+
+  describe('isFreeFormatType', () => {
+    it.each(['MP3_320KBPS', 'AAC'] as const)('returns true for %s', (formatType) => {
+      expect(isFreeFormatType(formatType)).toBe(true);
+    });
+
+    it.each(['MP3_V0', 'OGG_VORBIS', 'FLAC', 'ALAC', 'WAV', 'AIFF'] as const)(
+      'returns false for %s',
+      (formatType) => {
+        expect(isFreeFormatType(formatType)).toBe(false);
       }
     );
   });

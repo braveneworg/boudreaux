@@ -265,27 +265,27 @@ Headings lacked consistent styling and vertical rhythm, making content hierarchy
   }
 
   h1 {
-    @apply text-4xl font-bold leading-tight mb-6 mt-8;
+    @apply mt-8 mb-6 text-4xl leading-tight font-bold;
   }
 
   h2 {
-    @apply text-3xl leading-snug mb-5 mt-7;
+    @apply mt-7 mb-5 text-3xl leading-snug;
   }
 
   h3 {
-    @apply text-2xl leading-snug mb-4 mt-6;
+    @apply mt-6 mb-4 text-2xl leading-snug;
   }
 
   h4 {
-    @apply text-xl leading-normal mb-3 mt-5;
+    @apply mt-5 mb-3 text-xl leading-normal;
   }
 
   h5 {
-    @apply text-lg tracking-normal leading-normal mb-3 mt-4;
+    @apply mt-4 mb-3 text-lg leading-normal tracking-normal;
   }
 
   h6 {
-    @apply text-base tracking-normal leading-normal mb-2 mt-3;
+    @apply mt-3 mb-2 text-base leading-normal tracking-normal;
   }
 }
 ```

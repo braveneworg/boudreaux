@@ -21,6 +21,7 @@ export class DownloadEventRepository {
    */
   async logDownloadEvent(data: {
     userId: string | null;
+    visitorId?: string | null;
     releaseId: string;
     formatType: DigitalFormatType;
     success: boolean;
@@ -31,6 +32,7 @@ export class DownloadEventRepository {
     return prisma.downloadEvent.create({
       data: {
         userId: data.userId,
+        visitorId: data.visitorId ?? null,
         releaseId: data.releaseId,
         formatType: data.formatType,
         success: data.success,
@@ -183,5 +185,59 @@ export class DownloadEventRepository {
     };
 
     return prisma.downloadEvent.count({ where });
+  }
+
+  /**
+   * Count successful download events within a rolling window for cap
+   * enforcement. Supports three identity scopes used by the free-download
+   * flow (007-free-digital-downloads):
+   *
+   * 1. `visitorId: string` — single anonymous identity.
+   * 2. `visitorIds: string[]` — union of anonymous identities, used when
+   *    cookie and fingerprint resolve to different `VisitorIdentity` rows
+   *    (FR-019 conflict resolution).
+   * 3. `userId: string` — authenticated user (identity resolution skipped).
+   *
+   * Boundary semantics: events at exactly `windowStart` are **included**
+   * (`gte`). Returns `{ count, oldestInWindow }` where `oldestInWindow` is
+   * the earliest `downloadedAt` of the matched events (used to compute
+   * `resetsAt = oldestInWindow + windowDuration`), or `null` when no events
+   * match.
+   */
+  async countSuccessfulDownloadsInWindow(
+    params: {
+      releaseId: string;
+      windowStart: Date;
+    } & ({ visitorId: string } | { visitorIds: string[] } | { userId: string })
+  ): Promise<{ count: number; oldestInWindow: Date | null }> {
+    const identityClause: Prisma.DownloadEventWhereInput =
+      'userId' in params
+        ? { userId: params.userId }
+        : 'visitorIds' in params
+          ? { visitorId: { in: params.visitorIds } }
+          : { visitorId: params.visitorId };
+
+    // Treat empty visitorIds[] as "no events" without hitting the DB.
+    if ('visitorIds' in params && params.visitorIds.length === 0) {
+      return { count: 0, oldestInWindow: null };
+    }
+
+    const where: Prisma.DownloadEventWhereInput = {
+      ...identityClause,
+      releaseId: params.releaseId,
+      success: true,
+      downloadedAt: { gte: params.windowStart },
+    };
+
+    const aggregate = await prisma.downloadEvent.aggregate({
+      where,
+      _count: { _all: true },
+      _min: { downloadedAt: true },
+    });
+
+    return {
+      count: aggregate._count._all,
+      oldestInWindow: aggregate._min.downloadedAt ?? null,
+    };
   }
 }

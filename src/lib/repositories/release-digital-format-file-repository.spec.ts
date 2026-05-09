@@ -113,6 +113,26 @@ describe('ReleaseDigitalFormatFileRepository', () => {
         })),
       });
     });
+
+    it('should pass through title and duration when provided', async () => {
+      vi.mocked(prisma.releaseDigitalFormatFile.createMany).mockResolvedValue({ count: 1 });
+
+      await repo.createMany('format-1', [
+        {
+          trackNumber: 1,
+          s3Key: 'k',
+          fileName: 'song.mp3',
+          fileSize: BigInt(1),
+          mimeType: 'audio/mpeg',
+          title: 'My Song',
+          duration: 215,
+        },
+      ]);
+
+      expect(prisma.releaseDigitalFormatFile.createMany).toHaveBeenCalledWith({
+        data: [expect.objectContaining({ title: 'My Song', duration: 215 })],
+      });
+    });
   });
 
   describe('findAllByFormatId', () => {

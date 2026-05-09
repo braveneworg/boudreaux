@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import path from 'node:path';
-import { PassThrough, Readable } from 'node:stream';
+import { PassThrough, Readable, Transform } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
 
@@ -14,14 +14,25 @@ import { getToken } from 'next-auth/jwt';
 
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
+import {
+  FORMAT_LABELS,
+  FREE_FORMAT_TYPES,
+  isFreeFormatType,
+  type DigitalFormatType,
+} from '@/lib/constants/digital-formats';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
+import { freeDownloadLockService } from '@/lib/services/free-download-lock-service';
+import {
+  CapReachedError,
+  freeDownloadQuotaService,
+} from '@/lib/services/free-download-quota-service';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
+import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
 import {
   generatePresignedDownloadUrl,
   getS3BucketName,
@@ -29,7 +40,9 @@ import {
   verifyS3ObjectExists,
 } from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
+import { computeFingerprintHash } from '@/lib/utils/visitor-fingerprint';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
+import type { DownloadSubject } from '@/types/download-subject';
 
 /**
  * Allow up to 5 minutes for large multi-format bundles (WAV, AIFF).
@@ -179,6 +192,12 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
+  // Hoisted so the outer `finally` can release the in-process collision lock
+  // regardless of which exit branch the request takes (success, audit
+  // rejection, S3 failure, etc.). The 30s TTL on the lock entry bounds
+  // leakage if a process crashes between acquire and release.
+  let outerLockAcquired = false;
+  let outerLockKey: string | null = null;
   try {
     // Rate limiting
     const ip = extractClientIp(request);
@@ -195,7 +214,7 @@ export async function GET(
       );
     }
 
-    // Step 1: Authentication
+    // Step 1: Authentication (deferred for mode='free' — guest flow)
     const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
     const token = await getToken({
       req: request,
@@ -204,14 +223,6 @@ export async function GET(
       secureCookie,
     });
 
-    if (!token?.sub) {
-      return Response.json(
-        { success: false, error: 'UNAUTHORIZED', message: 'You must be logged in to download.' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const userId = token.sub;
     const { id: releaseId } = await context.params;
 
     // Validate release ID
@@ -222,10 +233,16 @@ export async function GET(
       );
     }
 
-    // Step 2: Parse and validate formats query parameter
+    // Step 2: Parse and validate formats + mode query parameters
     const formatsParam = request.nextUrl.searchParams.get('formats');
+    const modeParam = request.nextUrl.searchParams.get('mode') ?? undefined;
     const respondJson = request.nextUrl.searchParams.get('respond') === 'json';
-    const parseResult = bundleDownloadQuerySchema.safeParse({ formats: formatsParam });
+    const respondStream = request.nextUrl.searchParams.get('respond') === 'stream';
+    const respondPreflight = request.nextUrl.searchParams.get('respond') === 'preflight';
+    const parseResult = bundleDownloadQuerySchema.safeParse({
+      formats: formatsParam,
+      mode: modeParam,
+    });
 
     if (!parseResult.success) {
       return Response.json(
@@ -239,27 +256,90 @@ export async function GET(
     }
 
     const requestedFormats = parseResult.data.formats as DigitalFormatType[];
+    const mode = parseResult.data.mode;
+    const isFreeMode = mode === 'free';
 
-    // Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset)
-    const access = await PurchaseService.getDownloadAccess(userId, releaseId);
-
-    if (!access.allowed && access.reason === 'no_purchase') {
+    // Auth gating: paid mode requires a session; free mode is open to guests.
+    if (!isFreeMode && !token?.sub) {
       return Response.json(
-        { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { success: false, error: 'UNAUTHORIZED', message: 'You must be logged in to download.' },
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (!access.allowed && access.reason === 'download_limit_reached') {
+    const userId = token?.sub ?? null;
+
+    // Free-mode: resolve guest visitor identity BEFORE any streaming starts so
+    // the Set-Cookie header is part of the initial Response. iOS Safari only
+    // honors a cookie issued in the very first byte of the response — placing
+    // this work after the ReadableStream body would silently strip it.
+    //
+    // Authenticated users on the free path bypass the visitor cookie entirely
+    // (Session 2026-05-08 Q5, T061) — their cap is keyed by `userId`, not
+    // by composite identity.
+    let guestVisitorId: string | null = null;
+    let guestAllVisitorIds: string[] | undefined;
+    if (isFreeMode && !userId) {
+      const cookieValue = await readGuestVisitorId();
+      const fingerprintHash = computeFingerprintHash({
+        userAgent: request.headers.get('user-agent'),
+        acceptLanguage: request.headers.get('accept-language'),
+        ip: extractClientIp(request),
+      });
+      const identity = await freeDownloadQuotaService.resolveVisitorIdentity({
+        cookieValue,
+        fingerprintHash,
+      });
+      if (identity.cookieReissue) {
+        await setGuestVisitorIdCookie(identity.primaryVisitorId);
+      }
+      guestVisitorId = identity.primaryVisitorId;
+      guestAllVisitorIds = identity.allVisitorIds;
+    }
+
+    // For free-mode flows we still want to retain the format-restriction check
+    // (defence-in-depth — schema also validates this).
+    const isFreeOnlyRequest = requestedFormats.every(isFreeFormatType);
+    if (isFreeMode && !isFreeOnlyRequest) {
       return Response.json(
         {
           success: false,
-          error: 'DOWNLOAD_LIMIT',
-          message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
-          resetInHours: access.resetInHours,
+          error: 'INVALID_FORMATS',
+          message: `Free downloads only support ${FREE_FORMAT_TYPES.join(', ')}`,
         },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset).
+    // Free mode skips both — guest downloads are gated by the freemium quota
+    // service (added in US2/US3). The per-release download cap is still
+    // enforced for paid/free-only authenticated downloads below.
+    if (!isFreeMode) {
+      // Non-null assertion equivalent: userId is guaranteed by the auth gate above.
+      const access = await PurchaseService.getDownloadAccess(
+        { kind: 'user', userId: userId as string },
+        releaseId
+      );
+
+      if (!access.allowed && access.reason === 'no_purchase' && !isFreeOnlyRequest) {
+        return Response.json(
+          { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (!access.allowed && access.reason === 'download_limit_reached') {
+        return Response.json(
+          {
+            success: false,
+            error: 'DOWNLOAD_LIMIT',
+            message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
+            resetInHours: access.resetInHours,
+          },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     // Step 5: Fetch release title for ZIP filename
@@ -271,6 +351,10 @@ export async function GET(
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    // (Preflight return is performed below, after free-mode cap enforcement,
+    // so free-mode clients see CAP_REACHED via the same in-dialog channel as
+    // paid clients see PURCHASE_REQUIRED / DOWNLOAD_LIMIT.)
 
     // Step 6: Resolve all requested format records with their files (single query)
     const formatRepo = new ReleaseDigitalFormatRepository();
@@ -322,9 +406,172 @@ export async function GET(
     // `ResponseContentDisposition` at signing time, so the cached object's
     // upload-time filename does not leak into the user's download.
     const sortedFormatKey = [...requestedFormats].sort().join('-');
-    const cachedZipKey = `tmp/bundles/cache/${releaseId}/${sortedFormatKey}.zip`;
+    const cachedZipKey = `tmp/bundles/cache/${releaseId}/${mode}/${sortedFormatKey}.zip`;
     const safeTitleForKey = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
     const cachedZipFileName = `${safeTitleForKey}.zip`;
+
+    // 007-free-digital-downloads US2/US3 — Cap enforcement and concurrency lock.
+    //
+    // Free-mode subjects (guest or authenticated) are gated by a rolling 24h
+    // cap of 3 successful downloads per (subject, release) keyed by `userId`
+    // when authenticated, else by the union of cookie+fingerprint visitorIds
+    // (Session 2026-05-08 Q1, Q5). Cap is enforced BEFORE bundle prep so we
+    // do not pay the S3 round-trip cost for a request that will be rejected.
+    //
+    // The lock prevents two concurrent free requests for the same
+    // `(subject, release, sortedFormatKey)` from racing on the cap query
+    // (research.md §R-3, T059). On collision we fall through to the cache
+    // hit fast path if a previously-built ZIP exists; otherwise the second
+    // caller is told to retry.
+    const freeSubject: DownloadSubject | null = isFreeMode
+      ? userId
+        ? { kind: 'user', userId }
+        : { kind: 'guest', visitorId: guestVisitorId as string }
+      : null;
+    const freeSubjectKey =
+      freeSubject?.kind === 'user'
+        ? `user:${freeSubject.userId}`
+        : freeSubject !== null
+          ? `guest:${freeSubject.visitorId}`
+          : null;
+    const lockKey =
+      freeSubjectKey !== null ? `${freeSubjectKey}|${releaseId}|${sortedFormatKey}` : null;
+    let lockAcquired = false;
+    outerLockKey = lockKey;
+    const auditIp = request.headers.get('x-forwarded-for') ?? 'unknown';
+    const auditUserAgent = request.headers.get('user-agent') ?? 'unknown';
+
+    if (isFreeMode && freeSubject !== null) {
+      try {
+        await freeDownloadQuotaService.assertFreeDownloadAllowed({
+          subject: freeSubject,
+          visitorIds: guestAllVisitorIds,
+          releaseId,
+        });
+      } catch (capError) {
+        if (capError instanceof CapReachedError) {
+          // Audit row — `success: false, errorCode: 'CAP_REACHED'`. This row
+          // is intentionally NOT counted by future cap queries (the
+          // `countSuccessfulDownloadsInWindow` filter requires `success: true`).
+          try {
+            await new DownloadEventRepository().logDownloadEvent({
+              userId,
+              visitorId: guestVisitorId,
+              releaseId,
+              formatType: requestedFormats[0],
+              success: false,
+              errorCode: 'CAP_REACHED',
+              ipAddress: auditIp,
+              userAgent: auditUserAgent,
+            });
+          } catch (auditError) {
+            console.error('Failed to write CAP_REACHED audit event', { auditError, releaseId });
+          }
+          return Response.json(
+            {
+              errorCode: 'CAP_REACHED',
+              message: 'Free download limit reached for this release.',
+              resetsAtIso: capError.resetsAt.toISOString(),
+            },
+            { status: 403, headers: NO_STORE_HEADERS }
+          );
+        }
+        throw capError;
+      }
+
+      // Acquire the per-(subject, release, formats) collision lock. If
+      // another concurrent caller holds it AND there is no warm cache for
+      // the same tuple, return 409 LOCK_HELD so the client can retry.
+      //
+      // Skip lock acquisition for preflight requests — preflight is a
+      // gating-check only and the follow-up streaming request will
+      // re-acquire the lock for the actual delivery.
+      if (!respondPreflight) {
+        lockAcquired = freeDownloadLockService.acquire(lockKey as string);
+        outerLockAcquired = lockAcquired;
+        if (!lockAcquired) {
+          const cacheWarm = await verifyS3ObjectExists(cachedZipKey);
+          if (!cacheWarm) {
+            return Response.json(
+              {
+                errorCode: 'LOCK_HELD',
+                message: 'Another download is in progress for this release. Please retry shortly.',
+              },
+              { status: 409, headers: NO_STORE_HEADERS }
+            );
+          }
+          // Cache warm: proceed without holding the lock; the original holder
+          // is still responsible for cap accounting on their request, and this
+          // path will independently call `recordSuccessfulDownload` below.
+        }
+      }
+    }
+
+    // Preflight: paid- and free-mode clients call this before triggering
+    // anchor-based streaming downloads so 4xx errors (auth, purchase,
+    // download cap, free-tier cap) surface as in-dialog messages instead
+    // of the browser rendering raw JSON. All gating checks above have
+    // already executed; reaching here means the download is permitted.
+    if (respondPreflight) {
+      return Response.json({ success: true }, { status: 200, headers: NO_STORE_HEADERS });
+    }
+
+    /**
+     * Record a single successful free-tier download for the resolved subject.
+     * Called exactly once per successful bundle (T050) — must run BEFORE the
+     * SSE `ready` event / 302 response so the cap is incremented atomically
+     * with delivery.
+     */
+    const recordFreeSuccess = async (formatType: DigitalFormatType): Promise<void> => {
+      if (!isFreeMode || freeSubject === null) return;
+      try {
+        await freeDownloadQuotaService.recordSuccessfulDownload({
+          subject: freeSubject,
+          releaseId,
+          formatType,
+          ipAddress: auditIp,
+          userAgent: auditUserAgent,
+        });
+      } catch (recordError) {
+        console.error('Failed to record successful free download', { recordError, releaseId });
+      }
+    };
+
+    /**
+     * Audit a stream-failure for the free flow. Writes a `success:false,
+     * errorCode:'STREAM_FAILED'` event for observability — NOT counted by
+     * the cap (T062).
+     */
+    const recordFreeStreamFailure = async (): Promise<void> => {
+      if (!isFreeMode) return;
+      try {
+        await new DownloadEventRepository().logDownloadEvent({
+          userId,
+          visitorId: guestVisitorId,
+          releaseId,
+          formatType: requestedFormats[0],
+          success: false,
+          errorCode: 'STREAM_FAILED',
+          ipAddress: auditIp,
+          userAgent: auditUserAgent,
+        });
+      } catch (auditError) {
+        console.error('Failed to write STREAM_FAILED audit event', { auditError, releaseId });
+      }
+    };
+
+    /** Release the in-process lock if this request acquired it. */
+    const releaseLock = (): void => {
+      if (lockAcquired && lockKey !== null) {
+        freeDownloadLockService.release(lockKey);
+        lockAcquired = false;
+        outerLockAcquired = false;
+      }
+    };
+    // Reserved for early-release in long-running flows; the outer `finally`
+    // is the authoritative release point. Reference here keeps the local
+    // helper available without triggering an unused-symbol lint.
+    void releaseLock;
 
     // SSE streaming path: create a single combined ZIP containing all
     // requested formats as subfolders, streaming progress events to the
@@ -383,27 +630,35 @@ export async function GET(
                 zipFileName,
                 TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
               );
+
+              // Free mode: increment cap exactly once per bundle BEFORE the
+              // SSE `ready` event so delivery and accounting are atomic.
+              if (isFreeMode && completedFormats.length > 0) {
+                await recordFreeSuccess(completedFormats[0]);
+              }
               send('ready', { downloadUrl, fileName: zipFileName });
 
               try {
-                await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+                if (!isFreeMode && userId) {
+                  await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+                }
 
-                const downloadEventRepo = new DownloadEventRepository();
-                const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-                const userAgent = request.headers.get('user-agent') ?? 'unknown';
-
-                await Promise.all(
-                  completedFormats.map((formatType) =>
-                    downloadEventRepo.logDownloadEvent({
-                      userId,
-                      releaseId,
-                      formatType,
-                      success: true,
-                      ipAddress,
-                      userAgent,
-                    })
-                  )
-                );
+                if (!isFreeMode) {
+                  const downloadEventRepo = new DownloadEventRepository();
+                  await Promise.all(
+                    completedFormats.map((formatType) =>
+                      downloadEventRepo.logDownloadEvent({
+                        userId,
+                        visitorId: guestVisitorId,
+                        releaseId,
+                        formatType,
+                        success: true,
+                        ipAddress: auditIp,
+                        userAgent: auditUserAgent,
+                      })
+                    )
+                  );
+                }
               } catch (analyticsError) {
                 console.error('Failed to record bundle download analytics (cache hit)', {
                   completedFormats,
@@ -422,7 +677,20 @@ export async function GET(
             combinedArchive = archiveForSse;
             combinedPassThrough = passThroughForSse;
             archiveForSse.pipe(passThroughForSse);
+            // We attach a few listeners to the archiver across the lifecycle of
+            // the request (one error pipe-through, one error tracker, and
+            // potentially per-format entry listeners for progress). Bumping the
+            // limit avoids `MaxListenersExceededWarning` noise without hiding a
+            // real leak.
+            archiveForSse.setMaxListeners(32);
             archiveForSse.on('error', (err) => passThroughForSse.destroy(err));
+            // Track the first archiver-level error so the outer try/catch can
+            // surface it. archiver also emits this as a stream error which
+            // tears down the upload via the pipe-through above.
+            let archiveError: Error | null = null;
+            archiveForSse.on('error', (err) => {
+              archiveError = archiveError ?? err;
+            });
 
             // Start the S3 upload immediately so it consumes the archive
             // stream concurrently — otherwise the PassThrough buffer fills,
@@ -447,49 +715,81 @@ export async function GET(
             // formats are bundled; single-format bundles are flat so the
             // zip filename (release title) is the only label the user sees.
             const useSubfolders = resolvedFormats.length > 1;
+
+            // Flatten every file across every requested format into a single
+            // ordered list. Prefetching across the entire bundle (rather than
+            // per-format) lets multiple formats download from S3 in parallel
+            // — critical for the free flow which always bundles MP3 + AAC.
+            const flatEntries: Array<{
+              formatType: DigitalFormatType;
+              label: string;
+              s3Key: string;
+              entryName: string;
+              isLastForFormat: boolean;
+            }> = [];
             for (const { formatType, files } of resolvedFormats) {
               const label = FORMAT_LABELS[formatType] ?? formatType;
               const safeFolderName = safeArchiveEntryName(label);
-              send('progress', { formatType, label, status: 'zipping' });
-
-              try {
-                // Download bodies into memory in parallel so archiver only
-                // does memory→memory copies and the multipart uploader can
-                // drain at full throughput.
-                const keys = files.map((f) => f.s3Key);
-                const inFlight = startBufferPrefetch(
-                  s3ClientForZip,
-                  bucketForZip,
-                  keys,
-                  S3_PREFETCH_DEPTH
-                );
-
-                for (let i = 0; i < files.length; i++) {
-                  const file = files[i];
-                  const buffer = await inFlight[i];
-                  // Eagerly enqueue the next download so a body is
-                  // already in memory by the time we need it.
-                  const nextIndex = i + S3_PREFETCH_DEPTH;
-                  if (nextIndex < files.length) {
-                    inFlight.push(issuePrefetch(s3ClientForZip, bucketForZip, keys[nextIndex]));
-                  }
-
-                  if (buffer === null) continue;
-                  const entryName = useSubfolders
+              files.forEach((file, idx) => {
+                flatEntries.push({
+                  formatType,
+                  label,
+                  s3Key: file.s3Key,
+                  entryName: useSubfolders
                     ? `${safeFolderName}/${safeArchiveEntryName(file.fileName)}`
-                    : safeArchiveEntryName(file.fileName);
-                  await new Promise<void>((resolve, reject) => {
-                    archiveForSse.once('entry', () => resolve());
-                    archiveForSse.once('error', reject);
-                    archiveForSse.append(buffer, { name: entryName });
+                    : safeArchiveEntryName(file.fileName),
+                  isLastForFormat: idx === files.length - 1,
+                });
+              });
+              send('progress', { formatType, label, status: 'zipping' });
+            }
+
+            const flatKeys = flatEntries.map((e) => e.s3Key);
+            const inFlight = startBufferPrefetch(
+              s3ClientForZip,
+              bucketForZip,
+              flatKeys,
+              S3_PREFETCH_DEPTH
+            );
+
+            const formatHasError = new Set<DigitalFormatType>();
+            for (let i = 0; i < flatEntries.length; i++) {
+              const entry = flatEntries[i];
+              try {
+                const buffer = await inFlight[i];
+                const nextIndex = i + S3_PREFETCH_DEPTH;
+                if (nextIndex < flatEntries.length) {
+                  inFlight.push(issuePrefetch(s3ClientForZip, bucketForZip, flatKeys[nextIndex]));
+                }
+                if (buffer === null) continue;
+                if (archiveError) throw archiveError;
+                // archiver maintains its own internal queue; appending without
+                // awaiting `entry` lets multiple appends pipeline through the
+                // upload stream rather than each waiting for the previous to
+                // fully drain.
+                archiveForSse.append(buffer, { name: entry.entryName });
+              } catch (formatError) {
+                console.error(`Failed to append entry to archive`, {
+                  formatType: entry.formatType,
+                  s3Key: entry.s3Key,
+                  formatError,
+                });
+                if (!formatHasError.has(entry.formatType)) {
+                  formatHasError.add(entry.formatType);
+                  send('error', {
+                    formatType: entry.formatType,
+                    message: 'Failed to prepare download.',
                   });
                 }
+              }
 
-                completedFormats.push(formatType);
-                send('progress', { formatType, label, status: 'done' });
-              } catch (formatError) {
-                console.error(`Failed to append format ${formatType} to archive`, { formatError });
-                send('error', { formatType, message: 'Failed to prepare download.' });
+              if (entry.isLastForFormat && !formatHasError.has(entry.formatType)) {
+                completedFormats.push(entry.formatType);
+                send('progress', {
+                  formatType: entry.formatType,
+                  label: entry.label,
+                  status: 'done',
+                });
               }
             }
 
@@ -513,28 +813,34 @@ export async function GET(
               TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
             );
 
+            // Free mode: record success exactly once BEFORE 'ready' is emitted.
+            if (isFreeMode && completedFormats.length > 0) {
+              await recordFreeSuccess(completedFormats[0]);
+            }
             send('ready', { downloadUrl, fileName: zipFileName });
 
             // Increment download count and log events server-side on a best-effort basis.
             try {
-              await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+              if (!isFreeMode && userId) {
+                await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+              }
 
-              const downloadEventRepo = new DownloadEventRepository();
-              const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-              const userAgent = request.headers.get('user-agent') ?? 'unknown';
-
-              await Promise.all(
-                completedFormats.map((formatType) =>
-                  downloadEventRepo.logDownloadEvent({
-                    userId,
-                    releaseId,
-                    formatType,
-                    success: true,
-                    ipAddress,
-                    userAgent,
-                  })
-                )
-              );
+              if (!isFreeMode) {
+                const downloadEventRepo = new DownloadEventRepository();
+                await Promise.all(
+                  completedFormats.map((formatType) =>
+                    downloadEventRepo.logDownloadEvent({
+                      userId,
+                      visitorId: guestVisitorId,
+                      releaseId,
+                      formatType,
+                      success: true,
+                      ipAddress: auditIp,
+                      userAgent: auditUserAgent,
+                    })
+                  )
+                );
+              }
             } catch (error) {
               console.error('Failed to record bundle download analytics', {
                 completedFormats,
@@ -544,6 +850,7 @@ export async function GET(
             }
           } catch (streamError) {
             await abortSseUpload();
+            await recordFreeStreamFailure();
             console.error('Bundle SSE stream error', { streamError });
             send('error', { message: 'An unexpected error occurred.' });
           }
@@ -579,24 +886,31 @@ export async function GET(
       );
 
       try {
-        await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+        // Free mode: increment cap exactly once per bundle.
+        if (isFreeMode && resolvedFormats.length > 0) {
+          await recordFreeSuccess(resolvedFormats[0].formatType);
+        }
 
-        const downloadEventRepo = new DownloadEventRepository();
-        const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-        const userAgent = request.headers.get('user-agent') ?? 'unknown';
+        if (!isFreeMode && userId) {
+          await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+        }
 
-        await Promise.all(
-          resolvedFormats.map(({ formatType }) =>
-            downloadEventRepo.logDownloadEvent({
-              userId,
-              releaseId,
-              formatType,
-              success: true,
-              ipAddress,
-              userAgent,
-            })
-          )
-        );
+        if (!isFreeMode) {
+          const downloadEventRepo = new DownloadEventRepository();
+          await Promise.all(
+            resolvedFormats.map(({ formatType }) =>
+              downloadEventRepo.logDownloadEvent({
+                userId,
+                visitorId: guestVisitorId,
+                releaseId,
+                formatType,
+                success: true,
+                ipAddress: auditIp,
+                userAgent: auditUserAgent,
+              })
+            )
+          );
+        }
       } catch (analyticsError) {
         console.error('Failed to record bundle download analytics (cache hit, 302 path)', {
           analyticsError,
@@ -609,6 +923,193 @@ export async function GET(
         headers: {
           Location: downloadUrl,
           ...NO_STORE_HEADERS,
+        },
+      });
+    }
+
+    // Direct-stream fast path (`respond=stream`) — used by both paid and
+    // free flows.
+    //
+    // Removes the S3 multipart upload + presigned-URL round-trip from the
+    // critical path: archive bytes are produced and forwarded straight to
+    // the client's browser, while a parallel `tee` forks the same bytes to
+    // an S3 multipart upload that populates the shared cache key for any
+    // subsequent download (which then takes the cache-hit 302 fast path
+    // above). All authentication, purchase verification, format gating,
+    // download-limit checks, and free-tier cap enforcement have already
+    // run above — this branch only changes how the prepared bytes are
+    // delivered, not who is allowed to receive them.
+    if (respondStream) {
+      const archive = archiver('zip', { zlib: { level: 0 } });
+      const cachePass = new PassThrough();
+
+      // `teeToCache` forwards every chunk produced by the archiver into
+      // both the response body and the cache-upload PassThrough. Cache
+      // writes are best-effort: if the cache stream is destroyed (e.g.
+      // upload aborted because the client canceled mid-stream), we keep
+      // forwarding to the response so the user's download is unaffected.
+      const teeToCache = new Transform({
+        transform(chunk: Buffer, _enc, cb): void {
+          if (!cachePass.destroyed && cachePass.writable) {
+            cachePass.write(chunk);
+          }
+          cb(null, chunk);
+        },
+        flush(cb): void {
+          if (!cachePass.destroyed && cachePass.writable) {
+            cachePass.end();
+          }
+          cb();
+        },
+      });
+
+      const responsePass: Readable = archive.pipe(teeToCache);
+      archive.on('error', (err) => {
+        if (!cachePass.destroyed) cachePass.destroy(err);
+        if (!teeToCache.destroyed) teeToCache.destroy(err);
+      });
+
+      // Fire-and-forget cache upload. `leavePartsOnError: false` aborts
+      // the multipart upload if the source stream is destroyed (client
+      // cancellation), so we do not leak orphan multipart parts in S3.
+      const cacheUpload = new Upload({
+        client: s3Client,
+        params: {
+          Bucket: bucketName,
+          Key: tempS3Key,
+          Body: cachePass,
+          ContentType: 'application/zip',
+          ContentDisposition: buildContentDisposition(zipFileName),
+        },
+        partSize: UPLOAD_PART_SIZE_BYTES,
+        queueSize: UPLOAD_QUEUE_SIZE,
+        leavePartsOnError: false,
+      });
+      const cacheUploadPromise = cacheUpload.done().then(
+        () => true,
+        (cacheError: unknown) => {
+          console.error('Bundle cache upload failed (stream path)', { tempS3Key, cacheError });
+          return false;
+        }
+      );
+
+      // Drive the archive: download every file body in parallel and
+      // append. Errors here destroy both the response and cache streams.
+      const useSubfolders = resolvedFormats.length > 1;
+      const fileEntries = resolvedFormats.flatMap(({ formatType, files }) => {
+        const folderName = safeArchiveEntryName(FORMAT_LABELS[formatType] ?? formatType);
+        return files.map((file) => ({
+          formatType,
+          archivePath: useSubfolders
+            ? `${folderName}/${safeArchiveEntryName(file.fileName)}`
+            : safeArchiveEntryName(file.fileName),
+          s3Key: file.s3Key,
+        }));
+      });
+
+      void (async () => {
+        try {
+          const keys = fileEntries.map((entry) => entry.s3Key);
+          const inFlight = startBufferPrefetch(s3Client, bucketName, keys, S3_PREFETCH_DEPTH);
+          for (let i = 0; i < fileEntries.length; i++) {
+            const entry = fileEntries[i];
+            const buffer = await inFlight[i];
+            const nextIndex = i + S3_PREFETCH_DEPTH;
+            if (nextIndex < fileEntries.length) {
+              inFlight.push(issuePrefetch(s3Client, bucketName, keys[nextIndex]));
+            }
+            if (buffer === null) continue;
+            archive.append(buffer, { name: entry.archivePath });
+          }
+          archive.finalize();
+        } catch (driveError) {
+          console.error('Bundle stream drive error', { driveError, releaseId });
+          archive.abort();
+          if (!cachePass.destroyed) cachePass.destroy(driveError as Error);
+          if (!teeToCache.destroyed) teeToCache.destroy(driveError as Error);
+          cacheUpload.abort();
+        }
+      })();
+
+      // Free-mode cap accounting: record the successful free-tier
+      // download BEFORE returning the streaming Response so the cap
+      // increment is committed atomically with delivery — same semantics
+      // as the SSE pre-`ready` placement. Stream cancellation mid-flight
+      // still counts (matches existing SSE behavior).
+      if (isFreeMode && resolvedFormats.length > 0) {
+        await recordFreeSuccess(resolvedFormats[0].formatType);
+      }
+
+      // Paid-mode best-effort analytics: only record once the cache
+      // upload completes — that signals the full ZIP made it through the
+      // tee, which means the client also received every byte (or that
+      // the response stream is still draining; either way we credit a
+      // successful delivery). If the client canceled mid-stream the
+      // cache upload also fails and we skip analytics. Free mode skips
+      // this path entirely — the free quota service is the source of
+      // truth and the per-format `logDownloadEvent` is reserved for paid
+      // download analytics (matches the SSE free-mode path which also
+      // skips per-format event logging on success).
+      if (!isFreeMode) {
+        void cacheUploadPromise.then(async (uploadOk) => {
+          if (!uploadOk) return;
+          try {
+            if (userId) {
+              await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+            }
+            const repo = new DownloadEventRepository();
+            await Promise.all(
+              resolvedFormats.map(({ formatType }) =>
+                repo.logDownloadEvent({
+                  userId,
+                  visitorId: guestVisitorId,
+                  releaseId,
+                  formatType,
+                  success: true,
+                  ipAddress: auditIp,
+                  userAgent: auditUserAgent,
+                })
+              )
+            );
+          } catch (analyticsError) {
+            console.error('Failed to record bundle download analytics (stream path)', {
+              analyticsError,
+              releaseId,
+            });
+          }
+        });
+      }
+
+      // Adapt the Node Readable into a Web ReadableStream so the
+      // Next.js Response API consumes it natively. Cancellation
+      // propagates back to the archiver via `responsePass.destroy()`.
+      const webStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          responsePass.on('data', (chunk: Buffer) => {
+            controller.enqueue(new Uint8Array(chunk));
+          });
+          responsePass.on('end', () => {
+            controller.close();
+          });
+          responsePass.on('error', (err) => {
+            controller.error(err);
+          });
+        },
+        cancel() {
+          if (!responsePass.destroyed) responsePass.destroy();
+          if (!cachePass.destroyed) cachePass.destroy();
+          archive.abort();
+          cacheUpload.abort();
+        },
+      });
+
+      return new Response(webStream, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': buildContentDisposition(zipFileName),
+          'Cache-Control': 'private, no-store',
+          'X-Accel-Buffering': 'no',
         },
       });
     }
@@ -687,6 +1188,8 @@ export async function GET(
       }
       upload.abort();
       await uploadPromise.catch(() => undefined);
+      // Free flow: write a STREAM_FAILED audit row (not counted by cap).
+      await recordFreeStreamFailure();
       throw archiveError;
     }
 
@@ -698,26 +1201,34 @@ export async function GET(
         TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
       );
 
-      // Step 9: Increment download count (bundle = 1 download action)
-      await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+      // Free mode: increment cap exactly once per bundle.
+      if (isFreeMode && resolvedFormats.length > 0) {
+        await recordFreeSuccess(resolvedFormats[0].formatType);
+      }
 
-      // Step 10: Log download events per format
-      const downloadEventRepo = new DownloadEventRepository();
-      const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown';
-      const userAgent = request.headers.get('user-agent') ?? 'unknown';
+      // Step 9: Increment download count (bundle = 1 download action) — paid only.
+      if (!isFreeMode && userId) {
+        await PurchaseRepository.upsertDownloadCount(userId, releaseId);
+      }
 
-      await Promise.all(
-        resolvedFormats.map(({ formatType }) =>
-          downloadEventRepo.logDownloadEvent({
-            userId,
-            releaseId,
-            formatType,
-            success: true,
-            ipAddress,
-            userAgent,
-          })
-        )
-      );
+      // Step 10: Log download events per format — paid flow only. The free
+      // flow already wrote a single success row via `recordFreeSuccess`.
+      if (!isFreeMode) {
+        const downloadEventRepo = new DownloadEventRepository();
+        await Promise.all(
+          resolvedFormats.map(({ formatType }) =>
+            downloadEventRepo.logDownloadEvent({
+              userId,
+              visitorId: guestVisitorId,
+              releaseId,
+              formatType,
+              success: true,
+              ipAddress: auditIp,
+              userAgent: auditUserAgent,
+            })
+          )
+        );
+      }
 
       return new Response(null, {
         status: 302,
@@ -747,5 +1258,9 @@ export async function GET(
       { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
+  } finally {
+    if (outerLockAcquired && outerLockKey !== null) {
+      freeDownloadLockService.release(outerLockKey);
+    }
   }
 }
