@@ -298,6 +298,31 @@ describe('DownloadAuthorizationService', () => {
       expect(generatePresignedDownloadUrl).not.toHaveBeenCalled();
     });
 
+    it('should deny download when format has no s3Key', async () => {
+      const incompleteFormat = createMockFormat({ s3Key: null });
+
+      const mockPurchase: Partial<ReleasePurchase> = {
+        id: 'purchase123',
+        userId: mockUserId,
+        releaseId: mockReleaseId,
+        amountPaid: 500,
+      };
+
+      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(
+        mockPurchase as ReleasePurchase
+      );
+      vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(incompleteFormat);
+
+      const result = await service.authorizeDownload(mockUserId, mockReleaseId, mockFormatType);
+
+      expect(result).toEqual({
+        authorized: false,
+        errorCode: 'INTERNAL_ERROR',
+        message: 'Format file data is incomplete',
+      });
+      expect(generatePresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
     it('should authorize download when format is within grace period', async () => {
       // Deleted 45 days ago
       const deletedDate = new Date();

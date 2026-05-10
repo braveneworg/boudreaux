@@ -1234,4 +1234,72 @@ describe('ReleaseService', () => {
       expect(prisma.release.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('findByTitleInsensitive', () => {
+    it('should return a release when found by title', async () => {
+      const mockResult = {
+        id: 'r-1',
+        title: 'Test Album',
+        publishedAt: null,
+        deletedOn: null,
+      };
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(mockResult as never);
+
+      const result = await ReleaseService.findByTitleInsensitive('test album');
+
+      expect(result).toEqual(mockResult);
+      expect(prisma.release.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { title: { equals: 'test album', mode: 'insensitive' } },
+        })
+      );
+    });
+
+    it('should return null when no release matches the title', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+
+      const result = await ReleaseService.findByTitleInsensitive('missing title');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findTitleById', () => {
+    it('should return id and title when release is found', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue({
+        id: 'r-1',
+        title: 'Test Album',
+      } as never);
+
+      const result = await ReleaseService.findTitleById('r-1');
+
+      expect(result).toEqual({ id: 'r-1', title: 'Test Album' });
+    });
+
+    it('should return null when release is not found', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+
+      const result = await ReleaseService.findTitleById('missing-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('existsById', () => {
+    it('should return true when the release exists', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue({ id: 'r-1' } as never);
+
+      const result = await ReleaseService.existsById('r-1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when the release does not exist', async () => {
+      vi.mocked(prisma.release.findUnique).mockResolvedValue(null);
+
+      const result = await ReleaseService.existsById('missing-id');
+
+      expect(result).toBe(false);
+    });
+  });
 });

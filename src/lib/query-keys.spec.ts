@@ -71,6 +71,11 @@ describe('queryKeys', () => {
       const key = queryKeys.releases.filteredList({});
       expect(key).toEqual(['releases', 'filteredList', '', '', '']);
     });
+
+    it('should return freeDownloadStatus key with id', () => {
+      const key = queryKeys.releases.freeDownloadStatus('r-123');
+      expect(key).toEqual(['releases', 'freeDownloadStatus', 'r-123']);
+    });
   });
 
   describe('artists', () => {

@@ -10,10 +10,12 @@ import { useState, useEffect } from 'react';
 export function useMediaQuery(query: string): boolean {
   // Initialize with the current match state
   const [matches, setMatches] = useState<boolean>(() =>
+    /* v8 ignore next -- jsdom always defines `window`; SSR fallback is unreachable in tests */
     typeof window !== 'undefined' ? window.matchMedia(query).matches : false
   );
 
   useEffect(() => {
+    /* v8 ignore next -- jsdom always defines `window`; SSR early-return is unreachable in tests */
     if (typeof window === 'undefined') return;
 
     const mediaQueryList = window.matchMedia(query);

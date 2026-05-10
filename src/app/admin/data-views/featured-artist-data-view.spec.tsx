@@ -560,5 +560,67 @@ describe('FeaturedArtistDataView', () => {
         expect(toast.error).toHaveBeenCalledWith('Failed to publish');
       });
     });
+
+    it('should show fallback error toast when publish action fails without an error message', async () => {
+      const user = userEvent.setup();
+      vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+        isPending: false,
+        error: null,
+        data: mockFeaturedArtists,
+        refetch: vi.fn(),
+      } as never);
+
+      render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+      await user.click(screen.getByRole('button', { name: /publish to landing page/i }));
+
+      const { toast } = await import('sonner');
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to publish');
+      });
+    });
+  });
+
+  it('should fall back to "Unnamed" when getFeaturedArtistDisplayName resolves to null', async () => {
+    const mockUnnamed = {
+      featuredArtists: [
+        {
+          id: 'featured-unnamed',
+          displayName: null,
+          featuredOn: '2024-08-01T00:00:00.000Z',
+          position: 8,
+          description: null,
+          coverArt: null,
+          images: [],
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          publishedOn: null,
+          deletedOn: null,
+          // No connected artists — display name resolution returns null,
+          // exercising the `?? 'Unnamed'` fallback branch.
+          artists: [],
+          digitalFormat: null,
+          release: null,
+          group: null,
+        },
+      ],
+      count: 1,
+    };
+
+    vi.mocked(useFeaturedArtistsQuery).mockReturnValue({
+      isPending: false,
+      error: null,
+      data: mockUnnamed,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<FeaturedArtistDataView />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Unnamed')).toBeInTheDocument();
+    });
   });
 });

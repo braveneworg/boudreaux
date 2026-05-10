@@ -124,6 +124,15 @@ describe('Featured Artist by ID API Routes', () => {
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal server error' });
     });
+
+    it('should return 400 when featured artist ID is not a valid ObjectId', async () => {
+      const request = new NextRequest('http://localhost:3000/api/featured-artists/not-valid');
+      const response = await GET(request, createParams('not-valid'));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'Invalid featured artist ID' });
+    });
   });
 
   describe('PATCH /api/featured-artists/[id]', () => {

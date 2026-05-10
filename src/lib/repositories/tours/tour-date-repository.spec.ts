@@ -21,6 +21,7 @@ vi.mock('../../prisma', () => ({
       createMany: vi.fn(),
       deleteMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -635,6 +636,63 @@ describe('TourDateRepository', () => {
         data: Record<string, unknown>;
       };
       expect(callArg.data).toHaveProperty('notes', undefined);
+    });
+  });
+
+  describe('updateHeadlinerSetTimeByTourDateAndArtist', () => {
+    it('should return true when at least one row is updated', async () => {
+      vi.mocked(prisma.tourDateHeadliner.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      const result = await TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist(
+        validObjectId,
+        'artist-1',
+        new Date('2026-08-01T20:00:00Z')
+      );
+
+      expect(result).toBe(true);
+      expect(prisma.tourDateHeadliner.updateMany).toHaveBeenCalledWith({
+        where: { tourDateId: validObjectId, artistId: 'artist-1' },
+        data: { setTime: new Date('2026-08-01T20:00:00Z') },
+      });
+    });
+
+    it('should return false when no rows are updated', async () => {
+      vi.mocked(prisma.tourDateHeadliner.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      const result = await TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist(
+        validObjectId,
+        'artist-999',
+        null
+      );
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('removeHeadlinerByTourDateAndArtist', () => {
+    it('should return true when at least one row is deleted', async () => {
+      vi.mocked(prisma.tourDateHeadliner.deleteMany).mockResolvedValue({ count: 1 } as never);
+
+      const result = await TourDateRepository.removeHeadlinerByTourDateAndArtist(
+        validObjectId,
+        'artist-1'
+      );
+
+      expect(result).toBe(true);
+      expect(prisma.tourDateHeadliner.deleteMany).toHaveBeenCalledWith({
+        where: { tourDateId: validObjectId, artistId: 'artist-1' },
+      });
+    });
+
+    it('should return false when no rows are deleted', async () => {
+      vi.mocked(prisma.tourDateHeadliner.deleteMany).mockResolvedValue({ count: 0 } as never);
+
+      const result = await TourDateRepository.removeHeadlinerByTourDateAndArtist(
+        validObjectId,
+        'artist-999'
+      );
+
+      expect(result).toBe(false);
     });
   });
 });

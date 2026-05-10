@@ -30,6 +30,7 @@ export const SignedInToolbar = ({
     <div className={cn('mt-3', className)}>
       <div className="align-center mb-3 flex gap-0">
         <GravatarAvatar
+          className="mt-1"
           email={session?.user?.email || ''}
           firstName={session?.user?.name?.split(' ')[0]}
           surname={session?.user?.name?.split(' ')[1]}

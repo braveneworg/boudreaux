@@ -50,4 +50,9 @@ describe('TimeRemaining', () => {
     expect(el).toHaveAttribute('datetime', '2026-05-08T13:00:00Z');
     expect(el).toHaveAttribute('role', 'timer');
   });
+
+  it('renders 0s when resetsAtIso is not a valid date string', () => {
+    render(<TimeRemaining resetsAtIso="not-a-date" />);
+    expect(screen.getByTestId('time-remaining')).toHaveTextContent('0s');
+  });
 });

@@ -180,5 +180,14 @@ describe('Artist by Slug API Route', () => {
 
       expect(response.status).toBe(404);
     });
+
+    it('should return 400 when slug format is invalid', async () => {
+      const request = new NextRequest('http://localhost:3000/api/artists/slug/INVALID%20SLUG!');
+      const response = await GET(request, createParams('INVALID SLUG!'));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'Invalid slug format' });
+    });
   });
 });

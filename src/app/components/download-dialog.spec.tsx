@@ -1803,6 +1803,43 @@ describe('DownloadDialog — purchase-checkout step', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByText('You have already purchased this release.')).not.toBeInTheDocument();
   });
+
+  it('should advance to format-select step when Continue is clicked', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: 'user@test.com', id: 'user-123' } },
+      status: 'authenticated',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <DownloadDialog
+        {...defaultProps}
+        availableFormats={[{ formatType: 'FLAC', fileName: 'album.flac.zip' }]}
+        downloadCount={2}
+      >
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /premium/i }));
+    await waitFor(() => expect(screen.getByLabelText('Custom amount')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Custom amount'), {
+      target: { value: '10' },
+    });
+    await user.click(screen.getByRole('button', { name: /Buy & Download/i }));
+    await waitFor(() => expect(screen.getByTestId('purchase-checkout-step')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Trigger Already Purchased' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(screen.getByText(/Select formats/i)).toBeInTheDocument());
+  });
 });
 
 describe('DownloadDialog — returning-download step', () => {

@@ -1519,6 +1519,31 @@ describe('ArtistService', () => {
 
       expect(result).toEqual({ success: false, error: 'Database unavailable' });
     });
+
+    it('should skip the slug lookup and fall back to slugifying firstName when generateSlug yields an empty string', async () => {
+      // Names composed of only special characters slugify to '' — exercising the
+      // `if (slug)` false branch and the `slug || generateSlug(firstName ?? 'artist')`
+      // right-hand branch when persisting the new artist.
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null as never);
+      vi.mocked(prisma.artist.create).mockResolvedValue({
+        id: 'artist-special',
+        displayName: '...',
+        firstName: '...',
+        surname: '',
+      } as never);
+
+      const result = await ArtistService.findOrCreateByName('...');
+
+      expect(result.success).toBe(true);
+      // Slug lookup must be skipped entirely — only the displayName fallback path is consulted.
+      expect(prisma.artist.findUnique).not.toHaveBeenCalled();
+      expect(prisma.artist.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ displayName: '...' }),
+        })
+      );
+    });
   });
 
   describe('uploadArtistImage - additional branch coverage', () => {
@@ -1616,6 +1641,28 @@ describe('ArtistService', () => {
       const result = await ArtistService.uploadArtistImage('artist-123', {
         file: Buffer.from('test'),
         fileName: 'testfile', // no extension
+        contentType: 'image/jpeg',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should fall back to 'jpg' when the fileName extension slot is empty", async () => {
+      // `'cover.'.split('.').pop()` === '' which is falsy and falls through
+      // to the `|| 'jpg'` default, covering the right-hand branch.
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
+      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.image.create).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/media/artists/artist-123/cover.jpg',
+        caption: null,
+        altText: null,
+        sortOrder: 0,
+      } as never);
+
+      const result = await ArtistService.uploadArtistImage('artist-123', {
+        file: Buffer.from('test'),
+        fileName: 'cover.', // trailing dot → empty extension after split/pop
         contentType: 'image/jpeg',
       });
 
@@ -1778,6 +1825,27 @@ describe('ArtistService', () => {
       await ArtistService.connectToRelease('artist-1', 'release-1');
 
       expect(prisma.artistRelease.upsert).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('existsById', () => {
+    it('should return true when the artist exists', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-1' } as never);
+
+      const result = await ArtistService.existsById('artist-1');
+
+      expect(result).toBe(true);
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'artist-1' } })
+      );
+    });
+
+    it('should return false when the artist does not exist', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+
+      const result = await ArtistService.existsById('missing-id');
+
+      expect(result).toBe(false);
     });
   });
 });

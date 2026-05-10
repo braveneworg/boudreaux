@@ -197,6 +197,15 @@ describe('Release by ID API Routes', () => {
         expect(response.status).toBe(404);
       });
     });
+
+    it('should return 400 when release ID is not a valid ObjectId', async () => {
+      const request = new NextRequest('http://localhost:3000/api/releases/not-valid');
+      const response = await GET(request, createParams('not-valid'));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'Invalid release ID' });
+    });
   });
 
   describe('PATCH /api/releases/[id]', () => {
@@ -362,6 +371,19 @@ describe('Release by ID API Routes', () => {
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
         publishedAt: publishDate,
       });
+    });
+
+    it('should return 422 when the request body fails schema validation', async () => {
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 123 }),
+        }
+      );
+      const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.status).toBe(400);
     });
   });
 

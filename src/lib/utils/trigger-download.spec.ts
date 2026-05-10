@@ -104,4 +104,23 @@ describe('triggerDownload', () => {
     // Restore
     Object.defineProperty(document, 'body', { value: originalBody, configurable: true });
   });
+
+  it('returns silently when the URL constructor throws', () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    // Force `new URL(...)` to throw inside `normalizeDownloadUrl` via a
+    // monkey-patched stub. This exercises the catch branch that returns null.
+    const RealURL = globalThis.URL;
+    class ThrowingURL {
+      constructor() {
+        throw new TypeError('forced URL parse failure');
+      }
+    }
+    vi.stubGlobal('URL', ThrowingURL);
+    try {
+      triggerDownload('https://example.com/file.zip');
+      expect(clickSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('URL', RealURL);
+    }
+  });
 });

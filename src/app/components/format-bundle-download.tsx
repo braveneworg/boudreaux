@@ -45,7 +45,12 @@ interface FormatBundleDownloadProps {
   mode?: 'paid' | 'free';
 }
 
-type FormatDownloadStatus = 'pending' | 'zipping' | 'done' | 'uploading' | 'complete' | 'error';
+// This component streams progress for the JSON `respond=json` bundle flow,
+// which only ever surfaces two terminal states: `uploading` while the server
+// zips/uploads, and `complete` after the download URL is delivered. The
+// SSE-era `pending`/`zipping`/`done`/`error` states are exclusive to
+// `collection-list.tsx`, where the full SSE flow remains in use.
+type FormatDownloadStatus = 'uploading' | 'complete';
 
 interface FormatProgress {
   formatType: string;
@@ -248,26 +253,12 @@ export const FormatBundleDownload = ({
         <ul className="space-y-1" role="status">
           {formatProgress.map((fp) => (
             <li key={fp.formatType} className="flex items-center gap-2 text-sm">
-              {fp.status === 'complete' || fp.status === 'done' ? (
+              {fp.status === 'complete' ? (
                 <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-              ) : fp.status === 'zipping' || fp.status === 'uploading' ? (
-                <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
-              ) : fp.status === 'error' ? (
-                <AlertCircle className="text-destructive size-4 shrink-0" />
               ) : (
-                <span className="text-zinc-950-foreground size-4 shrink-0 text-center">&bull;</span>
+                <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
               )}
-              <span
-                className={
-                  fp.status === 'complete' || fp.status === 'done'
-                    ? 'text-emerald-600'
-                    : fp.status === 'error'
-                      ? 'text-destructive'
-                      : ''
-                }
-              >
-                {fp.label}
-              </span>
+              <span className={fp.status === 'complete' ? 'text-emerald-600' : ''}>{fp.label}</span>
             </li>
           ))}
         </ul>
