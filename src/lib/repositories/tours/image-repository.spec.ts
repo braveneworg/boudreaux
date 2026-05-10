@@ -384,4 +384,32 @@ describe('ImageRepository', () => {
       expect(result).toBe(0);
     });
   });
+
+  describe('updateAltText', () => {
+    it('should update the alt text for an image', async () => {
+      const mockUpdated = { id: 'img-1', altText: 'A descriptive caption' };
+      (prisma.tourImage.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdated);
+
+      const result = await ImageRepository.updateAltText('img-1', 'A descriptive caption');
+
+      expect(result).toEqual(mockUpdated);
+      expect(prisma.tourImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { altText: 'A descriptive caption' },
+      });
+    });
+
+    it('should set alt text to null', async () => {
+      const mockUpdated = { id: 'img-1', altText: null };
+      (prisma.tourImage.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockUpdated);
+
+      const result = await ImageRepository.updateAltText('img-1', null);
+
+      expect(result.altText).toBeNull();
+      expect(prisma.tourImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { altText: null },
+      });
+    });
+  });
 });

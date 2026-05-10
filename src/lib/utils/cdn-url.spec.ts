@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { buildCdnUrl } from './cdn-url';
+import { buildCdnUrl, resolveStreamUrl } from './cdn-url';
 
 describe('buildCdnUrl', () => {
   const s3Key = 'releases/abc/digital-formats/MP3_320KBPS/tracks/1-file.mp3';
@@ -89,5 +89,36 @@ describe('buildCdnUrl', () => {
     vi.stubEnv('CDN_DOMAIN', 'http://cdn.example.com');
 
     expect(buildCdnUrl(s3Key)).toBe(`https://cdn.example.com/${s3Key}`);
+  });
+});
+
+describe('resolveStreamUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns the streamUrl when present', () => {
+    expect(
+      resolveStreamUrl({ streamUrl: 'https://signed.example/track.mp3', s3Key: 'ignored.mp3' })
+    ).toBe('https://signed.example/track.mp3');
+  });
+
+  it('falls back to buildCdnUrl when only s3Key is present', () => {
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
+    expect(resolveStreamUrl({ s3Key: 'releases/abc/track.flac' })).toBe(
+      'https://cdn.example.com/releases/abc/track.flac'
+    );
+  });
+
+  it('returns null when neither streamUrl nor s3Key are present', () => {
+    expect(resolveStreamUrl({})).toBeNull();
+    expect(resolveStreamUrl({ streamUrl: null, s3Key: null })).toBeNull();
+  });
+
+  it('treats empty streamUrl as missing and falls back to s3Key', () => {
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
+    expect(resolveStreamUrl({ streamUrl: '', s3Key: 'releases/abc/track.flac' })).toBe(
+      'https://cdn.example.com/releases/abc/track.flac'
+    );
   });
 });

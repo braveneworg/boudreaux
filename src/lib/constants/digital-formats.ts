@@ -120,6 +120,32 @@ export const VALID_FORMAT_TYPES: ReadonlyArray<DigitalFormatType> = [
 ] as const;
 
 /**
+ * Free digital format types
+ *
+ * The set of digital formats eligible for free (non-paid) downloads.
+ * Feature: 007-free-digital-downloads
+ *
+ * - MP3_320KBPS: unsigned + CDN-cached delivery (no quota)
+ * - AAC: presigned URL, counts against the freemium quota (MAX_FREE_DOWNLOAD_QUOTA)
+ */
+export const FREE_FORMAT_TYPES = [
+  'MP3_320KBPS',
+  'AAC',
+] as const satisfies ReadonlyArray<DigitalFormatType>;
+
+/**
+ * Free format type literal union
+ */
+export type FreeFormatType = (typeof FREE_FORMAT_TYPES)[number];
+
+/**
+ * Type guard: is a format type eligible for free download?
+ */
+export function isFreeFormatType(formatType: DigitalFormatType): formatType is FreeFormatType {
+  return (FREE_FORMAT_TYPES as ReadonlyArray<DigitalFormatType>).includes(formatType);
+}
+
+/**
  * S3 key pattern generator utility
  *
  * @param releaseId - MongoDB ObjectId of the release

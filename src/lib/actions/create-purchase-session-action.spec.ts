@@ -438,5 +438,37 @@ describe('createPurchaseSessionAction', () => {
 
       expect(result).toEqual({ success: false, error: 'server_error' });
     });
+
+    it('returns server_error when an unexpected non-Error value is thrown', async () => {
+      mockAuth.mockResolvedValue(null);
+      vi.mocked(PurchaseRepository.findBySessionId).mockRejectedValue('string-thrown');
+
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
+
+      expect(result).toEqual({ success: false, error: 'server_error' });
+    });
+
+    it('returns user_not_found when P2002 race occurs but user disappears on re-fetch', async () => {
+      mockAuth.mockResolvedValue(null);
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
+      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
+        status: 'complete',
+        customer_details: { email: 'ghost@example.com' },
+        customer_email: null,
+      } as never);
+      // First lookup returns null, triggering create. After P2002 the
+      // re-fetch also returns null — userId stays undefined.
+      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
+      vi.mocked(prisma.user.create).mockRejectedValue(
+        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        })
+      );
+
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_ghost' });
+
+      expect(result).toEqual({ success: false, error: 'user_not_found' });
+    });
   });
 });

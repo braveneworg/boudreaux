@@ -5,9 +5,16 @@ import { CONSTANTS } from './src/lib/constants';
 const AUTH_SECRET = 'e2e-test-secret-key-that-is-at-least-32-characters-long';
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
 const IS_CI = !!process.env.CI;
 const E2E_PORT = IS_CI ? '3000' : '3099';
-const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
+// Use 127.0.0.1 (not "localhost") so the standalone server's internal
+// SSR fetches resolve to the same interface the server is bound to.
+// On macOS, Node resolves "localhost" to IPv6 (::1) first while the
+// standalone server binds IPv4-only (0.0.0.0), causing internal fetches
+// to fail and pages to render the not-found state.
+const E2E_HOST = '127.0.0.1';
+const E2E_BASE_URL = `http://${E2E_HOST}:${E2E_PORT}`;
 const PLAYWRIGHT_REPORT_OUTPUT = process.env.PLAYWRIGHT_HTML_REPORT || 'e2e/playwright-report';
 const PLAYWRIGHT_TEST_OUTPUT = process.env.PLAYWRIGHT_TEST_OUTPUT || 'e2e/test-results';
 
@@ -55,6 +62,7 @@ export default defineConfig({
     timeout: IS_CI ? 60_000 : 120_000, // 1 min in CI (pre-built), 2 min locally
     env: {
       NODE_ENV: IS_CI ? 'production' : 'development',
+      HOSTNAME: E2E_HOST,
       PORT: E2E_PORT,
       E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,

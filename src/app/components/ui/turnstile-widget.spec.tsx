@@ -67,6 +67,10 @@ describe('TurnstileWidget', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     mockCallbacks = {};
+    // Default to a non-bypass test key so the Turnstile widget renders.
+    // Individual tests can override with vi.stubEnv() or clear via stubEnv('', '').
+    vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'default-test-key');
+    vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'default-prod-key');
   });
 
   afterEach(() => {
@@ -112,6 +116,7 @@ describe('TurnstileWidget', () => {
   describe('verification handling', () => {
     it('should call setIsVerified with true when verification succeeds', async () => {
       render(<TurnstileWidget {...defaultProps} />);
+      mockSetIsVerified.mockClear();
 
       const widget = screen.getByTestId('turnstile-widget');
       await userEvent.click(widget);
@@ -213,6 +218,7 @@ describe('TurnstileWidget', () => {
 
     it('should handle multiple verification events', async () => {
       render(<TurnstileWidget {...defaultProps} />);
+      mockSetIsVerified.mockClear();
 
       const widget = screen.getByTestId('turnstile-widget');
 
@@ -229,6 +235,7 @@ describe('TurnstileWidget', () => {
       const mockOnToken = vi.fn();
 
       render(<TurnstileWidget {...defaultProps} onToken={mockOnToken} />);
+      mockOnToken.mockClear();
 
       const widget = screen.getByTestId('turnstile-widget');
       await userEvent.click(widget);

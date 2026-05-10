@@ -4,10 +4,10 @@
 import { z } from 'zod';
 
 export const DOWNLOAD_OPTIONS = [
-  { value: 'free-320kbps', label: 'Free (320Kbps)' },
+  { value: 'free-320-aac', label: 'FREE digital formats: MP3 (320Kbps) and AAC' },
   {
     value: 'premium-digital',
-    label: 'Premium digital formats: FLAC, AAC, WAV, and more',
+    label: 'Premium digital formats: WAV, FLAC, ALAC, etc.',
   },
 ] as const;
 

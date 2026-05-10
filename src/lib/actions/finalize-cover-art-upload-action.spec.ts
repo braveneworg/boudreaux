@@ -223,4 +223,88 @@ describe('finalizeCoverArtUploadAction', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Access Denied/);
   });
+
+  it('returns a generic error message when S3 list rejects with a non-Error value', async () => {
+    mockS3Send.mockRejectedValueOnce('boom-string');
+    const result = await finalizeCoverArtUploadAction(
+      'releases',
+      RELEASE_ID,
+      `media/releases/${RELEASE_ID}/cover.png`
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Unknown S3 list error/);
+  });
+
+  it('returns a delete-error when S3 batch-delete rejects with a non-Error value', async () => {
+    const prefix = `media/releases/${RELEASE_ID}/`;
+    // Pretend the listing returns an orphan to force a delete attempt.
+    mockS3Send
+      .mockResolvedValueOnce(listResponse([`${prefix}cover.jpg`]))
+      .mockRejectedValueOnce('delete-boom');
+
+    const result = await finalizeCoverArtUploadAction('releases', RELEASE_ID, `${prefix}cover.png`);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Unknown S3 delete error/);
+  });
+
+  it('returns a delete-error message when S3 batch-delete rejects with an Error', async () => {
+    const prefix = `media/releases/${RELEASE_ID}/`;
+    mockS3Send
+      .mockResolvedValueOnce(listResponse([`${prefix}cover.jpg`]))
+      .mockRejectedValueOnce(new Error('AccessDenied: nope'));
+
+    const result = await finalizeCoverArtUploadAction('releases', RELEASE_ID, `${prefix}cover.png`);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/AccessDenied/);
+  });
+
+  it('paginates ListObjectsV2 when IsTruncated is true', async () => {
+    const prefix = `media/releases/${RELEASE_ID}/`;
+    mockS3Send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: `${prefix}cover.jpg` }],
+        IsTruncated: true,
+        NextContinuationToken: 'tok-1',
+      })
+      .mockResolvedValueOnce({
+        Contents: undefined,
+        IsTruncated: false,
+      })
+      // Subsequent delete + cf invalidation calls.
+      .mockResolvedValue({});
+
+    const result = await finalizeCoverArtUploadAction('releases', RELEASE_ID, `${prefix}cover.png`);
+
+    expect(result.success).toBe(true);
+    // Two list calls (paginated), then a batch-delete for the orphan.
+    expect(mockS3Send).toHaveBeenCalled();
+  });
+
+  it('falls back to us-east-1 when AWS_REGION is unset', async () => {
+    delete process.env.AWS_REGION;
+    vi.stubEnv('CLOUDFRONT_DISTRIBUTION_ID', 'D123');
+    const prefix = `media/releases/${RELEASE_ID}/`;
+    mockS3Send.mockResolvedValue(listResponse([`${prefix}cover.png`]));
+
+    const result = await finalizeCoverArtUploadAction('releases', RELEASE_ID, `${prefix}cover.png`);
+
+    expect(result.success).toBe(true);
+    expect(mockCfSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves unrelated non-cover files alone (isOrphan returns false on regex miss)', async () => {
+    const prefix = `media/releases/${RELEASE_ID}/`;
+    // The listed files include something that doesn't match the
+    // `cover(_w\d+)?.<ext>` shape — isOrphan must return false so we don't
+    // include it in the delete payload.
+    mockS3Send.mockResolvedValueOnce(listResponse([`${prefix}cover.png`, `${prefix}readme.txt`]));
+    mockS3Send.mockResolvedValue({});
+
+    const result = await finalizeCoverArtUploadAction('releases', RELEASE_ID, `${prefix}cover.png`);
+
+    expect(result.success).toBe(true);
+    expect(result.deletedKeys).not.toContain(`${prefix}readme.txt`);
+  });
 });

@@ -15,6 +15,7 @@
  * `filename` / `filename*` parameters).
  */
 export function triggerDownload(url: string, fileName?: string): void {
+  /* v8 ignore next 3 -- jsdom always defines `window` and `document`; SSR guard is unreachable in tests */
   if (typeof globalThis.window === 'undefined' || typeof globalThis.document === 'undefined') {
     return;
   }

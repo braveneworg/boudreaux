@@ -18,7 +18,6 @@ import PageContainer from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
 import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
-import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
 import type { Metadata } from 'next';
@@ -61,20 +60,21 @@ export default async function ArtistDetailPage({ params, searchParams }: ArtistD
 
   const queryClient = getQueryClient();
 
-  // Prefetch artist with direct fetch for 404 handling
-  const artistUrl = getInternalApiUrl(
-    `/api/artists/slug/${encodeURIComponent(slug)}?withReleases=true`
-  );
-  const artistResponse = await fetch(artistUrl, { cache: 'no-store' });
+  // Fetch artist directly via service (Server Component → service is server-only).
+  // This avoids an internal HTTP roundtrip (SSRF-safe) and works regardless of
+  // how the standalone server's network/host is configured.
+  const result = await ArtistService.getArtistBySlugWithReleases(slug);
 
-  if (artistResponse.status === 404) {
+  if (!result.success) {
     notFound();
   }
 
-  if (artistResponse.ok) {
-    const artistData = await artistResponse.json();
-    queryClient.setQueryData(queryKeys.artists.bySlug(slug), artistData);
-  }
+  // Round-trip through JSON to normalize Date → string and BigInt → Number
+  // (matches API response shape that the client query consumer expects).
+  const artistData = JSON.parse(
+    JSON.stringify(result.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
+  );
+  queryClient.setQueryData(queryKeys.artists.bySlug(slug), artistData);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

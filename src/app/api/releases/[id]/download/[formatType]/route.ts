@@ -116,7 +116,10 @@ export async function GET(
 
     // Step 4: If no purchase, check freemium quota
     if (!hasPurchased) {
-      const quotaCheck = await quotaService.checkFreeDownloadQuota(userId, releaseId);
+      const quotaCheck = await quotaService.checkFreeDownloadQuota(
+        { kind: 'user', userId },
+        releaseId
+      );
 
       if (!quotaCheck.allowed) {
         // Log failed download attempt
@@ -143,7 +146,7 @@ export async function GET(
 
       // Track new unique release download (skip if already downloaded)
       if (quotaCheck.reason === 'WITHIN_QUOTA') {
-        await quotaService.incrementQuota(userId, releaseId);
+        await quotaService.incrementQuota({ kind: 'user', userId }, releaseId);
       }
     }
 

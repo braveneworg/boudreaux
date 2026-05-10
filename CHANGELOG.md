@@ -5,21 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
 
+### Added
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+- Free digital downloads for MP3 320 kbps and AAC bundles, gated by a per-release rolling 24h cap of 3 successful downloads. Identity is resolved across authenticated user IDs and an HttpOnly `boudreaux_visitor_id` cookie (with conflict-time union), and concurrent attempts for the same release are guarded by an in-process lock. Audit rows for every successful and failed bundle download are persisted via `DownloadEventRepository`, and the cap-reached UI surfaces a live countdown plus a "Pay what you want" CTA.
 
 ## [4.76.0] - 2026-05-06
 

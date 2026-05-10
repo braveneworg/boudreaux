@@ -7,7 +7,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import type { TourWithRelations } from '@/app/hooks/use-tour-query';
 import { queryKeys } from '@/lib/query-keys';
-import { getInternalApiUrl } from '@/lib/utils/get-internal-api-url';
+import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
 import { TourDetailContent } from '../components/tour-detail-content';
@@ -26,19 +26,17 @@ export default async function TourPage({ params }: TourPageProps) {
   const { tourId } = await params;
   const queryClient = getQueryClient();
 
-  // Fetch directly to inspect the response for 404 handling
-  const url = getInternalApiUrl(`/api/tours/${encodeURIComponent(tourId)}`);
-  const response = await fetch(url, { cache: 'no-store' });
+  const tour = await TourRepository.findById(tourId);
 
-  if (response.status === 404) {
+  if (!tour) {
     notFound();
   }
 
-  if (response.ok) {
-    const json = await response.json();
-    const tour = (json.tour ?? json) as TourWithRelations;
-    queryClient.setQueryData(queryKeys.tours.detail(tourId), tour);
-  }
+  // Round-trip through JSON to normalize Date → string and BigInt → Number for the client cache.
+  const tourData = JSON.parse(
+    JSON.stringify(tour, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
+  ) as TourWithRelations;
+  queryClient.setQueryData(queryKeys.tours.detail(tourId), tourData);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

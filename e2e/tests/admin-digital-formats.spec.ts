@@ -26,20 +26,25 @@ test.describe('Admin Digital Formats Accordion', () => {
     await adminPage.goto('/admin/releases');
     await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
 
-    // E2E Album One has MP3_320KBPS, FLAC, and WAV seeded — should show 3 checkmarks
-    const checkmarks = adminPage.getByTestId('format-uploaded-checkmark');
-    await expect(checkmarks.first()).toBeVisible({ timeout: 10_000 });
+    // Wait for the formats card to render (signals the release detail view is hydrated)
+    await expect(adminPage.getByText('Digital Formats')).toBeVisible({ timeout: 15_000 });
 
-    const count = await checkmarks.count();
-    expect(count).toBe(3);
+    // E2E Album One has MP3_320KBPS, AAC, FLAC, and WAV seeded — should show 4 checkmarks
+    const checkmarks = adminPage.getByTestId('format-uploaded-checkmark');
+    await expect(checkmarks.first()).toBeVisible({ timeout: 15_000 });
+
+    await expect(checkmarks).toHaveCount(4);
   });
 
   test('shows format badge count in accordion header', async ({ adminPage }) => {
     await adminPage.goto('/admin/releases');
     await adminPage.getByRole('link', { name: 'E2E Album One' }).click();
 
-    // Should show a badge like "3 formats uploaded"
-    await expect(adminPage.getByText(/3 formats uploaded/)).toBeVisible({ timeout: 10_000 });
+    // Wait for the formats card to render before asserting the badge
+    await expect(adminPage.getByText('Digital Formats')).toBeVisible({ timeout: 15_000 });
+
+    // Should show a badge like "4 formats uploaded" (MP3 320kbps, AAC, FLAC, WAV)
+    await expect(adminPage.getByText(/4 formats uploaded/)).toBeVisible({ timeout: 15_000 });
   });
 
   test('can expand accordion item to see format details', async ({ adminPage }) => {

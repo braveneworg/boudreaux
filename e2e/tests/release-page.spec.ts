@@ -99,8 +99,10 @@ test.describe('Release Page — Purchase State Awareness', () => {
     await downloadButton.click();
 
     // Should show the initial download choice dialog with radio options
-    await expect(userPage.getByLabel(/Free.*320Kbps/)).toBeVisible({ timeout: 5_000 });
-    await expect(userPage.getByLabel(/Premium digital formats/)).toBeVisible();
+    await expect(userPage.getByLabel(/FREE digital formats.*320Kbps.*AAC/i)).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(userPage.getByLabel(/Premium digital formats/i)).toBeVisible();
   });
 });
 

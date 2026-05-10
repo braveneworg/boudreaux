@@ -337,9 +337,14 @@ const CollectionDownloadDialog = ({
                 prev.map((fp) => (fp.formatType === data.formatType ? { ...fp, status } : fp))
               );
             } else if (status === 'uploading') {
+              // Global uploading phase fires after every format finished
+              // zipping. Do NOT regress formats already marked `done` back
+              // to a spinner — only advance still-pending formats.
               setFormatProgress((prev) =>
                 prev.map((fp) =>
-                  fp.status !== 'error' ? { ...fp, status: 'uploading' as const } : fp
+                  fp.status === 'pending' || fp.status === 'zipping'
+                    ? { ...fp, status: 'uploading' as const }
+                    : fp
                 )
               );
             }

@@ -131,6 +131,7 @@ describe('generateCloudFrontSignedUrl', () => {
   it('returns null and logs when the signing call throws (e.g. malformed PEM)', () => {
     process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
     process.env.CLOUDFRONT_PRIVATE_KEY = 'NOT_A_VALID_PEM';
+    delete process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
     process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

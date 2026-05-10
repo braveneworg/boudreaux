@@ -61,6 +61,11 @@ while IFS='=' read -r __feature_key __feature_value; do
 
     # Validate that the key is a safe shell variable name
     if [[ "${__feature_key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        # Strip a single layer of surrounding single quotes (common.sh emits quoted values)
+        if [[ "${__feature_value}" == \'*\' ]]; then
+            __feature_value="${__feature_value#\'}"
+            __feature_value="${__feature_value%\'}"
+        fi
         # Assign value without using eval
         printf -v "${__feature_key}" '%s' "${__feature_value}"
     else

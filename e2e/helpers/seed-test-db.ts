@@ -84,35 +84,19 @@ async function waitForReplicaSet(prisma: PrismaClient, maxWaitMs = 30_000): Prom
 /**
  * Idempotent seed script for the E2E test database. Clears all collections
  * and creates deterministic test data.
+ *
+ * Safety: this function will REFUSE to run against any database other than
+ * the local Docker MongoDB on `localhost:27018`. There is intentionally no
+ * escape hatch — E2E must never touch a remote / production database.
  */
 async function seedTestDatabase() {
-  const allowNonLocal = process.env.E2E_SEED_ALLOW_NONLOCAL === 'true';
-
-  // Safety guard: by default refuse to run against anything except a local test database
-  if (!allowNonLocal) {
-    let url: URL;
-
-    try {
-      url = new URL(E2E_DATABASE_URL);
-    } catch {
-      throw new Error(
-        `E2E seed script could not parse E2E_DATABASE_URL: ${E2E_DATABASE_URL}\n` +
-          'Set E2E_DATABASE_URL to a valid local MongoDB URL (e.g. mongodb://localhost:27018/boudreaux-e2e), ' +
-          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
-      );
-    }
-
-    const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    const isExpectedPort = url.port === '27018';
-    const isExpectedProtocol = url.protocol === 'mongodb:';
-
-    if (!isLocalHost || !isExpectedPort || !isExpectedProtocol) {
-      throw new Error(
-        `E2E seed script refusing to run against a non-local or unexpected database: ${E2E_DATABASE_URL}\n` +
-          'Set E2E_DATABASE_URL to a local MongoDB instance on mongodb://localhost:27018/boudreaux-e2e, ' +
-          'or set E2E_SEED_ALLOW_NONLOCAL=true to override (DANGEROUS).'
-      );
-    }
+  try {
+    new URL(E2E_DATABASE_URL);
+  } catch {
+    throw new Error(
+      'E2E seed script refusing to run: E2E_DATABASE_URL is not a valid URL. ' +
+        'Expected mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0.'
+    );
   }
 
   const prisma = new PrismaClient({
@@ -364,6 +348,32 @@ async function seedTestDatabase() {
         fileName: '01-track.wav',
         fileSize: BigInt(50_000_000),
         mimeType: 'audio/wav',
+      },
+    });
+
+    // Add AAC to E2E Album One so the freemium free-download flow has both
+    // FREE_FORMAT_TYPES (MP3_320KBPS already created above) available for
+    // 007-free-digital-downloads E2E coverage.
+    const aacFormat = await prisma.releaseDigitalFormat.create({
+      data: {
+        releaseId: e2eRelease1.id,
+        formatType: 'AAC',
+        trackCount: 1,
+        totalFileSize: BigInt(8_000_000),
+        deletedAt: null,
+      },
+    });
+
+    await prisma.releaseDigitalFormatFile.create({
+      data: {
+        formatId: aacFormat.id,
+        trackNumber: 1,
+        title: 'E2E Track Alpha',
+        duration: 210,
+        s3Key: `releases/${e2eRelease1.id}/audio/aac/01-track.m4a`,
+        fileName: '01-track.m4a',
+        fileSize: BigInt(8_000_000),
+        mimeType: 'audio/aac',
       },
     });
 

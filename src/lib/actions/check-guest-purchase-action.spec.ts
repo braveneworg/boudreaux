@@ -86,7 +86,10 @@ describe('checkGuestPurchaseAction', () => {
       downloadCount: 2,
       atCap: false,
     });
-    expect(mockGetDownloadAccess).toHaveBeenCalledWith('user-456', 'release-2');
+    expect(mockGetDownloadAccess).toHaveBeenCalledWith(
+      { kind: 'user', userId: 'user-456' },
+      'release-2'
+    );
   });
 
   it('should return atCap=true when download count reaches the maximum', async () => {

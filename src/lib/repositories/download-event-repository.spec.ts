@@ -17,6 +17,7 @@ vi.mock('@/lib/prisma', () => ({
       groupBy: vi.fn(),
       count: vi.fn(),
       findMany: vi.fn(),
+      aggregate: vi.fn(),
     },
   },
 }));
@@ -32,6 +33,7 @@ describe('DownloadEventRepository', () => {
     return {
       id: 'event123',
       userId: mockUserId,
+      visitorId: null,
       releaseId: mockReleaseId,
       formatType: mockFormatType,
       success: true,
@@ -72,6 +74,7 @@ describe('DownloadEventRepository', () => {
       expect(prisma.downloadEvent.create).toHaveBeenCalledWith({
         data: {
           ...eventData,
+          visitorId: null,
           errorCode: null,
         },
       });
@@ -101,7 +104,7 @@ describe('DownloadEventRepository', () => {
       const result = await repository.logDownloadEvent(eventData);
 
       expect(prisma.downloadEvent.create).toHaveBeenCalledWith({
-        data: eventData,
+        data: { ...eventData, visitorId: null },
       });
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('QUOTA_EXCEEDED');
@@ -327,6 +330,146 @@ describe('DownloadEventRepository', () => {
         },
       });
       expect(result).toBe(25);
+    });
+  });
+
+  describe('countSuccessfulDownloadsInWindow', () => {
+    const windowStart = new Date('2026-05-07T00:00:00Z');
+    const oldest = new Date('2026-05-07T01:23:45Z');
+
+    it('counts events for a single visitorId scoped to release+window+success', async () => {
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 2 },
+        _min: { downloadedAt: oldest },
+      } as never);
+
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        visitorId: 'visitor-abc',
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 2, oldestInWindow: oldest });
+      expect(prisma.downloadEvent.aggregate).toHaveBeenCalledWith({
+        where: {
+          visitorId: 'visitor-abc',
+          releaseId: mockReleaseId,
+          success: true,
+          downloadedAt: { gte: windowStart },
+        },
+        _count: { _all: true },
+        _min: { downloadedAt: true },
+      });
+    });
+
+    it('uses gte (boundary inclusive) so events at exactly windowStart count', async () => {
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 1 },
+        _min: { downloadedAt: windowStart },
+      } as never);
+
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        visitorId: 'visitor-abc',
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 1, oldestInWindow: windowStart });
+      const call = vi.mocked(prisma.downloadEvent.aggregate).mock.calls[0]?.[0];
+      expect(call?.where?.downloadedAt).toEqual({ gte: windowStart });
+    });
+
+    it('returns count=0 and oldestInWindow=null when no events match', async () => {
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 0 },
+        _min: { downloadedAt: null },
+      } as never);
+
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        visitorId: 'visitor-abc',
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 0, oldestInWindow: null });
+    });
+
+    it('unions multiple visitorIds via the visitorIds[] overload', async () => {
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 3 },
+        _min: { downloadedAt: oldest },
+      } as never);
+
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        visitorIds: ['visitor-a', 'visitor-b'],
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 3, oldestInWindow: oldest });
+      expect(prisma.downloadEvent.aggregate).toHaveBeenCalledWith({
+        where: {
+          visitorId: { in: ['visitor-a', 'visitor-b'] },
+          releaseId: mockReleaseId,
+          success: true,
+          downloadedAt: { gte: windowStart },
+        },
+        _count: { _all: true },
+        _min: { downloadedAt: true },
+      });
+    });
+
+    it('short-circuits to count=0 without DB access when visitorIds is empty', async () => {
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        visitorIds: [],
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 0, oldestInWindow: null });
+      expect(prisma.downloadEvent.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('queries by userId when the userId variant is used', async () => {
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 1 },
+        _min: { downloadedAt: oldest },
+      } as never);
+
+      const result = await repository.countSuccessfulDownloadsInWindow({
+        userId: mockUserId,
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      expect(result).toEqual({ count: 1, oldestInWindow: oldest });
+      expect(prisma.downloadEvent.aggregate).toHaveBeenCalledWith({
+        where: {
+          userId: mockUserId,
+          releaseId: mockReleaseId,
+          success: true,
+          downloadedAt: { gte: windowStart },
+        },
+        _count: { _all: true },
+        _min: { downloadedAt: true },
+      });
+    });
+
+    it('ignores success=false rows by virtue of where clause', async () => {
+      // The mock is configured with success=true filter; assert clause shape.
+      vi.mocked(prisma.downloadEvent.aggregate).mockResolvedValue({
+        _count: { _all: 0 },
+        _min: { downloadedAt: null },
+      } as never);
+
+      await repository.countSuccessfulDownloadsInWindow({
+        visitorId: 'visitor-abc',
+        releaseId: mockReleaseId,
+        windowStart,
+      });
+
+      const call = vi.mocked(prisma.downloadEvent.aggregate).mock.calls[0]?.[0];
+      expect(call?.where?.success).toBe(true);
     });
   });
 });

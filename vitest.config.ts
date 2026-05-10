@@ -123,7 +123,13 @@ export default defineConfig({
       reporter: process.env.CI
         ? ['text', 'json', 'json-summary']
         : ['text', 'json', 'json-summary', 'html'],
+      // Coverage is gathered exclusively from `.ts`/`.tsx` first-party source.
+      // Plain `.js`/`.jsx`/`.cjs`/`.mjs`/`.json` files are tooling, generated
+      // output, or third-party shims — explicitly drop them so they cannot
+      // inflate or deflate the headline metrics.
       exclude: [
+        '**/*.{js,jsx,cjs,mjs,json}',
+        '**/*.css',
         // Configuration files
         '**/*.config.{ts,js,mjs,cjs}',
         '**/vitest.config.ts',

@@ -93,7 +93,16 @@ export const MultiCombobox = ({
             ) : (
               <span className="text-zinc-950-foreground">{placeholder}</span>
             )}
-            <ChevronsUpDown className="ml-2 shrink-0 opacity-50" />
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              {open && (
+                <X
+                  className="size-3.5 opacity-40 transition-opacity hover:opacity-80"
+                  aria-hidden="true"
+                />
+              )}
+              <ChevronsUpDown className="shrink-0 opacity-50" />
+            </span>
+            {open && <span className="sr-only">Close formats menu</span>}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" asChild>

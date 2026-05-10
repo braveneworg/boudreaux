@@ -545,6 +545,32 @@ describe('BannerCarousel', () => {
       expect(screen.getByText('Notification 1')).toBeInTheDocument();
     });
 
+    it('completes swipe-right transition when transitionend fires', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+      mockContainerWidth();
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+
+      // First go to slide 2 via keyboard and complete the transition
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+      act(() => fireTransitionEnd());
+
+      const track = getTrack();
+
+      // Swipe right to go back to slide 1
+      act(() => {
+        firePointerDown(track, 100);
+        firePointerMove(track, 250);
+        firePointerUp(track, 250);
+      });
+
+      // Fire the transitionend to invoke the completeTransition(prev) callback
+      act(() => fireTransitionEnd());
+
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+    });
+
     it('snaps back when swipe does not exceed threshold', () => {
       render(<BannerCarousel banners={THREE_BANNERS} />);
       mockContainerWidth();

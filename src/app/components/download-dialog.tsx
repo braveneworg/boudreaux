@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form';
 import { CheckoutStep } from '@/app/components/checkout-step';
 import { EmailStep } from '@/app/components/email-step';
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
+import { FreeFormatSelectStep } from '@/app/components/free-format-select-step';
 import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
 import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
 import { RateSelectStep } from '@/app/components/rate-select-step';
@@ -38,6 +39,7 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
+import { useFreeDownloadStatusQuery } from '@/app/hooks/use-free-download-status-query';
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
 import { ALREADY_PURCHASED_ERROR, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
@@ -53,6 +55,7 @@ import {
 type DialogStep =
   | 'download'
   | 'format-select'
+  | 'free-format-select'
   | 'rate-select'
   | 'email-step'
   | 'checkout'
@@ -110,6 +113,17 @@ export const DownloadDialog = ({
   const [guestResetInHours, setGuestResetInHours] = useState<number | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const { data: session } = useSession();
+
+  // Pre-fetch the free-download status as soon as the dialog opens. This
+  // gives us `availableFreeFormats` for FreeFormatSelectStep and lets us
+  // gate the Free radio when no free formats are published.
+  // Feature: 007-free-digital-downloads (US1).
+  const { data: freeStatus, isPending: isFreeStatusPending } = useFreeDownloadStatusQuery(
+    releaseId,
+    { enabled: open }
+  );
+  const availableFreeFormats = freeStatus?.availableFreeFormats ?? [];
+  const freeRadioDisabled = freeStatus !== undefined && availableFreeFormats.length === 0;
 
   // Subscribers fall back to the session-derived status when the user-status
   // query hasn't resolved yet (or in render paths that don't pass the prop),
@@ -169,9 +183,12 @@ export const DownloadDialog = ({
         setStep('email-step');
       }
     } else {
-      console.info('Download submitted:', data);
-      setOpen(false);
-      form.reset();
+      // Free download path — advance to a step where the user explicitly
+      // picks which free formats (MP3 320Kbps and/or AAC) to bundle. This
+      // replaces the previous auto-start flow so that visitors who only want
+      // one format can opt out of the second.
+      // Feature: 007-free-digital-downloads (US1).
+      setStep('free-format-select');
     }
   };
 
@@ -338,27 +355,39 @@ export const DownloadDialog = ({
                             value={field.value ?? ''}
                             className="gap-4"
                           >
-                            {DOWNLOAD_OPTIONS.map((option) => (
-                              <FormItem
-                                key={option.value}
-                                className="flex items-center gap-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <RadioGroupItem className="size-6" value={option.value} />
-                                </FormControl>
-                                <FormLabel className="cursor-pointer font-normal">
-                                  <div className="flex flex-col gap-1">
-                                    <span className="leading-snug">{option.label}</span>
-                                    {option.value === 'premium-digital' && (
-                                      <span className="text-zinc-950-foreground">
-                                        {' '}
-                                        or <em>pay what you want</em>
-                                      </span>
+                            {DOWNLOAD_OPTIONS.map((option) => {
+                              const isFreeOption = option.value === 'free-320-aac';
+                              const optionDisabled = isFreeOption && freeRadioDisabled;
+                              return (
+                                <FormItem
+                                  key={option.value}
+                                  className="flex items-center gap-3 space-y-0"
+                                >
+                                  <FormControl>
+                                    <RadioGroupItem
+                                      className="size-6"
+                                      value={option.value}
+                                      disabled={optionDisabled}
+                                    />
+                                  </FormControl>
+                                  <FormLabel
+                                    className={cn(
+                                      'cursor-pointer font-normal',
+                                      optionDisabled && 'cursor-not-allowed opacity-50'
                                     )}
-                                  </div>
-                                </FormLabel>
-                              </FormItem>
-                            ))}
+                                  >
+                                    <div className="flex flex-col gap-1">
+                                      <span className="leading-snug">{option.label}</span>
+                                      {optionDisabled && (
+                                        <span className="text-xs text-zinc-500">
+                                          Not available for this release
+                                        </span>
+                                      )}
+                                    </div>
+                                  </FormLabel>
+                                </FormItem>
+                              );
+                            })}
                           </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -411,7 +440,7 @@ export const DownloadDialog = ({
                                     }}
                                     value={field.value ?? ''}
                                   />
-                                  <em>(suggested ${effectiveSuggestedPrice})</em>
+                                  <em>suggested or pay what you want</em>
                                 </div>
                               </div>
                             </FormControl>
@@ -511,6 +540,36 @@ export const DownloadDialog = ({
                 onDownloadComplete={handleDialogDownloadComplete}
               />
             )}
+          </>
+        )}
+
+        {step === 'free-format-select' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Free Download</DialogTitle>
+              <DialogDescription>
+                Choose your free formats for <strong>{releaseTitle}</strong>
+              </DialogDescription>
+            </DialogHeader>
+
+            <FreeFormatSelectStep
+              releaseId={releaseId}
+              availableFreeFormats={availableFreeFormats}
+              isLoading={isFreeStatusPending}
+              capReachedResetsAtIso={
+                freeStatus?.blockedReason === 'cap-reached' ? freeStatus.resetsAtIso : null
+              }
+              onDownloadComplete={handleDialogDownloadComplete}
+            />
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setStep('download')}
+            >
+              Back
+            </Button>
           </>
         )}
 

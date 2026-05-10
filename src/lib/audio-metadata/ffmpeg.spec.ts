@@ -27,6 +27,15 @@ vi.mock('node:child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
 }));
 
+/**
+ * `vi.waitFor` defaults to a 50ms polling interval, which is wildly oversized
+ * for the synchronous queueMicrotask-driven mocks below — every test was
+ * paying ~50ms per `waitFor` call. Polling every microtask (interval: 0) lets
+ * each test settle in <1ms.
+ */
+const waitFor = <T>(cb: () => T | Promise<T>): Promise<T> =>
+  vi.waitFor(cb, { interval: 0, timeout: 1000 });
+
 function createMockProcess(): ChildProcess {
   const proc = new EventEmitter() as ChildProcess;
   proc.stderr = new Readable({
@@ -101,7 +110,7 @@ describe('writeTagViaFfmpeg', () => {
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
     // Wait for probe to complete, then ffmpeg spawns
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -134,7 +143,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.ogg', 'COMMENT', 'New comment');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -162,7 +171,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.ogg', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -186,7 +195,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -217,7 +226,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -246,7 +255,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -263,7 +272,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -279,7 +288,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 1);
@@ -293,7 +302,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.stderr?.emit('data', Buffer.from('invalid metadata key'));
@@ -308,7 +317,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 1);
@@ -324,7 +333,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('error', new Error('ENOENT'));
@@ -338,7 +347,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('error', new Error('ENOENT'));
@@ -355,7 +364,7 @@ describe('writeTagViaFfmpeg', () => {
     mockUnlink.mockRejectedValue(new Error('ENOENT'));
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 1);
@@ -369,7 +378,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.ogg', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -387,7 +396,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
 
@@ -415,7 +424,7 @@ describe('writeTagViaFfmpeg', () => {
     setupSpawnSequence(probeProc, ffmpegProc);
 
     const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hello');
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
     ffmpegProc.emit('close', 0);
@@ -427,5 +436,72 @@ describe('writeTagViaFfmpeg', () => {
       (_arg: string, i: number) => i > 0 && ffmpegArgs[i - 1] === '-metadata'
     );
     expect(metadataEntries).toEqual(['COMMENT=Hello']);
+  });
+
+  it('handles a probe stream entry with no tags object', async () => {
+    // Stream array present but the entries lack a `tags` field — exercises
+    // the `stream.tags ?? {}` fallback in probeMetadata.
+    const probeProc = new EventEmitter() as ChildProcess;
+    probeProc.stdout = new Readable({
+      read() {
+        this.push(JSON.stringify({ format: {}, streams: [{}] }));
+        this.push(null);
+      },
+    });
+    probeProc.stderr = null as unknown as Readable;
+    queueMicrotask(() => probeProc.emit('close', 0));
+
+    const ffmpegProc = createMockProcess();
+    setupSpawnSequence(probeProc, ffmpegProc);
+
+    const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hi');
+    await waitFor(() => {
+      expect(mockSpawn).toHaveBeenCalledTimes(2);
+    });
+    ffmpegProc.emit('close', 0);
+
+    await promise;
+
+    const ffmpegArgs = mockSpawn.mock.calls[1][1] as string[];
+    const metadataEntries = ffmpegArgs.filter(
+      (_arg: string, i: number) => i > 0 && ffmpegArgs[i - 1] === '-metadata'
+    );
+    expect(metadataEntries).toEqual(['COMMENT=Hi']);
+  });
+
+  it('accepts string-typed chunks from both ffprobe stdout and ffmpeg stderr', async () => {
+    // Most stream implementations deliver Buffers; some test/runtime configs
+    // (encoding-set readables, mocks) deliver strings. The chunk handlers
+    // branch on `typeof chunk === 'string'` — emit strings explicitly to
+    // exercise that branch in both spawns.
+    const probeProc = new EventEmitter() as ChildProcess;
+    probeProc.stdout = new EventEmitter() as ChildProcess['stdout'];
+    probeProc.stderr = null as unknown as Readable;
+
+    const ffmpegProc = createMockProcess();
+    setupSpawnSequence(probeProc, ffmpegProc);
+
+    const promise = writeTagViaFfmpeg('/tmp/track.flac', 'COMMENT', 'Hi');
+
+    await waitFor(() => {
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+    });
+
+    // Deliver ffprobe stdout as a string chunk, then close.
+    probeProc.stdout?.emit(
+      'data',
+      JSON.stringify({ format: { tags: { artist: 'A' } }, streams: [] })
+    );
+    probeProc.emit('close', 0);
+
+    await waitFor(() => {
+      expect(mockSpawn).toHaveBeenCalledTimes(2);
+    });
+
+    // Deliver ffmpeg stderr as a string chunk before failing.
+    ffmpegProc.stderr?.emit('data', 'string-typed stderr line');
+    ffmpegProc.emit('close', 1);
+
+    await expect(promise).rejects.toThrow('string-typed stderr line');
   });
 });

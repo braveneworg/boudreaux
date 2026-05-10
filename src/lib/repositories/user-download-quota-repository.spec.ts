@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import type { DownloadSubject } from '@/types/download-subject';
 
 import { UserDownloadQuotaRepository } from './user-download-quota-repository';
 
@@ -22,193 +23,207 @@ vi.mock('@/lib/prisma', () => ({
 describe('UserDownloadQuotaRepository', () => {
   let repo: UserDownloadQuotaRepository;
 
-  const mockUserId = 'user-123';
+  const userSubject: DownloadSubject = { kind: 'user', userId: 'user-123' };
+  const guestSubject: DownloadSubject = {
+    kind: 'guest',
+    visitorId: 'visitor-abc',
+  };
   const mockReleaseId = 'release-456';
 
-  function createMockQuota(overrides?: Partial<UserDownloadQuota>): UserDownloadQuota {
+  function createUserQuota(overrides?: Partial<UserDownloadQuota>): UserDownloadQuota {
     return {
       id: 'quota-1',
-      userId: mockUserId,
+      userId: 'user-123',
+      visitorId: null,
       uniqueReleaseIds: ['release-1', 'release-2'],
       createdAt: new Date(),
       updatedAt: new Date(),
       ...overrides,
-    };
+    } as UserDownloadQuota;
   }
 
-  const mockQuota = createMockQuota();
+  function createGuestQuota(overrides?: Partial<UserDownloadQuota>): UserDownloadQuota {
+    return {
+      id: 'quota-g1',
+      userId: null,
+      visitorId: 'visitor-abc',
+      uniqueReleaseIds: ['release-1'],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    } as UserDownloadQuota;
+  }
 
   beforeEach(() => {
     repo = new UserDownloadQuotaRepository();
+    vi.mocked(prisma.userDownloadQuota.findUnique).mockReset();
+    vi.mocked(prisma.userDownloadQuota.create).mockReset();
+    vi.mocked(prisma.userDownloadQuota.update).mockReset();
   });
 
-  describe('findOrCreateByUserId', () => {
-    it('should return existing quota record', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
+  describe('findOrCreateBySubject', () => {
+    it('returns existing user quota keyed by userId', async () => {
+      const existing = createUserQuota();
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
 
-      const result = await repo.findOrCreateByUserId(mockUserId);
+      const result = await repo.findOrCreateBySubject(userSubject);
 
-      expect(result).toEqual(mockQuota);
+      expect(result).toEqual(existing);
       expect(prisma.userDownloadQuota.findUnique).toHaveBeenCalledWith({
-        where: { userId: mockUserId },
+        where: { userId: 'user-123' },
       });
       expect(prisma.userDownloadQuota.create).not.toHaveBeenCalled();
     });
 
-    it('should create new quota record if none exists', async () => {
-      const newQuota = createMockQuota({ id: 'new-1', uniqueReleaseIds: [] });
+    it('returns existing guest quota keyed by visitorId', async () => {
+      const existing = createGuestQuota();
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
+
+      const result = await repo.findOrCreateBySubject(guestSubject);
+
+      expect(result).toEqual(existing);
+      expect(prisma.userDownloadQuota.findUnique).toHaveBeenCalledWith({
+        where: { visitorId: 'visitor-abc' },
+      });
+    });
+
+    it('creates a new user quota row when missing', async () => {
+      const created = createUserQuota({ id: 'new-1', uniqueReleaseIds: [] });
       vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(newQuota);
+      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(created);
 
-      const result = await repo.findOrCreateByUserId(mockUserId);
+      const result = await repo.findOrCreateBySubject(userSubject);
 
-      expect(result).toEqual(newQuota);
+      expect(result).toEqual(created);
       expect(prisma.userDownloadQuota.create).toHaveBeenCalledWith({
-        data: { userId: mockUserId, uniqueReleaseIds: [] },
+        data: {
+          user: { connect: { id: 'user-123' } },
+          uniqueReleaseIds: [],
+        },
+      });
+    });
+
+    it('creates a new guest quota row when missing', async () => {
+      const created = createGuestQuota({ id: 'new-g1', uniqueReleaseIds: [] });
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(created);
+
+      const result = await repo.findOrCreateBySubject(guestSubject);
+
+      expect(result).toEqual(created);
+      expect(prisma.userDownloadQuota.create).toHaveBeenCalledWith({
+        data: {
+          visitorId: 'visitor-abc',
+          uniqueReleaseIds: [],
+        },
       });
     });
   });
 
   describe('addUniqueRelease', () => {
-    it('should atomically add release ID to quota', async () => {
-      const updatedQuota = createMockQuota({
-        uniqueReleaseIds: [...mockQuota.uniqueReleaseIds, mockReleaseId],
+    it('atomically pushes a release id for a user', async () => {
+      const existing = createUserQuota();
+      const updated = createUserQuota({
+        uniqueReleaseIds: [...existing.uniqueReleaseIds, mockReleaseId],
       });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updatedQuota);
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
+      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
 
-      const result = await repo.addUniqueRelease(mockUserId, mockReleaseId);
+      const result = await repo.addUniqueRelease(userSubject, mockReleaseId);
 
       expect(result.uniqueReleaseIds).toContain(mockReleaseId);
       expect(prisma.userDownloadQuota.update).toHaveBeenCalledWith({
-        where: { userId: mockUserId },
+        where: { userId: 'user-123' },
         data: { uniqueReleaseIds: { push: mockReleaseId } },
       });
     });
 
-    it('should create quota record if it does not exist before adding', async () => {
-      const newQuota = createMockQuota({ id: 'new-1', uniqueReleaseIds: [] });
-      const updatedQuota = createMockQuota({
-        id: 'new-1',
-        uniqueReleaseIds: [mockReleaseId],
+    it('atomically pushes a release id for a guest', async () => {
+      const existing = createGuestQuota();
+      const updated = createGuestQuota({
+        uniqueReleaseIds: [...existing.uniqueReleaseIds, mockReleaseId],
       });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(newQuota);
-      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updatedQuota);
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(existing);
+      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
 
-      const result = await repo.addUniqueRelease(mockUserId, mockReleaseId);
+      const result = await repo.addUniqueRelease(guestSubject, mockReleaseId);
+
+      expect(result.uniqueReleaseIds).toContain(mockReleaseId);
+      expect(prisma.userDownloadQuota.update).toHaveBeenCalledWith({
+        where: { visitorId: 'visitor-abc' },
+        data: { uniqueReleaseIds: { push: mockReleaseId } },
+      });
+    });
+
+    it('creates the row first when missing before pushing', async () => {
+      const created = createGuestQuota({ uniqueReleaseIds: [] });
+      const updated = createGuestQuota({ uniqueReleaseIds: [mockReleaseId] });
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.userDownloadQuota.create).mockResolvedValue(created);
+      vi.mocked(prisma.userDownloadQuota.update).mockResolvedValue(updated);
+
+      const result = await repo.addUniqueRelease(guestSubject, mockReleaseId);
 
       expect(prisma.userDownloadQuota.create).toHaveBeenCalled();
-      expect(result.uniqueReleaseIds).toContain(mockReleaseId);
+      expect(result.uniqueReleaseIds).toEqual([mockReleaseId]);
     });
   });
 
   describe('checkQuotaExceeded', () => {
-    it('should return false when under quota', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const exceeded = await repo.checkQuotaExceeded(mockUserId, 5);
-
-      expect(exceeded).toBe(false);
+    it('returns false under the cap (user)', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(createUserQuota());
+      expect(await repo.checkQuotaExceeded(userSubject, 5)).toBe(false);
     });
 
-    it('should return true when at quota limit', async () => {
-      const fullQuota = createMockQuota({
-        uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5'],
-      });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(fullQuota);
-
-      const exceeded = await repo.checkQuotaExceeded(mockUserId, 5);
-
-      expect(exceeded).toBe(true);
+    it('returns true at the cap (guest)', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(
+        createGuestQuota({ uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5'] })
+      );
+      expect(await repo.checkQuotaExceeded(guestSubject, 5)).toBe(true);
     });
 
-    it('should return true when over quota limit', async () => {
-      const overQuota = createMockQuota({
-        uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'],
-      });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(overQuota);
-
-      const exceeded = await repo.checkQuotaExceeded(mockUserId, 5);
-
-      expect(exceeded).toBe(true);
-    });
-
-    it('should use default quota of 5', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const exceeded = await repo.checkQuotaExceeded(mockUserId);
-
-      expect(exceeded).toBe(false);
+    it('defaults to a cap of 5', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(createUserQuota());
+      expect(await repo.checkQuotaExceeded(userSubject)).toBe(false);
     });
   });
 
   describe('getRemainingQuota', () => {
-    it('should return correct remaining quota', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const remaining = await repo.getRemainingQuota(mockUserId, 5);
-
-      expect(remaining).toBe(3);
+    it('returns the remaining count for a guest', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(
+        createGuestQuota({ uniqueReleaseIds: ['r1', 'r2'] })
+      );
+      expect(await repo.getRemainingQuota(guestSubject, 5)).toBe(3);
     });
 
-    it('should return 0 when quota is fully used', async () => {
-      const fullQuota = createMockQuota({
-        uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5'],
-      });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(fullQuota);
-
-      const remaining = await repo.getRemainingQuota(mockUserId, 5);
-
-      expect(remaining).toBe(0);
-    });
-
-    it('should never return negative values', async () => {
-      const overQuota = createMockQuota({
-        uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'],
-      });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(overQuota);
-
-      const remaining = await repo.getRemainingQuota(mockUserId, 5);
-
-      expect(remaining).toBe(0);
+    it('clamps to zero when over cap', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(
+        createUserQuota({
+          uniqueReleaseIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'],
+        })
+      );
+      expect(await repo.getRemainingQuota(userSubject, 5)).toBe(0);
     });
   });
 
   describe('hasDownloadedRelease', () => {
-    it('should return true if release is in uniqueReleaseIds', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const result = await repo.hasDownloadedRelease(mockUserId, 'release-1');
-
-      expect(result).toBe(true);
+    it('returns true when the release is present', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(createUserQuota());
+      expect(await repo.hasDownloadedRelease(userSubject, 'release-1')).toBe(true);
     });
 
-    it('should return false if release is not in uniqueReleaseIds', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const result = await repo.hasDownloadedRelease(mockUserId, 'release-999');
-
-      expect(result).toBe(false);
+    it('returns false when the release is absent (guest)', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(createGuestQuota());
+      expect(await repo.hasDownloadedRelease(guestSubject, 'release-999')).toBe(false);
     });
   });
 
   describe('getDownloadedReleaseIds', () => {
-    it('should return array of downloaded release IDs', async () => {
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(mockQuota);
-
-      const result = await repo.getDownloadedReleaseIds(mockUserId);
-
-      expect(result).toEqual(['release-1', 'release-2']);
-    });
-
-    it('should return empty array for new user', async () => {
-      const emptyQuota = createMockQuota({ uniqueReleaseIds: [] });
-      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(emptyQuota);
-
-      const result = await repo.getDownloadedReleaseIds(mockUserId);
-
-      expect(result).toEqual([]);
+    it('returns the array of release ids for a guest', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(
+        createGuestQuota({ uniqueReleaseIds: ['rA', 'rB'] })
+      );
+      expect(await repo.getDownloadedReleaseIds(guestSubject)).toEqual(['rA', 'rB']);
     });
   });
 });

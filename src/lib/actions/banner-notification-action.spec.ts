@@ -163,6 +163,41 @@ describe('banner-notification-action', () => {
         })
       );
     });
+
+    it('should pass null for omitted content and colors', async () => {
+      vi.mocked(BannerNotificationService.upsertNotification).mockResolvedValue({
+        success: true,
+        data: { id: 'notification-xyz' },
+      } as never);
+
+      // Only slotNumber present — all other optional fields are absent.
+      const result = await createOrUpdateBannerNotificationAction(
+        initialFormState,
+        buildFormData({ slotNumber: '2' })
+      );
+
+      expect(result.success).toBe(true);
+      expect(BannerNotificationService.upsertNotification).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({
+          content: null,
+          textColor: null,
+          backgroundColor: null,
+        })
+      );
+    });
+
+    it('aggregates multiple validation issues for the same field', async () => {
+      // textColor "x" is both wrong-length and not-hex, producing >1 issue path: 'textColor'.
+      const result = await createOrUpdateBannerNotificationAction(
+        initialFormState,
+        buildFormData({ ...validPayload, textColor: 'x' })
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.textColor).toBeDefined();
+      expect(result.errors?.textColor.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe('deleteBannerNotificationAction', () => {

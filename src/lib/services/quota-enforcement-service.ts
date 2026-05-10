@@ -6,6 +6,7 @@ import 'server-only';
 
 import { MAX_FREE_DOWNLOAD_QUOTA } from '@/lib/constants/digital-formats';
 import { UserDownloadQuotaRepository } from '@/lib/repositories/user-download-quota-repository';
+import type { DownloadSubject } from '@/types/download-subject';
 
 export interface QuotaCheckResult {
   allowed: boolean;
@@ -30,19 +31,23 @@ export class QuotaEnforcementService {
   }
 
   /**
-   * Check if a user is allowed to perform a free download of the given release.
+   * Check if the subject is allowed to perform a free download of the given
+   * release.
    *
    * Rules:
-   * - If the user has already downloaded this release for free, allow (no extra quota consumed).
-   * - If the user has not yet reached the quota limit, allow.
+   * - If the subject has already downloaded this release for free, allow
+   *   (no extra quota consumed).
+   * - If the subject has not yet reached the quota limit, allow.
    * - Otherwise, deny (QUOTA_EXCEEDED).
    */
-  async checkFreeDownloadQuota(userId: string, releaseId: string): Promise<QuotaCheckResult> {
-    const quota = await this.quotaRepo.findOrCreateByUserId(userId);
+  async checkFreeDownloadQuota(
+    subject: DownloadSubject,
+    releaseId: string
+  ): Promise<QuotaCheckResult> {
+    const quota = await this.quotaRepo.findOrCreateBySubject(subject);
     const uniqueDownloads = quota.uniqueReleaseIds.length;
     const remainingQuota = Math.max(0, this.maxQuota - uniqueDownloads);
 
-    // Already downloaded this release — re-download doesn't consume quota
     if (quota.uniqueReleaseIds.includes(releaseId)) {
       return {
         allowed: true,
@@ -52,7 +57,6 @@ export class QuotaEnforcementService {
       };
     }
 
-    // New release but quota exceeded
     if (uniqueDownloads >= this.maxQuota) {
       return {
         allowed: false,
@@ -62,35 +66,33 @@ export class QuotaEnforcementService {
       };
     }
 
-    // New release and within quota
     return {
       allowed: true,
       reason: 'WITHIN_QUOTA',
-      remainingQuota: remainingQuota - 1, // After this download
+      remainingQuota: remainingQuota - 1,
       uniqueDownloads,
     };
   }
 
   /**
-   * Increment the user's quota by adding a release to their unique downloads.
-   *
-   * Should only be called after `checkFreeDownloadQuota` returns `allowed: true`
-   * with reason `WITHIN_QUOTA` (not `ALREADY_DOWNLOADED`).
+   * Increment the subject's quota by adding a release to their unique
+   * downloads. Only call after `checkFreeDownloadQuota` returns
+   * `{ allowed: true, reason: 'WITHIN_QUOTA' }`.
    */
-  async incrementQuota(userId: string, releaseId: string): Promise<void> {
-    await this.quotaRepo.addUniqueRelease(userId, releaseId);
+  async incrementQuota(subject: DownloadSubject, releaseId: string): Promise<void> {
+    await this.quotaRepo.addUniqueRelease(subject, releaseId);
   }
 
   /**
-   * Get the current quota status for a user.
+   * Get the current quota status for the subject.
    */
-  async getQuotaStatus(userId: string): Promise<{
+  async getQuotaStatus(subject: DownloadSubject): Promise<{
     remainingQuota: number;
     uniqueDownloads: number;
     maxQuota: number;
     downloadedReleaseIds: string[];
   }> {
-    const quota = await this.quotaRepo.findOrCreateByUserId(userId);
+    const quota = await this.quotaRepo.findOrCreateBySubject(subject);
 
     return {
       remainingQuota: Math.max(0, this.maxQuota - quota.uniqueReleaseIds.length),
