@@ -21,6 +21,13 @@ const config = {
       ? 'https://cdn.fakefourrecords.com'
       : undefined,
   devIndicators: false,
+  // Next.js 16 blocks cross-origin requests to dev resources (e.g. HMR websocket)
+  // unless the origin is explicitly allowed. E2E runs bind the dev server to
+  // 127.0.0.1 (see playwright.config.ts) to avoid the macOS IPv6/IPv4 mismatch,
+  // so we must allow that host explicitly. Without this, the HMR client fails
+  // to connect and React never hydrates client components — the page stays
+  // stuck on its server-rendered skeleton.
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
 
   // Configure images for direct CDN delivery.
   // Uses a global custom loader (`image-loader.ts`) so all <Image> components
