@@ -1,0 +1,63 @@
+name: Refresh Stripe Webhook IP Ranges
+
+# Daily refresh of the STRIPE_WEBHOOK_IP_RANGES repository secret from
+# https://stripe.com/files/ips/ips_webhooks.json. If the IP list changed,
+# the secret is updated and deploy-stripe-webhook.yml is re-triggered so the
+# Lambda function configuration picks up the new value.
+#
+# Requires the SECRETS_ADMIN_PAT repository secret to be set to a fine-grained
+# PAT scoped to this repo with:
+#   - Actions: Read and write   (workflow dispatch)
+#   - Secrets: Read and write   (update STRIPE_WEBHOOK_IP_RANGES)
+#   - Variables: Read and write (update fingerprint variable)
+#
+# The fingerprint is stored as a repository variable (not a secret) because
+# the value being fingerprinted is already public.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Refresh Stripe webhook IP allowlist
+        env:
+          GH_TOKEN: ${{ secrets.SECRETS_ADMIN_PAT }}
+          OLD_FINGERPRINT: ${{ vars.STRIPE_WEBHOOK_IP_RANGES_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+
+          IPS=$(curl -fsSL https://stripe.com/files/ips/ips_webhooks.json \
+            | jq -r '.WEBHOOKS | sort | join(",")')
+          if [ -z "$IPS" ]; then
+            echo "::error::Stripe IPs payload was empty"
+            exit 1
+          fi
+
+          FINGERPRINT=$(printf '%s' "$IPS" | sha256sum | cut -d' ' -f1)
+          IP_COUNT=$(printf '%s' "$IPS" | tr ',' '\n' | wc -l | tr -d ' ')
+          echo "Fetched $IP_COUNT Stripe webhook IPs (fingerprint: $FINGERPRINT)"
+
+          if [ "$FINGERPRINT" = "$OLD_FINGERPRINT" ]; then
+            echo "Stripe webhook IPs unchanged; nothing to do."
+            exit 0
+          fi
+
+          echo "IP list changed (old=${OLD_FINGERPRINT:-<unset>}, new=$FINGERPRINT)"
+
+          printf '%s' "$IPS" | gh secret set STRIPE_WEBHOOK_IP_RANGES \
+            --repo "$GITHUB_REPOSITORY"
+
+          gh variable set STRIPE_WEBHOOK_IP_RANGES_FINGERPRINT \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "$FINGERPRINT"
+
+          gh workflow run deploy-stripe-webhook.yml \
+            --repo "$GITHUB_REPOSITORY"
+
+          echo "Dispatched deploy-stripe-webhook.yml to pick up the new IP list."

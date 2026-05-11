@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 import { z } from 'zod';
 
@@ -165,7 +165,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
         userId = newUser.id;
       } catch (createError) {
         if (
-          createError instanceof Prisma.PrismaClientKnownRequestError &&
+          createError instanceof PrismaClientKnownRequestError &&
           createError.code === 'P2002'
         ) {
           const racedUser = await getPrisma().user.findUnique({
@@ -241,7 +241,7 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session):
       // Race condition: a concurrent webhook delivery may have created the
       // record between our pre-check and the insert.
       if (
-        createError instanceof Prisma.PrismaClientKnownRequestError &&
+        createError instanceof PrismaClientKnownRequestError &&
         createError.code === 'P2002'
       ) {
         purchase =

@@ -9,8 +9,8 @@ let prismaClient: PrismaClient | null = null;
 
 /**
  * Returns the Prisma client, creating it lazily on first call.
- * Requires `initSecrets()` to have been called beforehand so that
- * `process.env.DATABASE_URL` is set.
+ * Reads `process.env.DATABASE_URL`, injected by the Lambda function
+ * configuration.
  */
 export function getPrisma(): PrismaClient {
   if (!prismaClient) {
