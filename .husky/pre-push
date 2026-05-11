@@ -48,7 +48,15 @@ fi
 # Resolve the branch's configured upstream (e.g. "origin/feature-x"). If the
 # branch has no upstream yet (first push), fall back to comparing against
 # origin/main so first-push branches still get the same safety checks.
-upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
+#
+# Note: on modern git, when no upstream is configured, `rev-parse` exits 128
+# AND prints the literal string '@{u}' to stdout. Gate on the exit code so we
+# don't capture that literal as if it were a real ref.
+if upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
+  :
+else
+  upstream_ref=""
+fi
 if [ -z "$upstream_ref" ]; then
   echo "ℹ️  No upstream configured for '$branch_name' — comparing against 'origin/main'."
   has_upstream=0
