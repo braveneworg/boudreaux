@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
+
+const ssmClient = new SSMClient({});
+
+/** Cached secret values — refreshed with latest webhookIpRanges each invocation. */
 let cachedSecrets: ResolvedSecrets | null = null;
+let cachedStaticSecrets: Omit<ResolvedSecrets, 'webhookIpRanges'> | null = null;
 
 interface ResolvedSecrets {
   stripeSecretKey: string;
@@ -11,37 +17,72 @@ interface ResolvedSecrets {
   webhookIpRanges: string;
 }
 
-const REQUIRED_ENV_VARS: Record<keyof ResolvedSecrets, string> = {
-  stripeSecretKey: 'STRIPE_SECRET_KEY',
-  stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
-  databaseUrl: 'DATABASE_URL',
-  webhookIpRanges: 'STRIPE_WEBHOOK_IP_RANGES',
-};
+/**
+ * SSM parameter paths are passed as non-secret environment variables so that
+ * the infrastructure definition (template.yaml) remains the single source of
+ * truth for parameter names.
+ */
+const SSM_PATH_ENV_VARS = {
+  stripeSecretKey: 'SSM_PATH_STRIPE_SECRET_KEY',
+  stripeWebhookSecret: 'SSM_PATH_STRIPE_WEBHOOK_SECRET',
+  databaseUrl: 'SSM_PATH_DATABASE_URL',
+  webhookIpRanges: 'SSM_PATH_STRIPE_WEBHOOK_IP_RANGES',
+} as const;
+
+async function fetchSsmParameter(path: string): Promise<string> {
+  const command = new GetParameterCommand({
+    Name: path,
+    WithDecryption: true,
+  });
+
+  const result = await ssmClient.send(command);
+  const value = result.Parameter?.Value;
+
+  if (!value) {
+    throw new Error(`SSM parameter ${path} returned no value`);
+  }
+
+  return value;
+}
 
 /**
- * Resolves required secrets from environment variables (injected via the
- * Lambda function configuration from GitHub Actions deploy parameters).
+ * Fetches static secrets from SSM Parameter Store once per cold start and
+ * refreshes webhookIpRanges on each invocation to avoid stale allowlists.
  *
- * Kept async to preserve the prior SSM-based call signature; safe to await
- * once per cold start.
+ * Must be called once at the start of each cold-start invocation before
+ * any Stripe or Prisma client is used.
  */
 export async function initSecrets(): Promise<ResolvedSecrets> {
-  if (cachedSecrets) {
-    return cachedSecrets;
-  }
+  const paths: Record<keyof ResolvedSecrets, string> = {
+    stripeSecretKey: '',
+    stripeWebhookSecret: '',
+    databaseUrl: '',
+    webhookIpRanges: '',
+  };
 
-  const resolved: Partial<ResolvedSecrets> = {};
-  for (const [key, envVar] of Object.entries(REQUIRED_ENV_VARS) as Array<
-    [keyof ResolvedSecrets, string]
-  >) {
-    const value = process.env[envVar];
-    if (!value) {
+  for (const [key, envVar] of Object.entries(SSM_PATH_ENV_VARS)) {
+    const path = process.env[envVar];
+    if (!path) {
       throw new Error(`Missing environment variable: ${envVar}`);
     }
-    resolved[key] = value;
+    paths[key as keyof ResolvedSecrets] = path;
   }
 
-  cachedSecrets = resolved as ResolvedSecrets;
+  if (!cachedStaticSecrets) {
+    const [stripeSecretKey, stripeWebhookSecret, databaseUrl] = await Promise.all([
+      fetchSsmParameter(paths.stripeSecretKey),
+      fetchSsmParameter(paths.stripeWebhookSecret),
+      fetchSsmParameter(paths.databaseUrl),
+    ]);
+    cachedStaticSecrets = { stripeSecretKey, stripeWebhookSecret, databaseUrl };
+  }
+
+  const webhookIpRanges = await fetchSsmParameter(paths.webhookIpRanges);
+
+  // Set DATABASE_URL in process.env so PrismaClient picks it up automatically.
+  process.env.DATABASE_URL = cachedStaticSecrets.databaseUrl;
+
+  cachedSecrets = { ...cachedStaticSecrets, webhookIpRanges };
   return cachedSecrets;
 }
 

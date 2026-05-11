@@ -104,18 +104,6 @@ jobs:
 
       - name: SAM deploy
         working-directory: stripe-webhook
-        env:
-          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION }}
-          BASE_URL: ${{ secrets.BASE_URL }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          SES_IDENTITY_ARN: ${{ secrets.SES_IDENTITY_ARN }}
-          STRIPE_PRICE_MINIMUM: ${{ secrets.STRIPE_PRICE_MINIMUM }}
-          STRIPE_PRICE_EXTRA: ${{ secrets.STRIPE_PRICE_EXTRA }}
-          STRIPE_PRICE_EXTRA_EXTRA: ${{ secrets.STRIPE_PRICE_EXTRA_EXTRA }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          STRIPE_WEBHOOK_IP_RANGES: ${{ secrets.STRIPE_WEBHOOK_IP_RANGES }}
         run: |
           sam deploy \
             --s3-bucket fakefour-sam-artifacts-us-east-1 \
@@ -125,19 +113,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --stack-name fakefour-stripe-webhook \
             --region us-east-1 \
-            --parameter-overrides \
-              "Environment=production" \
-              "AwsSesRegion=$AWS_SES_REGION" \
-              "BaseUrl=$BASE_URL" \
-              "EmailFrom=$EMAIL_FROM" \
-              "SesIdentityArn=$SES_IDENTITY_ARN" \
-              "StripePriceMinimum=$STRIPE_PRICE_MINIMUM" \
-              "StripePriceExtra=$STRIPE_PRICE_EXTRA" \
-              "StripePriceExtraExtra=$STRIPE_PRICE_EXTRA_EXTRA" \
-              "StripeSecretKey=$STRIPE_SECRET_KEY" \
-              "StripeWebhookSecret=$STRIPE_WEBHOOK_SECRET" \
-              "DatabaseUrl=$DATABASE_URL" \
-              "StripeWebhookIpRanges=$STRIPE_WEBHOOK_IP_RANGES"
+            --parameter-overrides Environment=production
 
       - name: Print webhook URL
         run: |
