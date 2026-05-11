@@ -6,9 +6,6 @@ import * as ipaddr from 'ipaddr.js';
 
 import { handleChargeRefunded } from './handlers/charge-refunded.js';
 import { handleCheckoutSessionCompleted } from './handlers/checkout-session-completed.js';
-import { handleInvoicePaymentFailed } from './handlers/invoice-payment-failed.js';
-import { handleSubscriptionDeleted } from './handlers/subscription-deleted.js';
-import { handleSubscriptionUpdated } from './handlers/subscription-updated.js';
 import { initSecrets, getSecrets } from './lib/secrets.js';
 import { getStripe } from './lib/stripe.js';
 
@@ -132,18 +129,6 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed': {
       await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
-      break;
-    }
-    case 'customer.subscription.updated': {
-      await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-      break;
-    }
-    case 'customer.subscription.deleted': {
-      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-      break;
-    }
-    case 'invoice.payment_failed': {
-      await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
       break;
     }
     case 'charge.refunded': {

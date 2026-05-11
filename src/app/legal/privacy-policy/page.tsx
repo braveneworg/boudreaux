@@ -62,8 +62,8 @@ export default function PrivacyPolicyPage() {
               </PageSectionParagraph>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>
-                  When you subscribe to a paid plan, our secure payment processor collects your
-                  billing information
+                  When you make a purchase, our secure payment processor collects your billing
+                  information
                 </li>
                 <li>We do not store complete credit card numbers on our servers</li>
                 <li>
@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
                 <li>Search queries</li>
                 <li>Features you use and interact with</li>
                 <li>Time, frequency, and duration of your activities</li>
-                <li>Playlists you create, follow, or subscribe to</li>
+                <li>Playlists you create or follow</li>
               </ul>
 
               <PageSectionParagraph>
@@ -145,7 +145,7 @@ export default function PrivacyPolicyPage() {
               <h3 className="mt-6 mb-4 text-xl font-semibold">To Provide Our Service</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Create and manage your account</li>
-                <li>Process your subscription and payments</li>
+                <li>Process your purchases and payments</li>
                 <li>Deliver music streaming and download functionality</li>
                 <li>Enable playlist creation and sharing</li>
                 <li>Allow you to interact with other users (comments, follows, etc.)</li>
@@ -226,7 +226,7 @@ export default function PrivacyPolicyPage() {
               </PageSectionParagraph>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
                 <li>Cloud hosting services (to store and deliver content)</li>
-                <li>Payment processors (to handle subscriptions)</li>
+                <li>Payment processors (to handle purchases)</li>
                 <li>Email service providers (to send service notifications)</li>
                 <li>Analytics providers (to understand service usage)</li>
                 <li>Customer support tools (to assist you)</li>
@@ -317,12 +317,6 @@ export default function PrivacyPolicyPage() {
                 <li>
                   We respect browser &ldquo;Do Not Track&rdquo; signals where technically feasible
                 </li>
-              </ul>
-
-              <h3 className="mt-6 mb-4 text-xl font-semibold">Cancel Your Subscription</h3>
-              <ul className="list-inside list-disc space-y-2 text-zinc-700">
-                <li>Cancel your paid subscription at any time from your account settings</li>
-                <li>Cancellation takes effect at the end of your billing period</li>
               </ul>
             </PageSection>
 

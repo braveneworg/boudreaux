@@ -150,10 +150,6 @@ const { handlers, auth, signIn, signOut } = NextAuth({
               zipCode: true,
               country: true,
               allowSmsNotifications: true,
-              // Stripe subscription fields
-              stripeCustomerId: true,
-              subscriptionStatus: true,
-              subscriptionTier: true,
             },
           });
 

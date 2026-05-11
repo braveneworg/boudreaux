@@ -8,13 +8,10 @@ import 'server-only';
 import { cookies } from 'next/headers';
 
 import { encode } from '@auth/core/jwt';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { generateUsername } from 'unique-username-generator';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { stripe } from '@/lib/stripe';
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
@@ -46,9 +43,8 @@ interface CreatePurchaseSessionResult {
 }
 
 /**
- * Create a JWT session cookie for a user after a completed purchase or
- * subscription checkout, enabling immediate downloads without requiring a
- * separate magic-link sign-in.
+ * Create a JWT session cookie for a user after a completed purchase, enabling
+ * immediate downloads without requiring a separate magic-link sign-in.
  *
  * The Stripe checkout session ID is used as the trust anchor — only a client
  * that initiated the checkout possesses it.
@@ -75,67 +71,12 @@ export async function createPurchaseSessionAction(
   }
 
   try {
-    // --- Resolve the user ---
-    // 1. Try the PWYW purchase path first (DB-only, no external call).
+    // Resolve the user via the PWYW purchase record (DB-only, no external call).
     const purchase = await PurchaseRepository.findBySessionId(sessionId);
-    let userId: string | undefined;
-    let customerEmail: string | undefined;
-
-    if (purchase) {
-      userId = purchase.userId;
-    } else {
-      // 2. Subscription path: retrieve the Stripe session to get the customer email.
-      const stripeSession = await stripe.checkout.sessions.retrieve(sessionId);
-      if (stripeSession.status !== 'complete') {
-        return { success: false, error: 'session_not_complete' };
-      }
-      customerEmail =
-        stripeSession.customer_details?.email ?? stripeSession.customer_email ?? undefined;
-      if (!customerEmail) {
-        return { success: false, error: 'no_customer_email' };
-      }
-      const existingUser = await PurchaseRepository.findUserByEmail(customerEmail);
-      if (existingUser) {
-        userId = existingUser.id;
-      } else {
-        // Create a new user for first-time subscribers.
-        // Guard against concurrent requests racing on the unique email index
-        // (P2002) by re-fetching the user if creation fails.
-        const placeholderUsername = generateUsername('', 0, 15);
-        try {
-          const newUser = await prisma.user.create({
-            data: {
-              email: customerEmail,
-              emailVerified: new Date(),
-              username: placeholderUsername,
-            },
-          });
-          userId = newUser.id;
-        } catch (createError) {
-          if (
-            createError instanceof PrismaClientKnownRequestError &&
-            createError.code === 'P2002'
-          ) {
-            // Race condition: another request already created this user — re-fetch.
-            const racedUser = await PurchaseRepository.findUserByEmail(customerEmail);
-            if (racedUser) {
-              userId = racedUser.id;
-            } else {
-              console.error(
-                '[createPurchaseSession] P2002 race: user not found on re-fetch',
-                customerEmail
-              );
-            }
-          } else {
-            throw createError;
-          }
-        }
-      }
-    }
-
-    if (!userId) {
+    if (!purchase) {
       return { success: false, error: 'user_not_found' };
     }
+    const userId = purchase.userId;
 
     // --- Build the JWT payload ---
     const user = await prisma.user.findUnique({
@@ -158,9 +99,6 @@ export async function createPurchaseSessionAction(
         zipCode: true,
         country: true,
         allowSmsNotifications: true,
-        stripeCustomerId: true,
-        subscriptionStatus: true,
-        subscriptionTier: true,
       },
     });
 

@@ -8,12 +8,7 @@ import { Dialog } from '@/app/components/ui/dialog';
 
 import { EmailStep } from './email-step';
 
-const mockResolveSubscriberAction = vi.fn();
 const mockVerifyTurnstile = vi.fn();
-
-vi.mock('@/lib/actions/resolve-subscriber-action', () => ({
-  resolveSubscriberAction: (...args: unknown[]) => mockResolveSubscriberAction(...args),
-}));
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
   default: ({
@@ -156,105 +151,30 @@ describe('EmailStep', () => {
     });
   });
 
-  it('should call resolveSubscriberAction and onConfirm for a new user', async () => {
+  it('should call onConfirm with the entered email after successful Turnstile verification', async () => {
     const user = userEvent.setup();
-    mockResolveSubscriberAction.mockResolvedValue({ success: true, status: 'created' });
+    const onConfirm = vi.fn();
 
-    renderInDialog(<EmailStep {...defaultProps} />);
+    renderInDialog(<EmailStep onCancel={defaultProps.onCancel} onConfirm={onConfirm} />);
 
     await fillFormAndVerify(user, 'new@example.com');
     await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
 
     await waitFor(() => {
       expect(mockVerifyTurnstile).toHaveBeenCalledWith('mock-turnstile-token');
-      expect(mockResolveSubscriberAction).toHaveBeenCalledWith({
-        email: 'new@example.com',
-        termsAccepted: true,
-      });
-      expect(defaultProps.onConfirm).toHaveBeenCalledWith('new@example.com');
+      expect(onConfirm).toHaveBeenCalledWith('new@example.com');
     });
   });
 
-  it('should show "Checking..." while the action is pending', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockVerifyTurnstile.mockImplementation(() => new Promise(() => {}));
-
-    renderInDialog(<EmailStep {...defaultProps} />);
-
-    await user.type(screen.getByLabelText('Email'), 'test@example.com');
-    await user.click(screen.getByRole('switch'));
-    await user.click(screen.getByTestId('verify-turnstile'));
-
-    // After Turnstile verify, we need to submit the form manually
-    // Use queryAllByRole to handle the transition state
-    const submitButtons = screen.queryAllByRole('button', { name: 'Continue to Checkout' });
-    if (submitButtons.length > 0) {
-      await user.click(submitButtons[0]);
-    }
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Checking...' })).toBeDisabled();
-    });
-
-    vi.useRealTimers();
-  });
-
-  it('should call onConfirm immediately for existing users', async () => {
+  it('should show error and not call onConfirm when Turnstile verification fails', async () => {
     const user = userEvent.setup();
-    mockResolveSubscriberAction.mockResolvedValue({ success: true, status: 'existing' });
-
-    renderInDialog(<EmailStep {...defaultProps} />);
-
-    await fillFormAndVerify(user, 'existing@example.com');
-    await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
-
-    await waitFor(() => {
-      expect(defaultProps.onConfirm).toHaveBeenCalledWith('existing@example.com');
-    });
-  });
-
-  it('should display a server error when the action fails', async () => {
-    const user = userEvent.setup();
-    mockResolveSubscriberAction.mockResolvedValue({
-      success: false,
-      error: 'Disposable email addresses are not allowed',
-    });
-
-    renderInDialog(<EmailStep {...defaultProps} />);
-
-    await fillFormAndVerify(user, 'test@tempmail.com');
-    await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Disposable email addresses are not allowed')).toBeInTheDocument();
-    });
-
-    expect(defaultProps.onConfirm).not.toHaveBeenCalled();
-  });
-
-  it('should display a generic server error when no error message is returned', async () => {
-    const user = userEvent.setup();
-    mockResolveSubscriberAction.mockResolvedValue({ success: false });
-
-    renderInDialog(<EmailStep {...defaultProps} />);
-
-    await fillFormAndVerify(user, 'test@example.com');
-    await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    });
-  });
-
-  it('should show error and not call resolveSubscriberAction when Turnstile verification fails', async () => {
-    const user = userEvent.setup();
+    const onConfirm = vi.fn();
     mockVerifyTurnstile.mockResolvedValue({
       success: false,
       error: 'Turnstile verification failed',
     });
 
-    renderInDialog(<EmailStep {...defaultProps} />);
+    renderInDialog(<EmailStep onCancel={defaultProps.onCancel} onConfirm={onConfirm} />);
 
     await fillFormAndVerify(user, 'test@example.com');
     await user.click(screen.getByRole('button', { name: 'Continue to Checkout' }));
@@ -263,8 +183,7 @@ describe('EmailStep', () => {
       expect(screen.getByText('Turnstile verification failed')).toBeInTheDocument();
     });
 
-    expect(mockResolveSubscriberAction).not.toHaveBeenCalled();
-    expect(defaultProps.onConfirm).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('should show default error message when Turnstile verification fails without error string', async () => {

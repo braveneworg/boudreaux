@@ -58,23 +58,11 @@ vi.mock('./lib/stripe.js', () => ({
 }));
 
 const mockHandleCheckoutSessionCompleted = vi.fn();
-const mockHandleSubscriptionUpdated = vi.fn();
-const mockHandleSubscriptionDeleted = vi.fn();
-const mockHandleInvoicePaymentFailed = vi.fn();
 const mockHandleChargeRefunded = vi.fn();
 
 vi.mock('./handlers/checkout-session-completed.js', () => ({
   handleCheckoutSessionCompleted: (...args: unknown[]) =>
     mockHandleCheckoutSessionCompleted(...args),
-}));
-vi.mock('./handlers/subscription-updated.js', () => ({
-  handleSubscriptionUpdated: (...args: unknown[]) => mockHandleSubscriptionUpdated(...args),
-}));
-vi.mock('./handlers/subscription-deleted.js', () => ({
-  handleSubscriptionDeleted: (...args: unknown[]) => mockHandleSubscriptionDeleted(...args),
-}));
-vi.mock('./handlers/invoice-payment-failed.js', () => ({
-  handleInvoicePaymentFailed: (...args: unknown[]) => mockHandleInvoicePaymentFailed(...args),
 }));
 vi.mock('./handlers/charge-refunded.js', () => ({
   handleChargeRefunded: (...args: unknown[]) => mockHandleChargeRefunded(...args),
@@ -225,30 +213,6 @@ describe('lambdaHandler', () => {
     mockConstructEvent.mockReturnValue(mockStripeEvent('checkout.session.completed'));
     const result = await lambdaHandler(makeEvent());
     expect(mockHandleCheckoutSessionCompleted).toHaveBeenCalledOnce();
-    expect(result).toEqual({ statusCode: 200, body: JSON.stringify({ received: true }) });
-  });
-
-  it('dispatches customer.subscription.updated to the correct handler', async () => {
-    mockConstructEvent.mockReturnValue(mockStripeEvent('customer.subscription.updated'));
-    mockHandleSubscriptionUpdated.mockResolvedValue(undefined);
-    const result = await lambdaHandler(makeEvent());
-    expect(mockHandleSubscriptionUpdated).toHaveBeenCalledOnce();
-    expect(result).toEqual({ statusCode: 200, body: JSON.stringify({ received: true }) });
-  });
-
-  it('dispatches customer.subscription.deleted to the correct handler', async () => {
-    mockConstructEvent.mockReturnValue(mockStripeEvent('customer.subscription.deleted'));
-    mockHandleSubscriptionDeleted.mockResolvedValue(undefined);
-    const result = await lambdaHandler(makeEvent());
-    expect(mockHandleSubscriptionDeleted).toHaveBeenCalledOnce();
-    expect(result).toEqual({ statusCode: 200, body: JSON.stringify({ received: true }) });
-  });
-
-  it('dispatches invoice.payment_failed to the correct handler', async () => {
-    mockConstructEvent.mockReturnValue(mockStripeEvent('invoice.payment_failed'));
-    mockHandleInvoicePaymentFailed.mockResolvedValue(undefined);
-    const result = await lambdaHandler(makeEvent());
-    expect(mockHandleInvoicePaymentFailed).toHaveBeenCalledOnce();
     expect(result).toEqual({ statusCode: 200, body: JSON.stringify({ received: true }) });
   });
 
