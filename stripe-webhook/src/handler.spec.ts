@@ -280,7 +280,9 @@ describe('lambdaHandler', () => {
     const initSecretsMock = vi.mocked(initSecrets);
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    initSecretsMock.mockRejectedValueOnce(new Error('Missing environment variable: STRIPE_SECRET_KEY'));
+    initSecretsMock.mockRejectedValueOnce(
+      new Error('Missing environment variable: STRIPE_SECRET_KEY')
+    );
 
     const result = await lambdaHandler(makeEvent());
 
