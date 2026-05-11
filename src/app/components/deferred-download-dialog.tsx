@@ -56,7 +56,6 @@ export const DeferredDownloadDialog = ({
   const { data: userStatus } = useReleaseUserStatusQuery(releaseId);
 
   const hasPurchase = userStatus?.hasPurchase ?? false;
-  const isSubscriber = userStatus?.isSubscriber ?? false;
   const purchasedAt = useMemo(
     () => (userStatus?.purchasedAt ? new Date(userStatus.purchasedAt) : null),
     [userStatus?.purchasedAt]
@@ -95,7 +94,6 @@ export const DeferredDownloadDialog = ({
           releaseId={releaseId}
           releaseTitle={releaseTitle}
           hasPurchase={hasPurchase}
-          isSubscriber={isSubscriber}
           purchasedAt={purchasedAt}
           downloadCount={downloadCount}
           resetInHours={resetInHours}

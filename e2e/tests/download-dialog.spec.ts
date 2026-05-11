@@ -108,21 +108,6 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
     await expect(userPage.getByLabel(/Premium digital formats/i)).toBeVisible();
   });
 
-  test('shows subscribe CTA in download dialog', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease2Id}`);
-
-    const downloadButton = userPage.getByRole('button', { name: 'Download' });
-    await downloadButton.click();
-
-    // Wait for dialog
-    await expect(userPage.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
-      timeout: 5_000,
-    });
-
-    // Should show subscribe call-to-action
-    await expect(userPage.getByRole('button', { name: /Subscribe/ })).toBeVisible();
-  });
-
   test('shows PWYW amount input when premium option selected', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease2Id}`);
 

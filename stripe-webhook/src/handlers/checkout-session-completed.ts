@@ -7,10 +7,8 @@ import { generateUsername } from 'unique-username-generator';
 import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '../email/send-purchase-confirmation.js';
-import { sendSubscriptionConfirmationEmail } from '../email/send-subscription-confirmation.js';
 import { getPrisma } from '../lib/prisma.js';
 import { getStripe } from '../lib/stripe.js';
-import { getTierByPriceId } from '../lib/subscriber-rates.js';
 
 import type Stripe from 'stripe';
 
@@ -27,77 +25,11 @@ const releaseMetadataSchema = z.object({
 export async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ): Promise<void> {
-  // Payment mode — PWYW release purchase
-  if (session.mode === 'payment' && session.metadata?.type === 'release_purchase') {
-    await handleReleasePurchaseCompleted(session);
+  // Only payment-mode release purchases are handled.
+  if (session.mode !== 'payment' || session.metadata?.type !== 'release_purchase') {
     return;
   }
-
-  // Subscription mode
-  const customerEmail = session.customer_details?.email ?? session.customer_email;
-  const stripeCustomerId =
-    typeof session.customer === 'string' ? session.customer : session.customer?.id;
-
-  if (!customerEmail || !stripeCustomerId) {
-    console.error('checkout.session.completed missing email or customer ID', {
-      sessionId: session.id,
-    });
-    return;
-  }
-
-  const updateUserResult = await getPrisma().user.updateMany({
-    where: { email: customerEmail },
-    data: { stripeCustomerId },
-  });
-
-  if (updateUserResult.count === 0) {
-    console.warn('checkout.session.completed user not found for email; skipping user update', {
-      customerEmail,
-      sessionId: session.id,
-      stripeCustomerId,
-    });
-  }
-
-  let tier = null;
-  let interval = 'month';
-
-  if (session.subscription) {
-    const subscriptionId =
-      typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
-
-    const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
-    const firstItem = subscription.items.data[0];
-    const priceId = firstItem?.price.id;
-    tier = priceId ? getTierByPriceId(priceId) : null;
-    interval = firstItem?.price.recurring?.interval ?? 'month';
-
-    const user = await getPrisma().user.findFirst({
-      where: { stripeCustomerId },
-      select: { id: true },
-    });
-
-    if (user) {
-      await getPrisma().user.update({
-        where: { id: user.id },
-        data: {
-          subscriptionId: subscription.id,
-          subscriptionStatus: subscription.status,
-          subscriptionTier: tier,
-          subscriptionCurrentPeriodEnd: firstItem
-            ? new Date(firstItem.current_period_end * 1000)
-            : null,
-        },
-      });
-    }
-  }
-
-  // Send the subscription confirmation email. The function is idempotent via
-  // the `confirmationEmailSentAt` flag on the User record, which prevents the
-  // same email from being sent twice when both `checkout.session.completed`
-  // and `customer.subscription.updated` fire for the same new subscription.
-  // Re-subscriptions are handled by `handleSubscriptionDeleted`, which clears
-  // the flag on cancellation so the next signup gets a fresh email.
-  await sendSubscriptionConfirmationEmail(customerEmail, tier, interval);
+  await handleReleasePurchaseCompleted(session);
 }
 
 async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session): Promise<void> {

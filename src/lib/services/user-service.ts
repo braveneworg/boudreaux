@@ -7,7 +7,6 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
 import { prisma } from '../prisma';
-import { CustomPrismaAdapter } from '../prisma-adapter';
 
 /** Result of {@link UserService.updateUsername}. */
 export interface UpdateUsernameResult {
@@ -130,24 +129,5 @@ export const UserService = {
       }
       throw error;
     }
-  },
-
-  /**
-   * Create a newsletter subscriber via the Auth.js adapter so the resulting
-   * user record is shaped consistently with the rest of the auth flow.
-   */
-  createSubscriber: async (email: string): Promise<void> => {
-    const adapter = CustomPrismaAdapter(prisma);
-    if (!adapter.createUser) {
-      throw new Error('CustomPrismaAdapter.createUser is not implemented');
-    }
-    await adapter.createUser({
-      id: '',
-      email,
-      emailVerified: null,
-      name: null,
-      image: null,
-      username: generateUsername('', 4),
-    });
   },
 };

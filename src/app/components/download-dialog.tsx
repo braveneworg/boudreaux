@@ -9,17 +9,15 @@ import type { ReactElement } from 'react';
 import Link from 'next/link';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { DownloadIcon, LogInIcon, UserPlus2Icon } from 'lucide-react';
+import { DownloadIcon, LogInIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 
-import { CheckoutStep } from '@/app/components/checkout-step';
 import { EmailStep } from '@/app/components/email-step';
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
 import { FreeFormatSelectStep } from '@/app/components/free-format-select-step';
 import { PurchaseCheckoutStep } from '@/app/components/purchase-checkout-step';
 import { PurchaseSuccessStep } from '@/app/components/purchase-success-step';
-import { RateSelectStep } from '@/app/components/rate-select-step';
 import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
@@ -43,8 +41,6 @@ import { useFreeDownloadStatusQuery } from '@/app/hooks/use-free-download-status
 import { checkGuestPurchaseAction } from '@/lib/actions/check-guest-purchase-action';
 import { ALREADY_PURCHASED_ERROR, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
-import { getSubscriberRate, SUBSCRIBER_RATE_MINIMUM } from '@/lib/subscriber-rates';
-import type { SubscriberRateTier } from '@/lib/subscriber-rates';
 import { cn } from '@/lib/utils/tailwind-utils';
 import {
   downloadSchema,
@@ -56,9 +52,7 @@ type DialogStep =
   | 'download'
   | 'format-select'
   | 'free-format-select'
-  | 'rate-select'
   | 'email-step'
-  | 'checkout'
   | 'purchase-checkout'
   | 'purchase-confirmed'
   | 'purchase-success'
@@ -76,8 +70,6 @@ interface DownloadDialogProps {
   releaseTitle?: string;
   suggestedPrice?: number | null;
   hasPurchase?: boolean;
-  /** True when the authenticated user holds an active label subscription. Subscribers are auto-advanced past the purchase/PWYW step. */
-  isSubscriber?: boolean;
   purchasedAt?: Date | null;
   downloadCount?: number;
   /** Hours until the per-release download limit resets. null when no reset is pending. */
@@ -94,7 +86,6 @@ export const DownloadDialog = ({
   releaseTitle = '',
   suggestedPrice = null,
   hasPurchase = false,
-  isSubscriber = false,
   purchasedAt = null,
   downloadCount = 0,
   resetInHours = null,
@@ -105,9 +96,7 @@ export const DownloadDialog = ({
   const initialStep: DialogStep = 'download';
   const [open, setOpen] = useState(openOnMount);
   const [step, setStep] = useState<DialogStep>(initialStep);
-  const [selectedTier, setSelectedTier] = useState<SubscriberRateTier | null>(null);
   const [customerEmail, setCustomerEmail] = useState<string | null>(null);
-  const [purchaseMode, setPurchaseMode] = useState(false);
   const [amountCents, setAmountCents] = useState<number>(0);
   const [guestAtCap, setGuestAtCap] = useState(false);
   const [guestResetInHours, setGuestResetInHours] = useState<number | null>(null);
@@ -125,21 +114,12 @@ export const DownloadDialog = ({
   const availableFreeFormats = freeStatus?.availableFreeFormats ?? [];
   const freeRadioDisabled = freeStatus !== undefined && availableFreeFormats.length === 0;
 
-  // Subscribers fall back to the session-derived status when the user-status
-  // query hasn't resolved yet (or in render paths that don't pass the prop),
-  // so subscribers always skip directly to format selection.
-  const sessionSubscriptionStatus = session?.user?.subscriptionStatus;
-  const isActiveSubscriber =
-    isSubscriber ||
-    sessionSubscriptionStatus === 'active' ||
-    sessionSubscriptionStatus === 'trialing';
-
-  // Auto-advance authenticated purchasers and active subscribers directly to format selection
+  // Auto-advance authenticated purchasers directly to format selection
   useEffect(() => {
-    if (open && (hasPurchase || isActiveSubscriber) && session?.user && step === 'download') {
+    if (open && hasPurchase && session?.user && step === 'download') {
       setStep('format-select');
     }
-  }, [open, hasPurchase, isActiveSubscriber, session, step]);
+  }, [open, hasPurchase, session, step]);
 
   const form = useForm<DownloadFormSchemaType>({
     resolver: zodResolver(downloadSchema),
@@ -179,7 +159,6 @@ export const DownloadDialog = ({
       if (session?.user) {
         setStep('purchase-checkout');
       } else {
-        setPurchaseMode(true);
         setStep('email-step');
       }
     } else {
@@ -198,9 +177,7 @@ export const DownloadDialog = ({
       if (!nextOpen) {
         form.reset();
         setStep(initialStep);
-        setSelectedTier(null);
         setCustomerEmail(null);
-        setPurchaseMode(false);
         setAmountCents(0);
         setGuestAtCap(false);
         setGuestResetInHours(null);
@@ -214,22 +191,17 @@ export const DownloadDialog = ({
     handleOpenChange(false);
   }, [handleOpenChange]);
 
-  const handleSubscribe = () => {
-    setStep('rate-select');
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
         className={cn(
           'sm:max-w-md',
-          (step === 'checkout' || step === 'purchase-checkout') &&
-            'max-h-[90vh] overflow-y-auto sm:max-w-lg'
+          step === 'purchase-checkout' && 'max-h-[90vh] overflow-y-auto sm:max-w-lg'
         )}
         /* v8 ignore next 3 -- Radix UI callback: not invocable from userEvent without real Radix focus management */
         onOpenAutoFocus={(e) => {
-          if (step === 'checkout' || step === 'purchase-checkout') e.preventDefault();
+          if (step === 'purchase-checkout') e.preventDefault();
         }}
       >
         <DialogTitle className="sr-only">
@@ -470,23 +442,6 @@ export const DownloadDialog = ({
                 </form>
               </Form>
             )}
-
-            {/* Subscribe CTA — hidden for active subscribers */}
-            {!isActiveSubscriber && (
-              <div className="border-t pt-4">
-                <p className="text-zinc-950-foreground mb-3 text-sm">
-                  Want <strong>ACCESS TO ALL</strong> music on the Fake Four Inc. record label?
-                </p>
-                <Button
-                  type="button"
-                  className="w-full bg-green-700 text-white hover:bg-green-800 focus-visible:ring-green-700 data-[state=open]:bg-green-800"
-                  onClick={handleSubscribe}
-                >
-                  <UserPlus2Icon className="size-4" />
-                  Subscribe (from ${getSubscriberRate(SUBSCRIBER_RATE_MINIMUM)}/month)
-                </Button>
-              </div>
-            )}
           </>
         )}
 
@@ -512,10 +467,6 @@ export const DownloadDialog = ({
                     : 'a previous date'}
                 </strong>
                 .
-              </p>
-            ) : isActiveSubscriber ? (
-              <p className="text-sm text-zinc-900">
-                Included with your <strong>Fake Four Inc.</strong> subscription.
               </p>
             ) : null}
 
@@ -573,54 +524,21 @@ export const DownloadDialog = ({
           </>
         )}
 
-        {step === 'rate-select' && (
-          <RateSelectStep
-            selectedTier={selectedTier}
-            onTierChange={setSelectedTier}
-            onCancel={() => {
-              setStep('download');
-              setSelectedTier(null);
-            }}
-            onConfirm={() => {
-              if (session?.user) {
-                setStep('checkout');
-              } else {
-                setStep('email-step');
-              }
-            }}
-          />
-        )}
-
         {step === 'email-step' && (
           <EmailStep
-            onCancel={() => {
-              if (purchaseMode) {
-                setPurchaseMode(false);
-                setStep('download');
-              } else {
-                setStep('rate-select');
-              }
-            }}
+            onCancel={() => setStep('download')}
             onConfirm={async (email: string) => {
               setCustomerEmail(email);
-              if (purchaseMode) {
-                const status = await checkGuestPurchaseAction(email, releaseId);
-                if (status.hasPurchase) {
-                  setGuestAtCap(status.atCap);
-                  setGuestResetInHours(status.resetInHours);
-                  setStep('returning-download');
-                } else {
-                  setStep('purchase-checkout');
-                }
+              const status = await checkGuestPurchaseAction(email, releaseId);
+              if (status.hasPurchase) {
+                setGuestAtCap(status.atCap);
+                setGuestResetInHours(status.resetInHours);
+                setStep('returning-download');
               } else {
-                setStep('checkout');
+                setStep('purchase-checkout');
               }
             }}
           />
-        )}
-
-        {step === 'checkout' && selectedTier && (
-          <CheckoutStep tier={selectedTier} customerEmail={customerEmail} />
         )}
 
         {step === 'purchase-checkout' && (

@@ -8,19 +8,14 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
-import { sendSubscriptionConfirmationEmail } from '@/lib/email/send-subscription-confirmation';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { ReleaseService } from '@/lib/services/release-service';
 import { UserService } from '@/lib/services/user-service';
 import { stripe } from '@/lib/stripe';
-import { getTierByPriceId } from '@/lib/subscriber-rates';
 
 import type Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
-
-const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 /** Zod schema for validating webhook metadata on release purchases */
 const releaseMetadataSchema = z.object({
@@ -87,15 +82,6 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         break;
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-      case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-        break;
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object as Stripe.Charge);
         break;
@@ -111,52 +97,10 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  // Payment mode — PWYW release purchase
+  // Only payment-mode release purchases are handled.
   if (session.mode === 'payment' && session.metadata?.type === 'release_purchase') {
     await handleReleasePurchaseCompleted(session);
-    return;
   }
-
-  const customerEmail = session.customer_details?.email ?? session.customer_email;
-  const stripeCustomerId =
-    typeof session.customer === 'string' ? session.customer : session.customer?.id;
-
-  if (!customerEmail || !stripeCustomerId) {
-    console.error('checkout.session.completed missing email or customer ID', {
-      sessionId: session.id,
-    });
-    return;
-  }
-
-  await SubscriptionRepository.linkStripeCustomer(customerEmail, stripeCustomerId);
-
-  let tier = null;
-  let interval = 'month';
-
-  if (session.subscription) {
-    const subscriptionId =
-      typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
-
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    const firstItem = subscription.items.data[0];
-    const priceId = firstItem?.price.id;
-    tier = priceId ? getTierByPriceId(priceId) : null;
-    interval = firstItem?.price.recurring?.interval ?? 'month';
-
-    await SubscriptionRepository.updateSubscription(stripeCustomerId, {
-      subscriptionId: subscription.id,
-      subscriptionStatus: subscription.status,
-      subscriptionTier: tier,
-      subscriptionCurrentPeriodEnd: firstItem
-        ? new Date(firstItem.current_period_end * 1000)
-        : null,
-    });
-  }
-
-  // Reset the flag so the email is sent even if this is a re-subscription or
-  // tier change that goes through Checkout instead of the customer portal.
-  await SubscriptionRepository.resetConfirmationEmailSent(customerEmail);
-  await sendSubscriptionConfirmationEmail(customerEmail, tier, interval);
 }
 
 async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) {
@@ -321,53 +265,6 @@ async function handleReleasePurchaseCompleted(session: Stripe.Checkout.Session) 
       userId,
     });
   }
-}
-
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  const stripeCustomerId =
-    typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-
-  const firstItem = subscription.items.data[0];
-  const priceId = firstItem?.price.id;
-  const newTier = priceId ? getTierByPriceId(priceId) : null;
-  const interval = firstItem?.price.recurring?.interval ?? 'month';
-
-  const existing = await SubscriptionRepository.findByStripeCustomerId(stripeCustomerId);
-
-  await SubscriptionRepository.updateSubscription(stripeCustomerId, {
-    subscriptionId: subscription.id,
-    subscriptionStatus: subscription.status,
-    subscriptionTier: newTier,
-    subscriptionCurrentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : null,
-  });
-
-  if (
-    existing?.email &&
-    ACTIVE_STATUSES.has(subscription.status) &&
-    newTier !== existing.subscriptionTier
-  ) {
-    await SubscriptionRepository.resetConfirmationEmailSent(existing.email);
-    await sendSubscriptionConfirmationEmail(existing.email, newTier, interval);
-  }
-}
-
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const stripeCustomerId =
-    typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-
-  await SubscriptionRepository.cancelSubscription(stripeCustomerId);
-}
-
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const stripeCustomerId =
-    typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-
-  if (!stripeCustomerId) {
-    console.error('invoice.payment_failed missing customer ID', { invoiceId: invoice.id });
-    return;
-  }
-
-  await SubscriptionRepository.updateSubscriptionStatus(stripeCustomerId, 'past_due');
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {

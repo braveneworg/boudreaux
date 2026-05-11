@@ -230,26 +230,17 @@ export default function TermsAndConditionsPage() {
               </PageSectionParagraph>
             </PageSection>
 
-            <PageSection id="subscriptions-payments" title="10. Subscriptions and Payments">
+            <PageSection id="purchases-payments" title="10. Purchases and Payments">
               <h3 className="mt-6 mb-4 text-xl font-semibold">Free Tier</h3>
               <PageSectionParagraph>
-                We may offer a free tier with limited features and advertising.
+                We may offer a free tier with limited features.
               </PageSectionParagraph>
 
-              <h3 className="mt-6 mb-4 text-xl font-semibold">Paid Subscriptions</h3>
+              <h3 className="mt-6 mb-4 text-xl font-semibold">Paid Purchases</h3>
               <ul className="list-inside list-disc space-y-2 text-zinc-700">
-                <li>
-                  Subscription fees are billed in advance on a recurring basis (monthly or annually)
-                </li>
+                <li>Purchase fees are charged at the time of purchase</li>
                 <li>All fees are non-refundable except as required by law</li>
-                <li>
-                  We reserve the right to change subscription pricing with 30 days&apos; notice
-                </li>
-                <li>
-                  You may cancel your subscription at any time; cancellation takes effect at the end
-                  of the current billing period
-                </li>
-                <li>If payment fails, we may suspend or terminate your subscription</li>
+                <li>We reserve the right to change pricing at any time</li>
               </ul>
             </PageSection>
 

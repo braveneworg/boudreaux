@@ -6,24 +6,6 @@ import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 
 vi.mock('server-only', () => ({}));
 
-const { MockPrismaClientKnownRequestError } = vi.hoisted(() => {
-  class MockPrismaClientKnownRequestError extends Error {
-    code: string;
-    clientVersion: string;
-    constructor(message: string, opts: { code: string; clientVersion: string }) {
-      super(message);
-      this.code = opts.code;
-      this.clientVersion = opts.clientVersion;
-      this.name = 'PrismaClientKnownRequestError';
-    }
-  }
-  return { MockPrismaClientKnownRequestError };
-});
-
-vi.mock('@prisma/client/runtime/library', () => ({
-  PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
-}));
-
 const mockAuth = vi.fn();
 vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
@@ -39,15 +21,10 @@ vi.mock('next/headers', () => ({
   cookies: () => Promise.resolve({ set: mockCookiesSet }),
 }));
 
-vi.mock('unique-username-generator', () => ({
-  generateUsername: () => 'generated-username',
-}));
-
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: vi.fn(),
-      create: vi.fn(),
     },
   },
 }));
@@ -55,24 +32,12 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
     findBySessionId: vi.fn(),
-    findUserByEmail: vi.fn(),
-  },
-}));
-
-vi.mock('@/lib/stripe', () => ({
-  stripe: {
-    checkout: {
-      sessions: {
-        retrieve: vi.fn(),
-      },
-    },
   },
 }));
 
 // Must import after mocks are set up
 const { createPurchaseSessionAction } = await import('./create-purchase-session-action');
 const { prisma } = await import('@/lib/prisma');
-const { stripe } = await import('@/lib/stripe');
 
 const mockUser = {
   id: 'user-123',
@@ -92,9 +57,19 @@ const mockUser = {
   zipCode: null,
   country: null,
   allowSmsNotifications: false,
-  stripeCustomerId: null,
-  subscriptionStatus: null,
-  subscriptionTier: null,
+};
+
+const mockPurchase = {
+  id: 'purchase-1',
+  userId: 'user-123',
+  releaseId: 'release-1',
+  amountPaid: 500,
+  currency: 'usd',
+  stripePaymentIntentId: 'pi_test',
+  stripeSessionId: 'cs_test_123',
+  confirmationEmailSentAt: null,
+  refundedAt: null,
+  purchasedAt: new Date(),
 };
 
 describe('createPurchaseSessionAction', () => {
@@ -140,18 +115,7 @@ describe('createPurchaseSessionAction', () => {
     });
 
     it('creates session cookie for a purchase found by session ID', async () => {
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue({
-        id: 'purchase-1',
-        userId: 'user-123',
-        releaseId: 'release-1',
-        amountPaid: 500,
-        currency: 'usd',
-        stripePaymentIntentId: 'pi_test',
-        stripeSessionId: 'cs_test_123',
-        confirmationEmailSentAt: null,
-        refundedAt: null,
-        purchasedAt: new Date(),
-      });
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
@@ -180,39 +144,18 @@ describe('createPurchaseSessionAction', () => {
       );
     });
 
-    it('does not call Stripe API when purchase is found in DB', async () => {
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue({
-        id: 'purchase-1',
-        userId: 'user-123',
-        releaseId: 'release-1',
-        amountPaid: 500,
-        currency: 'usd',
-        stripePaymentIntentId: 'pi_test',
-        stripeSessionId: 'cs_test_123',
-        confirmationEmailSentAt: null,
-        refundedAt: null,
-        purchasedAt: new Date(),
-      });
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
+    it('returns user_not_found when no purchase exists for the session', async () => {
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
 
-      await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
+      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_missing' });
 
-      expect(stripe.checkout.sessions.retrieve).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: false, error: 'user_not_found' });
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(mockCookiesSet).not.toHaveBeenCalled();
     });
 
-    it('returns error when user record not found for purchase', async () => {
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue({
-        id: 'purchase-1',
-        userId: 'user-123',
-        releaseId: 'release-1',
-        amountPaid: 500,
-        currency: 'usd',
-        stripePaymentIntentId: 'pi_test',
-        stripeSessionId: 'cs_test_123',
-        confirmationEmailSentAt: null,
-        refundedAt: null,
-        purchasedAt: new Date(),
-      });
+    it('returns user_not_found when user record is missing for the purchase', async () => {
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
       vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
 
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_123' });
@@ -222,161 +165,10 @@ describe('createPurchaseSessionAction', () => {
     });
   });
 
-  describe('subscription path (Stripe fallback)', () => {
-    beforeEach(() => {
-      mockAuth.mockResolvedValue(null);
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
-    });
-
-    it('retrieves Stripe session when no purchase found', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: 'buyer@example.com' },
-        customer_email: null,
-      } as never);
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue({ id: 'user-123' });
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
-
-      expect(result).toEqual({ success: true });
-      expect(stripe.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_test_456');
-      expect(PurchaseRepository.findUserByEmail).toHaveBeenCalledWith('buyer@example.com');
-    });
-
-    it('returns error when Stripe session is not complete', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'open',
-        customer_details: { email: 'buyer@example.com' },
-      } as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
-
-      expect(result).toEqual({ success: false, error: 'session_not_complete' });
-      expect(mockCookiesSet).not.toHaveBeenCalled();
-    });
-
-    it('returns error when no customer email in Stripe session', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: null },
-        customer_email: null,
-      } as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
-
-      expect(result).toEqual({ success: false, error: 'no_customer_email' });
-    });
-
-    it('creates a new user when email is not found in DB', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: 'new-buyer@example.com' },
-        customer_email: null,
-      } as never);
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
-      vi.mocked(prisma.user.create).mockResolvedValue({
-        id: 'new-user-id',
-        email: 'new-buyer@example.com',
-      } as never);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        ...mockUser,
-        id: 'new-user-id',
-        email: 'new-buyer@example.com',
-        username: 'generated-username',
-      } as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_789' });
-
-      expect(result).toEqual({ success: true });
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: {
-          email: 'new-buyer@example.com',
-          emailVerified: expect.any(Date),
-          username: 'generated-username',
-        },
-      });
-    });
-
-    it('recovers from P2002 race on user creation by re-fetching the existing user', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: 'race@example.com' },
-        customer_email: null,
-      } as never);
-      // First call returns null (user not found), triggering create
-      vi.mocked(PurchaseRepository.findUserByEmail)
-        .mockResolvedValueOnce(null)
-        // Second call (after P2002) returns the already-created user
-        .mockResolvedValueOnce({ id: 'raced-user-id' });
-      vi.mocked(prisma.user.create).mockRejectedValue(
-        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        })
-      );
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        ...mockUser,
-        id: 'raced-user-id',
-        email: 'race@example.com',
-      } as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_race' });
-
-      expect(result).toEqual({ success: true });
-      expect(PurchaseRepository.findUserByEmail).toHaveBeenCalledTimes(2);
-      expect(PurchaseRepository.findUserByEmail).toHaveBeenLastCalledWith('race@example.com');
-    });
-
-    it('propagates non-P2002 errors from user creation', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: 'error@example.com' },
-        customer_email: null,
-      } as never);
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
-      vi.mocked(prisma.user.create).mockRejectedValue(new Error('Unexpected DB error'));
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_dberror' });
-
-      expect(result).toEqual({ success: false, error: 'server_error' });
-    });
-
-    it('uses customer_email fallback when customer_details.email is null', async () => {
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: null },
-        customer_email: 'fallback@example.com',
-      } as never);
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue({ id: 'user-456' });
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        ...mockUser,
-        id: 'user-456',
-        email: 'fallback@example.com',
-      } as never);
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_fallback' });
-
-      expect(result).toEqual({ success: true });
-      expect(PurchaseRepository.findUserByEmail).toHaveBeenCalledWith('fallback@example.com');
-    });
-  });
-
   describe('cookie configuration', () => {
     beforeEach(() => {
       mockAuth.mockResolvedValue(null);
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue({
-        id: 'purchase-1',
-        userId: 'user-123',
-        releaseId: 'release-1',
-        amountPaid: 500,
-        currency: 'usd',
-        stripePaymentIntentId: 'pi_test',
-        stripeSessionId: 'cs_test_123',
-        confirmationEmailSentAt: null,
-        refundedAt: null,
-        purchasedAt: new Date(),
-      });
+      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(mockPurchase);
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as never);
     });
 
@@ -446,29 +238,6 @@ describe('createPurchaseSessionAction', () => {
       const result = await createPurchaseSessionAction({ sessionId: 'cs_test_456' });
 
       expect(result).toEqual({ success: false, error: 'server_error' });
-    });
-
-    it('returns user_not_found when P2002 race occurs but user disappears on re-fetch', async () => {
-      mockAuth.mockResolvedValue(null);
-      vi.mocked(PurchaseRepository.findBySessionId).mockResolvedValue(null);
-      vi.mocked(stripe.checkout.sessions.retrieve).mockResolvedValue({
-        status: 'complete',
-        customer_details: { email: 'ghost@example.com' },
-        customer_email: null,
-      } as never);
-      // First lookup returns null, triggering create. After P2002 the
-      // re-fetch also returns null — userId stays undefined.
-      vi.mocked(PurchaseRepository.findUserByEmail).mockResolvedValue(null);
-      vi.mocked(prisma.user.create).mockRejectedValue(
-        new MockPrismaClientKnownRequestError('Unique constraint failed on the fields: (`email`)', {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-        })
-      );
-
-      const result = await createPurchaseSessionAction({ sessionId: 'cs_test_ghost' });
-
-      expect(result).toEqual({ success: false, error: 'user_not_found' });
     });
   });
 });

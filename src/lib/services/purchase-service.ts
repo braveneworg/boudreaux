@@ -6,7 +6,6 @@ import 'server-only';
 import { DOWNLOAD_RESET_HOURS, MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { GuestDownloadCountRepository } from '@/lib/repositories/guest-download-count-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { SubscriptionRepository } from '@/lib/repositories/subscription-repository';
 import { computeResetInHours } from '@/lib/utils/download-reset';
 import { isGuestSubject, isUserSubject } from '@/types/download-subject';
 import type { DownloadSubject } from '@/types/download-subject';
@@ -18,8 +17,6 @@ export interface DownloadAccess {
   lastDownloadedAt: Date | null;
   /** Hours remaining until the download limit resets. null when no reset is pending. */
   resetInHours: number | null;
-  /** True when access is granted via an active subscription rather than a per-release purchase. */
-  isSubscriber?: boolean;
 }
 
 type PurchaseRecord = Awaited<ReturnType<typeof PurchaseRepository.findByUserAndRelease>>;
@@ -50,13 +47,11 @@ export class PurchaseService {
   /**
    * Determines whether the subject is permitted to download the release.
    *
-   * - For authenticated users: checks for an existing purchase or active
-   *   subscription, and enforces the per-release download cap with a
-   *   `DOWNLOAD_RESET_HOURS` reset window.
-   * - For anonymous guests: skips the purchase/subscription checks (the
-   *   freemium quota check happens upstream in `QuotaEnforcementService`)
-   *   and enforces the same per-release cap using
-   *   `GuestDownloadCountRepository`.
+   * - For authenticated users: checks for an existing purchase, and enforces
+   *   the per-release download cap with a `DOWNLOAD_RESET_HOURS` reset window.
+   * - For anonymous guests: skips the purchase check (the freemium quota
+   *   check happens upstream in `QuotaEnforcementService`) and enforces the
+   *   same per-release cap using `GuestDownloadCountRepository`.
    */
   static async getDownloadAccess(
     subject: DownloadSubject,
@@ -67,33 +62,20 @@ export class PurchaseService {
     }
 
     const userId = subject.userId;
-    const [purchase, hasActiveSubscription] = await Promise.all([
-      PurchaseRepository.findByUserAndRelease(userId, releaseId),
-      SubscriptionRepository.hasActiveSubscription(userId),
-    ]);
-    return PurchaseService.getDownloadAccessForPurchase(
-      purchase,
-      userId,
-      releaseId,
-      hasActiveSubscription
-    );
+    const purchase = await PurchaseRepository.findByUserAndRelease(userId, releaseId);
+    return PurchaseService.getDownloadAccessForPurchase(purchase, userId, releaseId);
   }
 
   /**
    * Determines whether the user is permitted to download the release
    * using an already-fetched purchase record.
-   *
-   * When `hasActiveSubscription` is true, the user is granted access
-   * regardless of whether a per-release purchase exists. The per-release
-   * download cap (MAX_RELEASE_DOWNLOAD_COUNT) still applies.
    */
   static async getDownloadAccessForPurchase(
     purchase: PurchaseRecord,
     userId: string,
-    releaseId: string,
-    hasActiveSubscription = false
+    releaseId: string
   ): Promise<DownloadAccess> {
-    if (!purchase && !hasActiveSubscription) {
+    if (!purchase) {
       return {
         allowed: false,
         reason: 'no_purchase',
@@ -102,8 +84,6 @@ export class PurchaseService {
         resetInHours: null,
       };
     }
-
-    const isSubscriber = !purchase && hasActiveSubscription;
 
     const downloadRecord = await PurchaseRepository.getDownloadRecord(userId, releaseId);
     const downloadCount = downloadRecord?.downloadCount ?? 0;
@@ -119,7 +99,6 @@ export class PurchaseService {
           downloadCount: 0,
           lastDownloadedAt,
           resetInHours: null,
-          isSubscriber,
         };
       }
       return {
@@ -128,7 +107,6 @@ export class PurchaseService {
         downloadCount,
         lastDownloadedAt,
         resetInHours: computeResetInHours(lastDownloadedAt),
-        isSubscriber,
       };
     }
 
@@ -138,7 +116,6 @@ export class PurchaseService {
       downloadCount,
       lastDownloadedAt,
       resetInHours: null,
-      isSubscriber,
     };
   }
 

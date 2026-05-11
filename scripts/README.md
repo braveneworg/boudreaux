@@ -11,10 +11,8 @@ Utility scripts for managing data, infrastructure, and deployment for the Fake F
 | `s3-apply-cache-headers.ts`          | `pnpm run s3:cache-headers`                                   | Apply Cache-Control headers to existing S3 media files     |
 | `upload-images.ts`                   | `pnpm run images:upload`                                      | Upload images to S3 with content-type detection            |
 | `sync-cdn.ts`                        | `pnpm exec tsx scripts/sync-cdn.ts`                           | Sync Next.js static assets to S3 and invalidate CloudFront |
-| `stripe-seed.ts`                     | `pnpm run stripe:seed`                                        | Seed Stripe with subscription product and pricing tiers    |
 | `check-coverage-regression.ts`       | `pnpm run test:coverage:check`                                | Compare test coverage against baseline thresholds          |
 | `fix-featured-artist-connections.ts` | `pnpm exec tsx scripts/fix-featured-artist-connections.ts`    | Backfill Artist-to-FeaturedArtist connections              |
-| `fix-stripe-customer-id-index.ts`    | `pnpm exec tsx scripts/fix-stripe-customer-id-index.ts`       | Migration: fix legacy stripeCustomerId index               |
 | `create-stardust-svg.ts`             | `pnpm exec tsx scripts/create-stardust-svg.ts`                | Generate parameterized stardust texture SVGs               |
 | `generate-stardust-svg.tsx`          | `pnpm exec tsx scripts/generate-stardust-svg.tsx`             | Generate stardust SVGs (TSX variant)                       |
 
@@ -314,26 +312,6 @@ SKIP_CLEANUP="false"                     # Optional
 
 ---
 
-## Stripe Seed
-
-**File:** `stripe-seed.ts`
-
-Seeds Stripe with the subscription product ("Fake Four Inc. Subscription") and its three pricing tiers.
-
-### Usage
-
-```bash
-pnpm run stripe:seed
-```
-
-Creates:
-
-- **Minimum tier**: $14.44/month
-- **Extra tier**: $24.44/month
-- **Extra Extra tier**: $44.44/month
-
----
-
 ## Coverage Regression Check
 
 **File:** `check-coverage-regression.ts`
@@ -372,16 +350,6 @@ pnpm exec tsx scripts/fix-featured-artist-connections.ts --dry-run
 
 # Apply
 pnpm exec tsx scripts/fix-featured-artist-connections.ts
-```
-
-### Fix Stripe Customer ID Index
-
-**File:** `fix-stripe-customer-id-index.ts`
-
-One-time migration that drops the legacy non-partial unique index on `User.stripeCustomerId` in MongoDB so Prisma can recreate it as a partial unique index (allowing multiple null values).
-
-```bash
-pnpm exec tsx scripts/fix-stripe-customer-id-index.ts
 ```
 
 ---

@@ -8,10 +8,3 @@ export interface PurchaseConfirmationEmailData {
   amountPaid: string;
   downloadUrl: string;
 }
-
-export interface SubscriptionConfirmationEmailData {
-  email: string;
-  tierLabel: string;
-  amount: string;
-  interval: string;
-}

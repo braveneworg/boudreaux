@@ -21,13 +21,6 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
-const mockHasActiveSubscription = vi.fn();
-vi.mock('@/lib/repositories/subscription-repository', () => ({
-  SubscriptionRepository: {
-    hasActiveSubscription: (...args: unknown[]) => mockHasActiveSubscription(...args),
-  },
-}));
-
 const mockGetDownloadAccess = vi.fn();
 vi.mock('@/lib/services/purchase-service', () => ({
   PurchaseService: {
@@ -49,7 +42,6 @@ describe('GET /api/releases/[id]/user-status', () => {
 
   beforeEach(() => {
     mockFindAllByRelease.mockResolvedValue([]);
-    mockHasActiveSubscription.mockResolvedValue(false);
     mockGetDownloadAccess.mockResolvedValue({
       allowed: true,
       reason: null,
@@ -103,7 +95,6 @@ describe('GET /api/releases/[id]/user-status', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({
       hasPurchase: true,
-      isSubscriber: false,
       purchasedAt: new Date('2024-06-01'),
       downloadCount: 5,
       resetInHours: 4,
@@ -112,8 +103,7 @@ describe('GET /api/releases/[id]/user-status', () => {
     expect(mockGetDownloadAccess).toHaveBeenCalledWith(
       expect.objectContaining({ purchasedAt: new Date('2024-06-01') }),
       'user-1',
-      'release-1',
-      false
+      'release-1'
     );
   });
 
@@ -154,21 +144,6 @@ describe('GET /api/releases/[id]/user-status', () => {
     expect(data.purchasedAt).toBeNull();
     expect(data.downloadCount).toBe(0);
     expect(data.resetInHours).toBeNull();
-  });
-
-  it('should report isSubscriber: true when the user has an active subscription', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    vi.mocked(PurchaseRepository.findByUserAndRelease).mockResolvedValue(null as never);
-    mockHasActiveSubscription.mockResolvedValue(true);
-
-    const request = new NextRequest('http://localhost:3000/api/releases/release-1/user-status');
-    const response = await GET(request, createParams('release-1'));
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.isSubscriber).toBe(true);
-    expect(data.hasPurchase).toBe(false);
-    expect(mockGetDownloadAccess).toHaveBeenCalledWith(null, 'user-1', 'release-1', true);
   });
 
   it('should return 500 when an exception is thrown', async () => {

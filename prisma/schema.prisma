@@ -37,18 +37,6 @@ model User {
   country               String?
   allowSmsNotifications Boolean? @default(false)
 
-  // Stripe subscription fields
-  // stripeCustomerId uniqueness is enforced through a sparse unique index managed
-  // outside Prisma (see prisma/scripts/fix-stripe-customer-id-index.ts). A standard
-  // Prisma @unique creates a non-sparse index that rejects multiple null values, which
-  // fails when many users have not yet subscribed.
-  stripeCustomerId             String?
-  subscriptionId               String?
-  subscriptionStatus           String?
-  subscriptionTier             String?
-  subscriptionCurrentPeriodEnd DateTime?
-  confirmationEmailSentAt      DateTime?
-
   // Optional for WebAuthn support
   Authenticator Authenticator[]
 
@@ -68,7 +56,6 @@ model User {
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
-  @@index([stripeCustomerId])
 }
 
 model Account {

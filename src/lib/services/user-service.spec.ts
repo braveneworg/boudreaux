@@ -5,7 +5,6 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { UserService } from './user-service';
 import { prisma } from '../prisma';
-import { CustomPrismaAdapter } from '../prisma-adapter';
 
 vi.mock('../prisma', () => ({
   prisma: {
@@ -15,10 +14,6 @@ vi.mock('../prisma', () => ({
       update: vi.fn(),
     },
   },
-}));
-
-vi.mock('../prisma-adapter', () => ({
-  CustomPrismaAdapter: vi.fn(),
 }));
 
 vi.mock('unique-username-generator', () => ({
@@ -174,26 +169,6 @@ describe('UserService', () => {
     it('rethrows generic errors', async () => {
       vi.mocked(prisma.user.create).mockRejectedValue(new Error('db down'));
       await expect(UserService.createGuestPurchaser('g@x.io')).rejects.toThrow('db down');
-    });
-  });
-
-  describe('createSubscriber', () => {
-    it('delegates to the adapter createUser', async () => {
-      const createUser = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(CustomPrismaAdapter).mockReturnValue({ createUser } as never);
-
-      await UserService.createSubscriber('sub@x.io');
-
-      expect(createUser).toHaveBeenCalledWith(
-        expect.objectContaining({ email: 'sub@x.io', emailVerified: null })
-      );
-    });
-
-    it('throws when the adapter does not implement createUser', async () => {
-      vi.mocked(CustomPrismaAdapter).mockReturnValue({} as never);
-      await expect(UserService.createSubscriber('sub@x.io')).rejects.toThrow(
-        'CustomPrismaAdapter.createUser is not implemented'
-      );
     });
   });
 });
