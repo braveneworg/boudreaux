@@ -32,7 +32,8 @@ describe('GravatarAvatar', () => {
       'data-src',
       expect.stringContaining('https://www.gravatar.com/avatar/')
     );
-    expect(img).toHaveAttribute('data-src', expect.stringContaining('?d=retro'));
+    expect(img).toHaveAttribute('data-src', expect.stringContaining('d=retro'));
+    expect(img).toHaveAttribute('data-src', expect.stringContaining('s=48'));
   });
 
   it('renders with default size-13 class', () => {

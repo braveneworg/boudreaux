@@ -3,11 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useSession } from 'next-auth/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
 import SignupSigninForm from '@/app/components/forms/signup-signin-form';
@@ -27,7 +28,21 @@ type CombinedFormSchema = SigninSchemaType & { termsAndConditions?: boolean };
 
 const SignupPage = () => {
   const path = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { status } = useSession();
   const isSignupPath = path === '/signup';
+
+  // If the user is already signed in (e.g. clicked a chat-mention email
+  // link in a tab that already has a session), bounce them to the
+  // callback URL — defaulting to the landing page when none was given.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const callbackUrl = searchParams.get('callbackUrl');
+    // Only allow internal redirects to avoid an open-redirect.
+    const target = callbackUrl?.startsWith('/') ? callbackUrl : '/';
+    router.replace(target);
+  }, [status, router, searchParams]);
 
   // Cloudflare Turnstile verification
   const [isVerified, setIsVerified] = useState(false);

@@ -20,6 +20,14 @@ describe('Environment Validation', () => {
       STRIPE_SECRET_KEY: 'sk_test_123',
       STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',
+      PUSHER_APP_ID: 'test-pusher-app-id',
+      PUSHER_KEY: 'test-pusher-key',
+      PUSHER_SECRET: 'test-pusher-secret',
+      PUSHER_CLUSTER: 'us2',
+      NEXT_PUBLIC_PUSHER_KEY: 'test-pusher-key',
+      NEXT_PUBLIC_PUSHER_CLUSTER: 'us2',
+      UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
+      UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
     };
   });
 
@@ -304,6 +312,14 @@ describe('Environment Validation', () => {
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_123',
+        PUSHER_APP_ID: 'test-pusher-app-id',
+        PUSHER_KEY: 'test-pusher-key',
+        PUSHER_SECRET: 'test-pusher-secret',
+        PUSHER_CLUSTER: 'us2',
+        NEXT_PUBLIC_PUSHER_KEY: 'test-pusher-key',
+        NEXT_PUBLIC_PUSHER_CLUSTER: 'us2',
+        UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
+        UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
       };
 
       // Dynamic import forces module-level code to run with NODE_ENV='production'

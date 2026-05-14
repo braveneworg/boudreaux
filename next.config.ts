@@ -142,7 +142,7 @@ const config = {
       "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
       "worker-src 'self' blob:",
       // Stripe API + Maps + own CDN. Add more connect targets here (do NOT use https:).
-      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
+      "connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com https://*.pusher.com wss://*.pusher.com",
       // Restrict media to own CDN and S3 buckets (drop the wildcard https:).
       "media-src 'self' blob: https://cdn.fakefourrecords.com https://*.s3.amazonaws.com https://*.amazonaws.com",
       "object-src 'none'",

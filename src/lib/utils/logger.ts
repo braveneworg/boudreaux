@@ -191,4 +191,5 @@ export const loggers = {
   media: createLogger('MEDIA'),
   s3: createLogger('S3'),
   notifications: createLogger('NOTIFICATIONS'),
+  chat: createLogger('CHAT'),
 };

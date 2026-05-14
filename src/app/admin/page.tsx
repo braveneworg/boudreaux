@@ -30,11 +30,16 @@ export default function AdminPage() {
       router.push('/admin/tours');
       return;
     }
+    // Chat moderation has its own dedicated page
+    if (selectedView === 'chat') {
+      router.push('/admin/chat');
+      return;
+    }
     setView(selectedView);
   };
 
   const getEntityOptions = useCallback(() => {
-    const entities = ['artist', 'release', 'featured artist', 'notifications', 'tours'];
+    const entities = ['artist', 'release', 'featured artist', 'notifications', 'tours', 'chat'];
     return entities.map((entity) => ({
       value: entity.toLowerCase(),
       label: toTitleCase(entity),
