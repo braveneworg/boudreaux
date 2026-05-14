@@ -53,6 +53,10 @@ model User {
   // Banner notification feature (006-banner-notification-carousel)
   bannerNotifications BannerNotification[]
 
+  // Live chat feature (009-live-chat)
+  chatMessages ChatMessage[]
+  chatUsers    ChatUser[]
+
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
@@ -754,4 +758,44 @@ model SiteSettings {
   key       String   @unique // Setting key (e.g., "carousel-rotation-interval")
   value     String // Setting value
   updatedAt DateTime @updatedAt
+}
+
+// Live Chat (009-live-chat)
+
+model ChatMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  reactions Json     @default("[]") // { emoji: string; userIds: string[] }[]
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model ChatUser {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @unique @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprint  String
+  ipAddress    String
+  messageCount Int      @default(0)
+  flagged      Boolean  @default(false)
+  disabled     Boolean  @default(false)
+  lastSeenAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([flagged])
+  @@index([disabled])
+}
+
+model ChatRateLimitLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  fingerprint String
+  ipAddress   String
+  attemptedAt DateTime @default(now())
+
+  @@index([attemptedAt])
+  @@index([fingerprint])
 }

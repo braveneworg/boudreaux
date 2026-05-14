@@ -63,6 +63,10 @@ vi.mock('@/components/ui/sonner', () => ({
   ),
 }));
 
+vi.mock('./components/chat/chat-launcher', () => ({
+  ChatLauncher: () => <div data-testid="chat-launcher">ChatLauncher</div>,
+}));
+
 describe('RootLayout', () => {
   beforeEach(() => {
     // Default: desktop user agent

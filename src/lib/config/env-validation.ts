@@ -31,6 +31,14 @@ export function validateEnvironment() {
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+    'PUSHER_APP_ID',
+    'PUSHER_KEY',
+    'PUSHER_SECRET',
+    'PUSHER_CLUSTER',
+    'NEXT_PUBLIC_PUSHER_KEY',
+    'NEXT_PUBLIC_PUSHER_CLUSTER',
+    'UPSTASH_REDIS_REST_URL',
+    'UPSTASH_REDIS_REST_TOKEN',
   ];
 
   const missing = required.filter((key) => !process.env[key]);

@@ -89,4 +89,11 @@ export const queryKeys = {
     search: (query: string) => [...queryKeys.venues.all, 'search', query] as const,
     detail: (id: string) => [...queryKeys.venues.all, 'detail', id] as const,
   },
+  chat: {
+    all: ['chat'] as const,
+    messages: () => [...queryKeys.chat.all, 'messages'] as const,
+    adminUsers: (page: number, sortBy: string, sortDirection: string) =>
+      [...queryKeys.chat.all, 'adminUsers', page, sortBy, sortDirection] as const,
+    mentionSearch: (query: string) => [...queryKeys.chat.all, 'mentionSearch', query] as const,
+  },
 } as const;

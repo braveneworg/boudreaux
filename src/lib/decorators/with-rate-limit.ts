@@ -6,6 +6,10 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { extractClientIp } from '@/lib/utils/extract-client-ip';
+
+export { extractClientIp };
+
 type RateLimiter = {
   check: (limit: number, token: string) => Promise<void>;
 };
@@ -14,19 +18,6 @@ type RateLimitedHandler<TParams = unknown> = (
   request: NextRequest,
   context: { params: Promise<TParams> }
 ) => Promise<NextResponse> | NextResponse;
-
-/**
- * Extract the client IP from the request headers.
- * Prefers x-real-ip (set by the reverse proxy) over x-forwarded-for
- * to prevent client-side header spoofing.
- */
-export function extractClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'anonymous'
-  );
-}
 
 /**
  * Higher-order function that wraps an API route handler with rate limiting.

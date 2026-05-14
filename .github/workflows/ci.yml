@@ -304,6 +304,7 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA: "1000"
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: "2000"
           NEXT_PUBLIC_BANNER_INTERVAL: "1000"
+          NEXT_PUBLIC_E2E_MODE: "true"
           NODE_ENV: "production"
           AUTH_SECRET: "e2e-test-secret-key-that-is-at-least-32-characters-long"
           AUTH_URL: "http://localhost:3000"

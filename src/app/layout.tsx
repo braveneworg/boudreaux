@@ -7,6 +7,7 @@ import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
 
+import { ChatLauncher } from './components/chat/chat-launcher';
 import Footer from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
@@ -102,6 +103,7 @@ export default async function RootLayout({
           <Header isMobile={isMobile} />
           <main className="flex w-full max-w-full grow flex-col overflow-x-hidden">{children}</main>
           <Footer />
+          <ChatLauncher />
         </Providers>
         <Toaster position="bottom-center" />
       </body>
