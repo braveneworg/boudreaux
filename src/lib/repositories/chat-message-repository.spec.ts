@@ -38,14 +38,17 @@ describe('ChatMessageRepository', () => {
   });
 
   describe('findRecent', () => {
-    it('returns most recent messages with no cursor', async () => {
+    it('returns most recent messages, filtering out hidden + disabled-author rows', async () => {
       const rows = [{ id: 'msg-2' }, { id: 'msg-1' }];
       vi.mocked(prisma.chatMessage.findMany).mockResolvedValue(rows as never);
 
       const result = await ChatMessageRepository.findRecent({ limit: 20 });
 
       expect(prisma.chatMessage.findMany).toHaveBeenCalledWith({
-        where: undefined,
+        where: {
+          hiddenAt: null,
+          user: { is: { chatUsers: { none: { disabled: true } } } },
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: 20,
         include: {
@@ -71,6 +74,8 @@ describe('ChatMessageRepository', () => {
               { createdAt: { lt: cursorDate } },
               { createdAt: cursorDate, id: { lt: 'cursor-id' } },
             ],
+            hiddenAt: null,
+            user: { is: { chatUsers: { none: { disabled: true } } } },
           },
         })
       );

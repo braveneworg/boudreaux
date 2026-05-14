@@ -67,6 +67,49 @@ export class ChatUserRepository {
   }
 
   /**
+   * Disable a user with full audit metadata (admin + reason + timestamp).
+   * Used by the abuse-reporting moderation flow (010-chat-abuse-reporting)
+   * so the admin who took the action and their stated reason are captured
+   * alongside the boolean flip.
+   */
+  static async disableWithAudit({
+    userId,
+    adminId,
+    reason,
+  }: {
+    userId: string;
+    adminId: string;
+    reason?: string;
+  }) {
+    return prisma.chatUser.update({
+      where: { userId },
+      data: {
+        disabled: true,
+        disabledAt: new Date(),
+        disabledByAdminId: adminId,
+        disabledReason: reason ?? null,
+      },
+    });
+  }
+
+  /**
+   * Re-enable a previously disabled user. Clears all disable-audit
+   * fields so a future disable starts from a clean slate; the audit
+   * trail is preserved on the {@link AuditLog} feed, not on the row.
+   */
+  static async enableWithAudit(userId: string) {
+    return prisma.chatUser.update({
+      where: { userId },
+      data: {
+        disabled: false,
+        disabledAt: null,
+        disabledByAdminId: null,
+        disabledReason: null,
+      },
+    });
+  }
+
+  /**
    * Page through all ChatUser rows for the admin moderation panel.
    * Joins the parent User to expose username/email columns.
    */

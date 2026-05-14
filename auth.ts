@@ -4,6 +4,7 @@ import Nodemailer from 'next-auth/providers/nodemailer';
 import { sendVerificationRequest } from '@/lib/email/send-verification-request';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import { BannedIdentityRepository } from '@/lib/repositories/banned-identity-repository';
 
 import type { User } from 'next-auth';
 import type { AdapterUser } from 'next-auth/adapters';
@@ -86,6 +87,31 @@ const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    // Ban-evasion gate (010-chat-abuse-reporting). Reject sign-in for
+    // any email or userId that matches an active BannedIdentity. The
+    // Auth.js v5 signIn callback only gives us account/email here —
+    // fingerprint-based blocking happens at the request layer
+    // (`/api/chat/me`, chat send) where headers are available.
+    async signIn({ user }) {
+      const email = user.email ?? null;
+      const userId = user.id ?? null;
+      if (!email && !userId) return true;
+      try {
+        const match = await BannedIdentityRepository.findActiveMatch({ userId, email });
+        if (match) {
+          console.warn('[auth.signIn] sign-in rejected for banned identity', {
+            email: email ? `${email[0]}***` : null,
+            userId: userId ?? null,
+          });
+          return false;
+        }
+      } catch (error) {
+        // Fail-open on transient DB errors so a temporary outage does
+        // not lock everyone out. The chat-time check still gates abuse.
+        console.error('[auth.signIn] ban check failed; allowing sign-in', error);
+      }
+      return true;
+    },
     async jwt({ token, user, trigger, session }) {
       // Handle session updates (when user profile is updated).
       // Security: whitelist fields that the client may update via `useSession().update()`.

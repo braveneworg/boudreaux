@@ -57,6 +57,14 @@ model User {
   chatMessages ChatMessage[]
   chatUsers    ChatUser[]
 
+  // Abuse reporting feature (010-chat-abuse-reporting)
+  abuseReportsAgainst     AbuseReport[]    @relation("AbuseReportTarget")
+  abuseReportsByReporter  AbuseReport[]    @relation("AbuseReportReporter")
+  bannedIdentities        BannedIdentity[]
+  hiddenChatMessages      ChatMessage[]    @relation("ChatMessageHiddenByAdmin")
+  chatUserDisableActions  ChatUser[]       @relation("ChatUserDisabledByAdmin")
+  bannedIdentityActions   BannedIdentity[] @relation("BannedIdentityByAdmin")
+
   // Indexes for performance
   @@index([failedLoginAttempts])
   @@index([lockedUntil])
@@ -770,8 +778,18 @@ model ChatMessage {
   reactions Json     @default("[]") // { emoji: string; userIds: string[] }[]
   createdAt DateTime @default(now())
 
+  // Abuse reporting (010-chat-abuse-reporting). `hiddenReason` distinguishes
+  // hides caused by the author being disabled ("user_disabled") from hides
+  // applied per-message by an admin ("admin_flagged"). Only "user_disabled"
+  // hides clear automatically when the author is re-enabled.
+  hiddenAt        DateTime?
+  hiddenByAdminId String?   @db.ObjectId
+  hiddenByAdmin   User?     @relation("ChatMessageHiddenByAdmin", fields: [hiddenByAdminId], references: [id])
+  hiddenReason    String? // "user_disabled" | "admin_flagged"
+
   @@index([createdAt(sort: Desc)])
   @@index([userId])
+  @@index([hiddenAt])
 }
 
 model ChatUser {
@@ -786,8 +804,54 @@ model ChatUser {
   lastSeenAt   DateTime @updatedAt
   createdAt    DateTime @default(now())
 
+  // Abuse reporting (010-chat-abuse-reporting). Captures the admin who
+  // disabled the user and when, for audit + per-message re-enable logic.
+  disabledAt      DateTime?
+  disabledByAdminId String? @db.ObjectId
+  disabledByAdmin User?     @relation("ChatUserDisabledByAdmin", fields: [disabledByAdminId], references: [id])
+  disabledReason  String?
+
   @@index([flagged])
   @@index([disabled])
+}
+
+// Abuse reporting feature (010-chat-abuse-reporting).
+//
+// Anonymous-to-admins but identified-to-system: `reporterId` and
+// `reporterFingerprint` are recorded for rate limiting + audit and must
+// NEVER be exposed in admin UI, emails, SMS, or API responses.
+model AbuseReport {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  reportedUserId      String   @db.ObjectId
+  reportedUser        User     @relation("AbuseReportTarget", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  reporterId          String   @db.ObjectId
+  reporter            User     @relation("AbuseReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterFingerprint String? // server-side hash from visitor-fingerprint.ts
+  createdAt           DateTime @default(now())
+
+  @@index([reporterId, reportedUserId, createdAt])
+  @@index([reportedUserId, createdAt])
+  @@index([createdAt])
+}
+
+// Active ban records used by the disabled-user UX + signup/login gate.
+// `email` is stored lowercased. `fingerprintHash` is the SHA-256 produced
+// by visitor-fingerprint.ts (UA + Accept-Language + IP /24).
+model BannedIdentity {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String?   @db.ObjectId
+  user            User?     @relation(fields: [userId], references: [id])
+  email           String
+  fingerprintHash String?
+  bannedByAdminId String    @db.ObjectId
+  bannedByAdmin   User      @relation("BannedIdentityByAdmin", fields: [bannedByAdminId], references: [id])
+  bannedAt        DateTime  @default(now())
+  unbannedAt      DateTime?
+  reason          String?
+
+  @@index([email])
+  @@index([fingerprintHash])
+  @@index([userId])
 }
 
 model ChatRateLimitLog {

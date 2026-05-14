@@ -10,16 +10,19 @@ import { Loader2, SmilePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useChatChannel } from '@/hooks/use-chat-channel';
+import { useChatMeQuery } from '@/hooks/use-chat-me-query';
 import { useChatMessagesQuery } from '@/hooks/use-chat-messages-query';
 import { useChatTyping } from '@/hooks/use-chat-typing';
 import { useFingerprint } from '@/hooks/use-fingerprint';
 import { useOptimisticChat, type OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 import { toggleChatReactionAction } from '@/lib/actions/toggle-chat-reaction-action';
 
+import { ChatDisabledState } from './chat-disabled-state';
 import { ChatEmojiPicker } from './chat-emoji-picker';
 import { ChatInput } from './chat-input';
 import { ChatMessageList } from './chat-message-list';
 import { ChatReactionBar } from './chat-reaction-bar';
+import { ChatReportAbusePopover } from './chat-report-abuse-popover';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 
 import type { Session } from 'next-auth';
@@ -37,6 +40,8 @@ interface ChatBodyProps {
 
 export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBodyProps) => {
   const { fingerprint } = useFingerprint();
+  const { data: meStatus } = useChatMeQuery({ enabled });
+  const isBlocked = meStatus?.blocked ?? false;
   const {
     messages: baseMessages,
     isPending,
@@ -44,7 +49,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useChatMessagesQuery({ enabled });
+  } = useChatMessagesQuery({ enabled: enabled && !isBlocked });
 
   const { messages, appendOptimistic, markFailed, addReceivedMessage, updateMessage } =
     useOptimisticChat({ baseMessages });
@@ -122,6 +127,10 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
     [currentUserId, handleToggleReaction]
   );
 
+  if (isBlocked) {
+    return <ChatDisabledState />;
+  }
+
   if (isPending) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -143,6 +152,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
 
   return (
     <>
+      <ChatReportAbusePopover />
       <ChatMessageList
         messages={messages}
         hasNextPage={hasNextPage}
