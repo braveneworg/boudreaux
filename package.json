@@ -52,6 +52,7 @@
     "e2e:merge": "playwright merge-reports --reporter=html ./blob-report",
     "typecheck": "tsc-files --noEmit types/next-auth.d.ts types/vitest.d.ts",
     "prepare": "husky",
+    "postinstall": "prisma generate",
     "stripe:forward": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"
   },
   "prisma": {
