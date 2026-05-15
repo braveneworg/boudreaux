@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { AbuseReportRepository } from '@/lib/repositories/abuse-report-repository';
+import { BannedIdentityRepository } from '@/lib/repositories/banned-identity-repository';
+import { ChatMessageRepository } from '@/lib/repositories/chat-message-repository';
 import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
 
 import { ChatAdminService, MAX_PER_PAGE } from './chat-admin-service';
@@ -14,6 +17,29 @@ vi.mock('@/lib/repositories/chat-user-repository', () => ({
     count: vi.fn(),
     setDisabled: vi.fn(),
     setFlagged: vi.fn(),
+    disableWithAudit: vi.fn(),
+    enableWithAudit: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/abuse-report-repository', () => ({
+  AbuseReportRepository: {
+    listReportedUsers: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/chat-message-repository', () => ({
+  ChatMessageRepository: {
+    hideAsAdminFlagged: vi.fn(),
+    unhide: vi.fn(),
+    findByUserIdForAdmin: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/repositories/banned-identity-repository', () => ({
+  BannedIdentityRepository: {
+    create: vi.fn(),
+    unban: vi.fn(),
   },
 }));
 
@@ -122,5 +148,147 @@ describe('ChatAdminService.clearFlag', () => {
     await ChatAdminService.clearFlag('user-1');
 
     expect(ChatUserRepository.setFlagged).toHaveBeenCalledWith('user-1', false);
+  });
+});
+
+describe('ChatAdminService.disableChatUser', () => {
+  it('forwards userId, adminId, and reason to the audit-aware repository call', async () => {
+    vi.mocked(ChatUserRepository.disableWithAudit).mockResolvedValue({} as never);
+
+    await ChatAdminService.disableChatUser({
+      userId: 'user-1',
+      adminId: 'admin-7',
+      reason: 'spam',
+    });
+
+    expect(ChatUserRepository.disableWithAudit).toHaveBeenCalledWith({
+      userId: 'user-1',
+      adminId: 'admin-7',
+      reason: 'spam',
+    });
+  });
+
+  it('passes reason as undefined when not provided', async () => {
+    vi.mocked(ChatUserRepository.disableWithAudit).mockResolvedValue({} as never);
+
+    await ChatAdminService.disableChatUser({ userId: 'user-2', adminId: 'admin-7' });
+
+    expect(ChatUserRepository.disableWithAudit).toHaveBeenCalledWith({
+      userId: 'user-2',
+      adminId: 'admin-7',
+      reason: undefined,
+    });
+  });
+});
+
+describe('ChatAdminService.enableChatUser', () => {
+  it('delegates to the repository enableWithAudit', async () => {
+    vi.mocked(ChatUserRepository.enableWithAudit).mockResolvedValue({} as never);
+
+    await ChatAdminService.enableChatUser('user-1');
+
+    expect(ChatUserRepository.enableWithAudit).toHaveBeenCalledWith('user-1');
+  });
+});
+
+describe('ChatAdminService.listReportedUsers', () => {
+  it('defaults to all-time (windowDays: null)', async () => {
+    vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([]);
+
+    await ChatAdminService.listReportedUsers();
+
+    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: null });
+  });
+
+  it('forwards an explicit windowDays value', async () => {
+    vi.mocked(AbuseReportRepository.listReportedUsers).mockResolvedValue([]);
+
+    await ChatAdminService.listReportedUsers(7);
+
+    expect(AbuseReportRepository.listReportedUsers).toHaveBeenCalledWith({ windowDays: 7 });
+  });
+});
+
+describe('ChatAdminService.hideMessage / unhideMessage', () => {
+  it('hideMessage forwards messageId and adminId', async () => {
+    vi.mocked(ChatMessageRepository.hideAsAdminFlagged).mockResolvedValue({} as never);
+
+    await ChatAdminService.hideMessage({ messageId: 'msg-1', adminId: 'admin-7' });
+
+    expect(ChatMessageRepository.hideAsAdminFlagged).toHaveBeenCalledWith({
+      messageId: 'msg-1',
+      adminId: 'admin-7',
+    });
+  });
+
+  it('unhideMessage forwards the messageId', async () => {
+    vi.mocked(ChatMessageRepository.unhide).mockResolvedValue({} as never);
+
+    await ChatAdminService.unhideMessage('msg-2');
+
+    expect(ChatMessageRepository.unhide).toHaveBeenCalledWith('msg-2');
+  });
+});
+
+describe('ChatAdminService.listUserMessages', () => {
+  it('forwards pagination params for the admin detail view', async () => {
+    vi.mocked(ChatMessageRepository.findByUserIdForAdmin).mockResolvedValue([] as never);
+
+    await ChatAdminService.listUserMessages({ userId: 'user-1', skip: 20, take: 10 });
+
+    expect(ChatMessageRepository.findByUserIdForAdmin).toHaveBeenCalledWith({
+      userId: 'user-1',
+      skip: 20,
+      take: 10,
+    });
+  });
+});
+
+describe('ChatAdminService.banIdentity', () => {
+  it('forwards all fields verbatim when present', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+
+    await ChatAdminService.banIdentity({
+      userId: 'user-1',
+      email: 'baduser@example.com',
+      fingerprintHash: 'fp-hash',
+      adminId: 'admin-7',
+      reason: 'evading prior ban',
+    });
+
+    expect(BannedIdentityRepository.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      email: 'baduser@example.com',
+      fingerprintHash: 'fp-hash',
+      bannedByAdminId: 'admin-7',
+      reason: 'evading prior ban',
+    });
+  });
+
+  it('coerces missing userId / fingerprintHash / reason to null', async () => {
+    vi.mocked(BannedIdentityRepository.create).mockResolvedValue({} as never);
+
+    await ChatAdminService.banIdentity({
+      email: 'baduser@example.com',
+      adminId: 'admin-7',
+    });
+
+    expect(BannedIdentityRepository.create).toHaveBeenCalledWith({
+      userId: null,
+      email: 'baduser@example.com',
+      fingerprintHash: null,
+      bannedByAdminId: 'admin-7',
+      reason: null,
+    });
+  });
+});
+
+describe('ChatAdminService.unbanIdentity', () => {
+  it('delegates to the repository unban with the ban id', async () => {
+    vi.mocked(BannedIdentityRepository.unban).mockResolvedValue({} as never);
+
+    await ChatAdminService.unbanIdentity('ban-1');
+
+    expect(BannedIdentityRepository.unban).toHaveBeenCalledWith('ban-1');
   });
 });
