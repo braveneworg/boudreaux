@@ -142,6 +142,24 @@ export class ChatAdminService {
   }
 
   /**
+   * Hide every visible message authored by `userId`. Returns the ids
+   * that were hidden so the caller can broadcast a deletion event per
+   * row to every connected chat client.
+   */
+  static async hideAllMessagesByUser({
+    userId,
+    adminId,
+  }: {
+    userId: string;
+    adminId: string;
+  }): Promise<string[]> {
+    const visible = await ChatMessageRepository.findVisibleIdsByUser(userId);
+    if (visible.length === 0) return [];
+    await ChatMessageRepository.hideAllByUserAsAdminFlagged({ userId, adminId });
+    return visible.map((row) => row.id);
+  }
+
+  /**
    * Paginated message history for the per-user admin detail view.
    * Returns messages newest-first regardless of hide status so admins
    * can review the full record.

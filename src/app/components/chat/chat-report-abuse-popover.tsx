@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useState, type SyntheticEvent } from 'react';
 
 import { CircleAlert, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -56,7 +56,7 @@ export const ChatReportAbusePopover = () => {
   );
 
   const handleSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
+    async (event: SyntheticEvent<HTMLFormElement>) => {
       event.preventDefault();
       const trimmed = username.trim();
       if (!trimmed || isSubmitting) return;
@@ -101,7 +101,7 @@ export const ChatReportAbusePopover = () => {
             type="button"
             className={cn(
               'inline-flex items-center justify-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-zinc-950',
-              'hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-950/30 focus-visible:outline-none'
+              'underline hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-950/30 focus-visible:outline-none'
             )}
           >
             <CircleAlert aria-hidden="true" className="size-4 text-zinc-950" />

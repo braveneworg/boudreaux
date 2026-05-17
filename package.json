@@ -2,6 +2,7 @@
   "name": "boudreaux",
   "version": "4.79.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --webpack 2>&1 | grep -v 'SyntaxError: Expected property name'",

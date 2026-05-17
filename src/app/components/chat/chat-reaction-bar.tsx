@@ -32,15 +32,17 @@ export const ChatReactionBar = ({ reactions, currentUserId, onToggle }: ChatReac
             aria-pressed={mine}
             aria-label={`React with ${reaction.emoji} (${reaction.userIds.length})`}
             className={cn(
-              'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs',
+              'inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap',
               'transition-colors',
               mine
                 ? 'border-primary/40 bg-primary/10 text-foreground'
                 : 'border-border bg-muted hover:bg-muted/70 text-muted-foreground'
             )}
           >
-            <span aria-hidden="true">{reaction.emoji}</span>
-            <span className="font-mono text-[10px]">{reaction.userIds.length}</span>
+            <span aria-hidden="true" className="inline-block shrink-0 leading-none">
+              {reaction.emoji}
+            </span>
+            <span className="font-mono text-[10px] leading-none">{reaction.userIds.length}</span>
           </button>
         );
       })}

@@ -13,6 +13,7 @@ export const CHAT_EVENTS = {
   newMessage: 'new-message',
   reactionUpdated: 'reaction-updated',
   messageDeleted: 'message-deleted',
+  messagePinChanged: 'message-pin-changed',
 } as const;
 
 let cachedPusher: Pusher | null = null;

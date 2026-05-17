@@ -31,6 +31,7 @@ export const ChatLauncher = () => {
   const shouldAutoOpenForMention = searchParams.get('chat') === 'mention';
 
   const handleOpen = useCallback(() => setOpen(true), []);
+  const handleClose = useCallback(() => setOpen(false), []);
   const isAuthenticated = status === 'authenticated' && Boolean(session);
 
   const autoOpenedRef = useRef(false);
@@ -63,7 +64,7 @@ export const ChatLauncher = () => {
         {isAuthenticated && session ? (
           <ChatBody session={session} enabled={open} scrollToMention={shouldAutoOpenForMention} />
         ) : (
-          <ChatAuthGate />
+          <ChatAuthGate onSignIn={handleClose} />
         )}
       </ChatDrawer>
     </>

@@ -30,6 +30,7 @@ export interface ChatMessageDto {
     id: string;
     username: string | null;
     gravatarHash: string;
+    role?: string | null;
   };
   /**
    * Client-generated id echoed back when this message originated from
@@ -39,6 +40,8 @@ export interface ChatMessageDto {
    * from history.
    */
   tempId?: string;
+  /** ISO timestamp when an admin pinned this message; null/absent when not pinned. */
+  pinnedAt?: string | null;
 }
 
 export type SendChatMessageResult =
@@ -50,6 +53,12 @@ export type ToggleReactionResult =
   | { success: true; data: ChatMessageDto }
   | { success: false; error: 'not_found' | 'disabled' };
 
+export const MAX_PINNED_CHAT_MESSAGES = 3;
+
+export type TogglePinResult =
+  | { success: true; data: ChatMessageDto; pinned: boolean }
+  | { success: false; error: 'not_found' | 'limit_reached' };
+
 export interface ListChatMessagesParams {
   limit: number;
   cursor?: { createdAt: Date; id: string };
@@ -59,10 +68,17 @@ interface UserRow {
   id: string;
   username: string | null;
   email: string;
+  role?: string | null;
 }
 
 const toDto = (
-  message: { id: string; body: string; reactions: unknown; createdAt: Date },
+  message: {
+    id: string;
+    body: string;
+    reactions: unknown;
+    createdAt: Date;
+    pinnedAt?: Date | null;
+  },
   user: UserRow,
   tempId?: string
 ): ChatMessageDto => {
@@ -72,10 +88,12 @@ const toDto = (
     body: message.body,
     reactions: parsedReactions.success ? parsedReactions.data : [],
     createdAt: message.createdAt.toISOString(),
+    pinnedAt: message.pinnedAt ? message.pinnedAt.toISOString() : null,
     user: {
       id: user.id,
       username: user.username,
       gravatarHash: gravatarHash(user.email),
+      role: user.role ?? null,
     },
     ...(tempId ? { tempId } : {}),
   };
@@ -95,6 +113,42 @@ export class ChatService {
       .reverse()
       .map((row) => toDto(row, row.user));
     return messages;
+  }
+
+  /** Currently pinned admin announcements (newest pin first). */
+  static async listPinned(): Promise<ChatMessageDto[]> {
+    const rows = await ChatMessageRepository.findPinned();
+    return rows.map((row) => toDto(row, row.user));
+  }
+
+  /**
+   * Pin or unpin a message. Toggles on the message's current state.
+   * Enforces the per-channel cap of `MAX_PINNED_CHAT_MESSAGES`.
+   */
+  static async togglePin({
+    messageId,
+    adminId,
+  }: {
+    messageId: string;
+    adminId: string;
+  }): Promise<TogglePinResult> {
+    const target = await ChatMessageRepository.findById(messageId);
+    if (!target) {
+      return { success: false, error: 'not_found' };
+    }
+
+    if (target.pinnedAt) {
+      const row = await ChatMessageRepository.unpin(messageId);
+      return { success: true, data: toDto(row, row.user), pinned: false };
+    }
+
+    const count = await ChatMessageRepository.countPinned();
+    if (count >= MAX_PINNED_CHAT_MESSAGES) {
+      return { success: false, error: 'limit_reached' };
+    }
+
+    const row = await ChatMessageRepository.pin({ messageId, adminId });
+    return { success: true, data: toDto(row, row.user), pinned: true };
   }
 
   /**

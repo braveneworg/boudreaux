@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -19,21 +19,43 @@ interface ChatMessageRowProps {
    * Phase 6's chat-body composes ChatReactionBar + ChatEmojiPicker here.
    */
   reactionBar?: React.ReactNode;
+  /**
+   * Optional badge rendered in the header (e.g., the red pin marker shown
+   * on rows in the pinned strip). Caller controls the visual + click
+   * behavior so this row stays presentational.
+   */
+  pinIndicator?: React.ReactNode;
 }
 
-const timestampFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'short',
-  timeStyle: 'short',
-});
-
-const formatTimestamp = (iso: string): string => {
+/**
+ * Format `iso` in the viewer's locale + time zone. Called inside a
+ * mount-only effect so the visible string is always the *client's*
+ * local time — formatting at module scope would otherwise pick up the
+ * server's time zone during SSR and briefly display it before
+ * hydration.
+ */
+const formatTimestamp = (iso: string): { short: string; long: string } => {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return timestampFormatter.format(date);
+  if (Number.isNaN(date.getTime())) return { short: '', long: '' };
+  const short = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
+  const long = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'full',
+    timeStyle: 'long',
+  }).format(date);
+  return { short, long };
 };
 
-export const ChatMessageRow = ({ message, reactionBar }: ChatMessageRowProps) => {
-  const formatted = useMemo(() => formatTimestamp(message.createdAt), [message.createdAt]);
+export const ChatMessageRow = ({ message, reactionBar, pinIndicator }: ChatMessageRowProps) => {
+  const [formatted, setFormatted] = useState<{ short: string; long: string }>({
+    short: '',
+    long: '',
+  });
+  useEffect(() => {
+    setFormatted(formatTimestamp(message.createdAt));
+  }, [message.createdAt]);
   const bodyTokens = useMemo(() => {
     const tokens = tokenizeMentions(message.body);
     let offset = 0;
@@ -64,9 +86,20 @@ export const ChatMessageRow = ({ message, reactionBar }: ChatMessageRowProps) =>
           defaultStyle="identicon"
           className="size-6 border-0"
         />
-        <span className="text-foreground font-medium">{message.user.username ?? 'unknown'}</span>
-        <time dateTime={message.createdAt} className="text-muted-foreground ml-auto text-[10px]">
-          {formatted}
+        <span className="text-foreground font-medium">
+          {message.user.username ?? 'unknown'}
+          {message.user.role === 'admin' && (
+            <span className="text-muted-foreground ml-1 font-normal">(moderator)</span>
+          )}
+        </span>
+        {pinIndicator && <span className="ml-auto inline-flex items-center">{pinIndicator}</span>}
+        <time
+          dateTime={message.createdAt}
+          title={formatted.long}
+          suppressHydrationWarning
+          className={cn('text-muted-foreground text-[10px]', !pinIndicator && 'ml-auto')}
+        >
+          {formatted.short}
         </time>
         {isPending && (
           <Loader2 aria-label="sending" className="text-muted-foreground size-3 animate-spin" />

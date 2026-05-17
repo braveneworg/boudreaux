@@ -10,12 +10,17 @@ import { Lock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
+interface ChatAuthGateProps {
+  /** Called when the user taps the sign-in CTA so the launcher can dismiss the drawer. */
+  onSignIn?: () => void;
+}
+
 /**
  * Drawer body shown to unauthenticated visitors. Routes to /signin
  * preserving the current path as callbackUrl so they land back where
  * they were after signing in.
  */
-export const ChatAuthGate = () => {
+export const ChatAuthGate = ({ onSignIn }: ChatAuthGateProps = {}) => {
   const pathname = usePathname() ?? '/';
   const callbackUrl = encodeURIComponent(pathname);
 
@@ -24,7 +29,9 @@ export const ChatAuthGate = () => {
       <Lock aria-hidden="true" className="text-muted-foreground size-12" />
       <p className="text-base">Sign in to chat</p>
       <Button asChild>
-        <Link href={`/signin?callbackUrl=${callbackUrl}`}>Sign in</Link>
+        <Link href={`/signin?callbackUrl=${callbackUrl}`} onClick={onSignIn}>
+          Sign in
+        </Link>
       </Button>
     </div>
   );

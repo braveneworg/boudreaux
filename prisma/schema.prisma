@@ -62,6 +62,7 @@ model User {
   abuseReportsByReporter  AbuseReport[]    @relation("AbuseReportReporter")
   bannedIdentities        BannedIdentity[]
   hiddenChatMessages      ChatMessage[]    @relation("ChatMessageHiddenByAdmin")
+  pinnedChatMessages      ChatMessage[]    @relation("ChatMessagePinnedByAdmin")
   chatUserDisableActions  ChatUser[]       @relation("ChatUserDisabledByAdmin")
   bannedIdentityActions   BannedIdentity[] @relation("BannedIdentityByAdmin")
 
@@ -787,9 +788,18 @@ model ChatMessage {
   hiddenByAdmin   User?     @relation("ChatMessageHiddenByAdmin", fields: [hiddenByAdminId], references: [id])
   hiddenReason    String? // "user_disabled" | "admin_flagged"
 
+  // Admin-pinned announcements. Up to 3 messages can be pinned at once;
+  // the limit is enforced in the action layer. `pinnedAt` is the time the
+  // admin clicked pin (used to order the pinned strip); a null/absent
+  // value means the message is in the regular chat stream.
+  pinnedAt        DateTime?
+  pinnedByAdminId String?   @db.ObjectId
+  pinnedByAdmin   User?     @relation("ChatMessagePinnedByAdmin", fields: [pinnedByAdminId], references: [id])
+
   @@index([createdAt(sort: Desc)])
   @@index([userId])
   @@index([hiddenAt])
+  @@index([pinnedAt])
 }
 
 model ChatUser {

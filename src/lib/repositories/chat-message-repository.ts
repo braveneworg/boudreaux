@@ -32,7 +32,7 @@ export class ChatMessageRepository {
       },
       include: {
         user: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true, email: true, role: true },
         },
       },
     });
@@ -53,26 +53,44 @@ export class ChatMessageRepository {
    * they have their own `hiddenAt` stamp.
    */
   static async findRecent({ limit, cursor }: FindRecentParams) {
-    const cursorWhere = cursor
-      ? {
-          OR: [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-          ],
-        }
-      : {};
+    const cursorAnd = cursor
+      ? [
+          {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+            ],
+          },
+        ]
+      : [];
+
+    // Active-ban predicate: a BannedIdentity is active when `unbannedAt`
+    // is null OR the field is absent from the document. Prisma MongoDB
+    // equality on `null` does not match missing fields, so both cases
+    // must be enumerated.
+    const activeBan = { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] };
 
     return prisma.chatMessage.findMany({
       where: {
-        ...cursorWhere,
-        hiddenAt: null,
-        user: { is: { chatUsers: { none: { disabled: true } } } },
+        AND: [
+          ...cursorAnd,
+          // hiddenAt may be absent on legacy rows; same null-vs-absent quirk.
+          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
+          {
+            user: {
+              is: {
+                chatUsers: { none: { disabled: true } },
+                bannedIdentities: { none: activeBan },
+              },
+            },
+          },
+        ],
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
       include: {
         user: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true, email: true, role: true },
         },
       },
     });
@@ -88,7 +106,7 @@ export class ChatMessageRepository {
       where: { id },
       include: {
         user: {
-          select: { id: true, username: true, email: true },
+          select: { id: true, username: true, email: true, role: true },
         },
       },
     });
@@ -137,6 +155,93 @@ export class ChatMessageRepository {
         hiddenByAdminId: adminId,
         hiddenReason: 'admin_flagged',
       },
+    });
+  }
+
+  /** Pin a message. The action layer enforces the 3-message cap. */
+  static async pin({ messageId, adminId }: { messageId: string; adminId: string }) {
+    return prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { pinnedAt: new Date(), pinnedByAdminId: adminId },
+      include: { user: { select: { id: true, username: true, email: true, role: true } } },
+    });
+  }
+
+  /** Unpin a message. */
+  static async unpin(messageId: string) {
+    return prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { pinnedAt: null, pinnedByAdminId: null },
+      include: { user: { select: { id: true, username: true, email: true, role: true } } },
+    });
+  }
+
+  /**
+   * Currently pinned messages, newest pin first. Excludes hidden rows so
+   * a hide/unpin race resolves consistently for every client.
+   */
+  static async findPinned() {
+    return prisma.chatMessage.findMany({
+      where: {
+        AND: [
+          { OR: [{ pinnedAt: { not: null } }] },
+          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
+        ],
+      },
+      orderBy: [{ pinnedAt: 'desc' }],
+      include: { user: { select: { id: true, username: true, email: true, role: true } } },
+    });
+  }
+
+  /** Count of currently pinned messages. Used to enforce the 3-pin cap. */
+  static async countPinned(): Promise<number> {
+    return prisma.chatMessage.count({
+      where: {
+        AND: [
+          { pinnedAt: { not: null } },
+          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
+        ],
+      },
+    });
+  }
+
+  /**
+   * Bulk admin hide for every message authored by a single user. Used by
+   * the in-chat "delete all messages by <user>" moderator action. Only
+   * touches rows that are not already hidden so prior `admin_flagged`
+   * stamps (with their own `hiddenByAdminId`) are preserved.
+   */
+  static async hideAllByUserAsAdminFlagged({
+    userId,
+    adminId,
+  }: {
+    userId: string;
+    adminId: string;
+  }) {
+    return prisma.chatMessage.updateMany({
+      where: {
+        userId,
+        OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
+      },
+      data: {
+        hiddenAt: new Date(),
+        hiddenByAdminId: adminId,
+        hiddenReason: 'admin_flagged',
+      },
+    });
+  }
+
+  /**
+   * Return the ids of every non-hidden message authored by a user. Used
+   * after a bulk hide to tell connected clients which rows to drop.
+   */
+  static async findVisibleIdsByUser(userId: string) {
+    return prisma.chatMessage.findMany({
+      where: {
+        userId,
+        OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
+      },
+      select: { id: true },
     });
   }
 

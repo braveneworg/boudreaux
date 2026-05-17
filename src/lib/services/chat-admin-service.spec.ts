@@ -33,6 +33,8 @@ vi.mock('@/lib/repositories/chat-message-repository', () => ({
     hideAsAdminFlagged: vi.fn(),
     unhide: vi.fn(),
     findByUserIdForAdmin: vi.fn(),
+    findVisibleIdsByUser: vi.fn(),
+    hideAllByUserAsAdminFlagged: vi.fn(),
   },
 }));
 
@@ -290,5 +292,42 @@ describe('ChatAdminService.unbanIdentity', () => {
     await ChatAdminService.unbanIdentity('ban-1');
 
     expect(BannedIdentityRepository.unban).toHaveBeenCalledWith('ban-1');
+  });
+});
+
+describe('ChatAdminService.hideAllMessagesByUser', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns an empty list and skips the bulk update when the user has no visible messages', async () => {
+    vi.mocked(ChatMessageRepository.findVisibleIdsByUser).mockResolvedValue([] as never);
+
+    const result = await ChatAdminService.hideAllMessagesByUser({
+      userId: 'user-1',
+      adminId: 'admin-1',
+    });
+
+    expect(result).toEqual([]);
+    expect(ChatMessageRepository.hideAllByUserAsAdminFlagged).not.toHaveBeenCalled();
+  });
+
+  it('snapshots ids first, then hides them in bulk', async () => {
+    vi.mocked(ChatMessageRepository.findVisibleIdsByUser).mockResolvedValue([
+      { id: 'a' },
+      { id: 'b' },
+    ] as never);
+    vi.mocked(ChatMessageRepository.hideAllByUserAsAdminFlagged).mockResolvedValue({
+      count: 2,
+    } as never);
+
+    const result = await ChatAdminService.hideAllMessagesByUser({
+      userId: 'user-1',
+      adminId: 'admin-1',
+    });
+
+    expect(result).toEqual(['a', 'b']);
+    expect(ChatMessageRepository.hideAllByUserAsAdminFlagged).toHaveBeenCalledWith({
+      userId: 'user-1',
+      adminId: 'admin-1',
+    });
   });
 });

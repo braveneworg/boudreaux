@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 
@@ -12,10 +12,18 @@ import { ChatMessageRow } from './chat-message-row';
 
 interface ChatMessageListProps {
   messages: OptimisticChatMessage[];
+  /**
+   * Currently pinned messages (already capped at the per-channel limit
+   * by the server). Rendered sticky at the top and filtered out of the
+   * regular stream.
+   */
+  pinnedMessages?: OptimisticChatMessage[];
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
   renderReactionBar?: (message: OptimisticChatMessage) => React.ReactNode;
+  /** Header badge rendered on rows inside the pinned strip (e.g., red pin button). */
+  renderPinIndicator?: (message: OptimisticChatMessage) => React.ReactNode;
   /**
    * When set, the list scrolls to the most recent message containing
    * `@<scrollToMentionUsername>` instead of anchoring to the bottom on
@@ -35,10 +43,12 @@ const SCROLL_BOTTOM_THRESHOLD_PX = 50;
  */
 export const ChatMessageList = ({
   messages,
+  pinnedMessages,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
   renderReactionBar,
+  renderPinIndicator,
   scrollToMentionUsername,
 }: ChatMessageListProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +57,14 @@ export const ChatMessageList = ({
   const prevScrollHeightRef = useRef(0);
   const wasAtBottomRef = useRef(true);
   const mentionScrollDoneRef = useRef(false);
+
+  // Admin-pinned announcements (caller already enforces the 3-cap),
+  // newest pin first. Filtered out of the regular stream so they only
+  // render once, in the sticky strip at the top.
+  const pinnedById = useMemo(
+    () => new Set((pinnedMessages ?? []).map((m) => m.id)),
+    [pinnedMessages]
+  );
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -110,20 +128,45 @@ export const ChatMessageList = ({
       style={{ touchAction: 'pan-y' }}
       data-testid="chat-message-list"
     >
-      {hasNextPage && <ChatLoadMoreButton onLoadMore={onLoadMore} isLoading={isFetchingNextPage} />}
-      {messages.length === 0 ? (
-        <div className="text-muted-foreground flex flex-1 items-center justify-center p-8 text-sm">
-          No messages yet — say hi 👋
+      {pinnedMessages && pinnedMessages.length > 0 && (
+        <div
+          data-testid="chat-pinned-messages"
+          className="bg-background sticky top-0 z-10 border-b shadow-sm"
+        >
+          <ul className="divide-y">
+            {pinnedMessages.map((message) => (
+              <li key={`pinned-${message.id}`}>
+                <ChatMessageRow
+                  message={message}
+                  reactionBar={renderReactionBar?.(message)}
+                  pinIndicator={renderPinIndicator?.(message)}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : (
-        <ul className="divide-y">
-          {messages.map((message) => (
-            <li key={message.tempId ?? message.id}>
-              <ChatMessageRow message={message} reactionBar={renderReactionBar?.(message)} />
-            </li>
-          ))}
-        </ul>
       )}
+      {hasNextPage && <ChatLoadMoreButton onLoadMore={onLoadMore} isLoading={isFetchingNextPage} />}
+      {(() => {
+        const visibleMessages =
+          pinnedById.size > 0 ? messages.filter((m) => !pinnedById.has(m.id)) : messages;
+        if (visibleMessages.length === 0) {
+          return (
+            <div className="text-muted-foreground flex flex-1 items-center justify-center p-8 text-sm">
+              No messages yet — say hi 👋
+            </div>
+          );
+        }
+        return (
+          <ul className="divide-y">
+            {visibleMessages.map((message) => (
+              <li key={message.tempId ?? message.id}>
+                <ChatMessageRow message={message} reactionBar={renderReactionBar?.(message)} />
+              </li>
+            ))}
+          </ul>
+        );
+      })()}
     </div>
   );
 };
