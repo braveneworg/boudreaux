@@ -166,9 +166,7 @@ describe('useOptimisticChat', () => {
     });
 
     act(() => result.current.addReceivedMessage(makeMsg('live-1', 'live')));
-    act(() =>
-      result.current.appendOptimistic({ ...makeMsg('local-1', 'local'), tempId: 'tmp-1' })
-    );
+    act(() => result.current.appendOptimistic({ ...makeMsg('local-1', 'local'), tempId: 'tmp-1' }));
 
     act(() => result.current.removeMessage('live-1'));
     act(() => result.current.removeMessage('local-1'));
@@ -246,9 +244,7 @@ describe('useOptimisticChat', () => {
       'chat',
       'messages',
     ]);
-    expect(cached?.pages[0].messages[0].reactions).toEqual([
-      { emoji: '🔥', userIds: ['user-2'] },
-    ]);
+    expect(cached?.pages[0].messages[0].reactions).toEqual([{ emoji: '🔥', userIds: ['user-2'] }]);
   });
 
   it('updateMessage leaves the cache untouched when no page contains the id', () => {
@@ -280,9 +276,7 @@ describe('useOptimisticChat', () => {
       wrapper: buildWrapper(),
     });
 
-    expect(() =>
-      act(() => result.current.updateMessage(makeMsg('msg-1', 'hi')))
-    ).not.toThrow();
+    expect(() => act(() => result.current.updateMessage(makeMsg('msg-1', 'hi')))).not.toThrow();
   });
 
   it('markFailed only flips the matching placeholder when multiple are queued', () => {

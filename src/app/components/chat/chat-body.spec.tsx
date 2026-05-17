@@ -258,7 +258,9 @@ describe('ChatBody — branch states', () => {
 describe('ChatBody — reaction-bar slot', () => {
   it('hides the trash/pin buttons for non-admin viewers', () => {
     useChatMessagesQueryMock.mockReturnValue({
-      messages: [makeMessage({ user: { id: 'u', username: 'fan', gravatarHash: 'h', role: 'admin' } })],
+      messages: [
+        makeMessage({ user: { id: 'u', username: 'fan', gravatarHash: 'h', role: 'admin' } }),
+      ],
       isPending: false,
       isError: false,
       hasNextPage: false,
@@ -563,10 +565,7 @@ describe('ChatBody — pinned strip indicators + channel wiring', () => {
     // currentUser is read by ChatInput (mocked out); covering this branch
     // is purely about exercising the `?? ''` / `?? null` fallbacks.
     render(
-      <ChatBody
-        session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session}
-        enabled
-      />
+      <ChatBody session={{ user: { id: 'anon-1', role: 'admin' } } as unknown as Session} enabled />
     );
     expect(lastListProps).not.toBeNull();
   });

@@ -109,9 +109,7 @@ describe('ChatMessageList', () => {
 
   it('shows the empty-state when every loaded message is in the pinned strip', () => {
     const pinned = makeMsg('p1');
-    render(
-      <ChatMessageList {...baseProps} messages={[pinned]} pinnedMessages={[pinned]} />
-    );
+    render(<ChatMessageList {...baseProps} messages={[pinned]} pinnedMessages={[pinned]} />);
     expect(screen.getByText(/no messages yet/i)).toBeInTheDocument();
   });
 
@@ -181,9 +179,7 @@ describe('ChatMessageList', () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView as never;
 
-    render(
-      <ChatMessageList {...baseProps} messages={[msg]} scrollToMentionUsername="octo" />
-    );
+    render(<ChatMessageList {...baseProps} messages={[msg]} scrollToMentionUsername="octo" />);
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
