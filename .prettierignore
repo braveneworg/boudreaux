@@ -38,11 +38,3 @@ prisma/migrations
 
 # Public assets
 public/
-
-# Ignore all files
-*
-
-# Allow (un-ignore) specific extensions
-!*.js
-!*.ts
-!*.css

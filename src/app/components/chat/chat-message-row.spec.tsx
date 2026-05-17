@@ -20,11 +20,13 @@ const makeMsg = (overrides?: Partial<OptimisticChatMessage>): OptimisticChatMess
 
 describe('ChatMessageRow', () => {
   it('renders username, body, and a locale-formatted timestamp', () => {
-    render(<ChatMessageRow message={makeMsg()} />);
+    const { container } = render(<ChatMessageRow message={makeMsg()} />);
 
     expect(screen.getByText('octo')).toBeInTheDocument();
     expect(screen.getByText('hello world')).toBeInTheDocument();
-    expect(screen.getByRole('time')).toHaveAttribute('dateTime', '2026-05-01T12:00:00Z');
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
+    expect(timeEl).toHaveAttribute('dateTime', '2026-05-01T12:00:00Z');
   });
 
   it('falls back to "unknown" when the user has no username', () => {
@@ -79,9 +81,10 @@ describe('ChatMessageRow', () => {
   });
 
   it('formats the timestamp on mount using the viewer locale (short + long title)', async () => {
-    render(<ChatMessageRow message={makeMsg()} />);
+    const { container } = render(<ChatMessageRow message={makeMsg()} />);
 
-    const timeEl = screen.getByRole('time');
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
     // The mount-only effect populates the short text and the title.
     await waitFor(() => expect(timeEl.textContent?.trim()).not.toBe(''));
     expect(timeEl.getAttribute('title')).toBeTruthy();
@@ -89,9 +92,10 @@ describe('ChatMessageRow', () => {
   });
 
   it('produces empty short/long strings when the createdAt cannot be parsed', () => {
-    render(<ChatMessageRow message={makeMsg({ createdAt: 'not-a-date' })} />);
+    const { container } = render(<ChatMessageRow message={makeMsg({ createdAt: 'not-a-date' })} />);
 
-    const timeEl = screen.getByRole('time');
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
     // Effect runs and returns the empty fallback — no crash, no visible text.
     expect(timeEl.textContent?.trim()).toBe('');
     expect(timeEl.getAttribute('title')).toBe('');

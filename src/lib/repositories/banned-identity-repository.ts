@@ -22,7 +22,7 @@ interface MatchActiveBanParams {
 /**
  * Data-access layer for {@link BannedIdentity}. Powers ban-evasion
  * enforcement at signup/login and the disabled-user chat UX gate.
- * A ban record is "active" when `unbannedAt` is null.
+ * A ban record is "active" when `unbannedAt` is null or missing.
  */
 export class BannedIdentityRepository {
   /**
@@ -58,8 +58,7 @@ export class BannedIdentityRepository {
 
     return prisma.bannedIdentity.findFirst({
       where: {
-        unbannedAt: null,
-        OR: or,
+        AND: [{ OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] }, { OR: or }],
       },
       orderBy: { bannedAt: 'desc' },
     });
@@ -76,7 +75,9 @@ export class BannedIdentityRepository {
   /** List active bans for the admin moderation view. */
   static async listActive() {
     return prisma.bannedIdentity.findMany({
-      where: { unbannedAt: null },
+      where: {
+        OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }],
+      },
       orderBy: { bannedAt: 'desc' },
     });
   }

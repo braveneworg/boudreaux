@@ -81,8 +81,10 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
 
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
-        unbannedAt: null,
-        OR: [{ userId: 'user-1' }],
+        AND: [
+          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
+          { OR: [{ userId: 'user-1' }] },
+        ],
       },
       orderBy: { bannedAt: 'desc' },
     });
@@ -99,11 +101,15 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
 
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
-        unbannedAt: null,
-        OR: [
-          { userId: 'user-1' },
-          { email: 'badactor@example.com' },
-          { fingerprintHash: 'fp-hash' },
+        AND: [
+          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
+          {
+            OR: [
+              { userId: 'user-1' },
+              { email: 'badactor@example.com' },
+              { fingerprintHash: 'fp-hash' },
+            ],
+          },
         ],
       },
       orderBy: { bannedAt: 'desc' },
@@ -121,8 +127,10 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
 
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
-        unbannedAt: null,
-        OR: [{ fingerprintHash: 'fp-hash' }],
+        AND: [
+          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
+          { OR: [{ fingerprintHash: 'fp-hash' }] },
+        ],
       },
       orderBy: { bannedAt: 'desc' },
     });
@@ -143,13 +151,15 @@ describe('BannedIdentityRepository.unban', () => {
 });
 
 describe('BannedIdentityRepository.listActive', () => {
-  it('returns all rows with unbannedAt null sorted newest-first', async () => {
+  it('returns active rows where unbannedAt is null or not set, sorted newest-first', async () => {
     vi.mocked(prisma.bannedIdentity.findMany).mockResolvedValue([] as never);
 
     await BannedIdentityRepository.listActive();
 
     expect(prisma.bannedIdentity.findMany).toHaveBeenCalledWith({
-      where: { unbannedAt: null },
+      where: {
+        OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }],
+      },
       orderBy: { bannedAt: 'desc' },
     });
   });

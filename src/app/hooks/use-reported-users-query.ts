@@ -33,7 +33,7 @@ const fetchReportedUsers = async ({
 
 export function useReportedUsersQuery(params: UseReportedUsersQueryParams) {
   return useQuery({
-    queryKey: queryKeys.chat.reportedUsers(params.windowDays ?? 'all'),
+    queryKey: queryKeys.chat.reportedUsers(params.windowDays ?? 'all', params.search),
     queryFn: () => fetchReportedUsers(params),
   });
 }
