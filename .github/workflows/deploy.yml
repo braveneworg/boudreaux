@@ -125,6 +125,8 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA: ${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
           NEXT_PUBLIC_CDN_DOMAIN: ${{ secrets.NEXT_PUBLIC_CDN_DOMAIN }}
+          NEXT_PUBLIC_PUSHER_KEY: ${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER: ${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
         run: |
           set -e
           TOK='${{ secrets.GITHUB_TOKEN }}'
@@ -149,6 +151,8 @@ jobs:
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA} \
               --build-arg NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA} \
               --build-arg NEXT_PUBLIC_CDN_DOMAIN=${NEXT_PUBLIC_CDN_DOMAIN} \
+              --build-arg NEXT_PUBLIC_PUSHER_KEY=${NEXT_PUBLIC_PUSHER_KEY} \
+              --build-arg NEXT_PUBLIC_PUSHER_CLUSTER=${NEXT_PUBLIC_PUSHER_CLUSTER} \
               --build-arg CACHE_BUST=${CACHE_BUST} \
               --provenance=false \
               --sbom=false \
@@ -453,6 +457,14 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
           NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
+          PUSHER_APP_ID=${{ secrets.PUSHER_APP_ID }}
+          PUSHER_KEY=${{ secrets.PUSHER_KEY }}
+          PUSHER_SECRET=${{ secrets.PUSHER_SECRET }}
+          PUSHER_CLUSTER=${{ secrets.PUSHER_CLUSTER }}
+          NEXT_PUBLIC_PUSHER_KEY=${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
+          NEXT_PUBLIC_PUSHER_CLUSTER=${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
+          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           EOF
 
       - name: Upload compose + env
