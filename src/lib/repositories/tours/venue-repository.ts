@@ -4,7 +4,7 @@
 
 import 'server-only';
 
-import { prisma } from '../../prisma';
+import { prisma } from '@/lib/prisma';
 
 import type { Prisma, Venue } from '@prisma/client';
 

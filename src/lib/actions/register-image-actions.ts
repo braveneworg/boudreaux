@@ -8,12 +8,11 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
+import { ArtistService } from '@/lib/services/artist-service';
+import { ImageService } from '@/lib/services/image-service';
+import { ReleaseService } from '@/lib/services/release-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { ArtistService } from '../services/artist-service';
-import { ImageService } from '../services/image-service';
-import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
+import { logSecurityEvent } from '@/utils/audit-log';
 
 /**
  * Input for registering an uploaded image

@@ -14,6 +14,7 @@ import { generateUsername } from 'unique-username-generator';
 import { signIn } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -21,8 +22,6 @@ import { validateEmailSecurity } from '@/lib/utils/email-security';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { signupSchema } from '@/lib/validation/signup-schema';
-
-import type { FormState } from '../types/form-state';
 
 // Rate limiter: 5 signup attempts per minute per IP
 const limiter = rateLimit({

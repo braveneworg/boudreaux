@@ -14,9 +14,8 @@ import { Switch } from '@/app/components/ui/switch';
 import TurnstileWidget from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
-
-import PageContainer from '../ui/page-container';
-import { Skeleton } from '../ui/skeleton';
+import PageContainer from '@/ui/page-container';
+import { Skeleton } from '@/ui/skeleton';
 
 import type { Control } from 'react-hook-form';
 

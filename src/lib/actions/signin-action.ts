@@ -8,13 +8,12 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { signIn } from '@/auth';
+import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { signinSchema } from '@/lib/validation/signin-schema';
-
-import type { FormState } from '../types/form-state';
 
 // Rate limiter: 5 signin attempts per minute per IP
 const limiter = rateLimit({
@@ -67,7 +66,7 @@ export const signinAction = async (_initialState: FormState, payload: FormData) 
   const { formState, parsed } = getActionState(payload, permittedFieldNames, signinSchema);
   if (parsed.success) {
     try {
-      const { email } = formState.fields!;
+      const { email } = formState.fields;
 
       // Redirect happens below because next throws an error if you redirect inside a try/catch
       // The property redirectTo is responsible for the magic link callback URL

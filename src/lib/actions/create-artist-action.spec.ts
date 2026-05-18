@@ -5,15 +5,14 @@
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
+import { ArtistService } from '@/lib/services/artist-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { requireRole } from '@/utils/auth/require-role';
 
 import { createArtistAction } from './create-artist-action';
-import { ArtistService } from '../services/artist-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { requireRole } from '../utils/auth/require-role';
-
-import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
 

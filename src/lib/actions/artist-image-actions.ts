@@ -8,10 +8,9 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
+import { ArtistService, type ImageUploadInput } from '@/lib/services/artist-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { ArtistService, type ImageUploadInput } from '../services/artist-service';
-import { logSecurityEvent } from '../utils/audit-log';
+import { logSecurityEvent } from '@/utils/audit-log';
 
 /**
  * Result type for image upload actions

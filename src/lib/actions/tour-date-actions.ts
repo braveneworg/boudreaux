@@ -7,16 +7,17 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { TourDateRepository } from '../repositories/tours/tour-date-repository';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { OBJECT_ID_REGEX } from '../utils/validation/object-id';
-import { tourDateCreateSchema, tourDateUpdateSchema } from '../validations/tours/tour-date-schema';
-
-import type { FormState } from '../types/form-state';
+import {
+  tourDateCreateSchema,
+  tourDateUpdateSchema,
+} from '@/lib/validations/tours/tour-date-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
 /**
  * Server action to create a new tour date entry
@@ -48,12 +49,14 @@ export const createTourDateAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
+    const errors = formState.errors ?? {};
+    formState.errors = errors;
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!formState.errors![field]) {
-        formState.errors![field] = [];
+      if (!errors[field]) {
+        errors[field] = [];
       }
-      (formState.errors![field] as string[]).push(issue.message);
+      errors[field].push(issue.message);
     }
     return formState;
   }
@@ -125,12 +128,14 @@ export const updateTourDateAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
+    const errors = formState.errors ?? {};
+    formState.errors = errors;
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!formState.errors![field]) {
-        formState.errors![field] = [];
+      if (!errors[field]) {
+        errors[field] = [];
       }
-      (formState.errors![field] as string[]).push(issue.message);
+      errors[field].push(issue.message);
     }
     return formState;
   }

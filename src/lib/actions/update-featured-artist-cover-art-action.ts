@@ -7,10 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
-
-import { prisma } from '../prisma';
 
 export interface UpdateFeaturedArtistCoverArtResult {
   success: boolean;

@@ -36,8 +36,7 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 import { changeUsernameSchema as usernameSchema } from '@/lib/validation/change-username-schema';
 import { profileSchema } from '@/lib/validation/profile-schema';
-
-import { Switch } from '../ui/switch';
+import { Switch } from '@/ui/switch';
 
 const initialFormState: FormState = {
   fields: {},

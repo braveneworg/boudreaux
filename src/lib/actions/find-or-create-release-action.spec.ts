@@ -3,11 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
 import { auth } from '@/auth';
+import { ArtistService } from '@/lib/services/artist-service';
+import { ReleaseService } from '@/lib/services/release-service';
+import { requireRole } from '@/utils/auth/require-role';
 
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-import { ArtistService } from '../services/artist-service';
-import { ReleaseService } from '../services/release-service';
-import { requireRole } from '../utils/auth/require-role';
 
 import type { Release } from '@prisma/client';
 import type { Session } from 'next-auth';

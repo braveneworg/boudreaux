@@ -6,11 +6,10 @@ import { notFound } from 'next/navigation';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import type { TourWithRelations } from '@/app/hooks/use-tour-query';
+import { TourDetailContent } from '@/app/tours/components/tour-detail-content';
 import { queryKeys } from '@/lib/query-keys';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { getQueryClient } from '@/lib/utils/get-query-client';
-
-import { TourDetailContent } from '../components/tour-detail-content';
 
 export interface TourPageProps {
   params: Promise<{

@@ -4,12 +4,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
-import { ContentContainer } from '../components/ui/content-container';
-import { Heading } from '../components/ui/heading';
-import PageContainer from '../components/ui/page-container';
-import { PageSection } from '../components/ui/page-section';
-import { PageSectionParagraph } from '../components/ui/page-section-paragraph';
+import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { ContentContainer } from '@/ui/content-container';
+import { Heading } from '@/ui/heading';
+import PageContainer from '@/ui/page-container';
+import { PageSection } from '@/ui/page-section';
+import { PageSectionParagraph } from '@/ui/page-section-paragraph';
 
 export default function AboutPage() {
   return (

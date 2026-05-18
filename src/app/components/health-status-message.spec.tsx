@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render } from '@testing-library/react';
 
-import HealthStatusMessage from './health-status-message';
+import type { HealthStatus } from '@/lib/types/health-status';
 
-import type { HealthStatus } from '../../lib/types/health-status';
+import HealthStatusMessage from './health-status-message';
 
 describe('HealthStatusMessage', () => {
   describe('Loading State', () => {

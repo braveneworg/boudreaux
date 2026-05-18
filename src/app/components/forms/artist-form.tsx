@@ -47,9 +47,8 @@ import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
-
-import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
-import { DatePicker } from '../ui/datepicker';
+import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { DatePicker } from '@/ui/datepicker';
 
 type FormFieldName = keyof ArtistFormData;
 
@@ -286,10 +285,14 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
 
                 try {
                   // Step 1: Get presigned URLs for direct S3 upload
-                  const fileInfos = imagesToUpload.map((img) => ({
-                    fileName: img.file!.name,
-                    contentType: img.file!.type,
-                    fileSize: img.file!.size,
+                  const imagesWithFiles = imagesToUpload.filter(
+                    (img): img is (typeof imagesToUpload)[number] & { file: File } =>
+                      img.file instanceof File
+                  );
+                  const fileInfos = imagesWithFiles.map((img) => ({
+                    fileName: img.file.name,
+                    contentType: img.file.type,
+                    fileSize: img.file.size,
                   }));
 
                   const presignedResult = await getPresignedUploadUrlsAction(
@@ -303,7 +306,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                   }
 
                   // Step 2: Upload files directly to S3
-                  const files = imagesToUpload.map((img) => img.file!);
+                  const files = imagesWithFiles.map((img) => img.file);
                   const uploadResults = await uploadFilesToS3(files, presignedResult.data);
 
                   // Check for upload failures
@@ -316,8 +319,8 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                   const imageInfos = presignedResult.data.map((presigned, index) => ({
                     s3Key: presigned.s3Key,
                     cdnUrl: presigned.cdnUrl,
-                    caption: imagesToUpload[index].caption || '',
-                    altText: imagesToUpload[index].altText || '',
+                    caption: imagesWithFiles[index].caption || '',
+                    altText: imagesWithFiles[index].altText || '',
                   }));
 
                   const registerResult = await registerArtistImagesAction(artistId, imageInfos);
@@ -403,10 +406,14 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
 
                   try {
                     // Step 1: Get presigned URLs for direct S3 upload
-                    const fileInfos = imagesToUpload.map((img) => ({
-                      fileName: img.file!.name,
-                      contentType: img.file!.type,
-                      fileSize: img.file!.size,
+                    const imagesWithFiles = imagesToUpload.filter(
+                      (img): img is (typeof imagesToUpload)[number] & { file: File } =>
+                        img.file instanceof File
+                    );
+                    const fileInfos = imagesWithFiles.map((img) => ({
+                      fileName: img.file.name,
+                      contentType: img.file.type,
+                      fileSize: img.file.size,
                     }));
 
                     const presignedResult = await getPresignedUploadUrlsAction(
@@ -420,7 +427,7 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     }
 
                     // Step 2: Upload files directly to S3
-                    const files = imagesToUpload.map((img) => img.file!);
+                    const files = imagesWithFiles.map((img) => img.file);
                     const uploadResults = await uploadFilesToS3(files, presignedResult.data);
 
                     // Check for upload failures
@@ -433,8 +440,8 @@ export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProp
                     const imageInfos = presignedResult.data.map((presigned, index) => ({
                       s3Key: presigned.s3Key,
                       cdnUrl: presigned.cdnUrl,
-                      caption: imagesToUpload[index].caption || '',
-                      altText: imagesToUpload[index].altText || '',
+                      caption: imagesWithFiles[index].caption || '',
+                      altText: imagesWithFiles[index].altText || '',
                     }));
 
                     const registerResult = await registerArtistImagesAction(

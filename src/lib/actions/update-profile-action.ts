@@ -9,12 +9,11 @@ import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { profileSchema } from '@/lib/validation/profile-schema';
-
-import type { FormState } from '../types/form-state';
 
 export const updateProfileAction = async (
   _initialState: FormState,

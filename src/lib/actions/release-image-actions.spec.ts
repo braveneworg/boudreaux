@@ -5,6 +5,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { requireRole } from '@/utils/auth/require-role';
 
 import {
   deleteReleaseImageAction,
@@ -12,9 +15,6 @@ import {
   updateReleaseImageAction,
   reorderReleaseImagesAction,
 } from './release-image-actions';
-import { prisma } from '../prisma';
-import { logSecurityEvent } from '../utils/audit-log';
-import { requireRole } from '../utils/auth/require-role';
 
 vi.mock('server-only', () => ({}));
 

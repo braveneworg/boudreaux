@@ -6,12 +6,11 @@ import 'server-only';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Prisma } from '@prisma/client';
 
+import { prisma } from '@/lib/prisma';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getS3Client } from '@/lib/utils/s3-client';
 import { splitFullName } from '@/lib/utils/split-full-name';
-
-import { prisma } from '../prisma';
 
 import type { ServiceResponse } from './service.types';
 

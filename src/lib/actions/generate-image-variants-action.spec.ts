@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
+import { requireRole } from '@/utils/auth/require-role';
 
 import { generateImageVariantsAction } from './generate-image-variants-action';
-import { requireRole } from '../utils/auth/require-role';
 
 const SIZE_COUNT = IMAGE_VARIANT_DEVICE_SIZES.length;
 

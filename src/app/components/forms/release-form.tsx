@@ -58,9 +58,8 @@ import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
-
-import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
-import { DatePicker } from '../ui/datepicker';
+import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { DatePicker } from '@/ui/datepicker';
 
 type FormFieldName = keyof ReleaseFormData;
 
@@ -478,10 +477,14 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
     );
 
     try {
-      const fileInfos = imagesToUpload.map((img) => ({
-        fileName: img.file!.name,
-        contentType: img.file!.type,
-        fileSize: img.file!.size,
+      const imagesWithFiles = imagesToUpload.filter(
+        (img): img is ImageItem & { file: File } => img.file instanceof File
+      );
+
+      const fileInfos = imagesWithFiles.map((img) => ({
+        fileName: img.file.name,
+        contentType: img.file.type,
+        fileSize: img.file.size,
       }));
 
       const presignedResult = await getPresignedUploadUrlsAction(
@@ -494,7 +497,7 @@ export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseForm
         throw Error(presignedResult.error || 'Failed to get upload URLs');
       }
 
-      const files = imagesToUpload.map((img) => img.file!);
+      const files = imagesWithFiles.map((img) => img.file);
       const uploadResults = await uploadFilesToS3(files, presignedResult.data);
 
       const failedUploads = uploadResults.filter((r) => !r.success);

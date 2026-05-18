@@ -9,11 +9,11 @@ import { useRouter } from 'next/navigation';
 
 import { Combobox } from '@/components/forms/fields/combobox';
 import { toTitleCase } from '@/lib/utils/string-utils';
+import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
 
 import { ArtistDataView } from './data-views/artist-data-view';
 import { FeaturedArtistDataView } from './data-views/featured-artist-data-view';
 import { ReleaseDataView } from './data-views/release-data-view';
-import { BreadcrumbMenu } from '../components/ui/breadcrumb-menu';
 
 export default function AdminPage() {
   const [view, setView] = useState('artist');

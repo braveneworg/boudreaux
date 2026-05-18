@@ -54,9 +54,8 @@ import {
   createFeaturedArtistSchema,
   type FeaturedArtistFormData,
 } from '@/lib/validation/create-featured-artist-schema';
-
-import { BreadcrumbMenu } from '../ui/breadcrumb-menu';
-import { DatePicker } from '../ui/datepicker';
+import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
+import { DatePicker } from '@/ui/datepicker';
 
 type FormFieldName = keyof FeaturedArtistFormData;
 
