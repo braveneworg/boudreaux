@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.81.0] - 2026-05-18
+
+### Added
+
+- Develop/feature/create live chat (#442)\n- Develop/feature/create live chat (#442)\n- Develop/feature/create live chat (#442)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Implement ban evasion service and enhance chat admin features (#441)\n- Develop/feature/create live chat (#442)\n
+
 ## [4.80.0] - 2026-05-14
 
 ### Added
