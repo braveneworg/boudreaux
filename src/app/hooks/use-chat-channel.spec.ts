@@ -10,6 +10,8 @@ import { getPusherClient } from '@/lib/utils/pusher-client';
 import {
   CHAT_CHANNEL_NAME,
   CLIENT_TYPING_EVENT,
+  SERVER_MESSAGE_DELETED,
+  SERVER_MESSAGE_PIN_CHANGED,
   SERVER_NEW_MESSAGE,
   SERVER_REACTION_UPDATED,
   useChatChannel,
@@ -174,6 +176,35 @@ describe('useChatChannel', () => {
     });
 
     expect(onReactionUpdated).toHaveBeenCalledWith({ id: 'msg-1' });
+  });
+
+  it('invokes onMessageDeleted when a message-deleted event arrives', () => {
+    const onMessageDeleted = vi.fn();
+    renderHook(() => useChatChannel({ enabled: true, onMessageDeleted }));
+
+    act(() => {
+      fakeClient.channels
+        .get(CHAT_CHANNEL_NAME)
+        ?.fire(SERVER_MESSAGE_DELETED, { messageId: 'msg-1' });
+    });
+
+    expect(onMessageDeleted).toHaveBeenCalledWith({ messageId: 'msg-1' });
+  });
+
+  it('invokes onMessagePinChanged when a message-pin-changed event arrives', () => {
+    const onMessagePinChanged = vi.fn();
+    renderHook(() => useChatChannel({ enabled: true, onMessagePinChanged }));
+
+    act(() => {
+      fakeClient.channels
+        .get(CHAT_CHANNEL_NAME)
+        ?.fire(SERVER_MESSAGE_PIN_CHANGED, { id: 'msg-1', pinnedAt: '2026-05-02T10:00:00.000Z' });
+    });
+
+    expect(onMessagePinChanged).toHaveBeenCalledWith({
+      id: 'msg-1',
+      pinnedAt: '2026-05-02T10:00:00.000Z',
+    });
   });
 
   it('forwards client-typing events to onTyping', () => {

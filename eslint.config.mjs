@@ -2,6 +2,7 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import prettierConfig from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import js from '@eslint/js';
 import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
@@ -256,6 +257,12 @@ const eslintConfig = [
       globals: {
         ...vitest.environments.env.globals,
       },
+    },
+  },
+  eslintPluginPrettierRecommended,
+  {
+    rules: {
+      'tailwindcss/classnames-order': 'off', // Prevents conflicts with Prettier sorting
     },
   },
 ];

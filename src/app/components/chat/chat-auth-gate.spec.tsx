@@ -4,6 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { ChatAuthGate } from './chat-auth-gate';
 
@@ -41,5 +42,15 @@ describe('ChatAuthGate', () => {
     pathnameMock.mockReturnValue('/');
     render(<ChatAuthGate />);
     expect(screen.getByText('Sign in to chat')).toBeInTheDocument();
+  });
+
+  it('invokes onSignIn when the CTA is clicked so the launcher can dismiss the drawer', async () => {
+    pathnameMock.mockReturnValue('/');
+    const onSignIn = vi.fn();
+
+    render(<ChatAuthGate onSignIn={onSignIn} />);
+    await userEvent.click(screen.getByRole('link', { name: /sign in/i }));
+
+    expect(onSignIn).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createStorageState } from './helpers/auth-helpers';
 import { seedTestDatabase, TEST_USERS } from './helpers/seed-test-db';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '.auth');
 
 /**

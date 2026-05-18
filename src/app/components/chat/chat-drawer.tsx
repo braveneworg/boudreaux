@@ -5,7 +5,7 @@
 
 import type { ReactNode } from 'react';
 
-import { Hand, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import {
   Drawer,
@@ -30,25 +30,23 @@ interface ChatDrawerProps {
  */
 export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) => {
   const isMobile = useIsMobile();
-
   return (
     <Drawer direction={isMobile ? 'bottom' : 'right'} open={open} onOpenChange={onOpenChange}>
       <DrawerContent
         className={cn(
-          'data-[vaul-drawer-direction=bottom]:!max-h-[85dvh]',
-          'data-[vaul-drawer-direction=bottom]:!h-[85dvh]',
-          'data-[vaul-drawer-direction=right]:!w-[400px]',
-          'data-[vaul-drawer-direction=right]:!max-w-[400px]'
+          'data-[vaul-drawer-direction=bottom]:max-h-[85dvh]!',
+          'data-[vaul-drawer-direction=bottom]:h-[85dvh]!',
+          'data-[vaul-drawer-direction=right]:w-100!',
+          'data-[vaul-drawer-direction=right]:max-w-100!'
         )}
       >
-        <header className="bg-background sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b px-4 py-3">
-          <div className="flex size-8 items-center justify-center rounded-full bg-black">
-            <Hand aria-hidden="true" className="size-4 text-white" />
-          </div>
-          <DrawerTitle className="text-center text-base">Fake Four Inc. Chat</DrawerTitle>
+        <header className="bg-background sticky top-0 z-10 flex items-center justify-center border-b">
+          <DrawerTitle className="relative -top-2 text-center text-base">
+            Fake Four Inc. Chat
+          </DrawerTitle>
           <DrawerClose
             aria-label="Close chat"
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground absolute -top-2 right-4 transition-colors"
           >
             <X aria-hidden="true" className="size-5" />
           </DrawerClose>

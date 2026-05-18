@@ -92,8 +92,18 @@ export const queryKeys = {
   chat: {
     all: ['chat'] as const,
     messages: () => [...queryKeys.chat.all, 'messages'] as const,
+    pinned: () => [...queryKeys.chat.all, 'pinned'] as const,
     adminUsers: (page: number, sortBy: string, sortDirection: string) =>
       [...queryKeys.chat.all, 'adminUsers', page, sortBy, sortDirection] as const,
     mentionSearch: (query: string) => [...queryKeys.chat.all, 'mentionSearch', query] as const,
+    me: () => [...queryKeys.chat.all, 'me'] as const,
+    reportedUsers: (windowDays: number | 'all', search?: string) =>
+      [
+        ...queryKeys.chat.all,
+        'reportedUsers',
+        windowDays,
+        search?.trim().toLowerCase() ?? '',
+      ] as const,
+    userMessages: (userId: string) => [...queryKeys.chat.all, 'userMessages', userId] as const,
   },
 } as const;

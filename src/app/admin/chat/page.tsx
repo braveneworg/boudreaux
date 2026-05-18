@@ -1,10 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Heading } from '@/app/components/ui/heading';
 
-import { ChatUsersTable } from './chat-users-table';
+import { ChatModerationTabs } from './chat-moderation-tabs';
 
 export default function AdminChatPage() {
   return (
@@ -27,7 +27,7 @@ export default function AdminChatPage() {
         guidelines. Disabled users cannot send new messages or react until re-enabled here.
       </p>
 
-      <ChatUsersTable />
+      <ChatModerationTabs />
     </div>
   );
 }

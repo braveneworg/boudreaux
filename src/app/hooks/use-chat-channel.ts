@@ -14,6 +14,12 @@ export const CHAT_CHANNEL_NAME = 'presence-fake-four-chat';
 export const CLIENT_TYPING_EVENT = 'client-typing';
 export const SERVER_NEW_MESSAGE = 'new-message';
 export const SERVER_REACTION_UPDATED = 'reaction-updated';
+export const SERVER_MESSAGE_DELETED = 'message-deleted';
+export const SERVER_MESSAGE_PIN_CHANGED = 'message-pin-changed';
+
+export interface MessageDeletedPayload {
+  messageId: string;
+}
 
 const TYPING_THROTTLE_MS = 1500;
 
@@ -34,6 +40,8 @@ interface UseChatChannelParams {
   enabled: boolean;
   onNewMessage?: (message: ChatMessageDto) => void;
   onReactionUpdated?: (message: ChatMessageDto) => void;
+  onMessageDeleted?: (payload: MessageDeletedPayload) => void;
+  onMessagePinChanged?: (message: ChatMessageDto) => void;
   onTyping?: (payload: TypingPayload) => void;
 }
 
@@ -55,6 +63,8 @@ export function useChatChannel({
   enabled,
   onNewMessage,
   onReactionUpdated,
+  onMessageDeleted,
+  onMessagePinChanged,
   onTyping,
 }: UseChatChannelParams) {
   const [members, setMembers] = useState<PresenceMember[]>([]);
@@ -65,12 +75,16 @@ export function useChatChannel({
   // Stash latest callbacks in refs so we don't have to re-bind on every render.
   const onNewMessageRef = useRef(onNewMessage);
   const onReactionUpdatedRef = useRef(onReactionUpdated);
+  const onMessageDeletedRef = useRef(onMessageDeleted);
+  const onMessagePinChangedRef = useRef(onMessagePinChanged);
   const onTypingRef = useRef(onTyping);
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
     onReactionUpdatedRef.current = onReactionUpdated;
+    onMessageDeletedRef.current = onMessageDeleted;
+    onMessagePinChangedRef.current = onMessagePinChanged;
     onTypingRef.current = onTyping;
-  }, [onNewMessage, onReactionUpdated, onTyping]);
+  }, [onNewMessage, onReactionUpdated, onMessageDeleted, onMessagePinChanged, onTyping]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -96,6 +110,12 @@ export function useChatChannel({
     const handleReaction = (payload: ChatMessageDto) => {
       onReactionUpdatedRef.current?.(payload);
     };
+    const handleMessageDeleted = (payload: MessageDeletedPayload) => {
+      onMessageDeletedRef.current?.(payload);
+    };
+    const handleMessagePinChanged = (payload: ChatMessageDto) => {
+      onMessagePinChangedRef.current?.(payload);
+    };
     const handleTyping = (payload: TypingPayload) => {
       onTypingRef.current?.(payload);
     };
@@ -105,6 +125,8 @@ export function useChatChannel({
     channel.bind('pusher:member_removed', handleRemoved);
     channel.bind(SERVER_NEW_MESSAGE, handleNewMessage);
     channel.bind(SERVER_REACTION_UPDATED, handleReaction);
+    channel.bind(SERVER_MESSAGE_DELETED, handleMessageDeleted);
+    channel.bind(SERVER_MESSAGE_PIN_CHANGED, handleMessagePinChanged);
     channel.bind(CLIENT_TYPING_EVENT, handleTyping);
 
     return () => {
@@ -113,6 +135,8 @@ export function useChatChannel({
       channel.unbind('pusher:member_removed', handleRemoved);
       channel.unbind(SERVER_NEW_MESSAGE, handleNewMessage);
       channel.unbind(SERVER_REACTION_UPDATED, handleReaction);
+      channel.unbind(SERVER_MESSAGE_DELETED, handleMessageDeleted);
+      channel.unbind(SERVER_MESSAGE_PIN_CHANGED, handleMessagePinChanged);
       channel.unbind(CLIENT_TYPING_EVENT, handleTyping);
       client.unsubscribe(CHAT_CHANNEL_NAME);
       channelRef.current = null;

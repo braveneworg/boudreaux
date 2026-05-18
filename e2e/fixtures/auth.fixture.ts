@@ -1,9 +1,11 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { test as base } from '@playwright/test';
 
 import type { Page } from '@playwright/test';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_STORAGE_STATE = path.join(__dirname, '../.auth/user.json');
 const ADMIN_STORAGE_STATE = path.join(__dirname, '../.auth/admin.json');
 

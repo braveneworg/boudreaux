@@ -9,6 +9,7 @@ import { checkChatRateLimit } from '@/lib/utils/chat-rate-limit';
 import { gravatarHash } from '@/lib/utils/gravatar-hash';
 import { CHAT_EVENTS, triggerChatEvent } from '@/lib/utils/pusher-server';
 
+import { ChatMentionService } from './chat-mention-service';
 import { ChatService } from './chat-service';
 
 vi.mock('server-only', () => ({}));
@@ -19,6 +20,10 @@ vi.mock('@/lib/repositories/chat-message-repository', () => ({
     findRecent: vi.fn(),
     findById: vi.fn(),
     setReactions: vi.fn(),
+    findPinned: vi.fn(),
+    countPinned: vi.fn(),
+    pin: vi.fn(),
+    unpin: vi.fn(),
   },
 }));
 
@@ -43,11 +48,19 @@ vi.mock('@/lib/utils/chat-rate-limit', () => ({
   checkChatRateLimit: vi.fn(),
 }));
 
+vi.mock('./chat-mention-service', () => ({
+  ChatMentionService: {
+    resolveMentions: vi.fn().mockResolvedValue([]),
+    notifyMentions: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock('@/lib/utils/pusher-server', () => ({
   CHAT_EVENTS: {
     newMessage: 'new-message',
     reactionUpdated: 'reaction-updated',
     messageDeleted: 'message-deleted',
+    messagePinChanged: 'message-pin-changed',
   },
   triggerChatEvent: vi.fn(),
 }));
@@ -214,6 +227,42 @@ describe('ChatService.sendMessage', () => {
     expect(ChatUserRepository.setFlagged).not.toHaveBeenCalled();
   });
 
+  it('echoes the tempId on the DTO when one is supplied', async () => {
+    const result = await ChatService.sendMessage({
+      userId: 'user-1',
+      email: 'octo@example.com',
+      body: 'hi',
+      fingerprint: 'fp-abc',
+      ip: '203.0.113.5',
+      tempId: 'tmp-99',
+    });
+
+    if (!result.success) throw Error('expected sendMessage to succeed');
+    expect(result.data.tempId).toBe('tmp-99');
+  });
+
+  it('dispatches mention emails when ChatMentionService.resolveMentions returns recipients', async () => {
+    vi.mocked(ChatMentionService.resolveMentions).mockResolvedValueOnce([
+      { id: 'user-2', email: 'cat@example.com', username: 'cat' },
+    ] as never);
+
+    await ChatService.sendMessage({
+      userId: 'user-1',
+      email: 'octo@example.com',
+      body: 'hey @cat',
+      fingerprint: 'fp-abc',
+      ip: '203.0.113.5',
+    });
+
+    expect(ChatMentionService.notifyMentions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authorId: 'user-1',
+        authorUsername: 'octo',
+        messageBody: 'hey @cat',
+      })
+    );
+  });
+
   it('does not flag when sends-in-window is below the threshold', async () => {
     vi.mocked(checkChatRateLimit).mockResolvedValue({
       success: true,
@@ -317,6 +366,53 @@ describe('ChatService.toggleReaction', () => {
     expect(ChatMessageRepository.setReactions).toHaveBeenCalledWith('msg-1', []);
   });
 
+  it('treats a malformed reactions column as an empty starting array', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      reactions: { not: 'valid' } as unknown,
+    } as never);
+
+    await ChatService.toggleReaction({ messageId: 'msg-1', userId: 'user-1', emoji: '🔥' });
+
+    expect(ChatMessageRepository.setReactions).toHaveBeenCalledWith('msg-1', [
+      { emoji: '🔥', userIds: ['user-1'] },
+    ]);
+  });
+
+  it('only patches the matching emoji entry when adding a vote alongside other reactions', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      reactions: [
+        { emoji: '🔥', userIds: ['user-2'] },
+        { emoji: '👍', userIds: ['user-3'] },
+      ],
+    } as never);
+
+    await ChatService.toggleReaction({ messageId: 'msg-1', userId: 'user-1', emoji: '🔥' });
+
+    expect(ChatMessageRepository.setReactions).toHaveBeenCalledWith('msg-1', [
+      { emoji: '🔥', userIds: ['user-2', 'user-1'] },
+      { emoji: '👍', userIds: ['user-3'] },
+    ]);
+  });
+
+  it('only patches the matching emoji entry when removing a vote alongside other reactions', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      reactions: [
+        { emoji: '🔥', userIds: ['user-1', 'user-2'] },
+        { emoji: '👍', userIds: ['user-3'] },
+      ],
+    } as never);
+
+    await ChatService.toggleReaction({ messageId: 'msg-1', userId: 'user-1', emoji: '🔥' });
+
+    expect(ChatMessageRepository.setReactions).toHaveBeenCalledWith('msg-1', [
+      { emoji: '🔥', userIds: ['user-2'] },
+      { emoji: '👍', userIds: ['user-3'] },
+    ]);
+  });
+
   it('broadcasts the updated message via Pusher', async () => {
     vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
       ...sampleMessage,
@@ -329,5 +425,84 @@ describe('ChatService.toggleReaction', () => {
       CHAT_EVENTS.reactionUpdated,
       expect.objectContaining({ id: 'msg-1' })
     );
+  });
+});
+
+describe('ChatService.listPinned', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('maps repository rows into DTOs with a pinnedAt ISO string', async () => {
+    vi.mocked(ChatMessageRepository.findPinned).mockResolvedValue([
+      { ...sampleMessage, pinnedAt: new Date('2026-05-02T10:00:00Z') },
+    ] as never);
+
+    const [dto] = await ChatService.listPinned();
+    expect(dto.id).toBe('msg-1');
+    expect(dto.pinnedAt).toBe(new Date('2026-05-02T10:00:00Z').toISOString());
+    expect(dto.user.gravatarHash).toBe(gravatarHash('octo@example.com'));
+  });
+});
+
+describe('ChatService.togglePin', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns not_found when the message id is unknown', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue(null);
+    const result = await ChatService.togglePin({ messageId: 'missing', adminId: 'admin-1' });
+    expect(result).toEqual({ success: false, error: 'not_found' });
+  });
+
+  it('unpins when the message is currently pinned (skips the count check)', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      pinnedAt: new Date('2026-05-02T10:00:00Z'),
+    } as never);
+    vi.mocked(ChatMessageRepository.unpin).mockResolvedValue({
+      ...sampleMessage,
+      pinnedAt: null,
+    } as never);
+
+    const result = await ChatService.togglePin({ messageId: 'msg-1', adminId: 'admin-1' });
+
+    expect(ChatMessageRepository.countPinned).not.toHaveBeenCalled();
+    expect(ChatMessageRepository.unpin).toHaveBeenCalledWith('msg-1');
+    if (!result.success) throw Error('expected togglePin to succeed');
+    expect(result.pinned).toBe(false);
+    expect(result.data.pinnedAt).toBeNull();
+  });
+
+  it('refuses to pin when the channel is already at the cap', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      pinnedAt: null,
+    } as never);
+    vi.mocked(ChatMessageRepository.countPinned).mockResolvedValue(3);
+
+    const result = await ChatService.togglePin({ messageId: 'msg-1', adminId: 'admin-1' });
+
+    expect(result).toEqual({ success: false, error: 'limit_reached' });
+    expect(ChatMessageRepository.pin).not.toHaveBeenCalled();
+  });
+
+  it('pins when the message is unpinned and there is room', async () => {
+    vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
+      ...sampleMessage,
+      pinnedAt: null,
+    } as never);
+    vi.mocked(ChatMessageRepository.countPinned).mockResolvedValue(2);
+    vi.mocked(ChatMessageRepository.pin).mockResolvedValue({
+      ...sampleMessage,
+      pinnedAt: new Date('2026-05-03T10:00:00Z'),
+    } as never);
+
+    const result = await ChatService.togglePin({ messageId: 'msg-1', adminId: 'admin-1' });
+
+    expect(ChatMessageRepository.pin).toHaveBeenCalledWith({
+      messageId: 'msg-1',
+      adminId: 'admin-1',
+    });
+    if (!result.success) throw Error('expected togglePin to succeed');
+    expect(result.pinned).toBe(true);
+    expect(result.data.pinnedAt).toBe(new Date('2026-05-03T10:00:00Z').toISOString());
   });
 });

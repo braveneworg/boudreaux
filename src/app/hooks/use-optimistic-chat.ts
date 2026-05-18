@@ -146,6 +146,29 @@ export function useOptimisticChat({ baseMessages }: UseOptimisticChatParams) {
     [queryClient]
   );
 
+  /**
+   * Drop a message from every layer (live, local, and the persisted
+   * infinite-query cache). Used when an admin deletes a message and
+   * the `messageDeleted` broadcast lands.
+   */
+  const removeMessage = useCallback(
+    (messageId: string) => {
+      setLiveMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setLocalMessages((prev) => prev.filter((m) => m.id !== messageId));
+      queryClient.setQueryData<ChatMessagesInfiniteData>(queryKeys.chat.messages(), (data) => {
+        if (!data) return data;
+        let changed = false;
+        const pages = data.pages.map((page) => {
+          if (!page.messages.some((m) => m.id === messageId)) return page;
+          changed = true;
+          return { ...page, messages: page.messages.filter((m) => m.id !== messageId) };
+        });
+        return changed ? { ...data, pages } : data;
+      });
+    },
+    [queryClient]
+  );
+
   const messages = useMemo<OptimisticChatMessage[]>(
     () => [...baseMessages, ...liveMessages, ...localMessages],
     [baseMessages, liveMessages, localMessages]
@@ -158,5 +181,6 @@ export function useOptimisticChat({ baseMessages }: UseOptimisticChatParams) {
     removeByTempId,
     addReceivedMessage,
     updateMessage,
+    removeMessage,
   };
 }

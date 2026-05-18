@@ -102,6 +102,16 @@ Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before co
 - Add JSDoc comments for complex functions and components.
 - Never ignore TypeScript errors or warnings.
 - Always use absolute imports (`@/lib/utils`) — never relative imports that traverse up (`../../../lib/utils`).
+- Always verify that any new dependencies have TypeScript types available (either built-in or via `@types/`).
+- Always check for existing types/interfaces before creating new ones. Reuse over recreate.
+- Always keep types/interfaces small and focused — break large files into smaller ones.
+- Always use discriminated unions for complex type variations.
+- Always prefer specific types over `unknown` or `Record<string, unknown>`. If a function accepts an object, define an interface for it rather than using `Record<string, unknown>`.
+- Always type check with `pnpm run typecheck` before committing, in addition to running tests and linters.
+- Never use deprecated TypeScript features or syntax.
+- Never use `ts-ignore` or `eslint-disable` to bypass type errors without a documented reason.
+- Never use `any` or the non-null assertion operator (`!`) — if you find yourself needing them, it's a sign that you should define a more specific type or handle the null case explicitly.
+- Never use conditional expects in tests — all test cases should be deterministic and have the same assertions regardless of conditions.
 
 ## Next.js Architecture
 

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import type { OptimisticChatMessage } from '@/hooks/use-optimistic-chat';
 
@@ -20,11 +20,13 @@ const makeMsg = (overrides?: Partial<OptimisticChatMessage>): OptimisticChatMess
 
 describe('ChatMessageRow', () => {
   it('renders username, body, and a locale-formatted timestamp', () => {
-    render(<ChatMessageRow message={makeMsg()} />);
+    const { container } = render(<ChatMessageRow message={makeMsg()} />);
 
     expect(screen.getByText('octo')).toBeInTheDocument();
     expect(screen.getByText('hello world')).toBeInTheDocument();
-    expect(screen.getByRole('time')).toHaveAttribute('dateTime', '2026-05-01T12:00:00Z');
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
+    expect(timeEl).toHaveAttribute('dateTime', '2026-05-01T12:00:00Z');
   });
 
   it('falls back to "unknown" when the user has no username', () => {
@@ -66,5 +68,36 @@ describe('ChatMessageRow', () => {
   it('omits the reaction area entirely when no slot is provided', () => {
     const { container } = render(<ChatMessageRow message={makeMsg()} />);
     expect(container.querySelectorAll('.pl-8')).toHaveLength(1); // only the body has pl-8
+  });
+
+  it('renders the optional pinIndicator slot inside the header', () => {
+    render(
+      <ChatMessageRow
+        message={makeMsg()}
+        pinIndicator={<button data-testid="pin-indicator">pin</button>}
+      />
+    );
+    expect(screen.getByTestId('pin-indicator')).toBeInTheDocument();
+  });
+
+  it('formats the timestamp on mount using the viewer locale (short + long title)', async () => {
+    const { container } = render(<ChatMessageRow message={makeMsg()} />);
+
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
+    // The mount-only effect populates the short text and the title.
+    await waitFor(() => expect(timeEl.textContent?.trim()).not.toBe(''));
+    expect(timeEl.getAttribute('title')).toBeTruthy();
+    expect(timeEl).toHaveAttribute('dateTime', '2026-05-01T12:00:00Z');
+  });
+
+  it('produces empty short/long strings when the createdAt cannot be parsed', () => {
+    const { container } = render(<ChatMessageRow message={makeMsg({ createdAt: 'not-a-date' })} />);
+
+    const timeEl = container.querySelector('time');
+    if (!timeEl) throw new Error('Expected a time element');
+    // Effect runs and returns the empty fallback — no crash, no visible text.
+    expect(timeEl.textContent?.trim()).toBe('');
+    expect(timeEl.getAttribute('title')).toBe('');
   });
 });

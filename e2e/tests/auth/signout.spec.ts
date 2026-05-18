@@ -19,6 +19,12 @@ test.describe('Signout Flow', () => {
 
     await signOutButton.click();
 
+    // Wait for the Sign Out button to disappear, signalling the signOut()
+    // promise has resolved and the session is no longer authenticated.
+    // Otherwise the next menu-open race-conditions with the router.push()
+    // that fires after signOut() resolves.
+    await expect(signOutButton).toBeHidden({ timeout: 10_000 });
+
     // After signout, should redirect and show sign in/up links in the hamburger menu
     await userPage.getByRole('button', { name: /open menu/i }).click();
     await expect(userPage.getByRole('link', { name: /sign in/i })).toBeVisible({ timeout: 10_000 });
