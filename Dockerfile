@@ -5,6 +5,8 @@ RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
+# Prisma schema is needed because the `postinstall` script runs `prisma generate`
+COPY prisma ./prisma
 # Install ALL dependencies (including dev) for building
 # Use cache mount for pnpm store to speed up installs
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
