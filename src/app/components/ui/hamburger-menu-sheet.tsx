@@ -4,9 +4,9 @@
 'use client';
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/app/components/ui/sheet';
+import AuthToolbar from '@/components/auth/auth-toolbar';
 
 import SocialMediaIconLinks from './social-media-icon-links';
-import AuthToolbar from '../auth/auth-toolbar';
 
 export interface MenuItem {
   name: string;

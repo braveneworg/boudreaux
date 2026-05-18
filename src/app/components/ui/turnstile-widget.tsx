@@ -23,8 +23,8 @@ const TurnstileWidget = ({
   // Cloudflare's public test site key — always passes verification.
   const siteKey =
     process.env.NODE_ENV === 'production'
-      ? process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY!
-      : process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY!;
+      ? (process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY ?? '')
+      : (process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY ?? '');
 
   useEffect(() => {
     // The test key always passes. Auto-verify synchronously so E2E and local

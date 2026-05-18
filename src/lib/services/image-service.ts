@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { prisma } from '../prisma';
+import { prisma } from '@/lib/prisma';
 
 /** Input for registering an image whose binary already lives in S3. */
 export interface RegisterImageInput {

@@ -3,8 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { COUNTRIES } from '../utils/countries';
-import { US_STATES } from '../utils/states';
+import { COUNTRIES } from '@/utils/countries';
+import { US_STATES } from '@/utils/states';
 
 export const profileSchema = z.object({
   firstName: z

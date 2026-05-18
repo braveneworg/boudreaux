@@ -251,7 +251,7 @@ export function useDigitalFormatUploads({
 
       const result = await uploadSingleFile(formatType, file);
 
-      if (!result.success) {
+      if (!result.success || !result.s3Key) {
         const message = result.error ?? 'Upload failed';
         setUploadStates((prev) => ({
           ...prev,
@@ -263,7 +263,7 @@ export function useDigitalFormatUploads({
         return;
       }
 
-      const { s3Key } = result;
+      const s3Key: string = result.s3Key;
       const config = FORMAT_CONFIGS.find((c) => c.type === formatType);
 
       // In create mode, auto-create the release on the first MP3_320KBPS upload
@@ -276,7 +276,11 @@ export function useDigitalFormatUploads({
           id: releaseId,
         });
 
-        if (!autoCreateResult.success) {
+        if (
+          !autoCreateResult.success ||
+          !autoCreateResult.releaseId ||
+          !autoCreateResult.releaseTitle
+        ) {
           const errMsg = autoCreateResult.error ?? 'Failed to create release';
           setUploadStates((prev) => ({
             ...prev,
@@ -287,10 +291,13 @@ export function useDigitalFormatUploads({
           return;
         }
 
+        const resolvedReleaseId = autoCreateResult.releaseId;
+        const resolvedReleaseTitle = autoCreateResult.releaseTitle;
+
         const confirmResult = await confirmDigitalFormatUploadAction({
-          releaseId: releaseId!,
+          releaseId: resolvedReleaseId,
           formatType,
-          s3Key: s3Key!,
+          s3Key,
           fileName: file.name,
           fileSize: file.size,
           mimeType: file.type,
@@ -309,31 +316,41 @@ export function useDigitalFormatUploads({
 
         setUploadStates((prev) => ({
           ...prev,
-          [formatType]: { status: 'success', s3Keys: [s3Key!] },
+          [formatType]: { status: 'success', s3Keys: [s3Key] },
         }));
         setUploadedFormats((prev) => new Set([...prev, formatType]));
         setUploadedFilesList((prev) => ({
           ...prev,
-          [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key: s3Key! }],
+          [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key }],
         }));
 
         onReleaseAutoCreated({
-          releaseId: autoCreateResult.releaseId!,
-          releaseTitle: autoCreateResult.releaseTitle!,
+          releaseId: resolvedReleaseId,
+          releaseTitle: resolvedReleaseTitle,
           metadata: extractedMetadata,
         });
 
-        toast.success(`Release "${autoCreateResult.releaseTitle}" created`);
+        toast.success(`Release "${resolvedReleaseTitle}" created`);
         return;
       }
 
       // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+      if (!releaseId) {
+        const errMsg = 'Cannot confirm upload: missing release ID';
+        setUploadStates((prev) => ({
+          ...prev,
+          [formatType]: { status: 'error', message: errMsg },
+        }));
+        setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+        toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
+        return;
+      }
       setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
       try {
         const confirmResult = await confirmDigitalFormatUploadAction({
-          releaseId: releaseId!,
+          releaseId,
           formatType,
-          s3Key: s3Key!,
+          s3Key,
           fileName: file.name,
           fileSize: file.size,
           mimeType: file.type,
@@ -343,12 +360,12 @@ export function useDigitalFormatUploads({
         }
         setUploadStates((prev) => ({
           ...prev,
-          [formatType]: { status: 'success', s3Keys: [s3Key!] },
+          [formatType]: { status: 'success', s3Keys: [s3Key] },
         }));
         setUploadedFormats((prev) => new Set([...prev, formatType]));
         setUploadedFilesList((prev) => ({
           ...prev,
-          [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key: s3Key! }],
+          [formatType]: [{ fileName: file.name, fileSize: file.size, s3Key }],
         }));
         toast.success(`${config?.label ?? formatType} uploaded successfully`);
       } catch (err) {
@@ -476,7 +493,11 @@ export function useDigitalFormatUploads({
             id: releaseId,
           });
 
-          if (!autoCreateResult.success) {
+          if (
+            !autoCreateResult.success ||
+            !autoCreateResult.releaseId ||
+            !autoCreateResult.releaseTitle
+          ) {
             const errMsg = autoCreateResult.error ?? 'Failed to create release';
             setUploadStates((prev) => ({
               ...prev,
@@ -487,10 +508,13 @@ export function useDigitalFormatUploads({
             return;
           }
 
+          const resolvedReleaseId = autoCreateResult.releaseId;
+          const resolvedReleaseTitle = autoCreateResult.releaseTitle;
+
           let confirmOk = false;
           if (successFiles.length === 1) {
             const cr = await confirmDigitalFormatUploadAction({
-              releaseId: releaseId!,
+              releaseId: resolvedReleaseId,
               formatType,
               s3Key: successFiles[0].s3Key,
               fileName: successFiles[0].fileName,
@@ -501,7 +525,7 @@ export function useDigitalFormatUploads({
           } else {
             const fileByName = new Map(files.map((f) => [f.name, f]));
             const cr = await confirmMultiTrackUploadAction({
-              releaseId: releaseId!,
+              releaseId: resolvedReleaseId,
               formatType,
               files: successFiles.map((f, idx) => ({
                 trackNumber: idx + 1,
@@ -546,18 +570,18 @@ export function useDigitalFormatUploads({
           }));
 
           onReleaseAutoCreated({
-            releaseId: autoCreateResult.releaseId!,
-            releaseTitle: autoCreateResult.releaseTitle!,
+            releaseId: resolvedReleaseId,
+            releaseTitle: resolvedReleaseTitle,
             metadata: extractedMetadata,
           });
 
           if (failCount > 0) {
             toast.warning(
-              `${config?.label ?? formatType}: ${successFiles.length} of ${files.length} files uploaded — release "${autoCreateResult.releaseTitle}" created`
+              `${config?.label ?? formatType}: ${successFiles.length} of ${files.length} files uploaded — release "${resolvedReleaseTitle}" created`
             );
           } else {
             toast.success(
-              `Release "${autoCreateResult.releaseTitle}" created with ${successFiles.length} files`
+              `Release "${resolvedReleaseTitle}" created with ${successFiles.length} files`
             );
           }
           console.info(
@@ -567,10 +591,20 @@ export function useDigitalFormatUploads({
         }
 
         // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
+        if (!releaseId) {
+          const errMsg = 'Cannot confirm upload: missing release ID';
+          setUploadStates((prev) => ({
+            ...prev,
+            [formatType]: { status: 'error', message: errMsg },
+          }));
+          setErrorMessages((prev) => ({ ...prev, [formatType]: errMsg }));
+          toast.error(`${config?.label ?? formatType} upload failed`, { description: errMsg });
+          return;
+        }
         let confirmOk = false;
         if (successFiles.length === 1) {
           const cr = await confirmDigitalFormatUploadAction({
-            releaseId: releaseId!,
+            releaseId,
             formatType,
             s3Key: successFiles[0].s3Key,
             fileName: successFiles[0].fileName,
@@ -580,7 +614,7 @@ export function useDigitalFormatUploads({
           confirmOk = cr.success;
         } else {
           const cr = await confirmMultiTrackUploadAction({
-            releaseId: releaseId!,
+            releaseId,
             formatType,
             files: successFiles.map((f, idx) => ({
               trackNumber: idx + 1,

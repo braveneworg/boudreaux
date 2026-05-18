@@ -11,12 +11,12 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { auth, signOut } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { CustomPrismaAdapter } from '@/lib/prisma-adapter';
+import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { changeEmailSchema } from '@/lib/validation/change-email-schema';
 
-import type { FormState } from '../types/form-state';
 import type { AdapterUser } from 'next-auth/adapters';
 
 export const changeEmailAction = async (
@@ -101,7 +101,7 @@ export const changeEmailAction = async (
     await signOut({ redirect: false }); // User is redirected
 
     return redirect(
-      `/success/change-email?email=${encodeURIComponent(formState.fields!.email as string)}`
+      `/success/change-email?email=${encodeURIComponent(formState.fields.email as string)}`
     );
   }
 

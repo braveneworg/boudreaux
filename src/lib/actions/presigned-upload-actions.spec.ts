@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
 import { auth } from '@/auth';
+import { requireRole } from '@/utils/auth/require-role';
+import { getS3BucketName } from '@/utils/s3-client';
 
 import { getPresignedUploadUrlsAction } from './presigned-upload-actions';
-import { requireRole } from '../utils/auth/require-role';
-import { getS3BucketName } from '../utils/s3-client';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/auth');

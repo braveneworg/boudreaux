@@ -398,13 +398,14 @@ export function DataView<T extends Record<string, unknown>>({
 
                       // If we have a direct cover art URL, show it
                       if (coverArtUrl) {
-                        const isBase64 = coverArtUrl.startsWith('data:');
+                        const resolvedCoverArtUrl: string = coverArtUrl;
+                        const isBase64 = resolvedCoverArtUrl.startsWith('data:');
                         return (
                           <div className="mb-3 flex justify-center gap-2">
                             <button
                               type="button"
                               onClick={() =>
-                                setPreviewImage({ src: coverArtUrl!, altText: 'Cover art' })
+                                setPreviewImage({ src: resolvedCoverArtUrl, altText: 'Cover art' })
                               }
                               className="group bg-muted focus:ring-primary relative h-16 w-16 overflow-hidden rounded-md border transition-opacity hover:opacity-80 focus:ring-2 focus:ring-offset-2 focus:outline-none"
                             >
@@ -412,13 +413,13 @@ export function DataView<T extends Record<string, unknown>>({
                                 // Use native img for base64 data URLs
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
-                                  src={coverArtUrl}
+                                  src={resolvedCoverArtUrl}
                                   alt="Cover art"
                                   className="h-full w-full object-cover"
                                 />
                               ) : (
                                 <Image
-                                  src={cleanImageUrl(coverArtUrl!)}
+                                  src={cleanImageUrl(resolvedCoverArtUrl)}
                                   alt="Cover art"
                                   fill
                                   className="object-cover"

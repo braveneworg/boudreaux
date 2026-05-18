@@ -5,17 +5,17 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '../prisma';
-import { deleteS3Object } from '../utils/s3-client';
-import { withCache } from '../utils/simple-cache';
-
-import type { ServiceResponse } from './service.types';
+import { prisma } from '@/lib/prisma';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
   Release,
   ReleaseCarouselItem,
-} from '../types/media-models';
+} from '@/lib/types/media-models';
+import { deleteS3Object } from '@/utils/s3-client';
+import { withCache } from '@/utils/simple-cache';
+
+import type { ServiceResponse } from './service.types';
 
 export class ReleaseService {
   /**

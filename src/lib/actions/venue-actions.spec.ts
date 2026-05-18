@@ -4,15 +4,14 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { VenueService } from '@/lib/services/tours/venue-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { requireRole } from '@/utils/auth/require-role';
 
 import { createVenueAction, updateVenueAction } from './venue-actions';
-import { VenueService } from '../services/tours/venue-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { requireRole } from '../utils/auth/require-role';
-
-import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');

@@ -3,8 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
+import { prisma } from '@/lib/prisma';
+
 import { UserService } from './user-service';
-import { prisma } from '../prisma';
 
 vi.mock('../prisma', () => ({
   prisma: {

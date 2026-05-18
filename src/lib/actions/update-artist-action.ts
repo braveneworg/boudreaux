@@ -7,15 +7,13 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { ArtistService } from '@/lib/services/artist-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { ArtistService } from '../services/artist-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { createArtistSchema } from '../validation/create-artist-schema';
-
-import type { FormState } from '../types/form-state';
+import { createArtistSchema } from '@/lib/validation/create-artist-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
 
 export const updateArtistAction = async (
   artistId: string,

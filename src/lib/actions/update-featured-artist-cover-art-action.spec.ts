@@ -4,9 +4,10 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/utils/auth/require-role';
+
 import { updateFeaturedArtistCoverArtAction } from './update-featured-artist-cover-art-action';
-import { prisma } from '../prisma';
-import { requireRole } from '../utils/auth/require-role';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');

@@ -7,16 +7,14 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { TourService } from '@/lib/services/tours/tour-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { TourService } from '../services/tours/tour-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { OBJECT_ID_REGEX } from '../utils/validation/object-id';
-import { tourCreateSchema, tourUpdateSchema } from '../validations/tours/tour-schema';
-
-import type { FormState } from '../types/form-state';
+import { tourCreateSchema, tourUpdateSchema } from '@/lib/validations/tours/tour-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
 /**
  * Server action to create a new tour
@@ -33,12 +31,14 @@ export const createTourAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
+    const errors = formState.errors ?? {};
+    formState.errors = errors;
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!formState.errors![field]) {
-        formState.errors![field] = [];
+      if (!errors[field]) {
+        errors[field] = [];
       }
-      (formState.errors![field] as string[]).push(issue.message);
+      errors[field].push(issue.message);
     }
     return formState;
   }
@@ -94,12 +94,14 @@ export const updateTourAction = async (
 
   if (!parsed.success) {
     // Populate field-level errors so the client can display them
+    const errors = formState.errors ?? {};
+    formState.errors = errors;
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!formState.errors![field]) {
-        formState.errors![field] = [];
+      if (!errors[field]) {
+        errors[field] = [];
       }
-      (formState.errors![field] as string[]).push(issue.message);
+      errors[field].push(issue.message);
     }
     return formState;
   }

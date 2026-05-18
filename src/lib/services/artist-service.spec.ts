@@ -3,8 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Prisma } from '@prisma/client';
 
+import { prisma } from '@/lib/prisma';
+
 import { ArtistService } from './artist-service';
-import { prisma } from '../prisma';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));

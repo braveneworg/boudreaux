@@ -299,10 +299,10 @@ export const ChatInput = ({
           disabled={!hasContent || isSending || !fingerprint}
           aria-label="Send message"
           className={cn(
-            'absolute right-2 bottom-2 inline-flex size-8 items-center justify-center rounded-md',
+            'absolute right-1 bottom-0.75 inline-flex size-8 items-center justify-center rounded-md',
             'transition-colors',
             hasContent && !isSending
-              ? 'bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-sm'
+              ? 'border border-zinc-950 bg-linear-to-b from-zinc-950 to-zinc-500 text-white shadow-sm'
               : 'text-muted-foreground bg-transparent',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}

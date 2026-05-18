@@ -1,6 +1,6 @@
 # boudreaux Development Guidelines
 
-Last updated: 2026-04-25
+Last updated: 2026-05-17
 
 ## Active Technologies
 
@@ -84,73 +84,55 @@ pnpm exec prisma studio         # Browse database
 pnpm run stripe                 # Forward Stripe webhooks to localhost:3000
 ```
 
-Always run `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before committing.
+Always run `pnpm run typecheck`, `pnpm run test:run`, `pnpm run lint`, and `pnpm run format` before committing.
 
 ## TypeScript
 
-- Strict mode — no `any` types, ever. Use specific types, generics, or `Record<string, unknown>`.
+- Strict mode — no `any`, no non-null assertion (`!`). If you reach for either, define a more specific type or handle the null case explicitly.
 - Explicit types on all function parameters and return values.
-- `interface` for object shapes.
-- Named exports only — no default exports unless there is a compelling reason.
-  - Named exports enable better tree shaking, IDE autocompletion, and explicit refactoring.
-- Never use the non-null assertion operator (`!`).
-- Use `as const` for literal types; prefer over enums. If enums are needed, use `const enum`.
+- `interface` for object shapes; discriminated unions for complex type variations.
+- Prefer specific types over `unknown` or `Record<string, unknown>`.
+- Named exports only (no default exports) — better tree shaking and refactoring.
+- Use `as const` for literal types; prefer over enums. If enums are required, use `const enum`.
 - Use optional chaining (`?.`) and nullish coalescing (`??`).
 - Use `async/await` with `try/catch` for all async code.
 - Use template literals for string interpolation.
 - Prefer array methods (`map`, `filter`, `reduce`) over `for` loops.
-- Add JSDoc comments for complex functions and components.
-- Never ignore TypeScript errors or warnings.
-- Always use absolute imports (`@/lib/utils`) — never relative imports that traverse up (`../../../lib/utils`).
-- Always verify that any new dependencies have TypeScript types available (either built-in or via `@types/`).
-- Always check for existing types/interfaces before creating new ones. Reuse over recreate.
-- Always keep types/interfaces small and focused — break large files into smaller ones.
-- Always use discriminated unions for complex type variations.
-- Always prefer specific types over `unknown` or `Record<string, unknown>`. If a function accepts an object, define an interface for it rather than using `Record<string, unknown>`.
-- Always type check with `pnpm run typecheck` before committing, in addition to running tests and linters.
+- Absolute imports only (`@/lib/utils`) — never relative imports that traverse up (`../../../`).
+- Reuse existing types/interfaces before creating new ones; keep them small and focused.
+- Verify new dependencies have TypeScript types (built-in or via `@types/`).
+- Never use `ts-ignore` or `eslint-disable` without a documented reason.
 - Never use deprecated TypeScript features or syntax.
-- Never use `ts-ignore` or `eslint-disable` to bypass type errors without a documented reason.
-- Never use `any` or the non-null assertion operator (`!`) — if you find yourself needing them, it's a sign that you should define a more specific type or handle the null case explicitly.
-- Never use conditional expects in tests — all test cases should be deterministic and have the same assertions regardless of conditions.
+- Add JSDoc only for complex functions and components.
 
 ## Next.js Architecture
 
-- Server Components by default — add `'use client'` only for interactive components (Stripe Elements, dialogs, etc.).
-- Server Actions for all mutations (in `src/lib/actions/`). Add `'use server'` directive at top of file.
-- Never call services, the Prisma client, or repositories directly from Client Components. Use Server Actions for mutations; for queries, call API route handlers from Client Components.
-- Always use the `'server-only'` package in files meant exclusively for server-side execution to prevent accidental client-side imports.
-- Use decorators for auth checks (`withAuth`, `withAdmin` from `src/lib/decorators/with-auth.ts`) in API route handlers and Server Actions.
-- Prefer TanStack Query for client-side data fetching and caching in interactive components.
-- Data fetching in Server Components uses `fetch` with explicit cache options:
-
-```typescript
-const res = await fetch(url, { cache: 'no-store' }); // for fresh data
-```
-
-- Always validate external data (API responses, user input) with Zod.
+- Server Components by default — add `'use client'` only for interactive components.
+- Server Actions for all mutations (`src/lib/actions/`, `'use server'` at top of file).
+- Client Components must not call services, Prisma, or repositories directly. Use Server Actions for mutations; call API route handlers for queries.
+- Use `'server-only'` in files that must never run on the client.
+- Use `withAuth` / `withAdmin` decorators (`src/lib/decorators/with-auth.ts`) in API routes and Server Actions.
+- Prefer TanStack Query for client-side data fetching and caching.
+- Server Component fetches use explicit cache options: `await fetch(url, { cache: 'no-store' })` for fresh data.
+- Always validate external data (API responses, user input) with Zod — including in Server Actions.
 - Use Prisma transactions for multi-step DB operations.
 - Check database connection health before running DB code; handle connection errors gracefully.
 
 ## Components
 
-- Prefer globalThis to window for client-only globals to avoid SSR issues.
-- Prefer function declarations; use `React.FC` only when necessary.
-- Prefer arrow functions for inline component definitions.
-- Never create class components.
-- Keep components small and focused — break large files into smaller ones.
-- Use props destructuring.
-- Use `React.memo` for performance optimization of pure components.
-- Use `useCallback` and `useMemo` for memoizing functions and values.
+- Function declarations preferred; arrow functions for inline definitions. Never class components.
+- Use `React.FC` only when necessary.
+- Keep components small and focused — split large files.
+- Destructure props in the function signature with explicit types.
+- Use `React.memo`, `useCallback`, `useMemo` for performance-sensitive cases.
 - Avoid inline functions and objects in JSX props.
-- Use Fragment shorthand `<> </>` when no key or attribute is needed.
-- Always use parentheses for multi-line JSX.
-- Before creating a new component, search the codebase for an existing one. Reuse over recreate.
-- Check global styles before adding component-level styles.
+- Use Fragment shorthand `<> </>` when no key/attribute is needed; parentheses for multi-line JSX.
+- Prefer `globalThis` over `window` for client-only globals to avoid SSR issues.
+- Search for an existing component before creating a new one.
 
 ## Forms
 
-- Always use React Hook Form + Zod for all forms.
-- Check `src/app/components/forms/fields/` for existing field components before building new ones.
+- Always use React Hook Form + Zod. Check `src/app/components/forms/fields/` for existing field components first.
 - Define Zod schemas in `src/lib/validation/`.
 - Standard pattern:
 
@@ -160,21 +142,15 @@ const form = useForm({
 });
 ```
 
-- Never skip Zod validation in Server Actions.
-
 ## Design & Styling
 
-- Mobile-first on all UI decisions. Never use checkboxes in mobile-first interfaces — use toggle switches or radio buttons for better touch usability.
-- Use Tailwind v4 utility classes exclusively. Avoid custom CSS unless absolutely necessary.
-- Use canonical Tailwind v4 classes — no `@apply`, no inline styles in JSX.
-- Use `cn()` helper for conditional class composition.
-- Follow shadcn/ui design patterns and variants. Never create new UI primitives — use shadcn/ui.
-- Use shadcn/ui components from `@/components/ui` whenever possible.
-- Use `lucide-react` for all icons.
-- Use Jost font for UI text.
-- Keep UI consistent with existing components.
-- Prioritize accessibility: semantic HTML, ARIA attributes, keyboard navigation support.
-- Use responsive design principles throughout.
+- Mobile-first. Never use checkboxes in mobile-first interfaces — use toggle switches or radio buttons.
+- Tailwind v4 utility classes exclusively. No `@apply`, no inline styles in JSX.
+- Use `cn()` for conditional class composition.
+- Check global styles before adding component-level styles.
+- Never create new UI primitives — use shadcn/ui from `@/components/ui`.
+- Use `lucide-react` for all icons. Use Jost font for UI text.
+- Prioritize accessibility: semantic HTML, ARIA attributes, keyboard navigation.
 
 ## Naming Conventions
 
@@ -184,137 +160,83 @@ const form = useForm({
 | Components (export) | PascalCase                         | `export function UserProfile` |
 | Pages               | folder name                        | `/profile/page.tsx`           |
 | API routes          | folder name                        | `/api/auth/route.ts`          |
-| Types               | PascalCase `.ts`, filename matches | `User.ts`                     |
-| Interfaces          | PascalCase `.ts`, filename matches | `UserProfile.ts`              |
+| Types / Interfaces  | PascalCase `.ts`, filename matches | `User.ts`, `UserProfile.ts`   |
 | Enums               | PascalCase `.ts`, filename matches | `UserRole.ts`                 |
-| Hooks               | `use` prefix, filename matches     | `useAuth.ts`                  |
-| Contexts            | `use` prefix, filename matches     | `useAuthContext.ts`           |
+| Hooks / Contexts    | `use` prefix, filename matches     | `useAuth.ts`                  |
 | Services            | PascalCase + `Service` suffix      | `UserService.ts`              |
 | Utils               | camelCase name, kebab-case file    | `format-date.ts`              |
 
-- Always use semicolons.
-- Always use single quotes for strings (double quotes in JSX attributes).
-- Always use trailing commas in multi-line objects and arrays.
-- Use meaningful, descriptive variable and function names.
-- Keep functions small and focused.
+- Semicolons always. Single quotes for strings; double quotes in JSX attributes.
+- Trailing commas in multi-line objects and arrays.
+- Meaningful, descriptive variable and function names.
 
 ## Testing
 
-- Vitest 4 for all unit and integration tests; Playwright for E2E (`e2e/` directory, `pnpm run test:e2e`).
-- `@testing-library/react` for component tests.
-- Test files use `.spec.ts` / `.spec.tsx` suffix, placed adjacent to source files.
-- Use `describe`/`it` blocks for organization.
-- Target 90–95%+ coverage on all testable files.
-- Exclude configuration files, types, interfaces, and Prisma schema files from coverage.
-- `describe`, `it`, `expect`, and `vi` are globally available — do **not** import them:
-
-```typescript
-// ✗ Never do this
-import { describe, it, expect, vi } from 'vitest';
-```
-
-- Use `userEvent` from `@testing-library/user-event` to simulate user interactions.
-- Use `screen` from `@testing-library/react` to query DOM elements.
-- Use `jest-dom` matchers (`toBeInTheDocument`, `toHaveClass`, `toHaveTextContent`).
-- Use `beforeEach`/`afterEach` for setup/teardown.
-- Mock external dependencies (Stripe, SES, Prisma) at the service layer boundary, not the DB layer.
-- Mock behavior — never implementation details.
+- Vitest 4 for unit/integration; Playwright for E2E (`e2e/`, `pnpm run test:e2e`).
+- `@testing-library/react` for component tests; `userEvent` for interactions; `screen` for queries; `jest-dom` matchers.
+- Test files use `.spec.ts` / `.spec.tsx` adjacent to source files.
+- `describe`, `it`, `expect`, `vi` are globals — never import them from `vitest`.
+- Target 90–95%+ coverage. Exclude config files, types, interfaces, and Prisma schema.
+- Mock external dependencies (Stripe, SES, Prisma) at the service layer boundary.
 - Test behavior and output — never implementation details.
-- Write separate test cases for different conditions — never use `expect` inside conditionals.
-- Use descriptive test names.
-- Use `async/await` for async test code.
-- Use mock functions for testing callbacks and event handlers.
-- Use spies to track function calls and assert on them.
-- Don't write brittle or hard-to-maintain tests.
-- Don't rely solely on coverage metrics — focus on meaningful tests.
+- Write separate test cases for different conditions — never `expect` inside conditionals.
+- Use `beforeEach`/`afterEach` for setup/teardown; `async/await` for async code.
 
 ### E2E database isolation (MANDATORY)
 
-E2E tests, the seed script, and the Playwright-managed web server **must** run against the local Docker MongoDB container only. They must never connect to any database URL stored in `.env`, `.env.local`, `.env.test`, `.env.production`, `.env.development`, the shell environment, or any other source outside the hardcoded local-Docker URL.
+E2E tests, the seed script, and the Playwright-managed web server **must** run against the local Docker MongoDB container only. They must never connect to a URL from `.env*`, the shell environment, or any other source.
 
-- The only acceptable E2E database URL is `mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0` (provided by the `boudreaux-e2e-mongo` Docker container on port 27018).
-- Never read, print, grep, cat, source, or otherwise inspect any `.env*` file to "check" or "find" a database URL. If you need to know the E2E URL, use the hardcoded value above.
-- Never set, export, or pass `DATABASE_URL` from the host shell when running E2E. Pass `E2E_DATABASE_URL` (or rely on the hardcoded default in `playwright.config.ts` / `seed-test-db.ts`) and let the test harness scope it to the child process.
-- Always launch the Playwright web server, seed scripts, and any E2E-related Node process with a clean, allowlisted environment. Do not let Next.js, Prisma, or `dotenv` auto-load `.env*` into an E2E run. Use one of:
-  - The repo's Docker E2E compose stack (`pnpm run e2e:docker:up` + the in-container test runner), or
-  - A child process launched with `env -i` plus only the explicitly allowlisted vars (`PATH`, `HOME`, `NODE_ENV=test`, `E2E_DATABASE_URL=...`, `DATABASE_URL=mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0`, `AUTH_SECRET=<test-only>`, `AUTH_URL=http://localhost:3000`, etc.).
-- Before running any E2E suite, verify that the resolved `DATABASE_URL` for the web server process points to `localhost:27018`. If it does not, refuse to run.
-- The seed script's `E2E_SEED_ALLOW_NONLOCAL` escape hatch is forbidden — never set it under any circumstance.
-- If an E2E run produces unexpected results (empty seed DB, "release not found", 404s), the first hypothesis is "the server is connected to the wrong database". Stop, verify the server's effective `DATABASE_URL`, and surface the issue to the user before retrying.
-- Never run E2E (or any production build that boots a server) from a process that has `DATABASE_URL` set in its environment to a non-local value. If `printenv DATABASE_URL` would return a non-`localhost:27018` value, the run is unsafe — abort.
+- The only acceptable E2E URL is `mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0` (the `boudreaux-e2e-mongo` Docker container).
+- Never read or inspect any `.env*` file to "find" a database URL — use the hardcoded value above.
+- Never set, export, or pass `DATABASE_URL` from the host shell. Pass `E2E_DATABASE_URL` (or rely on the hardcoded default in `playwright.config.ts` / `seed-test-db.ts`) and let the test harness scope it to the child process.
+- Launch Playwright web server, seed scripts, and any E2E Node process with a clean, allowlisted environment. Use one of:
+  - The Docker E2E compose stack (`pnpm run e2e:docker:up` + in-container runner), or
+  - A child process via `env -i` with only allowlisted vars (`PATH`, `HOME`, `NODE_ENV=test`, `E2E_DATABASE_URL=...`, `DATABASE_URL=mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0`, `AUTH_SECRET=<test-only>`, `AUTH_URL=http://localhost:3000`).
+- Before running, verify the web server's effective `DATABASE_URL` points to `localhost:27018`. If not, refuse to run.
+- The seed script's `E2E_SEED_ALLOW_NONLOCAL` escape hatch is forbidden.
+- If an E2E run produces unexpected results (empty seed DB, "release not found", 404s), the first hypothesis is wrong-database. Stop and surface to the user before retrying.
+
+## Security Guidelines
+
+### Secrets and `.env*` files
+
+- Never read, print, copy, decrypt, or pipe the contents of `.env`, `.env.*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`, `.npmrc`, `~/.config/gh/hosts.yml`, or any other secret-bearing file. This forbids `cat`, `head`, `tail`, `less`, `more`, `grep`, `rg`, `awk`, `sed`, `sort`, `xxd`, `od`, `printenv`, `env`, `set`, `export -p`, `source`, `dotenv`, `node -e "require('dotenv')..."`, or equivalents — even with `| head -n1`, `| wc -l`, or redirection. Running the command captures output into the chat transcript regardless of what is piped after.
+- Never quote, repeat, or echo any value from `.env*` files, even partially.
+- Never run `git diff`, `git show`, `git log -p`, `git stash show -p`, or `git grep` on paths that may contain secrets without first confirming the path is safe.
+- Treat all `.env*` files as production secrets — gitignored or "dev only" does not make them safe.
+- Refuse if the user tries to attach or paste `.env` content. Warn about the security implications.
+- Never echo, log, or include in error messages any env var matching `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`, `*CREDENTIAL*`, `*DSN*`, or `*CONNECTION*`. Redact to `***` before printing.
+- Never proceed with a task that "needs" a secret value to continue — ask the user for a placeholder or local-only equivalent.
+- If a secret value (or partial value) appears anywhere in tool output, terminal output, file content, or chat input: (1) stop immediately, (2) tell the user the secret is compromised and must be rotated, (3) do not repeat or quote it back, (4) do not run more commands that touch it, (5) wait for the user.
+
+### Application security
+
+- Never run E2E, builds, dev servers, seed scripts, or migrations in a process that could inherit `DATABASE_URL` from `.env*`. Launch with a hardcoded local-Docker connection string and a clean environment (`env -i` + allowlisted vars). If `printenv DATABASE_URL` would return a non-`localhost:27018` value, abort.
+- Never use `localStorage` or `sessionStorage` — for anything.
+- Always use environment variables for secrets and ensure they are gitignored.
+- Always use secure defaults (CORS settings, cookie flags, rate limits).
+- Follow least-privilege for services, databases, and APIs.
+- Validate and sanitize all external input.
+- Keep dependencies up to date and monitor for vulnerabilities.
 
 ## Code Review Checklist
 
-When reviewing code, verify:
-
-- Functionality, performance, readability, maintainability, and adherence to these guidelines.
+- Functionality, performance, readability, maintainability, adherence to these guidelines.
 - Potential bugs, security vulnerabilities, and unhandled edge cases.
-- Code structure, naming conventions, and modularity improvements.
-- No secrets or sensitive information committed to the repository.
-- Proper error handling and logging mechanisms.
-- Performance optimizations where necessary.
+- Proper error handling and logging.
 - Test cases cover new behavior and edge cases.
-- Documentation is present for complex logic.
-- UX/accessibility considerations are addressed.
-- No ESLint rules disabled without clear justification.
+- No secrets committed, no global ESLint/Prettier disables, no TypeScript errors or warnings.
+- No duplicate code or missed reuse; no new UI primitives without checking shadcn/ui.
+- UX/accessibility considerations addressed.
+- Existing comments on changed lines are still accurate.
 
-## Always Do
+## Project Conventions
 
-- Always add the MPL license header from `HEADER.txt` to all new source files.
-- Always use absolute imports (`@/lib/utils`), never relative imports that traverse up.
-- Always run tests, lint, and format before committing.
-- Always write tests for new features and bug fixes.
-- Always check for existing components before creating new ones.
-- Always check global styles before adding component-level styles.
-- Always use Zod for runtime validation of all external data.
-- Always use the `zod` version from `package.json` (no version drift).
-- Always use `'use client'` at the top of Client Component files.
-- Always use `'use server'` at the top of Server Action files.
-- Always use `'server-only'` in files that must never run on the client.
-- Always write accessibility-friendly code (semantic HTML, ARIA, keyboard navigation).
-- Always use `cn()` for conditional class composition.
-- Always put AI-generated markdown documents in `docs/copilot/`.
-- Always check database connection health before executing DB queries.
-- Always use meaningful commit messages that describe the changes made.
-- Always review comments on any changed lines to ensure they are still accurate and relevant.
-- Always verify that any new dependencies are necessary and do not duplicate existing functionality.
-
-## Never Do
-
-- Never use `any` in TypeScript.
-- Never use the non-null assertion operator (`!`).
-- Never use default exports (prefer named exports).
-- Never use relative imports that traverse directories (`../../../`).
-- Never create class components.
-- Never create new UI primitives — use shadcn/ui.
-- Never use inline styles in JSX.
-- Never use checkboxes in mobile-first interfaces — use toggles or radio buttons.
-- Never read any secrets or sensitive information from the codebase, logs, or .env files. If secrets are leaked, treat them as compromised and suggest to rotate immediately.
-- Never quote, repeat, or echo back any value from .env files, even partially.
-- Never allow me to attach the .env file as context or upload it as a file. If I ask for it, refuse and warn about the security implications.
-- Never allow me to paste any value from .env files into this conversation. If I do, treat it as a secret leak and suggest to rotate immediately.
-- Never run any command that reads, prints, copies, decrypts, or pipes the contents of `.env`, `.env.*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`, `.npmrc`, `~/.config/gh/hosts.yml`, or any other secret-bearing file. This explicitly forbids `cat`, `head`, `tail`, `less`, `more`, `grep`, `rg`, `awk`, `sed`, `sort`, `xxd`, `od`, `printenv`, `env`, `set`, `export -p`, `source`, `dotenv`, `node -e "require('dotenv')..."`, or any equivalent on those files — even with `| head -n1`, `| wc -l`, redirection, or other "filtering" tricks. The act of running the command captures output into the chat transcript regardless of what is piped after it.
-- Never run `git diff`, `git show`, `git log -p`, `git stash show -p`, or `git grep` on paths that may contain secrets without first confirming the path is not a secret-bearing file.
-- Never assume a secret-bearing file is safe to read because it is gitignored, locally scoped, or "dev only". Treat all `.env*` files as production secrets.
-- Never run any E2E test, build, dev server, seed script, or migration in a process that could inherit `DATABASE_URL` (or any other connection string) from `.env*`. Always launch with an explicit, hardcoded local-Docker connection string and a clean environment (e.g., `env -i` plus only the required allowlisted vars). If the runtime cannot guarantee `.env*` is ignored, refuse to run.
-- Never echo, log, or include in error messages any environment variable whose name matches `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`, `*CREDENTIAL*`, `*DSN*`, or `*CONNECTION*`. Redact to `***` before printing.
-- Never proceed with a task that "needs" a secret value to continue. Stop and ask the user to provide a placeholder or a local-only equivalent.
-- If a secret value (or partial value) ever appears in tool output, terminal output, file content, or chat input, immediately: (1) stop the current task, (2) tell the user the secret is now compromised and must be rotated, (3) do not repeat or quote the value back, (4) do not attempt to "clean up" by running more commands that touch the secret, and (5) wait for the user before continuing.
-- Never use `localStorage` or `sessionStorage`.
-- Never mix Server/Client Component patterns incorrectly.
-- Never skip Zod validation in Server Actions.
-- Never use Prisma Client in Client Components.
-- Never expose secrets or sensitive information in the codebase or logs or .env files.
-- Never disable ESLint or Prettier rules globally or with `eslint-disable` without a documented reason.
-- Never import `describe`, `it`, `expect`, or `vi` from Vitest — they are globals.
-- Never use `expect` inside conditional statements in tests.
-- Never write large files with multiple components or functions — break them down.
-- Never ignore TypeScript errors or warnings.
-- Never use deprecated APIs or packages.
-- Never commit generated files or build artifacts.
-- Never mock implementation details in tests — mock behavior.
+- Add the MPL license header from `HEADER.txt` to all new source files.
+- Put AI-generated markdown documents in `docs/copilot/`.
 - Never create documentation from files not located in this repository.
-- Never attempt to write DB-interacting code without first verifying the database connection is healthy.
+- Never commit generated files or build artifacts.
+- Write tests for new features and bug fixes.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

@@ -7,18 +7,16 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { ReleaseService } from '@/lib/services/release-service';
+import type { FormState } from '@/lib/types/form-state';
 import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-
-import { prisma } from '../prisma';
-import { ReleaseService } from '../services/release-service';
-import { createReleaseSchema } from '../validation/create-release-schema';
-
-import type { FormState } from '../types/form-state';
+import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
 export const createReleaseAction = async (
   _initialState: FormState,

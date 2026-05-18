@@ -149,6 +149,8 @@ export const TourDateImageUpload = ({
             throw new Error('Server did not return image ID');
           }
 
+          const uploadedS3Url = confirmResult.data.s3Url;
+
           // Update to completed state with server-provided URL
           setImages((prev) =>
             prev.map((img) =>
@@ -158,8 +160,8 @@ export const TourDateImageUpload = ({
                     id: uploadedId,
                     isUploading: false,
                     uploadProgress: 100,
-                    uploadedUrl: confirmResult.data!.s3Url,
-                    preview: confirmResult.data!.s3Url,
+                    uploadedUrl: uploadedS3Url,
+                    preview: uploadedS3Url,
                     error: undefined,
                   }
                 : img

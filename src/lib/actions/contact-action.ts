@@ -10,14 +10,13 @@ import { SendEmailCommand } from '@aws-sdk/client-ses';
 
 import { buildContactEmailHtml } from '@/lib/email/contact-email-html';
 import { buildContactEmailText } from '@/lib/email/contact-email-text';
+import type { FormState } from '@/lib/types/form-state';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { sesClient } from '@/lib/utils/ses-client';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { contactSchema, CONTACT_REASONS } from '@/lib/validation/contact-schema';
-
-import type { FormState } from '../types/form-state';
 
 // Rate limiter: 3 contact submissions per minute per IP
 const limiter = rateLimit({

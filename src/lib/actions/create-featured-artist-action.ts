@@ -9,15 +9,13 @@ import { revalidatePath } from 'next/cache';
 
 import { z } from 'zod';
 
+import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { FeaturedArtistsService } from '../services/featured-artists-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { createFeaturedArtistSchema } from '../validation/create-featured-artist-schema';
-
-import type { FormState } from '../types/form-state';
+import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
 
 export const createFeaturedArtistAction = async (
   _initialState: FormState,

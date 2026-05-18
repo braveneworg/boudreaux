@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { FormState } from '../../types/form-state';
+import type { FormState } from '@/lib/types/form-state';
+
 import type { ZodType } from 'zod';
 
 const getActionState = <TForm>(
@@ -23,8 +24,10 @@ const getActionState = <TForm>(
 
   // Populate the formState fields with form data
   for (const key of Object.keys(formData)) {
-    // We limit the keys to the permitted field names above, so no danger here
-    let value: boolean | string = formData[key]!.toString();
+    const rawValue = formData[key];
+    if (rawValue === undefined || rawValue === null) continue;
+    const stringValue = rawValue.toString();
+    let value: boolean | string = stringValue;
 
     // Convert checkbox/switch "on" values to boolean
     if (value === 'true' || value === 'on') {
@@ -34,7 +37,7 @@ const getActionState = <TForm>(
     }
 
     // Store original string values in fields for form state
-    fields[key] = formData[key]!.toString();
+    fields[key] = stringValue;
 
     // Update formData with converted boolean values for schema validation
     formData[key] = value as FormDataEntryValue;

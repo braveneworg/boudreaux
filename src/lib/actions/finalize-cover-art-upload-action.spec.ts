@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { requireRole } from '@/utils/auth/require-role';
+
 import { finalizeCoverArtUploadAction } from './finalize-cover-art-upload-action';
-import { requireRole } from '../utils/auth/require-role';
 
 vi.mock('server-only', () => ({}));
 vi.mock('../utils/auth/require-role');

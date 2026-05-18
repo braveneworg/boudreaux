@@ -4,16 +4,15 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { prisma } from '@/lib/prisma';
+import { ReleaseService } from '@/lib/services/release-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { requireRole } from '@/utils/auth/require-role';
 
 import { createReleaseAction } from './create-release-action';
-import { prisma } from '../prisma';
-import { ReleaseService } from '../services/release-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { requireRole } from '../utils/auth/require-role';
-
-import type { FormState } from '../types/form-state';
 
 vi.mock('server-only', () => ({}));
 vi.mock('../prisma', () => ({

@@ -11,6 +11,7 @@ import { BannerNotificationService } from '@/lib/services/banner-notification-se
 import type { FormState } from '@/lib/types/form-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
+import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import {
   bannerNotificationSchema,
   rotationIntervalSchema,
@@ -83,8 +84,13 @@ export const createOrUpdateBannerNotificationAction = async (
     userId: session.user.id,
   });
 
+  // Defense-in-depth: re-sanitize with a proper HTML parser before persisting.
+  // The Zod transform runs a regex sanitizer (shared with the client preview);
+  // this second pass uses sanitize-html so malformed input cannot bypass.
+  const sanitizedContent = content ? sanitizeBannerHtmlServer(content) : null;
+
   const result = await BannerNotificationService.upsertNotification(slotNumber, {
-    content: content ?? null,
+    content: sanitizedContent,
     textColor: textColor ?? null,
     backgroundColor: backgroundColor ?? null,
     displayFrom: displayFrom ?? null,

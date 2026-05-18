@@ -6,7 +6,7 @@ import 'server-only';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { generateUsername } from 'unique-username-generator';
 
-import { prisma } from '../prisma';
+import { prisma } from '@/lib/prisma';
 
 /** Result of {@link UserService.updateUsername}. */
 export interface UpdateUsernameResult {

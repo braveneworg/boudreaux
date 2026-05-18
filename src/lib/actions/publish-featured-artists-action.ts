@@ -8,8 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { cache } from '@/lib/utils/simple-cache';
-
-import { requireRole } from '../utils/auth/require-role';
+import { requireRole } from '@/utils/auth/require-role';
 
 /**
  * Invalidates the in-memory featured artists cache and the landing page route cache.

@@ -7,16 +7,14 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { VenueService } from '@/lib/services/tours/venue-service';
+import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-
-import { VenueService } from '../services/tours/venue-service';
-import { logSecurityEvent } from '../utils/audit-log';
-import { setUnknownError } from '../utils/auth/auth-utils';
-import { OBJECT_ID_REGEX } from '../utils/validation/object-id';
-import { venueCreateSchema, venueUpdateSchema } from '../validations/tours/venue-schema';
-
-import type { FormState } from '../types/form-state';
+import { venueCreateSchema, venueUpdateSchema } from '@/lib/validations/tours/venue-schema';
+import { logSecurityEvent } from '@/utils/audit-log';
+import { setUnknownError } from '@/utils/auth/auth-utils';
+import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
 /**
  * Server action to create a new venue
@@ -125,12 +123,14 @@ export const updateVenueAction = async (
   const { formState, parsed } = getActionState(payload, permittedFieldNames, venueUpdateSchema);
 
   if (!parsed.success) {
+    const errors = formState.errors ?? {};
+    formState.errors = errors;
     for (const issue of parsed.error.issues) {
       const field = issue.path.join('.');
-      if (!formState.errors![field]) {
-        formState.errors![field] = [];
+      if (!errors[field]) {
+        errors[field] = [];
       }
-      (formState.errors![field] as string[]).push(issue.message);
+      errors[field].push(issue.message);
     }
     return formState;
   }

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { JSX } from 'react';
 
-import type { HealthStatusType } from '../../lib/types/health-status';
+import type { HealthStatusType } from '@/lib/types/health-status';
 
 interface HealthStatusIconProps {
   status: HealthStatusType | null;

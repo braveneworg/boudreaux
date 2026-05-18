@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock bcrypt to speed up tests
-import { isValidEmail, setUnknownError, EMAIL_REGEX } from './auth-utils';
+import type { FormState } from '@/lib/types/form-state';
 
-import type { FormState } from '../../types/form-state';
+import { isValidEmail, setUnknownError, EMAIL_REGEX } from './auth-utils';
 
 describe('auth-utils', () => {
   describe('EMAIL_REGEX', () => {
