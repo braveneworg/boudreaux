@@ -8,6 +8,7 @@
 import { execSync, spawn } from 'child_process';
 import { existsSync, readdirSync, statSync, createReadStream } from 'fs';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
 import { createGzip } from 'zlib';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
@@ -629,7 +630,7 @@ class CDNSync {
 }
 
 // Run the script if called directly
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cdnSync = new CDNSync();
   cdnSync.run();
 }
