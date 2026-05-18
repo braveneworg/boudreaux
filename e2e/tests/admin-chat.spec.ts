@@ -33,6 +33,12 @@ test.describe('Admin chat moderation', () => {
     await adminPage.goto('/admin/chat');
 
     await expect(adminPage.getByRole('heading', { name: /chat moderation/i })).toBeVisible();
+
+    // The moderation page defaults to the "Reported users" view; switch to
+    // "All users" so the chat-users table is rendered.
+    await adminPage.getByRole('combobox', { name: /view/i }).click();
+    await adminPage.getByRole('option', { name: /all users/i }).click();
+
     await expect(adminPage.getByTestId('chat-users-table')).toBeVisible({ timeout: 10_000 });
 
     // The seed user that just sent a message should be listed.
@@ -44,21 +50,22 @@ test.describe('Admin chat moderation', () => {
     await expect(adminPage.getByText(/chat access disabled/i)).toBeVisible({ timeout: 10_000 });
   });
 
-  test('disabled user receives a disabled toast on their next send', async ({ userPage }) => {
+  test('disabled user sees the disabled state instead of the composer', async ({ userPage }) => {
     await userPage.goto('/');
     await userPage.getByRole('button', { name: /open chat/i }).click();
 
-    const composer = userPage.getByLabel('Chat message');
-    await composer.fill('attempt after disable');
-    await composer.press('Enter');
-
-    await expect(userPage.getByText(/chat access has been disabled for your account/i)).toBeVisible(
-      { timeout: 10_000 }
-    );
+    // When chat access is disabled, the composer is removed entirely and
+    // replaced with the disabled-state message (see ChatDisabledState).
+    await expect(userPage.getByText(/reported for abuse/i)).toBeVisible({ timeout: 10_000 });
+    await expect(userPage.getByLabel('Chat message')).not.toBeVisible();
   });
 
   test('admin can re-enable the user', async ({ adminPage }) => {
     await adminPage.goto('/admin/chat');
+
+    await adminPage.getByRole('combobox', { name: /view/i }).click();
+    await adminPage.getByRole('option', { name: /all users/i }).click();
+
     await expect(adminPage.getByTestId('chat-users-table')).toBeVisible({ timeout: 10_000 });
 
     const switches = adminPage.getByRole('switch');
