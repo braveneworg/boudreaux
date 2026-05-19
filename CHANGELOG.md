@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [4.83.0] - 2026-05-18
+
+### Added
+
+- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n- Make security audit, code review, and style updates to chat (#444)\n
+
+## [4.82.0] - 2026-05-18
+
+### Added
+
+- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n- Update deploy with env args for pusher and upstash (#443)\n
+
 ## [4.81.0] - 2026-05-18
 
 ### Added
