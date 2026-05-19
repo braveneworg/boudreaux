@@ -44,8 +44,23 @@ describe('sendChatMentionEmail', () => {
   const validInput = {
     toEmail: 'recipient@example.com',
     recipientUsername: 'recipient',
-    authorUsername: 'author',
-    messageBody: 'Hello @recipient',
+    mentions: [
+      {
+        authorUsername: 'author',
+        body: 'Hello @recipient',
+        createdAt: '2026-05-18T12:00:00.000Z',
+      },
+    ],
+  };
+
+  const digestInput = {
+    toEmail: 'recipient@example.com',
+    recipientUsername: 'recipient',
+    mentions: [
+      { authorUsername: 'a1', body: 'first', createdAt: '2026-05-18T11:00:00.000Z' },
+      { authorUsername: 'a2', body: 'second', createdAt: '2026-05-18T11:30:00.000Z' },
+      { authorUsername: 'a3', body: 'third', createdAt: '2026-05-18T12:00:00.000Z' },
+    ],
   };
 
   beforeEach(() => {
@@ -153,5 +168,21 @@ describe('sendChatMentionEmail', () => {
       expect.any(Error)
     );
     errorSpy.mockRestore();
+  });
+
+  it('returns false when the mentions array is empty', async () => {
+    const result = await sendChatMentionEmail({ ...validInput, mentions: [] });
+    expect(result).toBe(false);
+    expect(mockSesClientSend).not.toHaveBeenCalled();
+  });
+
+  it('uses a digest subject line when multiple mentions are passed', async () => {
+    await sendChatMentionEmail(digestInput);
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: expect.stringContaining('3 new chat mentions'),
+      })
+    );
   });
 });

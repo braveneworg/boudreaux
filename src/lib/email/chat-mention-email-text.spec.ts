@@ -4,11 +4,12 @@
 
 import { buildChatMentionEmailText } from './chat-mention-email-text';
 
+const ISO = '2026-05-18T12:00:00.000Z';
+
 describe('buildChatMentionEmailText', () => {
   const baseData = {
     recipientUsername: 'recipient',
-    authorUsername: 'author',
-    messageBody: 'Hello @recipient',
+    mentions: [{ authorUsername: 'author', body: 'Hello @recipient', createdAt: ISO }],
     signInUrl: 'https://example.com/signin?callbackUrl=%2F%3Fchat%3Dmention',
   };
 
@@ -30,20 +31,41 @@ describe('buildChatMentionEmailText', () => {
 
   it('truncates messages longer than 280 chars with an ellipsis', () => {
     const long = 'a'.repeat(400);
-    const text = buildChatMentionEmailText({ ...baseData, messageBody: long });
+    const text = buildChatMentionEmailText({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: long, createdAt: ISO }],
+    });
     expect(text).toContain('…');
     expect(text).not.toContain('a'.repeat(400));
   });
 
   it('does not truncate a message at the 280-char boundary', () => {
     const exact = 'b'.repeat(280);
-    const text = buildChatMentionEmailText({ ...baseData, messageBody: exact });
+    const text = buildChatMentionEmailText({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: exact, createdAt: ISO }],
+    });
     expect(text).toContain(exact);
     expect(text).not.toContain('…');
   });
 
-  it('starts with the Fake Four header', () => {
+  it('starts with the Fake Four header for a single mention', () => {
     const text = buildChatMentionEmailText(baseData);
     expect(text.startsWith('FAKE FOUR INC. — CHAT MENTION')).toBe(true);
+  });
+
+  it('uses the digest header and lists every entry when multiple mentions are passed', () => {
+    const text = buildChatMentionEmailText({
+      ...baseData,
+      mentions: [
+        { authorUsername: 'a1', body: 'first', createdAt: ISO },
+        { authorUsername: 'a2', body: 'second', createdAt: ISO },
+      ],
+    });
+    expect(text.startsWith('FAKE FOUR INC. — 2 CHAT MENTIONS')).toBe(true);
+    expect(text).toContain('a1');
+    expect(text).toContain('a2');
+    expect(text).toContain('first');
+    expect(text).toContain('second');
   });
 });

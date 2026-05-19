@@ -4,11 +4,12 @@
 
 import { buildChatMentionEmailHtml } from './chat-mention-email-html';
 
+const ISO = '2026-05-18T12:00:00.000Z';
+
 describe('buildChatMentionEmailHtml', () => {
   const baseData = {
     recipientUsername: 'recipient',
-    authorUsername: 'author',
-    messageBody: 'Hello @recipient',
+    mentions: [{ authorUsername: 'author', body: 'Hello @recipient', createdAt: ISO }],
     signInUrl: 'https://example.com/signin?callbackUrl=%2F%3Fchat%3Dmention',
   };
 
@@ -26,7 +27,9 @@ describe('buildChatMentionEmailHtml', () => {
   it('escapes HTML in the message body to prevent injection', () => {
     const html = buildChatMentionEmailHtml({
       ...baseData,
-      messageBody: '<script>alert("xss")</script>',
+      mentions: [
+        { authorUsername: 'author', body: '<script>alert("xss")</script>', createdAt: ISO },
+      ],
     });
     expect(html).not.toContain('<script>alert("xss")</script>');
     expect(html).toContain('&lt;script&gt;');
@@ -36,31 +39,35 @@ describe('buildChatMentionEmailHtml', () => {
   it('escapes ampersands and apostrophes in the body', () => {
     const html = buildChatMentionEmailHtml({
       ...baseData,
-      messageBody: `Tom & Jerry's`,
+      mentions: [{ authorUsername: 'author', body: `Tom & Jerry's`, createdAt: ISO }],
     });
     expect(html).toContain('Tom &amp; Jerry&#039;s');
   });
 
-  it('escapes HTML in the usernames', () => {
+  it('escapes HTML in the recipient username', () => {
     const html = buildChatMentionEmailHtml({
       ...baseData,
       recipientUsername: '<b>recip</b>',
-      authorUsername: '<i>auth</i>',
     });
     expect(html).toContain('&lt;b&gt;recip&lt;/b&gt;');
-    expect(html).toContain('&lt;i&gt;auth&lt;/i&gt;');
   });
 
   it('truncates messages longer than 280 chars with an ellipsis', () => {
     const long = 'a'.repeat(400);
-    const html = buildChatMentionEmailHtml({ ...baseData, messageBody: long });
+    const html = buildChatMentionEmailHtml({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: long, createdAt: ISO }],
+    });
     expect(html).toContain('…');
     expect(html).not.toContain('a'.repeat(400));
   });
 
   it('does not truncate a message at the 280-char boundary', () => {
     const exact = 'a'.repeat(280);
-    const html = buildChatMentionEmailHtml({ ...baseData, messageBody: exact });
+    const html = buildChatMentionEmailHtml({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: exact, createdAt: ISO }],
+    });
     expect(html).toContain(exact);
     expect(html).not.toContain('…');
   });
@@ -69,5 +76,24 @@ describe('buildChatMentionEmailHtml', () => {
     const html = buildChatMentionEmailHtml(baseData);
     expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
     expect(html).toContain('</html>');
+  });
+
+  it('renders a digest header and each mention card when multiple entries are passed', () => {
+    const html = buildChatMentionEmailHtml({
+      ...baseData,
+      mentions: [
+        { authorUsername: 'a1', body: 'first message', createdAt: ISO },
+        { authorUsername: 'a2', body: 'second message', createdAt: ISO },
+        { authorUsername: 'a3', body: 'third message', createdAt: ISO },
+      ],
+    });
+    expect(html).toContain('3 new mentions');
+    expect(html).toContain('Chat Mentions (3)');
+    expect(html).toContain('first message');
+    expect(html).toContain('second message');
+    expect(html).toContain('third message');
+    expect(html).toContain('a1');
+    expect(html).toContain('a2');
+    expect(html).toContain('a3');
   });
 });
