@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.84.0] - 2026-05-19
+
+### Added
+
+- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n- Implement admin markdown, alternating chat alignment, and other stylistic changes (#445)\n
+
 ## [4.83.0] - 2026-05-18
 
 ### Added
