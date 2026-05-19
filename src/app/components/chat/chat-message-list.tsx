@@ -131,7 +131,7 @@ export const ChatMessageList = ({
       {pinnedMessages && pinnedMessages.length > 0 && (
         <div
           data-testid="chat-pinned-messages"
-          className="bg-background sticky top-0 z-10 border-b shadow-sm"
+          className="sticky top-0 z-10 border-y border-zinc-500 bg-zinc-200 shadow-[0_4px_12px_rgba(0,0,0,0.22)]"
         >
           <ul className="divide-y">
             {pinnedMessages.map((message) => (
@@ -157,11 +157,29 @@ export const ChatMessageList = ({
             </div>
           );
         }
+        // Group consecutive messages by author so a single user's run
+        // keeps a consistent header alignment; flip alignment each time
+        // the author changes so adjacent users' headers sit on opposite
+        // sides. Body text is always left-aligned (handled in the row).
+        let groupIndex = 0;
+        let prevUserId: string | undefined;
+        const rows = visibleMessages.map((message) => {
+          if (prevUserId !== undefined && message.user.id !== prevUserId) {
+            groupIndex += 1;
+          }
+          prevUserId = message.user.id;
+          const align: 'left' | 'right' = groupIndex % 2 === 0 ? 'left' : 'right';
+          return { message, align };
+        });
         return (
           <ul className="divide-y">
-            {visibleMessages.map((message) => (
+            {rows.map(({ message, align }) => (
               <li key={message.tempId ?? message.id}>
-                <ChatMessageRow message={message} reactionBar={renderReactionBar?.(message)} />
+                <ChatMessageRow
+                  message={message}
+                  align={align}
+                  reactionBar={renderReactionBar?.(message)}
+                />
               </li>
             ))}
           </ul>

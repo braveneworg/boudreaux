@@ -100,4 +100,72 @@ describe('ChatMessageRow', () => {
     expect(timeEl.textContent?.trim()).toBe('');
     expect(timeEl.getAttribute('title')).toBe('');
   });
+
+  describe('admin markdown', () => {
+    const adminUser = { id: 'admin-1', username: 'mod', gravatarHash: 'h', role: 'admin' as const };
+
+    it('renders bold and emphasis for admin authors', () => {
+      const { container } = render(
+        <ChatMessageRow message={makeMsg({ user: adminUser, body: 'this is **bold** and *em*' })} />
+      );
+      expect(container.querySelector('strong')?.textContent).toBe('bold');
+      expect(container.querySelector('em')?.textContent).toBe('em');
+    });
+
+    it('does not render markdown for non-admin authors', () => {
+      const { container } = render(
+        <ChatMessageRow message={makeMsg({ body: 'this is **bold** and *em*' })} />
+      );
+      expect(container.querySelector('strong')).toBeNull();
+      expect(container.querySelector('em')).toBeNull();
+      expect(container.textContent).toContain('**bold**');
+    });
+
+    it('renders an internal link without a new tab or external icon', () => {
+      const { container } = render(
+        <ChatMessageRow
+          message={makeMsg({ user: adminUser, body: 'check [our roster](/artists)' })}
+        />
+      );
+      const anchor = container.querySelector('a');
+      if (!anchor) throw new Error('Expected an anchor');
+      expect(anchor.getAttribute('href')).toBe('/artists');
+      expect(anchor.getAttribute('target')).toBeNull();
+      expect(anchor.querySelector('[aria-label="opens in a new tab"]')).toBeNull();
+    });
+
+    it('renders an external link in a new tab with the external icon', () => {
+      const { container } = render(
+        <ChatMessageRow
+          message={makeMsg({
+            user: adminUser,
+            body: 'see [wiki](https://en.wikipedia.org/wiki/Hip_hop)',
+          })}
+        />
+      );
+      const anchor = container.querySelector('a');
+      if (!anchor) throw new Error('Expected an anchor');
+      expect(anchor.getAttribute('href')).toBe('https://en.wikipedia.org/wiki/Hip_hop');
+      expect(anchor.getAttribute('target')).toBe('_blank');
+      expect(anchor.getAttribute('rel')).toContain('noopener');
+      expect(anchor.querySelector('[aria-label="opens in a new tab"]')).not.toBeNull();
+    });
+
+    it('refuses to render a javascript: link as an anchor', () => {
+      const { container } = render(
+        <ChatMessageRow message={makeMsg({ user: adminUser, body: '[x](javascript:alert(1))' })} />
+      );
+      expect(container.querySelector('a')).toBeNull();
+      expect(container.textContent).toContain('[x](javascript:alert(1))');
+    });
+
+    it('still highlights @mentions inside admin-formatted text', () => {
+      const { container } = render(
+        <ChatMessageRow message={makeMsg({ user: adminUser, body: '**hi @alice**' })} />
+      );
+      const strong = container.querySelector('strong');
+      if (!strong) throw new Error('Expected a strong element');
+      expect(strong.querySelector('[data-mention-username="alice"]')).not.toBeNull();
+    });
+  });
 });

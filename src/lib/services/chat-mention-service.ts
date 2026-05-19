@@ -5,6 +5,7 @@ import 'server-only';
 
 import { sendChatMentionEmail } from '@/lib/email/send-chat-mention';
 import { prisma } from '@/lib/prisma';
+import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
 import { loggers } from '@/lib/utils/logger';
 import { extractMentionUsernames } from '@/lib/utils/mention-parsing';
 import { getRedisClient } from '@/lib/utils/upstash-redis';
@@ -15,11 +16,30 @@ const logger = loggers.chat;
 const SEARCH_LIMIT = 8;
 
 /**
- * Suppression window between mention emails from the same author to the
- * same recipient. Keeps a chatty conversation from generating an email
- * per @mention while still notifying on fresh mentions across sessions.
+ * Hard ceiling on mention emails to the same recipient. After an email
+ * goes out we refuse to send another one for this many seconds — any
+ * further mentions inside the window are buffered and folded into the
+ * next email as a digest.
  */
-const MENTION_EMAIL_THROTTLE_SECONDS = 300;
+const MENTION_EMAIL_THROTTLE_SECONDS = 60 * 60;
+
+/**
+ * Don't email a recipient who has sent a chat message within this window
+ * — they're actively watching the conversation and would just see the
+ * mention live. Compared against {@link ChatUser.lastSeenAt}.
+ */
+const ACTIVE_RECIPIENT_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Upper bound on how long a buffered (un-sent) mention sticks around in
+ * Redis before being dropped. Generously longer than the throttle so a
+ * chatty hour still produces a single digest, but short enough that
+ * stale mentions don't linger across days.
+ */
+const MENTION_BUFFER_TTL_SECONDS = 60 * 60 * 24;
+
+/** Hard cap on how many mention entries we'll digest in a single email. */
+const MENTION_BUFFER_MAX_ENTRIES = 25;
 
 export interface MentionUser {
   id: string;
@@ -31,6 +51,15 @@ export interface MentionMatch {
   id: string;
   username: string;
 }
+
+interface BufferedMention {
+  authorUsername: string;
+  body: string;
+  createdAt: string;
+}
+
+const throttleKey = (recipientId: string): string => `chat:mention-throttle:${recipientId}`;
+const bufferKey = (recipientId: string): string => `chat:mention-pending:${recipientId}`;
 
 export class ChatMentionService {
   /**
@@ -88,46 +117,97 @@ export class ChatMentionService {
   }
 
   /**
-   * Dispatch mention notification emails for the supplied recipients,
-   * respecting the per-author/per-recipient throttle so a single chatty
-   * thread can't fan out into an email storm.
+   * Dispatch mention notification emails for the supplied recipients.
+   *
+   * Per-recipient flow:
+   *   1. Skip the whole recipient if `ChatUser.lastSeenAt` is within
+   *      {@link ACTIVE_RECIPIENT_WINDOW_MS} — they're chatting now.
+   *   2. Try to claim the 1-hour throttle slot.
+   *      - Claimed: pop the buffer, append the current mention, send
+   *        an email. If the email send throws, push the entries back
+   *        and release the throttle so the next mention can retry.
+   *      - Not claimed: append the current mention to the buffer so a
+   *        later mention (after the throttle expires) can flush it as
+   *        part of a digest.
    */
   static async notifyMentions(params: {
     authorId: string;
     authorUsername: string | null;
     messageBody: string;
+    messageCreatedAt?: string;
     recipients: MentionUser[];
   }): Promise<void> {
     if (params.recipients.length === 0) return;
 
     const redis = getRedisClient();
+    const authorUsername = params.authorUsername ?? 'Someone';
+    const createdAt = params.messageCreatedAt ?? new Date().toISOString();
+    const current: BufferedMention = {
+      authorUsername,
+      body: params.messageBody,
+      createdAt,
+    };
 
     await Promise.all(
       params.recipients.map(async (recipient) => {
-        const key = `chat:mention-throttle:${params.authorId}:${recipient.id}`;
-        // SET key value NX EX <ttl> — atomic "claim if absent".
-        const claimed = await redis.set(key, '1', {
+        // 1. Suppress when the recipient is actively chatting.
+        const recipientChatUser = await ChatUserRepository.findByUserId(recipient.id);
+        if (recipientChatUser) {
+          const sinceMs = Date.now() - recipientChatUser.lastSeenAt.getTime();
+          if (sinceMs < ACTIVE_RECIPIENT_WINDOW_MS) {
+            logger.info('Chat mention email suppressed — recipient active', {
+              module: 'CHAT',
+              operation: 'notifyMentions',
+              userId: recipient.id,
+            });
+            return;
+          }
+        }
+
+        const tKey = throttleKey(recipient.id);
+        const bKey = bufferKey(recipient.id);
+
+        // 2. Try to claim the hourly slot.
+        const claimed = await redis.set(tKey, '1', {
           nx: true,
           ex: MENTION_EMAIL_THROTTLE_SECONDS,
         });
+
         if (!claimed) {
-          logger.info('Chat mention email throttled', {
+          // Throttle is held — buffer this mention for the next flush.
+          await redis.rpush(bKey, JSON.stringify(current));
+          await redis.expire(bKey, MENTION_BUFFER_TTL_SECONDS);
+          logger.info('Chat mention buffered for digest', {
             module: 'CHAT',
             operation: 'notifyMentions',
             userId: recipient.id,
           });
           return;
         }
+
+        // 3. Slot claimed — drain the buffer, append current, send.
+        const buffered = await redis.lrange<string>(bKey, 0, -1);
+        await redis.del(bKey);
+
+        const previous = buffered
+          .map((entry) => parseBufferedMention(entry))
+          .filter((m): m is BufferedMention => m !== null);
+        const mentions = [...previous, current].slice(-MENTION_BUFFER_MAX_ENTRIES);
+
         try {
           await sendChatMentionEmail({
             toEmail: recipient.email,
             recipientUsername: recipient.username,
-            authorUsername: params.authorUsername ?? 'Someone',
-            messageBody: params.messageBody,
+            mentions,
           });
         } catch (error) {
-          // Release the slot so the next mention has a chance to retry.
-          await redis.del(key);
+          // Re-buffer so the next mention can retry, and release the
+          // throttle so the next mention is the one that flushes.
+          await redis.del(tKey);
+          if (mentions.length > 0) {
+            await redis.rpush(bKey, ...mentions.map((m) => JSON.stringify(m)));
+            await redis.expire(bKey, MENTION_BUFFER_TTL_SECONDS);
+          }
           logger.error('Chat mention email failed', {
             module: 'CHAT',
             operation: 'notifyMentions',
@@ -137,5 +217,23 @@ export class ChatMentionService {
         }
       })
     );
+  }
+}
+
+function parseBufferedMention(raw: string): BufferedMention | null {
+  try {
+    const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as BufferedMention).authorUsername === 'string' &&
+      typeof (parsed as BufferedMention).body === 'string' &&
+      typeof (parsed as BufferedMention).createdAt === 'string'
+    ) {
+      return parsed as BufferedMention;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }

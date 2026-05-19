@@ -2,10 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+interface ChatMentionEntry {
+  authorUsername: string;
+  body: string;
+  createdAt: string;
+}
+
 interface ChatMentionEmailData {
   recipientUsername: string;
-  authorUsername: string;
-  messageBody: string;
+  mentions: ChatMentionEntry[];
   signInUrl: string;
 }
 
@@ -14,17 +19,37 @@ function truncate(text: string, max = 280): string {
   return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toUTCString();
+}
+
 export function buildChatMentionEmailText(data: ChatMentionEmailData): string {
-  return `FAKE FOUR INC. — CHAT MENTION
+  const isDigest = data.mentions.length > 1;
+  const heading = isDigest
+    ? `FAKE FOUR INC. — ${data.mentions.length} CHAT MENTIONS`
+    : 'FAKE FOUR INC. — CHAT MENTION';
+
+  const sections = data.mentions
+    .map((m) => {
+      const stamp = formatTimestamp(m.createdAt);
+      return `${m.authorUsername}${stamp ? ` — ${stamp}` : ''}:\n${truncate(m.body)}`;
+    })
+    .join('\n\n');
+
+  const intro = isDigest
+    ? `Hi ${data.recipientUsername},\n\nYou were mentioned ${data.mentions.length} times in Fake Four Inc. chat.`
+    : `Hi ${data.recipientUsername},\n\n${data.mentions[0]?.authorUsername ?? 'Someone'} mentioned you in Fake Four Inc. chat.`;
+
+  return `${heading}
 ==============================
 
-Hi ${data.recipientUsername},
+${intro}
 
-${data.authorUsername} mentioned you in Fake Four Inc. chat.
-
-Message:
+Messages:
 --------
-${truncate(data.messageBody)}
+${sections}
 
 Open the chat:
 ${data.signInUrl}

@@ -225,6 +225,7 @@ export class ChatService {
         authorId: params.userId,
         authorUsername: created.user.username,
         messageBody: params.body,
+        messageCreatedAt: created.createdAt.toISOString(),
         recipients,
       });
     }

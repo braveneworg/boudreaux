@@ -10,14 +10,13 @@ import nodemailer from 'nodemailer';
 
 import { sesClient } from '@/lib/utils/ses-client';
 
-import { buildChatMentionEmailHtml } from './chat-mention-email-html';
+import { buildChatMentionEmailHtml, type ChatMentionEntry } from './chat-mention-email-html';
 import { buildChatMentionEmailText } from './chat-mention-email-text';
 
 interface SendChatMentionEmailInput {
   toEmail: string;
   recipientUsername: string;
-  authorUsername: string;
-  messageBody: string;
+  mentions: ChatMentionEntry[];
 }
 
 /**
@@ -32,6 +31,7 @@ export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Pr
     console.error('[sendChatMentionEmail] EMAIL_FROM is not configured');
     return false;
   }
+  if (input.mentions.length === 0) return false;
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://fakefourrecords.com';
   // Email link → sign-in with a callback URL back to the landing page
@@ -44,10 +44,14 @@ export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Pr
 
   const emailData = {
     recipientUsername: input.recipientUsername,
-    authorUsername: input.authorUsername,
-    messageBody: input.messageBody,
+    mentions: input.mentions,
     signInUrl,
   };
+  const isDigest = input.mentions.length > 1;
+  const firstAuthor = input.mentions[0]?.authorUsername ?? 'Someone';
+  const subject = isDigest
+    ? `${input.mentions.length} new chat mentions on Fake Four Inc.`
+    : `${firstAuthor} mentioned you on Fake Four Inc.`;
 
   const logoPath = path.join(process.cwd(), 'public', 'fake-four-inc-black-hand-logo.svg');
 
@@ -61,7 +65,7 @@ export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Pr
     const info = await transport.sendMail({
       from: fromAddress,
       to: input.toEmail,
-      subject: `${input.authorUsername} mentioned you on Fake Four Inc.`,
+      subject,
       text: buildChatMentionEmailText(emailData),
       html: buildChatMentionEmailHtml(emailData),
       attachments: [
@@ -84,7 +88,7 @@ export async function sendChatMentionEmail(input: SendChatMentionEmailInput): Pr
 
     await sesClient.send(command);
     console.info(
-      `[sendChatMentionEmail] Email sent to ${input.toEmail} (mentioned by ${input.authorUsername})`
+      `[sendChatMentionEmail] Email sent to ${input.toEmail} (${input.mentions.length} mention${input.mentions.length === 1 ? '' : 's'})`
     );
     return true;
   } catch (error) {

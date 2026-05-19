@@ -18,8 +18,22 @@ vi.mock('@/lib/email/send-chat-mention', () => ({
 
 const mockRedisSet = vi.hoisted(() => vi.fn());
 const mockRedisDel = vi.hoisted(() => vi.fn());
+const mockRedisRpush = vi.hoisted(() => vi.fn());
+const mockRedisLrange = vi.hoisted(() => vi.fn());
+const mockRedisExpire = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/upstash-redis', () => ({
-  getRedisClient: () => ({ set: mockRedisSet, del: mockRedisDel }),
+  getRedisClient: () => ({
+    set: mockRedisSet,
+    del: mockRedisDel,
+    rpush: mockRedisRpush,
+    lrange: mockRedisLrange,
+    expire: mockRedisExpire,
+  }),
+}));
+
+const mockChatUserFindByUserId = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/repositories/chat-user-repository', () => ({
+  ChatUserRepository: { findByUserId: mockChatUserFindByUserId },
 }));
 
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
@@ -30,6 +44,8 @@ vi.mock('@/lib/utils/logger', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRedisLrange.mockResolvedValue([]);
+  mockChatUserFindByUserId.mockResolvedValue(null);
 });
 
 describe('ChatMentionService.searchByPrefix', () => {
@@ -115,56 +131,147 @@ describe('ChatMentionService.resolveMentions', () => {
 });
 
 describe('ChatMentionService.notifyMentions', () => {
-  const params = {
+  const baseParams = {
     authorId: 'author-1',
     authorUsername: 'author',
     messageBody: 'hey @recip',
+    messageCreatedAt: '2026-05-18T12:00:00.000Z',
     recipients: [{ id: 'r1', username: 'recip', email: 'recip@example.com' }],
   };
 
   it('is a no-op when the recipient list is empty', async () => {
-    await ChatMentionService.notifyMentions({ ...params, recipients: [] });
+    await ChatMentionService.notifyMentions({ ...baseParams, recipients: [] });
     expect(mockRedisSet).not.toHaveBeenCalled();
     expect(mockSendChatMentionEmail).not.toHaveBeenCalled();
   });
 
-  it('claims the throttle key and dispatches the email when the slot is free', async () => {
+  it('claims the 1-hour throttle and emails a single mention when the slot is free', async () => {
     mockRedisSet.mockResolvedValueOnce('OK');
     mockSendChatMentionEmail.mockResolvedValueOnce(true);
 
-    await ChatMentionService.notifyMentions(params);
+    await ChatMentionService.notifyMentions(baseParams);
 
-    expect(mockRedisSet).toHaveBeenCalledWith('chat:mention-throttle:author-1:r1', '1', {
+    expect(mockRedisSet).toHaveBeenCalledWith('chat:mention-throttle:r1', '1', {
       nx: true,
-      ex: 300,
+      ex: 60 * 60,
     });
+    expect(mockRedisLrange).toHaveBeenCalledWith('chat:mention-pending:r1', 0, -1);
+    expect(mockRedisDel).toHaveBeenCalledWith('chat:mention-pending:r1');
     expect(mockSendChatMentionEmail).toHaveBeenCalledWith({
       toEmail: 'recip@example.com',
       recipientUsername: 'recip',
-      authorUsername: 'author',
-      messageBody: 'hey @recip',
+      mentions: [
+        { authorUsername: 'author', body: 'hey @recip', createdAt: '2026-05-18T12:00:00.000Z' },
+      ],
     });
   });
 
-  it('skips the email and logs when the throttle slot is already taken', async () => {
-    mockRedisSet.mockResolvedValueOnce(null);
+  it('flushes buffered mentions as a digest when the slot is free again', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    mockRedisLrange.mockResolvedValueOnce([
+      JSON.stringify({
+        authorUsername: 'a1',
+        body: 'first',
+        createdAt: '2026-05-18T11:00:00.000Z',
+      }),
+      JSON.stringify({
+        authorUsername: 'a2',
+        body: 'second',
+        createdAt: '2026-05-18T11:30:00.000Z',
+      }),
+    ]);
+    mockSendChatMentionEmail.mockResolvedValueOnce(true);
 
-    await ChatMentionService.notifyMentions(params);
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockSendChatMentionEmail).toHaveBeenCalledWith({
+      toEmail: 'recip@example.com',
+      recipientUsername: 'recip',
+      mentions: [
+        { authorUsername: 'a1', body: 'first', createdAt: '2026-05-18T11:00:00.000Z' },
+        { authorUsername: 'a2', body: 'second', createdAt: '2026-05-18T11:30:00.000Z' },
+        { authorUsername: 'author', body: 'hey @recip', createdAt: '2026-05-18T12:00:00.000Z' },
+      ],
+    });
+  });
+
+  it('buffers the mention and skips emailing when the throttle is held', async () => {
+    mockRedisSet.mockResolvedValueOnce(null);
+    mockRedisRpush.mockResolvedValueOnce(1);
+
+    await ChatMentionService.notifyMentions(baseParams);
 
     expect(mockSendChatMentionEmail).not.toHaveBeenCalled();
+    expect(mockRedisRpush).toHaveBeenCalledWith(
+      'chat:mention-pending:r1',
+      JSON.stringify({
+        authorUsername: 'author',
+        body: 'hey @recip',
+        createdAt: '2026-05-18T12:00:00.000Z',
+      })
+    );
+    expect(mockRedisExpire).toHaveBeenCalledWith('chat:mention-pending:r1', 60 * 60 * 24);
     expect(mockLoggerInfo).toHaveBeenCalledWith(
-      'Chat mention email throttled',
+      'Chat mention buffered for digest',
       expect.objectContaining({ userId: 'r1' })
     );
   });
 
-  it('releases the slot and logs when the email send throws', async () => {
+  it('suppresses the email when the recipient has chatted in the last 15 minutes', async () => {
+    mockChatUserFindByUserId.mockResolvedValueOnce({
+      lastSeenAt: new Date(Date.now() - 5 * 60 * 1000),
+    });
+
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockRedisSet).not.toHaveBeenCalled();
+    expect(mockRedisRpush).not.toHaveBeenCalled();
+    expect(mockSendChatMentionEmail).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      'Chat mention email suppressed — recipient active',
+      expect.objectContaining({ userId: 'r1' })
+    );
+  });
+
+  it('still emails when the recipient last chatted more than 15 minutes ago', async () => {
+    mockChatUserFindByUserId.mockResolvedValueOnce({
+      lastSeenAt: new Date(Date.now() - 20 * 60 * 1000),
+    });
     mockRedisSet.mockResolvedValueOnce('OK');
+    mockSendChatMentionEmail.mockResolvedValueOnce(true);
+
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockSendChatMentionEmail).toHaveBeenCalled();
+  });
+
+  it('re-buffers entries and releases the throttle when sending fails', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    mockRedisLrange.mockResolvedValueOnce([
+      JSON.stringify({
+        authorUsername: 'a1',
+        body: 'first',
+        createdAt: '2026-05-18T11:00:00.000Z',
+      }),
+    ]);
     mockSendChatMentionEmail.mockRejectedValueOnce(new Error('SES down'));
 
-    await ChatMentionService.notifyMentions(params);
+    await ChatMentionService.notifyMentions(baseParams);
 
-    expect(mockRedisDel).toHaveBeenCalledWith('chat:mention-throttle:author-1:r1');
+    expect(mockRedisDel).toHaveBeenCalledWith('chat:mention-throttle:r1');
+    expect(mockRedisRpush).toHaveBeenCalledWith(
+      'chat:mention-pending:r1',
+      JSON.stringify({
+        authorUsername: 'a1',
+        body: 'first',
+        createdAt: '2026-05-18T11:00:00.000Z',
+      }),
+      JSON.stringify({
+        authorUsername: 'author',
+        body: 'hey @recip',
+        createdAt: '2026-05-18T12:00:00.000Z',
+      })
+    );
     expect(mockLoggerError).toHaveBeenCalledWith(
       'Chat mention email failed',
       expect.objectContaining({ userId: 'r1', error: 'SES down' })
@@ -175,10 +282,12 @@ describe('ChatMentionService.notifyMentions', () => {
     mockRedisSet.mockResolvedValueOnce('OK');
     mockSendChatMentionEmail.mockResolvedValueOnce(true);
 
-    await ChatMentionService.notifyMentions({ ...params, authorUsername: null });
+    await ChatMentionService.notifyMentions({ ...baseParams, authorUsername: null });
 
     expect(mockSendChatMentionEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ authorUsername: 'Someone' })
+      expect.objectContaining({
+        mentions: [expect.objectContaining({ authorUsername: 'Someone' })],
+      })
     );
   });
 
@@ -186,11 +295,27 @@ describe('ChatMentionService.notifyMentions', () => {
     mockRedisSet.mockResolvedValueOnce('OK');
     mockSendChatMentionEmail.mockRejectedValueOnce('boom-string');
 
-    await ChatMentionService.notifyMentions(params);
+    await ChatMentionService.notifyMentions(baseParams);
 
     expect(mockLoggerError).toHaveBeenCalledWith(
       'Chat mention email failed',
       expect.objectContaining({ error: 'boom-string' })
+    );
+  });
+
+  it('drops malformed buffered entries silently and still emails the current mention', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    mockRedisLrange.mockResolvedValueOnce(['not-json{', JSON.stringify({ wrong: 'shape' })]);
+    mockSendChatMentionEmail.mockResolvedValueOnce(true);
+
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockSendChatMentionEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mentions: [
+          { authorUsername: 'author', body: 'hey @recip', createdAt: '2026-05-18T12:00:00.000Z' },
+        ],
+      })
     );
   });
 });

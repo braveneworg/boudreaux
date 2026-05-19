@@ -3,10 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { LOGO_URL } from './constants';
 
+export interface ChatMentionEntry {
+  authorUsername: string;
+  body: string;
+  /** ISO timestamp; rendered as a localized short string in the email. */
+  createdAt: string;
+}
+
 export interface ChatMentionEmailData {
   recipientUsername: string;
-  authorUsername: string;
-  messageBody: string;
+  mentions: ChatMentionEntry[];
   signInUrl: string;
 }
 
@@ -25,8 +31,39 @@ function truncate(text: string, max = 280): string {
   return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toUTCString();
+}
+
+function renderMentionCard(mention: ChatMentionEntry, includeAuthor: boolean): string {
+  const safeBody = escapeHtml(truncate(mention.body));
+  const safeAuthor = escapeHtml(mention.authorUsername);
+  const timestamp = formatTimestamp(mention.createdAt);
+  const header = includeAuthor
+    ? `<strong style="color: #18181b;">${safeAuthor}</strong><span style="color: #71717a;"> &middot; ${escapeHtml(timestamp)}</span>`
+    : `<span style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Message</span>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden; margin-bottom: 12px;">
+              <tr>
+                <td style="padding: 12px 16px; background-color: #fafafa;">
+                  <div style="font-size: 13px; margin-bottom: 4px;">${header}</div>
+                  <p style="margin: 4px 0 0; color: #18181b; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${safeBody}</p>
+                </td>
+              </tr>
+            </table>`;
+}
+
 export function buildChatMentionEmailHtml(data: ChatMentionEmailData): string {
-  const safeBody = escapeHtml(truncate(data.messageBody));
+  const isDigest = data.mentions.length > 1;
+  const headerLabel = isDigest ? `Chat Mentions (${data.mentions.length})` : 'Chat Mention';
+  const title = isDigest
+    ? `You have ${data.mentions.length} new mentions, ${escapeHtml(data.recipientUsername)}.`
+    : `You were mentioned, ${escapeHtml(data.recipientUsername)}.`;
+  const intro = isDigest
+    ? `You were mentioned ${data.mentions.length} times in Fake Four Inc. chat.`
+    : `<strong>${escapeHtml(data.mentions[0]?.authorUsername ?? 'Someone')}</strong> mentioned you in Fake Four Inc. chat.`;
+  const cards = data.mentions.map((m) => renderMentionCard(m, isDigest)).join('\n              ');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -51,7 +88,7 @@ export function buildChatMentionEmailHtml(data: ChatMentionEmailData): string {
                   </td>
                   <td style="vertical-align: middle; padding-left: 14px;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.025em;">Fake Four Inc.</h1>
-                    <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">Chat Mention</p>
+                    <p style="margin: 4px 0 0; color: #a1a1aa; font-size: 13px;">${headerLabel}</p>
                   </td>
                 </tr>
               </table>
@@ -61,30 +98,23 @@ export function buildChatMentionEmailHtml(data: ChatMentionEmailData): string {
           <!-- Greeting -->
           <tr>
             <td style="padding: 24px 32px 0;">
-              <h2 style="margin: 0; color: #18181b; font-size: 18px; font-weight: 600;">You were mentioned, ${escapeHtml(data.recipientUsername)}.</h2>
+              <h2 style="margin: 0; color: #18181b; font-size: 18px; font-weight: 600;">${title}</h2>
               <p style="margin: 8px 0 0; color: #27272a; font-size: 14px; line-height: 1.6;">
-                <strong>${escapeHtml(data.authorUsername)}</strong> mentioned you in Fake Four Inc. chat.
+                ${intro}
               </p>
             </td>
           </tr>
 
-          <!-- Message preview -->
+          <!-- Messages -->
           <tr>
             <td style="padding: 20px 32px 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 12px 16px; background-color: #fafafa;">
-                    <span style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Message</span>
-                    <p style="margin: 4px 0 0; color: #18181b; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${safeBody}</p>
-                  </td>
-                </tr>
-              </table>
+              ${cards}
             </td>
           </tr>
 
           <!-- CTA -->
           <tr>
-            <td style="padding: 24px 32px;">
+            <td style="padding: 12px 32px 24px;">
               <p style="margin: 0 0 16px; color: #27272a; font-size: 14px; line-height: 1.6;">
                 Open the chat to jump straight to the mention.
               </p>
