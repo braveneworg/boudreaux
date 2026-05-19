@@ -195,11 +195,14 @@ export class ChatMentionService {
         const mentions = [...previous, current].slice(-MENTION_BUFFER_MAX_ENTRIES);
 
         try {
-          await sendChatMentionEmail({
+          const sent = await sendChatMentionEmail({
             toEmail: recipient.email,
             recipientUsername: recipient.username,
             mentions,
           });
+          if (!sent) {
+            throw new Error('Chat mention email send returned false');
+          }
         } catch (error) {
           // Re-buffer so the next mention can retry, and release the
           // throttle so the next mention is the one that flushes.

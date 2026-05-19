@@ -278,6 +278,42 @@ describe('ChatMentionService.notifyMentions', () => {
     );
   });
 
+  it('re-buffers entries and releases the throttle when sending returns false', async () => {
+    mockRedisSet.mockResolvedValueOnce('OK');
+    mockRedisLrange.mockResolvedValueOnce([
+      JSON.stringify({
+        authorUsername: 'a1',
+        body: 'first',
+        createdAt: '2026-05-18T11:00:00.000Z',
+      }),
+    ]);
+    mockSendChatMentionEmail.mockResolvedValueOnce(false);
+
+    await ChatMentionService.notifyMentions(baseParams);
+
+    expect(mockRedisDel).toHaveBeenCalledWith('chat:mention-throttle:r1');
+    expect(mockRedisRpush).toHaveBeenCalledWith(
+      'chat:mention-pending:r1',
+      JSON.stringify({
+        authorUsername: 'a1',
+        body: 'first',
+        createdAt: '2026-05-18T11:00:00.000Z',
+      }),
+      JSON.stringify({
+        authorUsername: 'author',
+        body: 'hey @recip',
+        createdAt: '2026-05-18T12:00:00.000Z',
+      })
+    );
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'Chat mention email failed',
+      expect.objectContaining({
+        userId: 'r1',
+        error: 'Chat mention email send returned false',
+      })
+    );
+  });
+
   it('falls back to "Someone" when the author has no username', async () => {
     mockRedisSet.mockResolvedValueOnce('OK');
     mockSendChatMentionEmail.mockResolvedValueOnce(true);
