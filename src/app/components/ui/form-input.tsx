@@ -8,15 +8,24 @@ interface FormInputProperties {
   placeholder: string;
   type: string;
   value: string;
+  autoComplete?: string;
   autoFocus?: boolean;
 }
 
-const FormInput = ({ id, placeholder, type, autoFocus, ...properties }: FormInputProperties) => (
+const FormInput = ({
+  id,
+  placeholder,
+  type,
+  autoComplete,
+  autoFocus,
+  ...properties
+}: FormInputProperties) => (
   <Input
     className="h-12 text-lg"
     id={id}
     placeholder={placeholder}
     type={type}
+    autoComplete={autoComplete}
     // eslint-disable-next-line jsx-a11y/no-autofocus
     autoFocus={autoFocus}
     {...properties}
