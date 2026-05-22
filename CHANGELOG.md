@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.87.0] - 2026-05-22
+
+### Added
+
+- fix: autocomplete email in inputs (#448)\n- fix: autocomplete email in inputs (#448)\n- fix: autocomplete email in inputs (#448)\n
+
 ## [4.86.0] - 2026-05-22
 
 ### Added
