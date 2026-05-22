@@ -288,7 +288,7 @@ export const ChatInput = ({
           style={{ fieldSizing: 'content' } as React.CSSProperties}
           className={cn(
             'border-input focus-visible:border-ring focus-visible:ring-ring/50',
-            'block w-full resize-none rounded-md border bg-transparent px-3 py-2 pr-12 text-sm leading-5',
+            'block w-full resize-none rounded-md border bg-transparent px-3 py-2 pr-12 text-base leading-5 md:text-sm',
             'transition-[color,box-shadow] outline-none focus-visible:ring-[3px]',
             'disabled:cursor-not-allowed disabled:opacity-60'
           )}
