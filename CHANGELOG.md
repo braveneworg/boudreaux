@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.86.0] - 2026-05-22
+
+### Added
+
+- fix: increase font-size in chat input (#447)\n- fix: increase font-size in chat input (#447)\n- fix: increase font-size in chat input (#447)\n
+
 ## [4.85.0] - 2026-05-21
 
 ### Added
