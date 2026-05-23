@@ -3,7 +3,7 @@
 
 @theme {
   --animate-marquee: marquee 15s linear infinite;
-  --color-rebecca-purple: #639;
+  --color-rebecca-purple: rebeccapurple;
 
   @keyframes marquee {
     0% {
@@ -95,6 +95,20 @@
   }
   html {
     height: 100%;
+    font-family:
+      'Jost',
+      sans-serif,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    text-transform: capitalize;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    text-wrap: wrap;
   }
 
   body {
@@ -113,27 +127,6 @@
     }
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family:
-      'Jost',
-      sans-serif,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif;
-    text-transform: capitalize;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    text-wrap: wrap;
-  }
   h1,
   h2 {
     font-weight: 600;
@@ -158,16 +151,6 @@
     line-height: 1.375rem;
   }
   a {
-    font-family:
-      'Jost',
-      sans-serif,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif;
     color: var(--color-blue-700);
     text-underline-offset: 0.25rem;
     &:hover {
@@ -184,7 +167,7 @@
 @utility banner-strip-dark {
   & a,
   & a:visited {
-    color: #ffffff;
+    color: var(--color-zinc-50);
     text-decoration: underline;
   }
 }
