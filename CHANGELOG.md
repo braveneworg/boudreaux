@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.88.0] - 2026-05-23
+
+### Added
+
+- chore: clean up globals css (#449)\n- chore: clean up globals css (#449)\n- chore: clean up globals css (#449)\n
+
 ## [4.87.0] - 2026-05-22
 
 ### Added
