@@ -96,9 +96,9 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
   // has rehydrated). Avoid `networkidle` — Pusher and other long-lived
   // connections keep the network busy and stall the wait until the timeout.
   await adminPage.reload();
-  await expect(
-    adminPage.locator('[role="list"][aria-label="Headlining artists"]')
-  ).toBeVisible({ timeout: 15000 });
+  await expect(adminPage.locator('[role="list"][aria-label="Headlining artists"]')).toBeVisible({
+    timeout: 15000,
+  });
 };
 
 test.describe('Admin Tour Date Artist Pills', () => {
