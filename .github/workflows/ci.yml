@@ -248,7 +248,12 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         timeout-minutes: 5
-        run: pnpm exec playwright install chromium
+        env:
+          DEBUG: pw:install
+        run: |
+          set -x
+          ./node_modules/.bin/playwright install chromium
+          echo "INSTALL_DONE"
 
       - name: Download build artifact
         uses: actions/download-artifact@v8
