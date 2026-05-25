@@ -89,13 +89,16 @@ const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
   // Submit the form
   await dialog.getByRole('button', { name: /Add Tour Date/i }).click();
 
-  // Wait for the dialog to close (allow extra time for dev-mode compilation on first run)
-  await expect(dialog).not.toBeVisible({ timeout: 60000 });
+  await expect(dialog).not.toBeVisible({ timeout: 15000 });
 
-  // The tour date is created server-side but the page may not immediately reflect the change.
-  // Reload to ensure the tour dates list is fresh.
+  // Reload so the tour dates list reflects the newly-created date, then wait
+  // for the headliner pill list to appear (the implicit signal that the page
+  // has rehydrated). Avoid `networkidle` — Pusher and other long-lived
+  // connections keep the network busy and stall the wait until the timeout.
   await adminPage.reload();
-  await adminPage.waitForLoadState('networkidle');
+  await expect(
+    adminPage.locator('[role="list"][aria-label="Headlining artists"]')
+  ).toBeVisible({ timeout: 15000 });
 };
 
 test.describe('Admin Tour Date Artist Pills', () => {
