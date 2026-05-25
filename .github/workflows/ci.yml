@@ -247,10 +247,12 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Install Playwright system deps
         if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 3
         run: pnpm exec playwright install-deps chromium
 
       - name: Download build artifact
