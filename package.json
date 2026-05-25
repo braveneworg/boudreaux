@@ -204,7 +204,6 @@
     "prisma": "^6.0.1",
     "shadcn": "^4.8.0",
     "sharp": "^0.34.5",
-    "tailwind": "^4.0.0",
     "tailwindcss": "^4.x",
     "tsc-files": "^1.1.4",
     "tsx": "^4.19.4",
