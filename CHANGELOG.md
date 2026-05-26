@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.89.0] - 2026-05-26
+
+### Added
+
+- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- chore: update-packages with vulnerabilities (#450)\n- Create centralized config for setup actions for node.js and pnpm (#451)\n
+
 ## [4.88.0] - 2026-05-23
 
 ### Added
