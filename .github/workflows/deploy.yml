@@ -318,19 +318,8 @@ jobs:
           fi
           echo "✓ Build artifact extracted and verified"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 10.12.4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24.14.1"
-          cache: "pnpm"
-
-      - name: Install dependencies for sync script
-        run: pnpm install --frozen-lockfile
+      - name: Setup environment
+        uses: ./.github/actions/setup
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -610,18 +599,9 @@ jobs:
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Install pnpm
+      - name: Setup pnpm + Node.js
         if: steps.bump-type.outputs.skip != 'true'
-        uses: pnpm/action-setup@v5
-        with:
-          version: 10.12.4
-
-      - name: Setup Node.js
-        if: steps.bump-type.outputs.skip != 'true'
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24.14.1"
-          cache: "pnpm"
+        uses: ./.github/actions/setup-tools
 
       - name: Bump version
         if: steps.bump-type.outputs.skip != 'true'
