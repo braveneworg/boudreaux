@@ -1,4 +1,41 @@
 packages:
   - '.'
+peerDependencyRules:
+  allowedVersions:
+    react: '^19.2.0'
+    react-dom: '^19.2.0'
+    nodemailer: '^8.0.5'
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - core-js
+  - esbuild
+  - msw
+  - prisma
+  - sharp
+  - unrs-resolver
+overrides:
+  c12>magicast: ^0.3.5
+  '@auth/core>nodemailer': ^8.0.5
+  typescript-eslint: ^8.58.0
+  '@typescript-eslint/utils': ^8.58.0
+  '@typescript-eslint/typescript-estree': ^8.58.0
+  '@typescript-eslint/tsconfig-utils': ^8.58.0
+  '@typescript-eslint/project-service': ^8.58.0
+  '@xmldom/xmldom': 0.9.9
+  lodash: 4.18.1
+  vite: ~7.3.2
+  defu: ^6.1.5
+  picomatch: ^4.0.4
+  effect: ^3.20.0
+  flatted: ^3.4.2
 shamefullyHoist: true
 strictPeerDependencies: false
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  msw: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

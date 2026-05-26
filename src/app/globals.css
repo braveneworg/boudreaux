@@ -105,7 +105,6 @@
       Helvetica,
       Arial,
       sans-serif;
-    text-transform: capitalize;
     overflow-wrap: break-word;
     word-wrap: break-word;
     text-wrap: wrap;
@@ -127,6 +126,14 @@
     }
   }
 
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-transform: capitalize;
+  }
   h1,
   h2 {
     font-weight: 600;
