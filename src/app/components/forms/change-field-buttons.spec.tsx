@@ -4,7 +4,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import ChangeFieldButtons from './change-field-buttons';
+import { ChangeFieldButtons } from './change-field-buttons';
 
 import type { UseFormReturn } from 'react-hook-form';
 

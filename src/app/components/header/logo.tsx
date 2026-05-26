@@ -10,7 +10,7 @@ interface LogoProps {
   isMobile: boolean;
 }
 
-const Logo = ({ isMobile }: Readonly<LogoProps>) => {
+export const Logo = ({ isMobile }: Readonly<LogoProps>) => {
   return (
     <Link href="/" className="shrink-0" prefetch={false}>
       <Image
@@ -29,5 +29,3 @@ const Logo = ({ isMobile }: Readonly<LogoProps>) => {
     </Link>
   );
 };
-
-export default Logo;

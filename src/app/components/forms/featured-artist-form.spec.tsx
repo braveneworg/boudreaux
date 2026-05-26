@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import FeaturedArtistForm from './featured-artist-form';
+import { FeaturedArtistForm } from './featured-artist-form';
 
 import type * as ReactHookFormTypes from 'react-hook-form';
 
@@ -78,13 +78,13 @@ vi.mock('@/app/components/forms/fields', () => ({
 }));
 
 vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
-  default: ({ name }: { name: string }) => (
+  CoverArtField: ({ name }: { name: string }) => (
     <div data-testid={`cover-art-field-${name}`}>CoverArtField</div>
   ),
 }));
 
 vi.mock('@/app/components/forms/fields/release-select', () => ({
-  default: ({
+  ReleaseSelect: ({
     name,
     setValue,
   }: {

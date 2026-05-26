@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
 import { ContentContainer } from '@/ui/content-container';
 import { Heading } from '@/ui/heading';
-import PageContainer from '@/ui/page-container';
+import { PageContainer } from '@/ui/page-container';
 import { PageSection } from '@/ui/page-section';
 import { PageSectionParagraph } from '@/ui/page-section-paragraph';
 

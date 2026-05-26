@@ -7,7 +7,7 @@ import { UserIcon } from 'lucide-react';
 
 import { useIsMobile } from '@/app/hooks/use-mobile';
 
-const EditProfileButton = () => {
+export const EditProfileButton = () => {
   const isMobile = useIsMobile();
 
   return isMobile ? null : (
@@ -17,5 +17,3 @@ const EditProfileButton = () => {
     </Link>
   );
 };
-
-export default EditProfileButton;

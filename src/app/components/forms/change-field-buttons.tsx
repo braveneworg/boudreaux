@@ -14,7 +14,7 @@ interface ChangeFieldFormProps<T extends FieldValues> {
   isTransitionPending: boolean;
 }
 
-const ChangeFieldButtons = <T extends FieldValues>({
+export const ChangeFieldButtons = <T extends FieldValues>({
   id,
   isEditingField,
   handleEditFieldButtonClick,
@@ -50,5 +50,3 @@ const ChangeFieldButtons = <T extends FieldValues>({
     </div>
   );
 };
-
-export default ChangeFieldButtons;

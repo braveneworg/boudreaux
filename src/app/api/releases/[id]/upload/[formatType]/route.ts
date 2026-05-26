@@ -10,15 +10,14 @@ import { extname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { Upload } from '@aws-sdk/lib-storage';
 
-import { auth } from '@/auth';
 import { supportsComment, writeComment } from '@/lib/audio-metadata';
 import { VALID_FORMAT_TYPES, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { withAdmin } from '@/lib/decorators/with-auth';
 import { UploadService } from '@/lib/services/upload-service';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 
@@ -44,24 +43,10 @@ export const maxDuration = 300;
  * 7. Clean up temp file
  * 8. Return { s3Key, contentType } for the client to pass to confirmDigitalFormatUploadAction
  */
-export async function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ id: string; formatType: string }> }
-): Promise<NextResponse> {
+export const PUT = withAdmin<{ id: string; formatType: string }>(async (request, context) => {
   const startTime = Date.now();
 
   try {
-    // Step 1: Admin auth check via session
-    const session = await auth();
-
-    if (!session?.user?.role || session.user.role !== 'admin') {
-      console.warn('[upload-proxy] Unauthorized upload attempt');
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED', message: 'Admin access required.' },
-        { status: 401 }
-      );
-    }
-
     const { id: releaseId, formatType } = await context.params;
     console.info(`[upload-proxy] START ${formatType} for release=${releaseId}`);
 
@@ -264,4 +249,4 @@ export async function PUT(
       { status: 500 }
     );
   }
-}
+});

@@ -3,29 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextResponse } from 'next/server';
 
-import { auth } from '@/auth';
+import { withAdmin } from '@/lib/decorators/with-auth';
 
 /**
  * Debug endpoint to check environment variable configuration.
  * SECURITY: Requires admin authentication - never expose env details to unauthenticated users.
  * Only returns boolean presence indicators, never actual values.
  */
-export async function GET() {
+export const GET = withAdmin(async () => {
   // Debug endpoints are disabled in production
   /* v8 ignore next 3 -- vitest config replaces `process.env.NODE_ENV` with `'test'` at compile time, so the production branch is dead-code-eliminated and not reachable from tests */
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  // Require admin authentication for debug endpoints
-  const session = await auth();
-
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  if (session.user.role !== 'admin') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
   }
 
   // Only return presence indicators, never actual values
@@ -36,4 +25,4 @@ export async function GET() {
     hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
     hasCdnDomain: !!process.env.CDN_DOMAIN,
   });
-}
+});

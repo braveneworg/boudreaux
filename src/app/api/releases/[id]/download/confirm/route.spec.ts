@@ -17,9 +17,9 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   DOWNLOAD_LIMIT: 10,
 }));
 
-const mockGetToken = vi.fn();
-vi.mock('next-auth/jwt', () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
+const mockAuth = vi.fn();
+vi.mock('@/auth', () => ({
+  auth: () => mockAuth(),
 }));
 
 const mockGetDownloadAccess = vi.fn();
@@ -64,7 +64,7 @@ function makeParams(id = '507f1f77bcf86cd799439011') {
 
 describe('POST /api/releases/[id]/download/confirm', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue({ sub: 'user-123' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-123', role: 'user' } });
     mockGetDownloadAccess.mockResolvedValue({
       allowed: true,
       reason: null,
@@ -75,14 +75,14 @@ describe('POST /api/releases/[id]/download/confirm', () => {
     mockLogDownloadEvent.mockResolvedValue(undefined);
   });
 
-  it('should return 401 when user is not authenticated', async () => {
-    mockGetToken.mockResolvedValue(null);
+  it('should return 401 when user is not authenticated (withAuth)', async () => {
+    mockAuth.mockResolvedValue(null);
 
     const response = await POST(makeRequest({ formats: ['FLAC'] }), makeParams());
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
+    expect(body.error).toBe('Authentication required');
   });
 
   it('should return 400 for invalid release ID', async () => {
@@ -268,25 +268,6 @@ describe('POST /api/releases/[id]/download/confirm', () => {
       );
     } finally {
       mockExtractClientIp.mockImplementation((_: NextRequest) => '127.0.0.1');
-    }
-  });
-
-  it('uses the __Secure cookie name when running in production outside of E2E', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('E2E_MODE', '');
-
-    try {
-      mockGetToken.mockResolvedValueOnce(null);
-      await POST(makeRequest({ formats: ['FLAC'] }), makeParams());
-
-      expect(mockGetToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cookieName: '__Secure-next-auth.session-token',
-          secureCookie: true,
-        })
-      );
-    } finally {
-      vi.unstubAllEnvs();
     }
   });
 });

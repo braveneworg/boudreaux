@@ -5,7 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import SuccessContainer from './container';
+import { SuccessContainer } from './container';
 
 // Mock next/link
 vi.mock('next/link', () => ({

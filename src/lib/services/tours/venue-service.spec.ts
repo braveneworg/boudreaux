@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
-import type { VenueCreateInput } from '@/lib/validations/tours/venue-schema';
+import type { VenueCreateInput } from '@/lib/validation/tours/venue-schema';
 
 import { VenueService } from './venue-service';
 

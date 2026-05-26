@@ -10,7 +10,7 @@ import {
   venueUpdateSchema,
   type VenueCreateInput,
   type VenueUpdateInput,
-} from '@/lib/validations/tours/venue-schema';
+} from '@/lib/validation/tours/venue-schema';
 
 import type { Venue } from '@prisma/client';
 

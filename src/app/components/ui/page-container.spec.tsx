@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import PageContainer from './page-container';
+import { PageContainer } from './page-container';
 
 describe('PageContainer', () => {
   it('renders', () => {

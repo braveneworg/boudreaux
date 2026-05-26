@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Calendar, MapPin, Music, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import TourDateForm from '@/app/admin/tours/components/tour-date-form';
+import { TourDateForm } from '@/app/admin/tours/components/tour-date-form';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,7 @@ import { useTourDatesQuery } from '@/app/hooks/use-tour-dates-query';
 import { deleteTourDateAction } from '@/lib/actions/tour-date-actions';
 import { formatTourDate, formatTourTime } from '@/lib/utils/timezone';
 
-import ArtistPillList from './artist-pill-list';
+import { ArtistPillList } from './artist-pill-list';
 
 import type { HeadlinerWithRelations } from './artist-pill';
 
@@ -83,7 +83,7 @@ interface TourDateListProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
-export default function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) {
+export function TourDateList({ tourId, onDialogOpenChange }: TourDateListProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const { isPending: isLoading, data: tourDatesData, refetch } = useTourDatesQuery(tourId);
   const tourDates = (tourDatesData?.tourDates ?? []) as unknown as TourDateWithRelations[];

@@ -5,7 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import StatusIndicator from '@/app/components/ui/status-indicator';
+import { StatusIndicator } from '@/app/components/ui/status-indicator';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({

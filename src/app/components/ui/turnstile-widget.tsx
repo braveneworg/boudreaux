@@ -7,9 +7,9 @@ import React, { useEffect } from 'react';
 
 import Turnstile, { useTurnstile } from 'react-turnstile';
 
-import { useMediaQuery } from '@/lib/utils/useMediaQuery';
+import { useMediaQuery } from '@/lib/utils/use-media-query';
 
-const TurnstileWidget = ({
+export const TurnstileWidget = ({
   isVerified: _isVerified,
   setIsVerified,
   onToken,
@@ -57,5 +57,3 @@ const TurnstileWidget = ({
     </div>
   );
 };
-
-export default TurnstileWidget;

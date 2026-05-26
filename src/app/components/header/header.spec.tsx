@@ -33,7 +33,7 @@ vi.mock('next/image', () => ({
 
 // Mock Logo component
 vi.mock('./logo', () => ({
-  default: ({ isMobile }: { isMobile?: boolean }) => (
+  Logo: ({ isMobile }: { isMobile?: boolean }) => (
     <div data-is-mobile={isMobile} data-testid="logo">
       Logo
     </div>
@@ -42,7 +42,7 @@ vi.mock('./logo', () => ({
 
 // Mock HamburgerMenu component
 vi.mock('../ui/hamburger-menu', () => ({
-  default: () => <div data-testid="hamburger-menu">HamburgerMenu</div>,
+  HamburgerMenu: () => <div data-testid="hamburger-menu">HamburgerMenu</div>,
 }));
 
 describe('Header', () => {

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import Footer from './footer';
+import { Footer } from './footer';
 
 describe('Footer', () => {
   it('renders the footer element', () => {

@@ -2,12 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { NextRequest } from 'next/server';
-
-import { getToken } from 'next-auth/jwt';
+import { NextResponse } from 'next/server';
 
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
+import { withAuth } from '@/lib/decorators/with-auth';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
 import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
@@ -29,17 +28,14 @@ interface ConfirmRequestBody {
  *
  * Body: { formats: ["FLAC", "WAV"] }
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-): Promise<Response> {
+export const POST = withAuth<{ id: string }>(async (request, context, session) => {
   try {
     // Rate limiting
     const ip = extractClientIp(request);
     try {
       await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
     } catch {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: 'RATE_LIMITED',
@@ -49,28 +45,12 @@ export async function POST(
       );
     }
 
-    // Step 1: Authentication
-    const secureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-      cookieName: secureCookie ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
-      secureCookie,
-    });
-
-    if (!token?.sub) {
-      return Response.json(
-        { success: false, error: 'UNAUTHORIZED', message: 'You must be logged in.' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const userId = token.sub;
+    const userId = session.user.id;
     const { id: releaseId } = await context.params;
 
     // Validate release ID
     if (!isValidObjectId(releaseId)) {
-      return Response.json(
+      return NextResponse.json(
         { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -81,14 +61,14 @@ export async function POST(
     try {
       body = (await request.json()) as ConfirmRequestBody;
     } catch {
-      return Response.json(
+      return NextResponse.json(
         { success: false, error: 'INVALID_BODY', message: 'Invalid JSON body.' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     if (!Array.isArray(body.formats) || body.formats.length === 0) {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: 'INVALID_FORMATS',
@@ -107,7 +87,7 @@ export async function POST(
     );
 
     if (validFormats.length === 0) {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: 'INVALID_FORMATS',
@@ -121,7 +101,7 @@ export async function POST(
     const access = await PurchaseService.getDownloadAccess({ kind: 'user', userId }, releaseId);
 
     if (!access.allowed) {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: access.reason === 'no_purchase' ? 'PURCHASE_REQUIRED' : 'DOWNLOAD_LIMIT',
@@ -155,13 +135,13 @@ export async function POST(
       )
     );
 
-    return Response.json({ success: true }, { headers: NO_STORE_HEADERS });
+    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Download confirm error', { error });
 
-    return Response.json(
+    return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
-}
+});

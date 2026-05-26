@@ -20,7 +20,7 @@ interface ChatEmojiPickerInnerProps {
  * the parent `chat-emoji-picker.tsx` can lazy-load it with
  * `next/dynamic`, keeping the ~200KB dataset out of the initial chat bundle.
  */
-const ChatEmojiPickerInner = ({ onSelect }: ChatEmojiPickerInnerProps) => {
+export const ChatEmojiPickerInner = ({ onSelect }: ChatEmojiPickerInnerProps) => {
   return (
     <Picker
       data={data}
@@ -33,5 +33,3 @@ const ChatEmojiPickerInner = ({ onSelect }: ChatEmojiPickerInnerProps) => {
     />
   );
 };
-
-export default ChatEmojiPickerInner;

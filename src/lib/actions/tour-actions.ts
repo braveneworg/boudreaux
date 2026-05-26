@@ -11,7 +11,7 @@ import { TourService } from '@/lib/services/tours/tour-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import { tourCreateSchema, tourUpdateSchema } from '@/lib/validations/tours/tour-schema';
+import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';

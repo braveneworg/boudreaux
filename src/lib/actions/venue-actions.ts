@@ -11,7 +11,7 @@ import { VenueService } from '@/lib/services/tours/venue-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import { venueCreateSchema, venueUpdateSchema } from '@/lib/validations/tours/venue-schema';
+import { venueCreateSchema, venueUpdateSchema } from '@/lib/validation/tours/venue-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';

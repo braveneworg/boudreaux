@@ -14,7 +14,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ArtistDetailContent } from '@/app/components/artist-detail-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
 import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';

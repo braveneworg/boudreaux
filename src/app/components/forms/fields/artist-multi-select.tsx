@@ -50,7 +50,7 @@ interface ArtistMultiSelectProps<
   initialArtists?: ArtistOption[];
 }
 
-export default function ArtistMultiSelect<
+export function ArtistMultiSelect<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

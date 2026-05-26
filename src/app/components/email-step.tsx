@@ -27,7 +27,7 @@ import {
 } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';
 import { Switch } from '@/app/components/ui/switch';
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 import { emailStepSchema } from '@/lib/validation/email-step-schema';
 import type { EmailStepFormSchemaType } from '@/lib/validation/email-step-schema';

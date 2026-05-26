@@ -103,9 +103,12 @@ export function CustomPrismaAdapter(p: PrismaClient): Adapter {
         }
       }
 
-      // Generate a unique placeholder username to avoid null constraint issues
-      // Users will be prompted to set their actual us  ername later
-      const placeholderUsername = generateUsername('', 0, 15);
+      // Generate a unique placeholder username to avoid null constraint issues.
+      // Users will be prompted to set their actual username later. The
+      // generator can return characters like apostrophes (e.g. "ne'er") that
+      // are unsafe for URLs and display — strip anything that isn't
+      // lowercase-alphanumeric or hyphen.
+      const placeholderUsername = generateUsername('', 0, 15).replace(/[^a-z0-9-]/g, '');
 
       const user = await p.user.create({
         data: {

@@ -22,7 +22,7 @@ interface CheckboxFieldProps<
   setValue?: UseFormSetValue<TFieldValues>;
 }
 
-export default function CheckboxField<
+export function CheckboxField<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

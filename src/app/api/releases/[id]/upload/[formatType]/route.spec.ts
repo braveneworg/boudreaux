@@ -160,17 +160,17 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
   });
 
-  it('should return 401 when user is not authenticated', async () => {
+  it('should return 401 when user is not authenticated (withAdmin)', async () => {
     mockAuth.mockResolvedValue(null);
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
+    expect(body.error).toBe('Authentication required');
   });
 
-  it('should return 401 when user is not admin', async () => {
+  it('should return 403 when user is not admin (withAdmin)', async () => {
     mockAuth.mockResolvedValue({
       user: { id: 'user-1', role: 'user', email: 'user@test.com' },
     });
@@ -178,8 +178,8 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('Insufficient permissions');
   });
 
   it('should return 400 for invalid format type', async () => {

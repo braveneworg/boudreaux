@@ -4,9 +4,9 @@
 'use client';
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/app/components/ui/sheet';
-import AuthToolbar from '@/components/auth/auth-toolbar';
+import { AuthToolbar } from '@/components/auth/auth-toolbar';
 
-import SocialMediaIconLinks from './social-media-icon-links';
+import { SocialMediaIconLinks } from './social-media-icon-links';
 
 export interface MenuItem {
   name: string;
@@ -29,7 +29,7 @@ export interface HamburgerMenuSheetProps {
   children?: React.ReactNode;
 }
 
-export default function HamburgerMenuSheet({
+export function HamburgerMenuSheet({
   isOpen,
   onOpenChange,
   menuItems,

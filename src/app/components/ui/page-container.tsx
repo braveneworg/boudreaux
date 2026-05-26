@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { cn } from '@/lib/utils';
 
-const PageContainer = ({
+export const PageContainer = ({
   children,
   className,
 }: {
@@ -16,5 +16,3 @@ const PageContainer = ({
     </div>
   );
 };
-
-export default PageContainer;

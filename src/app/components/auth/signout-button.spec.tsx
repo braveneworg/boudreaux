@@ -19,7 +19,7 @@ vi.mock('@/app/hooks/use-mobile', () => ({
 
 // Mock child components
 vi.mock('./signed-in-as', () => ({
-  default: ({ onClick }: { onClick?: () => void }) => (
+  SignedInAs: ({ onClick }: { onClick?: () => void }) => (
     <div data-testid="signed-in-as">
       <button data-testid="signed-in-as-action" onClick={onClick}>
         Signed In As
@@ -29,7 +29,7 @@ vi.mock('./signed-in-as', () => ({
 }));
 
 vi.mock('./edit-profile-button', () => ({
-  default: () => <div data-testid="edit-profile-button">Edit Profile Button</div>,
+  EditProfileButton: () => <div data-testid="edit-profile-button">Edit Profile Button</div>,
 }));
 
 vi.mock('./admin-link', () => ({
@@ -49,7 +49,7 @@ vi.mock('./sign-out-button', () => ({
 }));
 
 vi.mock('../ui/vertical-separator', () => ({
-  default: () => <div data-testid="vertical-separator">|</div>,
+  VerticalSeparator: () => <div data-testid="vertical-separator">|</div>,
 }));
 
 vi.mock('../gravatar-avatar', () => ({

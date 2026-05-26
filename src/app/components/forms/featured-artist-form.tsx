@@ -14,8 +14,8 @@ import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TextField } from '@/app/components/forms/fields';
-import CoverArtField from '@/app/components/forms/fields/cover-art-field';
-import ReleaseSelect, { type ReleaseOption } from '@/app/components/forms/fields/release-select';
+import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
+import { ReleaseSelect, type ReleaseOption } from '@/app/components/forms/fields/release-select';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -87,7 +87,7 @@ const ToastContent = ({
   </>
 );
 
-export default function FeaturedArtistForm({
+export function FeaturedArtistForm({
   featuredArtistId: initialFeaturedArtistId,
 }: FeaturedArtistFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);

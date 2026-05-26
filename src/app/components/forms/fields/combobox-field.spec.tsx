@@ -7,7 +7,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import ComboboxField from './combobox-field';
+import { ComboboxField } from './combobox-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 

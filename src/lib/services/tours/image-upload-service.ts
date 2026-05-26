@@ -14,8 +14,8 @@ import {
   SUPPORTED_IMAGE_TYPES,
   type ImageUploadRequest,
   type PresignedUrlResponse,
-} from '@/lib/validations/tours/image-schema';
-import type { TourDateImageUploadRequest } from '@/lib/validations/tours/tour-date-image-schema';
+} from '@/lib/validation/tours/image-schema';
+import type { TourDateImageUploadRequest } from '@/lib/validation/tours/tour-date-image-schema';
 
 /**
  * Service for handling tour image uploads to S3

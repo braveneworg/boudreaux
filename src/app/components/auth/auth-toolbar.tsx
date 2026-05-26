@@ -11,13 +11,13 @@ import { CONSTANTS } from '@/lib/constants';
 import { log } from '@/lib/utils/console-logger';
 import { cn } from '@/lib/utils/tailwind-utils';
 import { MessageSpinner } from '@/ui/spinners/message-spinner';
-import VerticalSeparator from '@/ui/vertical-separator';
+import { VerticalSeparator } from '@/ui/vertical-separator';
 
-import SignInLink from './signin-link';
+import { SignInLink } from './signin-link';
 import { SignedInToolbar } from './signout-button';
-import SignUpLink from './signup-link';
+import { SignUpLink } from './signup-link';
 
-const AuthToolbar = ({
+export const AuthToolbar = ({
   className,
   onNavigate,
 }: {
@@ -70,5 +70,3 @@ const AuthToolbar = ({
     </div>
   );
 };
-
-export default AuthToolbar;

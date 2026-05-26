@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import ReleaseForm from '@/app/components/forms/release-form';
+import { ReleaseForm } from '@/app/components/forms/release-form';
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -61,10 +61,10 @@ vi.mock('@/app/components/forms/digital-formats-accordion', () => ({
   DigitalFormatsAccordion: () => <div data-testid="digital-formats-accordion" />,
 }));
 vi.mock('@/app/components/forms/fields/artist-multi-select', () => ({
-  default: () => <div data-testid="artist-multi-select" />,
+  ArtistMultiSelect: () => <div data-testid="artist-multi-select" />,
 }));
 vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
-  default: () => <div data-testid="cover-art-field" />,
+  CoverArtField: () => <div data-testid="cover-art-field" />,
 }));
 vi.mock('@/app/components/ui/image-uploader', () => ({
   ImageUploader: () => <div data-testid="image-uploader" />,

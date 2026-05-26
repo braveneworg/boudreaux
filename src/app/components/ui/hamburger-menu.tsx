@@ -8,12 +8,12 @@ import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 
 import { Button } from '@/app/components/ui/button';
-import HamburgerMenuSheet from '@/app/components/ui/hamburger-menu-sheet';
-import HamburgerPatty from '@/app/components/ui/hamburger-patty';
+import { HamburgerMenuSheet } from '@/app/components/ui/hamburger-menu-sheet';
+import { HamburgerPatty } from '@/app/components/ui/hamburger-patty';
 
 import { SheetTrigger } from './sheet';
 
-export default function HamburgerMenu() {
+export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';

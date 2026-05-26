@@ -11,7 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import TourDateList from '@/app/admin/tours/components/tour-date-list';
+import { TourDateList } from '@/app/admin/tours/components/tour-date-list';
 import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload';
 import { TextField } from '@/app/components/forms/fields';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
@@ -30,7 +30,7 @@ import { Separator } from '@/app/components/ui/separator';
 import { Textarea } from '@/app/components/ui/textarea';
 import { createTourAction, updateTourAction, deleteTourAction } from '@/lib/actions/tour-actions';
 import type { FormState } from '@/lib/types/form-state';
-import { tourCreateSchema, tourUpdateSchema } from '@/lib/validations/tours/tour-schema';
+import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
 
 /**
  * Local interface matching Prisma TourImage model.
@@ -67,7 +67,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export default function TourForm({ tourId, initialTour = null }: TourFormProps) {
+export function TourForm({ tourId, initialTour = null }: TourFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
   const [isLoadingTour, setIsLoadingTour] = useState(!!tourId);

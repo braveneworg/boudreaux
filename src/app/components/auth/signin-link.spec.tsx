@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import SignInLink from './signin-link';
+import { SignInLink } from './signin-link';
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({

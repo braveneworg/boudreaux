@@ -4,8 +4,6 @@
 
 import { Separator } from './separator';
 
-const VerticalSeparator = ({ className }: { className?: string }) => {
+export const VerticalSeparator = ({ className }: { className?: string }) => {
   return <Separator className={className} orientation="vertical" />;
 };
-
-export default VerticalSeparator;

@@ -43,7 +43,7 @@ export interface HamburgerPattyProps {
   opacityClosed?: number;
 }
 
-export default function HamburgerPatty({
+export function HamburgerPatty({
   isOpen = false,
   rotateOpen = 45,
   rotateClosed = 0,

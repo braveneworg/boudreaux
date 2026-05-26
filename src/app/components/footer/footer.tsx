@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import VerticalSeparator from '@/ui/vertical-separator';
+import { VerticalSeparator } from '@/ui/vertical-separator';
 
-const Footer = () => {
+export const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -44,5 +44,3 @@ const Footer = () => {
     </footer>
   );
 };
-
-export default Footer;

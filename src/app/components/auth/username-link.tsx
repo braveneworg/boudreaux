@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-const UsernameLink = ({ username }: { username: string }) => {
+export const UsernameLink = ({ username }: { username: string }) => {
   return (
     <Link
       href={`/profile/${username}`}
@@ -13,5 +13,3 @@ const UsernameLink = ({ username }: { username: string }) => {
     </Link>
   );
 };
-
-export default UsernameLink;

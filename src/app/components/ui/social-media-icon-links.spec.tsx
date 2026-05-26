@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import SocialMediaIconLinks from './social-media-icon-links';
+import { SocialMediaIconLinks } from './social-media-icon-links';
 
 const SOCIAL_LINKS = [
   { label: 'Facebook', href: 'https://facebook.com/fakefourinc', testId: 'facebook-icon' },

@@ -68,7 +68,7 @@ interface VenueSelectProps<
   onVenueSelect?: (venue: VenueOption) => void;
 }
 
-export default function VenueSelect<
+export function VenueSelect<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

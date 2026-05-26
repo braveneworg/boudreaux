@@ -12,10 +12,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 // emoji-mart ships a ~200KB picker — lazy load so the chat bundle isn't
 // inflated for users who never react. SSR is disabled because the picker
 // is keyboard/touch-driven and has no useful server output.
-const EmojiPicker = dynamic(() => import('./chat-emoji-picker-inner'), {
-  ssr: false,
-  loading: () => <div className="text-muted-foreground p-4 text-xs">Loading emoji…</div>,
-});
+const EmojiPicker = dynamic(
+  () => import('./chat-emoji-picker-inner').then((mod) => mod.ChatEmojiPickerInner),
+  {
+    ssr: false,
+    loading: () => <div className="text-muted-foreground p-4 text-xs">Loading emoji…</div>,
+  }
+);
 
 interface ChatEmojiPickerProps {
   trigger: ReactNode;

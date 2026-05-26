@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import CheckboxField from './checkbox-field';
+import { CheckboxField } from './checkbox-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 

@@ -4,7 +4,7 @@
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { PageSection } from '@/app/components/ui/page-section';
 import { PageSectionParagraph } from '@/app/components/ui/page-section-paragraph';
 

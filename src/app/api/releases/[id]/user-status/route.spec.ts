@@ -59,7 +59,7 @@ describe('GET /api/releases/[id]/user-status', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toEqual({ error: 'Authentication required' });
   });
 
   it('should return 401 when session has no user id', async () => {
@@ -72,7 +72,7 @@ describe('GET /api/releases/[id]/user-status', () => {
   });
 
   it('should return user status with purchase info and resetInHours', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findByUserAndRelease).mockResolvedValue({
       purchasedAt: new Date('2024-06-01'),
     } as never);
@@ -108,7 +108,7 @@ describe('GET /api/releases/[id]/user-status', () => {
   });
 
   it('should map availableFormats fileName from fileName, files[0], and fallback format zip', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findByUserAndRelease).mockResolvedValue(null as never);
 
     mockFindAllByRelease.mockResolvedValue([
@@ -130,7 +130,7 @@ describe('GET /api/releases/[id]/user-status', () => {
   });
 
   it('should return default values when no purchase exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findByUserAndRelease).mockResolvedValue(null as never);
 
     mockFindAllByRelease.mockResolvedValue([]);
@@ -146,8 +146,9 @@ describe('GET /api/releases/[id]/user-status', () => {
     expect(data.resetInHours).toBeNull();
   });
 
-  it('should return 500 when an exception is thrown', async () => {
-    mockAuth.mockRejectedValue(new Error('Auth error'));
+  it('should return 500 when the service layer throws', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
+    vi.mocked(PurchaseRepository.findByUserAndRelease).mockRejectedValue(new Error('DB error'));
 
     const request = new NextRequest('http://localhost:3000/api/releases/release-1/user-status');
     const response = await GET(request, createParams('release-1'));

@@ -61,7 +61,7 @@ const menuLinks: MenuLink[] = [
   },
 ];
 
-const SocialMediaIconLinks = ({ className }: { className: string }) => (
+export const SocialMediaIconLinks = ({ className }: { className: string }) => (
   <div className={cn(['flex flex-wrap justify-end pt-0', className])}>
     {menuLinks.map((link) => (
       <Link
@@ -80,5 +80,3 @@ const SocialMediaIconLinks = ({ className }: { className: string }) => (
     ))}
   </div>
 );
-
-export default SocialMediaIconLinks;

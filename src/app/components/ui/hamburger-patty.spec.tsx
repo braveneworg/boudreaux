@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render } from '@testing-library/react';
 
-import HamburgerPatty from './hamburger-patty';
+import { HamburgerPatty } from './hamburger-patty';
 
 describe('HamburgerPatty', () => {
   it('renders', () => {

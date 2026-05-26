@@ -7,7 +7,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTurnstile } from 'react-turnstile';
 
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 
 // Store callbacks for testing
 let mockCallbacks: {
@@ -18,7 +18,7 @@ let mockCallbacks: {
 } = {};
 
 const mockUseMediaQuery = vi.fn().mockReturnValue(false);
-vi.mock('@/lib/utils/useMediaQuery', () => ({
+vi.mock('@/lib/utils/use-media-query', () => ({
   useMediaQuery: (...args: unknown[]) => mockUseMediaQuery(...args),
 }));
 

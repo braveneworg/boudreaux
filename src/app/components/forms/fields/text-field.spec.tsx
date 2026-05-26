@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import TextField from './text-field';
+import { TextField } from './text-field';
 
 import type { Control, FieldPath, FieldValues } from 'react-hook-form';
 

@@ -43,7 +43,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export default function ProfileForm() {
+export function ProfileForm() {
   const [formState, profileFormAction, isPending] = useActionState(
     updateProfileAction,
     initialFormState

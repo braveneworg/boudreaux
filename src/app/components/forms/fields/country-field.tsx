@@ -8,7 +8,7 @@ import React from 'react';
 import { COUNTRIES } from '@/lib/utils/countries';
 import type { ProfileFormData } from '@/lib/validation/profile-schema';
 
-import ComboboxField from './combobox-field';
+import { ComboboxField } from './combobox-field';
 
 import type { Control, UseFormSetValue } from 'react-hook-form';
 
@@ -18,7 +18,7 @@ interface CountryFieldProps {
   setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export default function CountryField({ control, onUserInteraction, setValue }: CountryFieldProps) {
+export function CountryField({ control, onUserInteraction, setValue }: CountryFieldProps) {
   const countryOptions = COUNTRIES.map((country) => ({
     value: country.code,
     label: country.name,

@@ -8,11 +8,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { HealthStatus } from '@/lib/types/health-status';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
-import DataStoreHealthStatus from './data-store-health-status';
+import { DataStoreHealthStatus } from './data-store-health-status';
 
 // Mock child components
 vi.mock('./health-status-icon', () => ({
-  default: ({ status, isLoading }: { status: string | null; isLoading: boolean }) => (
+  HealthStatusIcon: ({ status, isLoading }: { status: string | null; isLoading: boolean }) => (
     <span data-is-loading={isLoading} data-status={status} data-testid="health-status-icon">
       Icon
     </span>
@@ -20,7 +20,7 @@ vi.mock('./health-status-icon', () => ({
 }));
 
 vi.mock('./health-status-message', () => ({
-  default: ({
+  HealthStatusMessage: ({
     healthStatus,
     isLoading,
   }: {

@@ -9,7 +9,7 @@ import { useSession } from 'next-auth/react';
 import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
-const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
+export const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const username = session?.user?.username;
@@ -42,5 +42,3 @@ const SignedInAs = ({ onClick }: { onClick?: () => void }) => {
     </>
   );
 };
-
-export default SignedInAs;

@@ -14,7 +14,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { ReleaseDetailContent } from '@/app/components/release-detail-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';

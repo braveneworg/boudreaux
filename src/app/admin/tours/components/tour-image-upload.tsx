@@ -5,18 +5,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
 import {
   generateUploadUrlAction,
   confirmUploadAction,
   deleteImageAction,
   reorderImagesAction,
-} from '@/app/actions/tour-images';
-import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
+} from '@/lib/actions/tours/tour-images';
 import {
   MAX_FILE_SIZE,
   MAX_IMAGES_PER_TOUR,
   SUPPORTED_IMAGE_TYPES,
-} from '@/lib/validations/tours/image-schema';
+} from '@/lib/validation/tours/image-schema';
 
 /**
  * Local interface matching Prisma TourImage model.

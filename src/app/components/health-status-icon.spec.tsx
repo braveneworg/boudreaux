@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render } from '@testing-library/react';
 
-import HealthStatusIcon from './health-status-icon';
+import { HealthStatusIcon } from './health-status-icon';
 
 describe('HealthStatusIcon', () => {
   describe('Loading State', () => {

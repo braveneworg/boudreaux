@@ -7,7 +7,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
-import CDNStatusBanner from './cdn-status-banner';
+import { CDNStatusBanner } from './cdn-status-banner';
 
 // Mock fetch
 const mockFetch = vi.fn();

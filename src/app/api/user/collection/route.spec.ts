@@ -22,22 +22,24 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 }));
 
 describe('GET /api/user/collection', () => {
+  const ctx = { params: Promise.resolve({}) };
+
   it('should return 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toEqual({ error: 'Authentication required' });
   });
 
   it('should return 401 when session has no user id', async () => {
     mockAuth.mockResolvedValue({ user: {} });
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
 
     expect(response.status).toBe(401);
   });
@@ -51,7 +53,7 @@ describe('GET /api/user/collection', () => {
     vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue(mockPurchases as never);
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -68,7 +70,7 @@ describe('GET /api/user/collection', () => {
     vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue([] as never);
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
     const data = await response.json();
 
     expect(data.isAdmin).toBe(true);
@@ -79,18 +81,18 @@ describe('GET /api/user/collection', () => {
     vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue([] as never);
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
     const data = await response.json();
 
     expect(data).toEqual({ purchases: [], count: 0, isAdmin: false });
   });
 
   it('should return 500 when an exception is thrown', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findAllByUser).mockRejectedValue(new Error('DB error'));
 
     const request = new NextRequest('http://localhost:3000/api/user/collection');
-    const response = await GET(request);
+    const response = await GET(request, ctx);
     const data = await response.json();
 
     expect(response.status).toBe(500);

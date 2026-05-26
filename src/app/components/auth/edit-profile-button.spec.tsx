@@ -5,7 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import EditProfileButton from './edit-profile-button';
+import { EditProfileButton } from './edit-profile-button';
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({

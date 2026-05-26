@@ -22,6 +22,9 @@ describe('GET /api/debug', () => {
       AWS_SECRET_ACCESS_KEY: 'test-secret',
       CDN_DOMAIN: 'https://cdn.example.com',
     };
+    mockAuth.mockResolvedValue({
+      user: { id: 'admin-1', email: 'admin@test.com', role: 'admin' },
+    });
   });
 
   afterEach(() => {
@@ -29,11 +32,7 @@ describe('GET /api/debug', () => {
   });
 
   it('should return 200 with environment variable presence for admin users', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'admin-1', email: 'admin@test.com', role: 'admin' },
-    });
-
-    const response = await GET();
+    const response = await GET(undefined as never, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -44,44 +43,30 @@ describe('GET /api/debug', () => {
     expect(data.hasCdnDomain).toBe(true);
   });
 
-  it('should return 401 when session is null', async () => {
+  it('should return 401 when session is null (withAdmin)', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(undefined as never, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Authentication required');
   });
 
-  it('should return 401 when session has no user', async () => {
-    mockAuth.mockResolvedValue({ user: undefined });
-
-    const response = await GET();
-    const data = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(data.error).toBe('Authentication required');
-  });
-
-  it('should return 403 for non-admin users', async () => {
+  it('should return 403 for non-admin users (withAdmin)', async () => {
     mockAuth.mockResolvedValue({
       user: { id: 'user-1', email: 'user@test.com', role: 'user' },
     });
 
-    const response = await GET();
+    const response = await GET(undefined as never, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toBe('Admin access required');
+    expect(data.error).toBe('Insufficient permissions');
   });
 
   it('should return boolean values for all environment variable checks', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'admin-1', email: 'admin@test.com', role: 'admin' },
-    });
-
-    const response = await GET();
+    const response = await GET(undefined as never, undefined as never);
     const data = await response.json();
 
     expect(typeof data.hasS3Bucket).toBe('boolean');
@@ -98,11 +83,7 @@ describe('GET /api/debug', () => {
     delete process.env.AWS_SECRET_ACCESS_KEY;
     delete process.env.CDN_DOMAIN;
 
-    mockAuth.mockResolvedValue({
-      user: { id: 'admin-1', email: 'admin@test.com', role: 'admin' },
-    });
-
-    const response = await GET();
+    const response = await GET(undefined as never, undefined as never);
     const data = await response.json();
 
     expect(response.status).toBe(200);

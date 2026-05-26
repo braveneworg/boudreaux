@@ -49,7 +49,7 @@ interface ReleaseMultiSelectProps<
   onReleasesChange?: (releases: ReleaseOption[]) => void;
 }
 
-export default function ReleaseMultiSelect<
+export function ReleaseMultiSelect<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
