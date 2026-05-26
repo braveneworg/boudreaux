@@ -4,16 +4,8 @@ description: 'Setup Node.js with pnpm and install dependencies'
 runs:
   using: 'composite'
   steps:
-    - name: Install pnpm
-      uses: pnpm/action-setup@v5
-      with:
-        version: '11.3.0+sha512.2c403d6594527287672b1f7056343a1f7c3634036a67ffabfcc2b3d7595d843768f8787148d1b57cf7956c90606bbd192857c363af19e96d2d0ec9ec5741d215'
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v6
-      with:
-        node-version: '24.14.1'
-        cache: 'pnpm'
+    - name: Install pnpm + Node.js
+      uses: ./.github/actions/setup-tools
 
     - name: Install dependencies
       shell: bash

@@ -6026,9 +6026,6 @@ packages:
       '@types/node':
         optional: true
 
-  strnum@2.2.3:
-    resolution: {integrity: sha512-oKx6RUCuHfT3oyVjtnrmn19H1SiCqgJSg+54XqURKp5aCMbrXrhLjRN9TjuwMjiYstZ0MzDrHqkGZ5dFTKd+zg==}
-
   strnum@2.3.0:
     resolution: {integrity: sha512-ums3KNd42PGyx5xaoVTO1mjU1bH3NpY4vsrVlnv9PNGqQj8wd7rJ6nEypLrJ7z5vxK5RP0yMLo6J/Gsm62DI5Q==}
 
@@ -10528,7 +10525,7 @@ snapshots:
       '@nodable/entities': 2.1.0
       fast-xml-builder: 1.2.0
       path-expression-matcher: 1.5.0
-      strnum: 2.2.3
+      strnum: 2.3.0
 
   fast-xml-parser@5.8.0:
     dependencies:
@@ -12519,8 +12516,6 @@ snapshots:
   stripe@21.0.1(@types/node@25.5.0):
     optionalDependencies:
       '@types/node': 25.5.0
-
-  strnum@2.2.3: {}
 
   strnum@2.3.0: {}
 
