@@ -96,12 +96,12 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>
       <body
-        className={`${jost.className} flex min-h-screen max-w-full flex-col overflow-x-hidden antialiased`}
+        className={`${jost.className} flex min-h-screen max-w-full flex-col overflow-x-clip antialiased`}
         suppressHydrationWarning
       >
         <Providers>
           <Header isMobile={isMobile} />
-          <main className="flex w-full max-w-full grow flex-col overflow-x-hidden">{children}</main>
+          <main className="flex w-full max-w-full grow flex-col overflow-x-clip">{children}</main>
           <Footer />
           <ChatLauncher />
         </Providers>

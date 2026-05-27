@@ -101,6 +101,34 @@ describe('ChatMessageRow', () => {
     expect(timeEl.getAttribute('title')).toBe('');
   });
 
+  describe('accessibility contrast', () => {
+    const adminUser = { id: 'admin-1', username: 'mod', gravatarHash: 'h', role: 'admin' as const };
+
+    it('renders the "(moderator)" badge with AA-contrast text (zinc-700, not muted)', () => {
+      render(<ChatMessageRow message={makeMsg({ user: adminUser })} />);
+      const badge = screen.getByText('(moderator)');
+      expect(badge).toHaveClass('text-zinc-700');
+      expect(badge).not.toHaveClass('text-muted-foreground');
+    });
+
+    it('renders the timestamp with AA-contrast text (zinc-700, not muted)', () => {
+      const { container } = render(<ChatMessageRow message={makeMsg()} />);
+      const timeEl = container.querySelector('time');
+      if (!timeEl) throw new Error('Expected a time element');
+      expect(timeEl).toHaveClass('text-zinc-700');
+      expect(timeEl).not.toHaveClass('text-muted-foreground');
+    });
+
+    it('keeps the AA-contrast classes for right-aligned rows', () => {
+      const { container } = render(
+        <ChatMessageRow align="right" message={makeMsg({ user: adminUser })} />
+      );
+      expect(screen.getByText('(moderator)')).toHaveClass('text-zinc-700');
+      const timeEl = container.querySelector('time');
+      expect(timeEl).toHaveClass('text-zinc-700');
+    });
+  });
+
   describe('admin markdown', () => {
     const adminUser = { id: 'admin-1', username: 'mod', gravatarHash: 'h', role: 'admin' as const };
 

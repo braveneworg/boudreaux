@@ -158,7 +158,7 @@ export const ChatMessageRow = ({
     <span className="text-foreground font-medium">
       {message.user.username ?? 'unknown'}
       {message.user.role === 'admin' && (
-        <span className="text-muted-foreground ml-1 font-normal">(moderator)</span>
+        <span className="ml-1 font-normal text-zinc-700">(moderator)</span>
       )}
     </span>
   );
@@ -167,7 +167,7 @@ export const ChatMessageRow = ({
       dateTime={message.createdAt}
       title={formatted.long}
       suppressHydrationWarning
-      className="text-muted-foreground text-[10px]"
+      className="text-[10px] text-zinc-700"
     >
       {formatted.short}
     </time>
