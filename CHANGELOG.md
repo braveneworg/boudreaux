@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.90.0] - 2026-05-27
+
+### Added
+
+- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- fix: update chat trigger a11y issue (#453)\n- fix: update chat trigger a11y issue (#453)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n- chore: make changes related to code review (#452)\n
+
 ## [4.89.0] - 2026-05-26
 
 ### Added
