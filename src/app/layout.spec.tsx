@@ -152,7 +152,14 @@ describe('RootLayout', () => {
       render(await RootLayout({ children: <div>Test</div> }));
 
       const main = screen.getByRole('main');
-      expect(main).toHaveClass('flex', 'flex-col', 'w-full', 'max-w-full', 'overflow-x-hidden');
+      expect(main).toHaveClass(
+        'flex',
+        'flex-col',
+        'w-full',
+        'max-w-full',
+        'grow',
+        'overflow-x-clip'
+      );
     });
   });
 
@@ -242,14 +249,14 @@ describe('RootLayout', () => {
       expect(jsx.props.suppressHydrationWarning).toBe(true);
     });
 
-    it('renders body with overflow-x-hidden class', async () => {
+    it('renders body with overflow-x-clip class', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
       const children = jsx.props.children;
       const body = Array.isArray(children)
         ? children.find((c: React.JSX.Element) => c.type === 'body')
         : children;
 
-      expect(body.props.className).toContain('overflow-x-hidden');
+      expect(body.props.className).toContain('overflow-x-clip');
     });
 
     it('renders body with layout classes', async () => {
