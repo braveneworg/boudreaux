@@ -21,7 +21,13 @@ export const ChatTriggerButton = ({ onOpen, className }: ChatTriggerButtonProps)
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={(event) => {
+        // Blur before opening so focus does not stay on this button while
+        // Vaul applies aria-hidden to elements outside the drawer (which
+        // would trip the "aria-hidden on a focused element" a11y warning).
+        event.currentTarget.blur();
+        onOpen();
+      }}
       aria-label="Open chat"
       className={cn(
         'fixed right-6 bottom-6 z-50 flex flex-col items-center gap-1',
