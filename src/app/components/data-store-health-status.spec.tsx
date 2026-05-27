@@ -41,8 +41,8 @@ vi.mock('./health-status-message', () => ({
   ),
 }));
 
-// Mock database utils
-vi.mock('../../lib/utils/database-utils', () => ({
+// Mock api base url helper
+vi.mock('../../lib/utils/api-base-url', () => ({
   getApiBaseUrl: () => 'http://localhost:3000',
 }));
 

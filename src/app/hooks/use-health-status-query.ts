@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query-keys';
 import type { HealthStatus } from '@/lib/types/health-status';
-import { getApiBaseUrl } from '@/lib/utils/database-utils';
+import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 
 const fetchHealthStatus = async (): Promise<HealthStatus> => {
   const baseUrl = getApiBaseUrl();
