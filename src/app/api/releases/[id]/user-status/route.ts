@@ -3,11 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { auth } from '@/auth';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
@@ -19,15 +18,10 @@ export const dynamic = 'force-dynamic';
  * Returns purchase status, download info, and available formats for the
  * authenticated user. Returns 401 if not authenticated.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withAuth<{ id: string }>(async (_request, context, session) => {
   try {
-    const { id: releaseId } = await params;
-    const session = await auth();
-    const userId = (session?.user as { id?: string })?.id ?? null;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { id: releaseId } = await context.params;
+    const userId = session.user.id;
 
     const [purchase, digitalFormats] = await Promise.all([
       PurchaseRepository.findByUserAndRelease(userId, releaseId),
@@ -55,4 +49,4 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     console.error('Release user-status GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

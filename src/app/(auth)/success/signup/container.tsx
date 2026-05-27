@@ -7,10 +7,10 @@ import { usePathname } from 'next/navigation';
 
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { PageSectionParagraph } from '@/app/components/ui/page-section-paragraph';
 
-const SuccessContainer = ({ email }: { email: string }) => {
+export const SuccessContainer = ({ email }: { email: string }) => {
   const path = usePathname();
   const isSignupPath = path === '/signup';
 
@@ -33,5 +33,3 @@ const SuccessContainer = ({ email }: { email: string }) => {
     </PageContainer>
   );
 };
-
-export default SuccessContainer;

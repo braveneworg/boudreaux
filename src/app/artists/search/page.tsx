@@ -13,7 +13,7 @@ import { ArtistSearchResultsPanel } from '@/app/components/artist-search-results
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { Heading } from '@/app/components/ui/heading';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';

@@ -341,6 +341,8 @@ interface InteractiveCoverArtProps {
  * />
  * ```
  */
+const COVER_ART_FADE_MS = 400;
+
 const InteractiveCoverArt = ({
   src,
   alt,
@@ -351,33 +353,49 @@ const InteractiveCoverArt = ({
 }: InteractiveCoverArtProps) => {
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [displaySrc, setDisplaySrc] = useState(src);
-  const [incomingSrc, setIncomingSrc] = useState<string | null>(null);
-  const [showIncomingImage, setShowIncomingImage] = useState(false);
-  const swapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // `currentSrc` is the image the user sees (full opacity, baseline layer).
+  // `nextSrc` is the incoming image being loaded silently on top; once its
+  // bytes are ready, it fades in and is promoted to `currentSrc`. Keeping
+  // the previous image visible during the swap avoids the brief gray-box
+  // flash that happens when `<Image>` unmounts before the new bytes arrive.
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [nextSrc, setNextSrc] = useState<string | null>(null);
+  const [nextLoaded, setNextLoaded] = useState(false);
+  const promoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (swapTimerRef.current) {
-        clearTimeout(swapTimerRef.current);
+      if (promoteTimerRef.current) {
+        clearTimeout(promoteTimerRef.current);
       }
     };
   }, []);
 
   useEffect(() => {
-    if (src === displaySrc || src === incomingSrc) {
-      return;
+    if (src === currentSrc || src === nextSrc) return;
+    if (promoteTimerRef.current) {
+      clearTimeout(promoteTimerRef.current);
+      promoteTimerRef.current = null;
     }
-
-    if (swapTimerRef.current) {
-      clearTimeout(swapTimerRef.current);
-      swapTimerRef.current = null;
-    }
-
     setImageError(false);
-    setShowIncomingImage(false);
-    setIncomingSrc(src);
-  }, [src, displaySrc, incomingSrc]);
+    setNextLoaded(false);
+    setNextSrc(src);
+  }, [src, currentSrc, nextSrc]);
+
+  const handleNextLoad = () => {
+    setNextLoaded(true);
+    // Promote after the fade completes. Uses a timer (rather than
+    // `onTransitionEnd`) so the cached-image case — where Chrome may skip
+    // the transition entirely — still results in a clean state promotion.
+    if (promoteTimerRef.current) {
+      clearTimeout(promoteTimerRef.current);
+    }
+    promoteTimerRef.current = setTimeout(() => {
+      setCurrentSrc((prev) => nextSrc ?? prev);
+      setNextSrc(null);
+      setNextLoaded(false);
+    }, COVER_ART_FADE_MS);
+  };
 
   const handleClick = () => {
     if (isPlaying) {
@@ -410,8 +428,10 @@ const InteractiveCoverArt = ({
         </div>
       ) : (
         <>
+          {/* Baseline layer — always visible at full opacity. Holds the
+              previously-selected image steady while a new one loads above. */}
           <Image
-            src={displaySrc}
+            src={currentSrc}
             alt={alt}
             fill
             className="object-cover"
@@ -426,38 +446,29 @@ const InteractiveCoverArt = ({
             fetchPriority={priority ? 'high' : undefined}
             onError={() => setImageError(true)}
           />
-          {incomingSrc ? (
+          {nextSrc && (
             <Image
-              src={incomingSrc}
+              // `key={nextSrc}` so a rapid second swap restarts loading
+              // cleanly rather than re-using the in-flight element.
+              key={nextSrc}
+              src={nextSrc}
               alt=""
               aria-hidden
               fill
               className={cn(
-                'pointer-events-none object-cover transition-opacity duration-500',
-                showIncomingImage ? 'opacity-100' : 'opacity-0'
+                'pointer-events-none object-cover transition-opacity ease-out',
+                nextLoaded ? 'opacity-100' : 'opacity-0'
               )}
+              style={{ transitionDuration: `${COVER_ART_FADE_MS}ms` }}
               sizes="(max-width: 640px) 100vw, 576px"
-              loading="eager"
               fetchPriority="low"
-              onLoad={() => {
-                setShowIncomingImage(true);
-
-                if (swapTimerRef.current) {
-                  clearTimeout(swapTimerRef.current);
-                }
-
-                swapTimerRef.current = setTimeout(() => {
-                  setDisplaySrc(incomingSrc);
-                  setIncomingSrc(null);
-                  setShowIncomingImage(false);
-                }, 500);
-              }}
+              onLoad={handleNextLoad}
               onError={() => {
-                setIncomingSrc(null);
-                setShowIncomingImage(false);
+                setNextSrc(null);
+                setNextLoaded(false);
               }}
             />
-          ) : null}
+          )}
         </>
       )}
       {/* Overlay - visible when not playing or briefly when pausing */}

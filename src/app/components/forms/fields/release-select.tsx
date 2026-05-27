@@ -57,7 +57,7 @@ interface ReleaseSelectProps<
   artistIds?: string[];
 }
 
-export default function ReleaseSelect<
+export function ReleaseSelect<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

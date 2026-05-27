@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
 import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
-import type { PresignedUrlResponse } from '@/lib/validations/tours/image-schema';
+import type { PresignedUrlResponse } from '@/lib/validation/tours/image-schema';
 import {
   MAX_IMAGES_PER_TOUR_DATE,
   tourDateConfirmUploadSchema,
@@ -23,7 +23,7 @@ import {
   type TourDateImageReorder,
   type TourDateImageUploadRequest,
   type TourDateUpdateImageAltText,
-} from '@/lib/validations/tours/tour-date-image-schema';
+} from '@/lib/validation/tours/tour-date-image-schema';
 
 export interface TourDateImageActionResponse<T = unknown> {
   success: boolean;

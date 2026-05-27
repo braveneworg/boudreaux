@@ -23,7 +23,7 @@ import {
   type ImageUploadRequest,
   type PresignedUrlResponse,
   type UpdateImageAltText,
-} from '@/lib/validations/tours/image-schema';
+} from '@/lib/validation/tours/image-schema';
 
 export interface TourImageActionResponse<T = unknown> {
   success: boolean;

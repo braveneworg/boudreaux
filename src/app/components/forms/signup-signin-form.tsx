@@ -8,13 +8,13 @@ import { usePathname } from 'next/navigation';
 
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import FormInput from '@/app/components/ui/form-input';
-import StatusIndicator from '@/app/components/ui/status-indicator';
+import { FormInput } from '@/app/components/ui/form-input';
+import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Switch } from '@/app/components/ui/switch';
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/lib/types/form-state';
 import { cn } from '@/lib/utils/tailwind-utils';
-import PageContainer from '@/ui/page-container';
+import { PageContainer } from '@/ui/page-container';
 import { Skeleton } from '@/ui/skeleton';
 
 import type { Control } from 'react-hook-form';
@@ -36,7 +36,7 @@ interface SignupSigninFormProps {
   state: FormState;
 }
 
-const SignupSigninForm = ({
+export const SignupSigninForm = ({
   control,
   hasTermsAndConditions = true, // Should be true when signing up
   isPending,
@@ -148,5 +148,3 @@ const SignupSigninForm = ({
     </PageContainer>
   );
 };
-
-export default SignupSigninForm;

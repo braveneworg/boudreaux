@@ -3,39 +3,27 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextResponse } from 'next/server';
 
-import { auth } from '@/auth';
+import { withAdmin } from '@/lib/decorators/with-auth';
 
 /**
  * Debug endpoint to check session data.
  * SECURITY: Requires admin authentication - session data should not be publicly accessible.
  */
-export const GET = async () => {
+export const GET = withAdmin(async (_request, _context, session) => {
   // Debug endpoints are disabled in production
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   try {
-    const session = await auth();
-
-    // Require authentication to view session debug info
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
-    // Only admins can view full session debug data
-    if (session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
-
     return NextResponse.json({
-      hasSession: !!session,
-      hasUser: !!session?.user,
-      hasUsername: !!session?.user?.username,
-      username: session?.user?.username,
-      userId: session?.user?.id,
-      userEmail: session?.user?.email,
-      userRole: session?.user?.role,
+      hasSession: true,
+      hasUser: true,
+      hasUsername: !!(session.user as { username?: string }).username,
+      username: (session.user as { username?: string }).username,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userRole: session.user.role,
     });
   } catch {
     return NextResponse.json(
@@ -46,4 +34,4 @@ export const GET = async () => {
       { status: 500 }
     );
   }
-};
+});

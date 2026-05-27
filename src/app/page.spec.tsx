@@ -49,7 +49,7 @@ vi.mock('@/lib/utils/fetch-api', () => ({
 
 // Mock child components
 vi.mock('./components/ui/page-container', () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
+  PageContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="page-container">{children}</div>
   ),
 }));

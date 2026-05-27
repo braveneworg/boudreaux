@@ -5,13 +5,13 @@
 
 import React from 'react';
 
-import ComboboxField from '@/app/components/forms/fields/combobox-field';
-import TextField from '@/app/components/forms/fields/text-field';
+import { ComboboxField } from '@/app/components/forms/fields/combobox-field';
+import { TextField } from '@/app/components/forms/fields/text-field';
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
-import StatusIndicator from '@/app/components/ui/status-indicator';
+import { StatusIndicator } from '@/app/components/ui/status-indicator';
 import { Textarea } from '@/app/components/ui/textarea';
-import TurnstileWidget from '@/app/components/ui/turnstile-widget';
+import { TurnstileWidget } from '@/app/components/ui/turnstile-widget';
 import type { FormState } from '@/lib/types/form-state';
 import { CONTACT_REASONS, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
 
@@ -27,7 +27,7 @@ interface ContactFormProps {
   setValue: UseFormSetValue<ContactFormSchemaType>;
 }
 
-const ContactForm = ({
+export const ContactForm = ({
   control,
   isPending,
   isVerified,
@@ -130,5 +130,3 @@ const ContactForm = ({
     </div>
   );
 };
-
-export default ContactForm;

@@ -5,11 +5,9 @@ import Link from 'next/link';
 
 import { LogInIcon } from 'lucide-react';
 
-const SignInLink = ({ onClick }: { onClick?: () => void }) => (
+export const SignInLink = ({ onClick }: { onClick?: () => void }) => (
   <Link href="/signin" className="flex items-center gap-2 text-zinc-50 underline" onClick={onClick}>
     <LogInIcon size={18} className="mt-1" />
     Sign In
   </Link>
 );
-
-export default SignInLink;

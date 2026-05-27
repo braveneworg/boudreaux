@@ -14,7 +14,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
-} from '@/lib/validations/tours/tour-date-schema';
+} from '@/lib/validation/tours/tour-date-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';

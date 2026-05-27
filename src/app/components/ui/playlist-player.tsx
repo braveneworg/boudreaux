@@ -81,7 +81,7 @@ export const PlaylistPlayer = ({ tracks }: PlaylistPlayerProps) => {
   );
 };
 
-export default function Home() {
+export function Home() {
   const sampleTracks = [
     {
       id: '1',

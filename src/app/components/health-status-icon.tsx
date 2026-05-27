@@ -16,7 +16,7 @@ interface HealthStatusIconProps {
  * - ✅ for healthy status
  * - ❌ for error or unhealthy status
  */
-const HealthStatusIcon = ({ status, isLoading }: HealthStatusIconProps): JSX.Element => {
+export const HealthStatusIcon = ({ status, isLoading }: HealthStatusIconProps): JSX.Element => {
   if (isLoading) {
     return <>⏳</>;
   }
@@ -31,5 +31,3 @@ const HealthStatusIcon = ({ status, isLoading }: HealthStatusIconProps): JSX.Ele
 
   return <>⏳</>;
 };
-
-export default HealthStatusIcon;

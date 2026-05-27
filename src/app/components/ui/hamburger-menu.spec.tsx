@@ -4,7 +4,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import HamburgerMenu from './hamburger-menu';
+import { HamburgerMenu } from './hamburger-menu';
 
 const mockUseSession = vi.hoisted(() => vi.fn());
 
@@ -13,7 +13,7 @@ vi.mock('next-auth/react', () => ({
 }));
 
 vi.mock('../auth/auth-toolbar', () => ({
-  default: ({ className }: { className?: string }) => (
+  AuthToolbar: ({ className }: { className?: string }) => (
     <div data-testid="auth-toolbar" className={className}>
       Auth Toolbar
     </div>

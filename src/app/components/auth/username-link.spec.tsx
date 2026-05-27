@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import UsernameLink from './username-link';
+import { UsernameLink } from './username-link';
 
 vi.mock('server-only', () => ({}));
 

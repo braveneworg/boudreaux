@@ -7,9 +7,9 @@ import { useMemo } from 'react';
 
 import Image from 'next/image';
 
-import HamburgerMenu from '@/ui/hamburger-menu';
+import { HamburgerMenu } from '@/ui/hamburger-menu';
 
-import Logo from './logo';
+import { Logo } from './logo';
 
 /**
  * Deterministic pseudo-random based on index — avoids hydration mismatch

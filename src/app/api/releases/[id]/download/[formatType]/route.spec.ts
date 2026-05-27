@@ -14,9 +14,9 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   DOWNLOAD_LIMIT: 10,
 }));
 
-const mockGetToken = vi.fn();
-vi.mock('next-auth/jwt', () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
+const mockAuth = vi.fn();
+vi.mock('@/auth', () => ({
+  auth: () => mockAuth(),
 }));
 
 const mockCheckFormatExists = vi.fn();
@@ -83,31 +83,29 @@ const mockFormat = {
 
 describe('GET /api/releases/[id]/download/[formatType]', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue({ sub: 'user-123' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-123', role: 'user' } });
     mockCheckFormatExists.mockResolvedValue(mockFormat);
     mockCheckPurchaseStatus.mockResolvedValue(true);
     mockGenerateDownloadUrl.mockResolvedValue('https://s3.example.com/download?signed=true');
     mockLogDownloadEvent.mockResolvedValue(undefined);
   });
 
-  it('should return 401 when user is not authenticated', async () => {
-    mockGetToken.mockResolvedValue(null);
+  it('should return 401 when user is not authenticated (withAuth)', async () => {
+    mockAuth.mockResolvedValue(null);
 
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
+    expect(body.error).toBe('Authentication required');
   });
 
-  it('should return 401 when token has no sub', async () => {
-    mockGetToken.mockResolvedValue({ sub: undefined });
+  it('should return 401 when session has no user id (withAuth)', async () => {
+    mockAuth.mockResolvedValue({ user: {} });
 
     const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
   });
 
   it('should return 400 for invalid format type', async () => {
@@ -322,24 +320,5 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     expect(body.error).toBe('INTERNAL_ERROR');
 
     consoleSpy.mockRestore();
-  });
-
-  it('uses the __Secure cookie name when running in production outside of E2E', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('E2E_MODE', '');
-
-    try {
-      mockGetToken.mockResolvedValueOnce(null);
-      await GET(makeRequest(), makeParams());
-
-      expect(mockGetToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cookieName: '__Secure-next-auth.session-token',
-          secureCookie: true,
-        })
-      );
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 });

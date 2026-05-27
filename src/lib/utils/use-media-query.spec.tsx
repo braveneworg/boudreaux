@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { act, renderHook } from '@testing-library/react';
 
-import { useMediaQuery } from './useMediaQuery';
+import { useMediaQuery } from './use-media-query';
 
 describe('useMediaQuery', () => {
   let addEventListenerSpy: ReturnType<typeof vi.fn>;

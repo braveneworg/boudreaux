@@ -8,7 +8,7 @@ import React from 'react';
 import { US_STATES } from '@/lib/utils/states';
 import type { ProfileFormData } from '@/lib/validation/profile-schema';
 
-import ComboboxField from './combobox-field';
+import { ComboboxField } from './combobox-field';
 
 import type { Control, UseFormSetValue } from 'react-hook-form';
 
@@ -18,7 +18,7 @@ interface StateFieldProps {
   setValue?: UseFormSetValue<ProfileFormData>;
 }
 
-export default function StateField({ control, onUserInteraction, setValue }: StateFieldProps) {
+export function StateField({ control, onUserInteraction, setValue }: StateFieldProps) {
   const stateOptions = US_STATES.map((state) => ({
     value: state.code,
     label: `${state.name} - ${state.code}`,

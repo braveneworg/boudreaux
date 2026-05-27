@@ -14,7 +14,7 @@ interface HealthStatusMessageProps {
  * Displays the health status message with database information
  * Shows loading state, database status, latency, and errors
  */
-const HealthStatusMessage = ({
+export const HealthStatusMessage = ({
   healthStatus,
   isLoading,
 }: HealthStatusMessageProps): JSX.Element => {
@@ -40,5 +40,3 @@ const HealthStatusMessage = ({
     </>
   );
 };
-
-export default HealthStatusMessage;

@@ -8,7 +8,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import ArtistMultiSelect from './artist-multi-select';
+import { ArtistMultiSelect } from './artist-multi-select';
 
 import type { Control, UseFormSetValue } from 'react-hook-form';
 

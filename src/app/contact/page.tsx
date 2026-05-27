@@ -10,10 +10,10 @@ import { useSession } from 'next-auth/react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import ContactForm from '@/app/components/forms/contact-form';
+import { ContactForm } from '@/app/components/forms/contact-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import PageContainer from '@/app/components/ui/page-container';
+import { PageContainer } from '@/app/components/ui/page-container';
 import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
 import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';

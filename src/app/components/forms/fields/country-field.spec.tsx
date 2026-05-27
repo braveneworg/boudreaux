@@ -8,11 +8,11 @@ import { useForm, FormProvider, useFormContext } from 'react-hook-form';
 
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
-import CountryField from './country-field';
+import { CountryField } from './country-field';
 
 // Mock the ComboboxField component - use named function to ensure mock is properly hoisted
 vi.mock('./combobox-field', () => ({
-  default: function MockComboboxField(props: {
+  ComboboxField: function MockComboboxField(props: {
     label?: string;
     placeholder?: string;
     searchPlaceholder?: string;

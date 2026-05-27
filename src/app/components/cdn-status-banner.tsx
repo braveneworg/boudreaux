@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/app/components/ui/alert';
 import { Progress } from '@/app/components/ui/progress';
 import { useCdnStatusQuery } from '@/app/hooks/use-cdn-status-query';
 
-const CDNStatusBanner = () => {
+export const CDNStatusBanner = () => {
   const { isPending: isLoading, data: status } = useCdnStatusQuery();
 
   if (isLoading || !status || status.status === 'ready') {
@@ -85,5 +85,3 @@ const CDNStatusBanner = () => {
     </div>
   );
 };
-
-export default CDNStatusBanner;

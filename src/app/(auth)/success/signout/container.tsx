@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-const SuccessContainer = () => (
+export const SuccessContainer = () => (
   <>
     <h1>Success! 🎉</h1>
     <p>
@@ -12,5 +12,3 @@ const SuccessContainer = () => (
     </p>
   </>
 );
-
-export default SuccessContainer;

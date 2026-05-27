@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 
 import { CONSTANTS } from '@/lib/constants';
 
-import AuthToolbar from './auth-toolbar';
+import { AuthToolbar } from './auth-toolbar';
 
 import type { Session } from 'next-auth';
 
@@ -23,11 +23,11 @@ vi.mock('next-auth/react', () => ({
 
 // Mock child components
 vi.mock('./signin-link', () => ({
-  default: () => <div data-testid="signin-link">Sign In Link</div>,
+  SignInLink: () => <div data-testid="signin-link">Sign In Link</div>,
 }));
 
 vi.mock('./signup-link', () => ({
-  default: () => <div data-testid="signup-link">Sign Up Link</div>,
+  SignUpLink: () => <div data-testid="signup-link">Sign Up Link</div>,
 }));
 
 vi.mock('./signout-button', () => ({
@@ -39,7 +39,7 @@ vi.mock('./signout-button', () => ({
 }));
 
 vi.mock('../ui/vertical-separator', () => ({
-  default: () => <div data-testid="vertical-separator">|</div>,
+  VerticalSeparator: () => <div data-testid="vertical-separator">|</div>,
 }));
 
 vi.mock('../ui/spinners/message-spinner', () => ({

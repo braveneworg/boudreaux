@@ -79,7 +79,7 @@ const PublishedToastContent = ({ fullName }: { fullName: string }) => (
   </>
 );
 
-export default function ArtistForm({ artistId: initialArtistId }: ArtistFormProps) {
+export function ArtistForm({ artistId: initialArtistId }: ArtistFormProps) {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createArtistAction,
     initialFormState

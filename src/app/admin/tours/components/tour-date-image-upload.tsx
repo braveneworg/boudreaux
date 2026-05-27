@@ -5,15 +5,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
 import {
   confirmTourDateUploadAction,
   deleteTourDateImageAction,
   generateTourDateUploadUrlAction,
   reorderTourDateImagesAction,
-} from '@/app/actions/tour-date-images';
-import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
-import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from '@/lib/validations/tours/image-schema';
-import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validations/tours/tour-date-image-schema';
+} from '@/lib/actions/tours/tour-date-images';
+import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from '@/lib/validation/tours/image-schema';
+import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validation/tours/tour-date-image-schema';
 
 /**
  * Local interface matching Prisma TourDateImage model.

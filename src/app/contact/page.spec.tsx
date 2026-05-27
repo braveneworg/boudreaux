@@ -50,7 +50,10 @@ vi.mock('@hookform/resolvers/zod', () => ({
 let capturedSetIsVerified: ((v: boolean) => void) | null = null;
 let capturedOnToken: ((t: string) => void) | null = null;
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
-  default: (props: { setIsVerified: (v: boolean) => void; onToken: (t: string) => void }) => {
+  TurnstileWidget: (props: {
+    setIsVerified: (v: boolean) => void;
+    onToken: (t: string) => void;
+  }) => {
     capturedSetIsVerified = props.setIsVerified;
     capturedOnToken = props.onToken;
     return <div data-testid="turnstile-widget" />;
@@ -59,7 +62,7 @@ vi.mock('@/app/components/ui/turnstile-widget', () => ({
 
 // Mock ComboboxField
 vi.mock('@/app/components/forms/fields/combobox-field', () => ({
-  default: (props: { name: string; setValue: (name: string, value: string) => void }) => (
+  ComboboxField: (props: { name: string; setValue: (name: string, value: string) => void }) => (
     <select
       data-testid="reason-combobox"
       onChange={(e) => props.setValue(props.name, e.target.value)}
@@ -72,7 +75,7 @@ vi.mock('@/app/components/forms/fields/combobox-field', () => ({
 
 // Mock TextField
 vi.mock('@/app/components/forms/fields/text-field', () => ({
-  default: (props: { name: string; label: string; placeholder: string }) => (
+  TextField: (props: { name: string; label: string; placeholder: string }) => (
     <div>
       <label htmlFor={props.name}>{props.label}</label>
       <input
@@ -86,7 +89,7 @@ vi.mock('@/app/components/forms/fields/text-field', () => ({
 }));
 
 vi.mock('@/app/components/ui/status-indicator', () => ({
-  default: () => <div data-testid="status-indicator" />,
+  StatusIndicator: () => <div data-testid="status-indicator" />,
 }));
 
 describe('ContactPage', () => {

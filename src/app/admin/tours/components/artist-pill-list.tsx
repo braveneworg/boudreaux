@@ -82,7 +82,7 @@ interface ArtistPillListProps {
   onHeadlinersChange: () => Promise<void>;
 }
 
-export default function ArtistPillList({
+export function ArtistPillList({
   tourDateId,
   headliners: initialHeadliners,
   onHeadlinersChange,

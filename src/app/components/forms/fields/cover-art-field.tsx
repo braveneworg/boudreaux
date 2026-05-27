@@ -71,7 +71,7 @@ interface CoverArtFieldProps<
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-export default function CoverArtField<
+export function CoverArtField<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
@@ -447,12 +447,15 @@ export default function CoverArtField<
                     className="w-full justify-between"
                     disabled={disabled || isUploading || isLoadingArtistImages}
                   >
-                    {isLoadingArtistImages
-                      ? 'Loading artist images...'
-                      : field.value && artistImages.find((img) => img.src === field.value)
-                        ? artistImages.find((img) => img.src === field.value)!.artistName +
-                          ' - image selected'
-                        : 'Choose from artist images...'}
+                    {(() => {
+                      if (isLoadingArtistImages) return 'Loading artist images...';
+                      const selectedImage = field.value
+                        ? artistImages.find((img) => img.src === field.value)
+                        : undefined;
+                      return selectedImage
+                        ? `${selectedImage.artistName} - image selected`
+                        : 'Choose from artist images...';
+                    })()}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>

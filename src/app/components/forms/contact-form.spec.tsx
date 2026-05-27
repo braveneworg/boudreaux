@@ -7,14 +7,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import ContactForm from '@/app/components/forms/contact-form';
+import { ContactForm } from '@/app/components/forms/contact-form';
 import type { FormState } from '@/lib/types/form-state';
 import type { ContactFormSchemaType } from '@/lib/validation/contact-schema';
 
 // Mock TurnstileWidget
 const mockTurnstileWidget = vi.fn();
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
-  default: (props: Record<string, unknown>) => {
+  TurnstileWidget: (props: Record<string, unknown>) => {
     mockTurnstileWidget(props);
     return <div data-testid="turnstile-widget" />;
   },
@@ -23,7 +23,7 @@ vi.mock('@/app/components/ui/turnstile-widget', () => ({
 // Mock StatusIndicator
 const mockStatusIndicator = vi.fn();
 vi.mock('@/app/components/ui/status-indicator', () => ({
-  default: (props: Record<string, unknown>) => {
+  StatusIndicator: (props: Record<string, unknown>) => {
     mockStatusIndicator(props);
     return <div data-testid="status-indicator" />;
   },
@@ -32,7 +32,7 @@ vi.mock('@/app/components/ui/status-indicator', () => ({
 // Mock ComboboxField
 const mockComboboxField = vi.fn();
 vi.mock('@/app/components/forms/fields/combobox-field', () => ({
-  default: (props: Record<string, unknown>) => {
+  ComboboxField: (props: Record<string, unknown>) => {
     mockComboboxField(props);
     return <div data-testid="combobox-field">{String(props.label)}</div>;
   },
@@ -41,7 +41,7 @@ vi.mock('@/app/components/forms/fields/combobox-field', () => ({
 // Mock TextField
 const mockTextField = vi.fn();
 vi.mock('@/app/components/forms/fields/text-field', () => ({
-  default: (props: Record<string, unknown>) => {
+  TextField: (props: Record<string, unknown>) => {
     mockTextField(props);
     return (
       <div data-testid={`text-field-${String(props.name)}`}>

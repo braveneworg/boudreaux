@@ -6,9 +6,9 @@ import { NextRequest } from 'next/server';
 
 import { GET } from './route';
 
-const mockGetToken = vi.fn();
-vi.mock('next-auth/jwt', () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
+const mockAuth = vi.fn();
+vi.mock('@/auth', () => ({
+  auth: () => mockAuth(),
 }));
 
 const mockGetQuotaStatus = vi.fn();
@@ -24,9 +24,11 @@ function makeRequest(): NextRequest {
   return new NextRequest('http://localhost:3000/api/user/download-quota');
 }
 
+const ctx = { params: Promise.resolve({}) };
+
 describe('GET /api/user/download-quota', () => {
   beforeEach(() => {
-    mockGetToken.mockResolvedValue({ sub: 'user-123' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-123', role: 'user' } });
     mockGetQuotaStatus.mockResolvedValue({
       remainingDownloads: 3,
       uniqueReleaseIds: ['release-1', 'release-2'],
@@ -35,27 +37,25 @@ describe('GET /api/user/download-quota', () => {
   });
 
   it('should return 401 when user is not authenticated', async () => {
-    mockGetToken.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(null);
 
-    const response = await GET(makeRequest());
+    const response = await GET(makeRequest(), ctx);
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
+    expect(body.error).toBe('Authentication required');
   });
 
-  it('should return 401 when token has no sub', async () => {
-    mockGetToken.mockResolvedValue({ sub: undefined });
+  it('should return 401 when session has no user id', async () => {
+    mockAuth.mockResolvedValue({ user: {} });
 
-    const response = await GET(makeRequest());
-    const body = await response.json();
+    const response = await GET(makeRequest(), ctx);
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('UNAUTHORIZED');
   });
 
   it('should return quota status for authenticated user', async () => {
-    const response = await GET(makeRequest());
+    const response = await GET(makeRequest(), ctx);
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -64,8 +64,8 @@ describe('GET /api/user/download-quota', () => {
     expect(body.isQuotaExceeded).toBe(false);
   });
 
-  it('should call quota service with user ID from token', async () => {
-    await GET(makeRequest());
+  it('should call quota service with user ID from session', async () => {
+    await GET(makeRequest(), ctx);
 
     expect(mockGetQuotaStatus).toHaveBeenCalledWith({ kind: 'user', userId: 'user-123' });
   });
@@ -74,50 +74,12 @@ describe('GET /api/user/download-quota', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetQuotaStatus.mockRejectedValue(new Error('DB error'));
 
-    const response = await GET(makeRequest());
+    const response = await GET(makeRequest(), ctx);
     const body = await response.json();
 
     expect(response.status).toBe(500);
     expect(body.error).toBe('INTERNAL_ERROR');
 
     consoleSpy.mockRestore();
-  });
-
-  it('should use secure cookie name in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    delete process.env.E2E_MODE;
-
-    const response = await GET(makeRequest());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(mockGetToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cookieName: '__Secure-next-auth.session-token',
-        secureCookie: true,
-      })
-    );
-
-    vi.unstubAllEnvs();
-  });
-
-  it('should use non-secure cookie name in E2E mode even in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('E2E_MODE', 'true');
-
-    const response = await GET(makeRequest());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(mockGetToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cookieName: 'next-auth.session-token',
-        secureCookie: false,
-      })
-    );
-
-    vi.unstubAllEnvs();
   });
 });

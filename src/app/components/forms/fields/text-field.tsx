@@ -27,7 +27,7 @@ interface TextFieldProps<
   disabled?: boolean;
 }
 
-export default function TextField<
+export function TextField<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

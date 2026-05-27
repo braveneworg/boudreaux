@@ -12,7 +12,7 @@ interface FormInputProperties {
   autoFocus?: boolean;
 }
 
-const FormInput = ({
+export const FormInput = ({
   id,
   placeholder,
   type,
@@ -31,5 +31,3 @@ const FormInput = ({
     {...properties}
   />
 );
-
-export default FormInput;

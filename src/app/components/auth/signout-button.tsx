@@ -7,12 +7,12 @@ import { useIsMobile } from '@/app/hooks/use-mobile';
 import { GravatarAvatar } from '@/components/gravatar-avatar';
 import { CONSTANTS } from '@/lib/constants';
 import { cn } from '@/lib/utils/tailwind-utils';
-import VerticalSeparator from '@/ui/vertical-separator';
+import { VerticalSeparator } from '@/ui/vertical-separator';
 
 import { AdminLink } from './admin-link';
-import EditProfileButton from './edit-profile-button';
+import { EditProfileButton } from './edit-profile-button';
 import { SignOutButton } from './sign-out-button';
-import SignedInAs from './signed-in-as';
+import { SignedInAs } from './signed-in-as';
 
 // Use in hamburger menu on mobile
 export const SignedInToolbar = ({

@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import StateField from './state-field';
+import { StateField } from './state-field';
 
 import type { Control, FieldValues } from 'react-hook-form';
 
@@ -17,7 +17,7 @@ interface ComboboxOption {
 
 // Mock the ComboboxField component
 vi.mock('./combobox-field', () => ({
-  default: ({
+  ComboboxField: ({
     label,
     placeholder,
     searchPlaceholder,

@@ -10,9 +10,9 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { TourDateImageUpload } from '@/app/admin/tours/components/tour-date-image-upload';
-import VenueSelect from '@/app/admin/tours/components/venue-select';
+import { VenueSelect } from '@/app/admin/tours/components/venue-select';
 import { TextField } from '@/app/components/forms/fields';
-import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
+import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
 import { Button } from '@/app/components/ui/button';
 import { DatePicker } from '@/app/components/ui/datepicker';
 import {
@@ -42,7 +42,7 @@ import { getTimezoneOffsetMinutes, localToUTC, toLocalDateTimeString } from '@/l
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
-} from '@/lib/validations/tours/tour-date-schema';
+} from '@/lib/validation/tours/tour-date-schema';
 
 /**
  * Local interfaces matching Prisma model shapes.
@@ -105,7 +105,7 @@ const initialFormState: FormState = {
   success: false,
 };
 
-export default function TourDateForm({
+export function TourDateForm({
   tourId,
   tourDate,
   open,

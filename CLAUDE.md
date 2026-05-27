@@ -92,7 +92,7 @@ Always run `pnpm run typecheck`, `pnpm run test:run`, `pnpm run lint`, and `pnpm
 - Explicit types on all function parameters and return values.
 - `interface` for object shapes; discriminated unions for complex type variations.
 - Prefer specific types over `unknown` or `Record<string, unknown>`.
-- Named exports only (no default exports) — better tree shaking and refactoring.
+- Named exports only (no default exports) — better tree shaking and refactoring. Exception: Next.js App Router files that require a default export (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `template.tsx`, `default.tsx`, `route.ts`, `middleware.ts`).
 - Use `as const` for literal types; prefer over enums. If enums are required, use `const enum`.
 - Use optional chaining (`?.`) and nullish coalescing (`??`).
 - Use `async/await` with `try/catch` for all async code.

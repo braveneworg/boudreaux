@@ -8,7 +8,7 @@ import { userAgentFromString } from 'next/server';
 import { Toaster } from '@/components/ui/sonner';
 
 import { ChatLauncher } from './components/chat/chat-launcher';
-import Footer from './components/footer/footer';
+import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
 

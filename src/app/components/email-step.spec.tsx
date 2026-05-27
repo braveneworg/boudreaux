@@ -11,7 +11,7 @@ import { EmailStep } from './email-step';
 const mockVerifyTurnstile = vi.fn();
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
-  default: ({
+  TurnstileWidget: ({
     setIsVerified,
     onToken,
   }: {

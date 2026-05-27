@@ -15,8 +15,8 @@ import { toast } from 'sonner';
 import { DownloadAnalyticsDashboard } from '@/app/components/download-analytics-dashboard';
 import { DigitalFormatsAccordion } from '@/app/components/forms/digital-formats-accordion';
 import { TextField } from '@/app/components/forms/fields';
-import ArtistMultiSelect from '@/app/components/forms/fields/artist-multi-select';
-import CoverArtField from '@/app/components/forms/fields/cover-art-field';
+import { ArtistMultiSelect } from '@/app/components/forms/fields/artist-multi-select';
+import { CoverArtField } from '@/app/components/forms/fields/cover-art-field';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
@@ -115,7 +115,7 @@ const PublishedToastContent = ({ title }: { title: string }) => (
   </>
 );
 
-export default function ReleaseForm({ releaseId: initialReleaseId }: ReleaseFormProps) {
+export function ReleaseForm({ releaseId: initialReleaseId }: ReleaseFormProps) {
   const [formState, formAction, isPending] = useActionState<FormState, FormData>(
     createReleaseAction,
     initialFormState

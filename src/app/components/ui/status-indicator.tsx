@@ -15,7 +15,7 @@ interface StatusIndicatorProps {
   className?: string;
 }
 
-const StatusIndicator = ({
+export const StatusIndicator = ({
   isSuccess,
   hasError,
   hasTimeout,
@@ -71,5 +71,3 @@ const StatusIndicator = ({
 
   return null;
 };
-
-export default StatusIndicator;

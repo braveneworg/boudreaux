@@ -7,7 +7,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
-import type { ImageUploadRequest } from '@/lib/validations/tours/image-schema';
+import type { ImageUploadRequest } from '@/lib/validation/tours/image-schema';
 
 import { ImageUploadService } from './image-upload-service';
 

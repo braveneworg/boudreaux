@@ -8,7 +8,7 @@ import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
 import { HomeContent } from './components/home-content';
-import PageContainer from './components/ui/page-container';
+import { PageContainer } from './components/ui/page-container';
 
 /**
  * Force dynamic rendering on every request.

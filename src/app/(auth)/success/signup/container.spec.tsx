@@ -5,7 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import SuccessContainer from './container';
+import { SuccessContainer } from './container';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/signin',
@@ -25,7 +25,7 @@ vi.mock('@/app/components/ui/content-container', () => ({
 }));
 
 vi.mock('@/app/components/ui/page-container', () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
+  PageContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="page-container">{children}</div>
   ),
 }));

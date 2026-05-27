@@ -4,10 +4,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import HamburgerMenuSheet from './hamburger-menu-sheet';
+import { HamburgerMenuSheet } from './hamburger-menu-sheet';
 
 vi.mock('../auth/auth-toolbar', () => ({
-  default: ({ className, onNavigate }: { className?: string; onNavigate?: () => void }) => (
+  AuthToolbar: ({ className, onNavigate }: { className?: string; onNavigate?: () => void }) => (
     <div data-testid="auth-toolbar" className={className}>
       <button data-testid="auth-toolbar-action" onClick={onNavigate}>
         Auth Toolbar

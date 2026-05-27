@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import Logo from './logo';
+import { Logo } from './logo';
 
 // Mock next/image
 vi.mock('next/image', () => ({

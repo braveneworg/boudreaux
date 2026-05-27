@@ -46,7 +46,7 @@ vi.mock('./components/header/header', () => ({
 }));
 
 vi.mock('./components/footer/footer', () => ({
-  default: () => <div data-testid="footer">Footer</div>,
+  Footer: () => <div data-testid="footer">Footer</div>,
 }));
 
 vi.mock('./components/providers', () => ({

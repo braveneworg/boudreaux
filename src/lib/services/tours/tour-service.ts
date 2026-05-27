@@ -10,7 +10,7 @@ import {
   tourUpdateSchema,
   type TourCreateInput,
   type TourUpdateInput,
-} from '@/lib/validations/tours/tour-schema';
+} from '@/lib/validation/tours/tour-schema';
 
 import type { Tour } from '@prisma/client';
 

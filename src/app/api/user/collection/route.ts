@@ -3,10 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { auth } from '@/auth';
+import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 
 export const dynamic = 'force-dynamic';
@@ -16,24 +15,17 @@ export const dynamic = 'force-dynamic';
  * Returns all purchases for the authenticated user.
  * Returns 401 if not authenticated.
  */
-export async function GET(_request: NextRequest) {
+export const GET = withAuth(async (_request, _context, session) => {
   try {
-    const session = await auth();
-    const userId = (session?.user as { id?: string })?.id ?? null;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const purchases = await PurchaseRepository.findAllByUser(userId);
+    const purchases = await PurchaseRepository.findAllByUser(session.user.id);
 
     return NextResponse.json({
       purchases,
       count: purchases.length,
-      isAdmin: session?.user?.role === 'admin',
+      isAdmin: session.user.role === 'admin',
     });
   } catch (error) {
     console.error('User collection GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

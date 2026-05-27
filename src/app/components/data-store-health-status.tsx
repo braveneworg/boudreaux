@@ -8,15 +8,15 @@ import type { JSX } from 'react';
 
 import { useHealthStatusQuery } from '@/app/hooks/use-health-status-query';
 
-import HealthStatusIcon from './health-status-icon';
-import HealthStatusMessage from './health-status-message';
+import { HealthStatusIcon } from './health-status-icon';
+import { HealthStatusMessage } from './health-status-message';
 
 /**
  * DataStoreHealthStatus component
  * Displays the health status of the database connection
  * Uses TanStack Query with built-in retry (10 attempts) and exponential backoff
  */
-const DataStoreHealthStatus = (): JSX.Element => {
+export const DataStoreHealthStatus = (): JSX.Element => {
   const { isPending: isLoading, data: healthStatus } = useHealthStatusQuery();
   const [failsafe, setFailsafe] = useState(false);
 
@@ -53,5 +53,3 @@ const DataStoreHealthStatus = (): JSX.Element => {
     </div>
   );
 };
-
-export default DataStoreHealthStatus;

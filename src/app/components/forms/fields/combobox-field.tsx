@@ -43,7 +43,7 @@ interface ComboboxFieldProps<
   setValue?: UseFormSetValue<TFieldValues>;
 }
 
-export default function ComboboxField<
+export function ComboboxField<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({

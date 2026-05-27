@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import SignupSigninForm from '@/app/components/forms/signup-signin-form';
+import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
 import type { FormState } from '@/lib/types/form-state';
 
 import type { Control } from 'react-hook-form';
@@ -22,7 +22,7 @@ type BaseFormSchema = {
 let lastFormInputProps: FormInputProps | null = null;
 
 vi.mock('@/app/components/ui/form-input', () => ({
-  default: (props: FormInputProps) => {
+  FormInput: (props: FormInputProps) => {
     const { id, placeholder, type, autoFocus, ...rest } = props;
     lastFormInputProps = props; // Store props for testing
 
@@ -108,7 +108,7 @@ vi.mock('@/app/components/ui/button', () => ({
 }));
 
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
-  default: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
+  TurnstileWidget: ({ setIsVerified, ...props }: TurnstileWidgetProps) => (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div data-testid="turnstile-widget" onClick={() => setIsVerified?.(true)} {...props}>
       Turnstile Widget
@@ -117,7 +117,7 @@ vi.mock('@/app/components/ui/turnstile-widget', () => ({
 }));
 
 vi.mock('@/app/components/ui/status-indicator', () => ({
-  default: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) => (
+  StatusIndicator: ({ isSuccess, hasError, hasTimeout, isPending }: StatusIndicatorProps) => (
     <div
       data-testid="status-indicator"
       data-success={isSuccess?.toString() || 'false'}
