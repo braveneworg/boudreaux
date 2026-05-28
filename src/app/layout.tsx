@@ -11,8 +11,9 @@ import { ChatLauncher } from './components/chat/chat-launcher';
 import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
+import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 
@@ -60,17 +61,27 @@ export const metadata: Metadata = {
   title: 'Fake Four Inc.',
   description:
     'Official site of Fake Four Inc., an independent record label based in New Haven, CT, dedicated to promoting innovative and genre-defying music from around the world.',
+  applicationName: 'Fake Four Inc.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Fake Four',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
+  themeColor: '#000000',
 };
 
 export default async function RootLayout({
@@ -106,6 +117,7 @@ export default async function RootLayout({
           <ChatLauncher />
         </Providers>
         <Toaster position="bottom-center" />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

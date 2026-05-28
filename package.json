@@ -34,6 +34,7 @@
     "images:generate-variants": "pnpm exec tsx scripts/generate-image-variants.ts",
     "images:convert-to-webp": "pnpm exec tsx scripts/convert-images-to-webp.ts",
     "images:cleanup-orphans": "pnpm exec tsx scripts/cleanup-orphan-images.ts",
+    "pwa:generate-icons": "pnpm exec tsx scripts/generate-pwa-icons.ts",
     "backfill:coverart": "pnpm exec tsx scripts/backfill-coverart-urls.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
