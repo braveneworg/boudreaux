@@ -42,6 +42,16 @@ describe('ServiceWorkerRegister', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('does not register in E2E builds so navigation caching never flakes tests', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
+    stubServiceWorker();
+
+    render(<ServiceWorkerRegister />);
+
+    expect(register).not.toHaveBeenCalled();
+  });
+
   it('does nothing when the browser lacks service worker support', () => {
     vi.stubEnv('NODE_ENV', 'production');
 

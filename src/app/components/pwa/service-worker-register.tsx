@@ -7,10 +7,15 @@ import { useEffect } from 'react';
 
 // Registers the PWA service worker after the page is interactive. Rendered once
 // in the root layout. Registration is skipped in development so the SW cache
-// never interferes with hot reloading.
+// never interferes with hot reloading, and in E2E builds where the SW's
+// network-first navigation cache makes mutation→reload flows nondeterministic.
 export function ServiceWorkerRegister(): null {
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
+    if (process.env.NEXT_PUBLIC_E2E_MODE === 'true') {
       return;
     }
 
