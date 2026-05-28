@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.92.0] - 2026-05-28
+
+### Added
+
+- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n- feat: create basic pwa app (#455)\n
+
 ## [4.91.0] - 2026-05-27
 
 ### Added
