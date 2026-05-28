@@ -47,6 +47,9 @@ const eslintConfig = [
       '*.crt',
       '*.key',
       '**/.claude/**',
+      // Static assets served as-is, including the hand-written service worker
+      // which relies on ServiceWorkerGlobalScope globals that ESLint can't see.
+      'public/**',
     ],
   },
   // Base JavaScript rules
