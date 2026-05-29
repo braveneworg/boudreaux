@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.93.0] - 2026-05-29
+
+### Added
+
+- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n- feat: present install instructions for iOS (#456)\n- feat: present install instructions for iOS (#456)\n- Develop/feature/convert to pwa: fix flaky e2e test (#457)\n
+
 ## [4.92.0] - 2026-05-28
 
 ### Added
