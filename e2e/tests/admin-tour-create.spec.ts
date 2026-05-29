@@ -12,18 +12,22 @@ const E2E_DATABASE_URL =
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 test.describe('Admin Tour Creation', () => {
+  // Track only the tours this worker actually created so cleanup can target
+  // them by exact title. Deleting by `startsWith: 'E2E Create Tour'` would also
+  // remove tours created by other tests running in parallel (fullyParallel +
+  // workers=50%), making their post-create assertions flaky. Tests serialize
+  // within a worker, so a worker-local array needs no synchronization.
+  const createdTourTitles: string[] = [];
+
   test.afterAll(async () => {
     await prisma.$disconnect();
   });
 
   test.afterEach(async () => {
-    await prisma.tour.deleteMany({
-      where: {
-        title: {
-          startsWith: 'E2E Create Tour',
-        },
-      },
-    });
+    if (createdTourTitles.length > 0) {
+      await prisma.tour.deleteMany({ where: { title: { in: createdTourTitles } } });
+      createdTourTitles.length = 0;
+    }
   });
 
   test('should create tour with all basic fields', async ({ adminPage }) => {
@@ -32,6 +36,7 @@ test.describe('Admin Tour Creation', () => {
     await expect(adminPage.getByText('Create New Tour')).toBeVisible();
 
     const title = `E2E Create Tour - Full Fields ${Date.now()}`;
+    createdTourTitles.push(title);
 
     await adminPage.fill('[name="title"]', title);
     await adminPage.fill('[name="subtitle"]', 'E2E Subtitle');
