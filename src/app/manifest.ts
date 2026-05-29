@@ -8,7 +8,7 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Fake Four Inc.',
-    short_name: 'Fake Four',
+    short_name: 'Fake Four Inc.',
     description:
       'Official site of Fake Four Inc., an independent record label based in New Haven, CT.',
     start_url: '/',
