@@ -6,28 +6,10 @@ import { PrismaClient } from '@prisma/client';
 
 import { test, expect } from '../fixtures/base.fixture';
 
-import type { Page } from '@playwright/test';
-
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
-
-/**
- * Helper to create a tour via the admin UI and return its ID.
- */
-const createTourViaUi = async (adminPage: Page, title: string): Promise<string> => {
-  await adminPage.goto('/admin/tours/new');
-  await adminPage.fill('[name="title"]', title);
-  await adminPage.getByRole('button', { name: 'Create Tour', exact: true }).click();
-  await expect(adminPage).toHaveURL('/admin/tours');
-
-  const tourLink = adminPage.getByRole('link', { name: title }).first();
-  await expect(tourLink).toBeVisible();
-  const href = await tourLink.getAttribute('href');
-  expect(href).toBeTruthy();
-  return href!.split('/').at(-1)!;
-};
 
 /**
  * Helper to create a venue directly in the DB for test use.
@@ -43,99 +25,63 @@ const createTestVenue = async () => {
   });
 };
 
-/**
- * Helper to add a tour date to a tour via the UI.
- * Assumes the admin is on the tour edit page.
- */
-const addTourDateViaUi = async (adminPage: Page, venueName: string) => {
-  // Click "Add Tour Date" or "Add Date" button
-  const addButton = adminPage.getByRole('button', { name: /Add.*Date/i }).first();
-  await addButton.click();
-
-  // Wait for the dialog to appear — scope to the named dialog to avoid matching
-  // Radix PopoverContent elements which also render with role="dialog"
-  const dialog = adminPage.getByRole('dialog', { name: 'Add Tour Date' });
-  await expect(dialog).toBeVisible();
-
-  // Select venue — venue combobox is now in the Dates and Times section,
-  // after the Headliners section, so it is the second combobox (index 1).
-  const venueButton = dialog.getByRole('combobox').nth(1);
-  await venueButton.click();
-  await adminPage.getByPlaceholder('Search venues...').fill(venueName);
-  await adminPage
-    .getByRole('option', { name: new RegExp(venueName) })
-    .first()
-    .click();
-
-  // Select headlining artists — headliner combobox is first (index 0) since
-  // the Artists section now appears before the Dates and Times section.
-  const headlinerButton = dialog.locator('button[role="combobox"]').first();
-  await headlinerButton.click();
-  await adminPage.getByRole('option', { name: 'Test Artist One' }).click();
-  await adminPage.getByRole('option', { name: 'Test Artist Two' }).click();
-  // Close the popover with Escape — the PopoverContent's onEscapeKeyDown handler
-  // calls stopPropagation() so the Dialog underneath won't close.
-  await adminPage.keyboard.press('Escape');
-
-  // Set start date: type today's date directly into the input
-  // (the DatePicker uses PopoverAnchor, not PopoverTrigger, so clicking
-  // the input does not open a calendar — we type the date instead).
-  // Filling the date also auto-populates Show Start Time to 8 PM.
-  const startDateInput = dialog.getByPlaceholder('mm/dd/yyyy').first();
-  const today = new Date();
-  const dateString = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
-  await startDateInput.fill(dateString);
-
-  // Submit the form
-  await dialog.getByRole('button', { name: /Add Tour Date/i }).click();
-
-  await expect(dialog).not.toBeVisible({ timeout: 15000 });
-
-  // Reload so the tour dates list reflects the newly-created date, then wait
-  // for the headliner pill list to appear (the implicit signal that the page
-  // has rehydrated). Avoid `networkidle` — Pusher and other long-lived
-  // connections keep the network busy and stall the wait until the timeout.
-  await adminPage.reload();
-  await expect(adminPage.locator('[role="list"][aria-label="Headlining artists"]')).toBeVisible({
-    timeout: 15000,
-  });
-};
-
 test.describe('Admin Tour Date Artist Pills', () => {
   test.describe.configure({ timeout: 150000 });
   let tourId: string;
   let venueId: string;
-  let venueName: string;
 
   test.beforeEach(async ({ adminPage }) => {
-    // Create a venue for the test
+    // Seed the fixture state (venue, tour, tour date, two headliners) directly
+    // via the DB rather than driving the multi-step "Add Tour Date" dialog
+    // through the UI. These tests only exercise the artist-pill UI (display,
+    // set time, remove); the UI-driven setup made beforeEach flaky under
+    // parallel load against the standalone server, where the mutation→reload
+    // round-trip contends with other workers and intermittently times out.
     const venue = await createTestVenue();
     venueId = venue.id;
-    venueName = venue.name;
 
-    // Create a tour via UI
-    const title = `E2E Artist Pills Tour ${Date.now()}`;
-    tourId = await createTourViaUi(adminPage, title);
+    const [artistOne, artistTwo] = await Promise.all([
+      prisma.artist.findUniqueOrThrow({ where: { slug: 'test-artist-one' } }),
+      prisma.artist.findUniqueOrThrow({ where: { slug: 'test-artist-two' } }),
+    ]);
 
-    // Navigate to the tour edit page
+    const now = new Date();
+    const tour = await prisma.tour.create({
+      data: {
+        title: `E2E Artist Pills Tour ${Date.now()}`,
+        tourDates: {
+          create: {
+            startDate: now,
+            showStartTime: now,
+            venueId: venue.id,
+            headliners: {
+              create: [
+                { artistId: artistOne.id, sortOrder: 0 },
+                { artistId: artistTwo.id, sortOrder: 1 },
+              ],
+            },
+          },
+        },
+      },
+    });
+    tourId = tour.id;
+
+    // Navigate to the tour edit page and wait for the headliner pills to render.
     await adminPage.goto(`/admin/tours/${tourId}`);
-
-    // Wait for tour dates section to load
     await expect(adminPage.getByText('Tour Dates').first()).toBeVisible();
-
-    // Add a tour date with artists
-    await addTourDateViaUi(adminPage, venueName);
-
-    // Wait for the page to refresh and show headliner pills
-    await expect(adminPage.getByText('Tour Dates').first()).toBeVisible();
+    await expect(adminPage.locator('[role="list"][aria-label="Headlining artists"]')).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test.afterEach(async () => {
-    // Cleanup: delete tour cascades to tour dates and headliners
+    // Scope cleanup to THIS test's tour by id. Deleting by title prefix would
+    // also remove tours created by other artist-pills tests running in parallel
+    // (fullyParallel + workers=50%), yanking their seeded tour date out from
+    // under them mid-run and causing flaky "record not found" / empty-list
+    // failures. Deleting the tour cascades to its tour dates and headliners.
     await prisma.tourDate.deleteMany({ where: { tourId } });
-    await prisma.tour.deleteMany({
-      where: { title: { startsWith: 'E2E Artist Pills Tour' } },
-    });
+    await prisma.tour.deleteMany({ where: { id: tourId } });
     if (venueId) {
       await prisma.venue.deleteMany({ where: { id: venueId } });
     }
