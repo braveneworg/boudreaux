@@ -8,7 +8,7 @@ describe('manifest', () => {
     const result = manifest();
 
     expect(result.name).toBe('Fake Four Inc.');
-    expect(result.short_name).toBe('Fake Four');
+    expect(result.short_name).toBe('Fake Four Inc.');
     expect(result.start_url).toBe('/');
     expect(result.scope).toBe('/');
     expect(result.display).toBe('standalone');

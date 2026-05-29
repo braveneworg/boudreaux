@@ -11,6 +11,7 @@ import { ChatLauncher } from './components/chat/chat-launcher';
 import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
+import { IosInstallPrompt } from './components/pwa/ios-install-prompt';
 import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
 
 import type { Metadata, Viewport } from 'next';
@@ -65,7 +66,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Fake Four',
+    title: 'Fake Four Inc.',
   },
   icons: {
     apple: '/icons/apple-touch-icon.png',
@@ -118,6 +119,7 @@ export default async function RootLayout({
         </Providers>
         <Toaster position="bottom-center" />
         <ServiceWorkerRegister />
+        <IosInstallPrompt />
       </body>
     </html>
   );
