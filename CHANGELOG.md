@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.94.0] - 2026-05-30
+
+### Added
+
+- fix(ci): allow stripe-webhook build scripts (#459)\n- fix(ci): allow stripe-webhook build scripts (#459)\n- fix(deps): remediate security vulnerabilities (#458)\n- fix(deps): remediate security vulnerabilities (#458)\n- fix(ci): allow stripe-webhook build scripts (#459)\n
+
 ## [4.93.0] - 2026-05-29
 
 ### Added
