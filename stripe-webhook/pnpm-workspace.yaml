@@ -1,0 +1,10 @@
+packages:
+  - '.'
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
+overrides:
+  fast-xml-builder@<1.1.7: ^1.1.7
+  postcss@>=8.0.0 <8.5.10: ^8.5.10
