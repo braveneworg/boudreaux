@@ -74,6 +74,7 @@ pnpm run stripe               # Forward Stripe webhooks to localhost:3000
 - **Data layer**: all Prisma access goes through the repository pattern in `src/lib/repositories/` — keep DB logic out of components and routes. Use transactions for multi-step ops; handle connection failures gracefully.
 - **Validation**: validate all external input (user input, API responses, Server Action args) with Zod before use. Schemas live in `src/lib/validation/`.
 - **Fetching**: TanStack Query on the client; explicit cache options on Server Component fetches (`{ cache: 'no-store' }` for fresh data).
+- **node**: use the node version specified by .nvmrc (24); never a global install. Use `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
 
 ## TypeScript
 

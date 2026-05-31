@@ -11,7 +11,7 @@ import { useBannersQuery } from '@/app/hooks/use-banners-query';
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
 import { ContentContainer } from './ui/content-container';
-import { Heading } from './ui/heading';
+import { ImageHeading } from './ui/image-heading';
 
 import type { BannerSlotData } from './banner-carousel';
 
@@ -62,7 +62,12 @@ export const HomeContent = () => {
       <ContentContainer>
         <ArtistSearchInput />
         <section>
-          <Heading level={1}>featured artists</Heading>
+          <ImageHeading
+            src="/media/headings/FEATURED-1920-480.webp"
+            alt="featured artists"
+            imageHeight={480}
+            priority
+          />
           <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
         </section>
       </ContentContainer>
