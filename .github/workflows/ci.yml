@@ -281,6 +281,17 @@ jobs:
           CI: true
           E2E_DATABASE_URL: mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0
           SKIP_ENV_VALIDATION: "true"
+          # Real AWS credentials so the pre-built standalone server can reach
+          # production S3 at runtime — the bundle-download route lazily calls
+          # getS3Client()/getS3BucketName() per request, and without these the
+          # free/paid bundle stream 500s. Playwright merges this step's env
+          # into the web server child process (same as the inherited PATH), so
+          # setting them here propagates to `node .next/standalone/server.js`.
+          # The standalone server does NOT auto-load .env, unlike `next dev`.
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
 
       - name: Upload test results
         if: failure()
