@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.95.0] - 2026-05-31
+
+### Added
+
+- Develop/feature/improve claude instructions (#461)\n- Develop/feature/improve claude instructions (#461)\n- Develop/feature/improve claude instructions (#461)\n- feat: improve claude instructions for Opus 4.8 (#460)\n- feat: improve claude instructions for Opus 4.8 (#460)\n- Develop/feature/improve claude instructions (#461)\n
+
 ## [4.94.0] - 2026-05-30
 
 ### Added
