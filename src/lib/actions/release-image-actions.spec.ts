@@ -67,11 +67,11 @@ describe('release-image-actions', () => {
     vi.mocked(revalidatePath).mockImplementation(() => {});
 
     // Set environment variables
-    process.env.S3_BUCKET = 'test-bucket';
-    process.env.CDN_DOMAIN = 'https://cdn.example.com';
-    process.env.AWS_REGION = 'us-east-1';
-    process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
-    process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
+    vi.stubEnv('S3_BUCKET', 'test-bucket');
+    vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+    vi.stubEnv('AWS_REGION', 'us-east-1');
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'test-access-key');
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'test-secret-key');
   });
 
   describe('deleteReleaseImageAction', () => {
@@ -115,7 +115,7 @@ describe('release-image-actions', () => {
     });
 
     it('should skip S3 delete when no S3 bucket configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.stubEnv('S3_BUCKET', undefined);
       const mockImage = {
         id: 'image-123',
         src: 'https://cdn.example.com/images/release-cover.jpg',
@@ -652,9 +652,9 @@ describe('release-image-actions', () => {
 
   describe('getS3Client env var fallbacks', () => {
     it('should use fallback values when AWS env vars are not set', async () => {
-      delete process.env.AWS_REGION;
-      delete process.env.AWS_ACCESS_KEY_ID;
-      delete process.env.AWS_SECRET_ACCESS_KEY;
+      vi.stubEnv('AWS_REGION', undefined);
+      vi.stubEnv('AWS_ACCESS_KEY_ID', undefined);
+      vi.stubEnv('AWS_SECRET_ACCESS_KEY', undefined);
 
       const mockImage = {
         id: 'image-123',

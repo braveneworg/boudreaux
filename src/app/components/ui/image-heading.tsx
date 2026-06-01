@@ -43,7 +43,7 @@ const ImageHeading = ({
   ...headingProps
 }: ImageHeadingProps) => {
   return (
-    <Heading level={level} className={cn('h-auto', className)} {...headingProps}>
+    <Heading level={level} className={cn('mt-1 mb-1.5 h-auto', className)} {...headingProps}>
       <Image
         src={src}
         alt={alt}

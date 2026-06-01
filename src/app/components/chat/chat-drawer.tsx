@@ -5,6 +5,8 @@
 
 import type { ReactNode } from 'react';
 
+import Image from 'next/image';
+
 import { X } from 'lucide-react';
 
 import {
@@ -41,8 +43,16 @@ export const ChatDrawer = ({ open, onOpenChange, children }: ChatDrawerProps) =>
         )}
       >
         <header className="bg-background sticky top-0 z-10 flex items-center justify-center border-b">
-          <DrawerTitle className="relative -top-2 text-center text-base">
-            Fake Four Inc. Chat
+          <DrawerTitle>
+            <Image
+              src="/media/headings/LIVE-CHAT.webp"
+              alt="live chat"
+              width={480}
+              height={480}
+              sizes="(min-width: 380px) 380px, 100vw"
+              priority
+              className={cn('h-auto w-full max-w-480')}
+            />
           </DrawerTitle>
           <DrawerClose
             aria-label="Close chat"

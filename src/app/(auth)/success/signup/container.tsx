@@ -9,6 +9,7 @@ import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { PageSectionParagraph } from '@/app/components/ui/page-section-paragraph';
+import { ImageHeading } from '@/components/ui/image-heading';
 
 export const SuccessContainer = ({ email }: { email: string }) => {
   const path = usePathname();
@@ -21,7 +22,7 @@ export const SuccessContainer = ({ email }: { email: string }) => {
         items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
       />
       <ContentContainer>
-        <h1 className="pt-3">Success! 🎉</h1>
+        <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
         <PageSectionParagraph>
           Check your email. A link was sent to{' '}
           <a href={`mailto:${email}`}>

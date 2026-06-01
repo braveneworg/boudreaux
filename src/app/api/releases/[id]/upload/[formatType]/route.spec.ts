@@ -137,9 +137,6 @@ function makeParams(id = 'release-1', formatType = 'MP3_320KBPS') {
 }
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
-  const originalHostName = process.env.NEXT_PUBLIC_HOST_NAME;
-  const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
   beforeEach(() => {
     mockAuth.mockResolvedValue({
       user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
@@ -151,13 +148,8 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     mockUploadOn.mockReturnValue(undefined);
     mockWriteComment.mockResolvedValue(undefined);
     mockSupportsComment.mockReturnValue(true);
-    process.env.NEXT_PUBLIC_HOST_NAME = 'https://example.com';
-    process.env.NEXT_PUBLIC_BASE_URL = 'https://fallback.example.com';
-  });
-
-  afterEach(() => {
-    process.env.NEXT_PUBLIC_HOST_NAME = originalHostName;
-    process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://example.com');
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://fallback.example.com');
   });
 
   it('should return 401 when user is not authenticated (withAdmin)', async () => {
@@ -394,7 +386,7 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   });
 
   it('should use NEXT_PUBLIC_BASE_URL when NEXT_PUBLIC_HOST_NAME is missing', async () => {
-    delete process.env.NEXT_PUBLIC_HOST_NAME;
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', undefined);
 
     await PUT(makeRequest(), makeParams());
 
@@ -405,8 +397,8 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   });
 
   it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are missing', async () => {
-    delete process.env.NEXT_PUBLIC_HOST_NAME;
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', undefined);
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', undefined);
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();
@@ -419,8 +411,8 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
   });
 
   it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are invalid', async () => {
-    process.env.NEXT_PUBLIC_HOST_NAME = 'not-a-url';
-    process.env.NEXT_PUBLIC_BASE_URL = 'also-not-a-url';
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'not-a-url');
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'also-not-a-url');
 
     const response = await PUT(makeRequest(), makeParams());
     const body = await response.json();

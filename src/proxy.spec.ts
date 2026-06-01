@@ -482,8 +482,7 @@ describe('proxy middleware', () => {
     });
 
     it('passes AUTH_SECRET to getToken', async () => {
-      const originalSecret = process.env.AUTH_SECRET;
-      process.env.AUTH_SECRET = 'test-secret';
+      vi.stubEnv('AUTH_SECRET', 'test-secret');
 
       vi.mocked(getToken).mockResolvedValue(null);
       const request = createMockRequest('/');
@@ -495,8 +494,6 @@ describe('proxy middleware', () => {
           secret: 'test-secret',
         })
       );
-
-      process.env.AUTH_SECRET = originalSecret;
     });
   });
 });

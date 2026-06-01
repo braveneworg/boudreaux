@@ -66,16 +66,9 @@ describe('ImageUploadService', () => {
   };
 
   beforeEach(() => {
-    // Set up environment variables
+    // Set up environment variables (auto-restored by the global afterEach)
     Object.entries(mockEnv).forEach(([key, value]) => {
-      process.env[key] = value;
-    });
-  });
-
-  afterEach(() => {
-    // Clean up environment variables
-    Object.keys(mockEnv).forEach((key) => {
-      delete process.env[key];
+      vi.stubEnv(key, value);
     });
   });
 
@@ -191,7 +184,7 @@ describe('ImageUploadService', () => {
     });
 
     it('should generate S3 direct URL when CDN domain is not configured', () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', undefined);
 
       const s3Key = 'media/tours/tour123/poster-123456.jpg';
       const result = ImageUploadService.generateCdnUrl(s3Key);
@@ -201,7 +194,7 @@ describe('ImageUploadService', () => {
     });
 
     it('should handle CDN domain with or without https protocol', () => {
-      process.env.CDN_DOMAIN = 'cdn.example.com'; // No protocol
+      vi.stubEnv('CDN_DOMAIN', 'cdn.example.com'); // No protocol
 
       const s3Key = 'media/tours/tour123/poster-123456.jpg';
       const result = ImageUploadService.generateCdnUrl(s3Key);
@@ -557,7 +550,7 @@ describe('ImageUploadService', () => {
 
   describe('generateCdnUrl - env var fallbacks', () => {
     it('should use S3 direct URL with bucket name when CDN domain is not set', () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', undefined);
 
       const result = ImageUploadService.generateCdnUrl('media/tours/tour123/poster.jpg');
 

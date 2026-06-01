@@ -87,6 +87,12 @@ describe('Heading', () => {
       expect(heading).toBeInTheDocument();
       expect(heading.tagName).toBe('H1');
     });
+
+    it('applies the level-1 spacing styles', () => {
+      render(<Heading level={1}>H1 Heading</Heading>);
+
+      expect(screen.getByRole('heading', { level: 1 })).toHaveClass('text-2xl', 'pt-1', 'h-[52px]');
+    });
   });
 
   it('passes additional props', () => {

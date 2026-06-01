@@ -42,7 +42,7 @@ describe('ChatLauncher', () => {
     render(<ChatLauncher />);
 
     expect(screen.getByRole('button', { name: /open chat/i })).toBeInTheDocument();
-    expect(screen.queryByText('Fake Four Inc. Chat')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /live chat/i })).not.toBeInTheDocument();
   });
 
   it('opens the drawer and shows the auth gate for unauthenticated users', async () => {
@@ -52,7 +52,7 @@ describe('ChatLauncher', () => {
     render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
 
-    expect(screen.getByText('Fake Four Inc. Chat')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /live chat/i })).toHaveAttribute('alt', 'live chat');
     expect(screen.getByText('Sign in to chat')).toBeInTheDocument();
     expect(screen.queryByTestId('chat-body-placeholder')).not.toBeInTheDocument();
   });

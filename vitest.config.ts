@@ -58,9 +58,11 @@ export default defineConfig({
     // provide per-file isolation identical to forks without subprocess overhead.
     pool: 'vmThreads',
 
-    // Use all available cores. CI runners typically have 2–4 vCPUs;
-    // local machines benefit equally from full utilisation.
-    maxWorkers: '100%',
+    // Use most cores, but leave headroom. Saturating every core (`'100%'`)
+    // invites resource contention — workers spinning up simultaneously under
+    // memory pressure can produce rare, non-deterministic VM-context failures
+    // that pass on retry. `'75%'` keeps throughput high while reducing that risk.
+    maxWorkers: '75%',
 
     isolate: true, // Required for test isolation
     fileParallelism: true, // Run test files in parallel for speed

@@ -30,7 +30,7 @@ describe('ChatDrawer', () => {
     useIsMobileMock.mockReturnValue(false);
     renderDrawer();
 
-    expect(screen.getByText('Fake Four Inc. Chat')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /live chat/i })).toHaveAttribute('alt', 'live chat');
     expect(screen.getByTestId('chat-body')).toBeInTheDocument();
   });
 
@@ -62,5 +62,36 @@ describe('ChatDrawer', () => {
     );
 
     expect(screen.queryByTestId('chat-body')).not.toBeInTheDocument();
+  });
+
+  it('renders the accessible description for screen readers', () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderDrawer();
+
+    expect(
+      screen.getByText(/Real-time chat with other Fake Four Inc\. listeners and the label team\./i)
+    ).toBeInTheDocument();
+  });
+
+  describe('drawer direction', () => {
+    it('slides up from the bottom on mobile', () => {
+      useIsMobileMock.mockReturnValue(true);
+      renderDrawer();
+
+      expect(document.querySelector('[data-vaul-drawer-direction]')).toHaveAttribute(
+        'data-vaul-drawer-direction',
+        'bottom'
+      );
+    });
+
+    it('slides in from the right on desktop', () => {
+      useIsMobileMock.mockReturnValue(false);
+      renderDrawer();
+
+      expect(document.querySelector('[data-vaul-drawer-direction]')).toHaveAttribute(
+        'data-vaul-drawer-direction',
+        'right'
+      );
+    });
   });
 });

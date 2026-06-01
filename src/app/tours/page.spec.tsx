@@ -43,7 +43,8 @@ describe('ToursPage', () => {
     const Page = await ToursPage();
     render(Page);
 
-    expect(screen.getByRole('heading', { name: 'Tours' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /tours/i })).toHaveAttribute('alt', 'tours');
     expect(
       screen.getByText('Search and browse upcoming and recent tour dates')
     ).toBeInTheDocument();

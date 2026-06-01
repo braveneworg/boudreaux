@@ -17,9 +17,12 @@ vi.mock('next/link', () => ({
 }));
 
 describe('SignoutSuccessContainer', () => {
-  it('renders success heading', () => {
+  it('renders success heading as an image', () => {
     render(<SuccessContainer />);
-    expect(screen.getByRole('heading', { name: /Success! 🎉/i })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toBeInTheDocument();
+    const headingImage = screen.getByRole('img', { name: /success/i });
+    expect(headingImage).toHaveAttribute('alt', 'success');
   });
 
   it('renders signout success message', () => {

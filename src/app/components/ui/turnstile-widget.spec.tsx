@@ -54,9 +54,6 @@ vi.mock('react-turnstile', () => ({
   })),
 }));
 
-// Mock environment variables
-const originalEnv = process.env;
-
 describe('TurnstileWidget', () => {
   const mockSetIsVerified = vi.fn();
   const defaultProps = {
@@ -65,16 +62,12 @@ describe('TurnstileWidget', () => {
   };
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
     mockCallbacks = {};
     // Default to a non-bypass test key so the Turnstile widget renders.
     // Individual tests can override with vi.stubEnv() or clear via stubEnv('', '').
+    // Stubs are restored by the global afterEach in setupTests.ts.
     vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'default-test-key');
     vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'default-prod-key');
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('site key selection', () => {
@@ -104,7 +97,6 @@ describe('TurnstileWidget', () => {
       vi.stubEnv('NODE_ENV', 'test');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'prod-site-key');
       vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'test-site-key');
-      process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY = 'test-site-key';
 
       render(<TurnstileWidget {...defaultProps} />);
 

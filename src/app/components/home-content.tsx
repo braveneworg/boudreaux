@@ -63,7 +63,7 @@ export const HomeContent = () => {
         <ArtistSearchInput />
         <section>
           <ImageHeading
-            src="/media/headings/FEATURED-1920-480.webp"
+            src="/media/headings/FEATURED.webp"
             alt="featured artists"
             imageHeight={480}
             priority

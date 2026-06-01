@@ -14,6 +14,7 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { SignupSigninForm } from '@/app/components/forms/signup-signin-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
+import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
@@ -127,7 +128,16 @@ const SignupPage = () => {
         items={[{ anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true }]}
       />
       <ContentContainer>
-        {isSignupPath ? <h1>Sign Up</h1> : <h1>Sign In</h1>}
+        {isSignupPath ? (
+          <h1>Sign Up</h1>
+        ) : (
+          <ImageHeading
+            src="/media/headings/SIGN-IN.webp"
+            alt="sign in"
+            imageHeight={480}
+            priority
+          />
+        )}
         <div className="mt-3 flex flex-col">
           <FormProvider {...form}>
             <form noValidate onSubmit={form.handleSubmit(handleSubmit)} autoComplete="on">

@@ -37,25 +37,21 @@ Qk6BAoGBAJqMQQE0TInWVGEzybhKItVTuKVGUwKWh4RCkbDqyd9hovZnvYeTb3yA
 TOOawsVJ3z+4tgAIvlSYx9nkfQEsiyHHNoa7+2eWy2sV82iI/m+M
 -----END RSA PRIVATE KEY-----`;
 
-const ORIGINAL_ENV = { ...process.env };
-
-afterEach(() => {
-  process.env = { ...ORIGINAL_ENV };
-});
+// Per-test env mutations are restored by the global afterEach in setupTests.ts.
 
 describe('isCloudFrontSigningConfigured', () => {
   it('returns false when env vars are missing', () => {
-    delete process.env.CLOUDFRONT_KEY_PAIR_ID;
-    delete process.env.CLOUDFRONT_PRIVATE_KEY;
-    delete process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', undefined);
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', undefined);
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', undefined);
 
     expect(isCloudFrontSigningConfigured()).toBe(false);
   });
 
   it('returns true when key pair id, private key, and CDN domain are set', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
-    process.env.CLOUDFRONT_PRIVATE_KEY = TEST_PRIVATE_KEY;
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', TEST_PRIVATE_KEY);
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
 
     expect(isCloudFrontSigningConfigured()).toBe(true);
   });
@@ -63,9 +59,9 @@ describe('isCloudFrontSigningConfigured', () => {
 
 describe('generateCloudFrontSignedUrl', () => {
   it('returns null when CloudFront signing is not configured', () => {
-    delete process.env.CLOUDFRONT_KEY_PAIR_ID;
-    delete process.env.CLOUDFRONT_PRIVATE_KEY;
-    delete process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', undefined);
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', undefined);
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', undefined);
 
     const url = generateCloudFrontSignedUrl({
       s3Key: 'releases/abc/track.mp3',
@@ -77,9 +73,9 @@ describe('generateCloudFrontSignedUrl', () => {
   });
 
   it('returns a signed CloudFront URL when configured', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
-    process.env.CLOUDFRONT_PRIVATE_KEY = TEST_PRIVATE_KEY;
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', TEST_PRIVATE_KEY);
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
 
     const url = generateCloudFrontSignedUrl({
       s3Key: 'releases/abc/track.mp3',
@@ -96,12 +92,13 @@ describe('generateCloudFrontSignedUrl', () => {
   });
 
   it('accepts a base64-encoded PEM via CLOUDFRONT_PRIVATE_KEY_BASE64', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
-    delete process.env.CLOUDFRONT_PRIVATE_KEY;
-    process.env.CLOUDFRONT_PRIVATE_KEY_BASE64 = Buffer.from(TEST_PRIVATE_KEY, 'utf8').toString(
-      'base64'
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', undefined);
+    vi.stubEnv(
+      'CLOUDFRONT_PRIVATE_KEY_BASE64',
+      Buffer.from(TEST_PRIVATE_KEY, 'utf8').toString('base64')
     );
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
 
     const url = generateCloudFrontSignedUrl({
       s3Key: 'releases/abc/track.mp3',
@@ -114,9 +111,9 @@ describe('generateCloudFrontSignedUrl', () => {
   });
 
   it('strips the protocol from the CDN domain when building the URL', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
-    process.env.CLOUDFRONT_PRIVATE_KEY = TEST_PRIVATE_KEY;
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com/';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', TEST_PRIVATE_KEY);
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com/');
 
     const url = generateCloudFrontSignedUrl({
       s3Key: 'releases/abc/track.mp3',
@@ -129,10 +126,10 @@ describe('generateCloudFrontSignedUrl', () => {
   });
 
   it('returns null and logs when the signing call throws (e.g. malformed PEM)', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KTESTKEYPAIRID';
-    process.env.CLOUDFRONT_PRIVATE_KEY = 'NOT_A_VALID_PEM';
-    delete process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KTESTKEYPAIRID');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', 'NOT_A_VALID_PEM');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', undefined);
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com');
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

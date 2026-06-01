@@ -86,10 +86,18 @@ describe('ImageHeading', () => {
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-height', '480');
   });
 
-  it('forwards className to the heading', () => {
+  it('applies the default heading spacing classes', () => {
+    render(<ImageHeading {...defaultProps} />);
+
+    expect(screen.getByRole('heading')).toHaveClass('mt-1', 'mb-1.5', 'h-auto');
+  });
+
+  it('forwards className to the heading alongside the defaults', () => {
     render(<ImageHeading {...defaultProps} className="custom-heading" />);
 
-    expect(screen.getByRole('heading')).toHaveClass('custom-heading');
+    const heading = screen.getByRole('heading');
+    expect(heading).toHaveClass('custom-heading');
+    expect(heading).toHaveClass('mt-1', 'mb-1.5', 'h-auto');
   });
 
   it('forwards imageClassName to the image', () => {
