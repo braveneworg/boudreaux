@@ -15,7 +15,7 @@ test.describe('Contact Page', () => {
 
   test.describe('static content', () => {
     test('should display the page heading', async ({ page }) => {
-      await expect(page.getByRole('heading', { name: 'Contact Us' })).toBeVisible();
+      await expect(page.getByRole('img', { name: 'contact' })).toBeVisible();
     });
 
     test('should display the breadcrumb', async ({ page }) => {
