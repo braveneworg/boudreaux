@@ -89,11 +89,12 @@ describe('ReleasesPage', () => {
     expect(items).toEqual([{ anchorText: 'Releases', url: '/releases', isActive: true }]);
   });
 
-  it('should render Heading', async () => {
+  it('should render the releases heading as an image', async () => {
     const Page = await ReleasesPage();
     render(Page);
 
-    expect(screen.getByTestId('heading')).toBeInTheDocument();
+    const headingImage = screen.getByRole('img', { name: /releases/i });
+    expect(headingImage).toHaveAttribute('alt', 'releases');
   });
 
   it('should prefetch published releases data', async () => {

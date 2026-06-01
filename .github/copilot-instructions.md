@@ -34,6 +34,7 @@ Next.js 16 app with TypeScript 6 (strict), React 19, Tailwind v4, shadcn/ui, Rea
 - Use useCallback and useMemo for memoizing functions and values
 - Avoid inline functions and objects in JSX props
 - Use Fragment shorthand <> </> when no key or attribute is needed
+- Use @ alias when importing from src/ (e.g., '@/lib/utils' instead of '../../../lib/utils')
 
 ### Forms
 

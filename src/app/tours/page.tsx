@@ -4,6 +4,7 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import type { ToursResponse } from '@/app/hooks/use-tours-query';
+import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
@@ -26,7 +27,7 @@ export default async function ToursPage() {
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div className="container mx-auto py-8">
         <div className="mb-8 space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Tours</h1>
+          <ImageHeading src="/media/headings/TOURS.webp" alt="tours" imageHeight={480} priority />
           <p className="text-zinc-950-foreground text-lg">
             Search and browse upcoming and recent tour dates
           </p>

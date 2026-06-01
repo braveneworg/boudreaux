@@ -12,14 +12,10 @@ const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 describe('verifyTurnstile', () => {
-  const originalEnv = process.env;
-
+  // Default secret for each test; stubs are restored by the global afterEach
+  // in setupTests.ts.
   beforeEach(() => {
-    process.env = { ...originalEnv, CLOUDFLARE_SECRET: 'test-secret-key' };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
+    vi.stubEnv('CLOUDFLARE_SECRET', 'test-secret-key');
   });
 
   describe('successful verification', () => {
@@ -122,7 +118,7 @@ describe('verifyTurnstile', () => {
 
   describe('test secret key bypass', () => {
     it('should return success immediately when using Cloudflare test secret key in non-production', async () => {
-      process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
+      vi.stubEnv('CLOUDFLARE_SECRET', CONSTANTS.TURNSTILE.TEST_SECRET);
       vi.stubEnv('NODE_ENV', 'test');
 
       const result = await verifyTurnstile('any-token', '127.0.0.1');
@@ -132,7 +128,7 @@ describe('verifyTurnstile', () => {
     });
 
     it('should return success immediately when using Cloudflare test secret key in development', async () => {
-      process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
+      vi.stubEnv('CLOUDFLARE_SECRET', CONSTANTS.TURNSTILE.TEST_SECRET);
       vi.stubEnv('NODE_ENV', 'development');
 
       const result = await verifyTurnstile('any-token', '127.0.0.1');
@@ -142,7 +138,7 @@ describe('verifyTurnstile', () => {
     });
 
     it('should not bypass verification when test secret is used in production', async () => {
-      process.env.CLOUDFLARE_SECRET = CONSTANTS.TURNSTILE.TEST_SECRET;
+      vi.stubEnv('CLOUDFLARE_SECRET', CONSTANTS.TURNSTILE.TEST_SECRET);
       vi.stubEnv('NODE_ENV', 'production');
       mockFetch.mockResolvedValue({
         ok: true,
@@ -155,7 +151,7 @@ describe('verifyTurnstile', () => {
     });
 
     it('should not bypass verification for non-test secret keys in non-production', async () => {
-      process.env.CLOUDFLARE_SECRET = 'real-production-secret';
+      vi.stubEnv('CLOUDFLARE_SECRET', 'real-production-secret');
       vi.stubEnv('NODE_ENV', 'test');
       mockFetch.mockResolvedValue({
         ok: true,
@@ -170,7 +166,7 @@ describe('verifyTurnstile', () => {
 
   describe('missing configuration', () => {
     it('should return error when CLOUDFLARE_SECRET is not set', async () => {
-      delete process.env.CLOUDFLARE_SECRET;
+      vi.stubEnv('CLOUDFLARE_SECRET', undefined);
 
       const result = await verifyTurnstile('valid-token', '127.0.0.1');
 
@@ -180,7 +176,7 @@ describe('verifyTurnstile', () => {
     });
 
     it('should return error when CLOUDFLARE_SECRET is empty string', async () => {
-      process.env.CLOUDFLARE_SECRET = '';
+      vi.stubEnv('CLOUDFLARE_SECRET', '');
 
       const result = await verifyTurnstile('valid-token', '127.0.0.1');
 

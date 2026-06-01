@@ -14,6 +14,7 @@ import { ContactForm } from '@/app/components/forms/contact-form';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ImageHeading } from '@/components/ui/image-heading';
 import { contactAction } from '@/lib/actions/contact-action';
 import type { FormState } from '@/lib/types/form-state';
 import { contactSchema, type ContactFormSchemaType } from '@/lib/validation/contact-schema';
@@ -127,7 +128,7 @@ const ContactPage = () => {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'Contact', url: '/contact', isActive: true }]} />
-        <h1>Contact Us</h1>
+        <ImageHeading src="/media/headings/CONTACT.webp" alt="contact" imageHeight={480} priority />
         <div className="mb-4 flex flex-col space-y-2">
           <p>
             <strong>Co-founders/owners:</strong> Ceschi Ramos and David Ramos

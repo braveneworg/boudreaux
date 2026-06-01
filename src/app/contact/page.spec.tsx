@@ -122,9 +122,11 @@ describe('ContactPage', () => {
   }
 
   describe('rendering', () => {
-    it('should render the page heading', async () => {
+    it('should render the page heading as an image', async () => {
       await importAndRender();
-      expect(screen.getByRole('heading', { name: /contact us/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      const headingImage = screen.getByRole('img', { name: /contact/i });
+      expect(headingImage).toHaveAttribute('alt', 'contact');
     });
 
     it('should render the breadcrumb', async () => {

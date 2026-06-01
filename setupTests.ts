@@ -1,5 +1,13 @@
 import { afterEach, vi } from 'vitest';
 
+// Pristine snapshot of the environment captured at setup-file load. Restored
+// after every test so per-test env mutations — `vi.stubEnv`, raw
+// `process.env.X = …`, or `delete process.env.X` — can't bleed into a later
+// test. vmThreads already isolates `process.env` across files, so this guards
+// the in-file, cross-test case (e.g. specs that set `CDN_DOMAIN` inside `it`
+// blocks without cleanup), keeping shuffled test order deterministic.
+const PRISTINE_ENV = { ...process.env };
+
 // Mock server-only module to allow testing server-side code
 vi.mock('server-only', () => ({}));
 
@@ -217,4 +225,14 @@ if (typeof window !== 'undefined') {
 // Mock call history is cleared automatically by clearMocks: true in vitest.config.ts.
 afterEach(() => {
   cleanupFn();
+
+  // Restore any `vi.stubEnv` calls, then reset `process.env` to the pristine
+  // snapshot so raw assignments / deletes in one test cannot leak into the next.
+  vi.unstubAllEnvs();
+  for (const key of Object.keys(process.env)) {
+    if (!(key in PRISTINE_ENV)) {
+      delete process.env[key];
+    }
+  }
+  Object.assign(process.env, PRISTINE_ENV);
 });

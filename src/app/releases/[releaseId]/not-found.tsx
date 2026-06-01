@@ -8,13 +8,20 @@
  */
 import Link from 'next/link';
 
+import { ImageHeading } from '@/components/ui/image-heading';
+
 /**
  * Renders a "Release not found" message with a link back to the releases listing.
  */
 const NotFoundPage = () => {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4 text-center">
-      <h1 className="text-2xl font-bold text-zinc-900">Release Not Found</h1>
+      <ImageHeading
+        src="/media/headings/NOT-FOUND.webp"
+        alt="release not found"
+        imageHeight={480}
+        priority
+      />
       <p className="text-zinc-500">
         Could not find the requested release. It may have been removed or the link may be incorrect.
       </p>

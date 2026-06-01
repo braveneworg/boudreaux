@@ -50,7 +50,7 @@ test.describe('Chat drawer — authenticated', () => {
     await userPage.goto('/');
 
     await userPage.getByRole('button', { name: /open chat/i }).click();
-    await expect(userPage.getByText('Fake Four Inc. Chat')).toBeVisible();
+    await expect(userPage.getByRole('img', { name: 'live chat' })).toBeVisible();
 
     const composer = userPage.getByLabel('Chat message');
     await expect(composer).toBeVisible();

@@ -17,26 +17,18 @@ const ENV_KEYS = [
 ] as const;
 
 describe('signStreamUrl', () => {
-  const original: Record<string, string | undefined> = {};
-
+  // Start each test with the CloudFront/CDN vars unset; stubs are restored by
+  // the global afterEach in setupTests.ts.
   beforeEach(() => {
     for (const k of ENV_KEYS) {
-      original[k] = process.env[k];
-      delete process.env[k];
-    }
-  });
-
-  afterEach(() => {
-    for (const k of ENV_KEYS) {
-      if (original[k] === undefined) delete process.env[k];
-      else process.env[k] = original[k];
+      vi.stubEnv(k, undefined);
     }
   });
 
   it('returns null when s3Key is missing', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KP1';
-    process.env.CLOUDFRONT_PRIVATE_KEY = 'pem';
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', 'pem');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     expect(signStreamUrl(null)).toBeNull();
     expect(signStreamUrl(undefined)).toBeNull();
@@ -48,9 +40,9 @@ describe('signStreamUrl', () => {
   });
 
   it('signs the URL when fully configured (no Content-Disposition for streaming)', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KP1';
-    process.env.CLOUDFRONT_PRIVATE_KEY = 'pem';
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', 'pem');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     const result = signStreamUrl('releases/abc/digital-formats/MP3_320KBPS/track.mp3');
 
@@ -62,18 +54,18 @@ describe('signStreamUrl', () => {
   });
 
   it('strips https:// prefix and trailing slash from CDN domain', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KP1';
-    process.env.CLOUDFRONT_PRIVATE_KEY = 'pem';
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'https://cdn.example.com/';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', 'pem');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'https://cdn.example.com/');
 
     const result = signStreamUrl('a/b.mp3');
     expect(result?.startsWith('https://cdn.example.com/a/b.mp3')).toBe(true);
   });
 
   it('decodes base64 PEM when CLOUDFRONT_PRIVATE_KEY_BASE64 is set', () => {
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KP1';
-    process.env.CLOUDFRONT_PRIVATE_KEY_BASE64 = Buffer.from('pem-content').toString('base64');
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY_BASE64', Buffer.from('pem-content').toString('base64'));
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
 
     expect(signStreamUrl('a/b.mp3')).toContain('https://cdn.example.com/a/b.mp3');
   });
@@ -83,9 +75,9 @@ describe('signStreamUrl', () => {
     (signer.getSignedUrl as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw Error('boom');
     });
-    process.env.CLOUDFRONT_KEY_PAIR_ID = 'KP1';
-    process.env.CLOUDFRONT_PRIVATE_KEY = 'pem';
-    process.env.NEXT_PUBLIC_CDN_DOMAIN = 'cdn.example.com';
+    vi.stubEnv('CLOUDFRONT_KEY_PAIR_ID', 'KP1');
+    vi.stubEnv('CLOUDFRONT_PRIVATE_KEY', 'pem');
+    vi.stubEnv('NEXT_PUBLIC_CDN_DOMAIN', 'cdn.example.com');
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(signStreamUrl('a/b.mp3')).toBeNull();

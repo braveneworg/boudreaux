@@ -533,9 +533,9 @@ describe('ArtistService', () => {
     };
 
     beforeEach(() => {
-      process.env.S3_BUCKET = 'test-bucket';
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
-      process.env.AWS_REGION = 'us-east-1';
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      vi.stubEnv('AWS_REGION', 'us-east-1');
     });
 
     it('should upload image successfully', async () => {
@@ -565,7 +565,7 @@ describe('ArtistService', () => {
     });
 
     it('should return error when S3 bucket not configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.stubEnv('S3_BUCKET', undefined);
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
 
       const result = await ArtistService.uploadArtistImage('artist-123', mockImageData);
@@ -592,7 +592,7 @@ describe('ArtistService', () => {
     });
 
     it('should use direct S3 URL when CDN not configured', async () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', undefined);
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
       vi.mocked(prisma.image.findMany).mockResolvedValue([]);
       vi.mocked(prisma.image.create).mockResolvedValue({
@@ -624,9 +624,9 @@ describe('ArtistService', () => {
     ];
 
     beforeEach(() => {
-      process.env.S3_BUCKET = 'test-bucket';
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
-      process.env.AWS_REGION = 'us-east-1';
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      vi.stubEnv('AWS_REGION', 'us-east-1');
     });
 
     it('should upload multiple images successfully', async () => {
@@ -704,8 +704,8 @@ describe('ArtistService', () => {
 
   describe('deleteArtistImage', () => {
     beforeEach(() => {
-      process.env.S3_BUCKET = 'test-bucket';
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
     });
 
     it('should delete image successfully', async () => {
@@ -1549,9 +1549,9 @@ describe('ArtistService', () => {
 
   describe('uploadArtistImage - additional branch coverage', () => {
     beforeEach(() => {
-      process.env.S3_BUCKET = 'test-bucket';
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
-      process.env.AWS_REGION = 'us-east-1';
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+      vi.stubEnv('AWS_REGION', 'us-east-1');
     });
 
     it('should use fallback content type when contentType is empty', async () => {
@@ -1607,7 +1607,7 @@ describe('ArtistService', () => {
     });
 
     it('should use default AWS region when AWS_REGION is not set', async () => {
-      delete process.env.AWS_REGION;
+      vi.stubEnv('AWS_REGION', undefined);
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'artist-123' } as never);
       vi.mocked(prisma.image.findMany).mockResolvedValue([]);
       vi.mocked(prisma.image.create).mockResolvedValue({
@@ -1617,7 +1617,7 @@ describe('ArtistService', () => {
         altText: null,
         sortOrder: 0,
       } as never);
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', undefined);
 
       const result = await ArtistService.uploadArtistImage('artist-123', {
         file: Buffer.from('test'),
@@ -1673,8 +1673,8 @@ describe('ArtistService', () => {
 
   describe('deleteArtistImage - additional branch coverage', () => {
     beforeEach(() => {
-      process.env.S3_BUCKET = 'test-bucket';
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+      vi.stubEnv('S3_BUCKET', 'test-bucket');
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
     });
 
     it('should skip S3 deletion when image src is null', async () => {
@@ -1692,7 +1692,7 @@ describe('ArtistService', () => {
     });
 
     it('should skip S3 deletion when S3_BUCKET is not configured', async () => {
-      delete process.env.S3_BUCKET;
+      vi.stubEnv('S3_BUCKET', undefined);
       vi.mocked(prisma.image.findUnique).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/image.jpg',
@@ -1720,7 +1720,7 @@ describe('ArtistService', () => {
     });
 
     it('should strip protocol from CDN_DOMAIN when extracting S3 key', async () => {
-      process.env.CDN_DOMAIN = 'https://cdn.example.com';
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
       vi.mocked(prisma.image.findUnique).mockResolvedValue({
         id: 'image-123',
         src: 'https://cdn.example.com/media/artists/artist-123/image.jpg',

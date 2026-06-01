@@ -3,9 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
+import { ImageHeading } from '@/components/ui/image-heading';
+
 export const SuccessContainer = () => (
   <>
-    <h1>Success! 🎉</h1>
+    <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
     <p>
       You have been successfully signed out. Please close your browser to protect your privacy.{' '}
       <Link href="/signin">Return to signin.</Link>

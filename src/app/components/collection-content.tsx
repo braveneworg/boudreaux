@@ -11,6 +11,7 @@ import { useCollectionQuery } from '@/app/hooks/use-collection-query';
 
 import { CollectionList } from './collection-list';
 import { BreadcrumbMenu } from './ui/breadcrumb-menu';
+import { ImageHeading } from './ui/image-heading';
 
 /**
  * Client content wrapper for the collection page.
@@ -58,7 +59,12 @@ export const CollectionContent = () => {
         ]}
       />
       <div className="px-4 pb-8">
-        <h1 className="mb-6 text-2xl font-bold tracking-tight text-zinc-900">My Collection</h1>
+        <ImageHeading
+          src="/media/headings/MY-COLLECTION.webp"
+          alt="my collection"
+          imageHeight={480}
+          priority
+        />
         {purchases.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-lg text-zinc-500">No purchases yet.</p>

@@ -62,11 +62,11 @@ describe('presigned-upload-actions', () => {
     mockGetSignedUrl.mockResolvedValue('https://s3.amazonaws.com/presigned-url?signature=abc');
 
     // Set environment variables
-    process.env.S3_BUCKET = 'test-bucket';
-    process.env.CDN_DOMAIN = 'https://cdn.example.com';
-    process.env.AWS_REGION = 'us-east-1';
-    process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
-    process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
+    vi.stubEnv('S3_BUCKET', 'test-bucket');
+    vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+    vi.stubEnv('AWS_REGION', 'us-east-1');
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'test-access-key');
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'test-secret-key');
   });
 
   describe('getPresignedUploadUrlsAction', () => {
@@ -287,7 +287,7 @@ describe('presigned-upload-actions', () => {
       });
 
       it('should use direct S3 URL when CDN_DOMAIN is not configured', async () => {
-        delete process.env.CDN_DOMAIN;
+        vi.stubEnv('CDN_DOMAIN', undefined);
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
@@ -298,7 +298,7 @@ describe('presigned-upload-actions', () => {
       });
 
       it('should handle CDN_DOMAIN with https:// prefix', async () => {
-        process.env.CDN_DOMAIN = 'https://cdn.example.com';
+        vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },

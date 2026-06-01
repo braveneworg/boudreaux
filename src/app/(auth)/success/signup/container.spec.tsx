@@ -39,9 +39,12 @@ vi.mock('@/app/components/ui/page-section-paragraph', () => ({
 describe('SignupSuccessContainer', () => {
   const testEmail = 'test@example.com';
 
-  it('renders success heading', () => {
+  it('renders success heading as an image', () => {
     render(<SuccessContainer email={testEmail} />);
-    expect(screen.getByRole('heading', { name: /Success! 🎉/i })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toBeInTheDocument();
+    const headingImage = screen.getByRole('img', { name: /success/i });
+    expect(headingImage).toHaveAttribute('alt', 'success');
   });
 
   it('renders PageContainer component', () => {

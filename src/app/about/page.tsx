@@ -4,6 +4,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { ImageHeading } from '@/components/ui/image-heading';
 import { BreadcrumbMenu } from '@/ui/breadcrumb-menu';
 import { ContentContainer } from '@/ui/content-container';
 import { Heading } from '@/ui/heading';
@@ -16,9 +17,12 @@ export default function AboutPage() {
     <PageContainer>
       <ContentContainer>
         <BreadcrumbMenu items={[{ anchorText: 'About', url: '/about', isActive: true }]} />
-        <Heading level={1} id="about-fake-four-inc">
-          About fake four inc.
-        </Heading>
+        <ImageHeading
+          src="/media/headings/ABOUT.webp"
+          alt="about fake four inc."
+          imageHeight={480}
+          priority
+        />
         <Heading level={2}>Overview</Heading>
         <PageSectionParagraph>
           <Image

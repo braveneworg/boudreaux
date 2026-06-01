@@ -13,8 +13,8 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { ReleasesContent } from '@/app/components/releases-content';
 import { BreadcrumbMenu } from '@/app/components/ui/breadcrumb-menu';
 import { ContentContainer } from '@/app/components/ui/content-container';
-import { Heading } from '@/app/components/ui/heading';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
@@ -45,7 +45,12 @@ export default async function ReleasesPage() {
       <PageContainer>
         <ContentContainer>
           <BreadcrumbMenu items={breadcrumbItems} />
-          <Heading level={1}>Releases</Heading>
+          <ImageHeading
+            src="/media/headings/RELEASES.webp"
+            alt="releases"
+            imageHeight={480}
+            priority
+          />
           <ReleasesContent />
         </ContentContainer>
       </PageContainer>

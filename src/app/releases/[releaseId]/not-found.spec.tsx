@@ -16,10 +16,12 @@ vi.mock('next/link', () => ({
 }));
 
 describe('NotFoundPage', () => {
-  it('should render "Release not found" message', () => {
+  it('should render the "Release not found" heading as an image', () => {
     render(<NotFoundPage />);
 
-    expect(screen.getByText(/release not found/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    const headingImage = screen.getByRole('img', { name: /release not found/i });
+    expect(headingImage).toHaveAttribute('alt', 'release not found');
   });
 
   it('should render a link back to /releases', () => {

@@ -99,12 +99,14 @@ describe('AboutPage', () => {
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
   });
 
-  it('renders main heading with anchor id', () => {
+  it('renders the main heading as an image with the about wordmark', () => {
     render(<AboutPage />);
 
-    const heading = screen.getByRole('heading', { name: 'About fake four inc.' });
-    expect(heading).toBeInTheDocument();
-    expect(heading).toHaveAttribute('id', 'about-fake-four-inc');
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    const headingImage = screen.getByTestId('image-about fake four inc.');
+    expect(headingImage).toHaveAttribute('data-src', '/media/headings/ABOUT.webp');
+    expect(headingImage).toHaveAttribute('data-height', '480');
+    expect(headingImage).toHaveAttribute('data-priority', 'true');
   });
 
   describe('images', () => {

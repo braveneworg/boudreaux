@@ -23,6 +23,7 @@ import {
 } from '@/app/components/ui/card';
 import { Form } from '@/app/components/ui/form';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { ImageHeading } from '@/components/ui/image-heading';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
 import { updateProfileAction } from '@/lib/actions/update-profile-action';
@@ -376,7 +377,8 @@ export function ProfileForm() {
           changeEmailForm.clearErrors();
           changeEmailForm.setValue('confirmEmail', '');
         }
-      } else if (fieldName === 'username') {
+      } else {
+        // The only other editable field is the username.
         // Check current state before toggling
         const wasEditing = isEditingUsername;
         setIsEditingUsername((prev) => !prev);
@@ -438,7 +440,12 @@ export function ProfileForm() {
       {/* Personal Information */}
       <Card>
         <CardContent>
-          <h1>Profile</h1>
+          <ImageHeading
+            src="/media/headings/PROFILE.webp"
+            alt="profile"
+            imageHeight={480}
+            priority
+          />
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
             <CardDescription>
