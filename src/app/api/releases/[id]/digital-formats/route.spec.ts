@@ -31,6 +31,15 @@ function buildContext(id = '507f1f77bcf86cd799439011') {
 }
 
 describe('GET /api/releases/[id]/digital-formats', () => {
+  it('returns 400 for a malformed release ID', async () => {
+    const res = await GET(buildRequest(), buildContext('not-an-object-id'));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body).toEqual({ error: 'Invalid release ID' });
+    expect(mockFindAllByRelease).not.toHaveBeenCalled();
+  });
+
   describe('without formatType (list all)', () => {
     it('returns all available formats with files', async () => {
       mockFindAllByRelease.mockResolvedValue([

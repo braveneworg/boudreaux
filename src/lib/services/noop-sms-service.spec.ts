@@ -51,4 +51,12 @@ describe('NoOpSmsService', () => {
     service.reset();
     expect(service.getCaptured()).toHaveLength(0);
   });
+
+  it('fully masks a short recipient that has nothing safe to show', async () => {
+    const service = new NoOpSmsService();
+    await service.send('123', 'hello');
+    const message = consoleInfoSpy.mock.calls[0]?.[0];
+    expect(message).toContain('****');
+    expect(message).not.toContain('123');
+  });
 });

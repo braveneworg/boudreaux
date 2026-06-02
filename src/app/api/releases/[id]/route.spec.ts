@@ -85,6 +85,22 @@ describe('Release by ID API Routes', () => {
       expect(ReleaseService.getReleaseById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
+    it('serializes BigInt fields to numbers in the response', async () => {
+      vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
+        success: true,
+        data: { ...mockRelease, streamCount: 1000n } as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.streamCount).toBe(1000);
+    });
+
     it('should return 404 when release not found', async () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
         success: false,

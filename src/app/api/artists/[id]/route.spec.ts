@@ -68,6 +68,16 @@ describe('Artist by ID API Routes', () => {
       expect(ArtistService.getArtistById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
+    it('should return 400 for a malformed artist ID', async () => {
+      const request = new NextRequest('http://localhost:3000/api/artists/not-an-object-id');
+      const response = await GET(request, createParams('not-an-object-id'));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'Invalid artist ID' });
+      expect(ArtistService.getArtistById).not.toHaveBeenCalled();
+    });
+
     it('should return 404 when artist not found', async () => {
       vi.mocked(ArtistService.getArtistById).mockResolvedValue({
         success: false,

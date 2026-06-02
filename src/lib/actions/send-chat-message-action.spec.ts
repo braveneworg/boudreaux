@@ -61,6 +61,21 @@ describe('sendChatMessageAction', () => {
     expect(result.fieldErrors).toBeDefined();
   });
 
+  it('groups a top-level (pathless) issue under the _form key', async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: 'user-1', email: 'octo@example.com' },
+    } as never);
+
+    const result = await sendChatMessageAction(
+      null as unknown as Parameters<typeof sendChatMessageAction>[0]
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe('invalid');
+    expect(result.fieldErrors).toHaveProperty('_form');
+  });
+
   it('forwards the resolved IP and user fields to the service', async () => {
     vi.mocked(auth).mockResolvedValue({
       user: { id: 'user-1', email: 'octo@example.com' },

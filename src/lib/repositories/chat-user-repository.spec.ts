@@ -109,6 +109,56 @@ describe('ChatUserRepository', () => {
     });
   });
 
+  describe('disableWithAudit', () => {
+    it('records the admin id and stated reason', async () => {
+      vi.mocked(prisma.chatUser.update).mockResolvedValue({} as never);
+
+      await ChatUserRepository.disableWithAudit({
+        userId: 'user-1',
+        adminId: 'admin-1',
+        reason: 'spam',
+      });
+
+      expect(prisma.chatUser.update).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: expect.objectContaining({
+          disabled: true,
+          disabledByAdminId: 'admin-1',
+          disabledReason: 'spam',
+        }),
+      });
+    });
+
+    it('stores null when no reason is supplied', async () => {
+      vi.mocked(prisma.chatUser.update).mockResolvedValue({} as never);
+
+      await ChatUserRepository.disableWithAudit({ userId: 'user-1', adminId: 'admin-1' });
+
+      expect(prisma.chatUser.update).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: expect.objectContaining({ disabledReason: null }),
+      });
+    });
+  });
+
+  describe('enableWithAudit', () => {
+    it('clears every disable-audit field', async () => {
+      vi.mocked(prisma.chatUser.update).mockResolvedValue({} as never);
+
+      await ChatUserRepository.enableWithAudit('user-1');
+
+      expect(prisma.chatUser.update).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: {
+          disabled: false,
+          disabledAt: null,
+          disabledByAdminId: null,
+          disabledReason: null,
+        },
+      });
+    });
+  });
+
   describe('findManyPaginated', () => {
     it('orders by the requested column and direction with the requested page window', async () => {
       vi.mocked(prisma.chatUser.findMany).mockResolvedValue([] as never);
