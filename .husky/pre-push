@@ -139,8 +139,36 @@ fi
 # for non-main upstreams).
 stage="fetch $sync_ref"
 if ! git fetch "$sync_remote" "$sync_branch" --quiet; then
-  echo "❌ Failed to fetch latest changes from $sync_ref. Please check your network connection and try again."
-  exit 1
+  # A fetch failure is usually a network/auth problem — but it can also mean
+  # the upstream branch was DELETED on the remote (commonly: it was merged and
+  # the remote branch tidied up). Tell the two apart with ls-remote, whose
+  # --exit-code returns exactly 2 when the remote is reachable but has no such
+  # ref, versus any other non-zero for a connection/auth failure.
+  upstream_deleted=0
+  if [ "$has_upstream" = "1" ]; then
+    git ls-remote --exit-code "$sync_remote" "refs/heads/$sync_branch" >/dev/null 2>&1
+    [ "$?" -eq 2 ] && upstream_deleted=1
+  fi
+
+  if [ "$upstream_deleted" = "1" ]; then
+    # The branch we track no longer exists remotely, so there's nothing to be
+    # "behind" — push to re-create it. Keep the safety checks by falling back
+    # to comparing against origin/main, exactly like a brand-new branch.
+    echo "ℹ️  Upstream '$sync_ref' no longer exists on '$sync_remote' (branch deleted)."
+    echo "   Falling back to 'origin/main' and pushing to re-create the branch."
+    has_upstream=0
+    sync_ref="origin/main"
+    sync_remote="origin"
+    sync_branch="main"
+    stage="fetch $sync_ref"
+    if ! git fetch "$sync_remote" "$sync_branch" --quiet; then
+      echo "❌ Failed to fetch latest changes from $sync_ref. Please check your network connection and try again."
+      exit 1
+    fi
+  else
+    echo "❌ Failed to fetch latest changes from $sync_ref. Please check your network connection and try again."
+    exit 1
+  fi
 fi
 
 # If local branch is genuinely behind the sync ref, prevent push and tell
