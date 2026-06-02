@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [4.97.0] - 2026-06-02
+
+### Added
+
+- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- Develop/chore/comprehensive code review redux (#464)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- chore: perform coder review, harden XSS/SSRF, repair gates and free-cap (#463)\n- Develop/chore/comprehensive code review redux (#464)\n
+
 ## [4.96.0] - 2026-06-01
 
 ### Added
