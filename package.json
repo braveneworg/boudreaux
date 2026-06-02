@@ -52,7 +52,7 @@
     "e2e:docker:down": "docker compose -f docker-compose.e2e.yml down -v",
     "e2e:ci": "playwright test --shard=$SHARD_INDEX/$SHARD_TOTAL",
     "e2e:merge": "playwright merge-reports --reporter=html ./blob-report",
-    "typecheck": "tsc-files --noEmit types/next-auth.d.ts types/vitest.d.ts",
+    "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "postinstall": "prisma generate",
     "stripe:forward": "stripe listen --forward-to http://localhost:3000/api/stripe/webhook"
@@ -143,6 +143,7 @@
     "sonner": "^2.0.7",
     "stripe": "^21.0.1",
     "tailwind-merge": "^3.3.1",
+    "undici": "^7.26.0",
     "unique-username-generator": "^1.5.1",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",

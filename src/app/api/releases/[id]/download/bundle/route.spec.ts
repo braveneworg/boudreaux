@@ -1949,6 +1949,25 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream 
     await response.arrayBuffer();
   });
 
+  it('does NOT record a free download when every object body is missing (empty bundle)', async () => {
+    // M3: an all-files-deleted bundle produces an empty ZIP. The user's free
+    // cap must not be charged for a download that delivers nothing.
+    mockS3Send.mockResolvedValue({ Body: null });
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    await response.arrayBuffer();
+
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+
   it('does NOT call PurchaseRepository.upsertDownloadCount on the free stream path', async () => {
     const response = await GET(
       new NextRequest(

@@ -118,6 +118,24 @@ describe('GET /api/proxy-image', () => {
     expect(response.headers.get('Content-Type')).toBe('image/webp');
   });
 
+  it('pins the fetch to a dispatcher so DNS cannot be re-resolved after validation', async () => {
+    // M2: the upstream fetch must run through a custom undici dispatcher whose
+    // lookup is locked to the address we already validated. Without the
+    // dispatcher, Node's fetch re-resolves DNS and reopens the rebinding window.
+    mockFetch.mockResolvedValue(
+      new Response(new ArrayBuffer(8), {
+        headers: { 'content-type': 'image/png' },
+      })
+    );
+
+    const request = createRequest('https://bucket.s3.amazonaws.com/photo.png');
+    await GET(request, dummyContext);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const fetchInit = mockFetch.mock.calls[0][1] as { dispatcher?: unknown };
+    expect(fetchInit.dispatcher).toBeDefined();
+  });
+
   it('should pass through the upstream status code when fetch response is not ok', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

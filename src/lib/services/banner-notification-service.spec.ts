@@ -204,6 +204,49 @@ describe('BannerNotificationService', () => {
       });
     });
 
+    it('should sanitize notification content at the read boundary', async () => {
+      // Defense-in-depth: even if unsanitized HTML reached the DB (seed,
+      // migration, or a future write path that bypasses the write-time
+      // sanitizer), the public read path must strip it with the parser-based
+      // sanitizer before it reaches the carousel's dangerouslySetInnerHTML.
+      const maliciousNotification = {
+        ...mockNotification,
+        displayFrom: null,
+        displayUntil: null,
+        content: '<strong>Sale</strong><script>alert(1)</script><img src=x onerror=alert(1)>',
+      };
+      mockFindMany.mockResolvedValue([maliciousNotification]);
+      mockSettingsFindUnique.mockResolvedValue(null);
+
+      const result = await BannerNotificationService.getActiveBanners();
+
+      expect(result.success).toBe(true);
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect((data.banners[0].notification as { content: string }).content).toBe(
+        '<strong>Sale</strong>'
+      );
+    });
+
+    it('should strip javascript: hrefs from anchor content at the read boundary', async () => {
+      const jsHrefNotification = {
+        ...mockNotification,
+        displayFrom: null,
+        displayUntil: null,
+        content: '<a href="javascript:alert(1)">click</a>',
+      };
+      mockFindMany.mockResolvedValue([jsHrefNotification]);
+      mockSettingsFindUnique.mockResolvedValue(null);
+
+      const result = await BannerNotificationService.getActiveBanners();
+
+      const data = (result as { success: true; data: { banners: { notification: unknown }[] } })
+        .data;
+      expect((data.banners[0].notification as { content: string }).content).not.toContain(
+        'javascript:'
+      );
+    });
+
     it('should return error on PrismaClientInitializationError', async () => {
       mockWithCache.mockRejectedValue(
         new Prisma.PrismaClientInitializationError('DB down', '0.0.0')

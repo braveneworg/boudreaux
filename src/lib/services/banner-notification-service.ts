@@ -11,6 +11,7 @@ import {
   ROTATION_INTERVAL_SETTINGS_KEY,
 } from '@/lib/constants/banner-slots';
 import { prisma } from '@/lib/prisma';
+import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import { cache, withCache } from '@/lib/utils/simple-cache';
 
 import type { ServiceResponse } from './service.types';
@@ -95,7 +96,13 @@ export class BannerNotificationService {
               notification: isActive
                 ? {
                     id: notification.id,
-                    content: notification.content as string,
+                    // Re-sanitize at the read boundary with the parser-based
+                    // sanitizer so the publicly-rendered carousel always
+                    // receives robustly-sanitized HTML, regardless of how the
+                    // content entered the DB (write action, seed, migration).
+                    // The client carousel keeps its regex pass as an extra
+                    // defense-in-depth layer.
+                    content: sanitizeBannerHtmlServer(notification.content as string),
                     textColor: notification.textColor,
                     backgroundColor: notification.backgroundColor,
                     displayFrom: notification.displayFrom?.toISOString() ?? null,
