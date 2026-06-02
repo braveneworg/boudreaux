@@ -1007,11 +1007,18 @@ export async function GET(
         }));
       });
 
-      // Kick off the prefetch pipeline and await the first object body
+      // Kick off the prefetch pipeline and peek at the first object body
       // up-front. This lets the free-tier cap accounting below distinguish a
       // real delivery from an all-missing bundle (every S3 object deleted →
       // empty ZIP) without giving up the "cap committed before the Response is
       // returned" guarantee that concurrent same-tuple requests rely on. (M3)
+      //
+      // A rejection here (e.g. S3 NoSuchKey when a release has no objects) is
+      // coalesced to `null`; it must NOT fault the whole request with a 500.
+      // The drive below already handles a failed body by aborting the archive
+      // mid-stream — the client observes a connection reset, not an error
+      // status. Coalescing to `null` also leaves the cap uncharged for a
+      // download that ultimately delivered nothing.
       const streamKeys = fileEntries.map((entry) => entry.s3Key);
       const streamInFlight = startBufferPrefetch(
         s3Client,
@@ -1019,7 +1026,7 @@ export async function GET(
         streamKeys,
         S3_PREFETCH_DEPTH
       );
-      const streamFirstBuffer = await streamInFlight[0];
+      const streamFirstBuffer = await streamInFlight[0].catch(() => null);
 
       void (async () => {
         try {

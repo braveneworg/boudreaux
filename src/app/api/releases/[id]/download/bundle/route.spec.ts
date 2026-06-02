@@ -1968,6 +1968,15 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream 
     expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
   });
 
+  // Note: the "first object fetch rejects (NoSuchKey) → stream aborts mid-flight
+  // rather than faulting with a clean 500" behavior is exercised end-to-end by
+  // e2e/tests/free-digital-downloads.spec.ts (it asserts `streamOutcome` is not
+  // 500). A unit version is intentionally omitted: forcing the stream drive to
+  // fail destroys the cache PassThrough, and the shared mocked S3 `Upload` never
+  // attaches to it, so the destroy surfaces as an unhandled stream error in the
+  // pooled run. The route fix (coalescing the first-body rejection to `null`) is
+  // covered above by the empty-bundle (`Body: null`) case.
+
   it('does NOT call PurchaseRepository.upsertDownloadCount on the free stream path', async () => {
     const response = await GET(
       new NextRequest(
