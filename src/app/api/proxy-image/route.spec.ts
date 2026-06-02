@@ -39,6 +39,33 @@ vi.mock('next/server', async (importOriginal) => {
   };
 });
 
+type DispatcherLookup = (
+  hostname: string,
+  options: { all?: boolean },
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | { address: string; family: number }[],
+    family?: number
+  ) => void
+) => void;
+
+// Capture the connection lookup the route installs on its pinned dispatcher.
+// undici never invokes it here (fetch is stubbed), so we exercise it directly
+// to assert it pins to the validated address — and to cover the function.
+const { capturedLookupRef, mockAgentClose } = vi.hoisted(() => ({
+  capturedLookupRef: { current: undefined as DispatcherLookup | undefined },
+  mockAgentClose: vi.fn(),
+}));
+
+vi.mock('undici', () => ({
+  // Regular function (not an arrow) so the route's `new Agent(...)` works —
+  // arrow functions are not constructable.
+  Agent: vi.fn().mockImplementation(function (opts: { connect?: { lookup?: DispatcherLookup } }) {
+    capturedLookupRef.current = opts?.connect?.lookup;
+    return { close: mockAgentClose };
+  }),
+}));
+
 const mockFetch = vi.fn();
 
 describe('GET /api/proxy-image', () => {
@@ -46,6 +73,9 @@ describe('GET /api/proxy-image', () => {
     vi.stubGlobal('fetch', mockFetch);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    capturedLookupRef.current = undefined;
+    mockAgentClose.mockReset();
+    mockAgentClose.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -134,6 +164,58 @@ describe('GET /api/proxy-image', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const fetchInit = mockFetch.mock.calls[0][1] as { dispatcher?: unknown };
     expect(fetchInit.dispatcher).toBeDefined();
+  });
+
+  it('pins the dispatcher lookup to the validated address (single-result form)', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(new ArrayBuffer(4), { headers: { 'content-type': 'image/png' } })
+    );
+
+    await GET(createRequest('https://bucket.s3.amazonaws.com/photo.png'), dummyContext);
+
+    const lookup = capturedLookupRef.current;
+    if (typeof lookup !== 'function') {
+      throw new Error('dispatcher lookup was not captured');
+    }
+    const callback = vi.fn();
+    lookup('bucket.s3.amazonaws.com', { all: false }, callback);
+
+    // dns lookup is stubbed to 1.2.3.4 / family 4 — the pin must return exactly
+    // that, never re-resolving the hostname.
+    expect(callback).toHaveBeenCalledWith(null, '1.2.3.4', 4);
+  });
+
+  it('returns the validated address as a list when the all option is set', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(new ArrayBuffer(4), { headers: { 'content-type': 'image/png' } })
+    );
+
+    await GET(createRequest('https://bucket.s3.amazonaws.com/photo.png'), dummyContext);
+
+    const lookup = capturedLookupRef.current;
+    if (typeof lookup !== 'function') {
+      throw new Error('dispatcher lookup was not captured');
+    }
+    const callback = vi.fn();
+    lookup('bucket.s3.amazonaws.com', { all: true }, callback);
+
+    expect(callback).toHaveBeenCalledWith(null, [{ address: '1.2.3.4', family: 4 }]);
+  });
+
+  it('still returns the image when closing the pinned dispatcher fails', async () => {
+    // The dispatcher is closed in a finally as best-effort cleanup; a close
+    // failure must not affect the already-built response.
+    mockAgentClose.mockRejectedValueOnce(new Error('close failed'));
+    mockFetch.mockResolvedValue(
+      new Response(new ArrayBuffer(4), { headers: { 'content-type': 'image/png' } })
+    );
+
+    const response = await GET(
+      createRequest('https://bucket.s3.amazonaws.com/photo.png'),
+      dummyContext
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it('should pass through the upstream status code when fetch response is not ok', async () => {

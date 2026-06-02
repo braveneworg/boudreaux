@@ -222,6 +222,10 @@ export const GET = withAuth(async (request: NextRequest) => {
     // Each request builds a fresh pinned dispatcher; close its connection
     // pool so it does not leak. The body is fully buffered before any return
     // above, so closing here cannot truncate the response.
-    void pinnedDispatcher.close().catch(() => {});
+    try {
+      await pinnedDispatcher.close();
+    } catch {
+      // Best-effort cleanup — a close failure must not affect the response.
+    }
   }
 });

@@ -1026,7 +1026,14 @@ export async function GET(
         streamKeys,
         S3_PREFETCH_DEPTH
       );
-      const streamFirstBuffer = await streamInFlight[0].catch(() => null);
+      let streamFirstBuffer: Buffer | null = null;
+      try {
+        streamFirstBuffer = await streamInFlight[0];
+      } catch {
+        // First body failed (e.g. S3 NoSuchKey); leave it null so the cap is
+        // not charged and the request still streams — the drive below aborts
+        // the archive mid-flight.
+      }
 
       void (async () => {
         try {
