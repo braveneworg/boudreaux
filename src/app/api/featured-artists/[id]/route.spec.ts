@@ -62,6 +62,22 @@ describe('Featured Artist by ID API Routes', () => {
       );
     });
 
+    it('serializes BigInt fields to numbers in the response', async () => {
+      vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
+        success: true,
+        data: { ...mockFeaturedArtist, viewCount: 7n } as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.viewCount).toBe(7);
+    });
+
     it('should return 404 when featured artist not found', async () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
         success: false,

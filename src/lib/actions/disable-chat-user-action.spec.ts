@@ -66,6 +66,23 @@ describe('disableChatUserAction', () => {
     });
     expect(revalidateMock).toHaveBeenCalledWith('/admin/chat');
   });
+
+  it('groups a top-level (pathless) issue under the _form key', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    const result = await disableChatUserAction(
+      null as unknown as Parameters<typeof disableChatUserAction>[0]
+    );
+    expect(result.success).toBe(false);
+    const fieldErrors = !result.success ? result.fieldErrors : undefined;
+    expect(fieldErrors).toHaveProperty('_form');
+  });
+
+  it('returns unauthorized when the session lacks a user id', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: '' } });
+    const result = await disableChatUserAction({ userId: VALID_ID });
+    expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(disableMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('enableChatUserAction', () => {
@@ -90,5 +107,24 @@ describe('enableChatUserAction', () => {
 
     expect(result).toEqual({ success: true });
     expect(enableMock).toHaveBeenCalledWith(VALID_ID);
+  });
+
+  it('rejects a malformed userId with a field-scoped error', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    const result = await enableChatUserAction({ userId: 'not-an-id' });
+    expect(result.success).toBe(false);
+    const fieldErrors = !result.success ? result.fieldErrors : undefined;
+    expect(fieldErrors).toHaveProperty('userId');
+    expect(enableMock).not.toHaveBeenCalled();
+  });
+
+  it('groups a top-level (pathless) issue under the _form key', async () => {
+    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    const result = await enableChatUserAction(
+      null as unknown as Parameters<typeof enableChatUserAction>[0]
+    );
+    expect(result.success).toBe(false);
+    const fieldErrors = !result.success ? result.fieldErrors : undefined;
+    expect(fieldErrors).toHaveProperty('_form');
   });
 });

@@ -6,7 +6,11 @@ import { isIP } from 'node:net';
 
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { Agent } from 'undici';
+
 import { withAuth } from '@/lib/decorators/with-auth';
+
+import type { LookupAddress, LookupOptions } from 'node:dns';
 
 // Upper bound on proxied image size. Prevents unbounded memory use from
 // attacker-supplied URLs that return huge bodies. 20 MB is far larger than
@@ -110,25 +114,58 @@ export const GET = withAuth(async (request: NextRequest) => {
   if (isIP(parsedUrl.hostname) !== 0) {
     return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
   }
+  let vettedAddress: string;
+  let vettedFamily: number;
   try {
-    const { address } = await lookup(parsedUrl.hostname);
+    const { address, family } = await lookup(parsedUrl.hostname);
     if (isDisallowedAddress(address)) {
       console.warn('[proxy-image] Blocked request resolving to disallowed IP:', address);
       return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
     }
+    vettedAddress = address;
+    vettedFamily = family;
   } catch (error) {
     console.error('[proxy-image] DNS lookup failed:', error);
     return NextResponse.json({ error: 'DNS lookup failed' }, { status: 502 });
   }
 
+  // Pin the TCP connection to the exact address we just validated. Node's
+  // global fetch re-resolves DNS independently of the check above, leaving a
+  // DNS-rebinding window where an allowlisted hostname could flip to an
+  // internal IP between validation and socket connect. A dispatcher with a
+  // fixed lookup closes that window; TLS SNI still uses the original hostname,
+  // so certificate validation for the allowlisted CDN/S3 domain is
+  // unaffected. (M2)
+  const pinnedLookup = (
+    _hostname: string,
+    options: LookupOptions,
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | LookupAddress[],
+      family?: number
+    ) => void
+  ): void => {
+    if (options.all) {
+      callback(null, [{ address: vettedAddress, family: vettedFamily }]);
+    } else {
+      callback(null, vettedAddress, vettedFamily);
+    }
+  };
+  const pinnedDispatcher = new Agent({ connect: { lookup: pinnedLookup } });
+
   try {
     // redirect: 'manual' prevents follow-on requests to attacker-controlled
     // Location headers (e.g. 302 → 169.254.169.254). Redirects = treated as an error.
-    const response = await fetch(url, {
+    // `dispatcher` is a Node/undici fetch extension (not in the DOM RequestInit
+    // type); passing it via a variable lets the extra property through without
+    // naming a DOM lib global that `no-undef` would flag.
+    const fetchInit = {
       headers: { Accept: 'image/*' },
-      redirect: 'manual',
+      redirect: 'manual' as const,
       signal: AbortSignal.timeout(10_000),
-    });
+      dispatcher: pinnedDispatcher,
+    };
+    const response = await fetch(url, fetchInit);
 
     if (response.status >= 300 && response.status < 400) {
       return NextResponse.json({ error: 'Upstream redirect rejected' }, { status: 502 });
@@ -181,5 +218,14 @@ export const GET = withAuth(async (request: NextRequest) => {
   } catch (error) {
     console.error('[proxy-image] Error proxying image:', error);
     return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
+  } finally {
+    // Each request builds a fresh pinned dispatcher; close its connection
+    // pool so it does not leak. The body is fully buffered before any return
+    // above, so closing here cannot truncate the response.
+    try {
+      await pinnedDispatcher.close();
+    } catch {
+      // Best-effort cleanup — a close failure must not affect the response.
+    }
   }
 });

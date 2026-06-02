@@ -40,6 +40,19 @@ describe('toggleChatReactionAction', () => {
     expect(result.fieldErrors?.messageId).toBeDefined();
   });
 
+  it('groups a top-level (pathless) issue under the _form key', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+
+    const result = await toggleChatReactionAction(
+      null as unknown as Parameters<typeof toggleChatReactionAction>[0]
+    );
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe('invalid');
+    expect(result.fieldErrors).toHaveProperty('_form');
+  });
+
   it('forwards a valid toggle to the service and returns the DTO', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
     vi.mocked(ChatService.toggleReaction).mockResolvedValue({

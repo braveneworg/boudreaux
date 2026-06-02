@@ -72,7 +72,15 @@ vi.mock('@/lib/utils/content-disposition', () => ({
 const mockUploadDone = vi.fn().mockResolvedValue(undefined);
 const mockUploadAbort = vi.fn();
 vi.mock('@aws-sdk/lib-storage', () => ({
-  Upload: vi.fn().mockImplementation(function () {
+  Upload: vi.fn().mockImplementation(function (opts?: { params?: { Body?: unknown } }) {
+    // The real Upload consumes its Body stream. Attach a no-op error listener
+    // so that when the route destroys the cache PassThrough on a drive failure
+    // (e.g. S3 NoSuchKey), the `error` event has a handler and does not surface
+    // as an unhandled stream error in the pooled test run.
+    const body = opts?.params?.Body as { on?: (event: string, cb: () => void) => void } | undefined;
+    if (body && typeof body.on === 'function') {
+      body.on('error', () => {});
+    }
     return { done: mockUploadDone, abort: mockUploadAbort };
   }),
 }));
@@ -1947,6 +1955,50 @@ describe('GET /api/releases/[id]/download/bundle (mode=free) — respond=stream 
     );
 
     await response.arrayBuffer();
+  });
+
+  it('does NOT record a free download when every object body is missing (empty bundle)', async () => {
+    // M3: an all-files-deleted bundle produces an empty ZIP. The user's free
+    // cap must not be charged for a download that delivers nothing.
+    mockS3Send.mockResolvedValue({ Body: null });
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    await response.arrayBuffer();
+
+    expect(mockAppend).not.toHaveBeenCalled();
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
+  });
+
+  it('returns the stream (not a clean 500) when the first object fetch rejects', async () => {
+    // A release whose S3 objects are missing makes the first GetObject reject
+    // (NoSuchKey). The route must coalesce that to a missing first body and let
+    // the drive abort the archive mid-stream — NOT fault the request with a
+    // clean 500 — and must not charge the free cap. Mirrors the fixture-less CI
+    // behavior asserted by e2e/tests/free-digital-downloads.spec.ts. (The Upload
+    // mock attaches a Body error listener so the drive's stream destroy does not
+    // surface as an unhandled error in the pooled run.)
+    mockS3Send.mockRejectedValue(new Error('NoSuchKey'));
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free',
+        { headers: { 'x-forwarded-for': '203.0.113.42', 'user-agent': 'test-agent' } }
+      ),
+      makeParams()
+    );
+
+    // The body aborts mid-stream once the archive is destroyed; swallow it.
+    await response.arrayBuffer().catch(() => undefined);
+
+    expect(response.status).toBe(200);
+    expect(mockRecordSuccessfulDownload).not.toHaveBeenCalled();
   });
 
   it('does NOT call PurchaseRepository.upsertDownloadCount on the free stream path', async () => {

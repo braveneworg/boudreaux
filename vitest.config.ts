@@ -20,7 +20,7 @@ export default defineConfig({
 
   // Optimize build for faster test startup
   esbuild: {
-    target: 'node20',
+    target: 'node24', // Use latest Node.js target for faster builds in test environment
   },
 
   test: {
@@ -238,7 +238,7 @@ export default defineConfig({
       thresholds: {
         lines: 95,
         functions: 95,
-        branches: 85,
+        branches: 95,
         statements: 95,
       },
     },

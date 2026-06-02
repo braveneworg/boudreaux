@@ -59,6 +59,18 @@ describe('BanEvasionService.check', () => {
     };
     expect(args.fingerprintHash).toMatch(/^[a-f0-9]{64}$/);
   });
+
+  it('defaults a missing userId to null for the lookup', async () => {
+    findActiveMatchMock.mockResolvedValue(null);
+    await BanEvasionService.check({
+      email: 'a@b.c',
+      userAgent: 'ua',
+      acceptLanguage: 'en',
+      ip: '1.2.3.4',
+    });
+    const args = findActiveMatchMock.mock.calls[0]?.[0] as { userId: string | null };
+    expect(args.userId).toBeNull();
+  });
 });
 
 describe('BanEvasionService.fingerprintFor', () => {

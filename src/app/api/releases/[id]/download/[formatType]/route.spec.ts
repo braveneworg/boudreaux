@@ -108,6 +108,15 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     expect(response.status).toBe(401);
   });
 
+  it('should return 400 for an invalid release ID', async () => {
+    const response = await GET(makeRequest(), makeParams('not-an-object-id'));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('INVALID_ID');
+    expect(mockCheckFormatExists).not.toHaveBeenCalled();
+  });
+
   it('should return 400 for invalid format type', async () => {
     const response = await GET(
       makeRequest(),

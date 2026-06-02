@@ -98,6 +98,17 @@ describe('SnsSmsService', () => {
 
     expect(result.ok).toBe(false);
   });
+
+  it('falls back to a generic message on a non-Error rejection', async () => {
+    sendMock.mockRejectedValue('boom');
+    const service = new SnsSmsService({ region: 'us-east-1' });
+
+    const result = await service.send('+15551234567', 'hi');
+
+    expect(result.ok).toBe(false);
+    const error = !result.ok ? result.error : null;
+    expect(error).toBe('Unknown SNS error');
+  });
 });
 
 describe('buildSnsSmsServiceFromEnv', () => {
@@ -110,5 +121,12 @@ describe('buildSnsSmsServiceFromEnv', () => {
     vi.stubEnv('SNS_SMS_ORIGINATION_NUMBER', '+15551112222');
     const service = buildSnsSmsServiceFromEnv();
     expect(service).toBeInstanceOf(SnsSmsService);
+  });
+
+  it('defaults the region to us-east-1 when AWS_REGION is unset', () => {
+    vi.stubEnv('AWS_REGION', undefined);
+    const service = buildSnsSmsServiceFromEnv();
+    expect(service).toBeInstanceOf(SnsSmsService);
+    expect(SNSClientCtor).toHaveBeenCalledWith({ region: 'us-east-1' });
   });
 });

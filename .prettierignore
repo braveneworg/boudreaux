@@ -33,6 +33,9 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# Auto-generated release notes (semantic-release rewrites this on every release)
+CHANGELOG.md
+
 # Prisma
 prisma/migrations
 

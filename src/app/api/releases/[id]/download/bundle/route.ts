@@ -1007,16 +1007,42 @@ export async function GET(
         }));
       });
 
+      // Kick off the prefetch pipeline and peek at the first object body
+      // up-front. This lets the free-tier cap accounting below distinguish a
+      // real delivery from an all-missing bundle (every S3 object deleted →
+      // empty ZIP) without giving up the "cap committed before the Response is
+      // returned" guarantee that concurrent same-tuple requests rely on. (M3)
+      //
+      // A rejection here (e.g. S3 NoSuchKey when a release has no objects) is
+      // coalesced to `null`; it must NOT fault the whole request with a 500.
+      // The drive below already handles a failed body by aborting the archive
+      // mid-stream — the client observes a connection reset, not an error
+      // status. Coalescing to `null` also leaves the cap uncharged for a
+      // download that ultimately delivered nothing.
+      const streamKeys = fileEntries.map((entry) => entry.s3Key);
+      const streamInFlight = startBufferPrefetch(
+        s3Client,
+        bucketName,
+        streamKeys,
+        S3_PREFETCH_DEPTH
+      );
+      let streamFirstBuffer: Buffer | null = null;
+      try {
+        streamFirstBuffer = await streamInFlight[0];
+      } catch {
+        // First body failed (e.g. S3 NoSuchKey); leave it null so the cap is
+        // not charged and the request still streams — the drive below aborts
+        // the archive mid-flight.
+      }
+
       void (async () => {
         try {
-          const keys = fileEntries.map((entry) => entry.s3Key);
-          const inFlight = startBufferPrefetch(s3Client, bucketName, keys, S3_PREFETCH_DEPTH);
           for (let i = 0; i < fileEntries.length; i++) {
             const entry = fileEntries[i];
-            const buffer = await inFlight[i];
+            const buffer = await streamInFlight[i];
             const nextIndex = i + S3_PREFETCH_DEPTH;
             if (nextIndex < fileEntries.length) {
-              inFlight.push(issuePrefetch(s3Client, bucketName, keys[nextIndex]));
+              streamInFlight.push(issuePrefetch(s3Client, bucketName, streamKeys[nextIndex]));
             }
             if (buffer === null) continue;
             archive.append(buffer, { name: entry.archivePath });
@@ -1031,12 +1057,13 @@ export async function GET(
         }
       })();
 
-      // Free-mode cap accounting: record the successful free-tier
-      // download BEFORE returning the streaming Response so the cap
-      // increment is committed atomically with delivery — same semantics
-      // as the SSE pre-`ready` placement. Stream cancellation mid-flight
-      // still counts (matches existing SSE behavior).
-      if (isFreeMode && resolvedFormats.length > 0) {
+      // Free-mode cap accounting: record the successful free-tier download
+      // BEFORE returning the streaming Response so the cap increment is
+      // committed atomically with delivery — same semantics as the SSE
+      // pre-`ready` placement. Skipped when the first object body is missing:
+      // an all-files-deleted bundle yields an empty ZIP and must not consume
+      // the user's cap (M3). Cancellation after the first byte still counts.
+      if (isFreeMode && resolvedFormats.length > 0 && streamFirstBuffer !== null) {
         await recordFreeSuccess(resolvedFormats[0].formatType);
       }
 

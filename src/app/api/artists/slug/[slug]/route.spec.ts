@@ -63,6 +63,20 @@ describe('Artist by Slug API Route', () => {
       expect(ArtistService.getArtistBySlug).toHaveBeenCalledWith('john-doe');
     });
 
+    it('serializes BigInt fields to numbers in the response', async () => {
+      vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
+        success: true,
+        data: { ...mockArtist, playCount: 42n } as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists/slug/john-doe');
+      const response = await GET(request, createParams('john-doe'));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.playCount).toBe(42);
+    });
+
     it('should return 404 when artist not found', async () => {
       vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue({
         success: false,

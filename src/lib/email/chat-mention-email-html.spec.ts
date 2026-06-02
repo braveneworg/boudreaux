@@ -78,6 +78,22 @@ describe('buildChatMentionEmailHtml', () => {
     expect(html).toContain('</html>');
   });
 
+  it('renders an empty timestamp when the createdAt is unparseable', () => {
+    const html = buildChatMentionEmailHtml({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: 'hi', createdAt: 'not-a-date' }],
+    });
+    expect(html).not.toContain('Invalid Date');
+    expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
+  });
+
+  it('falls back to "Someone" in the intro when no author is available', () => {
+    // An empty mention list drives `mentions[0]?.authorUsername` to undefined,
+    // exercising the `?? 'Someone'` fallback in the single-mention intro.
+    const html = buildChatMentionEmailHtml({ ...baseData, mentions: [] });
+    expect(html).toContain('Someone');
+  });
+
   it('renders a digest header and each mention card when multiple entries are passed', () => {
     const html = buildChatMentionEmailHtml({
       ...baseData,

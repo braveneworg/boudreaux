@@ -137,4 +137,27 @@ describe('submitAbuseReportAction', () => {
 
     expect(result).toEqual({ success: true });
   });
+
+  it('tolerates a non-Error notification rejection', async () => {
+    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    submitMock.mockResolvedValue({ ok: true });
+    // A non-Error throw exercises the `: 'unknown'` side of the log.
+    dispatchMock.mockRejectedValue('boom');
+
+    const result = await submitAbuseReportAction({ reportedUsername: 'target' });
+
+    expect(result).toEqual({ success: true });
+  });
+
+  it('groups a top-level (pathless) issue under the _form key', async () => {
+    authMock.mockResolvedValue({ user: { id: 'r1' } });
+
+    const result = await submitAbuseReportAction(
+      null as unknown as Parameters<typeof submitAbuseReportAction>[0]
+    );
+
+    expect(result.success).toBe(false);
+    const fieldErrors = !result.success ? result.fieldErrors : undefined;
+    expect(fieldErrors).toHaveProperty('_form');
+  });
 });

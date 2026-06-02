@@ -54,6 +54,21 @@ describe('buildChatMentionEmailText', () => {
     expect(text.startsWith('FAKE FOUR INC. — CHAT MENTION')).toBe(true);
   });
 
+  it('omits the timestamp separator when the createdAt is unparseable', () => {
+    const text = buildChatMentionEmailText({
+      ...baseData,
+      mentions: [{ authorUsername: 'author', body: 'hi', createdAt: 'not-a-date' }],
+    });
+    expect(text).not.toContain('Invalid Date');
+    // With no parseable stamp the author line has no " — <stamp>" suffix.
+    expect(text).toContain('author:\nhi');
+  });
+
+  it('falls back to "Someone" in the intro when no author is available', () => {
+    const text = buildChatMentionEmailText({ ...baseData, mentions: [] });
+    expect(text).toContain('Someone mentioned you');
+  });
+
   it('uses the digest header and lists every entry when multiple mentions are passed', () => {
     const text = buildChatMentionEmailText({
       ...baseData,
