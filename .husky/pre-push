@@ -8,6 +8,10 @@ set +e
 log_file="${TMPDIR:-/tmp}/husky-pre-push.log"
 : > "$log_file"
 
+# Names the step currently running so a failure can report *what* failed even
+# before the full log is read. Updated as the hook progresses.
+stage="startup"
+
 # Drain pre-push stdin (git sends "<local ref> <local sha> <remote ref>
 # <remote sha>" lines) so child processes don't inherit it.
 if [ ! -t 0 ]; then
@@ -22,23 +26,59 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY 2>/de
 unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH 2>/dev/null
 unset GIT_INTERNAL_GETTEXT_SH_SCHEME GIT_REFLOG_ACTION GIT_EDITOR 2>/dev/null
 
-# Redirect all output to the log file; tail it to /dev/tty when available
-# so output is visible during an interactive push.
+# Preserve the ORIGINAL stderr on fd 3 *before* we redirect our own output to
+# the log file. git relays a hook's stderr to whatever launched the push
+# (terminal, VS Code, a GUI client); after the redirect below our fd 2 points
+# at the log instead, so the cleanup trap surfaces failures by writing to fd 3.
+exec 3>&2
+
+# Redirect all output to the log file; tail it to /dev/tty when one is
+# available so progress is visible live during an interactive CLI push.
 exec >>"$log_file" 2>&1
-if [ -e /dev/tty ]; then
+tty_shown=0
+if [ -e /dev/tty ] && { : >>/dev/tty; } 2>/dev/null; then
   tail -f "$log_file" >/dev/tty 2>/dev/null &
   tail_pid=$!
-  # Capture the script's true exit status *before* killing tail so that a
-  # failing `kill` (tail already dead when /dev/tty is inaccessible) does not
-  # replace it with a non-zero code and make the hook appear to fail.
-  # shellcheck disable=SC2064
-  trap 'last=$?; kill '"$tail_pid"' 2>/dev/null; exit $last' EXIT INT TERM
+  tty_shown=1
 fi
+
+# Single cleanup path for every exit. Stops the live tail and, on failure,
+# surfaces the diagnostics on the original stderr (fd 3) so the reason is
+# visible even when there is NO TTY — e.g. pushing from the VS Code Source
+# Control panel or a GUI client, where the live tail never ran and git
+# otherwise only shows its own generic "failed to push some refs".
+cleanup() {
+  rc=$?
+  if [ -n "${tail_pid:-}" ]; then
+    # Let the tail flush its final lines before we kill it on failure.
+    [ "$rc" -ne 0 ] && sleep 1
+    kill "$tail_pid" 2>/dev/null
+  fi
+  if [ "$rc" -ne 0 ]; then
+    {
+      echo ""
+      echo "❌ pre-push hook failed during: $stage (exit code $rc)"
+      echo "   Full log: $log_file"
+      # When the output was already streamed to a TTY, don't repeat the whole
+      # log — just the headline above. Otherwise replay it so non-TTY clients
+      # (VS Code / GUI) get the actual reason, not just a generic git error.
+      if [ "$tty_shown" -eq 0 ]; then
+        echo "   ----------------------- hook output -----------------------"
+        sed 's/^/   | /' "$log_file" 2>/dev/null
+        echo "   -----------------------------------------------------------"
+      fi
+    } >&3 2>/dev/null
+  fi
+  exit $rc
+}
+# shellcheck disable=SC2064
+trap cleanup EXIT INT TERM
 
 echo ""
 echo "===== pre-push hook started at $(date) ====="
 
 # Prevent pushing directly to main or master branches
+stage="branch protection"
 branch_name=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch_name" = "main" ] || [ "$branch_name" = "master" ]; then
   echo "🚫 You are on the '$branch_name' branch. Pushing directly to this branch is not allowed."
@@ -52,6 +92,7 @@ fi
 # Note: on modern git, when no upstream is configured, `rev-parse` exits 128
 # AND prints the literal string '@{u}' to stdout. Gate on the exit code so we
 # don't capture that literal as if it were a real ref.
+stage="upstream resolution"
 if upstream_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
   :
 else
@@ -82,6 +123,7 @@ fi
 # Block pushing WIP / fixup! / squash! commits — these should be rebased away
 # before review. Match against the subject line of each commit ahead of the
 # sync ref.
+stage="WIP/fixup commit scan"
 wip_subjects=$(git log "$sync_ref"..HEAD --pretty=%s | grep -iE '^(wip([: ]|$)|fixup!|squash!)' || true)
 if [ -n "$wip_subjects" ]; then
   echo "🚫 Refusing to push: WIP / fixup! / squash! commits present:"
@@ -95,6 +137,7 @@ fi
 # state. For first-push branches this fetches origin/main; for tracked
 # branches it fetches the actual upstream (avoids false "behind" results
 # for non-main upstreams).
+stage="fetch $sync_ref"
 if ! git fetch "$sync_remote" "$sync_branch" --quiet; then
   echo "❌ Failed to fetch latest changes from $sync_ref. Please check your network connection and try again."
   exit 1
@@ -103,6 +146,7 @@ fi
 # If local branch is genuinely behind the sync ref, prevent push and tell
 # the user to merge it in first. For new branches this means merging
 # origin/main; for tracked branches it means rebasing onto the upstream.
+stage="up-to-date check against $sync_ref"
 if ! git merge-base --is-ancestor "$sync_ref" HEAD; then
   if [ "$has_upstream" = "1" ]; then
     echo "🚫 Your local branch is behind '$sync_ref'."
@@ -129,6 +173,7 @@ if [ -z "$TS_CHANGED" ]; then
 fi
 
 echo "🔍 Running TypeScript type-check before push..."
+stage="TypeScript type-check (pnpm exec tsc --noEmit)"
 
 # Run TypeScript type-check on the entire project
 pnpm exec tsc --noEmit
@@ -144,6 +189,7 @@ echo "✅ TypeScript type-check passed"
 
 echo ""
 echo "🔎 Running ESLint before push..."
+stage="ESLint (pnpm run lint)"
 
 pnpm run lint
 
@@ -158,6 +204,7 @@ echo "✅ ESLint passed"
 
 echo ""
 echo "🧪 Running tests before push..."
+stage="tests + coverage (pnpm run test:coverage:check)"
 
 # Suppress console output during tests to reduce verbosity
 # SUPPRESS_CONSOLE=1 pnpm run test:coverage:check --reporter=dot --silent
