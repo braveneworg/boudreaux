@@ -200,6 +200,23 @@ jobs:
 
       - name: Start MongoDB replica set
         run: |
+          # Pull the image up front with retries. GitHub-hosted runners share
+          # IPs that intermittently time out or hit anonymous-pull rate limits
+          # against Docker Hub ("context deadline exceeded"); a few retries
+          # make the pull resilient without needing registry credentials.
+          for i in $(seq 1 5); do
+            if docker pull mongo:7; then
+              echo "Pulled mongo:7"
+              break
+            fi
+            if [ "$i" = "5" ]; then
+              echo "docker pull mongo:7 failed after 5 attempts" >&2
+              exit 1
+            fi
+            echo "docker pull failed (attempt $i/5); retrying in 15s..."
+            sleep 15
+          done
+
           docker run -d --name mongo-e2e \
             -p 27018:27018 \
             -e MONGO_INITDB_DATABASE=boudreaux-e2e \
