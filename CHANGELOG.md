@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.98.0] - 2026-06-03
+
+### Added
+
+- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- docs: align constitution and copilot-instructions with CLAUDE.md (#465)\n- fix(test): mock Prisma to stop vmThreads engine crash in CI (#466)\n
+
 ## [4.97.0] - 2026-06-02
 
 ### Added
