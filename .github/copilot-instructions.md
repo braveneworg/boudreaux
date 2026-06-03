@@ -30,8 +30,7 @@ Next.js 16 app with TypeScript 6 (strict), React 19, Tailwind v4, shadcn/ui, Rea
 - Never create class components
 - Use props destructuring
 - Use React.FC only when necessary, prefer function declarations
-- Use React.memo for performance optimization of pure components
-- Use useCallback and useMemo for memoizing functions and values
+- Use React.memo, useCallback, and useMemo only where they measurably help prevent unnecessary re-renders — not by default
 - Avoid inline functions and objects in JSX props
 - Use Fragment shorthand <> </> when no key or attribute is needed
 - Use @ alias when importing from src/ (e.g., '@/lib/utils' instead of '../../../lib/utils')
@@ -100,7 +99,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Run `pnpm run test:e2e` to run Playwright E2E tests
 - Run `pnpm run stripe` to forward Stripe webhooks to localhost:3000
 - Always run tests after making changes
-- Always run lint and format before committing
+- Before committing, all four gates must pass: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`
 
 ### Naming Conventions
 
@@ -113,7 +112,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Interfaces: file name matches interface name
 - Enums: PascalCase with .ts suffix (UserRole.ts)
 - Enums: file name matches enum name
-- Enums: use const enums where possible
+- Enums: prefer `as const` over enums; use a const enum only when an enum is unavoidable
 - Components: file name matches component name
 - Hooks: use prefix (useAuth.ts)
 - Hooks: file name matches hook name
@@ -139,10 +138,9 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Add JSDoc comments for complex functions and components
 - Use ESLint and Prettier for code formatting and linting
 - Follow existing code style and patterns in the project
-- Avoid using any type, prefer specific types or generics
+- Avoid using any type; prefer specific types or generics over unknown / Record<string, unknown>
 - Use React.FC only when necessary, prefer function declarations
-- Use React.memo for performance optimization of pure components
-- Use useCallback and useMemo for memoizing functions and values
+- Use React.memo, useCallback, and useMemo only where they measurably help prevent unnecessary re-renders — not by default
 - Avoid inline functions and objects in JSX props
 - Use Fragment shorthand <> </> when no key or attribute is needed
 - Why would I prefer named exports over default exports?
@@ -166,7 +164,8 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Unit tests with Vitest
 - Component tests with @testing-library/react
 - Place tests next to source files using the `.spec.ts` / `.spec.tsx` suffix (e.g. `component.spec.tsx`)
-- Mock external dependencies
+- Mock external dependencies (Stripe, SES, Prisma) at the service-layer boundary
+- In server-only specs, mock the server-only package: `vi.mock('server-only', () => ({}))`
 - Test edge cases and error handling
 - Use descriptive test names
 - Aim for high test coverage
@@ -210,7 +209,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Vitest for testing
 - Always use Docker for containerization and deployment
 - Always use meaningful commit messages that describe the changes made
-- Always run tests, lint, and format before committing code
+- Always run the full commit gate before committing: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`
 - Always put the MPL license header in all source files from HEADER.txt
 - Always use absolute imports from the project root (e.g., '@/lib/utils') instead of relative imports that traverse up the directory tree (e.g., ../../../lib/utils)
 - Always check for type errors and lint errors and warnings after creating or editing unit tests, and fix them
