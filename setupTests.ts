@@ -11,6 +11,20 @@ const PRISTINE_ENV = { ...process.env };
 // Mock server-only module to allow testing server-side code
 vi.mock('server-only', () => ({}));
 
+// Global safety-net mock for the Prisma client singleton. `src/lib/prisma.ts`
+// constructs `new PrismaClient()` at module load, and the generated library
+// engine initializes its native N-API addon eagerly. Loading that native engine
+// inside vitest's vmThreads VM context aborts the worker ("Failed to deserialize
+// constructor options" -> SIGABRT, exit 134) — this only bites in CI, where
+// `prisma generate` has produced a real client (locally the un-generated stub is
+// inert). Per project convention, unit tests mock Prisma at the service/repository
+// boundary; this is the global guard so no spec can ever reach the real engine.
+// Specs needing behavior supply their own `vi.mock('@/lib/prisma', ...)`, which
+// overrides this; `prisma.spec.ts` tests the real singleton via `vi.importActual`.
+vi.mock('@/lib/prisma', () => ({
+  prisma: new Proxy({}, { get: (_target, prop) => (prop === 'then' ? undefined : vi.fn()) }),
+}));
+
 // Pure stub for next/server — extends the native Node.js Request so route handlers get a
 // fully-functional headers/json()/text() API without loading any real Next.js module.
 vi.mock('next/server', () => {
