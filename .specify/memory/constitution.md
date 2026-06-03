@@ -1,6 +1,56 @@
 <!--
 Boudreaux Constitution - Sync Report
 =====================================
+Version: 1.1.1 → 1.2.0 (MINOR - aligned constitution with CLAUDE.md
+(2026-05-30): expanded/clarified standards to match the repo's current
+practical guidance; no principle removed or incompatibly redefined)
+Ratified: 2025-06-01 | Last Amended: 2026-06-02
+
+CHANGES SUMMARY (1.2.0) - alignment with CLAUDE.md:
+- I. TypeScript-First: `as const` over enums (with `const enum` fallback +
+  per-file PascalCase enum naming; dropped centralized utils/enums.ts); added
+  non-null-assertion (`!`) ban; "prefer specific types over `unknown` /
+  `Record<string, unknown>`" (was "prefer `unknown`"); reuse existing types
+- II. Next.js & React Architecture: added named-exports-only rule (with App
+  Router default-export exceptions); pinned Server Actions to src/lib/actions
+  and GET handlers to src/app/api
+- IV. Security & Data Integrity: Zod schemas in src/lib/validation; gate with
+  withAuth/withAdmin (+ withRateLimit, src/lib/decorators/with-auth.ts); secure
+  defaults + least privilege; banned localStorage/sessionStorage
+- V. Performance: memoize only where it measurably helps (not by default)
+- VI. Code Quality: JSDoc only for genuinely complex functions (was "all
+  functions"); "reuse before you create"; path-alias set spelled out
+- VII. Accessibility & UX: shadcn/ui from @/components/ui, never new primitives;
+  lucide-react icons + Jost font; no checkboxes in mobile-first UIs (use
+  toggles/radio buttons)
+- Coding Standards: no `@apply`; globalThis over window; ts-ignore needs inline
+  reason; repository pattern (src/lib/repositories) for all Prisma access
+- Testing & Quality: four-command commit gate
+  (typecheck+test:run+lint+format); exclude interfaces from coverage +
+  COVERAGE_METRICS.md baseline; .spec.ts(x); mock at service-layer boundary;
+  one condition per test; vi.mock('server-only')
+- Governance: CLAUDE.md added as primary runtime guidance reference
+
+MODIFIED PRINCIPLES (1.2.0): I, II, IV, V, VI, VII
+  (III. Test-Driven Development UNCHANGED - kept NON-NEGOTIABLE per maintainer
+  decision; CLAUDE.md's "tests for every feature and bug fix" is a subset that
+  strict TDD already satisfies)
+ADDED SECTIONS (1.2.0): None (clauses added within existing sections)
+REMOVED SECTIONS (1.2.0): None
+
+TEMPLATE VERIFICATION (2026-06-02):
+✅ .specify/templates/plan-template.md - Constitution Check gate is generic;
+   aligned with all 7 principles
+✅ .specify/templates/spec-template.md - Generic structure; no update needed
+✅ .specify/templates/tasks-template.md - Already hardened to NON-NEGOTIABLE TDD
+   in the prior turn; consistent with retained Principle III
+⚠️ .github/copilot-instructions.md - NOT re-synced this pass; may need a
+   parallel alignment to CLAUDE.md (out of scope for this request)
+
+FOLLOW-UP TODOS (1.2.0): Consider aligning .github/copilot-instructions.md with
+CLAUDE.md so it matches this constitution.
+
+--- PRIOR SYNC REPORT (1.1.1) ---
 Version: 1.1.0 → 1.1.1 (PATCH - clarifying refinements: added useDebugValue
 and useInsertionEffect hook guidance, motion.dev as Framer Motion alternative,
 explicit functional-programming preference, README.md maintenance mandate)
@@ -107,14 +157,19 @@ experience.
 
 TypeScript is mandatory for all new code. Strict mode MUST be enabled in
 `tsconfig.json`. Use the TypeScript version specified in `package.json`
-(currently 6.0+) and keep it updated to the latest stable release. Use
-`as const` assertions instead of enums for better type safety and
-performance; maintain a centralized `utils/enums.ts` file for shared enum
-definitions. Never use the `any` type; prefer `unknown` with proper type
-guards if necessary. Always specify explicit types for function parameters,
-return values, and variable declarations. Use `interface` for object shapes
-and `type` for unions and intersections. Type safety is non-negotiable and
-catches errors at compile-time rather than runtime.
+(currently 6.0+) and keep it updated to the latest stable release. Prefer
+`as const` over enums for better type safety and performance; reach for a
+`const enum` only when an enum is genuinely unavoidable, with one PascalCase
+enum per file matching its name. Never use the `any` type and never use the
+non-null assertion (`!`)—reaching for either means defining a narrower type
+or handling nullability explicitly with optional chaining (`?.`) and nullish
+coalescing (`??`). Prefer specific types over `unknown` / `Record<string,
+unknown>`; use `unknown` with proper type guards only when no narrower type
+is possible. Always specify explicit types for function parameters and
+return values, and reuse existing types before adding new ones. Use
+`interface` for object shapes and discriminated unions for variants. Type
+safety is non-negotiable and catches errors at compile-time rather than
+runtime.
 
 ### II. Next.js & React Architecture
 
@@ -123,8 +178,12 @@ Use Next.js 16+ with the App Router and Server Components by default. Add
 dialogs, form inputs). Use `'use server'` at the top of Server Action
 files and `'server-only'` in files that MUST NOT run on the client.
 Prefer functional components with React Hooks over class components—never
-create class components. Use Server Actions for all data mutations; use
-API routes for GET queries only. Leverage React 19 hooks for optimal UX:
+create class components. Use named exports only—except
+App Router files that require a default export (`page`, `layout`, `loading`,
+`error`, `not-found`, `template`, `default`, `route`, `middleware`). Use
+Server Actions (in `src/lib/actions/`, `'use server'` at the top) for all
+data mutations; use API route handlers (in `src/app/api/`) for GET queries
+only. Leverage React 19 hooks for optimal UX:
 `useTransition` for non-urgent state updates, `useDeferredValue` for
 deferred rendering, and `useId` for hydration-safe unique IDs. Use
 Tanstack Query for client-side data fetching (not mutations) with built-in
@@ -138,8 +197,9 @@ Adopt TDD as a core practice: write tests first, get user approval on
 requirements, watch tests fail, then implement functionality. Use Vitest 4
 for unit testing with jest-dom matchers; use Playwright for end-to-end
 testing. Achieve 90-95%+ test coverage on all testable files (excluding
-configuration, types, and Prisma schema). Write test files in the same
-directory as source code with a `.spec.ts` extension. Keep tests
+configuration, types, interfaces, and the Prisma schema) without regressing
+the `COVERAGE_METRICS.md` baseline. Write test files in the same directory
+as source code with a `.spec.ts(x)` extension. Keep tests
 deterministic and independent of external factors (network, time). Remove
 orphaned tests when code is deleted and orphaned code when tests are
 removed. Never import `describe`, `it`, `expect`, or `vi` from
@@ -147,15 +207,20 @@ Vitest—they are globals.
 
 ### IV. Security & Data Integrity
 
-Prioritize security in all aspects: validate all input data using Zod 4
-schemas in API routes and Server Actions; sanitize user input to prevent
-XSS, SQL injection, and other attacks. Implement proper authentication
-(Auth.js) and authorization (RBAC) mechanisms on all sensitive operations.
+Prioritize security in all aspects: validate all external input (user input,
+API responses, Server Action args) using Zod 4 schemas defined in
+`src/lib/validation/`; sanitize user input to prevent XSS, SQL injection,
+and other attacks. Implement proper authentication (Auth.js) and
+authorization (RBAC) on all sensitive operations; gate routes and Server
+Actions with the `withAuth` / `withAdmin` decorators
+(`src/lib/decorators/with-auth.ts`) and rate-limit with `withRateLimit`.
 Store sensitive information and configuration in environment variables;
 never hardcode secrets. Use a `.env` file for local development and ensure
 secrets are securely stored in production. Regularly audit and update
-dependencies for security vulnerabilities. Use HTTPS and secure cookies
-for authentication. Ensure all API routes have explicit error handling and
+dependencies for security vulnerabilities. Apply secure defaults always (CORS,
+cookie flags, rate limits) and least privilege; use HTTPS and secure cookies
+for authentication. Never use `localStorage` or `sessionStorage` for any
+data. Ensure all API routes have explicit error handling and
 return appropriate HTTP status codes. Include the MPL 2.0 license header
 (from `HEADER.txt`) in all source files for proper attribution and
 compliance.
@@ -163,8 +228,8 @@ compliance.
 ### V. Performance & Scalability
 
 Optimize for performance and scalability from the start. Use memoization
-techniques (`useMemo`, `useCallback`, `React.memo`) to prevent unnecessary
-re-renders. Implement code splitting and lazy loading (`React.lazy`,
+(`useMemo`, `useCallback`, `React.memo`) only where it measurably helps
+prevent unnecessary re-renders—never by default. Implement code splitting and lazy loading (`React.lazy`,
 `Suspense`) for components not needed immediately on page load. Use
 Next.js `<Image>` component for image optimization. Leverage Tanstack
 Query for data fetching with built-in caching, background updates, and
@@ -179,11 +244,12 @@ Monitor performance using React DevTools and profiling tools.
 Maintain a clean and organized codebase with clear separation of concerns.
 Favor functional programming paradigms (pure functions, immutability,
 composition) where appropriate. Follow the DRY principle to minimize code
-duplication. Use absolute imports
-from the project root (`@/lib/utils`) instead of relative imports that
-traverse up (`../../../`). Avoid deeply nested code; refactor into smaller
-functions and components. Write JSDoc comments for all functions and
-components explaining purpose, parameters, and return values. Use
+duplication; reuse before you create—search for an existing component, type,
+field, or util before adding one. Use absolute imports via path aliases
+(`@/*`, `@/components/*`, `@/ui/*`, `@/hooks/*`, `@/lib/*`, `@/utils/*`)
+instead of relative imports that traverse up (`../../../`). Avoid deeply nested code; refactor into smaller
+functions and components. Write JSDoc comments only for genuinely
+complex functions—avoid boilerplate JSDoc on every function or component. Use
 descriptive variable and function names that convey intent. Prefer
 immutability when updating state or props to prevent unintended side
 effects and ensure predictable behavior. Format all code with Prettier and
@@ -200,9 +266,12 @@ semantic HTML (`<button>`, `<nav>`, `<header>`, `<main>`, `<footer>`) to
 enhance structure and assistive technology compatibility. Never use
 deprecated HTML elements or inline event handlers. Test accessibility
 with tools like axe or Lighthouse. Ensure all form elements have
-associated labels; use shadcn/ui components with react-hook-form for
-consistent, accessible forms. Design components to be responsive and
-mobile-friendly, following mobile-first principles. Prioritize user
+associated labels; use shadcn/ui components from `@/components/ui` with
+react-hook-form for consistent, accessible forms—never create a new UI
+primitive. Use icons from `lucide-react` and the Jost font for UI text.
+Never use checkboxes in mobile-first UIs—use toggles or radio buttons
+instead. Design components to be responsive and mobile-friendly, following
+mobile-first principles. Prioritize user
 experience through intuitive design, clear error messages, and smooth
 interactions.
 
@@ -213,21 +282,24 @@ interactions.
 - Enforce TypeScript strict mode in all configuration files
 - Always define explicit types for function parameters, return values,
   and variables
-- Never use the `any` type; use `unknown` with proper type guards if
-  necessary
+- Never use the `any` type; prefer specific types over `unknown` /
+  `Record<string, unknown>`, using `unknown` with type guards only when no
+  narrower type is possible
 - Avoid non-null assertions (`!`); handle nullability explicitly using
   optional chaining (`?.`) and nullish coalescing (`??`)
 - Use interfaces or types to ensure all components are fully typed
 - Use destructuring assignment for objects and arrays to improve
   readability
 - Ensure all code passes ESLint and Prettier checks before committing
-- Never use `eslint-disable` or `prettier-ignore` comments without strong
-  justification
+- Never use `ts-ignore`, `eslint-disable`, or `prettier-ignore` without an
+  inline reason comment; no global ESLint/Prettier disables
 
 ### Code Organization & Style
 
-- No inline styles; use Tailwind CSS v4 utility classes exclusively
+- No inline styles and no `@apply`; use Tailwind CSS v4 utility classes
+  exclusively
 - Use the `cn()` helper for conditional class combinations
+- Use `globalThis`, not `window`, for client globals (SSR safety)
 - Use semicolons and commas consistently throughout the codebase
 - Use async/await for asynchronous code; avoid callback-based patterns
 - Use template literals for string interpolation
@@ -259,9 +331,8 @@ interactions.
 - Avoid side effects in render methods; use `useEffect` or event handlers
   instead
 - Always return a value from functions, even if it's `void`
-- Use `React.memo` for performance optimization of pure components
-- Implement `useCallback` and `useMemo` to memoize functions and values
-  and prevent unnecessary re-renders
+- Use `React.memo`, `useCallback`, and `useMemo` only where they measurably
+  help prevent unnecessary re-renders—not by default
 - Avoid inline functions and objects in JSX props; define them outside the
   component or use `useCallback`
 - Use Fragment shorthand (`<>` `</>`) when no key or attributes are needed
@@ -272,6 +343,10 @@ interactions.
   safety in all queries
 - Access data through Server Components or API routes; never use Prisma
   Client in Client Components
+- Route all Prisma access through the repository pattern in
+  `src/lib/repositories/`; keep DB logic out of components and routes, and
+  use transactions for multi-step operations
+- Never use `localStorage` or `sessionStorage` for any data
 - Use Server Actions for all mutations (POST, PUT, DELETE operations)
 - Use Tanstack Query for client-side data fetching (not mutations) with
   automatic caching and synchronization
@@ -341,12 +416,15 @@ interactions.
   logic and utilities
 - Write component tests for all interactive and complex components
 - Achieve 90-95%+ test coverage on all testable files (exclude config,
-  types, Prisma schema)
-- Keep test files adjacent to source code with `.spec.ts` extension
+  types, interfaces, and the Prisma schema); never regress the
+  `COVERAGE_METRICS.md` baseline
+- Keep test files adjacent to source code with the `.spec.ts(x)` extension
 - Use `describe` and `it` blocks for test organization
 - Use `beforeEach` and `afterEach` for setup and teardown
-- Mock external dependencies; test behavior and output, not
-  implementation details
+- Mock external dependencies (Stripe, SES, Prisma) at the service-layer
+  boundary; test behavior and output, not implementation details
+- One condition per test—never `expect` inside a conditional; in server-only
+  specs, `vi.mock('server-only', () => ({}))`
 - Use async/await for testing asynchronous code
 - Write deterministic tests that don't rely on network, time, or external
   factors
@@ -375,7 +453,8 @@ interactions.
 - Design components with performance optimization; use memoization and
   lazy loading
 - Implement error boundaries and graceful error handling in components
-- Document components clearly with JSDoc and type annotations
+- Document genuinely complex components with JSDoc; rely on TypeScript types
+  for the rest
 - Design components for extensibility using composition, render props,
   or hooks
 
@@ -408,7 +487,8 @@ interactions.
   standards
 - Use GitHub Actions for automated testing (Vitest) and E2E testing
   (Playwright)
-- Run `pnpm run lint` and `pnpm run format` before committing code
+- Before committing, all four gates MUST pass:
+  `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`
 - Use pre-commit hooks (Husky + lint-staged) to automate type checking,
   linting, and formatting before code reaches the repository
 - Maintain descriptive, clear commit messages that explain changes and
@@ -449,9 +529,9 @@ Changes fall into these categories:
 - All code contributions must be reviewed for constitution compliance
   during PR reviews
 - Complicated or uncertain code MUST include clear justification
-- Runtime development guidance (e.g.,
-  [Copilot instructions](./.github/copilot-instructions.md)) supplements
-  this constitution but doesn't override it
+- Runtime development guidance—[CLAUDE.md](../../CLAUDE.md) (primary, for
+  Claude Code) and [Copilot instructions](../../.github/copilot-instructions.md)—
+  supplements this constitution but doesn't override it
 - The constitution should be reviewed and updated periodically (at least
   quarterly) to reflect technology evolution, team practices, and project
   requirements
@@ -472,4 +552,4 @@ Changes fall into these categories:
 
 ---
 
-**Version**: 1.1.1 | **Ratified**: 2025-06-01 | **Last Amended**: 2026-05-06
+**Version**: 1.2.0 | **Ratified**: 2025-06-01 | **Last Amended**: 2026-06-02
