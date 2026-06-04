@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.99.0] - 2026-06-04
+
+### Added
+
+- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n- chore: commit Spec Kit install + drop redundant Copilot command duplicates (#467)\n
+
 ## [4.98.0] - 2026-06-03
 
 ### Added
