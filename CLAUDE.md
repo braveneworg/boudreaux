@@ -134,3 +134,10 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - Secure defaults always (CORS, cookie flags, rate limits); least privilege; validate and sanitize all external input. Keep dependencies patched.
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
+
+<!-- SPECKIT START -->
+
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+
+<!-- SPECKIT END -->
