@@ -135,6 +135,16 @@ E2E tests, the seed script, and the Playwright web server **must** run only agai
 - Add the MPL header from `HEADER.txt` to every new source file. Put AI-generated markdown in `docs/copilot/`; never author docs from files outside this repo. Never commit generated files or build artifacts.
 - No global ESLint/Prettier disables; no new UI primitives without checking shadcn/ui first; no secrets committed. When editing a line, confirm nearby comments are still accurate.
 
+## Spec Kit feature naming
+
+Feature branches and spec directories use a grouped scheme — branch `feature/NNN-name`, spec dir `specs/feature/NNN-name` (the number comes after the slash; exactly one grouping level). When running `/speckit-specify`:
+
+1. Ask the user for a short feature name (2–4 words) if they didn't already give one.
+2. Run `bash scripts/speckit-next-feature.sh <short-name>` — it's read-only and prints the next `GIT_BRANCH_NAME` + `SPECIFY_FEATURE_DIRECTORY`, computing `NNN` by scanning `specs/feature/*` and local/remote `feature/NNN-*` branches.
+3. Export those two values for the whole flow so the `before_specify` git hook creates `feature/NNN-name` and the specify skill creates `specs/feature/NNN-name/` and records it in `.specify/feature.json` (which is what `/speckit-plan`, `/speckit-tasks`, etc. read to find the nested dir).
+
+Pass a second arg to use a different group, e.g. `bash scripts/speckit-next-feature.sh <short-name> fix` → `fix/NNN-name`. This convention drives Spec Kit's existing `GIT_BRANCH_NAME` / `SPECIFY_FEATURE_DIRECTORY` overrides — never hand-edit `.specify/**` to change naming, so it survives Spec Kit upgrades.
+
 <!-- SPECKIT START -->
 
 For additional context about technologies to be used, project structure,
