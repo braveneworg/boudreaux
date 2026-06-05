@@ -23,17 +23,14 @@ interface StreamSigningConfig {
  */
 function getStreamSigningConfig(): StreamSigningConfig | null {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
-  const rawPem = process.env.CLOUDFRONT_PRIVATE_KEY;
   const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
 
-  if (!keyPairId || (!rawPem && !base64Pem) || !cdnDomainRaw) {
+  if (!keyPairId || !base64Pem || !cdnDomainRaw) {
     return null;
   }
 
-  const privateKey = base64Pem
-    ? Buffer.from(base64Pem, 'base64').toString('utf8')
-    : (rawPem ?? '').replace(/\\n/g, '\n');
+  const privateKey = Buffer.from(base64Pem, 'base64').toString('utf8');
 
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
