@@ -24,10 +24,9 @@ interface CloudFrontSignedUrlInput {
  * Required env vars (production):
  *  - `CLOUDFRONT_KEY_PAIR_ID` — the public key ID shown in the CloudFront
  *    console after uploading a public key (starts with `K...`).
- *  - `CLOUDFRONT_PRIVATE_KEY` — the PEM-encoded RSA private key (PKCS#1 or
- *    PKCS#8). Multi-line PEMs from AWS Secrets Manager / SSM work as-is.
- *    For env files use either the literal PEM with `\n` escapes or pass a
- *    base64 blob via `CLOUDFRONT_PRIVATE_KEY_BASE64` instead.
+ *  - `CLOUDFRONT_PRIVATE_KEY_BASE64` — the base64-encoded PEM RSA private key
+ *    (PKCS#1 or PKCS#8). Base64 avoids the multi-line / `\n`-escaping pain of
+ *    storing a raw PEM in env files and secret stores.
  *  - `NEXT_PUBLIC_CDN_DOMAIN` (or `CDN_DOMAIN`) — the CloudFront domain
  *    the URL is signed for (must match the distribution serving the file).
  */
@@ -37,19 +36,16 @@ function getCloudFrontSigningConfig(): {
   cdnDomain: string;
 } | null {
   const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID;
-  const rawPem = process.env.CLOUDFRONT_PRIVATE_KEY;
   const base64Pem = process.env.CLOUDFRONT_PRIVATE_KEY_BASE64;
   const cdnDomainRaw = process.env.NEXT_PUBLIC_CDN_DOMAIN ?? process.env.CDN_DOMAIN ?? '';
 
-  if (!keyPairId || (!rawPem && !base64Pem) || !cdnDomainRaw) {
+  if (!keyPairId || !base64Pem || !cdnDomainRaw) {
     return null;
   }
 
-  // Normalise: env files often store PEMs with literal `\n` rather than real
-  // newlines. The signer requires real newlines in the PEM.
-  const privateKey = base64Pem
-    ? Buffer.from(base64Pem, 'base64').toString('utf8')
-    : (rawPem ?? '').replace(/\\n/g, '\n');
+  // The PEM is stored base64-encoded to avoid multi-line / `\n`-escaping
+  // issues in env files; decode it back to the real PEM the signer needs.
+  const privateKey = Buffer.from(base64Pem, 'base64').toString('utf8');
 
   const cdnDomain = cdnDomainRaw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 

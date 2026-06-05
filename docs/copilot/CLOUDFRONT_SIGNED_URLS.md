@@ -168,11 +168,10 @@ CLOUDFRONT_KEY_PAIR_ID=K2JCJMDEHXQW5F
 NEXT_PUBLIC_CDN_DOMAIN=https://cdn.fakefourrecords.com
 ```
 
-Then choose **one** of the following two formats for the private key.
-
-### Option A — base64-encoded PEM (recommended)
-
-Avoids all newline-escaping pitfalls in env loaders.
+Provide the private key as a **base64-encoded PEM** in
+`CLOUDFRONT_PRIVATE_KEY_BASE64` — the only supported format. It avoids all
+newline-escaping pitfalls in env loaders; the utility decodes it back to a real
+PEM at runtime.
 
 ```bash
 # Encode locally:
@@ -180,15 +179,6 @@ base64 -i ~/.aws/cloudfront-keys/private_key.pem | pbcopy
 
 # In your environment:
 CLOUDFRONT_PRIVATE_KEY_BASE64=LS0tLS1CRUdJTi...
-```
-
-### Option B — multiline PEM with literal `\n`
-
-Works in most env managers; the utility automatically converts `\n` to real
-newlines.
-
-```bash
-CLOUDFRONT_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n...IDAQAB\n-----END RSA PRIVATE KEY-----"
 ```
 
 ### Production secret storage
