@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.101.0] - 2026-06-05
+
+### Added
+
+- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n- chore: standardize CloudFront signing on CLOUDFRONT_PRIVATE_KEY_BASE64 (#469)\n
+
 ## [4.100.0] - 2026-06-05
 
 ### Added
