@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.100.0] - 2026-06-05
+
+### Added
+
+- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n- feat: grouped feature/NNN-name Spec Kit branch + spec scheme (#468)\n
+
 ## [4.99.0] - 2026-06-04
 
 ### Added
