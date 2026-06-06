@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.102.0] - 2026-06-06
+
+### Added
+
+- feat: reference speckit constitution in claude (#472)\n- feat: reference speckit constitution in claude (#472)\n- fix: update broken pnpm scripts (#470)\n- fix: update broken pnpm scripts (#470)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- Feature/update signup heading (#471)\n- fix: update broken pnpm scripts (#470)\n- feat: reference speckit constitution in claude (#472)\n
+
 ## [4.101.0] - 2026-06-05
 
 ### Added
