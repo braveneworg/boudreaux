@@ -105,11 +105,12 @@ describe('SignupPage', () => {
   });
 
   describe('heading by path', () => {
-    it('renders the "Sign Up" text heading on the signup path', () => {
+    it('renders the sign-up heading image on the signup path', () => {
       usePathnameMock.mockReturnValue('/signup');
       render(<SignupPage />);
 
-      expect(screen.getByRole('heading', { name: 'Sign Up' })).toBeInTheDocument();
+      const headingImage = screen.getByRole('img', { name: /sign up/i });
+      expect(headingImage).toHaveAttribute('src', '/media/headings/SIGN-UP.webp');
       expect(screen.getByTestId('breadcrumb')).toHaveTextContent('Sign Up');
     });
 
