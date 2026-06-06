@@ -19,7 +19,11 @@ test.describe('Contact Page', () => {
     });
 
     test('should display the breadcrumb', async ({ page }) => {
-      await expect(page.getByRole('link', { name: 'Contact' })).toBeVisible();
+      // Scope to the breadcrumb nav so the header's "Contact Us" nav link
+      // (a substring match for "Contact") doesn't trigger a strict-mode clash.
+      await expect(
+        page.getByLabel('breadcrumb').getByRole('link', { name: 'Contact' })
+      ).toBeVisible();
     });
 
     test('should display the intro paragraph', async ({ page }) => {

@@ -57,10 +57,19 @@ test.describe('Chat drawer — authenticated', () => {
 
     const body = `e2e-${Date.now()}`;
     await composer.fill(body);
+    // Wait for React to commit the typed value before pressing Enter so the
+    // keydown handler closes over the latest value — otherwise a fill→press
+    // race under load can drop the send.
+    await expect(composer).toHaveValue(body);
     await composer.press('Enter');
 
     // Optimistic append + server echo both surface the body in the list.
     await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
+
+    // The composer is disabled while the send is in flight; wait for it to
+    // re-enable so the value assertion runs after the send cycle settles
+    // rather than reading a transient mid-send state.
+    await expect(composer).toBeEnabled({ timeout: 10_000 });
 
     // Composer clears after a successful send.
     await expect(composer).toHaveValue('');
