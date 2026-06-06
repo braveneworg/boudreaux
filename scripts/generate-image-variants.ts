@@ -12,11 +12,15 @@
  * naming convention (e.g. `hero_w1080.webp`). These variants are what
  * the custom Next.js image loader (`src/lib/image-loader.ts`) resolves.
  *
+ * Originals whose variants already exist on S3 are skipped automatically;
+ * pass `--force` to regenerate them.
+ *
  * Usage:
  *   pnpm run images:generate-variants
  *   pnpm run images:generate-variants -- --dry-run
  *   pnpm run images:generate-variants -- --prefix media/banners/
  *   pnpm run images:generate-variants -- --no-invalidate
+ *   pnpm run images:generate-variants -- --force
  *
  * Environment Variables:
  *   S3_BUCKET                  - S3 bucket name (required)
@@ -251,6 +255,31 @@ function buildVariantKey(originalKey: string, width: number, overrideExt?: strin
   return `${base}_w${width}${ext}`;
 }
 
+/**
+ * Compute every variant key `processImage` would upload for an original — one
+ * per device-size width, plus a `.webp` sibling for transcodable extensions.
+ * Used to detect originals that are already fully processed on S3 so we can
+ * skip the download/resize/upload round-trip entirely.
+ */
+function getExpectedVariantKeys(originalKey: string): string[] {
+  const shouldTranscodeToWebp = WEBP_TRANSCODE_EXTENSIONS.has(getExtension(originalKey));
+  const keys: string[] = [];
+
+  for (const width of IMAGE_VARIANT_DEVICE_SIZES) {
+    keys.push(buildVariantKey(originalKey, width));
+    if (shouldTranscodeToWebp) {
+      keys.push(buildVariantKey(originalKey, width, '.webp'));
+    }
+  }
+
+  return keys;
+}
+
+/** True when every expected variant for an original already exists on S3. */
+function hasAllVariants(originalKey: string, existingKeys: Set<string>): boolean {
+  return getExpectedVariantKeys(originalKey).every((key) => existingKeys.has(key));
+}
+
 interface ProcessResult {
   originalKey: string;
   variantsUploaded: number;
@@ -378,6 +407,7 @@ interface CliOptions {
   prefix: string;
   dryRun: boolean;
   invalidateCache: boolean;
+  force: boolean;
 }
 
 function parseArgs(args: string[]): CliOptions {
@@ -385,6 +415,7 @@ function parseArgs(args: string[]): CliOptions {
     prefix: 'media/',
     dryRun: false,
     invalidateCache: true,
+    force: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -393,6 +424,8 @@ function parseArgs(args: string[]): CliOptions {
       options.dryRun = true;
     } else if (arg === '--no-invalidate') {
       options.invalidateCache = false;
+    } else if (arg === '--force') {
+      options.force = true;
     } else if ((arg === '--prefix' || arg === '-p') && i + 1 < args.length) {
       options.prefix = args[++i];
       if (!options.prefix.endsWith('/')) {
@@ -423,11 +456,13 @@ ${colors.yellow}Usage:${colors.reset}
   pnpm run images:generate-variants -- --dry-run
   pnpm run images:generate-variants -- --prefix media/banners/
   pnpm run images:generate-variants -- --no-invalidate
+  pnpm run images:generate-variants -- --force
 
 ${colors.yellow}Options:${colors.reset}
   --dry-run           List what would be generated without uploading
   --prefix <prefix>   S3 key prefix to scan (default: media/)
   --no-invalidate     Skip CloudFront cache invalidation
+  --force             Regenerate even when all variants already exist on S3
 
 ${colors.yellow}Environment Variables:${colors.reset}
   S3_BUCKET                    S3 bucket name (required)
@@ -455,18 +490,36 @@ ${colors.yellow}Environment Variables:${colors.reset}
   log(`Found ${allKeys.length} total object(s)`, 'info');
 
   // 2. Filter to processable originals
-  const originals = allKeys.filter((key) => isProcessableImage(key) && !isExistingVariant(key));
+  const existingKeys = new Set(allKeys);
+  const candidates = allKeys.filter((key) => isProcessableImage(key) && !isExistingVariant(key));
   log(
-    `${originals.length} original image(s) to process (excluding SVG/ICO/GIF and existing variants)`,
+    `${candidates.length} original image(s) found (excluding SVG/ICO/GIF and existing variants)`,
     'info'
   );
+
+  // 3. Skip originals whose variants are all already on S3 (unless --force).
+  const originals = options.force
+    ? candidates
+    : candidates.filter((key) => !hasAllVariants(key, existingKeys));
+  const alreadyComplete = candidates.length - originals.length;
+
+  if (alreadyComplete > 0) {
+    log(
+      `Skipping ${alreadyComplete} image(s) that already have all variants on S3${
+        options.force ? '' : ' (use --force to regenerate)'
+      }`,
+      'info'
+    );
+  }
+
+  log(`${originals.length} image(s) to process`, 'info');
 
   if (originals.length === 0) {
     log('Nothing to do.', 'success');
     process.exit(0);
   }
 
-  // 3. Process with concurrency
+  // 4. Process with concurrency
   const uploadedKeys: string[] = [];
   let totalVariants = 0;
   let totalSkipped = 0;
@@ -490,7 +543,7 @@ ${colors.yellow}Environment Variables:${colors.reset}
     }
   }
 
-  // 4. CloudFront invalidation
+  // 5. CloudFront invalidation
   const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
   if (!options.dryRun && options.invalidateCache && distributionId && uploadedKeys.length > 0) {
     try {
@@ -501,10 +554,10 @@ ${colors.yellow}Environment Variables:${colors.reset}
     }
   }
 
-  // 5. Summary
+  // 6. Summary
   console.info('\n' + '='.repeat(60));
   log(
-    `Summary: ${originals.length} originals → ${totalVariants} variants generated, ${totalSkipped} skipped (larger than original), ${totalErrors} error(s)`,
+    `Summary: ${originals.length} originals → ${totalVariants} variants generated, ${totalSkipped} skipped (larger than original), ${alreadyComplete} image(s) already complete, ${totalErrors} error(s)`,
     totalErrors > 0 ? 'warning' : 'success'
   );
   console.info('='.repeat(60));
