@@ -30,6 +30,7 @@
  */
 
 import { extname } from 'path';
+import { fileURLToPath } from 'url';
 
 import {
   CopyObjectCommand,
@@ -351,6 +352,9 @@ ${colors.yellow}Environment Variables:${colors.reset}
   }
 }
 
-if (require.main === module) {
+// True when this file is executed directly, not imported (ESM-safe require.main === module)
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
   main();
 }

@@ -14,6 +14,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 interface ParticleCounts {
   dot: number;
@@ -277,8 +278,8 @@ function main(): void {
   console.info(`✓ Scale range: ${config.scaleMin} - ${config.scaleMax}`);
 }
 
-// Run if called directly
-if (require.main === module) {
+// Run if called directly (ESM-safe require.main === module)
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
 

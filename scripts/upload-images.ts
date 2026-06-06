@@ -35,6 +35,7 @@
 
 import { createReadStream } from 'fs';
 import { isAbsolute, join, normalize, relative, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -51,8 +52,11 @@ const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const CACHE_CONTROL_IMMUTABLE = 'public, max-age=31536000, immutable';
 
+// True when this file is executed directly, not imported (ESM-safe require.main === module)
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
 // Only check S3_BUCKET if running as main script
-if (!S3_BUCKET && require.main === module) {
+if (!S3_BUCKET && isMainModule) {
   console.error('Error: S3_BUCKET environment variable is not set');
   console.error('Please ensure your .env.local or .env file contains S3_BUCKET');
   process.exit(1);
@@ -557,6 +561,6 @@ ${colors.yellow}Environment Variables:${colors.reset}
 }
 
 // Run main if this is the entry point
-if (require.main === module) {
+if (isMainModule) {
   main();
 }
