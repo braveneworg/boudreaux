@@ -15,14 +15,14 @@ export const Logo = ({ isMobile }: Readonly<LogoProps>) => {
     <Link href="/" className="shrink-0" prefetch={false}>
       <Image
         alt="Fake Four Inc. Hand Logo"
-        className="mt-px ml-3 block size-10 rounded-full bg-white md:size-36"
+        className="mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-10 xl:left-8 xl:size-36"
         height={48}
         priority
         unoptimized
         src={
           isMobile
             ? '/media/fake-four-inc-black-hand-logo.svg'
-            : '/media/fake-four-inc-black-stardust-hand-logo.svg'
+            : '/media/ffinc-black-hand-sans-words-stardust.webp'
         }
         width={48}
       />

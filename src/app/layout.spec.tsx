@@ -153,10 +153,11 @@ describe('RootLayout', () => {
 
       const main = screen.getByRole('main');
       expect(main).toHaveClass(
+        'mx-auto',
         'flex',
         'flex-col',
         'w-full',
-        'max-w-full',
+        'max-w-7xl',
         'grow',
         'overflow-x-clip'
       );

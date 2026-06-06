@@ -73,7 +73,7 @@ describe('Logo', () => {
     render(<Logo isMobile={false} />);
 
     const img = screen.getByTestId('logo-image');
-    expect(img).toHaveClass('rounded-full', 'bg-white', 'size-10', 'md:size-36');
+    expect(img).toHaveClass('rounded-full', 'bg-zinc-50', 'size-10', 'xl:size-36');
   });
 
   describe('mobile vs desktop logo source', () => {
@@ -88,20 +88,16 @@ describe('Logo', () => {
       render(<Logo isMobile={false} />);
 
       const img = screen.getByTestId('logo-image');
-      expect(img).toHaveAttribute('data-src', '/media/fake-four-inc-black-stardust-hand-logo.svg');
+      expect(img).toHaveAttribute('data-src', '/media/ffinc-black-hand-sans-words-stardust.webp');
     });
 
-    it('both variants use SVG format', () => {
+    it('serves both variants from the media directory', () => {
       const { unmount } = render(<Logo isMobile />);
-      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
-        /^\/media\/.*\.svg$/
-      );
+      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(/^\/media\/.+/);
       unmount();
 
       render(<Logo isMobile={false} />);
-      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(
-        /^\/media\/.*\.svg$/
-      );
+      expect(screen.getByTestId('logo-image').getAttribute('data-src')).toMatch(/^\/media\/.+/);
     });
   });
 });

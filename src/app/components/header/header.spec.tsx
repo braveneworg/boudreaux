@@ -45,6 +45,16 @@ vi.mock('../ui/hamburger-menu', () => ({
   HamburgerMenu: () => <div data-testid="hamburger-menu">HamburgerMenu</div>,
 }));
 
+// Mock DesktopMenu component (it depends on next-auth's useSession)
+vi.mock('../desktop-menu', () => ({
+  DesktopMenu: () => <div data-testid="desktop-menu">DesktopMenu</div>,
+}));
+
+// Mock DesktopAuthMenu component (it depends on next-auth's useSession)
+vi.mock('../desktop-auth-menu', () => ({
+  DesktopAuthMenu: () => <div data-testid="desktop-auth-menu">DesktopAuthMenu</div>,
+}));
+
 describe('Header', () => {
   it('renders without crashing', () => {
     render(<Header />);
@@ -120,9 +130,38 @@ describe('Header', () => {
       expect(screen.queryByTestId('hamburger-menu')).not.toBeInTheDocument();
     });
 
-    it('does not render Fake Four Inc words image in desktop mode', () => {
+    it('renders the DesktopMenu in desktop mode', () => {
       render(<Header isMobile={false} />);
-      expect(screen.queryByTestId('next-image')).not.toBeInTheDocument();
+      expect(screen.getByTestId('desktop-menu')).toBeInTheDocument();
+    });
+
+    it('renders the DesktopAuthMenu in desktop mode', () => {
+      render(<Header isMobile={false} />);
+      expect(screen.getByTestId('desktop-auth-menu')).toBeInTheDocument();
+    });
+
+    it('renders Fake Four Inc words image in desktop mode', () => {
+      render(<Header isMobile={false} />);
+      const image = screen.getByTestId('next-image');
+      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words-sans-hand.webp');
+      expect(image).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
+    });
+
+    it('renders the desktop words image at the larger width', () => {
+      render(<Header isMobile={false} />);
+      const image = screen.getByTestId('next-image');
+      expect(image).toHaveAttribute('data-width', '444');
+      expect(image).toHaveAttribute('data-height', '40');
+    });
+
+    it('does not render the DesktopMenu in mobile mode', () => {
+      render(<Header isMobile />);
+      expect(screen.queryByTestId('desktop-menu')).not.toBeInTheDocument();
+    });
+
+    it('does not render the DesktopAuthMenu in mobile/tablet mode', () => {
+      render(<Header isMobile />);
+      expect(screen.queryByTestId('desktop-auth-menu')).not.toBeInTheDocument();
     });
   });
 
@@ -133,10 +172,10 @@ describe('Header', () => {
       expect(bgDiv).toBeInTheDocument();
     });
 
-    it('renders background with particles SVG class', () => {
-      const { container } = render(<Header />);
+    it('renders the particles SVG background with bg-black in mobile mode', () => {
+      const { container } = render(<Header isMobile />);
       const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
+      expect(bgDiv).toHaveClass('inset-0', 'bg-black');
     });
   });
 
@@ -189,13 +228,13 @@ describe('Header', () => {
     it('applies desktop height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('md:h-[122px]');
+      expect(header).toHaveClass('xl:h-56');
     });
 
     it('applies mobile height styles', () => {
       const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('h-[58px]');
+      expect(header).toHaveClass('h-14.5');
     });
 
     it('renders content layer with proper z-index', () => {
@@ -207,7 +246,7 @@ describe('Header', () => {
     it('content layer has max-width constraint', () => {
       const { container } = render(<Header />);
       const contentLayer = container.querySelector('.z-20');
-      expect(contentLayer).toHaveClass('max-w-480');
+      expect(contentLayer).toHaveClass('xl:max-w-480');
     });
 
     it('content layer has overflow hidden', () => {
