@@ -57,12 +57,12 @@ vi.mock('../desktop-auth-menu', () => ({
 
 describe('Header', () => {
   it('renders without crashing', () => {
-    render(<Header />);
+    render(<Header isMobile={false} />);
     expect(screen.getByTestId('logo')).toBeInTheDocument();
   });
 
   it('renders with sticky positioning', () => {
-    const { container } = render(<Header />);
+    const { container } = render(<Header isMobile={false} />);
     const headerWrapper = container.firstChild as HTMLElement;
     expect(headerWrapper).toHaveClass('sticky');
     expect(headerWrapper).toHaveClass('top-0');
@@ -70,15 +70,15 @@ describe('Header', () => {
   });
 
   it('renders full-width wrapper', () => {
-    const { container } = render(<Header />);
+    const { container } = render(<Header isMobile={false} />);
     const headerWrapper = container.firstChild as HTMLElement;
     expect(headerWrapper).toHaveClass('w-full');
     expect(headerWrapper).toHaveClass('left-0');
     expect(headerWrapper).toHaveClass('right-0');
   });
 
-  it('renders Logo component with isMobile=false by default', () => {
-    render(<Header />);
+  it('renders Logo component with isMobile=false when passed', () => {
+    render(<Header isMobile={false} />);
     const logo = screen.getByTestId('logo');
     expect(logo).toBeInTheDocument();
     expect(logo).toHaveAttribute('data-is-mobile', 'false');
@@ -167,28 +167,28 @@ describe('Header', () => {
 
   describe('animated background', () => {
     it('renders background div with CSS animation class', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const bgDiv = container.querySelector('.header-bg-pulse');
       expect(bgDiv).toBeInTheDocument();
     });
 
-    it('renders the particles SVG background with bg-black in mobile mode', () => {
+    it('renders the particles SVG background with a dark backdrop in mobile mode', () => {
       const { container } = render(<Header isMobile />);
       const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toHaveClass('inset-0', 'bg-black');
+      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
     });
   });
 
   describe('sparkle effects', () => {
     it('renders sparkle container', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const sparkleContainer = container.querySelector('.pointer-events-none');
       expect(sparkleContainer).toBeInTheDocument();
       expect(sparkleContainer).toHaveClass('absolute', 'inset-0', 'z-10');
     });
 
     it('generates 20 sparkles and 15 extinguish particles', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const sparkles = container.querySelectorAll('.header-sparkle');
       const extinguish = container.querySelectorAll('.header-extinguish');
       expect(sparkles).toHaveLength(20);
@@ -196,20 +196,20 @@ describe('Header', () => {
     });
 
     it('sparkles have absolute positioning', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const sparkle = container.querySelector('.header-sparkle');
       expect(sparkle).toHaveClass('absolute', 'rounded-full');
     });
 
     it('sparkle elements have percentage-based positions', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const sparkle = container.querySelector('.header-sparkle') as HTMLElement;
       expect(sparkle.style.left).toMatch(/%$/);
       expect(sparkle.style.top).toMatch(/%$/);
     });
 
     it('extinguish particles have orange color class', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const extinguishParticle = container.querySelector('.header-extinguish');
       expect(extinguishParticle).toHaveClass('bg-orange-400');
     });
@@ -217,7 +217,7 @@ describe('Header', () => {
 
   describe('header content', () => {
     it('renders header element with flex layout', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const header = container.querySelector('header');
       expect(header).toBeInTheDocument();
       expect(header).toHaveClass('flex');
@@ -226,31 +226,31 @@ describe('Header', () => {
     });
 
     it('applies desktop height styles', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('xl:h-56');
     });
 
     it('applies mobile height styles', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('h-14.5');
     });
 
     it('renders content layer with proper z-index', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toBeInTheDocument();
     });
 
     it('content layer has max-width constraint', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toHaveClass('xl:max-w-480');
     });
 
     it('content layer has overflow hidden', () => {
-      const { container } = render(<Header />);
+      const { container } = render(<Header isMobile={false} />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toHaveClass('overflow-hidden');
     });

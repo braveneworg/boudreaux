@@ -13,13 +13,7 @@ import { DesktopAuthMenu } from '../desktop-auth-menu';
 import { DesktopMenu } from '../desktop-menu';
 import { Logo } from './logo';
 
-const Header = ({
-  isMobile = false,
-  className = '',
-}: {
-  isMobile?: boolean;
-  className?: string;
-}) => {
+const Header = ({ isMobile, className = '' }: { isMobile: boolean; className?: string }) => {
   const { sparkles, extinguishParticles } = useSparklingParticles();
 
   return (
@@ -29,9 +23,9 @@ const Header = ({
       {/* Animated background layer — CSS animation replaces framer-motion */}
       <div
         className={cn(
-          "header-bg-pulse inset-0 before:pointer-events-none before:absolute before:inset-0 before:content-[''] xl:absolute",
+          "header-bg-pulse absolute inset-0 before:pointer-events-none before:absolute before:inset-0 before:content-['']",
           {
-            'before:bg-[url(/media/ffinc-starfield-tile.png)] before:bg-repeat': !isMobile,
+            'xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-repeat': !isMobile,
             "bg-black before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat":
               isMobile,
           }
@@ -42,7 +36,7 @@ const Header = ({
         {/* Main sparkles */}
         {sparkles.map((sparkle) => (
           <span
-            className="header-sparkle absolute h-1 w-1 rounded-full bg-white"
+            className="header-sparkle absolute h-1 w-1 rounded-full bg-zinc-50"
             key={sparkle.id}
             style={{
               left: `${sparkle.left}%`,

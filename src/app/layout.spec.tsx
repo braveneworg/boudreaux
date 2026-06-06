@@ -157,7 +157,7 @@ describe('RootLayout', () => {
         'flex',
         'flex-col',
         'w-full',
-        'max-w-7xl',
+        'xl:max-w-7xl',
         'grow',
         'overflow-x-clip'
       );

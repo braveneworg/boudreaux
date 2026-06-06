@@ -112,8 +112,8 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <Header className="mx-auto max-w-7xl" isMobile={isMobile} />
-          <main className="mx-auto flex w-full max-w-7xl grow flex-col overflow-x-clip">
+          <Header className="mx-auto xl:max-w-7xl" isMobile={isMobile} />
+          <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
             {children}
           </main>
           <Footer />
