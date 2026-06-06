@@ -129,7 +129,12 @@ const SignupPage = () => {
       />
       <ContentContainer>
         {isSignupPath ? (
-          <h1>Sign Up</h1>
+          <ImageHeading
+            src="/media/headings/SIGN-UP.webp"
+            alt="sign up"
+            imageHeight={480}
+            priority
+          />
         ) : (
           <ImageHeading
             src="/media/headings/SIGN-IN.webp"
