@@ -15,11 +15,17 @@ vi.mock('next/image', () => ({
       data-alt={props.alt as string}
       data-height={String(props.height)}
       data-priority={props.priority ? 'true' : 'false'}
+      data-sizes={props.sizes as string}
       data-src={props.src as string}
       data-testid="next-image"
       data-width={String(props.width)}
     />
   ),
+}));
+
+const mockUseIsMobile = vi.fn();
+vi.mock('@/app/hooks/use-mobile', () => ({
+  useIsMobile: () => mockUseIsMobile(),
 }));
 
 const defaultProps = {
@@ -29,6 +35,10 @@ const defaultProps = {
 };
 
 describe('ImageHeading', () => {
+  beforeEach(() => {
+    mockUseIsMobile.mockReturnValue(false);
+  });
+
   it('defaults to an h1', () => {
     render(<ImageHeading {...defaultProps} />);
 
@@ -122,5 +132,41 @@ describe('ImageHeading', () => {
     render(<ImageHeading {...defaultProps} id="featured-heading" />);
 
     expect(screen.getByRole('heading')).toHaveAttribute('id', 'featured-heading');
+  });
+
+  describe('responsive behavior', () => {
+    it('uses auto width on desktop', () => {
+      mockUseIsMobile.mockReturnValue(false);
+      render(<ImageHeading {...defaultProps} />);
+
+      expect(screen.getByTestId('next-image')).toHaveClass('w-auto');
+    });
+
+    it('uses the desktop sizes hint on desktop', () => {
+      mockUseIsMobile.mockReturnValue(false);
+      render(<ImageHeading {...defaultProps} />);
+
+      expect(screen.getByTestId('next-image')).toHaveAttribute(
+        'data-sizes',
+        '(min-width: 600px) 600px, 100dvw'
+      );
+    });
+
+    it('uses full width on mobile', () => {
+      mockUseIsMobile.mockReturnValue(true);
+      render(<ImageHeading {...defaultProps} />);
+
+      expect(screen.getByTestId('next-image')).toHaveClass('w-full', 'max-w-480');
+    });
+
+    it('uses the mobile sizes hint on mobile', () => {
+      mockUseIsMobile.mockReturnValue(true);
+      render(<ImageHeading {...defaultProps} />);
+
+      expect(screen.getByTestId('next-image')).toHaveAttribute(
+        'data-sizes',
+        '(min-width: 380px) 380px, 100vw'
+      );
+    });
   });
 });

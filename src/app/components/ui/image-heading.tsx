@@ -1,8 +1,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+'use client';
+
 import Image from 'next/image';
 
+import { useIsMobile } from '@/app/hooks/use-mobile';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import { Heading } from './heading';
@@ -42,6 +45,8 @@ const ImageHeading = ({
   priority = false,
   ...headingProps
 }: ImageHeadingProps) => {
+  const isMobile = useIsMobile();
+
   return (
     <Heading level={level} className={cn('mt-1 mb-1.5 h-auto', className)} {...headingProps}>
       <Image
@@ -49,9 +54,13 @@ const ImageHeading = ({
         alt={alt}
         width={imageWidth}
         height={imageHeight}
-        sizes="(min-width: 380px) 380px, 100vw"
+        sizes={isMobile ? '(min-width: 380px) 380px, 100vw' : '(min-width: 600px) 600px, 100dvw'}
         priority={priority}
-        className={cn('h-auto w-full max-w-480', imageClassName)}
+        className={cn(
+          'h-auto',
+          { 'w-full': isMobile, 'max-w-480': isMobile, 'w-auto': !isMobile },
+          imageClassName
+        )}
       />
     </Heading>
   );

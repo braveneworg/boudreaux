@@ -37,9 +37,13 @@ test.describe('Release Page — Player and Navigation', () => {
   test('displays release player with cover art and track info', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    // Breadcrumb should show "Releases" and the release title
-    await expect(userPage.getByRole('link', { name: 'Releases' })).toBeVisible({ timeout: 10_000 });
-    await expect(userPage.getByRole('link', { name: 'E2E Album One' })).toBeVisible();
+    // Breadcrumb should show "Releases" and the release title. Scope to the
+    // breadcrumb nav so the desktop header's "Releases" nav link doesn't clash.
+    const breadcrumb = userPage.getByLabel('breadcrumb');
+    await expect(breadcrumb.getByRole('link', { name: 'Releases' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(breadcrumb.getByRole('link', { name: 'E2E Album One' })).toBeVisible();
 
     // Cover art should be visible (inside the Play button)
     await expect(
@@ -62,8 +66,9 @@ test.describe('Release Page — Player and Navigation', () => {
   test('navigates between releases via breadcrumb', async ({ userPage }) => {
     await userPage.goto(`/releases/${e2eRelease1Id}`);
 
-    // Click "Releases" breadcrumb to go back to releases list
-    const releasesLink = userPage.getByRole('link', { name: 'Releases' });
+    // Click "Releases" breadcrumb to go back to releases list. Scope to the
+    // breadcrumb nav so the desktop header's "Releases" nav link doesn't clash.
+    const releasesLink = userPage.getByLabel('breadcrumb').getByRole('link', { name: 'Releases' });
     await expect(releasesLink).toBeVisible({ timeout: 10_000 });
     await releasesLink.click();
 
