@@ -4,6 +4,7 @@ Last updated: 2026-05-30
 
 ## How to work in this repo
 
+- Engineering principles are defined in `.specify/memory/constitution.md` — treat them as binding.
 - Default posture: Server Components, Server Actions for mutations, named exports, reuse before you create. Search for an existing component, type, field, or util before adding one.
 - Gate before committing — all four must pass: `pnpm run typecheck && pnpm run test:run && pnpm run lint && pnpm run format`. Write tests for every feature and bug fix.
 - Two sections below are hard constraints, not guidance: [E2E database isolation](#e2e-database-isolation-mandatory) and [Secrets and `.env*`](#secrets-and-env-files). Read them before touching E2E, the DB, builds, dev servers, seed scripts, or anything that reads the environment. When in doubt there, stop and ask.
