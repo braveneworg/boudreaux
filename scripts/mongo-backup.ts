@@ -25,6 +25,7 @@
  */
 
 import { dirname, resolve, join } from 'path';
+import { fileURLToPath } from 'url';
 
 import dotenv from 'dotenv';
 
@@ -43,8 +44,11 @@ dotenv.config(); // This loads .env as fallback
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
+// True when this file is executed directly, not imported (ESM-safe require.main === module)
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
 // Only check DATABASE_URL if running as main script (not when imported for testing)
-if (!DATABASE_URL && require.main === module) {
+if (!DATABASE_URL && isMainModule) {
   console.error('Error: DATABASE_URL environment variable is not set');
   console.error('Please ensure your .env.local or .env file contains DATABASE_URL');
   process.exit(1);
@@ -261,7 +265,7 @@ export function showUsage(): void {
 }
 
 // Main execution - only run when script is executed directly
-if (require.main === module) {
+if (isMainModule) {
   const args = process.argv.slice(2);
   const command = args[0];
 

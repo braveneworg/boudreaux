@@ -51,6 +51,7 @@
 import { createWriteStream, createReadStream } from 'fs';
 import { basename, dirname, extname, join, posix } from 'path';
 import { pipeline } from 'stream/promises';
+import { fileURLToPath } from 'url';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import {
@@ -86,8 +87,11 @@ const MAX_BACKUPS_TO_KEEP = parseInt(process.env.S3_MAX_BACKUPS || '5', 10);
 const CLOUDFRONT_DISTRIBUTION_ID = process.env.CLOUDFRONT_DISTRIBUTION_ID;
 const SKIP_INVALIDATION = process.env.SKIP_INVALIDATION === 'true';
 
+// True when this file is executed directly, not imported (ESM-safe require.main === module)
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
 // Only check S3_BUCKET if running as main script (not when imported for testing)
-if (!S3_BUCKET && require.main === module) {
+if (!S3_BUCKET && isMainModule) {
   console.error('Error: S3_BUCKET environment variable is not set');
   console.error('Please ensure your .env.local or .env file contains S3_BUCKET');
   process.exit(1);
@@ -941,6 +945,6 @@ async function main(): Promise<void> {
 }
 
 // Run if called directly
-if (require.main === module) {
+if (isMainModule) {
   main();
 }

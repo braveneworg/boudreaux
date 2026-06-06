@@ -13,7 +13,7 @@ Last updated: 2026-05-30
 
 Versions track `package.json` — update this block when they change.
 
-- **Runtime**: TypeScript 6 (strict), Node 24, pnpm 11
+- **Runtime**: TypeScript 6 (strict), Node 24, pnpm 11; Always use Node from `.nvmrc` (never a global install) and `pnpm exec` for CLI tools (`prisma`, `tsx`, etc.) to ensure the correct version and environment.
 - **Framework**: Next.js 16 (App Router, Turbopack dev, webpack build), React 19
 - **Data**: Prisma 6 + MongoDB; AWS SDK S3 v3 (presigned URLs — 24h download, 15min upload)
 - **Auth**: Auth.js (next-auth v5 beta) · **Payments**: Stripe 21 (payment-mode checkout, PWYW) · **Email**: AWS SES
