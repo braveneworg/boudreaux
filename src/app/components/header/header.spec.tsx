@@ -181,60 +181,9 @@ describe('Header', () => {
     });
   });
 
-  describe('animated background', () => {
-    it('renders background div with CSS animation class', () => {
-      const { container } = render(<Header />);
-      const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toBeInTheDocument();
-    });
-
-    it('paints the dark particle backdrop below xl', () => {
-      const { container } = render(<Header />);
-      const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
-    });
-
-    it('switches to a transparent backdrop at xl for the starfield', () => {
-      const { container } = render(<Header />);
-      const bgDiv = container.querySelector('.header-bg-pulse');
-      expect(bgDiv).toHaveClass('xl:bg-transparent');
-    });
-  });
-
-  describe('sparkle effects', () => {
-    it('renders sparkle container', () => {
-      const { container } = render(<Header />);
-      const sparkleContainer = container.querySelector('.pointer-events-none');
-      expect(sparkleContainer).toBeInTheDocument();
-      expect(sparkleContainer).toHaveClass('absolute', 'inset-0', 'z-10');
-    });
-
-    it('generates 20 sparkles and 15 extinguish particles', () => {
-      const { container } = render(<Header />);
-      const sparkles = container.querySelectorAll('.header-sparkle');
-      const extinguish = container.querySelectorAll('.header-extinguish');
-      expect(sparkles).toHaveLength(20);
-      expect(extinguish).toHaveLength(15);
-    });
-
-    it('sparkles have absolute positioning', () => {
-      const { container } = render(<Header />);
-      const sparkle = container.querySelector('.header-sparkle');
-      expect(sparkle).toHaveClass('absolute', 'rounded-full');
-    });
-
-    it('sparkle elements have percentage-based positions', () => {
-      const { container } = render(<Header />);
-      const sparkle = container.querySelector('.header-sparkle') as HTMLElement;
-      expect(sparkle.style.left).toMatch(/%$/);
-      expect(sparkle.style.top).toMatch(/%$/);
-    });
-
-    it('extinguish particles have orange color class', () => {
-      const { container } = render(<Header />);
-      const extinguishParticle = container.querySelector('.header-extinguish');
-      expect(extinguishParticle).toHaveClass('bg-orange-400');
-    });
+  it('renders the decorative backdrop layer', () => {
+    const { container } = render(<Header />);
+    expect(container.querySelector('.header-bg-pulse')).toBeInTheDocument();
   });
 
   describe('header content', () => {

@@ -5,53 +5,19 @@
 
 import Image from 'next/image';
 
-import { useSparklingParticles } from '@/hooks/use-sparkling-particles';
 import { HamburgerMenu } from '@/ui/hamburger-menu';
 
 import { DesktopAuthMenu } from '../desktop-auth-menu';
 import { DesktopMenu } from '../desktop-menu';
+import { HeaderBackdrop } from './header-backdrop';
 import { Logo } from './logo';
 
 const Header = ({ className = '' }: { className?: string }) => {
-  const { sparkles, extinguishParticles } = useSparklingParticles();
-
   return (
     <div
       className={`sticky top-0 right-0 left-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)] xl:border-b-2 xl:border-b-zinc-50 ${className}`}
     >
-      {/* Animated background layer — mobile particles below `xl`, the desktop
-          starfield tile at `xl`. Driven by viewport width (CSS), not the
-          server's User-Agent guess. */}
-      <div className="header-bg-pulse absolute inset-0 bg-black before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:content-[''] xl:bg-transparent xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-auto xl:before:bg-repeat" />
-      {/* Sparkle overlay */}
-      <div className="pointer-events-none absolute inset-0 z-10">
-        {/* Main sparkles */}
-        {sparkles.map((sparkle) => (
-          <span
-            className="header-sparkle absolute h-1 w-1 rounded-full bg-zinc-50"
-            key={sparkle.id}
-            style={{
-              left: `${sparkle.left}%`,
-              top: `${sparkle.top}%`,
-              animationDelay: `${sparkle.delay}s`,
-              animationDuration: `${sparkle.duration}s`,
-            }}
-          />
-        ))}
-        {/* Extinguishing particles */}
-        {extinguishParticles.map((particle) => (
-          <span
-            className="header-extinguish absolute h-0.5 w-0.5 rounded-full bg-orange-400"
-            key={particle.id}
-            style={{
-              left: `${particle.left}%`,
-              top: `${particle.top}%`,
-              animationDelay: `${2.5 + particle.delay}s`,
-              animationDuration: `${particle.duration}s`,
-            }}
-          />
-        ))}
-      </div>
+      <HeaderBackdrop />
       {/* Header content layer */}
       <div className="xl:border-b-px relative z-20 mx-auto w-full overflow-hidden pb-1 pl-0 xl:max-w-480">
         {/* The header is viewport-responsive, not User-Agent gated: the mobile
