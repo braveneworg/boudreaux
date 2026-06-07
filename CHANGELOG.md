@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.105.0] - 2026-06-07
+
+### Added
+
+- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n- fix: header too short on iPhone 16 Pro Max (#475)\n
+
 ## [4.104.0] - 2026-06-07
 
 ### Added
