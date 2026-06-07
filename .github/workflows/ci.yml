@@ -333,13 +333,21 @@ jobs:
       - name: Setup environment
         uses: ./.github/actions/setup
 
+      # The cache key MUST hash the source that affects build output (the
+      # Tailwind content in src/** plus build config) so any source change busts
+      # the cache and Tailwind regenerates the CSS. The previous second hash,
+      # `hashFiles('**/*.[jt]s?(x)')`, used an extglob `?(x)` that GitHub's
+      # hashFiles (actions/glob) does NOT support — it matched nothing and
+      # returned "", making the key constant. Every build then got an exact-key
+      # hit on the same stale .next/cache and never regenerated CSS for
+      # newly-used utilities (the desktop header's xl:* classes went missing,
+      # so the desktop chrome silently broke). No restore-keys: only reuse an
+      # exact-key (identical-source) hit.
       - name: Cache Next.js build cache
         uses: actions/cache@v5
         with:
           path: .next/cache
-          key: ${{ runner.os }}-next-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
-          restore-keys: |
-            ${{ runner.os }}-next-e2e-
+          key: ${{ runner.os }}-next-e2e-${{ hashFiles('pnpm-lock.yaml', 'src/**/*.ts', 'src/**/*.tsx', 'src/**/*.css', 'next.config.ts', 'postcss.config.mjs') }}
 
       - name: Build Next.js (E2E)
         env:
@@ -383,13 +391,16 @@ jobs:
       - name: Setup environment
         uses: ./.github/actions/setup
 
+      # See the E2E build job above: the old `hashFiles('**/*.[jt]s?(x)')` used an
+      # unsupported extglob, so the key was constant and the build kept restoring
+      # a stale .next/cache without regenerating CSS — which would ship a broken
+      # desktop header (missing xl:* classes) to production. Hash the real source
+      # so any change busts the cache; no restore-keys.
       - name: Cache Next.js build cache
         uses: actions/cache@v5
         with:
           path: .next/cache
-          key: ${{ runner.os }}-next-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s?(x)') }}
-          restore-keys: |
-            ${{ runner.os }}-next-cache-
+          key: ${{ runner.os }}-next-cache-${{ hashFiles('pnpm-lock.yaml', 'src/**/*.ts', 'src/**/*.tsx', 'src/**/*.css', 'next.config.ts', 'postcss.config.mjs') }}
 
       - name: Build Next.js
         env:
