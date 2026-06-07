@@ -33,8 +33,8 @@ vi.mock('next/image', () => ({
 
 // Mock Logo component
 vi.mock('./logo', () => ({
-  Logo: ({ isMobile }: { isMobile?: boolean }) => (
-    <div data-is-mobile={isMobile} data-testid="logo">
+  Logo: ({ isMobile, priority }: { isMobile?: boolean; priority?: boolean }) => (
+    <div data-is-mobile={isMobile} data-priority={priority} data-testid="logo">
       Logo
     </div>
   ),
@@ -101,6 +101,30 @@ describe('Header', () => {
         .getAllByTestId('logo')
         .find((logo) => logo.getAttribute('data-is-mobile') === 'false');
       expect(desktopLogo).toBeInTheDocument();
+    });
+
+    it('lazy-loads the desktop logo so its image is not fetched on phones', () => {
+      render(<Header />);
+      const desktopLogo = screen
+        .getAllByTestId('logo')
+        .find((logo) => logo.getAttribute('data-is-mobile') === 'false');
+      expect(desktopLogo).toHaveAttribute('data-priority', 'false');
+    });
+
+    it('lazy-loads the mobile logo so its image is not fetched on desktop', () => {
+      render(<Header />);
+      const mobileLogo = screen
+        .getAllByTestId('logo')
+        .find((logo) => logo.getAttribute('data-is-mobile') === 'true');
+      expect(mobileLogo).toHaveAttribute('data-priority', 'false');
+    });
+
+    it('lazy-loads both wordmark images so only the active viewport fetches one', () => {
+      render(<Header />);
+      const wordmarks = screen.getAllByTestId('next-image');
+      expect(wordmarks.every((image) => image.getAttribute('data-priority') === 'false')).toBe(
+        true
+      );
     });
 
     it('renders the hamburger menu', () => {

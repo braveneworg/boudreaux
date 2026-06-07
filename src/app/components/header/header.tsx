@@ -62,22 +62,23 @@ const Header = ({ className = '' }: { className?: string }) => {
             Desktop Website" enabled). The height steps 58px → 122px (`md`, to
             meet the hamburger sheet) → 224px (`xl`, the desktop header). */}
         <header className="border-b-px relative flex h-14.5 w-full min-w-0 items-center justify-between leading-14.5 md:h-[122px] xl:h-56 xl:justify-start">
-          {/* Mobile / tablet chrome (below xl) */}
+          {/* Mobile / tablet chrome (below xl). Its images lazy-load so they
+              aren't fetched on desktop, where this branch is hidden. */}
           <div className="contents xl:hidden">
-            <Logo isMobile />
+            <Logo isMobile priority={false} />
             <Image
               alt="Fake Four Inc. Words"
               className="relative right-0.5 h-auto w-50.5"
-              priority
               src="/media/fake-four-inc-words-sans-hand.webp"
               width={222}
               height={40}
             />
             <HamburgerMenu />
           </div>
-          {/* Desktop chrome (xl and up) */}
+          {/* Desktop chrome (xl and up). Its images lazy-load so they aren't
+              fetched on phones, where this branch is hidden. */}
           <div className="hidden xl:contents">
-            <Logo isMobile={false} />
+            <Logo isMobile={false} priority={false} />
             <Image
               alt="Fake Four Inc. Words"
               className="absolute top-6 left-1/2 z-40 h-auto w-auto -translate-x-1/2 transform"

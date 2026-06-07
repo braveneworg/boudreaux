@@ -8,16 +8,21 @@ import Link from 'next/link';
 
 interface LogoProps {
   isMobile: boolean;
+  // The header renders two Logos (mobile + desktop) and shows one per viewport.
+  // The off-screen one should lazy-load (`priority={false}`) so its image isn't
+  // fetched on the viewport that hides it — e.g. the detailed desktop webp must
+  // not download on phones.
+  priority?: boolean;
 }
 
-export const Logo = ({ isMobile }: Readonly<LogoProps>) => {
+export const Logo = ({ isMobile, priority = true }: Readonly<LogoProps>) => {
   return (
     <Link href="/" className="shrink-0" prefetch={false}>
       <Image
         alt="Fake Four Inc. Hand Logo"
         className="mt-px ml-3 block size-10 rounded-full bg-zinc-50 xl:absolute xl:top-10 xl:left-8 xl:size-36"
         height={48}
-        priority
+        priority={priority}
         unoptimized
         src={
           isMobile
