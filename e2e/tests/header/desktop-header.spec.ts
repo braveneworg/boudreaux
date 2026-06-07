@@ -4,11 +4,18 @@
 import { test, expect } from '../../fixtures/base.fixture';
 
 /**
- * Desktop header coverage. The default Playwright project uses Desktop Chrome,
- * whose User-Agent makes the server render the desktop branch of the header
- * (the primary `DesktopMenu` nav plus the `DesktopAuthMenu`). The mobile
- * hamburger auth flow is covered separately in auth/signout.spec.ts.
+ * Desktop header coverage. The header is viewport-responsive (CSS), not
+ * User-Agent gated: the desktop chrome (`DesktopMenu` nav + `DesktopAuthMenu`)
+ * shows at the `xl` breakpoint (min-width: 1280px) via `xl:contents`.
+ *
+ * Pin a viewport clearly above `xl`; the default Desktop Chrome 1280×720 sits
+ * exactly on the breakpoint. The `test.use` viewport also propagates to the
+ * `userPage` / `adminPage` fixtures.
+ *
+ * The mobile hamburger auth flow is covered separately in auth/signout.spec.ts.
  */
+test.use({ viewport: { width: 1440, height: 900 } });
+
 test.describe('Desktop header — primary navigation', () => {
   test('shows the Playlists nav link', async ({ page }) => {
     await page.goto('/');

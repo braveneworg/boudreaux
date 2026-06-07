@@ -9,8 +9,9 @@ import { GET } from './route';
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
   extractClientIp: () => '127.0.0.1',
 }));
+const mockDownloadLimiterCheck = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  downloadLimiter: { check: vi.fn().mockResolvedValue(undefined) },
+  downloadLimiter: { check: (...args: unknown[]) => mockDownloadLimiterCheck(...args) },
   DOWNLOAD_LIMIT: 10,
 }));
 
@@ -106,6 +107,18 @@ describe('GET /api/releases/[id]/download/[formatType]', () => {
     const response = await GET(makeRequest(), makeParams());
 
     expect(response.status).toBe(401);
+  });
+
+  it('skips rate limiting in E2E test mode (E2E_MODE=true)', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    const response = await GET(makeRequest(), makeParams());
+
+    // The limiter is never consulted in E2E mode, so retried downloads can't 429.
+    expect(mockDownloadLimiterCheck).not.toHaveBeenCalled();
+    expect(response.status).not.toBe(429);
+
+    vi.unstubAllEnvs();
   });
 
   it('should return 400 for an invalid release ID', async () => {

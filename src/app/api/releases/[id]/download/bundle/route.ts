@@ -199,19 +199,23 @@ export async function GET(
   let outerLockAcquired = false;
   let outerLockKey: string | null = null;
   try {
-    // Rate limiting
+    // Rate limiting — skipped in E2E test mode to avoid 429s during test runs
+    // (repeated/retried downloads from one IP), matching the `withRateLimit`
+    // decorator used by the sibling free-status route.
     const ip = extractClientIp(request);
-    try {
-      await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-    } catch {
-      return Response.json(
-        {
-          success: false,
-          error: 'RATE_LIMITED',
-          message: 'Too many requests. Please try again later.',
-        },
-        { status: 429, headers: NO_STORE_HEADERS }
-      );
+    if (process.env.E2E_MODE !== 'true') {
+      try {
+        await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+      } catch {
+        return Response.json(
+          {
+            success: false,
+            error: 'RATE_LIMITED',
+            message: 'Too many requests. Please try again later.',
+          },
+          { status: 429, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     // Step 1: Authentication (deferred for mode='free' — guest flow)

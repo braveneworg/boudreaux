@@ -1100,6 +1100,19 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
+  it('skips rate limiting in E2E test mode (E2E_MODE=true)', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    const response = await GET(makeRequest(), makeParams());
+
+    // The limiter is never consulted in E2E mode, so a request cannot be 429'd
+    // by repeated/retried downloads during a Playwright run.
+    expect(mockRateLimitCheck).not.toHaveBeenCalled();
+    expect(response.status).not.toBe(429);
+
+    vi.unstubAllEnvs();
+  });
+
   // ─── Invalid ObjectId ────────────────────────────────────────────────────────
 
   it('should return 400 for invalid release ID', async () => {

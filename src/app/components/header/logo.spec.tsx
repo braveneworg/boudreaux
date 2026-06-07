@@ -69,6 +69,13 @@ describe('Logo', () => {
     expect(img).toHaveAttribute('data-unoptimized', 'true');
   });
 
+  it('lazy-loads when priority is false', () => {
+    render(<Logo isMobile={false} priority={false} />);
+
+    const img = screen.getByTestId('logo-image');
+    expect(img).toHaveAttribute('data-priority', 'false');
+  });
+
   it('has correct styling classes', () => {
     render(<Logo isMobile={false} />);
 

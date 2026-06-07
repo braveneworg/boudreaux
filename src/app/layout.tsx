@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Jost } from 'next/font/google';
-import { headers } from 'next/headers';
-import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
 
@@ -58,6 +56,19 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   }
 }
 
+/**
+ * Render every route dynamically. The app is request-driven (auth/session,
+ * per-user content, live DB data) and intentionally prerenders nothing — there
+ * is no `generateStaticParams` anywhere. The root layout was previously dynamic
+ * implicitly because it read the request `User-Agent` to pick a header layout;
+ * that detection was removed once the header became viewport-responsive (CSS),
+ * which let Next.js try to statically prerender pages and fail on request-time
+ * APIs (e.g. `useSearchParams()` in the global `ChatLauncher`). Declaring it
+ * here restores the previous behavior explicitly, matching the per-page
+ * `force-dynamic` already used on the home and admin routes.
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Fake Four Inc.',
   description:
@@ -85,15 +96,11 @@ export const viewport: Viewport = {
   themeColor: '#000000',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const userAgent = (await headers()).get('user-agent') || '';
-  const { device } = userAgentFromString(userAgent);
-  const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -112,7 +119,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <Header className="mx-auto xl:max-w-7xl" isMobile={isMobile} />
+          <Header className="mx-auto xl:max-w-7xl" />
           <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
             {children}
           </main>

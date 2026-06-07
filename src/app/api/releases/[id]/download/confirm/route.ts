@@ -30,19 +30,22 @@ interface ConfirmRequestBody {
  */
 export const POST = withAuth<{ id: string }>(async (request, context, session) => {
   try {
-    // Rate limiting
+    // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
+    // matching the `withRateLimit` decorator on the sibling free-status route.
     const ip = extractClientIp(request);
-    try {
-      await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'RATE_LIMITED',
-          message: 'Too many requests. Please try again later.',
-        },
-        { status: 429, headers: NO_STORE_HEADERS }
-      );
+    if (process.env.E2E_MODE !== 'true') {
+      try {
+        await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+      } catch {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'RATE_LIMITED',
+            message: 'Too many requests. Please try again later.',
+          },
+          { status: 429, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     const userId = session.user.id;
