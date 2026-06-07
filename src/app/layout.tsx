@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Jost } from 'next/font/google';
-import { headers } from 'next/headers';
-import { userAgentFromString } from 'next/server';
 
 import { Toaster } from '@/components/ui/sonner';
 
@@ -85,15 +83,11 @@ export const viewport: Viewport = {
   themeColor: '#000000',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const userAgent = (await headers()).get('user-agent') || '';
-  const { device } = userAgentFromString(userAgent);
-  const isMobile = device?.type === 'mobile' || device?.type === 'tablet';
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -112,7 +106,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <Header className="mx-auto xl:max-w-7xl" isMobile={isMobile} />
+          <Header className="mx-auto xl:max-w-7xl" />
           <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
             {children}
           </main>

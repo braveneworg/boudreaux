@@ -13,21 +13,6 @@ vi.mock('next/font/google', () => ({
   }),
 }));
 
-// Mock next/headers — headers() returns a Promise in Next.js 15+
-const mockHeadersGet = vi.fn();
-vi.mock('next/headers', () => ({
-  headers: () =>
-    Promise.resolve({
-      get: (key: string) => mockHeadersGet(key),
-    }),
-}));
-
-// Mock next/server — override setupTests.ts mock to include userAgentFromString
-const mockUserAgentFromString = vi.fn();
-vi.mock('next/server', () => ({
-  userAgentFromString: (ua: string) => mockUserAgentFromString(ua),
-}));
-
 // Mock env-validation dynamic import
 vi.mock('@/lib/config/env-validation', () => ({
   validateEnvironment: vi.fn(),
@@ -38,11 +23,7 @@ vi.mock('./globals.css', () => ({}));
 
 // Mock child components
 vi.mock('./components/header/header', () => ({
-  Header: ({ isMobile }: { isMobile: boolean }) => (
-    <div data-testid="header" data-is-mobile={String(isMobile)}>
-      Header
-    </div>
-  ),
+  Header: () => <div data-testid="header">Header</div>,
 }));
 
 vi.mock('./components/footer/footer', () => ({
@@ -68,17 +49,6 @@ vi.mock('./components/chat/chat-launcher', () => ({
 }));
 
 describe('RootLayout', () => {
-  beforeEach(() => {
-    // Default: desktop user agent
-    mockHeadersGet.mockImplementation((key: string) => {
-      if (key === 'user-agent') return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
-      return null;
-    });
-    mockUserAgentFromString.mockReturnValue({
-      device: { type: undefined },
-    });
-  });
-
   describe('metadata export', () => {
     it('has correct title', () => {
       expect(metadata.title).toBe('Fake Four Inc.');
@@ -161,79 +131,6 @@ describe('RootLayout', () => {
         'grow',
         'overflow-x-clip'
       );
-    });
-  });
-
-  describe('device detection', () => {
-    it('passes isMobile=false for desktop user agent', async () => {
-      mockUserAgentFromString.mockReturnValue({
-        device: { type: undefined },
-      });
-
-      render(await RootLayout({ children: <div>Test</div> }));
-
-      expect(screen.getByTestId('header')).toHaveAttribute('data-is-mobile', 'false');
-    });
-
-    it('passes isMobile=true for mobile user agent', async () => {
-      mockHeadersGet.mockImplementation((key: string) => {
-        if (key === 'user-agent') return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)';
-        return null;
-      });
-      mockUserAgentFromString.mockReturnValue({
-        device: { type: 'mobile' },
-      });
-
-      render(await RootLayout({ children: <div>Test</div> }));
-
-      expect(screen.getByTestId('header')).toHaveAttribute('data-is-mobile', 'true');
-    });
-
-    it('passes isMobile=true for tablet user agent', async () => {
-      mockHeadersGet.mockImplementation((key: string) => {
-        if (key === 'user-agent') return 'Mozilla/5.0 (iPad; CPU OS 17_0)';
-        return null;
-      });
-      mockUserAgentFromString.mockReturnValue({
-        device: { type: 'tablet' },
-      });
-
-      render(await RootLayout({ children: <div>Test</div> }));
-
-      expect(screen.getByTestId('header')).toHaveAttribute('data-is-mobile', 'true');
-    });
-
-    it('passes isMobile=false when user-agent header is empty', async () => {
-      mockHeadersGet.mockReturnValue(null);
-      mockUserAgentFromString.mockReturnValue({
-        device: {},
-      });
-
-      render(await RootLayout({ children: <div>Test</div> }));
-
-      expect(screen.getByTestId('header')).toHaveAttribute('data-is-mobile', 'false');
-    });
-
-    it('calls userAgentFromString with the user-agent header value', async () => {
-      const expectedUA = 'TestBrowser/1.0';
-      mockHeadersGet.mockImplementation((key: string) => {
-        if (key === 'user-agent') return expectedUA;
-        return null;
-      });
-      mockUserAgentFromString.mockReturnValue({ device: {} });
-
-      await RootLayout({ children: <div>Test</div> });
-
-      expect(mockUserAgentFromString).toHaveBeenCalledWith(expectedUA);
-    });
-
-    it('falls back to empty string when user-agent header is null', async () => {
-      mockHeadersGet.mockReturnValue(null);
-      mockUserAgentFromString.mockReturnValue({ device: {} });
-
-      await RootLayout({ children: <div>Test</div> });
-
-      expect(mockUserAgentFromString).toHaveBeenCalledWith('');
     });
   });
 

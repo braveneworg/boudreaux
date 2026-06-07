@@ -6,31 +6,23 @@
 import Image from 'next/image';
 
 import { useSparklingParticles } from '@/hooks/use-sparkling-particles';
-import { cn } from '@/lib/utils/tailwind-utils';
 import { HamburgerMenu } from '@/ui/hamburger-menu';
 
 import { DesktopAuthMenu } from '../desktop-auth-menu';
 import { DesktopMenu } from '../desktop-menu';
 import { Logo } from './logo';
 
-const Header = ({ isMobile, className = '' }: { isMobile: boolean; className?: string }) => {
+const Header = ({ className = '' }: { className?: string }) => {
   const { sparkles, extinguishParticles } = useSparklingParticles();
 
   return (
     <div
       className={`sticky top-0 right-0 left-0 z-40 w-full overflow-hidden shadow-[0_0_30px_0_rgba(0,0,0,1)] xl:border-b-2 xl:border-b-zinc-50 ${className}`}
     >
-      {/* Animated background layer — CSS animation replaces framer-motion */}
-      <div
-        className={cn(
-          "header-bg-pulse absolute inset-0 before:pointer-events-none before:absolute before:inset-0 before:content-['']",
-          {
-            'xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-repeat': !isMobile,
-            "bg-black before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat":
-              isMobile,
-          }
-        )}
-      />
+      {/* Animated background layer — mobile particles below `xl`, the desktop
+          starfield tile at `xl`. Driven by viewport width (CSS), not the
+          server's User-Agent guess. */}
+      <div className="header-bg-pulse absolute inset-0 bg-black before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/media/particles-6.svg')] before:bg-cover before:bg-center before:bg-no-repeat before:content-[''] xl:bg-transparent xl:before:bg-[url(/media/ffinc-starfield-tile.png)] xl:before:bg-auto xl:before:bg-repeat" />
       {/* Sparkle overlay */}
       <div className="pointer-events-none absolute inset-0 z-10">
         {/* Main sparkles */}
@@ -62,47 +54,40 @@ const Header = ({ isMobile, className = '' }: { isMobile: boolean; className?: s
       </div>
       {/* Header content layer */}
       <div className="xl:border-b-px relative z-20 mx-auto w-full overflow-hidden pb-1 pl-0 xl:max-w-480">
-        <header
-          className={cn(
-            'border-b-px relative flex h-14.5 w-full min-w-0 items-center justify-between leading-14.5',
-            // The mobile/tablet header height must track the hamburger sheet,
-            // which grows at the `md` breakpoint (top-14 → md:top-36). The
-            // desktop redesign moved the header's growth to `xl`, leaving it
-            // too short at tablet widths and opening a gap below it. Restore
-            // md:h-[122px] for the mobile branch; keep the taller desktop
-            // header at xl.
-            isMobile ? 'md:h-[122px]' : 'xl:h-56 xl:justify-start'
-          )}
-        >
-          <Logo isMobile={isMobile} />
-          {isMobile && (
-            <>
-              <Image
-                alt="Fake Four Inc. Words"
-                className="relative right-0.5 h-auto w-50.5"
-                priority
-                src="/media/fake-four-inc-words-sans-hand.webp"
-                width={222}
-                height={40}
-              />
-              <HamburgerMenu />
-            </>
-          )}
-          {!isMobile && (
-            <>
-              <Image
-                alt="Fake Four Inc. Words"
-                className="absolute top-6 left-1/2 z-40 h-auto w-auto -translate-x-1/2 transform"
-                priority
-                src="/media/fake-four-inc-words-sans-hand.webp"
-                width={444}
-                height={40}
-              />
-
-              <DesktopMenu />
-              <DesktopAuthMenu className="absolute top-6 right-10 z-30" />
-            </>
-          )}
+        {/* The header is viewport-responsive, not User-Agent gated: the mobile
+            chrome shows below `xl`, the desktop chrome at `xl`. Both branches
+            are rendered and toggled purely by CSS (`contents` ↔ `hidden`) so the
+            browser picks the right one at paint time — no hydration flash on
+            devices the server misdetects (e.g. an iPhone with Safari's "Request
+            Desktop Website" enabled). The height steps 58px → 122px (`md`, to
+            meet the hamburger sheet) → 224px (`xl`, the desktop header). */}
+        <header className="border-b-px relative flex h-14.5 w-full min-w-0 items-center justify-between leading-14.5 md:h-[122px] xl:h-56 xl:justify-start">
+          {/* Mobile / tablet chrome (below xl) */}
+          <div className="contents xl:hidden">
+            <Logo isMobile />
+            <Image
+              alt="Fake Four Inc. Words"
+              className="relative right-0.5 h-auto w-50.5"
+              priority
+              src="/media/fake-four-inc-words-sans-hand.webp"
+              width={222}
+              height={40}
+            />
+            <HamburgerMenu />
+          </div>
+          {/* Desktop chrome (xl and up) */}
+          <div className="hidden xl:contents">
+            <Logo isMobile={false} />
+            <Image
+              alt="Fake Four Inc. Words"
+              className="absolute top-6 left-1/2 z-40 h-auto w-auto -translate-x-1/2 transform"
+              src="/media/fake-four-inc-words-sans-hand.webp"
+              width={444}
+              height={40}
+            />
+            <DesktopMenu />
+            <DesktopAuthMenu className="absolute top-6 right-10 z-30" />
+          </div>
         </header>
       </div>
     </div>

@@ -57,12 +57,12 @@ vi.mock('../desktop-auth-menu', () => ({
 
 describe('Header', () => {
   it('renders without crashing', () => {
-    render(<Header isMobile={false} />);
-    expect(screen.getByTestId('logo')).toBeInTheDocument();
+    render(<Header />);
+    expect(screen.getAllByTestId('logo').length).toBeGreaterThan(0);
   });
 
   it('renders with sticky positioning', () => {
-    const { container } = render(<Header isMobile={false} />);
+    const { container } = render(<Header />);
     const headerWrapper = container.firstChild as HTMLElement;
     expect(headerWrapper).toHaveClass('sticky');
     expect(headerWrapper).toHaveClass('top-0');
@@ -70,125 +70,123 @@ describe('Header', () => {
   });
 
   it('renders full-width wrapper', () => {
-    const { container } = render(<Header isMobile={false} />);
+    const { container } = render(<Header />);
     const headerWrapper = container.firstChild as HTMLElement;
     expect(headerWrapper).toHaveClass('w-full');
     expect(headerWrapper).toHaveClass('left-0');
     expect(headerWrapper).toHaveClass('right-0');
   });
 
-  it('renders Logo component with isMobile=false when passed', () => {
-    render(<Header isMobile={false} />);
-    const logo = screen.getByTestId('logo');
-    expect(logo).toBeInTheDocument();
-    expect(logo).toHaveAttribute('data-is-mobile', 'false');
+  it('applies the className passed in', () => {
+    const { container } = render(<Header className="custom-class" />);
+    const headerWrapper = container.firstChild as HTMLElement;
+    expect(headerWrapper).toHaveClass('custom-class');
   });
 
-  it('renders Logo component with isMobile=true when passed', () => {
-    render(<Header isMobile />);
-    const logo = screen.getByTestId('logo');
-    expect(logo).toHaveAttribute('data-is-mobile', 'true');
-  });
+  // The header renders both the mobile and desktop chrome and toggles them
+  // purely with CSS (`contents` ↔ `hidden`) at the `xl` breakpoint, so the
+  // layout is correct regardless of the server's User-Agent guess.
+  describe('responsive chrome', () => {
+    it('renders the mobile logo (isMobile=true)', () => {
+      render(<Header />);
+      const mobileLogo = screen
+        .getAllByTestId('logo')
+        .find((logo) => logo.getAttribute('data-is-mobile') === 'true');
+      expect(mobileLogo).toBeInTheDocument();
+    });
 
-  describe('mobile mode', () => {
-    it('renders hamburger menu in mobile mode', () => {
-      render(<Header isMobile />);
+    it('renders the desktop logo (isMobile=false)', () => {
+      render(<Header />);
+      const desktopLogo = screen
+        .getAllByTestId('logo')
+        .find((logo) => logo.getAttribute('data-is-mobile') === 'false');
+      expect(desktopLogo).toBeInTheDocument();
+    });
+
+    it('renders the hamburger menu', () => {
+      render(<Header />);
       expect(screen.getByTestId('hamburger-menu')).toBeInTheDocument();
     });
 
-    it('renders Fake Four Inc words image in mobile mode', () => {
-      render(<Header isMobile />);
-      const image = screen.getByTestId('next-image');
-      expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words-sans-hand.webp');
-      expect(image).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
+    it('hides the mobile chrome at xl via the wrapper', () => {
+      render(<Header />);
+      const mobileWrapper = screen.getByTestId('hamburger-menu').parentElement;
+      expect(mobileWrapper).toHaveClass('contents', 'xl:hidden');
     });
 
-    it('renders image with correct dimensions', () => {
-      render(<Header isMobile />);
-      const image = screen.getByTestId('next-image');
-      expect(image).toHaveAttribute('data-width', '222');
-      expect(image).toHaveAttribute('data-height', '40');
-    });
-
-    it('image has priority flag set', () => {
-      render(<Header isMobile />);
-      const image = screen.getByTestId('next-image');
-      expect(image).toHaveAttribute('data-priority', 'true');
-    });
-
-    it('renders both image and hamburger menu together', () => {
-      render(<Header isMobile />);
-      expect(screen.getByTestId('next-image')).toBeInTheDocument();
-      expect(screen.getByTestId('hamburger-menu')).toBeInTheDocument();
-    });
-  });
-
-  describe('desktop mode', () => {
-    it('does not render hamburger menu in desktop mode', () => {
-      render(<Header isMobile={false} />);
-      expect(screen.queryByTestId('hamburger-menu')).not.toBeInTheDocument();
-    });
-
-    it('renders the DesktopMenu in desktop mode', () => {
-      render(<Header isMobile={false} />);
+    it('renders the DesktopMenu', () => {
+      render(<Header />);
       expect(screen.getByTestId('desktop-menu')).toBeInTheDocument();
     });
 
-    it('renders the DesktopAuthMenu in desktop mode', () => {
-      render(<Header isMobile={false} />);
+    it('renders the DesktopAuthMenu', () => {
+      render(<Header />);
       expect(screen.getByTestId('desktop-auth-menu')).toBeInTheDocument();
     });
 
-    it('renders Fake Four Inc words image in desktop mode', () => {
-      render(<Header isMobile={false} />);
-      const image = screen.getByTestId('next-image');
-      expect(image).toHaveAttribute('data-src', '/media/fake-four-inc-words-sans-hand.webp');
-      expect(image).toHaveAttribute('data-alt', 'Fake Four Inc. Words');
+    it('hides the desktop chrome below xl via the wrapper', () => {
+      render(<Header />);
+      const desktopWrapper = screen.getByTestId('desktop-menu').parentElement;
+      expect(desktopWrapper).toHaveClass('hidden', 'xl:contents');
+    });
+
+    it('renders the mobile words image at the smaller width', () => {
+      render(<Header />);
+      const mobileWords = screen
+        .getAllByTestId('next-image')
+        .find((image) => image.getAttribute('data-width') === '222');
+      expect(mobileWords).toBeInTheDocument();
     });
 
     it('renders the desktop words image at the larger width', () => {
-      render(<Header isMobile={false} />);
-      const image = screen.getByTestId('next-image');
-      expect(image).toHaveAttribute('data-width', '444');
-      expect(image).toHaveAttribute('data-height', '40');
+      render(<Header />);
+      const desktopWords = screen
+        .getAllByTestId('next-image')
+        .find((image) => image.getAttribute('data-width') === '444');
+      expect(desktopWords).toBeInTheDocument();
     });
 
-    it('does not render the DesktopMenu in mobile mode', () => {
-      render(<Header isMobile />);
-      expect(screen.queryByTestId('desktop-menu')).not.toBeInTheDocument();
-    });
-
-    it('does not render the DesktopAuthMenu in mobile/tablet mode', () => {
-      render(<Header isMobile />);
-      expect(screen.queryByTestId('desktop-auth-menu')).not.toBeInTheDocument();
+    it('uses the Fake Four Inc. words asset for the header images', () => {
+      render(<Header />);
+      const images = screen.getAllByTestId('next-image');
+      expect(
+        images.every(
+          (image) => image.getAttribute('data-src') === '/media/fake-four-inc-words-sans-hand.webp'
+        )
+      ).toBe(true);
     });
   });
 
   describe('animated background', () => {
     it('renders background div with CSS animation class', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const bgDiv = container.querySelector('.header-bg-pulse');
       expect(bgDiv).toBeInTheDocument();
     });
 
-    it('renders the particles SVG background with a dark backdrop in mobile mode', () => {
-      const { container } = render(<Header isMobile />);
+    it('paints the dark particle backdrop below xl', () => {
+      const { container } = render(<Header />);
       const bgDiv = container.querySelector('.header-bg-pulse');
       expect(bgDiv).toHaveClass('absolute', 'inset-0', 'bg-black');
+    });
+
+    it('switches to a transparent backdrop at xl for the starfield', () => {
+      const { container } = render(<Header />);
+      const bgDiv = container.querySelector('.header-bg-pulse');
+      expect(bgDiv).toHaveClass('xl:bg-transparent');
     });
   });
 
   describe('sparkle effects', () => {
     it('renders sparkle container', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const sparkleContainer = container.querySelector('.pointer-events-none');
       expect(sparkleContainer).toBeInTheDocument();
       expect(sparkleContainer).toHaveClass('absolute', 'inset-0', 'z-10');
     });
 
     it('generates 20 sparkles and 15 extinguish particles', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const sparkles = container.querySelectorAll('.header-sparkle');
       const extinguish = container.querySelectorAll('.header-extinguish');
       expect(sparkles).toHaveLength(20);
@@ -196,20 +194,20 @@ describe('Header', () => {
     });
 
     it('sparkles have absolute positioning', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const sparkle = container.querySelector('.header-sparkle');
       expect(sparkle).toHaveClass('absolute', 'rounded-full');
     });
 
     it('sparkle elements have percentage-based positions', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const sparkle = container.querySelector('.header-sparkle') as HTMLElement;
       expect(sparkle.style.left).toMatch(/%$/);
       expect(sparkle.style.top).toMatch(/%$/);
     });
 
     it('extinguish particles have orange color class', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const extinguishParticle = container.querySelector('.header-extinguish');
       expect(extinguishParticle).toHaveClass('bg-orange-400');
     });
@@ -217,7 +215,7 @@ describe('Header', () => {
 
   describe('header content', () => {
     it('renders header element with flex layout', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const header = container.querySelector('header');
       expect(header).toBeInTheDocument();
       expect(header).toHaveClass('flex');
@@ -225,44 +223,44 @@ describe('Header', () => {
       expect(header).toHaveClass('justify-between');
     });
 
-    it('applies desktop height styles', () => {
-      const { container } = render(<Header isMobile={false} />);
+    it('aligns content to the start at xl', () => {
+      const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).toHaveClass('xl:h-56');
+      expect(header).toHaveClass('xl:justify-start');
     });
 
-    it('applies mobile height styles', () => {
-      const { container } = render(<Header isMobile />);
+    it('applies the compact base height', () => {
+      const { container } = render(<Header />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('h-14.5');
     });
 
-    it('grows to the tablet height in mobile mode to meet the hamburger sheet', () => {
-      const { container } = render(<Header isMobile />);
+    it('grows to the tablet height at md to meet the hamburger sheet', () => {
+      const { container } = render(<Header />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('md:h-[122px]');
     });
 
-    it('does not apply the desktop xl height in mobile mode', () => {
-      const { container } = render(<Header isMobile />);
+    it('grows to the desktop height at xl', () => {
+      const { container } = render(<Header />);
       const header = container.querySelector('header');
-      expect(header).not.toHaveClass('xl:h-56');
+      expect(header).toHaveClass('xl:h-56');
     });
 
     it('renders content layer with proper z-index', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toBeInTheDocument();
     });
 
     it('content layer has max-width constraint', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toHaveClass('xl:max-w-480');
     });
 
     it('content layer has overflow hidden', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header />);
       const contentLayer = container.querySelector('.z-20');
       expect(contentLayer).toHaveClass('overflow-hidden');
     });
