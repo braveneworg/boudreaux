@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import Link from 'next/link';
+
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/app/components/ui/sheet';
 import { AuthToolbar } from '@/components/auth/auth-toolbar';
 
@@ -52,26 +54,29 @@ export function HamburgerMenuSheet({
         </SheetDescription>
         <nav className="flex flex-col" aria-label="Main navigation">
           <SocialMediaIconLinks className="justify-center pt-2" />
-          <AuthToolbar className="pb-0 text-zinc-50" onNavigate={() => onOpenChange(false)} />
+          <AuthToolbar
+            className="font-fake-four-cutout pb-0 text-zinc-50"
+            onNavigate={() => onOpenChange(false)}
+          />
           <ul>
             {menuItems.map((item, index) => (
               <li
                 key={item.name}
-                className="menu-item-stagger"
+                className="menu-item-stagger font-fake-four-cutout"
                 style={{
                   opacity: isOpen ? 1 : 0,
                   transform: isOpen ? 'translateX(0)' : 'translateX(20px)',
                   transition: `opacity 0.3s ease ${index * 0.1}s, transform 0.3s ease ${index * 0.1}s`,
                 }}
               >
-                <a
+                <Link
                   href={item.href}
                   className="mt-4 block text-xl tracking-wider text-zinc-50 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white"
                   onClick={() => onOpenChange(false)}
-                  tabIndex={0}
+                  prefetch={false}
                 >
                   {item.name}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>

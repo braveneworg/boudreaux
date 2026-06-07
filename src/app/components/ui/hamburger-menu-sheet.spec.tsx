@@ -199,15 +199,19 @@ describe('HamburgerMenuSheet', () => {
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('menu links have tabIndex 0 for keyboard accessibility', () => {
+  it('renders menu items as keyboard-focusable anchors with an href', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
 
+    // An anchor with an href is inherently focusable — no explicit tabIndex
+    // needed — so assert the element is a real link rather than a manual override.
     const homeLink = screen.getByRole('link', { name: 'Home' });
-    expect(homeLink).toHaveAttribute('tabindex', '0');
+    expect(homeLink.tagName).toBe('A');
+    expect(homeLink).toHaveAttribute('href', '/');
+    expect(homeLink).not.toHaveAttribute('tabindex');
   });
 
   it('renders the sr-only sheet description', () => {
