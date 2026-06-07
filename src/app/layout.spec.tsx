@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import RootLayout, { metadata, viewport } from './layout';
+import RootLayout, { dynamic, metadata, viewport } from './layout';
 
 // Mock next/font/google
 vi.mock('next/font/google', () => ({
@@ -82,6 +82,15 @@ describe('RootLayout', () => {
 
     it('enables user scaling', () => {
       expect(viewport.userScalable).toBe(true);
+    });
+  });
+
+  describe('route config', () => {
+    // The app prerenders nothing; forcing dynamic rendering keeps request-time
+    // APIs (e.g. useSearchParams in the global ChatLauncher) out of the static
+    // export so the build does not fail with a CSR-bailout error.
+    it('forces dynamic rendering for every route', () => {
+      expect(dynamic).toBe('force-dynamic');
     });
   });
 

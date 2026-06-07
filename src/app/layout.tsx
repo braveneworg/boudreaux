@@ -56,6 +56,19 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   }
 }
 
+/**
+ * Render every route dynamically. The app is request-driven (auth/session,
+ * per-user content, live DB data) and intentionally prerenders nothing — there
+ * is no `generateStaticParams` anywhere. The root layout was previously dynamic
+ * implicitly because it read the request `User-Agent` to pick a header layout;
+ * that detection was removed once the header became viewport-responsive (CSS),
+ * which let Next.js try to statically prerender pages and fail on request-time
+ * APIs (e.g. `useSearchParams()` in the global `ChatLauncher`). Declaring it
+ * here restores the previous behavior explicitly, matching the per-page
+ * `force-dynamic` already used on the home and admin routes.
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Fake Four Inc.',
   description:
