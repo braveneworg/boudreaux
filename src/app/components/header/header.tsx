@@ -62,7 +62,18 @@ const Header = ({ isMobile, className = '' }: { isMobile: boolean; className?: s
       </div>
       {/* Header content layer */}
       <div className="xl:border-b-px relative z-20 mx-auto w-full overflow-hidden pb-1 pl-0 xl:max-w-480">
-        <header className="border-b-px relative flex h-14.5 w-full min-w-0 items-center justify-between leading-14.5 xl:h-56 xl:justify-start">
+        <header
+          className={cn(
+            'border-b-px relative flex h-14.5 w-full min-w-0 items-center justify-between leading-14.5',
+            // The mobile/tablet header height must track the hamburger sheet,
+            // which grows at the `md` breakpoint (top-14 → md:top-36). The
+            // desktop redesign moved the header's growth to `xl`, leaving it
+            // too short at tablet widths and opening a gap below it. Restore
+            // md:h-[122px] for the mobile branch; keep the taller desktop
+            // header at xl.
+            isMobile ? 'md:h-[122px]' : 'xl:h-56 xl:justify-start'
+          )}
+        >
           <Logo isMobile={isMobile} />
           {isMobile && (
             <>

@@ -232,9 +232,21 @@ describe('Header', () => {
     });
 
     it('applies mobile height styles', () => {
-      const { container } = render(<Header isMobile={false} />);
+      const { container } = render(<Header isMobile />);
       const header = container.querySelector('header');
       expect(header).toHaveClass('h-14.5');
+    });
+
+    it('grows to the tablet height in mobile mode to meet the hamburger sheet', () => {
+      const { container } = render(<Header isMobile />);
+      const header = container.querySelector('header');
+      expect(header).toHaveClass('md:h-[122px]');
+    });
+
+    it('does not apply the desktop xl height in mobile mode', () => {
+      const { container } = render(<Header isMobile />);
+      const header = container.querySelector('header');
+      expect(header).not.toHaveClass('xl:h-56');
     });
 
     it('renders content layer with proper z-index', () => {
