@@ -74,11 +74,15 @@ test.describe('Admin Digital Formats Accordion', () => {
   test('create release page shows locked state until MP3 uploaded', async ({ adminPage }) => {
     await adminPage.goto('/admin/releases/new');
 
-    // CardDescription should show the locked message about uploading MP3 first
-    await expect(
-      adminPage.getByText(
-        'Upload MP3 320kbps first — the release will be created automatically from the audio metadata.'
-      )
-    ).toBeVisible();
+    // CardDescription shows the locked message about uploading MP3 first. The
+    // release form is a client component; under load its initial hydration can
+    // briefly mount a second copy of the card before settling to one. Assert
+    // the match count settles to 1 before checking visibility, so the transient
+    // duplicate can't trip a strict-mode violation (toBeVisible throws on >1).
+    const lockedMessage = adminPage.getByText(
+      'Upload MP3 320kbps first — the release will be created automatically from the audio metadata.'
+    );
+    await expect(lockedMessage).toHaveCount(1);
+    await expect(lockedMessage).toBeVisible();
   });
 });

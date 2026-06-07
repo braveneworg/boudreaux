@@ -33,7 +33,13 @@ test.describe('Admin Tour Creation', () => {
   test('should create tour with all basic fields', async ({ adminPage }) => {
     await adminPage.goto('/admin/tours/new');
 
-    await expect(adminPage.getByText('Create New Tour')).toBeVisible();
+    // The admin form is a client component; under heavy parallel load its
+    // hydration can briefly mount a second copy before settling to one. Wait
+    // for a single instance first so this check — and the fills below — can't
+    // trip a strict-mode violation on the transient duplicate.
+    const heading = adminPage.getByText('Create New Tour');
+    await expect(heading).toHaveCount(1);
+    await expect(heading).toBeVisible();
 
     const title = `E2E Create Tour - Full Fields ${Date.now()}`;
     createdTourTitles.push(title);
