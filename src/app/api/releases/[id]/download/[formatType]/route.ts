@@ -30,19 +30,22 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
 export const GET = withAuth<{ id: string; formatType: string }>(
   async (request, context, session) => {
     try {
-      // Rate limiting
+      // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
+      // matching the `withRateLimit` decorator on the sibling free-status route.
       const ip = extractClientIp(request);
-      try {
-        await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-      } catch {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'RATE_LIMITED',
-            message: 'Too many requests. Please try again later.',
-          },
-          { status: 429 }
-        );
+      if (process.env.E2E_MODE !== 'true') {
+        try {
+          await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+        } catch {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'RATE_LIMITED',
+              message: 'Too many requests. Please try again later.',
+            },
+            { status: 429 }
+          );
+        }
       }
 
       const userId = session.user.id;
