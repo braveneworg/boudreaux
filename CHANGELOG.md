@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.103.0] - 2026-06-06
+
+### Added
+
+- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n- feat: add desktop auth menu and revamp site header (#473)\n
+
 ## [4.102.0] - 2026-06-06
 
 ### Added
