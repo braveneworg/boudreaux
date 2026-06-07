@@ -5,7 +5,7 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import { Header } from './header';
+import { HeaderDesktop } from './header-desktop';
 
 // Mock next/image using <span> to avoid @next/next/no-img-element lint rule
 vi.mock('next/image', () => ({
@@ -40,11 +40,6 @@ vi.mock('./logo', () => ({
   ),
 }));
 
-// Mock HamburgerMenu component
-vi.mock('../ui/hamburger-menu', () => ({
-  HamburgerMenu: () => <div data-testid="hamburger-menu">HamburgerMenu</div>,
-}));
-
 // Mock DesktopMenu component (it depends on next-auth's useSession)
 vi.mock('../desktop-menu', () => ({
   DesktopMenu: () => <div data-testid="desktop-menu">DesktopMenu</div>,
@@ -55,41 +50,47 @@ vi.mock('../desktop-auth-menu', () => ({
   DesktopAuthMenu: () => <div data-testid="desktop-auth-menu">DesktopAuthMenu</div>,
 }));
 
-describe('Header', () => {
-  it('renders without crashing', () => {
-    render(<Header />);
-    expect(screen.getAllByTestId('logo').length).toBeGreaterThan(0);
+describe('HeaderDesktop', () => {
+  it('renders the desktop logo (isMobile=false)', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('logo')).toHaveAttribute('data-is-mobile', 'false');
   });
 
-  it('renders with sticky positioning', () => {
-    const { container } = render(<Header />);
-    const headerWrapper = container.firstChild as HTMLElement;
-    expect(headerWrapper).toHaveClass('sticky');
-    expect(headerWrapper).toHaveClass('top-0');
-    expect(headerWrapper).toHaveClass('z-40');
+  it('lazy-loads the desktop logo so its image is not fetched on phones', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('logo')).toHaveAttribute('data-priority', 'false');
   });
 
-  it('renders full-width wrapper', () => {
-    const { container } = render(<Header />);
-    const headerWrapper = container.firstChild as HTMLElement;
-    expect(headerWrapper).toHaveClass('w-full');
-    expect(headerWrapper).toHaveClass('left-0');
-    expect(headerWrapper).toHaveClass('right-0');
+  it('renders the DesktopMenu', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('desktop-menu')).toBeInTheDocument();
   });
 
-  it('centers and caps the container width at xl', () => {
-    const { container } = render(<Header />);
-    const headerWrapper = container.firstChild as HTMLElement;
-    expect(headerWrapper).toHaveClass('mx-auto', 'xl:max-w-7xl');
+  it('renders the DesktopAuthMenu', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('desktop-auth-menu')).toBeInTheDocument();
   });
 
-  it('renders the decorative backdrop layer', () => {
-    const { container } = render(<Header />);
-    expect(container.querySelector('.header-bg-pulse')).toBeInTheDocument();
+  it('renders the desktop words image at the larger width', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-width', '444');
   });
 
-  it('renders the content layer', () => {
-    const { container } = render(<Header />);
-    expect(container.querySelector('header')).toBeInTheDocument();
+  it('lazy-loads the wordmark image', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('next-image')).toHaveAttribute('data-priority', 'false');
+  });
+
+  it('uses the Fake Four Inc. words asset', () => {
+    render(<HeaderDesktop />);
+    expect(screen.getByTestId('next-image')).toHaveAttribute(
+      'data-src',
+      '/media/fake-four-inc-words-sans-hand.webp'
+    );
+  });
+
+  it('hides below xl via the contents-toggle wrapper', () => {
+    const { container } = render(<HeaderDesktop />);
+    expect(container.firstChild as HTMLElement).toHaveClass('hidden', 'xl:contents');
   });
 });

@@ -67,14 +67,18 @@ describe('DesktopAuthMenu', () => {
       expect(screen.getByRole('link', { name: 'sign in' })).toHaveClass('visited:text-zinc-50');
     });
 
-    it('applies the configured font and class name', () => {
-      const { container } = render(<DesktopAuthMenu className="absolute top-4 right-0" />);
+    it('applies the configured font and text classes', () => {
+      const { container } = render(<DesktopAuthMenu />);
       expect(container.querySelector('nav')).toHaveClass(
         'font-fake-four-cutout',
         'text-lg',
-        'text-zinc-50',
-        'absolute'
+        'text-zinc-50'
       );
+    });
+
+    it('pins itself to the upper-right of the header', () => {
+      const { container } = render(<DesktopAuthMenu />);
+      expect(container.querySelector('nav')).toHaveClass('absolute', 'top-6', 'right-10', 'z-30');
     });
 
     it('falls back to signed-out links when status is authenticated but session is missing', () => {
@@ -95,6 +99,11 @@ describe('DesktopAuthMenu', () => {
     it('renders a sign out control', () => {
       render(<DesktopAuthMenu />);
       expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
+    });
+
+    it('pins itself to the upper-right of the header', () => {
+      const { container } = render(<DesktopAuthMenu />);
+      expect(container.querySelector('nav')).toHaveClass('absolute', 'top-6', 'right-10', 'z-30');
     });
 
     it('links the username to the profile page', () => {

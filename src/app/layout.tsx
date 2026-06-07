@@ -119,7 +119,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <Header className="mx-auto xl:max-w-7xl" />
+          <Header />
           <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
             {children}
           </main>
