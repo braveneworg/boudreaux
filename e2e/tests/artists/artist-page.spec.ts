@@ -11,8 +11,13 @@ test.describe('Artist Page', () => {
       // The artist name should be visible (use .first() — text appears in breadcrumb, heading, and ticker)
       await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
 
-      // The carousel should be rendered (aria-label pattern: "Releases by <name>")
-      await expect(page.getByLabel(/releases by e2e artist/i)).toBeVisible();
+      // The carousel should be rendered (aria-label pattern: "Releases by <name>").
+      // During the SSR → client hydration handoff the region can momentarily
+      // appear twice; wait for the DOM to settle to a single carousel before the
+      // strict-mode visibility assertion so it doesn't catch the transient state.
+      const carousel = page.getByLabel(/releases by e2e artist/i);
+      await expect(carousel).toHaveCount(1, { timeout: 10_000 });
+      await expect(carousel).toBeVisible();
     });
 
     test('should display release thumbnails in the carousel', async ({ page }) => {
