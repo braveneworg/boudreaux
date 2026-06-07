@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.104.0] - 2026-06-07
+
+### Added
+
+- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n- Feature/create xl device header for desktops: fix mobile header regression (#474)\n
+
 ## [4.103.0] - 2026-06-06
 
 ### Added
