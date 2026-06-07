@@ -429,7 +429,13 @@ export function BannerCarousel({
                     src={buildBannerSrc(banner.imageFilename)}
                     alt={`Banner ${banner.slotNumber}`}
                     fill
-                    sizes="100vw"
+                    // The carousel is full-bleed below `xl` but its `<main>`
+                    // ancestor caps width at `max-w-7xl` (1280px) from the `xl`
+                    // breakpoint up, so above 1280px the banner never fills the
+                    // viewport. Match `sizes` to that layout so the browser (and
+                    // the `priority` preload) picks the 1280px variant instead
+                    // of a needlessly large full-viewport one on wide screens.
+                    sizes="(min-width: 1280px) 1280px, 100vw"
                     priority={idx === 0 && currentIndex === 0}
                     fetchPriority={isCurrentSlide ? 'high' : 'low'}
                     loading={isCurrentSlide ? 'eager' : 'lazy'}
