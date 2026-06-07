@@ -24,7 +24,7 @@ const HeaderDesktop = () => (
       height={40}
     />
     <DesktopMenu />
-    <DesktopAuthMenu className="absolute top-6 right-10 z-30" />
+    <DesktopAuthMenu />
   </div>
 );
 

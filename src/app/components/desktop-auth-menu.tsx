@@ -24,13 +24,16 @@ const SEPARATOR_CLASSNAME = 'h-4! w-0.5! bg-zinc-50';
 // wins the cascade so visited links stay white too.
 const LINK_CLASSNAME = 'text-zinc-50 visited:text-zinc-50';
 
+const NAV_CLASSNAME =
+  'absolute top-6 right-10 z-30 flex items-center gap-2 font-fake-four-cutout text-lg text-zinc-50';
+
 /**
  * Desktop-only authentication menu pinned to the upper-right of the header.
  * Signed out: `sign in | sign up`. Signed in: a sign-out control, the bold
  * `@username` (linking to the user's profile), and — for admins — an admin link,
  * separated by vertical rules.
  */
-export const DesktopAuthMenu = ({ className }: { className?: string }) => {
+export const DesktopAuthMenu = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const isAdmin = session?.user?.role === CONSTANTS.ROLES.ADMIN;
@@ -39,11 +42,6 @@ export const DesktopAuthMenu = ({ className }: { className?: string }) => {
   if (status === CONSTANTS.AUTHENTICATION.STATUS.LOADING) {
     return null;
   }
-
-  const navClassName = cn(
-    'flex items-center gap-2 font-fake-four-cutout text-lg text-zinc-50',
-    className
-  );
 
   if (status === CONSTANTS.AUTHENTICATION.STATUS.AUTHENTICATED && session) {
     const { user } = session;
@@ -55,7 +53,7 @@ export const DesktopAuthMenu = ({ className }: { className?: string }) => {
     };
 
     return (
-      <nav aria-label="Authentication" className={navClassName}>
+      <nav aria-label="Authentication" className={NAV_CLASSNAME}>
         <button
           type="button"
           onClick={handleSignOut}
@@ -81,7 +79,7 @@ export const DesktopAuthMenu = ({ className }: { className?: string }) => {
   }
 
   return (
-    <nav aria-label="Authentication" className={navClassName}>
+    <nav aria-label="Authentication" className={NAV_CLASSNAME}>
       <Link href="/signin" className={LINK_CLASSNAME}>
         sign in
       </Link>
