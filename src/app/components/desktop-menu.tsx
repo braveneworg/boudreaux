@@ -24,19 +24,69 @@ export const DesktopMenu = () => {
 
   const menuItems = useMemo(() => {
     const items = [
-      { name: 'Home', href: '/', hasBullet: true },
-      { name: 'Artists', href: '/artists', hasBullet: true },
-      { name: 'Releases', href: '/releases', hasBullet: true },
-      { name: 'Videos', href: '/videos', hasBullet: !isAuthenticated },
-      { name: 'Tours', href: '/tours', hasBullet: true },
-      { name: 'Merch', href: '/merch', hasBullet: true },
-      { name: 'Playlists', href: '/playlists', hasBullet: true },
-      { name: 'About', href: '/about', hasBullet: true },
-      { name: 'Contact Us', href: '/contact', hasBullet: false },
+      {
+        name: 'Home',
+        href: '/',
+        hasBullet: true,
+        color: 'text-menu-item-yellow-400 visited:text-menu-item-yellow-400',
+      },
+      {
+        name: 'Artists',
+        href: '/artists',
+        hasBullet: true,
+        color: 'text-menu-item-pink-300 visited:text-menu-item-pink-300',
+      },
+      {
+        name: 'Releases',
+        href: '/releases',
+        hasBullet: true,
+        color: 'text-menu-item-cyan-400 visited:text-menu-item-cyan-400',
+      },
+      {
+        name: 'Videos',
+        href: '/videos',
+        hasBullet: !isAuthenticated,
+        color: 'text-menu-item-tan-400 visited:text-menu-item-tan-400',
+      },
+      {
+        name: 'Tours',
+        href: '/tours',
+        hasBullet: true,
+        color: 'text-menu-item-tan-200 visited:text-menu-item-tan-200',
+      },
+      {
+        name: 'Merch',
+        href: '/merch',
+        hasBullet: isAuthenticated,
+        color: 'text-menu-item-yellow-300 visited:text-menu-item-yellow-300',
+      },
+      {
+        name: 'Playlists',
+        href: '/playlists',
+        hasBullet: true,
+        color: 'text-menu-item-teal-400 visited:text-menu-item-teal-400',
+      },
+      {
+        name: 'About',
+        href: '/about',
+        hasBullet: true,
+        color: 'text-menu-item-pink-400 visited:text-menu-item-pink-400',
+      },
+      {
+        name: 'Contact Us',
+        href: '/contact',
+        hasBullet: false,
+        color: 'text-menu-item-orange-300 visited:text-menu-item-orange-300',
+      },
     ];
 
     if (isAuthenticated) {
-      items.splice(3, 0, { name: 'My Collection', href: '/collection', hasBullet: true });
+      items.splice(3, 0, {
+        name: 'My Collection',
+        href: '/collection',
+        hasBullet: true,
+        color: 'text-menu-item-green-400 visited:text-menu-item-green-400',
+      });
     }
 
     return items;
@@ -44,14 +94,14 @@ export const DesktopMenu = () => {
 
   return (
     <nav>
-      <ul className="font-fake-four-cutout absolute top-32 left-1/2 flex w-220 -translate-x-1/2 transform flex-wrap justify-center gap-x-6 gap-y-4 text-2xl">
+      <ul className="font-fake-four-cutout absolute top-32 left-1/2 z-50 flex w-220 -translate-x-1/2 transform flex-wrap justify-center gap-x-6 gap-y-4 text-2xl">
         {menuItems.map((item) => (
           <Fragment key={item.name}>
             <li className="flex">
               <Link
                 href={item.href}
                 aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
-                className="text-zinc-50 underline-offset-8 visited:text-zinc-50 hover:underline aria-[current=page]:underline"
+                className={`${item.color} underline-offset-8 hover:underline aria-[current=page]:underline`}
                 prefetch={false}
               >
                 {item.name}
@@ -59,7 +109,7 @@ export const DesktopMenu = () => {
             </li>
             {item.hasBullet && (
               <li className="self-center" role="presentation" aria-hidden="true">
-                <span className="block size-2 rotate-45 bg-white" />
+                <span className="block size-2 rotate-45 bg-zinc-50" />
               </li>
             )}
           </Fragment>

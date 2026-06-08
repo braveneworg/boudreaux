@@ -62,10 +62,12 @@ describe('DesktopMenu', () => {
       expect(screen.queryByRole('link', { name: 'My Collection' })).not.toBeInTheDocument();
     });
 
-    it('keeps links white in the visited state', () => {
+    it('keeps each link its own color in the visited state', () => {
       render(<DesktopMenu />);
 
-      expect(screen.getByRole('link', { name: 'Home' })).toHaveClass('visited:text-zinc-50');
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveClass(
+        'visited:text-menu-item-yellow-400'
+      );
     });
   });
 

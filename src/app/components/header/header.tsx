@@ -81,7 +81,7 @@ const Header = ({ className = '' }: { className?: string }) => {
             <Logo isMobile={false} priority={false} />
             <Image
               alt="Fake Four Inc. Words"
-              className="absolute top-6 left-1/2 z-40 h-auto w-auto -translate-x-1/2 transform"
+              className="pointer-events-none absolute top-6 left-1/2 z-40 h-auto w-auto -translate-x-1/2 transform"
               src="/media/fake-four-inc-words-sans-hand.webp"
               width={444}
               height={40}
