@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { isDarkColor } from '@/lib/utils/color';
 
-import { BannerCarousel, type BannerSlotData } from './banner-carousel';
+import { BannerCarousel, buildBannerSrc, type BannerSlotData } from './banner-carousel';
 
 const mockIsDarkColor = vi.mocked(isDarkColor);
 
@@ -339,6 +339,48 @@ describe('BannerCarousel', () => {
       fireEvent.keyDown(carousel, { key: 'ArrowLeft' });
 
       expect(screen.getByText('Notification 3')).toBeInTheDocument();
+    });
+
+    it('ignores arrow-key navigation when there is only one banner', () => {
+      render(<BannerCarousel banners={[makeBanner(1)]} />);
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      // A single-banner carousel short-circuits both the slide animation and the
+      // auto-rotation timer, so it stays on its only slide.
+      expect(screen.getByRole('group', { name: 'Banner 1 of 1' })).toBeInTheDocument();
+    });
+
+    it('ignores keys other than the arrow keys', () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'Enter' });
+
+      expect(screen.getByText('Notification 1')).toBeInTheDocument();
+      expect(screen.queryByText('Notification 2')).not.toBeInTheDocument();
+    });
+
+    it('falls back to zero slide width when the container reports no layout size', () => {
+      const { container } = render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      // jsdom has no layout engine, so emulate a container with no measurable
+      // width to exercise the `offsetWidth ?? 0` fallback during the animation.
+      const slideContainer = container.querySelector('div[style*="padding-bottom"]');
+      Object.defineProperty(slideContainer, 'offsetWidth', {
+        configurable: true,
+        get: () => undefined,
+      });
+
+      const carousel = screen.getByRole('region', { name: 'Banner carousel' });
+      carousel.focus();
+      fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+
+      // The transition still begins (incoming slide 2's strip renders).
+      expect(screen.getByText('Notification 2')).toBeInTheDocument();
     });
   });
 
@@ -829,5 +871,26 @@ describe('BannerCarousel', () => {
       const section = container.querySelector('section');
       expect(section).toHaveClass('my-custom-class');
     });
+  });
+});
+
+describe('buildBannerSrc', () => {
+  it('returns the base CDN path when no width is given', () => {
+    const src = buildBannerSrc('banner-1.webp');
+
+    expect(src).toMatch(/\/banner-1\.webp$/);
+    expect(src).not.toContain('_w');
+  });
+
+  it('inserts the _w{width} suffix before the file extension', () => {
+    const src = buildBannerSrc('banner-1.webp', 640);
+
+    expect(src).toMatch(/\/banner-1_w640\.webp$/);
+  });
+
+  it('appends the _w{width} suffix when the filename has no extension', () => {
+    const src = buildBannerSrc('banner-1', 640);
+
+    expect(src).toMatch(/\/banner-1_w640$/);
   });
 });

@@ -103,6 +103,18 @@ describe('HamburgerMenu', () => {
     expect(screen.getByText('Open menu')).toBeInTheDocument();
   });
 
+  it('shares the full nav item set with the desktop menu', async () => {
+    const user = userEvent.setup();
+    render(<HamburgerMenu />);
+    await user.click(screen.getByRole('button'));
+
+    // Artists, Videos and Playlists used to be desktop-only — they must now
+    // appear in the mobile sheet because both pull from the same source.
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute('href', '/artists');
+    expect(screen.getByRole('link', { name: 'Videos' })).toHaveAttribute('href', '/videos');
+    expect(screen.getByRole('link', { name: 'Playlists' })).toHaveAttribute('href', '/playlists');
+  });
+
   it('shows My Collection link when user is authenticated', async () => {
     mockUseSession.mockReturnValue({
       data: { user: { id: '1', name: 'Test' } },

@@ -39,7 +39,7 @@ interface BannerCarouselProps {
 }
 
 /** Insert the `_w{width}` suffix before the file extension, matching S3 variant keys. */
-function buildBannerSrc(filename: string, width?: number): string {
+export function buildBannerSrc(filename: string, width?: number): string {
   const base = `/${BANNER_CDN_PATH}/${filename}`;
   if (!width) return base;
   const lastDot = base.lastIndexOf('.');
@@ -54,7 +54,7 @@ const EASING = 'cubic-bezier(0.42, 0, 0.58, 1)'; // ease-in-out
 
 /**
  * BannerCarousel displays rotating banner images with optional notification
- * strips. Uses CSS transitions and pointer events — zero framer-motion.
+ * strips. Uses CSS transitions and pointer events — zero JS animation libraries.
  */
 export function BannerCarousel({
   banners,
@@ -77,30 +77,49 @@ export function BannerCarousel({
   const isDraggingRef = useRef(false);
   const currentDragXRef = useRef(0);
 
-  /** Apply a CSS transition to the track and move it */
-  const animateTrack = useCallback((targetX: number, onComplete: () => void) => {
+  /** Run `fn` with the track element when it is mounted. */
+  const withTrack = useCallback((fn: (track: HTMLDivElement) => void) => {
     const track = trackRef.current;
     /* v8 ignore next -- ref is always set after mount */
-    if (!track) return;
-
-    track.style.transition = `transform ${TRANSITION_DURATION}ms ${EASING}`;
-    track.style.transform = `translateX(${targetX}px)`;
-
-    const handleEnd = () => {
-      track.removeEventListener('transitionend', handleEnd);
-      onComplete();
-    };
-    track.addEventListener('transitionend', handleEnd);
+    if (track) fn(track);
   }, []);
+
+  /** Current container width in px, falling back to `fallback` before layout. */
+  const measureWidth = useCallback(
+    /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
+    (fallback: number) => containerRef.current?.offsetWidth ?? fallback,
+    []
+  );
+
+  /** Clear the auto-rotation timer if one is running. */
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
+
+  /** Apply a CSS transition to the track and move it */
+  const animateTrack = useCallback(
+    (targetX: number, onComplete: () => void) => {
+      withTrack((track) => {
+        track.style.transition = `transform ${TRANSITION_DURATION}ms ${EASING}`;
+        track.style.transform = `translateX(${targetX}px)`;
+
+        const handleEnd = () => {
+          track.removeEventListener('transitionend', handleEnd);
+          onComplete();
+        };
+        track.addEventListener('transitionend', handleEnd);
+      });
+    },
+    [withTrack]
+  );
 
   /** Reset track position instantly (no transition) */
   const resetTrack = useCallback(() => {
-    const track = trackRef.current;
-    /* v8 ignore next -- ref is always set after mount */
-    if (!track) return;
-    track.style.transition = 'none';
-    track.style.transform = 'translateX(0px)';
-  }, []);
+    withTrack((track) => {
+      track.style.transition = 'none';
+      track.style.transform = 'translateX(0px)';
+    });
+  }, [withTrack]);
 
   /** Finish a slide transition: update index and reset track position */
   const completeTransition = useCallback(
@@ -123,11 +142,10 @@ export function BannerCarousel({
       if (isAnimatingRef.current || totalSlides <= 1) return;
       isAnimatingRef.current = true;
       setIncomingIndex(toIndex);
-      /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
-      const width = containerRef.current?.offsetWidth ?? 0;
+      const width = measureWidth(0);
       animateTrack(-dir * width, () => completeTransition(toIndex));
     },
-    [totalSlides, animateTrack, completeTransition]
+    [totalSlides, measureWidth, animateTrack, completeTransition]
   );
 
   const goToNext = useCallback(() => {
@@ -142,19 +160,17 @@ export function BannerCarousel({
 
   /** Reset and restart the auto-rotation timer */
   const resetTimer = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    clearTimer();
     if (totalSlides <= 1) return;
     timerRef.current = setInterval(goToNext, rotationInterval * 1000);
-  }, [goToNext, rotationInterval, totalSlides]);
+  }, [clearTimer, goToNext, rotationInterval, totalSlides]);
 
   // Auto-rotation timer
   useEffect(() => {
     if (totalSlides <= 1) return;
     resetTimer();
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [totalSlides, resetTimer]);
+    return () => clearTimer();
+  }, [totalSlides, resetTimer, clearTimer]);
 
   // Tab visibility handling
   useEffect(() => {
@@ -198,34 +214,32 @@ export function BannerCarousel({
       pointerStartTimeRef.current = Date.now();
       currentDragXRef.current = 0;
 
-      const track = trackRef.current;
-      /* v8 ignore next -- ref is always set after mount */
-      if (track) {
+      withTrack((track) => {
         track.style.transition = 'none';
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      }
+      });
     },
-    [totalSlides]
+    [totalSlides, withTrack]
   );
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDraggingRef.current) return;
-    const deltaX = e.clientX - pointerStartXRef.current;
-    // Apply elastic resistance (10% of drag distance beyond edge)
-    /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
-    const width = containerRef.current?.offsetWidth ?? 1;
-    const elasticDelta =
-      Math.abs(deltaX) > width * 0.5
-        ? Math.sign(deltaX) * (width * 0.5 + (Math.abs(deltaX) - width * 0.5) * 0.1)
-        : deltaX;
-    currentDragXRef.current = elasticDelta;
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const deltaX = e.clientX - pointerStartXRef.current;
+      // Apply elastic resistance (10% of drag distance beyond edge)
+      const width = measureWidth(1);
+      const elasticDelta =
+        Math.abs(deltaX) > width * 0.5
+          ? Math.sign(deltaX) * (width * 0.5 + (Math.abs(deltaX) - width * 0.5) * 0.1)
+          : deltaX;
+      currentDragXRef.current = elasticDelta;
 
-    const track = trackRef.current;
-    /* v8 ignore next -- ref is always set after mount */
-    if (track) {
-      track.style.transform = `translateX(${elasticDelta}px)`;
-    }
-  }, []);
+      withTrack((track) => {
+        track.style.transform = `translateX(${elasticDelta}px)`;
+      });
+    },
+    [measureWidth, withTrack]
+  );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
@@ -238,8 +252,7 @@ export function BannerCarousel({
       const deltaX = currentDragXRef.current;
       const elapsed = Date.now() - pointerStartTimeRef.current;
       const velocity = elapsed > 0 ? (deltaX / elapsed) * 1000 : 0;
-      /* v8 ignore next -- jsdom has no layout engine; offsetWidth is always 0 */
-      const width = containerRef.current?.offsetWidth ?? 0;
+      const width = measureWidth(0);
 
       if (deltaX < -SWIPE_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
         isAnimatingRef.current = true;
@@ -259,7 +272,7 @@ export function BannerCarousel({
       }
       resetTimer();
     },
-    [totalSlides, animateTrack, completeTransition, resetTimer]
+    [totalSlides, measureWidth, animateTrack, completeTransition, resetTimer]
   );
 
   /** Navigate to a specific dot — animate if adjacent, instant jump otherwise */

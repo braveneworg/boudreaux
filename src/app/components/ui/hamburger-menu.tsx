@@ -3,37 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useMemo, useState } from 'react';
-
-import { useSession } from 'next-auth/react';
+import { useState } from 'react';
 
 import { Button } from '@/app/components/ui/button';
 import { HamburgerMenuSheet } from '@/app/components/ui/hamburger-menu-sheet';
 import { HamburgerPatty } from '@/app/components/ui/hamburger-patty';
+import { useNavMenuItems } from '@/hooks/use-nav-menu-items';
 
 import { SheetTrigger } from './sheet';
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
-  const { status } = useSession();
-  const isAuthenticated = status === 'authenticated';
-
-  const menuItems = useMemo(() => {
-    const items = [
-      { name: 'Home', href: '/' },
-      { name: 'Releases', href: '/releases' },
-      { name: 'Tours', href: '/tours' },
-      { name: 'Merch', href: '/merch' },
-      { name: 'About', href: '/about' },
-      { name: 'Contact Us', href: '/contact' },
-    ];
-
-    if (isAuthenticated) {
-      items.splice(3, 0, { name: 'My Collection', href: '/collection' });
-    }
-
-    return items;
-  }, [isAuthenticated]);
+  const menuItems = useNavMenuItems();
 
   return (
     <div className="pointer-events-none flex items-center justify-end">

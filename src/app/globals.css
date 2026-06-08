@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -234,6 +238,11 @@
   }
 }
 
+/* Particle-texture backdrop behind the mobile nav sheet. */
+@utility mobile-nav-backdrop {
+  background-image: url('/media/particles-6.svg');
+}
+
 /* Banner notification strip slide animations — keyframes are referenced from
    inline styles with dynamic durations, so they must stay outside @theme. */
 @keyframes banner-strip-slide-right {
@@ -273,7 +282,7 @@
   }
 }
 
-/* Header animations — replace framer-motion for GPU-compositable perf.
+/* Header animations — CSS keyframes for GPU-compositable perf.
    Sparkle/extinguish durations and delays are set per-element via inline
    style in header.tsx, so the animation shorthand here omits duration. */
 
@@ -333,5 +342,24 @@
   100% {
     opacity: 0;
     transform: scale(0) translateY(-10px);
+  }
+}
+
+/* Mobile nav sheet — each link fades in while sliding 20px from the right to
+   its resting position. The per-item `animation-delay` is set inline
+   (index * 0.1s) to stagger the reveal; the `both` fill keeps each item hidden
+   during its delay and settled after. */
+@utility menu-item-stagger {
+  animation: menu-item-stagger 0.3s ease both;
+}
+
+@keyframes menu-item-stagger {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

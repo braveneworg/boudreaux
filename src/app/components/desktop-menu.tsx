@@ -2,95 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
-import { Fragment, useMemo } from 'react';
+import { Fragment } from 'react';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { useSession } from 'next-auth/react';
-
-/**
- * Whether `href` represents the page the user is currently on. The root path
- * matches exactly; every other path also matches its sub-routes (e.g.
- * `/releases` stays active on `/releases/123`).
- */
-const isActiveHref = (href: string, pathname: string): boolean =>
-  href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+import { useNavMenuItems } from '@/hooks/use-nav-menu-items';
+import { isActiveHref } from '@/lib/utils/is-active-href';
 
 export const DesktopMenu = () => {
-  const { status } = useSession();
   const pathname = usePathname();
-  const isAuthenticated = status === 'authenticated';
-
-  const menuItems = useMemo(() => {
-    const items = [
-      {
-        name: 'Home',
-        href: '/',
-        hasBullet: true,
-        color: 'text-menu-item-yellow-400 visited:text-menu-item-yellow-400',
-      },
-      {
-        name: 'Artists',
-        href: '/artists',
-        hasBullet: true,
-        color: 'text-menu-item-pink-300 visited:text-menu-item-pink-300',
-      },
-      {
-        name: 'Releases',
-        href: '/releases',
-        hasBullet: true,
-        color: 'text-menu-item-cyan-400 visited:text-menu-item-cyan-400',
-      },
-      {
-        name: 'Videos',
-        href: '/videos',
-        hasBullet: !isAuthenticated,
-        color: 'text-menu-item-tan-400 visited:text-menu-item-tan-400',
-      },
-      {
-        name: 'Tours',
-        href: '/tours',
-        hasBullet: true,
-        color: 'text-menu-item-tan-200 visited:text-menu-item-tan-200',
-      },
-      {
-        name: 'Merch',
-        href: '/merch',
-        hasBullet: isAuthenticated,
-        color: 'text-menu-item-yellow-300 visited:text-menu-item-yellow-300',
-      },
-      {
-        name: 'Playlists',
-        href: '/playlists',
-        hasBullet: true,
-        color: 'text-menu-item-teal-400 visited:text-menu-item-teal-400',
-      },
-      {
-        name: 'About',
-        href: '/about',
-        hasBullet: true,
-        color: 'text-menu-item-pink-400 visited:text-menu-item-pink-400',
-      },
-      {
-        name: 'Contact Us',
-        href: '/contact',
-        hasBullet: false,
-        color: 'text-menu-item-orange-300 visited:text-menu-item-orange-300',
-      },
-    ];
-
-    if (isAuthenticated) {
-      items.splice(3, 0, {
-        name: 'My Collection',
-        href: '/collection',
-        hasBullet: true,
-        color: 'text-menu-item-green-400 visited:text-menu-item-green-400',
-      });
-    }
-
-    return items;
-  }, [isAuthenticated]);
+  const menuItems = useNavMenuItems();
 
   return (
     <nav>
