@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.107.0] - 2026-06-08
+
+### Added
+
+- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n- Update nav menus: shared source of truth, colors, slide-in animation, and a11y skip link (#477)\n
+
 ## [4.106.0] - 2026-06-07
 
 ### Added
