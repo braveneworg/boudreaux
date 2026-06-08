@@ -11,6 +11,7 @@ import { Header } from './components/header/header';
 import { Providers } from './components/providers';
 import { IosInstallPrompt } from './components/pwa/ios-install-prompt';
 import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
+import { MAIN_CONTENT_ID, SkipNavLink } from './components/skip-nav-link';
 
 import type { Metadata, Viewport } from 'next';
 
@@ -106,11 +107,6 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
-        {/* The home page LCP banner is preloaded via an HTTP Link: response
-            header (see next.config.ts). Other routes don't render that image,
-            so emitting a global preload here would trigger the browser's
-            "preloaded but not used" warning. Next.js's <Image priority>
-            auto-preload covers the home banner during SSR. */}
         {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>
@@ -119,8 +115,13 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
+          <SkipNavLink />
           <Header />
-          <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="mx-auto flex w-full grow flex-col overflow-x-clip outline-none xl:max-w-7xl"
+          >
             {children}
           </main>
           <Footer />

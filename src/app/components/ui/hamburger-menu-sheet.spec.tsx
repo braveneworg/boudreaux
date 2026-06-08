@@ -186,6 +186,53 @@ describe('HamburgerMenuSheet', () => {
     expect(homeLink).toHaveClass('text-xl');
   });
 
+  it('applies a per-item color when provided', () => {
+    render(
+      <HamburgerMenuSheet
+        isOpen
+        onOpenChange={mockOnOpenChange}
+        menuItems={[{ name: 'Tours', href: '/tours', color: 'text-menu-item-tan-200' }]}
+      >
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    const link = screen.getByRole('link', { name: 'Tours' });
+    expect(link).toHaveClass('text-menu-item-tan-200');
+    expect(link).not.toHaveClass('text-zinc-50');
+  });
+
+  it('marks the active link with aria-current=page', () => {
+    // The global next/navigation mock resolves usePathname() to '/'.
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('does not mark inactive links with aria-current', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('link', { name: 'About' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('underlines the active link', () => {
+    render(
+      <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
+        <button>Open</button>
+      </HamburgerMenuSheet>
+    );
+
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveClass('aria-[current=page]:underline');
+  });
+
   it('calls onOpenChange(false) when auth toolbar onNavigate is triggered', async () => {
     const user = userEvent.setup();
     render(
@@ -199,15 +246,19 @@ describe('HamburgerMenuSheet', () => {
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('menu links have tabIndex 0 for keyboard accessibility', () => {
+  it('renders menu items as keyboard-focusable anchors with an href', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
 
+    // An anchor with an href is inherently focusable — no explicit tabIndex
+    // needed — so assert the element is a real link rather than a manual override.
     const homeLink = screen.getByRole('link', { name: 'Home' });
-    expect(homeLink).toHaveAttribute('tabindex', '0');
+    expect(homeLink.tagName).toBe('A');
+    expect(homeLink).toHaveAttribute('href', '/');
+    expect(homeLink).not.toHaveAttribute('tabindex');
   });
 
   it('renders the sr-only sheet description', () => {
@@ -245,20 +296,17 @@ describe('HamburgerMenuSheet', () => {
     });
   });
 
-  it('reveals menu items with opacity/transform when isOpen is true', () => {
+  it('starts the first menu item with no animation delay', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
       </HamburgerMenuSheet>
     );
 
-    const items = screen.getAllByRole('listitem');
-    items.forEach((item) => {
-      expect(item).toHaveStyle({ opacity: '1', transform: 'translateX(0)' });
-    });
+    expect(screen.getAllByRole('listitem')[0]).toHaveStyle({ animationDelay: '0s' });
   });
 
-  it('staggers menu item transition delays based on item index', () => {
+  it('staggers each subsequent menu item by index via animation delay', () => {
     render(
       <HamburgerMenuSheet isOpen onOpenChange={mockOnOpenChange} menuItems={defaultMenuItems}>
         <button>Open</button>
@@ -266,15 +314,8 @@ describe('HamburgerMenuSheet', () => {
     );
 
     const items = screen.getAllByRole('listitem');
-    expect(items[0]).toHaveStyle({
-      transition: 'opacity 0.3s ease 0s, transform 0.3s ease 0s',
-    });
-    expect(items[1]).toHaveStyle({
-      transition: 'opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s',
-    });
-    expect(items[2]).toHaveStyle({
-      transition: 'opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s',
-    });
+    expect(items[1]).toHaveStyle({ animationDelay: '0.1s' });
+    expect(items[2]).toHaveStyle({ animationDelay: '0.2s' });
   });
 
   it('applies focus-visible styling to menu links', () => {

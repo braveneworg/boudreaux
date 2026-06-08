@@ -137,13 +137,26 @@ if (typeof window !== 'undefined') {
     })),
   });
 
-  // Suppress jsdom "Not implemented: navigation (except hash changes)" errors.
-  // jsdom cannot handle window.location.href assignments; these fire console.error
-  // messages that cause the test runner to exit with code 1 in CI.
+  // Suppress noisy jsdom "Not implemented" jsdomErrors for APIs jsdom lacks but
+  // that unit tests don't meaningfully exercise:
+  //   - navigation: window.location.href assignments / anchor target="_blank".
+  //   - HTMLFormElement.prototype.requestSubmit: fired when a submit <button>
+  //     inside a <form> is clicked. jsdom routes this through its internal impl
+  //     (_doRequestSubmit), which throws and bypasses the prototype polyfill below.
+  // These spam stderr and can fail CI with a non-zero exit; every other message
+  // still surfaces. jsdom emits them via both console.error and the virtualConsole
+  // (process.stderr), so guard both channels with one shared matcher.
+  const SUPPRESSED_JSDOM_ERRORS = [
+    'Not implemented: navigation',
+    'Not implemented: HTMLFormElement.prototype.requestSubmit',
+  ];
+  const isSuppressedJsdomError = (text: string): boolean =>
+    SUPPRESSED_JSDOM_ERRORS.some((needle) => text.includes(needle));
+
   const originalConsoleError = console.error;
   console.error = (...args: unknown[]) => {
     const message = typeof args[0] === 'string' ? args[0] : String(args[0]);
-    if (message.includes('Not implemented: navigation (except hash changes)')) {
+    if (isSuppressedJsdomError(message)) {
       return;
     }
     originalConsoleError.call(console, ...args);
@@ -152,14 +165,13 @@ if (typeof window !== 'undefined') {
   // Mock window.open to prevent jsdom navigation errors from anchor clicks with target="_blank"
   window.open = vi.fn();
 
-  // Suppress jsdom "Not implemented: navigation" errors by intercepting the
-  // virtualConsole jsdomError event. jsdom fires these via _virtualConsole.emit("jsdomError"),
-  // which bypasses console.error interception since the listener was bound before our override.
-  // Instead, we suppress via process.stderr.write for these specific messages.
+  // jsdom fires the errors above via _virtualConsole.emit("jsdomError"), which
+  // bypasses the console.error override (its listener was bound before ours).
+  // Catch that channel by filtering process.stderr.write for the same messages.
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
   process.stderr.write = ((...args: Parameters<typeof process.stderr.write>) => {
     const chunk = args[0];
-    if (typeof chunk === 'string' && chunk.includes('Not implemented: navigation')) {
+    if (typeof chunk === 'string' && isSuppressedJsdomError(chunk)) {
       return true;
     }
     return originalStderrWrite(...args);
