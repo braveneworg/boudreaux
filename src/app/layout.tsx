@@ -107,11 +107,6 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
-        {/* The home page LCP banner is preloaded via an HTTP Link: response
-            header (see next.config.ts). Other routes don't render that image,
-            so emitting a global preload here would trigger the browser's
-            "preloaded but not used" warning. Next.js's <Image priority>
-            auto-preload covers the home banner during SSR. */}
         {/* Keep a lightweight global DNS prefetch for Stripe; add a route-level preconnect where Stripe is actually loaded if needed. */}
         <link rel="dns-prefetch" href="https://js.stripe.com" />
       </head>
@@ -121,7 +116,7 @@ export default function RootLayout({
       >
         <Providers>
           <SkipNavLink />
-          <Header className="mx-auto xl:max-w-7xl" />
+          <Header />
           <main
             id={MAIN_CONTENT_ID}
             tabIndex={-1}
