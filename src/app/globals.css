@@ -206,13 +206,13 @@
     line-height: 1.375rem;
   }
   a {
-    color: var(--color-blue-700);
+    color: var(--color-zinc-950);
     text-underline-offset: 0.25rem;
     &:hover {
       text-decoration-line: underline;
     }
     &:visited {
-      color: var(--color-rebecca-purple);
+      color: var(--color-zinc-950);
     }
   }
 }
@@ -228,11 +228,9 @@
 }
 
 @utility banner-strip-light {
-  & a {
-    color: var(--color-blue-700);
-  }
+  & a,
   & a:visited {
-    color: var(--color-rebecca-purple);
+    color: var(--color-zinc-950);
   }
 }
 
