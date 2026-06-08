@@ -11,6 +11,7 @@ import { Header } from './components/header/header';
 import { Providers } from './components/providers';
 import { IosInstallPrompt } from './components/pwa/ios-install-prompt';
 import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
+import { MAIN_CONTENT_ID, SkipNavLink } from './components/skip-nav-link';
 
 import type { Metadata, Viewport } from 'next';
 
@@ -119,8 +120,13 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
+          <SkipNavLink />
           <Header className="mx-auto xl:max-w-7xl" />
-          <main className="mx-auto flex w-full grow flex-col overflow-x-clip xl:max-w-7xl">
+          <main
+            id={MAIN_CONTENT_ID}
+            tabIndex={-1}
+            className="mx-auto flex w-full grow flex-col overflow-x-clip outline-none xl:max-w-7xl"
+          >
             {children}
           </main>
           <Footer />
