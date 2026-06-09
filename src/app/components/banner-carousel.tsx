@@ -35,7 +35,6 @@ export interface BannerSlotData {
 interface BannerCarouselProps {
   banners: BannerSlotData[];
   rotationInterval?: number;
-  className?: string;
 }
 
 /** Insert the `_w{width}` suffix before the file extension, matching S3 variant keys. */
@@ -59,7 +58,6 @@ const EASING = 'cubic-bezier(0.42, 0, 0.58, 1)'; // ease-in-out
 export function BannerCarousel({
   banners,
   rotationInterval = DEFAULT_ROTATION_INTERVAL,
-  className,
 }: BannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTabVisible, setIsTabVisible] = useState(true);
@@ -301,7 +299,7 @@ export function BannerCarousel({
   if (banners.length === 0) {
     // Reserve the same vertical space as a loaded carousel to prevent CLS
     return (
-      <section className={cn('relative w-full', className)} aria-hidden="true">
+      <section className="relative w-full md:hidden" aria-hidden="true">
         {/* Notification strip placeholder */}
         <div className="w-full" style={{ minHeight: '2.5rem' }} />
         {/* Banner aspect-ratio placeholder */}
@@ -323,7 +321,7 @@ export function BannerCarousel({
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- Carousel widget requires keyboard interaction per WAI-ARIA carousel pattern */
   return (
     <section
-      className={cn('relative w-full overflow-hidden', className)}
+      className="relative w-full overflow-hidden md:hidden"
       aria-label="Banner carousel"
       aria-roledescription="carousel"
       onKeyDown={handleKeyDown}

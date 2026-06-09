@@ -10,6 +10,7 @@ import { useBannersQuery } from '@/app/hooks/use-banners-query';
 
 import { ArtistSearchInput } from './artist-search-input';
 import { BannerCarousel } from './banner-carousel';
+import { BannerStrip } from './banner-strip';
 import { ContentContainer } from './ui/content-container';
 import { ImageHeading } from './ui/image-heading';
 
@@ -30,38 +31,28 @@ const FeaturedArtistsPlayer = nextDynamic(
  * Uses TanStack Query to fetch banners and featured artists (hydrated from SSR prefetch).
  */
 export const HomeContent = () => {
-  const { data: bannersData } = useBannersQuery();
   const { data: artistsData } = useActiveFeaturedArtistsQuery();
+  const { data: bannersData } = useBannersQuery();
 
-  const banners: BannerSlotData[] = bannersData?.banners
-    ? bannersData.banners.map((b: Record<string, unknown>) => ({
-        slotNumber: b.slotNumber as number,
-        imageFilename: b.imageFilename as string,
-        notification: b.notification
-          ? {
-              id: (b.notification as Record<string, unknown>).id as string,
-              content: (b.notification as Record<string, unknown>).content as string,
-              textColor: (b.notification as Record<string, unknown>).textColor as string | null,
-              backgroundColor: (b.notification as Record<string, unknown>).backgroundColor as
-                | string
-                | null,
-            }
-          : null,
-      }))
-    : [];
-
-  const rotationInterval = bannersData?.rotationInterval as number | undefined;
+  // The query is typed as BannersApiResponse, whose BannerSlotResponse rows
+  // are a structural superset of BannerSlotData (they also carry
+  // displayFrom/displayUntil, which the carousel ignores), so they pass
+  // straight through without a field-by-field remap.
+  const banners: BannerSlotData[] = bannersData?.banners ?? [];
+  const rotationInterval = bannersData?.rotationInterval;
   const featuredArtists = artistsData?.featuredArtists ?? [];
 
   return (
     <>
-      {/* Always render BannerCarousel — when empty it renders a placeholder
-          section to reserve space, and keeping a single code path avoids a
-          conditional mount that could shift layout during hydration. */}
+      {/* Both banner treatments render at every breakpoint and CSS picks the
+          visible one — so each is correct from first paint with no JS-driven
+          swap (which would flash + shift layout during hydration). Carousel
+          below md (<768px); stitched strip at md and up. */}
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
+      <BannerStrip banners={banners} />
       <ContentContainer>
-        <ArtistSearchInput />
         <section>
+          <ArtistSearchInput />
           <ImageHeading
             src="/media/headings/FEATURED.webp"
             alt="featured artists"
