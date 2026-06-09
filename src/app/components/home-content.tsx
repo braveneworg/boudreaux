@@ -49,7 +49,7 @@ export const HomeContent = () => {
           swap (which would flash + shift layout during hydration). Carousel
           below md (<768px); stitched strip at md and up. */}
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
-      <BannerStrip banners={banners} />
+      <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
         <section>
           <ArtistSearchInput />

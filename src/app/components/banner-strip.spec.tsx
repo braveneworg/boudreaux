@@ -17,6 +17,24 @@ vi.mock('next/image', () => ({
   ),
 }));
 
+// The rotating ticker has its own spec; stub it so these tests stay focused on
+// the stitched image band and can assert the props it receives.
+vi.mock('./banner-notification-ticker', () => ({
+  BannerNotificationTicker: ({
+    banners,
+    rotationInterval,
+  }: {
+    banners: BannerSlotData[];
+    rotationInterval?: number;
+  }) => (
+    <div
+      data-testid="banner-notification-ticker"
+      data-count={banners.length}
+      data-interval={String(rotationInterval)}
+    />
+  ),
+}));
+
 function makeBanner(slot: number): BannerSlotData {
   return { slotNumber: slot, imageFilename: `banner-${slot}.jpg`, notification: null };
 }
@@ -24,6 +42,14 @@ function makeBanner(slot: number): BannerSlotData {
 const THREE_BANNERS: BannerSlotData[] = [makeBanner(1), makeBanner(2), makeBanner(3)];
 
 describe('BannerStrip', () => {
+  it('renders the desktop notification ticker, forwarding the banners and interval', () => {
+    render(<BannerStrip banners={THREE_BANNERS} rotationInterval={8} />);
+
+    const ticker = screen.getByTestId('banner-notification-ticker');
+    expect(ticker).toHaveAttribute('data-count', '3');
+    expect(ticker).toHaveAttribute('data-interval', '8');
+  });
+
   it('renders one image per banner', () => {
     render(<BannerStrip banners={THREE_BANNERS} />);
 

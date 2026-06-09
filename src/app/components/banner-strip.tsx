@@ -4,6 +4,7 @@
 import Image from 'next/image';
 
 import { buildBannerSrc, type BannerSlotData } from './banner-carousel';
+import { BannerNotificationTicker } from './banner-notification-ticker';
 
 /**
  * Native aspect ratio of every banner source asset (1920×1097). Applied to
@@ -15,6 +16,8 @@ const BANNER_CELL_ASPECT = 'aspect-[1920/1097]';
 
 interface BannerStripProps {
   banners: BannerSlotData[];
+  /** Seconds each desktop notification shows before rotating. Threaded to the ticker. */
+  rotationInterval?: number;
 }
 
 /**
@@ -28,7 +31,7 @@ interface BannerStripProps {
  * from an SSR prefetch, so an empty strip is the no-banners case rather than a
  * transient loading state).
  */
-export const BannerStrip = ({ banners }: BannerStripProps) => {
+export const BannerStrip = ({ banners, rotationInterval }: BannerStripProps) => {
   if (banners.length === 0) return null;
 
   // Each cell occupies an equal 1/N slice of the strip. The strip is capped at
@@ -46,6 +49,9 @@ export const BannerStrip = ({ banners }: BannerStripProps) => {
       data-testid="banner-strip"
       className="mx-auto hidden w-full max-w-7xl md:block"
     >
+      {/* Desktop notifications sit above the stitched image band, rotating on
+          their own timer since the desktop banners don't slide. */}
+      <BannerNotificationTicker banners={banners} rotationInterval={rotationInterval} />
       <div className="flex w-full">
         {banners.map((banner, index) => (
           <div key={banner.slotNumber} className={`relative flex-1 ${BANNER_CELL_ASPECT}`}>
