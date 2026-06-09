@@ -70,6 +70,14 @@ describe('DesktopMenu', () => {
       );
     });
 
+    it('fades the text and underline color in and out on hover', () => {
+      render(<DesktopMenu />);
+
+      const home = screen.getByRole('link', { name: 'Home' });
+      expect(home).toHaveClass('transition-colors');
+      expect(home).toHaveClass('duration-200');
+    });
+
     it('renders links white by default with color scoped to interactive states', () => {
       render(<DesktopMenu />);
 
