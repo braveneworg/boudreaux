@@ -4,6 +4,13 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Notification Banner Carousel', () => {
+  // The rotating carousel is the mobile banner treatment: it's hidden from the
+  // `md` breakpoint (768px) up, where the stitched desktop BannerStrip takes
+  // over. Playwright's default 1280px viewport would therefore render the strip
+  // (and hide the carousel), so pin a narrow viewport for this whole suite to
+  // exercise the carousel. Gating is pure CSS, so the width alone is enough.
+  test.use({ viewport: { width: 390, height: 844 } });
+
   test('should display the notification banner carousel on home page', async ({ page }) => {
     await page.goto('/');
 
