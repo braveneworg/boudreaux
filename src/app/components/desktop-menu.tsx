@@ -23,7 +23,7 @@ export const DesktopMenu = () => {
               <Link
                 href={item.href}
                 aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
-                className={`${item.color} underline-offset-8 hover:underline aria-[current=page]:underline`}
+                className={`text-zinc-50 ${item.color} underline-offset-8 hover:underline aria-[current=page]:underline`}
                 prefetch={false}
               >
                 {item.name}

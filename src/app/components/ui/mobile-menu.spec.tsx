@@ -65,6 +65,22 @@ describe('MobileMenu', () => {
     expect(screen.getByRole('link', { name: 'About' })).toHaveClass('text-zinc-50');
   });
 
+  it('keeps the white base under a state-scoped color so it shows when idle', () => {
+    const scopedItems = [
+      {
+        name: 'Home',
+        href: '/',
+        color:
+          'aria-[current=page]:text-menu-item-yellow-400 hover:text-menu-item-yellow-400 hover:decoration-menu-item-yellow-400',
+      },
+    ];
+    render(<MobileMenu menuItems={scopedItems} onNavigate={vi.fn()} />);
+
+    const link = screen.getByRole('link', { name: 'Home' });
+    expect(link).toHaveClass('text-zinc-50');
+    expect(link).toHaveClass('hover:text-menu-item-yellow-400');
+  });
+
   it('marks the active link with aria-current=page', () => {
     render(<MobileMenu menuItems={menuItems} onNavigate={vi.fn()} />);
 

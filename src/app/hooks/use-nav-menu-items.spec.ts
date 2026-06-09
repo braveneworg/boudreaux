@@ -54,11 +54,41 @@ describe('useNavMenuItems', () => {
       expect(merch?.hasBullet).toBe(false);
     });
 
-    it('pairs each item color with a matching visited variant', () => {
+    it('scopes the Home color to the active and hover states with a matching hover underline', () => {
       const { result } = renderHook(() => useNavMenuItems());
 
       const home = result.current.find((item) => item.name === 'Home');
-      expect(home?.color).toBe('text-menu-item-yellow-400 visited:text-menu-item-yellow-400');
+      expect(home?.color).toBe(
+        'aria-[current=page]:text-menu-item-yellow-400 hover:text-menu-item-yellow-400 hover:decoration-menu-item-yellow-400'
+      );
+    });
+
+    it('leaves no item with a base (always-on) text-color utility', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const baseTextColors = result.current.filter((item) =>
+        item.color.split(' ').some((cls) => /^text-/.test(cls))
+      );
+      expect(baseTextColors).toEqual([]);
+    });
+
+    it('no longer pairs any item with a visited variant', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const withVisited = result.current.filter((item) => item.color.includes('visited:'));
+      expect(withVisited).toEqual([]);
+    });
+
+    it('gives every item active and hover text colors plus a hover underline color', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const fullyVariant = result.current.every(
+        (item) =>
+          item.color.includes('aria-[current=page]:text-') &&
+          item.color.includes('hover:text-') &&
+          item.color.includes('hover:decoration-')
+      );
+      expect(fullyVariant).toBe(true);
     });
   });
 
@@ -81,6 +111,15 @@ describe('useNavMenuItems', () => {
       const merch = result.current.find((item) => item.name === 'Merch');
       expect(videos?.hasBullet).toBe(false);
       expect(merch?.hasBullet).toBe(true);
+    });
+
+    it('scopes the My Collection color to the active and hover states with matching underline colors', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const collection = result.current.find((item) => item.name === 'My Collection');
+      expect(collection?.color).toBe(
+        'aria-[current=page]:text-menu-item-green-400 aria-[current=page]:decoration-menu-item-green-400 hover:text-menu-item-green-400 hover:decoration-menu-item-green-400'
+      );
     });
   });
 });
