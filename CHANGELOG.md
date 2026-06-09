@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [4.108.0] - 2026-06-09
+
+### Added
+
+- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n- feat: scope nav menu colors to hover/active states with a fade transition (#478)\n
+
 ## [4.107.0] - 2026-06-08
 
 ### Added
