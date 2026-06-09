@@ -62,12 +62,29 @@ describe('DesktopMenu', () => {
       expect(screen.queryByRole('link', { name: 'My Collection' })).not.toBeInTheDocument();
     });
 
-    it('keeps each link its own color in the visited state', () => {
+    it('colors each link underline on hover to match its own hue', () => {
       render(<DesktopMenu />);
 
       expect(screen.getByRole('link', { name: 'Home' })).toHaveClass(
-        'visited:text-menu-item-yellow-400'
+        'hover:decoration-menu-item-yellow-400'
       );
+    });
+
+    it('fades the text and underline color in and out on hover', () => {
+      render(<DesktopMenu />);
+
+      const home = screen.getByRole('link', { name: 'Home' });
+      expect(home).toHaveClass('transition-colors');
+      expect(home).toHaveClass('duration-200');
+    });
+
+    it('renders links white by default with color scoped to interactive states', () => {
+      render(<DesktopMenu />);
+
+      const home = screen.getByRole('link', { name: 'Home' });
+      expect(home).toHaveClass('text-zinc-50');
+      expect(home).toHaveClass('hover:text-menu-item-yellow-400');
+      expect(home).toHaveClass('aria-[current=page]:text-menu-item-yellow-400');
     });
   });
 

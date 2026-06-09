@@ -16,9 +16,10 @@ export interface MenuItem {
   name: string;
   href: string;
   /**
-   * Tailwind text-color utilities (including the `visited:` variant) shared
-   * with the desktop menu. Optional so the menu can be rendered with bare
-   * items; it falls back to white when omitted.
+   * Tailwind utilities that color the link on its active and `hover:` states
+   * (text plus the matching underline color), shared with the desktop menu.
+   * Optional so the menu can be rendered with bare items; the link stays white
+   * when omitted.
    */
   color?: string;
 }
@@ -53,8 +54,8 @@ export function MobileMenu({ menuItems, onNavigate }: MobileMenuProps) {
               href={item.href}
               aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
               className={cn(
-                'mt-4 block text-xl tracking-wider underline-offset-8 transition-all duration-300 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
-                item.color ?? 'text-zinc-50'
+                'mt-4 block text-xl tracking-wider text-zinc-50 underline-offset-8 text-shadow-sm focus:outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
+                item.color
               )}
               onClick={onNavigate}
               prefetch={false}

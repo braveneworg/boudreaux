@@ -16,9 +16,10 @@ export interface NavMenuItem {
    */
   hasBullet: boolean;
   /**
-   * Tailwind text-color utilities (including the `visited:` variant) used by
-   * the desktop menu. The mobile sheet renders its own monochrome styling and
-   * ignores this.
+   * Tailwind utilities that color the link on the active (`aria-[current=page]:`)
+   * and `hover:` states — both the text and the matching underline
+   * (`decoration-*`) color. There is no base color, so the link stays white
+   * until interacted with. Shared by the desktop and mobile menus.
    */
   color: string;
 }
@@ -41,55 +42,64 @@ export function useNavMenuItems(): NavMenuItem[] {
         name: 'Home',
         href: '/',
         hasBullet: true,
-        color: 'text-menu-item-yellow-400 visited:text-menu-item-yellow-400',
+        color:
+          'aria-[current=page]:text-menu-item-yellow-400 hover:text-menu-item-yellow-400 hover:decoration-menu-item-yellow-400',
       },
       {
         name: 'Artists',
         href: '/artists',
         hasBullet: true,
-        color: 'text-menu-item-pink-300 visited:text-menu-item-pink-300',
+        color:
+          'aria-[current=page]:text-menu-item-pink-300 aria-[current=page]:decoration-menu-item-pink-300 hover:text-menu-item-pink-300 hover:decoration-menu-item-pink-300',
       },
       {
         name: 'Releases',
         href: '/releases',
         hasBullet: true,
-        color: 'text-menu-item-cyan-400 visited:text-menu-item-cyan-400',
+        color:
+          'aria-[current=page]:text-menu-item-cyan-400 aria-[current=page]:decoration-menu-item-cyan-400 hover:text-menu-item-cyan-400 hover:decoration-menu-item-cyan-400',
       },
       {
         name: 'Videos',
         href: '/videos',
         hasBullet: !isAuthenticated,
-        color: 'text-menu-item-tan-400 visited:text-menu-item-tan-400',
+        color:
+          'aria-[current=page]:text-menu-item-tan-400 aria-[current=page]:decoration-menu-item-tan-400 hover:text-menu-item-tan-400 hover:decoration-menu-item-tan-400',
       },
       {
         name: 'Tours',
         href: '/tours',
         hasBullet: true,
-        color: 'text-menu-item-tan-200 visited:text-menu-item-tan-200',
+        color:
+          'aria-[current=page]:text-menu-item-tan-200 aria-[current=page]:decoration-menu-item-tan-200 hover:text-menu-item-tan-200 hover:decoration-menu-item-tan-200',
       },
       {
         name: 'Merch',
         href: '/merch',
         hasBullet: isAuthenticated,
-        color: 'text-menu-item-yellow-300 visited:text-menu-item-yellow-300',
+        color:
+          'aria-[current=page]:text-menu-item-yellow-300 aria-[current=page]:decoration-menu-item-yellow-300 hover:text-menu-item-yellow-300 hover:decoration-menu-item-yellow-300',
       },
       {
         name: 'Playlists',
         href: '/playlists',
         hasBullet: true,
-        color: 'text-menu-item-teal-400 visited:text-menu-item-teal-400',
+        color:
+          'aria-[current=page]:text-menu-item-teal-400 aria-[current=page]:decoration-menu-item-teal-400 hover:text-menu-item-teal-400 hover:decoration-menu-item-teal-400',
       },
       {
         name: 'About',
         href: '/about',
         hasBullet: true,
-        color: 'text-menu-item-pink-400 visited:text-menu-item-pink-400',
+        color:
+          'aria-[current=page]:text-menu-item-pink-400 aria-[current=page]:decoration-menu-item-pink-400 hover:text-menu-item-pink-400 hover:decoration-menu-item-pink-400',
       },
       {
         name: 'Contact Us',
         href: '/contact',
         hasBullet: false,
-        color: 'text-menu-item-orange-300 visited:text-menu-item-orange-300',
+        color:
+          'aria-[current=page]:text-menu-item-orange-300 aria-[current=page]:decoration-menu-item-orange-300 hover:text-menu-item-orange-300 hover:decoration-menu-item-orange-300',
       },
     ];
 
@@ -98,7 +108,8 @@ export function useNavMenuItems(): NavMenuItem[] {
         name: 'My Collection',
         href: '/collection',
         hasBullet: true,
-        color: 'text-menu-item-green-400 visited:text-menu-item-green-400',
+        color:
+          'aria-[current=page]:text-menu-item-green-400 aria-[current=page]:decoration-menu-item-green-400 hover:text-menu-item-green-400 hover:decoration-menu-item-green-400',
       });
     }
 
