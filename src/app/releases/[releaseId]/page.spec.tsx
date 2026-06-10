@@ -20,7 +20,14 @@ const mockPrefetchQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
-      await Promise.resolve(opts.queryFn());
+      // Real prefetchQuery swallows queryFn errors; mirror that so failure
+      // branches in the page's queryFns can be exercised without crashing
+      // the render.
+      try {
+        await Promise.resolve(opts.queryFn());
+      } catch {
+        // ignored — matches TanStack prefetchQuery semantics
+      }
     }
   });
 const mockSetQueryData = vi.fn();
@@ -48,9 +55,11 @@ vi.mock('@/lib/utils/get-internal-api-url', () => ({
 }));
 
 const mockGetReleaseWithTracks = vi.fn();
+const mockGetArtistOtherReleases = vi.fn();
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
     getReleaseWithTracks: (...args: unknown[]) => mockGetReleaseWithTracks(...args),
+    getArtistOtherReleases: (...args: unknown[]) => mockGetArtistOtherReleases(...args),
   },
 }));
 
@@ -101,6 +110,8 @@ describe('ReleasePlayerPage', () => {
       success: true,
       data: mockReleaseData,
     });
+    mockGetArtistOtherReleases.mockResolvedValue({ success: true, data: [] });
+    mockGetQueryData.mockReturnValue(undefined);
   });
 
   it('should render page structure', async () => {
@@ -194,6 +205,53 @@ describe('ReleasePlayerPage', () => {
         queryKey: ['releases', 'related', 'release-1', ''],
       })
     );
+  });
+
+  it('prefetches related releases via the service when a primary artist is present', async () => {
+    // Page derives primaryArtistId from the release cache, then prefetches
+    // related releases by calling the service directly (no self-HTTP).
+    mockGetQueryData.mockReturnValue({
+      artistReleases: [{ artist: { id: 'artist-9' } }],
+    });
+    mockGetArtistOtherReleases.mockResolvedValue({
+      success: true,
+      data: [{ id: 'release-2', title: 'Other Album' }],
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    expect(mockGetArtistOtherReleases).toHaveBeenCalledWith('artist-9', 'release-1');
+    expect(mockPrefetchQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['releases', 'related', 'release-1', 'artist-9'],
+      })
+    );
+  });
+
+  it('surfaces a related-releases service failure as a queryFn rejection', async () => {
+    mockGetQueryData.mockReturnValue({
+      artistReleases: [{ artist: { id: 'artist-9' } }],
+    });
+    mockGetArtistOtherReleases.mockResolvedValue({
+      success: false,
+      error: 'Database unavailable',
+    });
+
+    const Page = await ReleasePlayerPage({
+      params: defaultParams,
+      searchParams: defaultSearchParams,
+    });
+    render(Page);
+
+    const calls = mockPrefetchQuery.mock.calls as Array<
+      [{ queryKey: unknown[]; queryFn: () => Promise<unknown> }]
+    >;
+    const relatedCall = calls.find(([opts]) => opts.queryKey[1] === 'related');
+    await expect(relatedCall?.[0].queryFn()).rejects.toThrow('Database unavailable');
   });
 
   it('should render ReleaseDetailContent with releaseId and autoPlay=false', async () => {

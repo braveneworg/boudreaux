@@ -29,8 +29,11 @@ vi.mock('@/lib/utils/get-query-client', () => ({
   }),
 }));
 
-vi.mock('@/lib/utils/fetch-api', () => ({
-  fetchApi: vi.fn(),
+const mockFindAll = vi.fn().mockResolvedValue([]);
+vi.mock('@/lib/repositories/tours/tour-repository', () => ({
+  TourRepository: {
+    findAll: (...args: unknown[]) => mockFindAll(...args),
+  },
 }));
 
 // Mock child component
@@ -59,6 +62,21 @@ describe('ToursPage', () => {
         queryKey: ['tours', 'list'],
       })
     );
+  });
+
+  it('prefetches via the repository (no self-HTTP) returning the route shape', async () => {
+    mockFindAll.mockResolvedValue([{ id: 'tour-1', title: 'E2E Tour' }]);
+
+    const Page = await ToursPage();
+    render(Page);
+
+    expect(mockFindAll).toHaveBeenCalledWith({ limit: 100 });
+
+    const [opts] = mockPrefetchQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({
+      tours: [{ id: 'tour-1', title: 'E2E Tour' }],
+      count: 1,
+    });
   });
 
   it('should render ToursContent within HydrationBoundary', async () => {

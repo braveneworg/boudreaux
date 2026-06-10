@@ -28,9 +28,18 @@ test.describe('Signout Flow', () => {
     // that fires after signOut() resolves.
     await expect(signOutButton).toBeHidden({ timeout: 10_000 });
 
-    // After signout, should redirect and show sign in/up links in the hamburger menu
-    await userPage.getByRole('button', { name: /open menu/i }).click();
-    await expect(userPage.getByRole('link', { name: /sign in/i })).toBeVisible({ timeout: 10_000 });
+    // After signout, the router.push() re-render can land AFTER the next
+    // menu click, silently closing the freshly-opened sheet (the click is
+    // not retried by the assertion below it). Retry the whole open+assert
+    // compound so a sheet lost to the remount just gets reopened.
+    await expect(async () => {
+      // Close any half-open sheet from a previous attempt before clicking.
+      await userPage.keyboard.press('Escape');
+      await userPage.getByRole('button', { name: /open menu/i }).click({ timeout: 2_000 });
+      await expect(userPage.getByRole('link', { name: /sign in/i })).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 15_000 });
   });
 
   test('should show authenticated toolbar for logged in user', async ({ userPage }) => {

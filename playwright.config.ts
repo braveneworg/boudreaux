@@ -74,7 +74,9 @@ export default defineConfig({
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,
       SKIP_ENV_VALIDATION: 'true',
-      NEXT_PUBLIC_BANNER_INTERVAL: '1000', // 1 second for faster E2E tests
+      // The carousel rotation speed is NOT env-driven — it comes from the
+      // SiteSettings row seeded in e2e/helpers/seed-test-db.ts (pinned to
+      // the 3s service minimum for fast, non-flaky rotation tests).
     },
   },
 });

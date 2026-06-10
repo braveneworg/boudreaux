@@ -35,12 +35,14 @@ test.describe('Notification Banner Carousel', () => {
 
     const tabs = page.getByRole('tab');
 
-    // Click the second dot
-    await tabs.nth(1).click();
-
-    // Second dot should now be selected
-    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
-    await expect(tabs.first()).toHaveAttribute('aria-selected', 'false');
+    // Clicking a dot resets the rotation timer; retry the click+assert as a
+    // unit so a background auto-advance (the carousel never pauses) can't
+    // flip the selection out from under the assertion.
+    await expect(async () => {
+      await tabs.nth(1).click();
+      await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 1500 });
+      await expect(tabs.first()).toHaveAttribute('aria-selected', 'false', { timeout: 1500 });
+    }).toPass({ timeout: 10_000 });
   });
 
   test('should support keyboard navigation with arrow keys', async ({ page }) => {
@@ -48,21 +50,26 @@ test.describe('Notification Banner Carousel', () => {
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
+    const count = await tabs.count();
 
-    // Focus the carousel — this pauses auto-cycling via onFocus
-    await carousel.focus();
+    const getSelectedIndex = () =>
+      tabs.evaluateAll((tabList) =>
+        tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+      );
 
-    // Determine which tab is currently selected after focus stabilises
-    const selectedBefore = await tabs.evaluateAll((tabList) =>
-      tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
-    );
-
-    // Press right arrow to advance one slide
-    await carousel.press('ArrowRight');
-
-    // The next dot (wrapping around) should now be selected
-    const expectedIndex = (selectedBefore + 1) % (await tabs.count());
-    await expect(tabs.nth(expectedIndex)).toHaveAttribute('aria-selected', 'true');
+    // The carousel auto-rotates continuously (there is no hover/focus pause),
+    // so capture-then-press can race a background advance. ArrowRight both
+    // advances one slide AND resets the rotation timer, so retry the whole
+    // capture+press+assert as a unit: any iteration the timer pre-empts just
+    // re-runs against a fresh baseline.
+    await expect(async () => {
+      const before = await getSelectedIndex();
+      await carousel.press('ArrowRight');
+      const expectedIndex = (before + 1) % count;
+      await expect(tabs.nth(expectedIndex)).toHaveAttribute('aria-selected', 'true', {
+        timeout: 1500,
+      });
+    }).toPass({ timeout: 10_000 });
   });
 
   test('should auto-cycle to next banner after interval', async ({ page }) => {
@@ -72,44 +79,56 @@ test.describe('Notification Banner Carousel', () => {
     const tabs = page.getByRole('tab');
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
 
-    // Wait for auto-cycle with assertion timeout
-    // Default rotation interval is 6.5s + 1.5s buffer = 8s timeout
+    // Wait for auto-cycle with assertion timeout. The seed pins the
+    // rotation interval to 3s (seed-test-db.ts), so 8s covers the first
+    // rotation with generous margin even on a loaded CI shard.
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true', { timeout: 8000 });
   });
 
-  test('should pause auto-cycling on hover', async ({ page }) => {
+  // NOTE: there is intentionally NO "pause auto-cycling on hover" test.
+  // BannerCarousel does not pause rotation on hover or focus (only
+  // totalSlides <= 1 stops the timer; isTabVisible merely dims the strip).
+  // The former test polled a 2s window inside the 6.5s interval, so it could
+  // never observe an advance and passed vacuously regardless of behavior.
+  // Pinning the seed interval to 3s surfaced that it asserted a non-feature,
+  // so it was removed rather than re-anchored to behavior that does not exist.
+
+  test('renders sanitized banner HTML with hardened link attributes', async ({ page }) => {
+    // Slot 4 is seeded with allowed markup (<strong>, <a>) PLUS a raw
+    // <script> and a javascript: link written directly to the DB. This
+    // asserts the read-boundary sanitizer + addLinkAttributes end-to-end:
+    // allowed content renders, hostile content never reaches the DOM.
     await page.goto('/');
 
-    const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
+    const strip = page.locator('.banner-strip-slide', { hasText: 'E2E Linked Banner' });
 
-    // Wait for initial state to be stable
-    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    // The carousel rotates continuously, so the slot-4 strip is only the
+    // active one transiently. Re-click the dot and assert as one retried
+    // unit (clicking resets the rotation timer, giving a fresh interval for
+    // the assertions); if a background advance pre-empts us, toPass re-clicks.
+    await expect(async () => {
+      await tabs.nth(3).click();
+      await expect(strip).toBeVisible({ timeout: 1500 });
 
-    // Hover over the carousel to pause auto-cycling BEFORE capturing the index
-    // to avoid a race where auto-cycle fires between capture and hover
-    await carousel.hover();
+      // Allowed markup survives.
+      await expect(strip.locator('strong')).toHaveText('bold', { timeout: 1500 });
+      const promoLink = strip.getByRole('link', { name: 'Promo link' });
+      await expect(promoLink).toHaveAttribute('href', 'https://example.com/promo');
+      await expect(promoLink).toHaveAttribute('target', '_blank');
+      await expect(promoLink).toHaveAttribute('rel', 'noopener noreferrer');
 
-    // Capture which tab is selected after hovering (paused state)
-    const getSelectedIndex = async () => {
-      return await tabs.evaluateAll((tabList) => {
-        return tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
-      });
-    };
+      // Hostile markup is stripped: no script element, no javascript: URL.
+      await expect(strip.locator('script')).toHaveCount(0);
+      const stripHtml = await strip.innerHTML();
+      expect(stripHtml).not.toContain('javascript:');
+    }).toPass({ timeout: 15_000 });
 
-    const selectedTab = await getSelectedIndex();
-
-    // Poll for 2 seconds (2x the interval) to ensure the selection doesn't change
-    // If auto-cycling were still active, it would have changed after 1 second
-    const pollDuration = 2000;
-    const pollInterval = 200;
-    const iterations = pollDuration / pollInterval;
-
-    for (let i = 0; i < iterations; i++) {
-      await page.waitForTimeout(pollInterval);
-      const currentSelected = await getSelectedIndex();
-      expect(currentSelected).toBe(selectedTab);
-    }
+    // The seeded <script> payload never executed (global, slide-independent).
+    const pwned = await page.evaluate(
+      () => (globalThis as unknown as Record<string, unknown>).__e2eBannerPwned
+    );
+    expect(pwned).toBeUndefined();
   });
 
   test('should wrap around when navigating past the last banner', async ({ page }) => {
@@ -119,22 +138,25 @@ test.describe('Notification Banner Carousel', () => {
     const tabs = page.getByRole('tab');
     const totalTabs = await tabs.count();
 
-    // Focus pauses auto-cycling; capture the current index
-    await carousel.focus();
-
     const getSelectedIndex = async () =>
       tabs.evaluateAll((tabList) =>
         tabList.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
       );
 
-    const startIndex = await getSelectedIndex();
-
-    // Press ArrowRight (totalTabs) times to cycle through all and wrap back to start
-    for (let i = 0; i < totalTabs; i++) {
-      await carousel.press('ArrowRight');
-    }
-
-    // Should be back at the starting index after a full cycle
-    await expect(tabs.nth(startIndex)).toHaveAttribute('aria-selected', 'true');
+    // Each ArrowRight resets the rotation timer, so a tight press loop never
+    // races a background advance; the only exposure is a stray auto-advance
+    // between capturing the start index and the first press. Wrap the whole
+    // capture+cycle+assert so that rare interleaving just retries.
+    await carousel.focus();
+    await expect(async () => {
+      const startIndex = await getSelectedIndex();
+      // Press ArrowRight totalTabs times to cycle through all and wrap back.
+      for (let i = 0; i < totalTabs; i++) {
+        await carousel.press('ArrowRight');
+      }
+      await expect(tabs.nth(startIndex)).toHaveAttribute('aria-selected', 'true', {
+        timeout: 1500,
+      });
+    }).toPass({ timeout: 12_000 });
   });
 });
