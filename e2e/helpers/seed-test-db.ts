@@ -410,10 +410,21 @@ async function seedTestDatabase() {
     });
 
     await Promise.all([
+      // Slot 1 is the carousel's INITIAL (server-rendered) active strip, so it
+      // carries the markup the sanitization chain must handle: an allowed
+      // <strong> + <a>, plus a raw <script> and a javascript: link written
+      // straight to the DB (bypassing the admin write action). The e2e test
+      // asserts this strip WITHOUT navigating the carousel — placing it on
+      // slot 1 means the read-boundary sanitizer's output is in the SSR HTML
+      // and visible on load, independent of client hydration/rotation timing.
       prisma.bannerNotification.create({
         data: {
           slotNumber: 1,
-          content: 'E2E Test Banner One — First test notification',
+          content:
+            'E2E Linked Banner <strong>bold</strong> ' +
+            '<a href="https://example.com/promo">Promo link</a>' +
+            '<script>window.__e2eBannerPwned = true</script>' +
+            '<a href="javascript:window.__e2eBannerPwned2=true">evil</a>',
           textColor: '#ffffff',
           backgroundColor: '#16213e',
           displayFrom: now,
@@ -438,26 +449,6 @@ async function seedTestDatabase() {
           content: 'E2E Test Banner Three — Third test notification',
           textColor: '#ffffff',
           backgroundColor: '#e94560',
-          displayFrom: now,
-          displayUntil: thirtyDaysLater,
-          addedBy: { connect: { id: adminUser.id } },
-        },
-      }),
-      // Slot 4 carries markup the sanitization chain must handle: an allowed
-      // <strong> + <a>, plus a raw <script> and a javascript: link written
-      // straight to the DB (bypassing the admin write action) so the e2e
-      // test proves the READ-boundary sanitizer strips hostile content
-      // before it ever reaches dangerouslySetInnerHTML.
-      prisma.bannerNotification.create({
-        data: {
-          slotNumber: 4,
-          content:
-            'E2E Linked Banner <strong>bold</strong> ' +
-            '<a href="https://example.com/promo">Promo link</a>' +
-            '<script>window.__e2eBannerPwned = true</script>' +
-            '<a href="javascript:window.__e2eBannerPwned2=true">evil</a>',
-          textColor: '#ffffff',
-          backgroundColor: '#16213e',
           displayFrom: now,
           displayUntil: thirtyDaysLater,
           addedBy: { connect: { id: adminUser.id } },

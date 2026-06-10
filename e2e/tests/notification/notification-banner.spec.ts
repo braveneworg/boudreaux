@@ -3,6 +3,20 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { test, expect } from '@playwright/test';
 
+import type { Page } from '@playwright/test';
+
+/**
+ * Navigate to the home page and wait for the carousel to settle to a single
+ * instance. The home page transiently double-renders during React hydration
+ * (the SSR HTML ships exactly one carousel; the client briefly mounts a second
+ * before reconciling). Without this, carousel/tab/slide locators intermittently
+ * hit strict-mode violations ("resolved to 2 elements").
+ */
+const gotoHome = async (page: Page): Promise<void> => {
+  await page.goto('/');
+  await expect(page.locator('[aria-roledescription="carousel"]')).toHaveCount(1);
+};
+
 test.describe('Notification Banner Carousel', () => {
   // The rotating carousel is the mobile banner treatment: it's hidden from the
   // `md` breakpoint (768px) up, where the stitched desktop BannerStrip takes
@@ -12,7 +26,7 @@ test.describe('Notification Banner Carousel', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('should display the notification banner carousel on home page', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
     await expect(carousel).toBeVisible();
@@ -23,7 +37,7 @@ test.describe('Notification Banner Carousel', () => {
   });
 
   test('should display navigation dots for multiple banners', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     const tablist = page.getByRole('tablist', { name: 'Banner slides' });
     await expect(tablist).toBeVisible();
@@ -38,7 +52,7 @@ test.describe('Notification Banner Carousel', () => {
   });
 
   test('should navigate to a specific banner when clicking a dot', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     const tabs = page.getByRole('tab');
 
@@ -53,7 +67,7 @@ test.describe('Notification Banner Carousel', () => {
   });
 
   test('should support keyboard navigation with arrow keys', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
@@ -80,7 +94,7 @@ test.describe('Notification Banner Carousel', () => {
   });
 
   test('should auto-cycle to next banner after interval', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     // Verify first dot is selected
     const tabs = page.getByRole('tab');
@@ -101,22 +115,33 @@ test.describe('Notification Banner Carousel', () => {
   // so it was removed rather than re-anchored to behavior that does not exist.
 
   test('renders sanitized banner HTML with hardened link attributes', async ({ page }) => {
-    // Slot 4 is seeded with allowed markup (<strong>, <a>) PLUS a raw
-    // <script> and a javascript: link written directly to the DB. This
-    // asserts the read-boundary sanitizer + addLinkAttributes end-to-end:
+    // Slot 1 (the carousel's INITIAL, server-rendered strip) is seeded with
+    // allowed markup (<strong>, <a>) PLUS a raw <script> and a javascript:
+    // link written directly to the DB. Asserting slot 1 means we never depend
+    // on client-side carousel navigation or hydration timing — the
+    // read-boundary sanitizer's output is already in the SSR HTML on load.
+    // This proves the read-boundary sanitizer + addLinkAttributes end-to-end:
     // allowed content renders, hostile content never reaches the DOM.
-    await page.goto('/');
+    await gotoHome(page);
 
+    // Scope to the mobile carousel: the desktop BannerStrip ticker shares the
+    // `.banner-strip-slide` class and rotates independently, so an unscoped
+    // locator can match two elements (strict-mode breakage) when both happen
+    // to show this notification.
+    const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
-    const strip = page.locator('.banner-strip-slide', { hasText: 'E2E Linked Banner' });
+    const strip = carousel.locator('.banner-strip-slide', { hasText: 'E2E Linked Banner' });
 
-    // The carousel rotates continuously, so the slot-4 strip is only the
-    // active one transiently. Re-click the dot and assert as one retried
-    // unit (clicking resets the rotation timer, giving a fresh interval for
-    // the assertions); if a background advance pre-empts us, toPass re-clicks.
+    // Slot 1 is active on first paint. The carousel auto-rotates once
+    // hydrated, so if it has advanced, click dot 1 to return — but before
+    // hydration the SSR strip is already slot 1, so this passes without
+    // needing an interactive click. toPass re-runs if a rotation pre-empts an
+    // assertion mid-flight.
     await expect(async () => {
-      await tabs.nth(3).click();
-      await expect(strip).toBeVisible({ timeout: 1500 });
+      if (!(await strip.isVisible())) {
+        await tabs.nth(0).click();
+        await expect(strip).toBeVisible({ timeout: 1500 });
+      }
 
       // Allowed markup survives.
       await expect(strip.locator('strong')).toHaveText('bold', { timeout: 1500 });
@@ -139,7 +164,7 @@ test.describe('Notification Banner Carousel', () => {
   });
 
   test('should wrap around when navigating past the last banner', async ({ page }) => {
-    await page.goto('/');
+    await gotoHome(page);
 
     const carousel = page.locator('[aria-roledescription="carousel"]');
     const tabs = page.getByRole('tab');
