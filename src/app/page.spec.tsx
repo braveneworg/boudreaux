@@ -25,7 +25,13 @@ const mockPrefetchQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
-      await Promise.resolve(opts.queryFn());
+      // Real prefetchQuery swallows queryFn errors; mirror that so failure
+      // branches in the page's queryFns can be exercised.
+      try {
+        await Promise.resolve(opts.queryFn());
+      } catch {
+        // ignored — matches TanStack prefetchQuery semantics
+      }
     }
   });
 const mockDehydratedState = { queries: [], mutations: [] };
@@ -43,8 +49,26 @@ vi.mock('@/lib/utils/get-query-client', () => ({
   }),
 }));
 
-vi.mock('@/lib/utils/fetch-api', () => ({
-  fetchApi: vi.fn(),
+// The page prefetches by calling the services directly (no self-HTTP), so the
+// service layer is mocked at the boundary. The prefetchQuery mock above
+// executes each queryFn, exercising the success path of both arrows.
+const mockGetFeaturedArtists = vi.fn();
+const mockGetActiveBanners = vi.fn();
+
+vi.mock('@/lib/services/featured-artists-service', () => ({
+  FeaturedArtistsService: {
+    getFeaturedArtists: (...args: unknown[]) => mockGetFeaturedArtists(...args),
+  },
+}));
+
+vi.mock('@/lib/services/banner-notification-service', () => ({
+  BannerNotificationService: {
+    getActiveBanners: () => mockGetActiveBanners(),
+  },
+}));
+
+vi.mock('@/lib/utils/attach-stream-urls', () => ({
+  attachStreamUrls: <T,>(payload: T): T => payload,
 }));
 
 // Mock child components
@@ -61,6 +85,11 @@ vi.mock('./components/home-content', () => ({
 describe('Home Page', () => {
   beforeEach(() => {
     mockGetQueryData.mockReturnValue(undefined);
+    mockGetFeaturedArtists.mockResolvedValue({ success: true, data: [] });
+    mockGetActiveBanners.mockResolvedValue({
+      success: true,
+      data: { banners: [], rotationInterval: 5000 },
+    });
   });
 
   afterEach(() => {
@@ -95,6 +124,47 @@ describe('Home Page', () => {
         queryKey: ['banners', 'active'],
       })
     );
+  });
+
+  it('prefetches via direct service calls with the route response shapes', async () => {
+    mockGetFeaturedArtists.mockResolvedValue({
+      success: true,
+      data: [{ id: 'featured-1' }],
+    });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    expect(mockGetFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 7);
+    expect(mockGetActiveBanners).toHaveBeenCalledTimes(1);
+
+    const calls = mockPrefetchQuery.mock.calls as Array<
+      [{ queryKey: string[]; queryFn: () => Promise<unknown> }]
+    >;
+
+    const featuredCall = calls.find(([opts]) => opts.queryKey[0] === 'featuredArtists');
+    await expect(featuredCall?.[0].queryFn()).resolves.toEqual({
+      featuredArtists: [{ id: 'featured-1' }],
+      count: 1,
+    });
+
+    const bannersCall = calls.find(([opts]) => opts.queryKey[0] === 'banners');
+    await expect(bannersCall?.[0].queryFn()).resolves.toEqual({
+      banners: [],
+      rotationInterval: 5000,
+    });
+  });
+
+  it('surfaces service failures as queryFn rejections so the client refetches', async () => {
+    mockGetFeaturedArtists.mockResolvedValue({ success: false, error: 'Database unavailable' });
+    mockGetActiveBanners.mockResolvedValue({ success: false, error: 'Database unavailable' });
+
+    const HomeComponent = await Home();
+    render(HomeComponent);
+
+    const calls = mockPrefetchQuery.mock.calls as Array<[{ queryFn: () => Promise<unknown> }]>;
+    await expect(calls[0]?.[0].queryFn()).rejects.toThrow('Database unavailable');
+    await expect(calls[1]?.[0].queryFn()).rejects.toThrow('Database unavailable');
   });
 
   it('should render HomeContent within HydrationBoundary', async () => {

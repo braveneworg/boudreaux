@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -189,6 +189,25 @@ export function BannerCarousel({
   const activeNotification = isTransitioning ? incomingNotification : outgoingNotification;
   const stripVisible = activeNotification !== null && isTabVisible;
 
+  // Sanitize each notification once per banners payload rather than on every
+  // rotation tick — the regex chain is pure string work on unchanging input.
+  // (Content is already sanitized server-side at the read boundary; this
+  // client pass stays as defense-in-depth.)
+  const sanitizedHtmlByIndex = useMemo(
+    () =>
+      banners.map((banner) =>
+        banner.notification
+          ? addLinkAttributes(sanitizeNotificationHtml(banner.notification.content))
+          : null
+      ),
+    [banners]
+  );
+  const outgoingHtml = sanitizedHtmlByIndex[currentIndex] ?? null;
+  const activeHtml =
+    isTransitioning && incomingIndex !== null
+      ? (sanitizedHtmlByIndex[incomingIndex] ?? null)
+      : outgoingHtml;
+
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -354,7 +373,7 @@ export function BannerCarousel({
               animation: `banner-strip-exit-right ${TRANSITION_DURATION}ms ${EASING} forwards`,
             }}
             dangerouslySetInnerHTML={{
-              __html: addLinkAttributes(sanitizeNotificationHtml(outgoingNotification.content)),
+              __html: outgoingHtml ?? '',
             }}
           />
         )}
@@ -378,7 +397,7 @@ export function BannerCarousel({
                 : {}),
             }}
             dangerouslySetInnerHTML={{
-              __html: addLinkAttributes(sanitizeNotificationHtml(activeNotification.content)),
+              __html: activeHtml ?? '',
             }}
           />
         )}

@@ -10,17 +10,13 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
-
-/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
-function serializeForResponse<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
-}
 
 /**
  * GET /api/featured-artists

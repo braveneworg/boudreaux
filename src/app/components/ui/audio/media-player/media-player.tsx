@@ -31,12 +31,24 @@ import {
 import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import type { ArtistNameFields } from '@/lib/utils/get-artist-display-name';
 import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
 import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { cn } from '@/lib/utils/tailwind-utils';
 
 import { LazyControls } from './lazy-controls';
+
+/**
+ * The release/artist pair consumed by CoverArtView, InfoTickerTape, and
+ * TrackListDrawer. Only the fields these widgets actually read are required,
+ * so callers can pass projected payloads (e.g. `PublishedReleaseDetail`)
+ * as well as the full `Release`/`Artist` types.
+ */
+interface ArtistReleasePair {
+  release: Pick<Release, 'title' | 'coverArt' | 'digitalFormats'>;
+  artist: ArtistNameFields;
+}
 
 /**
  * A carousel component that displays a grid of artist images.
@@ -277,7 +289,7 @@ const CoverArtView = ({
   width = 380,
   height = 380,
 }: {
-  artistRelease: { release: Release; artist: Artist };
+  artistRelease: ArtistReleasePair;
   width?: number;
   height?: number;
 }) => {
@@ -492,7 +504,7 @@ const InteractiveCoverArt = ({
  * Props for InfoTickerTape when using artistRelease format
  */
 interface InfoTickerTapeArtistReleaseProps {
-  artistRelease: { release: Release; artist: Artist };
+  artistRelease: ArtistReleasePair;
   trackName: string;
   featuredArtist?: never;
   isPlaying?: boolean;
@@ -632,7 +644,7 @@ const TrackListDrawer = ({
   onTrackSelect,
 }: {
   artistName: string;
-  artistRelease: { release: Release; artist: Artist };
+  artistRelease: ArtistReleasePair;
   currentTrackId?: string;
   onTrackSelect?: (trackId: string) => void;
 }) => {

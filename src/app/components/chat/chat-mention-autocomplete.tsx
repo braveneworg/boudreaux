@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 
 import { Loader2 } from 'lucide-react';
 
+import { useDebounce } from '@/hooks/use-debounce';
 import { useMentionSearchQuery, type MentionMatch } from '@/hooks/use-mention-search-query';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +36,10 @@ export const ChatMentionAutocomplete = ({
   onSelect,
   onMatchesChange,
 }: ChatMentionAutocompleteProps) => {
-  const { data: matches, isFetching } = useMentionSearchQuery(query, true);
+  // Debounce the prefix so typing `@username` fires one request per pause,
+  // not one per keystroke (matching the other search inputs in the app).
+  const debouncedQuery = useDebounce(query, 200);
+  const { data: matches, isFetching } = useMentionSearchQuery(debouncedQuery, true);
 
   useEffect(() => {
     onMatchesChange(matches ?? []);

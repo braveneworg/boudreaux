@@ -26,21 +26,15 @@ interface ReleaseCoverArtSource {
   title: string;
   coverArt: string;
   images: Array<{
-    id: string;
     src: string | null;
     altText: string | null;
-    sortOrder: number;
   }>;
 }
 
 /** Minimal release shape for Bandcamp URL extraction */
 interface ReleaseBandcampSource {
   releaseUrls: Array<{
-    id: string;
-    releaseId: string;
-    urlId: string;
     url: {
-      id: string;
       platform: string;
       url: string;
     };

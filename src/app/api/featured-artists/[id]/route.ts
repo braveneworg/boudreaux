@@ -8,16 +8,12 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
+import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { updateFeaturedArtistSchema } from '@/lib/validation/update-schemas';
 
 import type { Prisma } from '@prisma/client';
-
-/** Convert BigInt values to Number so NextResponse.json() can serialize them. */
-function serializeForResponse<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
-}
 
 /**
  * GET /api/featured-artists/[id]

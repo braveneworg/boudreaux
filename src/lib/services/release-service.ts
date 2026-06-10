@@ -6,6 +6,10 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import {
+  publishedReleaseDetailInclude,
+  publishedReleaseListingSelect,
+} from '@/lib/types/media-models';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
@@ -454,27 +458,12 @@ export class ReleaseService {
           },
           orderBy: { releasedOn: 'desc' },
           take: 200,
-          include: {
-            images: {
-              orderBy: { sortOrder: 'asc' },
-              take: 1,
-            },
-            artistReleases: {
-              include: {
-                artist: true,
-              },
-            },
-            releaseUrls: {
-              include: {
-                url: true,
-              },
-            },
-          },
+          select: publishedReleaseListingSelect,
         });
 
         return {
           success: true,
-          data: releases as unknown as PublishedReleaseListing[],
+          data: releases,
         };
       } catch (error) {
         if (error instanceof Prisma.PrismaClientInitializationError) {
@@ -507,46 +496,14 @@ export class ReleaseService {
           publishedAt: { not: null },
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
-        include: {
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-          artistReleases: {
-            include: {
-              artist: {
-                include: {
-                  images: true,
-                  labels: true,
-                  releases: {
-                    include: {
-                      release: true,
-                    },
-                  },
-                  urls: true,
-                },
-              },
-            },
-          },
-          digitalFormats: {
-            include: {
-              files: {
-                orderBy: { trackNumber: 'asc' },
-              },
-            },
-          },
-          releaseUrls: {
-            include: {
-              url: true,
-            },
-          },
-        },
+        include: publishedReleaseDetailInclude,
       });
 
       if (!release) {
         return { success: false, error: 'Release not found' };
       }
 
-      return { success: true, data: release as unknown as PublishedReleaseDetail };
+      return { success: true, data: release };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientInitializationError) {
         console.error('Database connection failed:', error);

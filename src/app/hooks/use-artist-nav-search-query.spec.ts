@@ -10,6 +10,7 @@ import { useArtistNavSearchQuery } from './use-artist-nav-search-query';
 const mockUseQuery = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-query', () => ({
+  keepPreviousData: Symbol('keepPreviousData'),
   useQuery: (options: unknown) => mockUseQuery(options),
 }));
 
